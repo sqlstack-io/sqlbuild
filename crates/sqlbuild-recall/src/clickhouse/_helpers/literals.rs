@@ -1,6 +1,7 @@
 //! ClickHouse literals and key expressions for the store's own queries.
 
 use crate::clickhouse::constants::TIMESTAMP_PATTERN;
+use crate::records::_helpers::rows;
 use crate::records::main::format_timestamp::format_timestamp;
 use crate::records::main::parse_timestamp::parse_timestamp;
 use crate::records::main::timestamp_micros::timestamp_micros;
@@ -62,10 +63,6 @@ pub(crate) fn key_text(value: Option<&RecallValue>, column_type: ColumnType) -> 
         Some(RecallValue::Text(text)) if column_type == ColumnType::Timestamp => {
             parse_timestamp(text).map_or_else(|| text.clone(), format_timestamp)
         }
-        Some(RecallValue::Text(text)) => text.clone(),
-        Some(RecallValue::Integer(number)) => number.to_string(),
-        Some(RecallValue::Real(number)) => number.to_string(),
-        Some(RecallValue::Blob(_)) => "<blob>".to_owned(),
-        Some(RecallValue::Null) | None => String::new(),
+        _ => rows::key_text(value),
     }
 }

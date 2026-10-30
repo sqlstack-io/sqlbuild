@@ -2,6 +2,18 @@
 
 use std::path::PathBuf;
 
+use crate::argv::models::Namespace;
+
+/// Parsing can finish an invocation before package discovery or any Python handoff.
+#[derive(Debug)]
+pub(crate) enum NativeParse {
+    Exit(i32),
+    Invocation {
+        namespace: Namespace,
+        use_color: bool,
+    },
+}
+
 /// What `sqb skills` installs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SkillsOptions {

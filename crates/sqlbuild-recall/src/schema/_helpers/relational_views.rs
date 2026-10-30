@@ -1,4 +1,4 @@
-//! The bodies of the supported views in SQLite.
+//! Shared relational view definitions, with explicit dialect expressions for binary transcripts.
 
 use crate::schema::constants::OUTPUT_TAIL_RECORDS;
 
@@ -212,18 +212,29 @@ SELECT
     END AS complete
 FROM counted";
 
-const OUTPUT_TRANSCRIPTS: &str = "SELECT
-    invocation_id,
-    MIN(invocation_started_at) AS invocation_started_at,
-    CAST(COALESCE(
-        group_concat(CASE WHEN stream = 'stdout' THEN data END, x'' ORDER BY sequence), x''
-    ) AS BLOB) AS stdout,
-    CAST(COALESCE(
-        group_concat(CASE WHEN stream = 'stderr' THEN data END, x'' ORDER BY sequence), x''
-    ) AS BLOB) AS stderr,
-    CAST(COALESCE(group_concat(data, x'' ORDER BY sequence), x'') AS BLOB) AS combined
-FROM recall_output
-GROUP BY invocation_id";
+fn output_transcripts(postgres: bool) -> String {
+    let columns: Vec<String> = [
+        ("CASE WHEN stream = 'stdout' THEN data END", "stdout"),
+        ("CASE WHEN stream = 'stderr' THEN data END", "stderr"),
+        ("data", "combined"),
+    ]
+    .into_iter()
+    .map(|(expression, alias)| {
+        let value = if postgres {
+            format!("COALESCE(string_agg({expression}, ''::BYTEA ORDER BY sequence), ''::BYTEA)")
+        } else {
+            format!(
+                "CAST(COALESCE(group_concat({expression}, x'' ORDER BY sequence), x'') AS BLOB)"
+            )
+        };
+        format!("    {value} AS {alias}")
+    })
+    .collect();
+    format!(
+        "SELECT invocation_id, MIN(invocation_started_at) AS invocation_started_at,\n{}\nFROM recall_output GROUP BY invocation_id",
+        columns.join(",\n")
+    )
+}
 
 const EVENTS: &str = "SELECT * FROM recall_events";
 
@@ -414,15 +425,15 @@ WHERE position <= {OUTPUT_TAIL_RECORDS}"
     )
 }
 
-/// Each supported view's name and SQLite body, in creation order.
-pub(crate) fn sqlite_view_bodies() -> Vec<(&'static str, String)> {
+/// Each supported view's name and relational body, in creation order.
+pub(crate) fn relational_view_bodies(postgres: bool) -> Vec<(&'static str, String)> {
     vec![
         ("invocations", invocations()),
         ("statements", STATEMENTS.to_owned()),
         ("audit_results", AUDIT_RESULTS.to_owned()),
         ("output_invocations", OUTPUT_INVOCATIONS.to_owned()),
         ("output_tail", output_tail()),
-        ("output_transcripts", OUTPUT_TRANSCRIPTS.to_owned()),
+        ("output_transcripts", output_transcripts(postgres)),
         ("events", EVENTS.to_owned()),
         ("diagnostics", DIAGNOSTICS.to_owned()),
         ("artifacts", ARTIFACTS.to_owned()),

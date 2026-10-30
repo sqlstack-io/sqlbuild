@@ -1,0 +1,252 @@
+use std::collections::BTreeMap;
+use std::num::NonZeroU32;
+
+use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
+use sqlbuild_orchestration::runs::main::list_runs::list_runs;
+use sqlbuild_orchestration::runs::models::RunStatus;
+use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
+use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
+use sqlbuild_orchestration::store::main::create_location::create_location;
+use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
+use uuid::Uuid;
+
+use crate::helpers::{finish, queue, request, snapshot};
+use crate::store_helpers::{close_store, close_test_store, open_test_store, run, second_store};
+use crate::store_test_types::Backend;
+
+#[test]
+fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rollback_and_terminal_facts_release_claims()
+ {
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let Some(fixture) = open_test_store(backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate run store");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("create location");
+            let published = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("publish snapshot");
+            let scope = (location, published.snapshot_id);
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            for input in [
+                request(scope, 1, 1, &["orders"]),
+                request(scope, 2, 3, &["orders"]),
+                request(scope, 3, 2, &["products"]),
+            ] {
+                queue(store, &input).await;
+            }
+            let second = second_store(store).await;
+            let limits = BTreeMap::new();
+            let (first, other) = tokio::join!(
+                claim_next_run(store, &lease, &limits),
+                claim_next_run(&second, &lease, &limits)
+            );
+            let first = first.expect("first claimant").expect("claim available");
+            let other = other
+                .expect("second claimant")
+                .expect("independent claim available");
+            let claimed: std::collections::BTreeSet<_> =
+                [first.request.run_id, other.request.run_id]
+                    .into_iter()
+                    .collect();
+            assert_eq!(
+                claimed,
+                [Uuid::from_u128(2), Uuid::from_u128(3)]
+                    .into_iter()
+                    .collect(),
+                "higher priority wins the shared write set"
+            );
+            assert!(
+                claim_next_run(store, &lease, &limits)
+                    .await
+                    .expect("blocked run stays queued")
+                    .is_none()
+            );
+            queue(store, &request(scope, 4, 9, &["customers", "orders"])).await;
+            queue(store, &request(scope, 5, 0, &["customers"])).await;
+            let independent = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("try partially conflicting candidate")
+                .expect("independent work proceeds");
+            assert_eq!(
+                independent.request.run_id,
+                Uuid::from_u128(5),
+                "customers was not leaked by the failed customers/orders claim"
+            );
+            let orders = [&first, &other]
+                .into_iter()
+                .find(|claim| claim.request.run_id == Uuid::from_u128(2))
+                .expect("orders owner");
+            finish(store, &lease, orders).await;
+            finish(store, &lease, &independent).await;
+            let next = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("terminal cleanup committed")
+                .expect("next priority run claims both nodes");
+            assert_eq!(next.request.run_id, Uuid::from_u128(4));
+            let events = read_recall_events(store, 0, 100)
+                .await
+                .expect("read immutable run stream");
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["event_type"] == "run_claimed")
+                    .count(),
+                4
+            );
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["event_type"] == "run_terminated")
+                    .count(),
+                2
+            );
+            let runs = list_runs(store, (location, "development"), 100)
+                .await
+                .expect("read atomic projections");
+            assert_eq!(
+                runs.iter()
+                    .filter(|run| run.status == RunStatus::Failed)
+                    .count(),
+                2
+            );
+            close_store(second).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_still_count_and_terminal_cleanup_unblocks_work()
+ {
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let Some(fixture) = open_test_store(backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate run store");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("create location");
+            let published = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("publish snapshot");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let mut limits = BTreeMap::from([(
+                "warehouse".into(),
+                NonZeroU32::new(2).expect("nonzero limit"),
+            )]);
+            for id in 1..=3 {
+                let mut input = request((location, published.snapshot_id), id, 0, &["orders"]);
+                input.write_set.clear();
+                input.concurrency_groups.insert("warehouse".into());
+                queue(store, &input).await;
+            }
+            assert!(
+                claim_next_run(store, &lease, &BTreeMap::new())
+                    .await
+                    .is_err(),
+                "unknown groups cannot silently become unlimited"
+            );
+            let first = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("first slot")
+                .expect("available");
+            let second = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("second slot")
+                .expect("available");
+            assert_eq!(first.request.run_id, Uuid::from_u128(1));
+            assert_eq!(second.request.run_id, Uuid::from_u128(2));
+            assert!(
+                claim_next_run(store, &lease, &limits)
+                    .await
+                    .expect("group full")
+                    .is_none()
+            );
+            finish(store, &lease, &first).await;
+            limits.insert(
+                "warehouse".into(),
+                NonZeroU32::new(1).expect("nonzero lowered limit"),
+            );
+            assert!(
+                claim_next_run(store, &lease, &limits)
+                    .await
+                    .expect("high slot counts after limit reduction")
+                    .is_none()
+            );
+            finish(store, &lease, &second).await;
+            let third = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("released group")
+                .expect("third queued run");
+            assert_eq!(third.request.run_id, Uuid::from_u128(3));
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_independent_work_is_not_starved()
+ {
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let Some(fixture) = open_test_store(backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let published = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("snapshot");
+            let scope = (location, published.snapshot_id);
+            let mut lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::new();
+            queue(store, &request(scope, 1, 0, &["orders"])).await;
+            claim_next_run(store, &lease, &limits)
+                .await
+                .expect("claim blocker")
+                .expect("available");
+            for id in 2..=104 {
+                queue(store, &request(scope, id, 0, &["orders"])).await;
+                if id % 20 == 0 {
+                    lease = sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease(
+                        store, &lease,
+                    )
+                    .await
+                    .expect("keep leader live while preparing backlog");
+                }
+            }
+            queue(store, &request(scope, 105, -1, &["customers"])).await;
+            let started = std::time::Instant::now();
+            let independent = claim_next_run(store, &lease, &limits)
+                .await
+                .expect("scan past a full blocked page")
+                .expect("independent work");
+            assert_eq!(independent.request.run_id, Uuid::from_u128(105));
+            assert!(
+                started.elapsed() < std::time::Duration::from_secs(5),
+                "claim scan exceeded five seconds on {backend:?}"
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}

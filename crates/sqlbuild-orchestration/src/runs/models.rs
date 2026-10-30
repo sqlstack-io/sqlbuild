@@ -1,0 +1,250 @@
+//! Frozen requests and rebuildable run projections; lifecycle authority remains in Recall.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunKind {
+    Job,
+    Group,
+    Adhoc,
+}
+
+impl RunKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Job => "job",
+            Self::Group => "group",
+            Self::Adhoc => "adhoc",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunOrigin {
+    Manual,
+    Schedule,
+    Sensor,
+    Rerun,
+    Backfill,
+}
+
+impl RunOrigin {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Schedule => "schedule",
+            Self::Sensor => "sensor",
+            Self::Rerun => "rerun",
+            Self::Backfill => "backfill",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunStatus {
+    Queued,
+    Launched,
+    Running,
+    Unresponsive,
+    Success,
+    Warn,
+    Partial,
+    Failed,
+    Cancelled,
+    PresumedFailed,
+}
+
+/// The authorized selection and pinned execution inputs are immutable once requested.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RunRequest {
+    pub run_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub snapshot_id: Uuid,
+    pub image_id: Option<String>,
+    pub kind: RunKind,
+    pub origin: RunOrigin,
+    pub job_key: Option<String>,
+    pub parent_run_id: Option<Uuid>,
+    pub root_run_id: Uuid,
+    pub trigger_id: Option<Uuid>,
+    pub tick_id: Option<Uuid>,
+    pub rerun_of_run_id: Option<Uuid>,
+    pub requested_by: String,
+    pub priority: i64,
+    pub selection: BTreeSet<String>,
+    pub write_set: BTreeSet<String>,
+    pub settings: BTreeMap<String, serde_json::Value>,
+    pub concurrency_groups: BTreeSet<String>,
+    pub overlap: crate::scheduler::models::Overlap,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RunRecord {
+    pub run_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub snapshot_id: Uuid,
+    pub job_key: Option<String>,
+    pub status: RunStatus,
+    pub queued_at: DateTime<Utc>,
+    pub launched_at: Option<DateTime<Utc>>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub selection_json: BTreeSet<String>,
+    pub node_counts_json: BTreeMap<String, i64>,
+    pub last_event_storage_id: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeOutcome {
+    Success,
+    Warn,
+    Failed,
+    Skipped,
+    Cancelled,
+}
+
+impl NodeOutcome {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Success => "success",
+            Self::Warn => "warn",
+            Self::Failed => "failed",
+            Self::Skipped => "skipped",
+            Self::Cancelled => "cancelled",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunNodeRecord {
+    pub node_key: String,
+    pub attempt: i64,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub rows_affected: Option<i64>,
+    pub error_code: Option<String>,
+    pub skipped_because_of: Option<String>,
+}
+
+/// The database owns the claim before a launcher sees the pinned request.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RunClaim {
+    pub claim_id: Uuid,
+    pub request: RunRequest,
+}
+
+/// Terminal outcomes cannot be confused with a request to change an active status.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunOutcome {
+    Success,
+    Warn,
+    Partial,
+    Failed,
+    Cancelled,
+    PresumedFailed,
+}
+
+impl RunOutcome {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Success => "success",
+            Self::Warn => "warn",
+            Self::Partial => "partial",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+            Self::PresumedFailed => "presumed_failed",
+        }
+    }
+}
+
+/// This is a server-owned instruction, not an arbitrary status supplied by a worker.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RunChange {
+    Launched {
+        container_id: Option<String>,
+    },
+    Started,
+    NodeStarted {
+        node_key: String,
+    },
+    NodeFinished {
+        node_key: String,
+        outcome: NodeOutcome,
+        rows_affected: Option<i64>,
+        error_code: Option<String>,
+        skipped_because_of: Option<String>,
+    },
+    Unresponsive,
+    Recovered,
+    CancelRequested {
+        actor: String,
+    },
+    Finished {
+        outcome: RunOutcome,
+        reason: String,
+        exit_code: Option<i64>,
+    },
+}
+
+impl RunChange {
+    pub(crate) const fn event_type(&self) -> &'static str {
+        match self {
+            Self::Launched { .. } => "run_launched",
+            Self::Started => "run_started",
+            Self::NodeStarted { .. } => "run_node_started",
+            Self::NodeFinished { .. } => "run_node_finished",
+            Self::Unresponsive => "run_unresponsive",
+            Self::Recovered => "run_recovered",
+            Self::CancelRequested { .. } => "run_cancel_requested",
+            Self::Finished { .. } => "run_terminated",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunChangeRequest {
+    pub event_id: Uuid,
+    pub run_id: Uuid,
+    pub claim_id: Option<Uuid>,
+    pub change: RunChange,
+}
+
+/// Constructed after authentication; this authority is never deserialized from a request body.
+#[derive(Clone, Copy, Debug)]
+pub enum RunAuthority<'a> {
+    Scheduler(&'a crate::scheduler::models::SchedulerLease),
+    Worker { run_id: Uuid, claim_id: Uuid },
+    Operator(&'a str),
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct QueueCandidate {
+    pub(crate) request_json: RunRequest,
+    pub(crate) queued_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct ChangingRun {
+    pub(crate) status: RunStatus,
+    pub(crate) worker_instance: Option<Uuid>,
+    pub(crate) cancel_requested_at: Option<DateTime<Utc>>,
+    pub(crate) node_counts_json: BTreeMap<String, i64>,
+}

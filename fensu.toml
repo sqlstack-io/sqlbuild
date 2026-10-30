@@ -1617,6 +1617,7 @@ crate_names = [
     "sqlbuild-discovery",
     "sqlbuild-host",
     "sqlbuild-model-config",
+    "sqlbuild-orchestration",
     "sqlbuild-project",
     "sqlbuild-pysource",
     "sqlbuild-python",

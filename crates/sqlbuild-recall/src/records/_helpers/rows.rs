@@ -23,6 +23,17 @@ pub(crate) fn boolean(value: bool) -> RecallValue {
     RecallValue::Integer(i64::from(value))
 }
 
+/// The human-readable part of a conflict key, without dialect-specific timestamp normalization.
+pub(crate) fn key_text(value: Option<&RecallValue>) -> String {
+    match value {
+        Some(RecallValue::Text(text)) => text.clone(),
+        Some(RecallValue::Integer(number)) => number.to_string(),
+        Some(RecallValue::Real(number)) => number.to_string(),
+        Some(RecallValue::Blob(_)) => "<blob>".to_owned(),
+        Some(RecallValue::Null) | None => String::new(),
+    }
+}
+
 /// `values` plus the envelope columns and `content_hash`; an artifact's digest covers only its content, since every invocation that sees it writes the same row.
 pub(crate) fn finish_row(
     table: Table,

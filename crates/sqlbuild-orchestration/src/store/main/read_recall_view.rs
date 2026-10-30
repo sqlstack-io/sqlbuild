@@ -1,0 +1,46 @@
+//! Only the supported Recall views can be read; no caller-provided SQL is evaluated.
+
+use sqlbuild_recall::schema::constants::VIEW_NAMES;
+
+use crate::store::errors::ControlError;
+use crate::store::main::begin::begin;
+use crate::store::main::commit::commit;
+use crate::store::main::query::query;
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::types::Row;
+
+/// The API authorizes the invocation and evidence capability before entering this storage reader.
+pub async fn read_recall_view(
+    store: &ControlStore,
+    (view, invocation_id): (&str, &str),
+    limit: u32,
+) -> Result<Vec<Row>, ControlError> {
+    if !VIEW_NAMES.contains(&view) {
+        return Err(ControlError::Invalid("unknown Recall view".into()));
+    }
+    let transaction = begin(store, TransactionMode::Read).await?;
+    let (transaction, mut rows) = query(
+        transaction,
+        &format!("SELECT * FROM \"{view}\" WHERE invocation_id=$1 LIMIT $2"),
+        vec![
+            Parameter::Text(invocation_id.into()),
+            Parameter::Integer(i64::from(limit.min(1000))),
+        ],
+    )
+    .await?;
+    // These PostgreSQL view columns retain bytes: conversion to database text would reject NUL.
+    // Decode only the display field, leaving captured content and transcripts byte-exact.
+    if matches!(view, "output_tail" | "artifacts") {
+        for row in &mut rows {
+            if let Some(text) = row.get_mut("text")
+                && text.is_array()
+            {
+                let bytes: Vec<u8> = serde_json::from_value(text.clone())
+                    .map_err(|error| ControlError::Invalid(error.to_string()))?;
+                *text = serde_json::Value::String(String::from_utf8_lossy(&bytes).into_owned());
+            }
+        }
+    }
+    commit(transaction).await?;
+    Ok(rows)
+}

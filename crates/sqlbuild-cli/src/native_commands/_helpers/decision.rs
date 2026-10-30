@@ -25,14 +25,14 @@ pub(crate) fn review_json_failure(arguments: &[String], outcome: &ArgvOutcome) -
             .is_some_and(|failure| failure.prog == REVIEW_PROG)
 }
 
-fn text(namespace: &Namespace, name: &str) -> Option<String> {
+pub(crate) fn text(namespace: &Namespace, name: &str) -> Option<String> {
     match namespace.get(name) {
         Some(Value::Str(text) | Value::Path(text)) => Some(text.clone()),
         _ => None,
     }
 }
 
-fn flag(namespace: &Namespace, name: &str) -> bool {
+pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
     namespace.get(name) == Some(&Value::Bool(true))
 }
 

@@ -1,5 +1,6 @@
 pub mod checkpoint_sqlite_store;
 pub mod chosen_invocation;
+pub mod conflict_evidence;
 pub mod describe_store;
 pub mod ensure_sqlite_schema;
 pub mod insert_rows;
@@ -10,5 +11,7 @@ pub mod open_sqlite_store;
 pub mod quarantine_store;
 pub mod query_store;
 pub mod read_output_transcript;
+pub mod relational_insert;
+pub mod relational_lookup;
 pub mod resolve_invocation;
 pub mod store_location_problem;

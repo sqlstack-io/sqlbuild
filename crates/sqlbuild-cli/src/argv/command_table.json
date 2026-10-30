@@ -79,6 +79,133 @@
    "group": 0,
    "parsers": [
     {
+     "name": "server",
+     "parser": {
+      "prog": "sqb server",
+      "description": "Run the native control API and scheduler without importing project Python.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--host"
+        ],
+        "dest": "control_host",
+        "default": "127.0.0.1",
+        "help": "IP address to listen on (default: 127.0.0.1)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--port"
+        ],
+        "dest": "control_port",
+        "default": 8000,
+        "type": "int",
+        "help": "TCP port, or 0 to choose a free port (default: 8000)",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--no-scheduler"
+        ],
+        "dest": "control_no_scheduler",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "serve the API without the embedded scheduler",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--openapi"
+        ],
+        "dest": "control_openapi",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print the OpenAPI contract as JSON without opening a database",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
+     "name": "scheduler",
+     "parser": {
+      "prog": "sqb scheduler",
+      "description": "Run the lease-guarded native scheduler against the server's control database.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
      "name": "compile",
      "parser": {
       "prog": "sqb compile",
@@ -7592,6 +7719,16 @@
     }
    ],
    "choices_help": [
+    {
+     "dest": "server",
+     "metavar": "server",
+     "help": "run the native control API and scheduler"
+    },
+    {
+     "dest": "scheduler",
+     "metavar": "scheduler",
+     "help": "run a standalone lease-guarded scheduler"
+    },
     {
      "dest": "cost",
      "metavar": "cost",

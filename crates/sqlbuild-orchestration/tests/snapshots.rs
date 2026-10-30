@@ -1,0 +1,10 @@
+#[path = "snapshots/test_contract.rs"]
+mod contract;
+#[path = "snapshots/helpers.rs"]
+mod helpers;
+#[path = "store/helpers.rs"]
+mod store_helpers;
+#[path = "store/test_types.rs"]
+mod store_test_types;
+#[path = "snapshots/test_types.rs"]
+mod test_types;
