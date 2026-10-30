@@ -15,8 +15,10 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
-use crate::fault_helpers::{expire_lease, install_fault, remove_fault};
-use crate::store_helpers::{close_store, close_test_store, open_test_store, second_store};
+use crate::fault_helpers::{install_fault, remove_fault};
+use crate::lease_helpers::expire_lease;
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store_test_types::Backend;
 use crate::test_types::TickFaultTestCase;
 

@@ -78,19 +78,3 @@ pub(crate) async fn close_store(store: ControlStore) {
     };
     pool.close().await;
 }
-
-pub(crate) async fn second_store(store: &ControlStore) -> ControlStore {
-    let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path) = store else {
-            panic!("expected SQLite fixture");
-        };
-        return open_store(path.to_str().expect("UTF-8 test path"))
-            .await
-            .expect("open independent SQLite handle");
-    };
-    ControlStore::Postgres(
-        sqlx_postgres::PgPool::connect_with(pool.connect_options().as_ref().clone())
-            .await
-            .expect("open independent PostgreSQL pool"),
-    )
-}

@@ -8,9 +8,10 @@ use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::fault_helpers::expire_lease;
 use crate::helpers::snapshot;
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run, second_store};
+use crate::lease_helpers::expire_lease;
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::test_types::TickTransactionTestCase;
 

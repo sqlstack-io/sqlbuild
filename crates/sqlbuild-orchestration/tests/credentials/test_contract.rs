@@ -15,9 +15,11 @@ use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::fault_helpers::{install_fault, remove_fault};
-use crate::run_helpers::{finish, queue, request, snapshot};
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run, second_store};
+use crate::replica_helpers::second_store;
+use crate::run_helpers::{queue, request, snapshot};
+use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
+use crate::terminal_helpers::finish;
 use crate::test_types::TickFaultTestCase;
 
 #[test]

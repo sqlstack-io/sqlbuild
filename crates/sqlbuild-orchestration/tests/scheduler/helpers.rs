@@ -4,33 +4,12 @@ use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::store_helpers::{close_store, close_test_store, open_test_store, second_store};
+use crate::lease_helpers::expire_lease;
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store_test_types::Backend;
-
-async fn expire_lease(store: &ControlStore) {
-    let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path) = store else {
-            panic!("expected SQLite fixture");
-        };
-        rusqlite::Connection::open(path)
-            .expect("open fault injection connection")
-            .execute(
-                "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
-                [],
-            )
-            .expect("expire SQLite scheduler lease");
-        return;
-    };
-    sqlx_core::query::query(
-        "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
-    )
-    .execute(pool)
-    .await
-    .expect("expire PostgreSQL scheduler lease");
-}
 
 pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     let test_store = open_test_store(backend).await?;

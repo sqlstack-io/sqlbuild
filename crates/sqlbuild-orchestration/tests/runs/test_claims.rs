@@ -11,9 +11,11 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
-use crate::helpers::{finish, queue, request, snapshot};
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run, second_store};
+use crate::helpers::{queue, request, snapshot};
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
+use crate::terminal_helpers::finish;
 
 #[test]
 fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rollback_and_terminal_facts_release_claims()

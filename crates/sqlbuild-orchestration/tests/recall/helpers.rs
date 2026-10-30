@@ -6,7 +6,8 @@ use sqlbuild_recall::records::main::artifact_rows::artifact_rows;
 use sqlbuild_recall::records::main::event_object_row::event_object_row;
 use sqlbuild_recall::records::models::{ArtifactInput, RecallRow, RowEnvelope};
 
-use crate::store_helpers::{close_store, close_test_store, open_test_store, second_store};
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store_test_types::Backend;
 
 pub(crate) fn event(id: &str, occurred_at: &str, duration_ms: f64) -> RecallRow {

@@ -1,5 +1,9 @@
 #[path = "scheduler/helpers.rs"]
 mod helpers;
+#[path = "store/lease_helpers.rs"]
+mod lease_helpers;
+#[path = "store/replica_helpers.rs"]
+mod replica_helpers;
 #[path = "store/helpers.rs"]
 mod store_helpers;
 #[path = "store/test_types.rs"]

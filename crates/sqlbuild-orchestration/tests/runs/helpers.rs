@@ -3,12 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
-use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::request_run::request_run;
-use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunClaim, RunKind, RunOrigin, RunOutcome, RunRequest,
-};
-use sqlbuild_orchestration::scheduler::models::{Overlap, SchedulerLease};
+use sqlbuild_orchestration::runs::models::{RunKind, RunOrigin, RunRequest};
+use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
@@ -91,28 +88,5 @@ pub(crate) async fn queue(store: &ControlStore, request: &RunRequest) {
     assert!(
         request_run(store, &changed).await.is_err(),
         "a reused run ID cannot change its request"
-    );
-}
-
-pub(crate) async fn finish(store: &ControlStore, lease: &SchedulerLease, claim: &RunClaim) {
-    let request = RunChangeRequest {
-        event_id: Uuid::new_v5(&claim.claim_id, b"test-finished"),
-        run_id: claim.request.run_id,
-        claim_id: Some(claim.claim_id),
-        change: RunChange::Finished {
-            outcome: RunOutcome::Failed,
-            reason: "synthetic worker exit".into(),
-            exit_code: Some(1),
-        },
-    };
-    assert!(
-        change_run(store, RunAuthority::Scheduler(lease), &request)
-            .await
-            .expect("terminate claimed work")
-    );
-    assert!(
-        !change_run(store, RunAuthority::Scheduler(lease), &request)
-            .await
-            .expect("retry terminal fact")
     );
 }

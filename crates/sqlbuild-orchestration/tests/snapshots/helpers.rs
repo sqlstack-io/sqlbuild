@@ -13,7 +13,8 @@ use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::store_helpers::{close_store, close_test_store, open_test_store, second_store};
+use crate::replica_helpers::second_store;
+use crate::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store_test_types::Backend;
 use crate::test_types::SchemaRejectionCase;
 
