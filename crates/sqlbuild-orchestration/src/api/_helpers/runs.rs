@@ -10,8 +10,27 @@ use crate::api::models::{HeartbeatResponse, MutationResponse};
 use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::runs::main::change_run::change_run;
 use crate::runs::main::heartbeat_run::heartbeat_run;
-use crate::runs::models::{RunAuthority, RunChangeRequest};
+use crate::runs::main::run_execution::run_execution;
+use crate::runs::models::{RunAuthority, RunChangeRequest, RunExecution};
 use crate::store::models::ControlStore;
+
+#[utoipa::path(get, path = "/api/runs/{run_id}/execution", params(("run_id" = Uuid, Path)),
+    responses((status = 200, body = RunExecution), (status = 401, description = "Inactive claim or invalid credential"),
+        (status = 403, description = "Run not authorized")), security(("bearer" = [])))]
+pub(crate) async fn execution(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path(run_id): Path<Uuid>,
+) -> Result<Json<RunExecution>, ApiError> {
+    let claim_id = require_worker(&identity, run_id)?;
+    let execution = run_execution(&store, (run_id, claim_id))
+        .await?
+        .ok_or_else(|| ApiError {
+            status: StatusCode::UNAUTHORIZED,
+            message: "run claim is no longer active".into(),
+        })?;
+    Ok(Json(execution))
+}
 
 #[utoipa::path(post, path = "/api/runs/{run_id}/events", params(("run_id" = Uuid, Path)),
     request_body = RunChangeRequest,

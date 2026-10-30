@@ -22,6 +22,7 @@ pub async fn serve_api(
             "/api/locations/{location_id}/targets/{target}/snapshots",
             get(snapshots::current).post(snapshots::publish),
         )
+        .route("/api/runs/{run_id}/execution", get(runs::execution))
         .route("/api/runs/{run_id}/events", post(runs::report))
         .route("/api/runs/{run_id}/heartbeat", post(runs::heartbeat))
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024))

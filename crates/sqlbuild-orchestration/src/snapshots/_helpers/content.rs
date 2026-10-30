@@ -7,7 +7,7 @@ use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use serde_json::Value;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
-use crate::snapshots::models::{PreparedNode, SnapshotNode};
+use crate::snapshots::models::{NodeContent, PreparedNode, SnapshotNode};
 use crate::store::errors::ControlError;
 
 fn canonical(value: &Value) -> Value {
@@ -42,18 +42,15 @@ pub(crate) fn decompress(value: &Value) -> Result<Vec<u8>, ControlError> {
     Ok(output)
 }
 
-pub(crate) fn prepare_node(node: &SnapshotNode) -> Result<PreparedNode, ControlError> {
-    let mut sources: BTreeMap<&'static str, (String, Vec<u8>)> = BTreeMap::new();
+pub(crate) fn node_content(node: &SnapshotNode) -> Result<NodeContent<'_>, ControlError> {
+    let mut sources: BTreeMap<&'static str, (String, &str)> = BTreeMap::new();
     for (kind, text) in [
         ("raw_sql", &node.raw_sql),
         ("compiled_sql", &node.compiled_sql),
         ("python_source", &node.python_source),
     ] {
         if let Some(text) = text {
-            sources.insert(
-                kind,
-                (sha256_hex(text.as_bytes()), compress(text.as_bytes())?),
-            );
+            sources.insert(kind, (sha256_hex(text.as_bytes()), text));
         }
     }
     let source_hashes: BTreeMap<_, _> = sources
@@ -63,10 +60,23 @@ pub(crate) fn prepare_node(node: &SnapshotNode) -> Result<PreparedNode, ControlE
     let definition = json_bytes(
         &serde_json::json!({"kind": node.kind, "definition": node.definition, "sources": source_hashes}),
     )?;
+    Ok(NodeContent {
+        definition,
+        sources,
+    })
+}
+
+pub(crate) fn prepare_node(node: &SnapshotNode) -> Result<PreparedNode, ControlError> {
+    let content = node_content(node)?;
+    let sources = content
+        .sources
+        .into_iter()
+        .map(|(kind, (hash, text))| Ok((kind, (hash, compress(text.as_bytes())?))))
+        .collect::<Result<_, ControlError>>()?;
     Ok(PreparedNode {
         kind: node.kind.clone(),
-        hash: sha256_hex(&definition),
-        definition: compress(&definition)?,
+        hash: sha256_hex(&content.definition),
+        definition: compress(&content.definition)?,
         sources,
     })
 }

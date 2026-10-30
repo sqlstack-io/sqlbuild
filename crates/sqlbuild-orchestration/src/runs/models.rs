@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RunKind {
     Job,
@@ -25,7 +25,7 @@ impl RunKind {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RunOrigin {
     Manual,
@@ -64,7 +64,7 @@ pub enum RunStatus {
 }
 
 /// The authorized selection and pinned execution inputs are immutable once requested.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunRequest {
     pub run_id: Uuid,
     pub location_id: Uuid,
@@ -141,10 +141,26 @@ pub struct RunNodeRecord {
 }
 
 /// The database owns the claim before a launcher sees the pinned request.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunClaim {
     pub claim_id: Uuid,
     pub request: RunRequest,
+}
+
+/// Workers compile locally and compare against this immutable snapshot, not the current deploy.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunExecution {
+    pub claim: RunClaim,
+    pub environment_hash: String,
+    pub sqb_version: String,
+    pub node_hashes: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ExecutionMetadata {
+    pub(crate) request_json: RunRequest,
+    pub(crate) environment_hash: String,
+    pub(crate) sqb_version: String,
 }
 
 /// Terminal outcomes cannot be confused with a request to change an active status.

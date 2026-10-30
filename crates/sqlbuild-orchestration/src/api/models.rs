@@ -5,7 +5,13 @@ use serde::{Deserialize, Serialize};
 use crate::api::_helpers::{runs, snapshots};
 
 #[derive(Debug, utoipa::OpenApi)]
-#[openapi(paths(snapshots::publish, snapshots::current, runs::report, runs::heartbeat))]
+#[openapi(paths(
+    snapshots::publish,
+    snapshots::current,
+    runs::execution,
+    runs::report,
+    runs::heartbeat
+))]
 pub(crate) struct ControlApi;
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]

@@ -55,7 +55,7 @@ pub enum CatchUp {
     All { max_runs: std::num::NonZeroUsize },
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Overlap {
     #[default]

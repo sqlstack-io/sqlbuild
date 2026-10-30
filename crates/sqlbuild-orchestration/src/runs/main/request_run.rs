@@ -41,11 +41,13 @@ pub async fn request_run(store: &ControlStore, request: &RunRequest) -> Result<b
     let (transaction, nodes) = query(
         transaction,
         "SELECT node_key FROM sqb_snapshot_nodes WHERE snapshot_id=$1 AND EXISTS \
-         (SELECT 1 FROM sqb_snapshots WHERE snapshot_id=$1 AND location_id=$2 AND target=$3)",
+         (SELECT 1 FROM sqb_snapshots WHERE snapshot_id=$1 AND location_id=$2 AND target=$3 \
+         AND image_id IS NOT DISTINCT FROM $4)",
         vec![
             Parameter::Id(request.snapshot_id),
             Parameter::Id(request.location_id),
             Parameter::Text(request.target.clone()),
+            Parameter::OptionalText(request.image_id.clone()),
         ],
     )
     .await?;
@@ -59,7 +61,7 @@ pub async fn request_run(store: &ControlStore, request: &RunRequest) -> Result<b
         .any(|key| !keys.contains(key.as_str()))
     {
         return Err(ControlError::Invalid(
-            "run selection is not in the pinned location and target snapshot".into(),
+            "run selection or image does not match the pinned location and target snapshot".into(),
         ));
     }
     commit(queue_run(transaction, request).await?).await?;

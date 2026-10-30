@@ -62,6 +62,13 @@ pub struct CurrentSnapshot {
     pub changes: Vec<SnapshotChange>,
 }
 
+/// Canonical identity is shared by publication and worker verification; only publication compresses.
+#[derive(Debug)]
+pub(crate) struct NodeContent<'a> {
+    pub(crate) definition: Vec<u8>,
+    pub(crate) sources: BTreeMap<&'static str, (String, &'a str)>,
+}
+
 #[derive(Debug)]
 pub(crate) struct PreparedNode {
     pub(crate) kind: String,
