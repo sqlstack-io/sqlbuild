@@ -9,3 +9,4 @@ pub mod runs;
 pub mod scheduler;
 pub mod snapshots;
 pub mod store;
+pub mod worker;

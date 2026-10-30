@@ -14,6 +14,7 @@ chrono-tz.workspace = true
 croner.workspace = true
 flate2.workspace = true
 getrandom.workspace = true
+reqwest.workspace = true
 rusqlite.workspace = true
 semver.workspace = true
 serde.workspace = true
@@ -29,7 +30,6 @@ uuid.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
-reqwest.workspace = true
 tempfile.workspace = true
 
 [lints]

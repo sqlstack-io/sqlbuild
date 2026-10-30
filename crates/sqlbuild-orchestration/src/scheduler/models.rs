@@ -46,6 +46,9 @@ pub struct CronSchedule {
     pub(crate) timezone: chrono_tz::Tz,
 }
 
+/// Expanded wall-clock times and the first omitted time, if the batch was bounded.
+pub(crate) type ScheduleExpansion = (Vec<DateTime<Utc>>, Option<DateTime<Utc>>);
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CatchUp {

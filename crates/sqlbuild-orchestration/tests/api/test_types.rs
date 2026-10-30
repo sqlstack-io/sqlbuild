@@ -9,6 +9,11 @@ pub(crate) struct ApiContractTestCase {
     pub(crate) expected_status: RunStatus,
 }
 
+pub(crate) struct WorkerRedirectTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
 pub(crate) struct TestApi {
     pub(crate) url: String,
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,
