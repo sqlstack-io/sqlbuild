@@ -1,6 +1,8 @@
 //! Expected queue outcomes for each real control-store backend.
 
-use sqlbuild_orchestration::runs::models::RunStatus;
+use std::collections::BTreeSet;
+
+use sqlbuild_orchestration::runs::models::{RerunRequest, RunStatus};
 
 pub(crate) use crate::fault_types::TransactionFault;
 use crate::store_test_types::Backend;
@@ -48,6 +50,14 @@ pub(crate) struct RunLifecycleTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_status: RunStatus,
+}
+
+pub(crate) struct RerunExecutionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) request: RerunRequest,
+    pub(crate) expected_applied: bool,
+    pub(crate) expected_selection: BTreeSet<String>,
+    pub(crate) expected_jobs: &'static [&'static str],
 }
 
 pub(crate) struct RunMonitorTestCase {

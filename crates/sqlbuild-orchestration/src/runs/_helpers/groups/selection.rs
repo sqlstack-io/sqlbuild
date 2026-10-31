@@ -28,7 +28,7 @@ pub(crate) async fn child_ready(
         .job_key
         .as_ref()
         .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
-    let dependencies = &group.definitions.groups[parent_name].jobs[name];
+    let dependencies = upstream_jobs(&group.definitions.groups[parent_name].jobs, name);
     let ready = group.parent.state.status == RunStatus::Running
         && group.parent.state.cancel_requested_at.is_none()
         && !group.stopped()
@@ -37,7 +37,7 @@ pub(crate) async fn child_ready(
                 .request_json
                 .job_key
                 .as_ref()
-                .is_none_or(|name| !dependencies.contains(name))
+                .is_none_or(|name| !dependencies.contains(name.as_str()))
                 || child.state.status.is_terminal()
         });
     Ok((transaction, ready))
@@ -62,13 +62,7 @@ pub(crate) async fn skipped_nodes(
         .as_ref()
         .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
     let edges = &group.definitions.groups[parent_name].jobs;
-    let mut ancestors: BTreeSet<&str> = BTreeSet::new();
-    let mut pending: Vec<&str> = edges[name].iter().map(String::as_str).collect();
-    while let Some(name) = pending.pop() {
-        if ancestors.insert(name) {
-            pending.extend(edges[name].iter().map(String::as_str));
-        }
-    }
+    let ancestors = upstream_jobs(edges, name);
     let (transaction, rows) = query(transaction,
         "SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
          WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.status IN ('failed','skipped','cancelled')",
@@ -136,4 +130,19 @@ pub(crate) async fn skipped_nodes(
         }
     }
     Ok((transaction, skipped))
+}
+
+/// Completed jobs omitted from a retry do not sever explicit ordering between retained jobs.
+fn upstream_jobs<'a>(
+    edges: &'a BTreeMap<String, BTreeSet<String>>,
+    name: &str,
+) -> BTreeSet<&'a str> {
+    let mut ancestors: BTreeSet<&str> = BTreeSet::new();
+    let mut pending: Vec<&str> = edges[name].iter().map(String::as_str).collect();
+    while let Some(name) = pending.pop() {
+        if ancestors.insert(name) {
+            pending.extend(edges[name].iter().map(String::as_str));
+        }
+    }
+    ancestors
 }

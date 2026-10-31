@@ -49,6 +49,35 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             attribute: "contract_command",
             expected_value: Value::Str("diff".to_owned()),
         },
+        ParsedValueTestCase {
+            description: "an explicit failed-node rerun never becomes a full rerun",
+            argv: &[
+                "admin",
+                "rerun-run",
+                "00000000-0000-0000-0000-000000000001",
+                "--run-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                "Retry failed orders",
+                "--from-failure",
+            ],
+            attribute: "admin_from_failure",
+            expected_value: Value::Bool(true),
+        },
+        ParsedValueTestCase {
+            description: "a full rerun is the default without failure narrowing",
+            argv: &[
+                "admin",
+                "rerun-run",
+                "00000000-0000-0000-0000-000000000001",
+                "--run-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                "Retry all orders",
+            ],
+            attribute: "admin_from_failure",
+            expected_value: Value::Bool(false),
+        },
     ];
 
     for test_case in test_cases {
