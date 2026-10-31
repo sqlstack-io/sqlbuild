@@ -18,6 +18,7 @@ use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
 };
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
+use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::native_host::orchestration_declarations::validate_jobs;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
@@ -50,6 +51,17 @@ impl NativeOrchestrationSnapshot {
             serde_json::to_string(&record)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))
         })
+    }
+
+    /// Retain the verified claim and its independent native heartbeat in the worker interpreter.
+    fn start_worker(
+        &self,
+        py: Python<'_>,
+        server_url: &str,
+        bearer: &str,
+        identity: (String, String),
+    ) -> PyResult<NativeOrchestrationWorker> {
+        NativeOrchestrationWorker::start(self, py, (server_url, bearer), identity)
     }
 }
 
@@ -139,5 +151,6 @@ pub(crate) fn destination(value: &sqlbuild_project::models::DestinationFact) -> 
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NativeOrchestrationSnapshot>()?;
+    module.add_class::<NativeOrchestrationWorker>()?;
     module.add_function(wrap_pyfunction!(build_orchestration_snapshot, module)?)
 }
