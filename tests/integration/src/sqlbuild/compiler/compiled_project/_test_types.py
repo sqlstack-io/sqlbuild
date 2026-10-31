@@ -197,3 +197,20 @@ class SnapshotCatalogTestCase:
     description: str
     files: dict[str, str]
     expected_kinds: frozenset[str]
+
+
+@dataclass(frozen=True)
+class SnapshotRejectionTestCase:
+    description: str
+    files: dict[str, str]
+    nodes: dict[str, object]
+    expected_compiler_errors: bool
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class SnapshotEnvironmentTestCase:
+    description: str
+    first_lockfile: str
+    second_lockfile: str
+    expected_environment_count: int

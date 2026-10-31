@@ -1,9 +1,10 @@
 //! `encode_rows`: one table's rows as a `RowBinary` insert block.
 
 use crate::clickhouse::_helpers::row_binary::{encoded, scaled};
-use crate::clickhouse::constants::{INGESTED_AT_COLUMN, MICROS_DIGITS};
+use crate::clickhouse::constants::MICROS_DIGITS;
 use crate::clickhouse::models::{ColumnEncoding, StoredColumn};
 use crate::records::models::{RecallRow, RecallValue};
+use crate::schema::constants::INGESTED_AT_COLUMN;
 
 /// The column names and `RowBinary` block of `rows`, all of one table, written with `ingested_at`. Values for columns the table lacks are left out; columns the rows lack take their defaults.
 pub fn encode_rows(

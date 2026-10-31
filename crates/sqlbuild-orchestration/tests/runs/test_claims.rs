@@ -16,13 +16,30 @@ use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::terminal_helpers::finish;
+use crate::test_types::{BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase};
 
 #[test]
 fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rollback_and_terminal_facts_release_claims()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        PriorityClaimsTestCase {
+            description: "SQLite claims prioritize independent write sets and release atomically",
+            backend: Backend::Sqlite,
+            expected_initial_claims: [2, 3],
+            expected_claim_events: 4,
+            expected_terminal_events: 2,
+        },
+        PriorityClaimsTestCase {
+            description: "PostgreSQL claims prioritize independent write sets and release atomically",
+            backend: Backend::Postgres,
+            expected_initial_claims: [2, 3],
+            expected_claim_events: 4,
+            expected_terminal_events: 2,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -61,10 +78,13 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
                     .collect();
             assert_eq!(
                 claimed,
-                [Uuid::from_u128(2), Uuid::from_u128(3)]
+                test_case
+                    .expected_initial_claims
                     .into_iter()
+                    .map(Uuid::from_u128)
                     .collect(),
-                "higher priority wins the shared write set"
+                "{}",
+                test_case.description
             );
             assert!(
                 claim_next_run(store, &lease, &limits)
@@ -102,14 +122,18 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
                     .iter()
                     .filter(|event| event["event_type"] == "run_claimed")
                     .count(),
-                4
+                test_case.expected_claim_events,
+                "{}",
+                test_case.description
             );
             assert_eq!(
                 events
                     .iter()
                     .filter(|event| event["event_type"] == "run_terminated")
                     .count(),
-                2
+                test_case.expected_terminal_events,
+                "{}",
+                test_case.description
             );
             let runs = list_runs(store, (location, "development"), 100)
                 .await
@@ -129,9 +153,21 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
 #[test]
 fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_still_count_and_terminal_cleanup_unblocks_work()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        GroupLimitTestCase {
+            description: "SQLite occupied high slots still count after lowering a group limit",
+            backend: Backend::Sqlite,
+            expected_unblocked_run: 3,
+        },
+        GroupLimitTestCase {
+            description: "PostgreSQL occupied high slots still count after lowering a group limit",
+            backend: Backend::Postgres,
+            expected_unblocked_run: 3,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -194,7 +230,12 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
                 .await
                 .expect("released group")
                 .expect("third queued run");
-            assert_eq!(third.request.run_id, Uuid::from_u128(3));
+            assert_eq!(
+                third.request.run_id,
+                Uuid::from_u128(test_case.expected_unblocked_run),
+                "{}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }
@@ -203,9 +244,21 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
 #[test]
 fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_independent_work_is_not_starved()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        BacklogClaimTestCase {
+            description: "SQLite scans past more than a full page of blocked work",
+            backend: Backend::Sqlite,
+            expected_independent_run: 105,
+        },
+        BacklogClaimTestCase {
+            description: "PostgreSQL scans past more than a full page of blocked work",
+            backend: Backend::Postgres,
+            expected_independent_run: 105,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -227,15 +280,15 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 .await
                 .expect("claim blocker")
                 .expect("available");
-            for id in 2..=104 {
-                queue(store, &request(scope, id, 0, &["orders"])).await;
-                if id % 20 == 0 {
-                    lease = sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease(
-                        store, &lease,
-                    )
-                    .await
-                    .expect("keep leader live while preparing backlog");
+            for batch in (2..=104).collect::<Vec<_>>().chunks(20) {
+                for id in batch {
+                    queue(store, &request(scope, *id, 0, &["orders"])).await;
                 }
+                lease = sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease(
+                    store, &lease,
+                )
+                .await
+                .expect("keep leader live while preparing backlog");
             }
             queue(store, &request(scope, 105, -1, &["customers"])).await;
             let started = std::time::Instant::now();
@@ -243,10 +296,16 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 .await
                 .expect("scan past a full blocked page")
                 .expect("independent work");
-            assert_eq!(independent.request.run_id, Uuid::from_u128(105));
+            assert_eq!(
+                independent.request.run_id,
+                Uuid::from_u128(test_case.expected_independent_run),
+                "{}",
+                test_case.description
+            );
             assert!(
                 started.elapsed() < std::time::Duration::from_secs(5),
-                "claim scan exceeded five seconds on {backend:?}"
+                "claim scan exceeded five seconds: {}",
+                test_case.description
             );
             close_test_store(fixture).await;
         });

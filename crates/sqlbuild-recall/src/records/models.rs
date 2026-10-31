@@ -12,6 +12,20 @@ pub enum RecallValue {
     Blob(Vec<u8>),
 }
 
+impl RecallValue {
+    /// Human-readable conflict-key text, before dialect-specific timestamp normalization.
+    #[must_use]
+    pub fn key_text(&self) -> String {
+        match self {
+            Self::Text(text) => text.clone(),
+            Self::Integer(number) => number.to_string(),
+            Self::Real(number) => number.to_string(),
+            Self::Blob(_) => "<blob>".to_owned(),
+            Self::Null => String::new(),
+        }
+    }
+}
+
 /// One row bound for a Recall table: named values, without `ingested_at`, which the store sets.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecallRow {

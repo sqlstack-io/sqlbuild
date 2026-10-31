@@ -7,6 +7,7 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use serde_json::Value;
+use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
@@ -55,7 +56,7 @@ pub(crate) fn build_orchestration_snapshot(
     }
     for diagnostic in project.diagnostics(py).bind(py).try_iter()? {
         let severity: String = field(&field(&diagnostic?, "severity")?, "value")?.extract()?;
-        if severity == "error" {
+        if severity == DiagnosticSeverity::Error.as_str() {
             return Err(PyValueError::new_err(
                 "cannot publish a project with compiler errors",
             ));

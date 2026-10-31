@@ -212,30 +212,6 @@ SELECT
     END AS complete
 FROM counted";
 
-fn output_transcripts(postgres: bool) -> String {
-    let columns: Vec<String> = [
-        ("CASE WHEN stream = 'stdout' THEN data END", "stdout"),
-        ("CASE WHEN stream = 'stderr' THEN data END", "stderr"),
-        ("data", "combined"),
-    ]
-    .into_iter()
-    .map(|(expression, alias)| {
-        let value = if postgres {
-            format!("COALESCE(string_agg({expression}, ''::BYTEA ORDER BY sequence), ''::BYTEA)")
-        } else {
-            format!(
-                "CAST(COALESCE(group_concat({expression}, x'' ORDER BY sequence), x'') AS BLOB)"
-            )
-        };
-        format!("    {value} AS {alias}")
-    })
-    .collect();
-    format!(
-        "SELECT invocation_id, MIN(invocation_started_at) AS invocation_started_at,\n{}\nFROM recall_output GROUP BY invocation_id",
-        columns.join(",\n")
-    )
-}
-
 const EVENTS: &str = "SELECT * FROM recall_events";
 
 const DIAGNOSTICS: &str = "SELECT * FROM recall_diagnostics";
@@ -260,6 +236,30 @@ FROM recall_artifact_refs AS refs
 LEFT JOIN recall_artifacts AS artifact ON artifact.digest = refs.digest";
 
 const CONFLICTS: &str = "SELECT * FROM recall_conflicts";
+
+fn output_transcripts(postgres: bool) -> String {
+    let columns: Vec<String> = [
+        ("CASE WHEN stream = 'stdout' THEN data END", "stdout"),
+        ("CASE WHEN stream = 'stderr' THEN data END", "stderr"),
+        ("data", "combined"),
+    ]
+    .into_iter()
+    .map(|(expression, alias)| {
+        let value = if postgres {
+            format!("COALESCE(string_agg({expression}, ''::BYTEA ORDER BY sequence), ''::BYTEA)")
+        } else {
+            format!(
+                "CAST(COALESCE(group_concat({expression}, x'' ORDER BY sequence), x'') AS BLOB)"
+            )
+        };
+        format!("    {value} AS {alias}")
+    })
+    .collect();
+    format!(
+        "SELECT invocation_id, MIN(invocation_started_at) AS invocation_started_at,\n{}\nFROM recall_output GROUP BY invocation_id",
+        columns.join(",\n")
+    )
+}
 
 fn invocations() -> String {
     format!(

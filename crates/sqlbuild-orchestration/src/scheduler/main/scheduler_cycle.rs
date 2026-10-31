@@ -18,8 +18,8 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn scheduler_cycle(
     store: &ControlStore,
-    state: &mut SchedulerState,
-) -> Result<SchedulerCycle, ControlError> {
+    mut state: SchedulerState,
+) -> Result<(SchedulerState, SchedulerCycle), ControlError> {
     let renewal = match state.lease.as_ref() {
         Some(lease) => renew_lease(store, lease).await.map(Some),
         None => acquire_lease(store, state.holder).await,
@@ -36,7 +36,7 @@ pub async fn scheduler_cycle(
         wait_for: Duration::from_secs(RENEW_INTERVAL_SECONDS),
     };
     let Some(mut lease) = state.lease.clone() else {
-        return Ok(cycle);
+        return Ok((state, cycle));
     };
     let transaction = begin(store, TransactionMode::Read).await?;
     let now = transaction.now;
@@ -71,5 +71,5 @@ pub async fn scheduler_cycle(
             .min(cycle.wait_for);
     }
     commit(transaction).await?;
-    Ok(cycle)
+    Ok((state, cycle))
 }

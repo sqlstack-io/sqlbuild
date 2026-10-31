@@ -1,8 +1,9 @@
 //! `add_column_statement`: the additive upgrade of one table by one column.
 
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::schema::_helpers::rendering::{
-    clickhouse_identifier, clickhouse_table, clickhouse_type, on_cluster, sqlite_identifier,
-    sqlite_type,
+    clickhouse_identifier, clickhouse_table, clickhouse_type, on_cluster, sqlite_type,
 };
 use crate::schema::models::{ColumnSpec, DdlOptions, Dialect, TableSpec};
 

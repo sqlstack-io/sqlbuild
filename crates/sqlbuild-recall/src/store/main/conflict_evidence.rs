@@ -1,7 +1,6 @@
 //! Duplicate rows preserve the first content and expose the rejected digest.
 
-use crate::records::_helpers::rows::key_text;
-use crate::records::models::RecallRow;
+use crate::records::models::{RecallRow, RecallValue};
 use crate::schema::main::table_spec::table_spec;
 use crate::store::models::ConflictEvidence;
 
@@ -14,7 +13,10 @@ pub fn conflict_evidence(row: &RecallRow, existing: &str) -> Option<ConflictEvid
         record_key: table_spec(row.table)
             .key
             .iter()
-            .map(|name| key_text(row.value(name)))
+            .map(|name| {
+                row.value(name)
+                    .map_or_else(String::new, RecallValue::key_text)
+            })
             .collect::<Vec<_>>()
             .join(":"),
         existing_sha256: existing.to_owned(),

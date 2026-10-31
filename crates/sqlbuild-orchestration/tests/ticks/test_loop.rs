@@ -46,30 +46,31 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
                 .await
                 .expect("publish due schedule");
             let second = second_store(store).await;
-            let mut first_state = SchedulerState::new(Uuid::now_v7());
-            let mut second_state = SchedulerState::new(Uuid::now_v7());
-            let first = scheduler_cycle(store, &mut first_state)
+            let first_state = SchedulerState::new(Uuid::now_v7());
+            let second_state = SchedulerState::new(Uuid::now_v7());
+            let (first_state, first) = scheduler_cycle(store, first_state)
                 .await
                 .expect("initial cycle");
             assert!(first.leader, "{}", test_case.description);
             assert_eq!(first.evaluated, 1);
             assert_eq!(first.ticks, test_case.expected_ticks);
             assert_eq!(first.wait_for, Duration::from_secs(5));
-            let follower = scheduler_cycle(&second, &mut second_state)
+            let (second_state, follower) = scheduler_cycle(&second, second_state)
                 .await
                 .expect("follower cycle");
             assert!(!follower.leader);
             assert_eq!(follower.ticks, 0);
             expire_lease(store).await;
-            let successor = scheduler_cycle(&second, &mut second_state)
+            let (second_state, successor) = scheduler_cycle(&second, second_state)
                 .await
                 .expect("takeover cycle");
             assert!(successor.leader);
             assert_eq!(successor.ticks, 0, "takeover never repeats durable work");
             assert!(
-                !scheduler_cycle(store, &mut first_state)
+                !scheduler_cycle(store, first_state)
                     .await
                     .expect("fenced cycle")
+                    .1
                     .leader
             );
             let runs = sqlbuild_orchestration::runs::main::list_runs::list_runs(

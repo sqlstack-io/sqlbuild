@@ -9,6 +9,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// Occupied slots above a lowered limit still count against the run's concurrency group.
 pub(crate) async fn reserve_claims(
     mut transaction: ControlTransaction,
     request: &RunRequest,
@@ -62,7 +63,6 @@ pub(crate) async fn reserve_claims(
             .iter()
             .filter_map(|row| row.get("slot").and_then(serde_json::Value::as_i64))
             .collect();
-        // Lowering a limit also counts occupied slots above the new maximum.
         if occupied.len() >= limit as usize {
             return Ok((transaction, false));
         }

@@ -19,14 +19,26 @@ use crate::fault_helpers::{install_fault, remove_fault};
 use crate::helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::TickFaultTestCase;
+use crate::test_types::{RunLifecycleTestCase, TickFaultTestCase};
 
 #[test]
 fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_facts_outcomes_and_claims_are_atomic()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        RunLifecycleTestCase {
+            description: "SQLite preserves facts, outcomes and claims through worker failures",
+            backend: Backend::Sqlite,
+            expected_status: RunStatus::Partial,
+        },
+        RunLifecycleTestCase {
+            description: "PostgreSQL preserves facts, outcomes and claims through worker failures",
+            backend: Backend::Postgres,
+            expected_status: RunStatus::Partial,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -137,42 +149,40 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     },
                     ..started.clone()
                 };
-                if node == "customers" {
-                    let before_nodes = list_run_nodes(store, started.run_id)
-                        .await
-                        .expect("node before fault");
-                    let before_events = read_recall_events(store, 0, 100)
-                        .await
-                        .expect("events before node fault");
-                    for table in ["sqb_run_nodes", "sqb_runs"] {
-                        let point = TickFaultTestCase {
-                            description: "node projection and counter failure",
-                            table,
-                            operation: "UPDATE",
-                            condition: "",
-                            sqlite_body: "SELECT RAISE(ABORT,'injected node failure')",
-                            postgres_body: "RAISE EXCEPTION 'injected node failure'",
-                        };
-                        install_fault(store, &point).await;
-                        assert!(
-                            change_run(store, worker, &completed).await.is_err(),
-                            "{} at {table}",
-                            point.description
-                        );
-                        remove_fault(store, &point).await;
-                        assert_eq!(
-                            list_run_nodes(store, started.run_id)
-                                .await
-                                .expect("node rollback"),
-                            before_nodes
-                        );
-                        assert_eq!(
-                            read_recall_events(store, 0, 100)
-                                .await
-                                .expect("node fact rollback"),
-                            before_events
-                        );
-                    }
+                let before_nodes = list_run_nodes(store, started.run_id)
+                    .await
+                    .expect("node before fault");
+                let before_events = read_recall_events(store, 0, 100)
+                    .await
+                    .expect("events before node fault");
+                for table in ["sqb_run_nodes", "sqb_runs"] {
+                    let point = TickFaultTestCase {
+                        description: "node projection and counter failure",
+                        table,
+                        operation: "UPDATE",
+                        condition: "",
+                        sqlite_body: "SELECT RAISE(ABORT,'injected node failure')",
+                        postgres_body: "RAISE EXCEPTION 'injected node failure'",
+                    };
+                    install_fault(store, &point).await;
+                    assert!(
+                        change_run(store, worker, &completed).await.is_err(),
+                        "{} at {table}",
+                        point.description
+                    );
+                    remove_fault(store, &point).await;
+                    assert_eq!(
+                        list_run_nodes(store, started.run_id)
+                            .await
+                            .expect("node rollback"),
+                        before_nodes
+                    );
+                    assert_eq!(
+                        read_recall_events(store, 0, 100)
+                            .await
+                            .expect("node fact rollback"),
+                        before_events
+                    );
                 }
                 assert!(
                     change_run(store, worker, &completed)
@@ -201,22 +211,16 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             let before = read_recall_events(store, 0, 100)
                 .await
                 .expect("before terminal");
-            for table in [
-                "recall_events",
-                "sqb_runs",
-                "sqb_write_claims",
-                "sqb_run_liveness",
+            for (table, operation) in [
+                ("recall_events", "INSERT"),
+                ("sqb_runs", "UPDATE"),
+                ("sqb_write_claims", "DELETE"),
+                ("sqb_run_liveness", "DELETE"),
             ] {
                 let point = TickFaultTestCase {
                     description: "terminal transaction failure",
                     table,
-                    operation: if table == "recall_events" {
-                        "INSERT"
-                    } else if table.starts_with("sqb_run") && table != "sqb_run_liveness" {
-                        "UPDATE"
-                    } else {
-                        "DELETE"
-                    },
+                    operation,
                     condition: "",
                     sqlite_body: "SELECT RAISE(ABORT,'injected terminal failure')",
                     postgres_body: "RAISE EXCEPTION 'injected terminal failure'",
@@ -317,7 +321,11 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 .into_iter()
                 .find(|run| run.run_id == started.run_id)
                 .expect("original run");
-            assert_eq!(projected.status, RunStatus::Partial);
+            assert_eq!(
+                projected.status, test_case.expected_status,
+                "{}",
+                test_case.description
+            );
             assert_eq!(
                 projected.node_counts_json,
                 BTreeMap::from([("success".into(), 1), ("failed".into(), 1)])
@@ -342,9 +350,21 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
 #[test]
 fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_launch_and_preserves_the_actor()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        RunLifecycleTestCase {
+            description: "SQLite cancellation before launch preserves the operator and terminal fact",
+            backend: Backend::Sqlite,
+            expected_status: RunStatus::Cancelled,
+        },
+        RunLifecycleTestCase {
+            description: "PostgreSQL cancellation before launch preserves the operator and terminal fact",
+            backend: Backend::Postgres,
+            expected_status: RunStatus::Cancelled,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -397,7 +417,11 @@ fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_l
                 .await
                 .expect("cancelled projection")
                 .remove(0);
-            assert_eq!(projected.status, RunStatus::Cancelled);
+            assert_eq!(
+                projected.status, test_case.expected_status,
+                "{}",
+                test_case.description
+            );
             assert_eq!(
                 projected.node_counts_json,
                 BTreeMap::from([("cancelled".into(), 1)])

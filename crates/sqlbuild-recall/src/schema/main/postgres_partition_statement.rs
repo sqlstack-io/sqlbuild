@@ -1,8 +1,8 @@
 //! Monthly partition bounds are calculated from a typed date, never interpolated user SQL.
 
 use chrono::{Datelike, Months, NaiveDate};
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
-use crate::schema::_helpers::rendering::sqlite_identifier;
 use crate::schema::main::table_spec::table_spec;
 use crate::schema::models::Table;
 

@@ -1,10 +1,11 @@
 //! Duplicate detection uses the same stable keys as physical unique constraints.
 
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::records::models::{RecallRow, RecallValue};
-use crate::schema::_helpers::rendering::sqlite_identifier;
 use crate::schema::main::table_columns::table_columns;
 use crate::schema::main::table_spec::table_spec;
-use crate::schema::models::Table;
+use crate::schema::models::{ColumnType, Table};
 use crate::store::_helpers::relational::placeholder;
 use crate::store::models::RecallStatement;
 
@@ -17,14 +18,11 @@ pub fn relational_lookup(row: &RecallRow, postgres: bool, control: bool) -> Reca
         keys.push(spec.expiry_column);
     }
     let metadata = table_columns(row.table);
-    let mut values = Vec::new();
-    let mut conditions = Vec::new();
-    for key in keys {
-        let kind = metadata
-            .iter()
-            .find(|column| column.name == key)
-            .expect("Recall key columns belong to their schema")
-            .column_type;
+    let mut values: Vec<(&RecallValue, ColumnType)> = Vec::new();
+    let mut conditions: Vec<String> = Vec::new();
+    for column in metadata.iter().filter(|column| keys.contains(&column.name)) {
+        let key = column.name;
+        let kind = column.column_type;
         values.push((row.value(key).unwrap_or(&RecallValue::Null), kind));
         conditions.push(format!(
             "{} = {}",

@@ -1,5 +1,7 @@
 #[path = "ticks/fault_helpers.rs"]
 mod fault_helpers;
+#[path = "store/fault_types.rs"]
+mod fault_types;
 #[path = "runs/helpers.rs"]
 mod helpers;
 #[path = "store/lease_helpers.rs"]
@@ -20,5 +22,5 @@ mod test_coalesce;
 mod test_faults;
 #[path = "runs/test_lifecycle.rs"]
 mod test_lifecycle;
-#[path = "store/fault_types.rs"]
+#[path = "runs/test_types.rs"]
 mod test_types;

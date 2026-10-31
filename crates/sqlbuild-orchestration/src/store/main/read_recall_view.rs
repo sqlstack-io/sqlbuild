@@ -9,7 +9,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::types::Row;
 
-/// The API authorizes the invocation and evidence capability before entering this storage reader.
+/// Read authorized evidence, decoding only display text while preserving byte-exact captured content.
 pub async fn read_recall_view(
     store: &ControlStore,
     (view, invocation_id): (&str, &str),
@@ -28,8 +28,6 @@ pub async fn read_recall_view(
         ],
     )
     .await?;
-    // These PostgreSQL view columns retain bytes: conversion to database text would reject NUL.
-    // Decode only the display field, leaving captured content and transcripts byte-exact.
     if matches!(view, "output_tail" | "artifacts") {
         for row in &mut rows {
             if let Some(text) = row.get_mut("text")

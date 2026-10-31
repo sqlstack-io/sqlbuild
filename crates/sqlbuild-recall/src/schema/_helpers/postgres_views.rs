@@ -29,12 +29,12 @@ fn json_fields(mut body: String) -> String {
             &format!("(payload ->> '{field}'){cast}"),
         );
     }
-    for field in ["name", "job_name", "run_id", "retry_number"] {
-        let cast = if field == "retry_number" {
-            "::BIGINT"
-        } else {
-            ""
-        };
+    for (field, cast) in [
+        ("name", ""),
+        ("job_name", ""),
+        ("run_id", ""),
+        ("retry_number", "::BIGINT"),
+    ] {
         body = body.replace(
             &format!("json_extract(context.external_context, '$.integration.{field}')"),
             &format!("(context.external_context #>> '{{integration,{field}}}'){cast}"),
@@ -50,6 +50,7 @@ fn json_fields(mut body: String) -> String {
     )
 }
 
+/// Keep display bytes until readers decode them: PostgreSQL text rejects NUL and malformed UTF-8.
 fn postgres_body(body: String) -> String {
     let mut body = json_fields(body)
         .replace("strftime('%Y-%m-%dT%H:%M:%fZ', 'now')", "CURRENT_TIMESTAMP")
@@ -59,7 +60,6 @@ fn postgres_body(body: String) -> String {
         .replace("MAX(COALESCE(received.queue_drops", "GREATEST(COALESCE(received.queue_drops")
         .replace("COALESCE(context.recall_filter_active, 0)", "COALESCE(CAST(context.recall_filter_active AS INTEGER), 0)")
         .replace("COALESCE(delivery.flush_complete, 0)", "COALESCE(CAST(delivery.flush_complete AS INTEGER), 0)")
-        // PostgreSQL text cannot hold NUL or malformed UTF-8. Keep display bytes until the reader decodes them.
         .replace("CAST(data AS TEXT)", "data")
         .replace("CAST(artifact.content AS TEXT)", "artifact.content")
         .replace(")\nGROUP BY", ") AS source_rows\nGROUP BY")

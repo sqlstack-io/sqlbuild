@@ -1,7 +1,8 @@
 //! Control stores expose Recall's supported views on both engines.
 
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::schema::_helpers::postgres_views::postgres_view_bodies;
-use crate::schema::_helpers::rendering::sqlite_identifier;
 use crate::schema::main::view_statements::view_statements;
 use crate::schema::models::{DdlOptions, Dialect};
 

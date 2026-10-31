@@ -1,19 +1,10 @@
 //! One logical schema and index list for SQLite and PostgreSQL.
 
-use crate::schema::_helpers::rendering::{all_columns, sqlite_identifier, sqlite_type};
-use crate::schema::models::{ColumnType, TableSpec};
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
-pub(crate) fn postgres_type(column: ColumnType) -> &'static str {
-    match column {
-        ColumnType::Text => "TEXT",
-        ColumnType::Timestamp => "TIMESTAMPTZ",
-        ColumnType::Json => "JSONB",
-        ColumnType::Integer => "BIGINT",
-        ColumnType::Boolean => "BOOLEAN",
-        ColumnType::Real => "DOUBLE PRECISION",
-        ColumnType::Blob => "BYTEA",
-    }
-}
+use crate::schema::_helpers::rendering::{all_columns, sqlite_type};
+use crate::schema::constants::{ARTIFACTS_TABLE, EVENTS_TABLE};
+use crate::schema::models::{ColumnType, TableSpec};
 
 pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) -> Vec<String> {
     let mut definitions: Vec<String> = all_columns(spec)
@@ -21,7 +12,7 @@ pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) 
         .map(|column| {
             let not_null = if column.nullable { "" } else { " NOT NULL" };
             let kind = if postgres {
-                postgres_type(column.column_type)
+                column.column_type.postgres_type()
             } else if control && column.column_type == ColumnType::Json {
                 "JSON"
             } else {
@@ -30,7 +21,7 @@ pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) 
             format!("    {} {kind}{not_null}", sqlite_identifier(column.name))
         })
         .collect();
-    if control && spec.name == "recall_events" {
+    if control && spec.name == EVENTS_TABLE.name {
         definitions.push(if postgres {
             "    storage_id BIGINT GENERATED ALWAYS AS IDENTITY".into()
         } else {
@@ -38,7 +29,7 @@ pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) 
         });
     }
     let mut key: Vec<&str> = spec.key.to_vec();
-    let partition = if postgres && spec.name != "recall_artifacts" {
+    let partition = if postgres && spec.name != ARTIFACTS_TABLE.name {
         if !key.contains(&spec.expiry_column) {
             key.push(spec.expiry_column);
         }

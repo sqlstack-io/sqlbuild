@@ -23,7 +23,7 @@ pub(crate) fn environment_hash(py: Python<'_>, project_dir: &Path) -> PyResult<S
             hash.update(lockfile);
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let mut packages = Vec::new();
+            let mut packages: Vec<(String, String)> = Vec::new();
             for distribution in py
                 .import("importlib.metadata")?
                 .call_method0("distributions")?

@@ -19,14 +19,26 @@ use crate::helpers::{queue, request, snapshot};
 use crate::lease_helpers::expire_lease;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::TickFaultTestCase;
+use crate::test_types::{ClaimFailureTestCase, TickFaultTestCase};
 
 #[test]
 fn given_failures_during_claim_publication_when_retried_then_claims_slots_liveness_facts_and_projection_commit_together()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        ClaimFailureTestCase {
+            description: "SQLite rolls back every claim-publication failure window",
+            backend: Backend::Sqlite,
+            expected_run: 1,
+        },
+        ClaimFailureTestCase {
+            description: "PostgreSQL rolls back every claim-publication failure window",
+            backend: Backend::Postgres,
+            expected_run: 1,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -59,21 +71,17 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
             let projected = list_runs(store, (location, "development"), 100)
                 .await
                 .expect("queued projection");
-            for table in [
-                "sqb_write_claims",
-                "sqb_concurrency_slots",
-                "sqb_run_liveness",
-                "recall_events",
-                "sqb_runs",
+            for (table, operation) in [
+                ("sqb_write_claims", "INSERT"),
+                ("sqb_concurrency_slots", "INSERT"),
+                ("sqb_run_liveness", "INSERT"),
+                ("recall_events", "INSERT"),
+                ("sqb_runs", "UPDATE"),
             ] {
                 let point = TickFaultTestCase {
                     description: "claim publication failure",
                     table,
-                    operation: if table == "sqb_runs" {
-                        "UPDATE"
-                    } else {
-                        "INSERT"
-                    },
+                    operation,
                     condition: "",
                     sqlite_body: "SELECT RAISE(ABORT,'injected claim failure')",
                     postgres_body: "RAISE EXCEPTION 'injected claim failure'",
@@ -121,6 +129,12 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                 .expect("retry complete claim")
                 .expect("no leaked claims or slots");
             assert_eq!(claim.request, input);
+            assert_eq!(
+                claim.request.run_id,
+                Uuid::from_u128(test_case.expected_run),
+                "{}",
+                test_case.description
+            );
             assert!(
                 claim_next_run(store, &lease, &limits)
                     .await

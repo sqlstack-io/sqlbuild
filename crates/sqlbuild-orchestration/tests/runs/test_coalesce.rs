@@ -15,13 +15,26 @@ use uuid::Uuid;
 use crate::helpers::snapshot;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
+use crate::test_types::CoalescedRunTestCase;
 
 #[test]
 fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks_wait_in_a_new_run_instead_of_covering_executing_work()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        CoalescedRunTestCase {
+            description: "SQLite coalesces only work that has not been claimed",
+            backend: Backend::Sqlite,
+            expected_runs: 2,
+        },
+        CoalescedRunTestCase {
+            description: "PostgreSQL coalesces only work that has not been claimed",
+            backend: Backend::Postgres,
+            expected_runs: 2,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -95,7 +108,9 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
                     .await
                     .expect("one executing and one waiting")
                     .len(),
-                2
+                test_case.expected_runs,
+                "{}",
+                test_case.description
             );
             close_test_store(fixture).await;
         });

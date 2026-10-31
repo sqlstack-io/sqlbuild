@@ -15,7 +15,8 @@ pub async fn run_scheduler(
     mut changes: watch::Receiver<()>,
 ) -> Result<(), ControlError> {
     while !*shutdown.borrow() {
-        let cycle = scheduler_cycle(store, &mut state).await?;
+        let (next_state, cycle) = scheduler_cycle(store, state).await?;
+        state = next_state;
         tokio::select! {
             _ = tokio::time::sleep(cycle.wait_for) => {},
             result = changes.changed() => { if result.is_err() { break; } },

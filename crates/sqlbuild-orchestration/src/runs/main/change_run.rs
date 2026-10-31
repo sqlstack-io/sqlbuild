@@ -14,7 +14,7 @@ use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-/// Authority comes from authenticated API state, not client-supplied actor or scope fields.
+/// Use authenticated authority and record unclaimed cancellation as terminal in the same transaction.
 pub async fn change_run(
     store: &ControlStore,
     authority: RunAuthority<'_>,
@@ -67,7 +67,6 @@ pub async fn change_run(
     )
     .await?;
     let mut transaction = project_change(transaction, request, &state).await?;
-    // No process can exist before a durable claim. Cancel queued work without leaving it inert forever.
     if matches!(request.change, RunChange::CancelRequested { .. })
         && state.worker_instance.is_none()
     {

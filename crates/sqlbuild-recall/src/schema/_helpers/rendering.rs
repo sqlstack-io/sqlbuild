@@ -36,11 +36,6 @@ pub(crate) fn clickhouse_type(column: &ColumnSpec) -> String {
     }
 }
 
-/// `"name"` for SQLite.
-pub(crate) fn sqlite_identifier(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
 /// `` `name` `` for ClickHouse.
 pub(crate) fn clickhouse_identifier(name: &str) -> String {
     format!("`{}`", name.replace('\\', "\\\\").replace('`', "\\`"))

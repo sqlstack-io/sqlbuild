@@ -2,8 +2,10 @@
 
 use std::collections::HashSet;
 
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::records::models::{RecallRow, RecallValue};
-use crate::schema::_helpers::rendering::sqlite_identifier;
+use crate::schema::constants::INGESTED_AT_COLUMN;
 use crate::schema::main::table_columns::table_columns;
 use crate::schema::main::table_spec::table_spec;
 use crate::schema::models::ColumnType;
@@ -18,18 +20,18 @@ pub fn relational_insert<'a>(
     postgres: bool,
 ) -> RecallStatement<'a> {
     let metadata = table_columns(row.table);
-    let mut names = Vec::new();
-    let mut values = Vec::new();
+    let mut names: Vec<String> = Vec::new();
+    let mut values: Vec<(&RecallValue, ColumnType)> = Vec::new();
     for (name, value) in &row.values {
         if let Some(column) = metadata.iter().find(|column| column.name == *name)
             && columns.contains(*name)
-            && *name != "ingested_at"
+            && *name != INGESTED_AT_COLUMN
         {
             names.push(sqlite_identifier(name));
             values.push((value, column.column_type));
         }
     }
-    names.push("ingested_at".into());
+    names.push(INGESTED_AT_COLUMN.into());
     values.push((ingested_at, ColumnType::Timestamp));
     let placeholders: Vec<String> = values
         .iter()

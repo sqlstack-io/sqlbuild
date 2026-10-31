@@ -61,8 +61,6 @@ pub(crate) const MAX_DATETIME64_PRECISION: u64 = 9;
 pub(crate) const MICROS_DIGITS: u64 = 6;
 /// One decimal digit of timestamp scale.
 pub(crate) const DECIMAL_SCALE: i64 = 10;
-/// The column the store sets when a row is written.
-pub(crate) const INGESTED_AT_COLUMN: &str = "ingested_at";
 pub(crate) const VARINT_PAYLOAD_BITS: u32 = 7;
 pub(crate) const VARINT_CONTINUE: u8 = 0x80;
 pub(crate) const VARINT_MASK: u64 = 0x7f;

@@ -1566,6 +1566,18 @@ reason = "CompactAnalysisJob holds a prepared analysis closure, which cannot imp
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
+path = "crates/sqlbuild-orchestration/src/credentials/models.rs"
+symbols = ["IssuedToken"]
+reason = "IssuedToken implements Debug manually to redact its bearer credential; deriving Debug would expose the secret."
+
+[[targets.rust.rule_exceptions]]
+rule = "XSB072"
+path = "crates/sqlbuild-python/src/bindings/_helpers/compiled_project/snapshot.rs"
+symbols = ["NativeOrchestrationSnapshot"]
+reason = "The pyclass module attribute names sqlbuild._native but executes no Python call. The struct retains only SnapshotInput; binding functions remain checked."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
 path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
 

@@ -19,6 +19,8 @@ from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
+    SnapshotEnvironmentTestCase,
+    SnapshotRejectionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
@@ -148,7 +150,7 @@ def test_given_real_projects_when_building_snapshots_then_catalogs_are_stable_an
             adapter=DuckDbAdapter(),
             resolved_connection={"database": "warehouse", "schema": "main"},
         )
-        assert not [item for item in project.diagnostics if item.severity == "error"]
+        assert not any(item.severity == "error" for item in project.diagnostics)
         snapshot: NativeOrchestrationSnapshot = build_orchestration_snapshot(
             project, metadata, directory
         )
@@ -185,46 +187,70 @@ def test_given_real_projects_when_building_snapshots_then_catalogs_are_stable_an
     assert publications[0] == publications[1]
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotRejectionTestCase(
+            description="a valid compile cannot publish caller-forged nodes",
+            files=TYPE_PROOF_FILES,
+            nodes={
+                "model:forged": {
+                    "kind": "model",
+                    "definition": {},
+                    "raw_sql": None,
+                    "compiled_sql": "select 2",
+                    "python_source": None,
+                }
+            },
+            expected_compiler_errors=False,
+            expected_message="nodes must come from the compiled project",
+        ),
+        SnapshotRejectionTestCase(
+            description="compiler errors cannot replace the last good publication",
+            files=TYPE_PROOF_FILES | {"models/orders.sql": "MODEL ();\nSELECT 1 AS order_id\n"},
+            nodes={},
+            expected_compiler_errors=True,
+            expected_message="cannot publish a project with compiler errors",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_invalid_compilation_or_forged_nodes_when_publishing_then_no_snapshot_is_emitted(
+    test_case: SnapshotRejectionTestCase,
     tmp_path: Path,
 ) -> None:
-    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    write_files(project_dir=tmp_path, files=test_case.files)
     project: CompiledProjectView = build_compiled_project(
         discovered_inputs=discover_project_inputs(project_dir=tmp_path),
         adapter=DuckDbAdapter(),
         resolved_connection={"database": "warehouse", "schema": "main"},
     )
-    with pytest.raises(ValueError, match="nodes must come from the compiled project"):
+    assert (
+        any(item.severity == "error" for item in project.diagnostics)
+        == test_case.expected_compiler_errors
+    )
+    with pytest.raises(ValueError, match=test_case.expected_message):
         build_orchestration_snapshot(
             project,
-            json.dumps(
-                METADATA
-                | {
-                    "nodes": {
-                        "model:forged": {
-                            "kind": "model",
-                            "definition": {},
-                            "raw_sql": None,
-                            "compiled_sql": "select 2",
-                            "python_source": None,
-                        }
-                    }
-                }
-            ),
+            json.dumps(METADATA | {"nodes": test_case.nodes}),
             tmp_path,
         )
-    (tmp_path / "models/orders.sql").write_text("MODEL ();\nSELECT 1 AS order_id\n")
-    broken: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
-        adapter=DuckDbAdapter(),
-        resolved_connection={"database": "warehouse", "schema": "main"},
-    )
-    assert any(item.severity == "error" for item in broken.diagnostics)
-    with pytest.raises(ValueError, match="cannot publish a project with compiler errors"):
-        build_orchestration_snapshot(broken, json.dumps(METADATA), tmp_path)
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotEnvironmentTestCase(
+            description="installed dependencies and two lock revisions identify different environments",
+            first_lockfile="version = 1\n# dependency revision one\n",
+            second_lockfile="version = 1\n# dependency revision two\n",
+            expected_environment_count=3,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
 def test_given_a_dependency_lock_when_it_changes_then_environment_identity_changes_not_node_content(
+    test_case: SnapshotEnvironmentTestCase,
     tmp_path: Path,
 ) -> None:
     write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
@@ -236,11 +262,11 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     installed: dict[str, Any] = json.loads(
         build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
     )
-    (tmp_path / "uv.lock").write_text("version = 1\n# dependency revision one\n")
+    (tmp_path / "uv.lock").write_text(test_case.first_lockfile)
     locked: dict[str, Any] = json.loads(
         build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
     )
-    (tmp_path / "uv.lock").write_text("version = 1\n# dependency revision two\n")
+    (tmp_path / "uv.lock").write_text(test_case.second_lockfile)
     changed: dict[str, Any] = json.loads(
         build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
     )
@@ -248,7 +274,7 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
         len(
             {installed["environment_hash"], locked["environment_hash"], changed["environment_hash"]}
         )
-        == 3
+        == test_case.expected_environment_count
     )
     assert installed["nodes"] == locked["nodes"] == changed["nodes"]
     assert changed == json.loads(

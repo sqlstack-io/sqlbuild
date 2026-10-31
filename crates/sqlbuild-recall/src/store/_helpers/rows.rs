@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 
 use rusqlite::{Connection, OptionalExtension};
 
-use crate::records::_helpers::rows::key_text;
 use crate::records::main::conflict_row::conflict_row;
 use crate::records::models::{RecallRow, RecallValue, RowEnvelope};
 use crate::schema::main::table_spec::table_spec;
@@ -19,7 +18,8 @@ use crate::store::main::relational_lookup::relational_lookup;
 use crate::store::models::{ConflictEvidence, InsertOutcome};
 
 fn text_of(row: &RecallRow, column: &str) -> String {
-    key_text(row.value(column))
+    row.value(column)
+        .map_or_else(String::new, RecallValue::key_text)
 }
 
 /// Insert one row's values for the columns its table has; `Some(evidence)` when its key holds different content.
