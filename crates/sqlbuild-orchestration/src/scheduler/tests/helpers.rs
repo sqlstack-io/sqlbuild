@@ -8,7 +8,7 @@ use proptest::test_runner::{Config, TestCaseError, TestCaseResult, TestRunner};
 use proptest::{prop_assert, prop_assert_eq};
 use uuid::Uuid;
 
-use crate::scheduler::main::plan_ticks::plan_ticks;
+use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::models::{CatchUp, Overlap, TickAction, TickDecision, TickPlan, TickState};
 use crate::scheduler::tests::test_types::TickTestCase;
 

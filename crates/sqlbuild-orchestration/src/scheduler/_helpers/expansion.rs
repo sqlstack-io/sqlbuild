@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 
 use crate::declarations::models::{Schedule, TriggerDefinition};
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
-use crate::scheduler::main::next_cron_time::next_cron_time;
+use crate::scheduler::main::_next_cron_time::next_cron_time;
+use crate::scheduler::main::_previous_cron_time::previous_cron_time;
 use crate::scheduler::main::parse_cron::parse_cron;
-use crate::scheduler::main::previous_cron_time::previous_cron_time;
 use crate::scheduler::models::CatchUp;
 use crate::scheduler::types::ScheduleExpansion;
 use crate::store::errors::ControlError;

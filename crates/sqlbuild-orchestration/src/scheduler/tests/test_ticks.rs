@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use crate::scheduler::main::plan_ticks::plan_ticks;
+use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::models::{CatchUp, Overlap};
 use crate::scheduler::tests::helpers::{covered_seconds, request_seconds, state, time};
 use crate::scheduler::tests::test_types::TickTestCase;

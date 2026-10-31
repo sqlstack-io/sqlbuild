@@ -7,7 +7,7 @@ use crate::scheduler::models::CronSchedule;
 use crate::store::errors::ControlError;
 
 /// Fold and gap mapping is identical to forward expansion, including the later ambiguous instant.
-pub fn previous_cron_time(
+pub(in crate::scheduler) fn previous_cron_time(
     schedule: &CronSchedule,
     at: DateTime<Utc>,
 ) -> Result<DateTime<Utc>, ControlError> {

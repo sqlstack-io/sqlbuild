@@ -10,7 +10,10 @@ use crate::scheduler::models::{TickPlan, TickState};
 use crate::store::errors::ControlError;
 
 /// Return facts to append and the cursor to commit atomically with them.
-pub fn plan_ticks(state: &TickState, now: DateTime<Utc>) -> Result<TickPlan, ControlError> {
+pub(in crate::scheduler) fn plan_ticks(
+    state: &TickState,
+    now: DateTime<Utc>,
+) -> Result<TickPlan, ControlError> {
     if !state.enabled {
         return Ok(TickPlan {
             actions: vec![],

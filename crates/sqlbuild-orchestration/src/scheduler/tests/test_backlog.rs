@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use crate::declarations::models::{Schedule, TriggerDefinition, TriggerStatus};
 use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
-use crate::scheduler::main::plan_ticks::plan_ticks;
+use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::models::{CatchUp, Overlap, TickDecision, TickState};
 use crate::scheduler::tests::helpers::time;
 use crate::scheduler::tests::test_types::BacklogTestCase;

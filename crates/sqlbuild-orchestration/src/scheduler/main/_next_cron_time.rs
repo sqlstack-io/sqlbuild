@@ -7,7 +7,7 @@ use crate::scheduler::models::CronSchedule;
 use crate::store::errors::ControlError;
 
 /// Ambiguities select the later fold; missing times move to the end of the actual IANA gap.
-pub fn next_cron_time(
+pub(in crate::scheduler) fn next_cron_time(
     schedule: &CronSchedule,
     after: DateTime<Utc>,
 ) -> Result<DateTime<Utc>, ControlError> {
