@@ -36,6 +36,8 @@ pub(crate) const MAXIMUM_BLANK_RUN: usize = 2;
 
 /// `CliNamespace` attributes the post-parse rules read and write.
 pub(crate) const COMMAND_DEST: &str = "command";
+pub(crate) const BUILD_COMMAND: &str = "build";
+pub(crate) const CONCURRENCY_DEST: &str = "concurrency";
 pub(crate) const DBT_COMMAND: &str = "dbt";
 pub(crate) const DBT_DEBUG_COMMAND: &str = "debug";
 pub(crate) const DBT_PASSTHROUGH_COMMANDS: [&str; 4] = ["plan", "run", "build", "debug"];

@@ -304,6 +304,8 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         select="+orders",
         exclude="stg_orders",
         overlap="queue",
+        settings={"run_tests": False, "vars": {"batch": 3}, "warehouse": "reporting"},
+        concurrency=4,
         concurrency_groups=("order_reporting",),
         schedule=schedule(cron="15 2 * * *", timezone=test_case.timezone),
         targets=("development",),
@@ -321,7 +323,12 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         "nightly_orders": {
             "description": "Refresh order reporting.",
             "selection": list(test_case.expected_selection),
-            "settings": {},
+            "settings": {
+                "concurrency": 4,
+                "run_tests": False,
+                "vars": {"batch": 3},
+                "warehouse": "reporting",
+            },
             "overlap": "queue",
             "on_failure": "skip_dependents",
             "concurrency_groups": ["order_reporting"],
@@ -373,6 +380,57 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         SnapshotDeclarationRejectionTestCase(
             description="duplicate names", copies=2, expected_message="duplicate job orders"
         ),
+        SnapshotDeclarationRejectionTestCase(
+            description="unknown setting",
+            settings={"concurreny": 4},
+            expected_message="unknown build setting concurreny",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="selection cannot escape its pinned run",
+            settings={"select": "customers"},
+            expected_message="owned by the run request",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="zero concurrency",
+            concurrency=0,
+            expected_message="must be positive",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="boolean is not concurrency",
+            concurrency=True,
+            expected_message="concurrency must be an integer",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="integer is not a boolean flag",
+            settings={"full_refresh": 1},
+            expected_message="must be boolean",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="integer strings are not typed settings",
+            settings={"concurrency": "3"},
+            expected_message="must be an integer",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="variables need an object",
+            settings={"vars": ["orders"]},
+            expected_message="must be a JSON object",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="mutually exclusive load settings",
+            settings={"load_sources": False, "reload": True},
+            expected_message="mutually exclusive",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="conflicting cursor families",
+            settings={"start_cursor": "2", "end_cursor_int": "4"},
+            expected_message="cannot be combined",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="duplicate concurrency declarations",
+            concurrency=3,
+            settings={"concurrency": 4},
+            expected_message="declared twice",
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -390,6 +448,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             "orders",
             description=test_case.job_description,
             select=test_case.select,
+            settings=test_case.settings,
+            concurrency=test_case.concurrency,
             schedule=schedule(cron=test_case.cron, timezone=test_case.timezone),
         )
     ] * test_case.copies
@@ -495,6 +555,26 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=PythonNodeDiscoveryError,
             expected_message="Failed to import orchestration file orchestration/jobs.py",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="DuckShop settings cannot replace the selection",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/invalid_settings.py"
+                ).read_text()
+            },
+            expected_error=ValueError,
+            expected_message="owned by the run request",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="DuckShop mutually exclusive settings fail on every retry",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/conflicting_settings.py"
+                ).read_text()
+            },
+            expected_error=ValueError,
+            expected_message="mutually exclusive",
         ),
     ],
     ids=lambda case: case.description,

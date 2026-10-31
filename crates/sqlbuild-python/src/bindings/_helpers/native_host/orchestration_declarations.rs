@@ -3,12 +3,22 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use pyo3::exceptions::PyTypeError;
+use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::native_host::host::entry;
+
+/// JSON authoring values cross once; the interpreter rejects circular user containers safely.
+pub(crate) fn authored_setting(value: &Bound<'_, PyAny>) -> PyResult<serde_json::Value> {
+    let text: String = value
+        .py()
+        .import("json")?
+        .call_method1("dumps", (value,))?
+        .extract()?;
+    serde_json::from_str(&text).map_err(|error| PyValueError::new_err(error.to_string()))
+}
 
 /// Only module execution crosses into Python; discovery and collection stay native.
 pub(crate) fn module_jobs<'py>(

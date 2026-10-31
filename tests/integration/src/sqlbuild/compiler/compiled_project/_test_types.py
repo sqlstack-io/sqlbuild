@@ -230,6 +230,8 @@ class SnapshotDeclarationRejectionTestCase:
     select: str = "orders"
     cron: str = "0 2 * * *"
     timezone: str = "UTC"
+    settings: dict[str, object] = field(default_factory=dict)
+    concurrency: int | None = None
     copies: int = 1
     expected_message: str = ""
 

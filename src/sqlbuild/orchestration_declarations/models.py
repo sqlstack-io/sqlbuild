@@ -26,6 +26,8 @@ class Job:
     on_failure: Literal["skip_dependents", "skip_downstream_jobs", "stop_group"] = field(
         default="skip_dependents", kw_only=True
     )
+    settings: dict[str, object] = field(default_factory=dict, kw_only=True)
+    concurrency: int | None = field(default=None, kw_only=True)
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)

@@ -9,6 +9,7 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_core::constants::PYTHON_INIT_MODULE_STEM;
 use sqlbuild_discovery::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
 use sqlbuild_discovery::tree::main::rglob::rglob;
@@ -20,7 +21,9 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::scheduler::models::{CatchUp, Overlap};
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
-use crate::bindings::_helpers::native_host::orchestration_declarations::module_jobs;
+use crate::bindings::_helpers::native_host::orchestration_declarations::{
+    authored_setting, module_jobs,
+};
 
 /// Dedicated declaration modules are imported only in the code-location interpreter.
 pub(crate) fn discover_declarations<'py>(
@@ -65,6 +68,10 @@ pub(crate) struct AuthoredJob {
     exclude: String,
     overlap: String,
     on_failure: String,
+    #[pyo3(from_py_with = authored_setting)]
+    settings: Value,
+    #[pyo3(from_py_with = authored_setting)]
+    concurrency: Value,
     concurrency_groups: Vec<String>,
     schedule: Option<AuthoredSchedule>,
     targets: Vec<String>,
@@ -93,6 +100,15 @@ pub(crate) fn compile_declarations(
         if !job.targets.is_empty() && !job.targets.contains(&input.target) {
             continue;
         }
+        let mut settings: BTreeMap<String, Value> = serde_json::from_value(job.settings)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        if !job.concurrency.is_null() {
+            if settings.contains_key("concurrency") {
+                return Err(PyValueError::new_err("job concurrency is declared twice"));
+            }
+            settings.insert("concurrency".into(), job.concurrency);
+        }
+        job_settings_arguments(&settings).map_err(PyValueError::new_err)?;
         let tokens = |value: &str| {
             value
                 .split_whitespace()
@@ -132,7 +148,7 @@ pub(crate) fn compile_declarations(
             JobDefinition {
                 description: job.description,
                 selection,
-                settings: BTreeMap::new(),
+                settings,
                 overlap: serde_json::from_value::<Overlap>(Value::String(job.overlap))
                     .map_err(|error| PyValueError::new_err(error.to_string()))?,
                 on_failure: serde_json::from_value::<OnFailure>(Value::String(job.on_failure))
