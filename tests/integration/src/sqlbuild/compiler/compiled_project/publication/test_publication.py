@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 import pytest
 
@@ -50,7 +52,15 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
     test_case: SnapshotPublicationTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = tmp_path / "project"
-    write_files(project_dir=project_dir, files=TYPE_PROOF_FILES)
+    files: dict[str, str] = TYPE_PROOF_FILES | {
+        "orchestration/edge_cases/definitions.py": Path(
+            "benchmarks/duckshop/project/orchestration/edge_cases/definitions.py"
+        ).read_text(),
+        "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+            "MODEL (", "MODEL (tags ['edge_case'],", 1
+        ),
+    }
+    write_files(project_dir=project_dir, files=files)
     project: CompiledProjectView = build_compiled_project(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
         adapter=DuckDbAdapter(),
@@ -71,7 +81,10 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         initial: dict[str, Any] = current_snapshot(api, test_case.target)
         assert frozenset(initial["nodes"]) == test_case.expected_nodes
         assert initial["nodes"]["model:orders"]["definition"]["deps"] == ["model:stg_orders"]
-        edited: dict[str, str] = TYPE_PROOF_FILES | {
+        assert initial["documents"]["triggers"]["edge_snapshot_orders"]["catch_up"] == {
+            "all": {"max_runs": 3}
+        }
+        edited: dict[str, str] = files | {
             "models/stg_orders.sql": TYPE_PROOF_FILES["models/stg_orders.sql"].replace(
                 "CAST(5 AS INTEGER)", "CAST(9 AS INTEGER)"
             )
@@ -95,3 +108,15 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         current: dict[str, Any] = current_snapshot(api, test_case.target)
         assert current["record"] == updated
         assert "CAST(9 AS INTEGER)" in current["nodes"]["model:stg_orders"]["raw_sql"]
+        request: Request = Request(
+            f"{api.url}/api/locations/{api.location_id}/targets/"
+            f"{quote(test_case.target, safe='')}/triggers",
+            headers={"Authorization": f"Bearer {api.bearer}"},
+        )
+        with urlopen(request, timeout=5) as response:
+            triggers: list[dict[str, Any]] = json.load(response)
+        assert len(triggers) == 1
+        assert triggers[0]["status"] == "paused"
+        assert triggers[0]["definition_json"]["starts_at"] == "2026-07-02T19:47:23.456789Z"
+        assert triggers[0]["definition_json"]["default_status"] == "paused"
+        assert triggers[0]["definition_json"]["catch_up"] == {"all": {"max_runs": 3}}

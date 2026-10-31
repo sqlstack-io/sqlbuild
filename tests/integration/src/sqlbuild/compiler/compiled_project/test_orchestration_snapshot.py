@@ -280,11 +280,42 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     [
         SnapshotScheduleTestCase(
             description="daylight saving zone",
-            timezone="Europe/London",
+            schedule=schedule(cron="15 2 * * *", timezone="Europe/London"),
             expected_selection=("model:orders",),
         ),
         SnapshotScheduleTestCase(
-            description="fixed offset zone", timezone="UTC", expected_selection=("model:orders",)
+            description="fixed offset zone",
+            schedule=schedule(cron="15 2 * * *", timezone="UTC"),
+            expected_selection=("model:orders",),
+        ),
+        SnapshotScheduleTestCase(
+            description="paused bounded catch-up with a zoned start",
+            schedule=schedule(
+                cron="15 2 * * *",
+                timezone="Europe/London",
+                starts_at="2026-07-03T01:17:23.456789+05:30",
+                default_status="paused",
+                catch_up="all",
+                max_catch_up=3,
+            ),
+            expected_selection=("model:orders",),
+            expected_controls={
+                "starts_at": "2026-07-02T19:47:23.456789Z",
+                "default_status": "paused",
+                "catch_up": {"all": {"max_runs": 3}},
+            },
+        ),
+        SnapshotScheduleTestCase(
+            description="largest supported catch-up batch",
+            schedule=schedule(
+                cron="15 2 * * *", timezone="UTC", catch_up="all", max_catch_up=10_000
+            ),
+            expected_selection=("model:orders",),
+            expected_controls={
+                "starts_at": None,
+                "default_status": "running",
+                "catch_up": {"all": {"max_runs": 10_000}},
+            },
         ),
     ],
     ids=lambda case: case.description,
@@ -307,7 +338,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         settings={"run_tests": False, "vars": {"batch": 3}, "warehouse": "reporting"},
         concurrency=4,
         concurrency_groups=("order_reporting",),
-        schedule=schedule(cron="15 2 * * *", timezone=test_case.timezone),
+        schedule=test_case.schedule,
         targets=("development",),
     )
     excluded: Job = replace(nightly, name="other_target", targets=("production",))
@@ -339,8 +370,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
     assert trigger["schedule"] == {
         "kind": "cron",
         "expression": "15 2 * * *",
-        "timezone": test_case.timezone,
+        "timezone": test_case.schedule.timezone,
     }
+    assert {key: trigger[key] for key in test_case.expected_controls} == test_case.expected_controls
     edited: Job = replace(nightly, schedule=schedule(cron="30 3 * * *", timezone="UTC"))
     second: dict[str, Any] = json.loads(
         compile_snapshot(
@@ -376,6 +408,43 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         ),
         SnapshotDeclarationRejectionTestCase(
             description="invalid timezone", timezone="Unknown/Zone", expected_message="time zone"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="zero catch-up bound",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=0),
+            expected_message="catch_up",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="negative catch-up bound",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=-1),
+            expected_message="catch_up",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="boolean is not a catch-up bound",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=True),
+            expected_message="catch_up",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="unbounded all catch-up",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all"),
+            expected_message="catch_up",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="catch-up exceeds transaction bound",
+            schedule=schedule(
+                cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=10_001
+            ),
+            expected_message="catch-up exceeds 10000",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="latest does not silently ignore a bound",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", max_catch_up=3),
+            expected_message="latest.*without a bound",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="start needs an explicit offset",
+            schedule=schedule(cron="0 2 * * *", timezone="UTC", starts_at="2026-07-03T01:17:23"),
+            expected_message="starts_at",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="duplicate names", copies=2, expected_message="duplicate job orders"
@@ -450,7 +519,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             select=test_case.select,
             settings=test_case.settings,
             concurrency=test_case.concurrency,
-            schedule=schedule(cron=test_case.cron, timezone=test_case.timezone),
+            schedule=test_case.schedule
+            or schedule(cron=test_case.cron, timezone=test_case.timezone),
         )
     ] * test_case.copies
     with pytest.raises(ValueError, match=test_case.expected_message):

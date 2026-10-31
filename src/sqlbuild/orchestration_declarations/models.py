@@ -8,10 +8,14 @@ from typing import Literal
 
 @dataclass(frozen=True, kw_only=True)
 class Schedule:
-    """A wall-clock cron schedule attached to a job."""
+    """Cron with an RFC 3339 start; catch_up='all' requires a positive max_catch_up."""
 
     cron: str
     timezone: str
+    starts_at: str | None = None
+    default_status: Literal["running", "paused"] = "running"
+    catch_up: Literal["latest", "all"] = "latest"
+    max_catch_up: int | None = None
 
 
 @dataclass(frozen=True, eq=False)

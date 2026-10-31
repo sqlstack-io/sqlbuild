@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sqlbuild.orchestration import Schedule
+
 
 @dataclass(frozen=True)
 class HeaderProjectionTestCase:
@@ -219,8 +221,15 @@ class SnapshotEnvironmentTestCase:
 @dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
-    timezone: str
+    schedule: Schedule
     expected_selection: tuple[str, ...]
+    expected_controls: dict[str, object] = field(
+        default_factory=lambda: {
+            "starts_at": None,
+            "default_status": "running",
+            "catch_up": "latest",
+        }
+    )
 
 
 @dataclass(frozen=True)
@@ -234,6 +243,7 @@ class SnapshotDeclarationRejectionTestCase:
     concurrency: int | None = None
     copies: int = 1
     expected_message: str = ""
+    schedule: Schedule | None = None
 
 
 @dataclass(frozen=True)

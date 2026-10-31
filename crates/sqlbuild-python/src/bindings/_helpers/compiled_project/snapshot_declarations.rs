@@ -16,9 +16,9 @@ use sqlbuild_discovery::tree::main::rglob::rglob;
 use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    JobDefinition, OnFailure, Schedule, TriggerDefinition, TriggerStatus,
+    JobDefinition, OnFailure, Schedule, TriggerDefinition,
 };
-use sqlbuild_orchestration::scheduler::models::{CatchUp, Overlap};
+use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
@@ -58,6 +58,12 @@ pub(crate) fn discover_declarations<'py>(
 struct AuthoredSchedule {
     cron: String,
     timezone: String,
+    #[pyo3(from_py_with = authored_setting)]
+    starts_at: Value,
+    default_status: String,
+    catch_up: String,
+    #[pyo3(from_py_with = authored_setting)]
+    max_catch_up: Value,
 }
 
 #[derive(FromPyObject)]
@@ -128,6 +134,11 @@ pub(crate) fn compile_declarations(
                 .map(|(kind, name)| format!("{kind}:{name}"))
                 .collect();
         if let Some(schedule) = job.schedule {
+            let catch_up = if schedule.max_catch_up.is_null() {
+                Value::String(schedule.catch_up)
+            } else {
+                serde_json::json!({schedule.catch_up: {"max_runs": schedule.max_catch_up}})
+            };
             triggers.insert(
                 job.name.clone(),
                 TriggerDefinition {
@@ -137,9 +148,16 @@ pub(crate) fn compile_declarations(
                         expression: schedule.cron,
                         timezone: schedule.timezone,
                     },
-                    starts_at: None,
-                    default_status: TriggerStatus::Running,
-                    catch_up: CatchUp::Latest,
+                    starts_at: serde_json::from_value(schedule.starts_at)
+                        .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
+                    default_status: serde_json::from_value(Value::String(schedule.default_status))
+                        .map_err(|error| {
+                            PyValueError::new_err(format!("default_status: {error}"))
+                        })?,
+                    catch_up: serde_json::from_value(catch_up)
+                        .map_err(|error| PyValueError::new_err(format!(
+                            "catch_up: {error}; use 'latest' without a bound or 'all' with a positive max_catch_up"
+                        )))?,
                 },
             );
         }
