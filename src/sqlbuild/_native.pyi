@@ -1742,6 +1742,7 @@ class NativeOrchestrationSnapshot:
     """A compiled data-only publication retained natively until transport."""
 
     def to_json(self) -> str: ...
+    def publish(self, server_url: str, bearer: str) -> str: ...
 
 def build_orchestration_snapshot(
     project: CompiledProjectView,

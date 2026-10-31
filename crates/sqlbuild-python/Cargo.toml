@@ -47,6 +47,7 @@ sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
 stacker.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

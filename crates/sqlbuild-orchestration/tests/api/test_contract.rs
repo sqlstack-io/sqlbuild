@@ -4,6 +4,7 @@ use std::time::Duration;
 use chrono::Utc;
 use reqwest::StatusCode;
 use serde_json::json;
+use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
@@ -15,6 +16,7 @@ use sqlbuild_orchestration::runs::models::{
     RunAuthority, RunChange, RunChangeRequest, RunExecution, RunStatus,
 };
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
+use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::main::verify_execution::verify_execution;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 use sqlbuild_orchestration::store::main::create_location::create_location;
@@ -107,16 +109,26 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             assert!(openapi["components"]["schemas"]["RunChangeRequest"].is_object());
             assert!(openapi["components"]["schemas"]["RunExecution"].is_object());
             let input = snapshot(location_id);
+            let published = publish_remote_snapshot(&api.url, &location_token.bearer, &input)
+                .await
+                .expect("publish retained native data");
             let response = client
-                .post(&path)
+                .get(&path)
                 .bearer_auth(&location_token.bearer)
-                .json(&input)
                 .send()
                 .await
-                .expect("publish through API");
+                .expect("read published snapshot through API");
             assert_eq!(response.status(), StatusCode::OK);
             assert_eq!(response.headers()["cache-control"], "no-store");
-            let published: SnapshotRecord = response.json().await.expect("snapshot response");
+            drop(response);
+            assert!(matches!(
+                publish_remote_snapshot(&api.url, &location_token.bearer, &input).await,
+                Err(ClientError::Rejected(StatusCode::CONFLICT))
+            ));
+            assert!(matches!(
+                publish_remote_snapshot(&api.url, &location_token.bearer, &snapshot(other)).await,
+                Err(ClientError::Rejected(StatusCode::FORBIDDEN))
+            ));
             let response = client
                 .post(&path)
                 .bearer_auth(&location_token.bearer)

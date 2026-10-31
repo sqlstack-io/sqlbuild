@@ -3,11 +3,12 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use serde_json::Value;
 use sqlbuild_core::models::DiagnosticSeverity;
+use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
@@ -28,6 +29,21 @@ impl NativeOrchestrationSnapshot {
     fn to_json(&self, py: Python<'_>) -> PyResult<String> {
         py.detach(|| serde_json::to_string(&self.input))
             .map_err(|error| PyValueError::new_err(error.to_string()))
+    }
+
+    /// Publish retained data without projecting it through Python, releasing the GIL during IO.
+    fn publish(&self, py: Python<'_>, server_url: &str, bearer: &str) -> PyResult<String> {
+        py.detach(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            let result = runtime.block_on(publish_remote_snapshot(server_url, bearer, &self.input));
+            runtime.shutdown_timeout(std::time::Duration::from_secs(1));
+            let record = result.map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            serde_json::to_string(&record)
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
     }
 }
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 import pytest
 
@@ -24,24 +23,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
+    METADATA,
     PARITY_FILES,
     TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
-
-METADATA: dict[str, Any] = {
-    "location_id": str(UUID(int=1)),
-    "target": "development",
-    "generation": 1,
-    "git_revision": None,
-    "git_dirty": False,
-    "git_author": None,
-    "image_id": None,
-    "environment_hash": "test-environment",
-    "sqb_version": "not-the-installed-version",
-    "nodes": {},
-    "documents": {},
-}
 
 
 @pytest.mark.parametrize(

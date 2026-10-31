@@ -2647,6 +2647,7 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlbuild-state",
  "stacker",
+ "tokio",
 ]
 
 [[package]]
