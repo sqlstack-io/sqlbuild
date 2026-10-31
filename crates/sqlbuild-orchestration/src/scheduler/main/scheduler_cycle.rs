@@ -3,18 +3,19 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
+use crate::runs::constants::MONITOR_BATCH_SIZE;
+use crate::runs::main::monitor_runs::monitor_runs;
+use crate::scheduler::_helpers::drain_due_triggers::drain_due_triggers;
 use crate::scheduler::constants::RENEW_INTERVAL_SECONDS;
 use crate::scheduler::main::acquire_lease::acquire_lease;
-use crate::scheduler::main::evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::{SchedulerCycle, SchedulerState};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, TransactionMode};
 
 pub async fn scheduler_cycle(
     store: &ControlStore,
@@ -29,31 +30,20 @@ pub async fn scheduler_cycle(
         Err(ControlError::Fenced) => None,
         Err(error) => return Err(error),
     };
-    let mut cycle = SchedulerCycle {
+    let cycle = SchedulerCycle {
         leader: state.lease.is_some(),
         evaluated: 0,
         ticks: 0,
+        unresponsive: 0,
         wait_for: Duration::from_secs(RENEW_INTERVAL_SECONDS),
     };
-    let Some(mut lease) = state.lease.clone() else {
+    let Some(lease) = state.lease.clone() else {
         return Ok((state, cycle));
     };
-    let transaction = begin(store, TransactionMode::Read).await?;
-    let now = transaction.now;
-    let (transaction, rows) = query(transaction,
-        "SELECT s.trigger_id FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id \
-         JOIN sqb_locations l ON l.location_id=t.location_id \
-         WHERE s.status='running' AND s.next_due_at<=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
-         ORDER BY s.next_due_at, s.trigger_id LIMIT 100", vec![Parameter::Time(now)]).await?;
-    commit(transaction).await?;
-    for row in rows {
-        let trigger_id: Uuid = serde_json::from_value(row["trigger_id"].clone())
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if let Some(plan) = evaluate_trigger(store, &lease, trigger_id).await? {
-            cycle.evaluated += 1;
-            cycle.ticks += plan.actions.len();
-        }
-        lease = renew_lease(store, &lease).await?;
+    let (lease, mut cycle) = drain_due_triggers(store, lease, cycle).await?;
+    cycle.unresponsive = monitor_runs(store, &lease).await?;
+    if cycle.unresponsive == MONITOR_BATCH_SIZE {
+        cycle.wait_for = Duration::ZERO;
     }
     state.lease = Some(lease);
     let transaction = begin(store, TransactionMode::Read).await?;

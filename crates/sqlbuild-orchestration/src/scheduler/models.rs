@@ -36,6 +36,7 @@ pub struct SchedulerCycle {
     pub leader: bool,
     pub evaluated: usize,
     pub ticks: usize,
+    pub unresponsive: usize,
     pub wait_for: std::time::Duration,
 }
 

@@ -6,6 +6,8 @@ mod fault_types;
 mod helpers;
 #[path = "store/leases/helpers.rs"]
 mod lease_helpers;
+#[path = "runs/monitor/helpers.rs"]
+mod monitor_helpers;
 #[path = "store/replicas/helpers.rs"]
 mod replica_helpers;
 #[path = "store/helpers.rs"]
@@ -22,5 +24,7 @@ mod test_coalesce;
 mod test_faults;
 #[path = "runs/test_lifecycle.rs"]
 mod test_lifecycle;
+#[path = "runs/test_monitor.rs"]
+mod test_monitor;
 #[path = "runs/test_types.rs"]
 mod test_types;
