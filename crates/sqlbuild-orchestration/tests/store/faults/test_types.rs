@@ -1,6 +1,6 @@
-//! Transaction failure points shared by credential, tick and run contracts.
+//! Transaction failure cases shared by credential, tick and run contracts.
 
-pub(crate) struct TickFaultTestCase {
+pub(crate) struct TransactionFault {
     pub(crate) description: &'static str,
     pub(crate) table: &'static str,
     pub(crate) operation: &'static str,

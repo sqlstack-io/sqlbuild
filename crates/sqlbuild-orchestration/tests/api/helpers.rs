@@ -20,18 +20,21 @@ pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
         .build()
         .expect("HTTP client");
     tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if client
+        for _ in 0..250 {
+            assert!(!task.is_finished(), "API failed during startup");
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            let Ok(response) = client
                 .get(format!("{url}/api/openapi.json"))
                 .send()
                 .await
-                .is_ok_and(|response| response.status().is_success())
-            {
-                break;
-            }
-            assert!(!task.is_finished(), "API failed during startup");
-            tokio::time::sleep(Duration::from_millis(20)).await;
+                .and_then(reqwest::Response::error_for_status)
+            else {
+                continue;
+            };
+            drop(response);
+            return;
         }
+        panic!("API exhausted readiness attempts");
     })
     .await
     .expect("API becomes ready");

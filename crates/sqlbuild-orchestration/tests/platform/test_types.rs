@@ -7,7 +7,7 @@ use crate::store_test_types::Backend;
 pub(crate) struct WatchdogTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) take_lease: bool,
+    pub(crate) leaders: usize,
     pub(crate) expected_no_leader: bool,
     pub(crate) expected_overdue: usize,
     pub(crate) expected_low_horizons: usize,

@@ -1,3 +1,5 @@
+//! Terminal facts exercise claim release through the public run lifecycle.
+
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::models::{
     RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,

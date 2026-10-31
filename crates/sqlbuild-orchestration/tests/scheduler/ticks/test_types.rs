@@ -1,4 +1,6 @@
-pub(crate) use crate::fault_types::TickFaultTestCase;
+//! Database cases and expected scheduler tick outcomes.
+
+pub(crate) use crate::fault_types::TransactionFault;
 use crate::store_test_types::Backend;
 
 pub(crate) struct TickTransactionTestCase {

@@ -1,3 +1,5 @@
+//! Expected Recall storage outcomes for both supported databases.
+
 use crate::store_test_types::Backend;
 
 pub(crate) struct RecallTestCase {

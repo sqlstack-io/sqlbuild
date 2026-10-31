@@ -1,7 +1,9 @@
-use crate::helpers::transaction_contract;
+//! Crash points must not separate a tick from its queued work and durable cursor.
+
 use crate::store_helpers::run;
 use crate::store_test_types::Backend;
-use crate::test_types::TickTransactionTestCase;
+use crate::ticks::helpers::transaction_contract;
+use crate::ticks::test_types::TickTransactionTestCase;
 
 #[test]
 fn given_two_schedulers_and_faults_between_writes_when_restarting_then_ticks_runs_recall_and_cursor_commit_together()

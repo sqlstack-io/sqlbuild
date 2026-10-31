@@ -19,7 +19,7 @@ use crate::fault_helpers::{install_fault, remove_fault};
 use crate::helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::{RunLifecycleTestCase, TickFaultTestCase};
+use crate::test_types::{RunLifecycleTestCase, TransactionFault};
 
 #[test]
 fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_facts_outcomes_and_claims_are_atomic()
@@ -156,7 +156,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     .await
                     .expect("events before node fault");
                 for table in ["sqb_run_nodes", "sqb_runs"] {
-                    let point = TickFaultTestCase {
+                    let point = TransactionFault {
                         description: "node projection and counter failure",
                         table,
                         operation: "UPDATE",
@@ -217,7 +217,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 ("sqb_write_claims", "DELETE"),
                 ("sqb_run_liveness", "DELETE"),
             ] {
-                let point = TickFaultTestCase {
+                let point = TransactionFault {
                     description: "terminal transaction failure",
                     table,
                     operation,

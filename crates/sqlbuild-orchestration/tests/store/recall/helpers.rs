@@ -1,3 +1,5 @@
+//! Recall publication fixtures exercise the control store's durable append boundary.
+
 use serde_json::json;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::publish_recall::publish_recall;

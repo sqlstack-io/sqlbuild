@@ -80,27 +80,31 @@ pub(crate) async fn wait_for_scans(
         let mut cursor = 0;
         let mut observations = Vec::new();
         let mut scanned = BTreeSet::new();
-        while &scanned != replicas {
+        for _ in 0..1000 {
+            let Some(_) = replicas.difference(&scanned).next() else {
+                return observations;
+            };
             assert!(
                 tasks.iter().all(|task| !task.is_finished()),
                 "watchdog failed before scanning"
             );
-            for row in read_recall_events(store, cursor, 1000)
+            let batch: Vec<Observation> = read_recall_events(store, cursor, 1000)
                 .await
                 .expect("read health facts")
-            {
-                let observation: Observation =
-                    serde_json::from_value(json!(row)).expect("typed platform event");
-                cursor = observation.storage_id;
-                scanned.extend(match observation.payload.platform {
-                    PlatformEvent::Heartbeat { replica_id } => Some(replica_id),
-                    _ => None,
-                });
-                observations.push(observation);
-            }
+                .into_iter()
+                .map(|row| serde_json::from_value(json!(row)).expect("typed platform event"))
+                .collect();
+            cursor = batch.last().map_or(cursor, |row| row.storage_id);
+            scanned.extend(batch.iter().filter_map(|row| {
+                let PlatformEvent::Heartbeat { replica_id } = row.payload.platform else {
+                    return None;
+                };
+                Some(replica_id)
+            }));
+            observations.extend(batch);
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
-        observations
+        panic!("watchdog exhausted scan completion attempts");
     })
     .await
     .expect("both replicas finish a paged scan without a scheduler")

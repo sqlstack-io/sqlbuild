@@ -19,7 +19,7 @@ use crate::helpers::{queue, request, snapshot};
 use crate::lease_helpers::expire_lease;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::{ClaimFailureTestCase, TickFaultTestCase};
+use crate::test_types::{ClaimFailureTestCase, TransactionFault};
 
 #[test]
 fn given_failures_during_claim_publication_when_retried_then_claims_slots_liveness_facts_and_projection_commit_together()
@@ -78,7 +78,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                 ("recall_events", "INSERT"),
                 ("sqb_runs", "UPDATE"),
             ] {
-                let point = TickFaultTestCase {
+                let point = TransactionFault {
                     description: "claim publication failure",
                     table,
                     operation,
@@ -106,7 +106,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                     projected
                 );
             }
-            let expiry = TickFaultTestCase {
+            let expiry = TransactionFault {
                 description: "claim fence expires before commit",
                 table: "sqb_run_liveness",
                 operation: "INSERT",

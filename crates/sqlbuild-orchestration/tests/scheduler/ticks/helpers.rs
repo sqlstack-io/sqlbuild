@@ -1,3 +1,5 @@
+//! Trigger and failure fixtures exercise the scheduler's transactional tick boundary.
+
 use std::collections::BTreeMap;
 
 use serde_json::json;
@@ -20,7 +22,7 @@ use crate::lease_helpers::expire_lease;
 use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store_test_types::Backend;
-use crate::test_types::TickFaultTestCase;
+use crate::ticks::test_types::TransactionFault;
 
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {
@@ -77,7 +79,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
         .expect("elected");
     let second = second_store(store).await;
     for point in [
-        TickFaultTestCase {
+        TransactionFault {
             description: "tick insertion",
             table: "sqb_ticks",
             operation: "INSERT",
@@ -85,7 +87,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected tick failure')",
             postgres_body: "RAISE EXCEPTION 'injected tick failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "requested event",
             table: "recall_events",
             operation: "INSERT",
@@ -93,7 +95,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected requested failure')",
             postgres_body: "RAISE EXCEPTION 'injected requested failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "queued event",
             table: "recall_events",
             operation: "INSERT",
@@ -101,7 +103,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected queued failure')",
             postgres_body: "RAISE EXCEPTION 'injected queued failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "run projection",
             table: "sqb_runs",
             operation: "INSERT",
@@ -109,7 +111,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected run failure')",
             postgres_body: "RAISE EXCEPTION 'injected run failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "node projection",
             table: "sqb_run_nodes",
             operation: "INSERT",
@@ -117,7 +119,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected node failure')",
             postgres_body: "RAISE EXCEPTION 'injected node failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "cursor commit",
             table: "sqb_trigger_state",
             operation: "UPDATE",
@@ -125,7 +127,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
             sqlite_body: "SELECT RAISE(ABORT,'injected cursor failure')",
             postgres_body: "RAISE EXCEPTION 'injected cursor failure'",
         },
-        TickFaultTestCase {
+        TransactionFault {
             description: "lease expires during append",
             table: "sqb_runs",
             operation: "INSERT",

@@ -1,8 +1,10 @@
+//! Database-trigger fault injection at durable publication boundaries.
+
 use sqlbuild_orchestration::store::models::ControlStore;
 
-use crate::test_types::TickFaultTestCase;
+use crate::fault_types::TransactionFault;
 
-pub(crate) async fn install_fault(store: &ControlStore, point: &TickFaultTestCase) {
+pub(crate) async fn install_fault(store: &ControlStore, point: &TransactionFault) {
     let ControlStore::Postgres(pool) = store else {
         let ControlStore::Sqlite(path) = store else {
             unreachable!()
@@ -23,7 +25,7 @@ pub(crate) async fn install_fault(store: &ControlStore, point: &TickFaultTestCas
         .execute(pool).await.expect(point.description);
 }
 
-pub(crate) async fn remove_fault(store: &ControlStore, point: &TickFaultTestCase) {
+pub(crate) async fn remove_fault(store: &ControlStore, point: &TransactionFault) {
     let ControlStore::Postgres(pool) = store else {
         let ControlStore::Sqlite(path) = store else {
             unreachable!()

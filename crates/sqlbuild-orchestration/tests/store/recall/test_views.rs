@@ -1,3 +1,5 @@
+//! Durable Recall views preserve the published execution records.
+
 use serde_json::json;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::publish_recall::publish_recall;

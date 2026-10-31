@@ -2,10 +2,10 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use crate::test_types::TestControl;
+use crate::test_types::{ServiceTestCase, TestControl};
 
 pub(crate) fn isolated_binary(directory: &Path) -> std::path::PathBuf {
-    let binary = directory.join(if cfg!(windows) { "sqb.exe" } else { "sqb" });
+    let binary = directory.join(format!("sqb{}", std::env::consts::EXE_SUFFIX));
     std::fs::copy(env!("CARGO_BIN_EXE_sqb"), &binary)
         .expect("copy standalone binary without Python CLI");
     binary
@@ -37,29 +37,33 @@ pub(crate) async fn api_ready(control: &mut TestControl) -> String {
         .build()
         .expect("HTTP client");
     tokio::time::timeout(Duration::from_secs(10), async {
-        loop {
+        for _ in 0..500 {
             assert!(
                 control.child.try_wait().expect("child status").is_none(),
                 "control process exited: {}",
                 std::fs::read_to_string(&control.stderr).unwrap_or_default()
             );
+            tokio::time::sleep(Duration::from_millis(20)).await;
             let log = std::fs::read_to_string(&control.stderr).expect("read control log");
-            if let Some(address) = log
+            let Some(address) = log
                 .lines()
                 .find_map(|line| line.strip_prefix("Control API ready: "))
-            {
-                let url = format!("http://{address}");
-                if client
-                    .get(format!("{url}/api/openapi.json"))
-                    .send()
-                    .await
-                    .is_ok_and(|response| response.status().is_success())
-                {
-                    return url;
-                }
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
+            else {
+                continue;
+            };
+            let url = format!("http://{address}");
+            let Ok(response) = client
+                .get(format!("{url}/api/openapi.json"))
+                .send()
+                .await
+                .and_then(reqwest::Response::error_for_status)
+            else {
+                continue;
+            };
+            drop(response);
+            return url;
         }
+        panic!("native API exhausted readiness attempts");
     })
     .await
     .expect("native API becomes ready")
@@ -81,6 +85,31 @@ pub(crate) fn health_counts(control: &TestControl) -> Option<(i64, i64)> {
         .ok()
 }
 
+pub(crate) async fn wait_for_health(
+    control: &mut TestControl,
+    case: &ServiceTestCase,
+) -> (i64, i64) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        for _ in 0..250 {
+            assert!(
+                control.child.try_wait().expect("service status").is_none(),
+                "service exited: {}",
+                std::fs::read_to_string(&control.stderr).unwrap_or_default()
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            let Some(counts) = health_counts(control).filter(|(leaders, heartbeats)| {
+                *leaders == case.expected_leaders && *heartbeats >= case.expected_heartbeats
+            }) else {
+                continue;
+            };
+            return counts;
+        }
+        panic!("control service exhausted health readiness attempts");
+    })
+    .await
+    .expect("native control service publishes its health state")
+}
+
 #[cfg(unix)]
 pub(crate) async fn terminate(control: &mut TestControl) {
     let status = Command::new("kill")
@@ -89,12 +118,14 @@ pub(crate) async fn terminate(control: &mut TestControl) {
         .expect("send SIGTERM");
     assert!(status.success());
     let status = tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if let Some(status) = control.child.try_wait().expect("child exit") {
-                return status;
-            }
+        for _ in 0..250 {
             tokio::time::sleep(Duration::from_millis(20)).await;
+            let Some(status) = control.child.try_wait().expect("child exit") else {
+                continue;
+            };
+            return status;
         }
+        panic!("control roles exhausted shutdown attempts");
     })
     .await
     .expect("control roles stop promptly");

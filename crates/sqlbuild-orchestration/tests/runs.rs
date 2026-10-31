@@ -1,18 +1,18 @@
-#[path = "ticks/fault_helpers.rs"]
+#[path = "store/faults/helpers.rs"]
 mod fault_helpers;
-#[path = "store/fault_types.rs"]
+#[path = "store/faults/test_types.rs"]
 mod fault_types;
 #[path = "runs/helpers.rs"]
 mod helpers;
-#[path = "store/lease_helpers.rs"]
+#[path = "store/leases/helpers.rs"]
 mod lease_helpers;
-#[path = "store/replica_helpers.rs"]
+#[path = "store/replicas/helpers.rs"]
 mod replica_helpers;
 #[path = "store/helpers.rs"]
 mod store_helpers;
 #[path = "store/test_types.rs"]
 mod store_test_types;
-#[path = "runs/terminal_helpers.rs"]
+#[path = "runs/termination/helpers.rs"]
 mod terminal_helpers;
 #[path = "runs/test_claims.rs"]
 mod test_claims;

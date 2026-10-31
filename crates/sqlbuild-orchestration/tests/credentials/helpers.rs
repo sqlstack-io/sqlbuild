@@ -1,0 +1,21 @@
+use sqlbuild_orchestration::store::models::ControlStore;
+
+pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
+    let ControlStore::Postgres(pool) = store else {
+        let ControlStore::Sqlite(path) = store else {
+            unreachable!()
+        };
+        let connection = rusqlite::Connection::open(path).expect("inspect durable tokens");
+        return connection
+            .prepare("SELECT secret_hash FROM sqb_access_tokens")
+            .expect("token hashes")
+            .query_map([], |row| row.get(0))
+            .expect("read token hashes")
+            .collect::<Result<_, _>>()
+            .expect("hashes");
+    };
+    sqlx_core::query_scalar::query_scalar("SELECT secret_hash FROM sqb_access_tokens")
+        .fetch_all(pool)
+        .await
+        .expect("read durable token hashes")
+}

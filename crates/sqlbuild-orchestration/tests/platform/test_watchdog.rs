@@ -22,7 +22,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
         WatchdogTestCase {
             description: "SQLite without a leader",
             backend: Backend::Sqlite,
-            take_lease: false,
+            leaders: 0,
             expected_no_leader: true,
             expected_overdue: 102,
             expected_low_horizons: 1,
@@ -30,7 +30,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
         WatchdogTestCase {
             description: "PostgreSQL without a leader",
             backend: Backend::Postgres,
-            take_lease: false,
+            leaders: 0,
             expected_no_leader: true,
             expected_overdue: 102,
             expected_low_horizons: 1,
@@ -38,7 +38,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
         WatchdogTestCase {
             description: "SQLite with a frozen leader",
             backend: Backend::Sqlite,
-            take_lease: true,
+            leaders: 1,
             expected_no_leader: false,
             expected_overdue: 102,
             expected_low_horizons: 1,
@@ -46,7 +46,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
         WatchdogTestCase {
             description: "PostgreSQL with a frozen leader",
             backend: Backend::Postgres,
-            take_lease: true,
+            leaders: 1,
             expected_no_leader: false,
             expected_overdue: 102,
             expected_low_horizons: 1,
@@ -82,7 +82,7 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
             publish_snapshot(store, &input)
                 .await
                 .expect("current definition");
-            if test_case.take_lease {
+            for _ in 0..test_case.leaders {
                 acquire_lease(store, Uuid::now_v7())
                     .await
                     .expect("acquire lease")
@@ -103,9 +103,11 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
             let observations = wait_for_scans(store, &replicas, &tasks).await;
             let overdue: BTreeSet<_> = observations
                 .iter()
-                .filter_map(|row| match row.payload.platform {
-                    PlatformEvent::TickOverdue { trigger_id, .. } => Some(trigger_id),
-                    _ => None,
+                .filter_map(|row| {
+                    let PlatformEvent::TickOverdue { trigger_id, .. } = row.payload.platform else {
+                        return None;
+                    };
+                    Some(trigger_id)
                 })
                 .collect();
             assert_eq!(
@@ -116,9 +118,12 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
             );
             let horizons: BTreeSet<_> = observations
                 .iter()
-                .filter_map(|row| match row.payload.platform {
-                    PlatformEvent::CalendarHorizonLow { trigger_id, .. } => Some(trigger_id),
-                    _ => None,
+                .filter_map(|row| {
+                    let PlatformEvent::CalendarHorizonLow { trigger_id, .. } = row.payload.platform
+                    else {
+                        return None;
+                    };
+                    Some(trigger_id)
                 })
                 .collect();
             assert_eq!(

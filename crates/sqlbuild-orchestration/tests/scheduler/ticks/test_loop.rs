@@ -1,3 +1,5 @@
+//! Embedded and standalone schedulers share takeover and shutdown semantics.
+
 use std::time::Duration;
 
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
@@ -8,12 +10,12 @@ use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::helpers::snapshot;
 use crate::lease_helpers::expire_lease;
 use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::TickTransactionTestCase;
+use crate::ticks::helpers::snapshot;
+use crate::ticks::test_types::TickTransactionTestCase;
 
 #[test]
 fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drains_due_work_and_idle_shutdown_is_prompt()

@@ -11,23 +11,35 @@ use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::fault_helpers::{install_fault, remove_fault};
+use crate::helpers::stored_hashes;
 use crate::replica_helpers::second_store;
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::terminal_helpers::finish;
-use crate::test_types::TickFaultTestCase;
+use crate::test_types::{CredentialTestCase, TransactionFault};
 
 #[test]
 fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_them_and_audit_failure_rolls_back()
  {
-    for backend in [Backend::Sqlite, Backend::Postgres] {
+    let test_cases = [
+        CredentialTestCase {
+            description: "SQLite credential lifecycle and atomic audit",
+            backend: Backend::Sqlite,
+            expected_hash_length: 64,
+        },
+        CredentialTestCase {
+            description: "PostgreSQL credential lifecycle and atomic audit",
+            backend: Backend::Postgres,
+            expected_hash_length: 64,
+        },
+    ];
+    for test_case in test_cases {
         run(async {
-            let Some(fixture) = open_test_store(backend).await else {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
             };
             let store = &fixture.store;
@@ -39,7 +51,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 request_id: Uuid::now_v7(),
                 ip_address: Some("127.0.0.1".parse().expect("loopback")),
             };
-            let fault = TickFaultTestCase {
+            let fault = TransactionFault {
                 description: "security audit failure",
                 table: "sqb_security_audit",
                 operation: "INSERT",
@@ -87,11 +99,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                     !format!("{issued:?}").contains(&issued.bearer),
                     "debug output redacts secrets"
                 );
-                let replacement = if issued.bearer.ends_with('0') {
-                    "1"
-                } else {
-                    "0"
-                };
+                let replacement = ["0", "1"][usize::from(issued.bearer.ends_with('0'))];
                 let tampered =
                     format!("{}{replacement}", &issued.bearer[..issued.bearer.len() - 1]);
                 for invalid in [
@@ -141,29 +149,14 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                         .await
                         .is_err()
                 );
-                let stored: Vec<String> = match store {
-                    ControlStore::Sqlite(path) => {
-                        let connection =
-                            rusqlite::Connection::open(path).expect("inspect durable tokens");
-                        connection
-                            .prepare("SELECT secret_hash FROM sqb_access_tokens")
-                            .expect("token hashes")
-                            .query_map([], |row| row.get(0))
-                            .expect("read token hashes")
-                            .collect::<Result<_, _>>()
-                            .expect("hashes")
-                    }
-                    ControlStore::Postgres(pool) => sqlx_core::query_scalar::query_scalar(
-                        "SELECT secret_hash FROM sqb_access_tokens",
-                    )
-                    .fetch_all(pool)
-                    .await
-                    .expect("read durable token hashes"),
-                };
+                let stored = stored_hashes(store).await;
                 assert!(
                     stored
                         .iter()
-                        .all(|hash| hash.len() == 64 && hash != &issued.bearer)
+                        .all(|hash| hash.len() == test_case.expected_hash_length
+                            && hash != &issued.bearer),
+                    "{}",
+                    test_case.description
                 );
             }
             for scope in [

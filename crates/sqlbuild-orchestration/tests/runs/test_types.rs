@@ -2,7 +2,7 @@
 
 use sqlbuild_orchestration::runs::models::RunStatus;
 
-pub(crate) use crate::fault_types::TickFaultTestCase;
+pub(crate) use crate::fault_types::TransactionFault;
 use crate::store_test_types::Backend;
 
 pub(crate) struct PriorityClaimsTestCase {

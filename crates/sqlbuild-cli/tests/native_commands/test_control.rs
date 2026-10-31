@@ -1,102 +1,188 @@
 use std::process::Command;
-use std::time::Duration;
 
-use crate::helpers::{api_ready, health_counts, isolated_binary, start_control};
+use crate::helpers::{api_ready, isolated_binary, start_control, wait_for_health};
+use crate::test_types::{CommandTestCase, OpenApiTestCase, ServiceTestCase};
 
 #[test]
-fn given_a_standalone_binary_when_printing_control_help_or_openapi_then_python_and_database_access_are_not_required()
+fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_python_and_database_access_are_not_required()
  {
-    let directory = tempfile::tempdir().expect("isolated CLI directory");
-    let binary = isolated_binary(directory.path());
-    for arguments in [
-        ["server", "--help"],
-        ["scheduler", "--help"],
-        ["server", "--openapi"],
-    ] {
+    let test_cases = [
+        CommandTestCase {
+            description: "native server help",
+            arguments: &["server", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
+            description: "native scheduler help",
+            arguments: &["scheduler", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
+            description: "invalid port is rejected before store initialization",
+            arguments: &["server", "--port", "65536"],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control service failed: invalid control-plane data: --port must be between 0 and 65535\n",
+        },
+    ];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("isolated CLI directory");
+        let binary = isolated_binary(directory.path());
         let output = Command::new(&binary)
-            .args(arguments)
+            .args(test_case.arguments)
             .current_dir(directory.path())
             .env("PATH", "")
             .env("SQLBUILD_CONTROL_DATABASE_URL", "unsupported://not-opened")
             .output()
             .expect("standalone native command");
-        assert!(
+        assert_eq!(
             output.status.success(),
+            test_case.expected_success,
             "{}",
-            String::from_utf8_lossy(&output.stderr)
+            test_case.description
         );
-        assert!(output.stderr.is_empty());
-        if arguments[1] == "--openapi" {
-            let document: serde_json::Value =
-                serde_json::from_slice(&output.stdout).expect("machine-readable OpenAPI");
-            assert!(document["paths"]["/api/runs/{run_id}/events"].is_object());
-        } else {
-            assert!(String::from_utf8_lossy(&output.stdout).starts_with("usage: sqb "));
-        }
-    }
-    assert!(!directory.path().join(".sqlbuild").exists());
-    let output = Command::new(&binary)
-        .args(["server", "--port", "65536"])
-        .current_dir(directory.path())
-        .env("PATH", "")
-        .output()
-        .expect("invalid port");
-    assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("--port must be between 0 and 65535"));
-    assert!(
-        !directory.path().join(".sqlbuild").exists(),
-        "invalid input cannot initialize a database"
-    );
-}
-
-#[tokio::test]
-async fn given_a_standalone_binary_when_serving_with_or_without_a_scheduler_then_migrations_auth_and_shutdown_are_native()
- {
-    for scheduler in [false, true] {
-        let mut arguments = vec!["server", "--port", "0"];
-        if !scheduler {
-            arguments.push("--no-scheduler");
-        }
-        let mut control = start_control(&arguments);
-        let url = api_ready(&mut control).await;
-        let response = reqwest::Client::new()
-            .post(format!("{url}/api/runs/{}/heartbeat", uuid::Uuid::now_v7()))
-            .send()
-            .await
-            .expect("protected native API");
-        assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
-        tokio::time::timeout(Duration::from_secs(5), async {
-            while !health_counts(&control).is_some_and(|(leaders, heartbeats)| {
-                leaders == i64::from(scheduler) && heartbeats > 0
-            }) {
-                tokio::time::sleep(Duration::from_millis(20)).await;
-            }
-        })
-        .await
-        .expect("watchdog records health with or without the optional scheduler");
-        #[cfg(unix)]
-        crate::helpers::terminate(&mut control).await;
+        assert_eq!(
+            String::from_utf8_lossy(&output.stderr),
+            test_case.expected_stderr,
+            "{}",
+            test_case.description
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).starts_with(test_case.expected_stdout_prefix),
+            "{}",
+            test_case.description
+        );
+        assert!(
+            !directory.path().join(".sqlbuild").exists(),
+            "{}",
+            test_case.description
+        );
     }
 }
 
-#[tokio::test]
-async fn given_a_standalone_scheduler_when_started_without_python_then_it_migrates_and_takes_the_durable_lease()
+#[test]
+fn given_a_standalone_server_when_exporting_openapi_then_the_worker_contract_is_machine_readable_without_python_or_a_database()
  {
-    let mut control = start_control(&["scheduler"]);
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while health_counts(&control).map(|(leaders, _)| leaders) != Some(1) {
-            assert!(
-                control
-                    .child
-                    .try_wait()
-                    .expect("scheduler status")
-                    .is_none()
+    let test_cases = [OpenApiTestCase {
+        description: "worker lifecycle endpoint",
+        expected_path: "/api/runs/{run_id}/events",
+    }];
+    for test_case in test_cases {
+        let directory = tempfile::tempdir().expect("isolated CLI directory");
+        let output = Command::new(isolated_binary(directory.path()))
+            .args(["server", "--openapi"])
+            .current_dir(directory.path())
+            .env("PATH", "")
+            .env("SQLBUILD_CONTROL_DATABASE_URL", "unsupported://not-opened")
+            .output()
+            .expect("standalone OpenAPI");
+        assert!(output.status.success(), "{}", test_case.description);
+        assert!(output.stderr.is_empty(), "{}", test_case.description);
+        let document: serde_json::Value =
+            serde_json::from_slice(&output.stdout).expect("machine-readable OpenAPI");
+        assert!(
+            document["paths"][test_case.expected_path].is_object(),
+            "{}",
+            test_case.description
+        );
+        assert!(
+            !directory.path().join(".sqlbuild").exists(),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_standalone_binary_when_serving_with_or_without_a_scheduler_then_migrations_auth_and_shutdown_are_native()
+ {
+    let test_cases = [
+        ServiceTestCase {
+            description: "server without scheduling still observes platform health",
+            arguments: &["server", "--port", "0", "--no-scheduler"],
+            expected_leaders: 0,
+            expected_heartbeats: 1,
+        },
+        ServiceTestCase {
+            description: "server with embedded scheduling",
+            arguments: &["server", "--port", "0"],
+            expected_leaders: 1,
+            expected_heartbeats: 1,
+        },
+    ];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let mut control = start_control(test_case.arguments);
+            let url = api_ready(&mut control).await;
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .expect("bounded HTTP requests");
+            let response = client
+                .post(format!("{url}/api/runs/{}/heartbeat", uuid::Uuid::now_v7()))
+                .send()
+                .await
+                .expect("protected native API");
+            assert_eq!(
+                response.status(),
+                reqwest::StatusCode::UNAUTHORIZED,
+                "{}",
+                test_case.description
             );
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-    })
-    .await
-    .expect("standalone scheduler acquires leadership");
-    #[cfg(unix)]
-    crate::helpers::terminate(&mut control).await;
+            let (leaders, heartbeats) = wait_for_health(&mut control, &test_case).await;
+            assert_eq!(
+                leaders, test_case.expected_leaders,
+                "{}",
+                test_case.description
+            );
+            assert!(
+                heartbeats >= test_case.expected_heartbeats,
+                "{}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_standalone_scheduler_when_started_without_python_then_it_migrates_and_takes_the_durable_lease()
+ {
+    let test_cases = [ServiceTestCase {
+        description: "standalone scheduler takes a lease without starting a server watchdog",
+        arguments: &["scheduler"],
+        expected_leaders: 1,
+        expected_heartbeats: 0,
+    }];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let mut control = start_control(test_case.arguments);
+            let (leaders, heartbeats) = wait_for_health(&mut control, &test_case).await;
+            assert_eq!(
+                leaders, test_case.expected_leaders,
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                heartbeats, test_case.expected_heartbeats,
+                "{}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
 }

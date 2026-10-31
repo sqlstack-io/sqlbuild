@@ -1,3 +1,5 @@
+//! Idempotency and commit-order paging through the public store API.
+
 use crate::helpers::recall_contract;
 use crate::store_helpers::run;
 use crate::store_test_types::Backend;

@@ -1,3 +1,5 @@
+//! Operator trigger facts remain consistent across publication and retry boundaries.
+
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::main::list_trigger_events::list_trigger_events;
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
@@ -12,10 +14,10 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::snapshot;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::{TickFaultTestCase, TriggerControlsTestCase};
+use crate::ticks::helpers::snapshot;
+use crate::ticks::test_types::{TransactionFault, TriggerControlsTestCase};
 
 #[test]
 fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_state_remain_consistent()
@@ -84,7 +86,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 change: TriggerChange::Enable,
                 ..pause.clone()
             };
-            let fault = TickFaultTestCase {
+            let fault = TransactionFault {
                 description: "operator event and projection",
                 table: "sqb_trigger_state",
                 operation: "UPDATE",
