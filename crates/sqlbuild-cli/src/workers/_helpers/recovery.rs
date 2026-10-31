@@ -9,7 +9,7 @@ use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 
-use crate::workers::models::{ClaimedWorker, DockerWorker, WorkerChild, Workers};
+use crate::workers::models::{ClaimedWorker, DockerWorker, Launcher, WorkerChild, Workers};
 
 impl Workers {
     pub(in crate::workers) async fn recover(
@@ -25,12 +25,17 @@ impl Workers {
             .iter()
             .map(|worker| worker.claim.claim_id)
             .collect();
-        for location in &self.configuration.docker {
+        for location in self.configuration.locations() {
+            #[cfg(not(target_os = "linux"))]
+            if matches!(location, Launcher::Local(_)) {
+                continue;
+            }
+            let scope = location.scope();
             let mut after = None;
             loop {
                 renew_lease(store, lease).await?;
                 let claims =
-                    list_run_claims(store, (location.location_id, &location.target), after).await?;
+                    list_run_claims(store, (scope.location_id, scope.target), after).await?;
                 let Some(last) = claims.last() else {
                     break;
                 };
@@ -39,10 +44,19 @@ impl Workers {
                     if !known.insert(claim.claim_id) {
                         continue;
                     }
-                    let child = match DockerWorker::prepare(location, &claim) {
-                        Ok(child) => Some(WorkerChild::Docker(child)),
-                        Err(ControlError::Invalid(_)) => None,
-                        Err(error) => return Err(error),
+                    let child = match location {
+                        #[cfg(target_os = "linux")]
+                        Launcher::Local(location) => Some(WorkerChild::RecoveredLocal(
+                            crate::workers::models::LocalWorker::open(location, &claim)?,
+                        )),
+                        #[cfg(not(target_os = "linux"))]
+                        Launcher::Local(_) => continue,
+                        Launcher::Docker(location) => match DockerWorker::prepare(location, &claim)
+                        {
+                            Ok(child) => Some(WorkerChild::Docker(child)),
+                            Err(ControlError::Invalid(_)) => None,
+                            Err(error) => return Err(error),
+                        },
                     };
                     drop(writeln!(
                         std::io::stderr().lock(),

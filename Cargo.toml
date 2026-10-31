@@ -99,6 +99,7 @@ syn-v3-macro-features = { package = "syn", version = "3", default-features = fal
 thiserror = "2"
 # Windows only: `sqb` ignores Ctrl+C while the Python CLI it started handles it.
 ctrlc = "3"
+command-fds = "0.3"
 quote = "1"
 rayon = "1"
 # Static reading of project Python source; the parser fensu uses.

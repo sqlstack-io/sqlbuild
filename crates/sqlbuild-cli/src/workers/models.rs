@@ -13,7 +13,18 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub(super) enum WorkerChild {
     Local(Child),
+    #[cfg(target_os = "linux")]
+    RecoveredLocal(LocalWorker),
     Docker(DockerWorker),
+}
+
+/// The inherited lock proves physical ownership without relying on a remembered process ID.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub(super) struct LocalWorker {
+    pub(super) lock: std::fs::File,
+    pub(super) run_id: Uuid,
+    pub(super) stopped: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
