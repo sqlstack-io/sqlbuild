@@ -33,3 +33,9 @@ pub(crate) struct TestApi {
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,
     pub(crate) task: tokio::task::JoinHandle<Result<(), ControlError>>,
 }
+
+pub(crate) struct LocationHealthTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_observations: usize,
+}

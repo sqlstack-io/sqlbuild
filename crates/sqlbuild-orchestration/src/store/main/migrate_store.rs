@@ -3,7 +3,7 @@
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::store::_helpers::migration::{SCHEMA, render, verify_migrations};
+use crate::store::_helpers::migration::{LOCATION_INSTANCES, SCHEMA, render, verify_migrations};
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -25,7 +25,9 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     .await?;
     let recall_statements = recall_schema(store);
     let digest = sha256_hex(format!("{SCHEMA}\n{}", recall_statements.join(";\n")).as_bytes());
-    let current = verify_migrations(&rows, &digest)?;
+    let location_digest = sha256_hex(LOCATION_INSTANCES.as_bytes());
+    let digests = [digest.clone(), location_digest.clone()];
+    let current = verify_migrations(&rows, &digests)?;
     if rows.is_empty() {
         for statement in SCHEMA
             .split(';')
@@ -45,6 +47,20 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
             "INSERT INTO sqb_schema_migrations (version, name, checksum, min_server_version, applied_at) \
              VALUES (1, 'control_store', $1, $2, $3)",
             vec![Parameter::Text(digest), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
+    }
+    if rows.len() < digests.len() {
+        for statement in LOCATION_INSTANCES
+            .split(';')
+            .map(str::trim)
+            .filter(|statement| !statement.is_empty())
+        {
+            (transaction, _) = query(transaction, &render(store, statement), vec![]).await?;
+        }
+        let now = transaction.now;
+        (transaction, _) = query(transaction,
+            "INSERT INTO sqb_schema_migrations (version, name, checksum, min_server_version, applied_at) \
+             VALUES (2, 'location_instances', $1, $2, $3)",
+            vec![Parameter::Text(location_digest), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
     }
     commit(transaction).await
 }

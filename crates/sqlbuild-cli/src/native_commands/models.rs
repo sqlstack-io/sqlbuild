@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::runs::models::JobRunRequest;
@@ -134,6 +135,17 @@ pub(crate) struct LocationServe {
     pub(crate) location_id: uuid::Uuid,
     pub(crate) target: String,
     pub(crate) image_id: Option<String>,
+}
+
+/// Retained source observations survive compilation; warehouse exclusions never replace them.
+#[derive(Debug)]
+pub(crate) struct LocationWatch {
+    pub(crate) rules: SnapshotRules,
+    pub(crate) local_files: Vec<PathBuf>,
+    pub(crate) observed: (Vec<PathStamp>, Option<String>),
+    pub(crate) attempted: Option<(Vec<PathStamp>, Option<String>)>,
+    pub(crate) changed_at: tokio::time::Instant,
+    pub(crate) retry_at: Option<tokio::time::Instant>,
 }
 
 /// What Python's buffered stdout does with output its reader no longer takes.

@@ -79,6 +79,38 @@ def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str) -> None
         time.sleep(0.02)
 
 
+def wait_for_location_health(
+    api: SnapshotApi,
+    target: str,
+    health: dict[str, Any],
+    process: subprocess.Popen[bytes],
+    log: Path,
+    *,
+    minimum_reports: int = 1,
+) -> dict[str, Any]:
+    deadline: float = time.monotonic() + 15 + 30 * (minimum_reports - 1)
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/health",
+        headers={"Authorization": f"Bearer {api.bearer}"},
+    )
+    key: tuple[str, str] = (target, json.dumps(health, sort_keys=True))
+    observations: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
+    while len(observations.get(key, ())) < minimum_reports:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        with urlopen(request, timeout=2) as response:
+            reports: list[dict[str, Any]] = json.load(response)
+        for report in reversed(reports):
+            event_id: str = report["report"]["event_id"]
+            observed_key: tuple[str, str] = (
+                report["report"]["target"],
+                json.dumps(report["report"]["health"], sort_keys=True),
+            )
+            observations.setdefault(observed_key, {})[event_id] = report
+        time.sleep(0.02)
+    return list(observations[key].values())[-1]
+
+
 def wait_for_interpreter(process: subprocess.Popen[bytes], pidfile: Path, log: Path) -> int:
     deadline: float = time.monotonic() + 15
     while not pidfile.exists():

@@ -6,6 +6,31 @@ use uuid::Uuid;
 
 use crate::declarations::models::TriggerDefinition;
 
+/// Locations report bounded facts, never connection strings or user exception text.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum LocationHealth {
+    Heartbeat {},
+    CompileFailed { generation: i64 },
+    Connection { generation: i64, healthy: bool },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationHealthReport {
+    pub event_id: Uuid,
+    pub session_id: Uuid,
+    pub target: String,
+    pub health: LocationHealth,
+}
+
+/// Receipt time belongs to the server; consumers derive freshness rather than storing availability.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct LocationHealthObservation {
+    pub received_at: DateTime<Utc>,
+    pub report: LocationHealthReport,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlatformEvent {

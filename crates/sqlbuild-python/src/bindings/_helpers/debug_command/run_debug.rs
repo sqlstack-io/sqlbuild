@@ -28,7 +28,9 @@ use crate::bindings::_helpers::boundary::python_calls::{
 };
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
-use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::command_runtime::connection::{
+    local_database_files, project_connection_config,
+};
 use crate::bindings::_helpers::command_runtime::runtime_errors::{
     expected_resolution_error, resolution_message,
 };
@@ -357,6 +359,7 @@ fn build_report(
         ConnectionCheck::Skipped
     };
     Ok(DebugReport {
+        local_files: local_database_files(&facts.adapter_name, &connection_config)?,
         runtime: debug_runtime_lines(&runtime(py)?),
         configuration: debug_configuration_lines(&facts, &warehouses),
         providers: debug_provider_lines(&providers(&context.discovered_inputs)?),

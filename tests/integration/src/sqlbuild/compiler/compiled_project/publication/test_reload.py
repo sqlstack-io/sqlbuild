@@ -9,10 +9,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import TYPE_PROOF_FILES
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    LocationDatabaseTestCase,
     LocationReloadTestCase,
     LocationShutdownTestCase,
 )
@@ -22,6 +24,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     snapshot_api,
     wait_for_generation,
     wait_for_interpreter,
+    wait_for_location_health,
     wait_for_log,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -30,8 +33,22 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 @pytest.mark.parametrize(
     "test_case",
     [
-        LocationReloadTestCase("ordinary target", "development", 5, int(sys.platform == "win32")),
-        LocationReloadTestCase("encoded target", "preview #1", 5, int(sys.platform == "win32")),
+        LocationReloadTestCase(
+            "healthy connection",
+            "development",
+            5,
+            int(sys.platform == "win32"),
+            "warehouse.duckdb",
+            True,
+        ),
+        LocationReloadTestCase(
+            "failed connection with encoded target",
+            "preview #1",
+            5,
+            int(sys.platform == "win32"),
+            "missing/warehouse.duckdb",
+            False,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -45,7 +62,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
     )
     files: dict[str, str] = TYPE_PROOF_FILES | {
         "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
-        + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
+        + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         "orchestration/orders.py": declaration,
     }
@@ -73,6 +90,17 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         publications: Path = project / "publications.jsonl"
         with location_process(arguments, log, publications) as process:
             first: dict[str, Any] = wait_for_generation(api, test_case.target, 1, process, log)
+            heartbeat: dict[str, Any] = wait_for_location_health(
+                api, test_case.target, {"kind": "heartbeat"}, process, log
+            )
+            initial_health: dict[str, Any] = wait_for_location_health(
+                api,
+                test_case.target,
+                {"kind": "connection", "generation": 1, "healthy": test_case.expected_connection},
+                process,
+                log,
+            )
+            assert initial_health["report"]["session_id"] == heartbeat["report"]["session_id"]
             staging: Path = project / "models/stg_orders.sql"
             for value in (11, 12, 13):
                 _ = staging.write_text(
@@ -87,6 +115,9 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
 
             _ = (project / "orchestration/orders.py").write_text("invalid Python declaration !\n")
             wait_for_log(process, log, "Location reload failed; retaining last good snapshot.")
+            _ = wait_for_location_health(
+                api, test_case.target, {"kind": "compile_failed", "generation": 3}, process, log
+            )
             assert current_snapshot(api, test_case.target)["record"] == second["record"]
             _ = (project / "orchestration/orders.py").write_text(
                 declaration.replace("Build orders.", "Refresh order totals.")
@@ -121,6 +152,17 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
                 api, test_case.target, test_case.expected_generation, process, log
             )
             assert restarted["nodes"] == third["nodes"]
+            restarted_health: dict[str, Any] = wait_for_location_health(
+                api,
+                test_case.target,
+                {"kind": "connection", "generation": 5, "healthy": test_case.expected_connection},
+                process,
+                log,
+            )
+            assert (
+                restarted_health["report"]["session_id"] != initial_health["report"]["session_id"]
+            )
+            assert restarted_health["received_at"] >= initial_health["received_at"]
             # Redirected output and compiler cache writes must not feed the input watcher.
             time.sleep(1)
             assert current_snapshot(api, test_case.target)["record"] == restarted["record"]
@@ -132,19 +174,28 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         assert [record["generation"] for record in records] == [1, 2, 3, 4, 5]
         assert api.bearer not in log.read_text() + publications.read_text()
         assert not (project / ".sqlbuild/control.sqlite3").exists()
-        assert not (project / "warehouse.duckdb").exists()
+        assert (project / "warehouse.duckdb").exists() == test_case.expected_connection
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unix signal and process ownership contract")
 @pytest.mark.parametrize(
     "test_case",
     [
-        LocationShutdownTestCase("terminate compiling interpreter", signal.SIGTERM, 0),
-        LocationShutdownTestCase("interrupt compiling interpreter", signal.SIGINT, 0),
+        LocationShutdownTestCase(
+            "terminate compiling interpreter after repeated heartbeats",
+            signal.SIGTERM,
+            0,
+            2,
+            "publish",
+        ),
+        LocationShutdownTestCase("interrupt compiling interpreter", signal.SIGINT, 0, 1, "publish"),
+        LocationShutdownTestCase(
+            "terminate connection checking interpreter", signal.SIGTERM, 0, 1, "debug"
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_a_compiling_location_when_stopped_then_its_interpreter_is_reaped(
+def test_given_a_busy_location_when_stopped_then_its_interpreter_is_reaped(
     test_case: LocationShutdownTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project: Path = tmp_path / "project"
@@ -156,10 +207,11 @@ def test_given_a_compiling_location_when_stopped_then_its_interpreter_is_reaped(
             "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
             + '\n[connections.local]\ndatabase = "warehouse.duckdb"\n'
             + '\n[targets.development]\nschema = "main"\n',
-            "orchestration/slow.py": (
-                "import os, time\nfrom pathlib import Path\n"
-                f"Path({str(child_pid)!r}).write_text(str(os.getpid()))\n"
-                "time.sleep(60)\n"
+            "adapters/slow.py": (
+                "import os, sys, time\nfrom pathlib import Path\n"
+                f"if {test_case.blocked_command!r} in sys.argv:\n"
+                f"    Path({str(child_pid)!r}).write_text(str(os.getpid()))\n"
+                "    time.sleep(60)\n"
             ),
         },
     )
@@ -181,7 +233,87 @@ def test_given_a_compiling_location_when_stopped_then_its_interpreter_is_reaped(
         ]
         with location_process(arguments, log, tmp_path / "publications.jsonl") as process:
             interpreter: int = wait_for_interpreter(process, child_pid, log)
+            _ = wait_for_location_health(
+                api,
+                "development",
+                {"kind": "heartbeat"},
+                process,
+                log,
+                minimum_reports=test_case.minimum_heartbeats,
+            )
             process.send_signal(test_case.signal)
             assert process.wait(timeout=5) == test_case.expected_exit_code
             with pytest.raises(ProcessLookupError):
                 os.kill(interpreter, 0)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocationDatabaseTestCase(
+            "custom database extension", "warehouse.db", 1, 'database = "warehouse.db"'
+        ),
+        LocationDatabaseTestCase(
+            "extensionless database", "warehouse", 1, 'database = "warehouse"'
+        ),
+        LocationDatabaseTestCase(
+            "custom attached database",
+            "inventory.db",
+            1,
+            'database = ":memory:"\nattach = [{path = "inventory.db", alias = "inventory"}]',
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_location_using_a_local_database_when_it_is_created_and_written_then_only_source_edits_reload(
+    test_case: LocationDatabaseTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project: Path = tmp_path / "project"
+    write_files(
+        project_dir=project,
+        files=TYPE_PROOF_FILES
+        | {
+            "sqlbuild_project.toml": TYPE_PROOF_FILES["sqlbuild_project.toml"]
+            + f"\n[connections.local]\n{test_case.connection_toml}\n"
+            + '\n[targets.development]\nschema = "main"\n',
+        },
+    )
+    database: Path = project / test_case.database
+    assert not database.exists()
+    with snapshot_api(tmp_path / "control") as api:
+        monkeypatch.setenv("SQLBUILD_LOCATION_TOKEN", api.bearer)
+        log: Path = tmp_path / "location.log"
+        arguments: list[str] = [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "location",
+            "serve",
+            "--server",
+            api.url,
+            "--location-id",
+            api.location_id,
+            "--target",
+            "development",
+        ]
+        with location_process(arguments, log, tmp_path / "publications.jsonl") as process:
+            baseline: dict[str, Any] = wait_for_generation(
+                api, "development", test_case.expected_generation, process, log
+            )
+            _ = wait_for_location_health(
+                api,
+                "development",
+                {"kind": "connection", "generation": 1, "healthy": True},
+                process,
+                log,
+            )
+            assert database.is_file()
+            with duckdb.connect(str(database)) as connection:
+                _ = connection.execute(
+                    "CREATE TABLE orders (order_id INTEGER); INSERT INTO orders VALUES (17), (23)"
+                )
+                assert connection.execute("SELECT sum(order_id) FROM orders").fetchone() == (40,)
+                time.sleep(1)
+                assert current_snapshot(api, "development")["record"] == baseline["record"]
+            time.sleep(1)
+            assert current_snapshot(api, "development")["record"] == baseline["record"]

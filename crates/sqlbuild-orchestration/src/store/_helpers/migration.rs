@@ -7,11 +7,12 @@ use crate::store::models::ControlStore;
 use crate::store::types::Row;
 
 pub(crate) const SCHEMA: &str = include_str!("../schema.sql");
+pub(crate) const LOCATION_INSTANCES: &str = include_str!("../location_instances.sql");
 
-pub(crate) fn verify_migrations(rows: &[Row], digest: &str) -> Result<Version, ControlError> {
+pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))
         .map_err(|error| ControlError::Schema(error.to_string()))?;
-    for row in rows {
+    for (index, row) in rows.iter().enumerate() {
         let minimum = row
             .get("min_server_version")
             .and_then(|value| value.as_str())
@@ -20,9 +21,11 @@ pub(crate) fn verify_migrations(rows: &[Row], digest: &str) -> Result<Version, C
             })?;
         let minimum =
             Version::parse(minimum).map_err(|error| ControlError::Schema(error.to_string()))?;
-        if row.get("version").and_then(|value| value.as_i64()) != Some(1)
+        if row.get("version").and_then(|value| value.as_u64()) != Some(index as u64 + 1)
             || minimum > current
-            || row.get("checksum").and_then(|value| value.as_str()) != Some(digest)
+            || row.get("checksum").and_then(|value| value.as_str())
+                != digests.get(index).map(String::as_str)
+            || index >= digests.len()
         {
             return Err(ControlError::Schema(
                 "unknown migration, checksum mismatch, or minimum server version not met".into(),

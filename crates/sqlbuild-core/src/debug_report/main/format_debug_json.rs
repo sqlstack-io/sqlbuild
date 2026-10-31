@@ -43,6 +43,17 @@ pub fn format_debug_json(report: &DebugReport) -> String {
         ),
         ("providers".to_owned(), lines_value(&report.providers)),
         ("connection".to_owned(), lines_value(&report.connection)),
+        (
+            "local_files".to_owned(),
+            JsonValue::Array(
+                report
+                    .local_files
+                    .iter()
+                    .cloned()
+                    .map(JsonValue::String)
+                    .collect(),
+            ),
+        ),
     ]);
     let options: StdlibJsonOptions = StdlibJsonOptions {
         sort_keys: true,

@@ -189,18 +189,8 @@ fn anchor_attach_paths(config: &Bound<'_, PyDict>, project_dir: &Bound<'_, PyAny
             anchored.push(entry);
             continue;
         };
-        let local_file: bool = match mapping.get_item(ATTACH_TYPE_KEY)? {
-            None => true,
-            Some(kind) => kind
-                .extract::<String>()
-                .is_ok_and(|kind| LOCAL_ATTACH_TYPES.contains(&kind.to_ascii_lowercase().as_str())),
-        };
         let copy: Bound<'_, PyDict> = mapping.copy()?;
-        if let Some(path_value) = mapping.get_item(ATTACH_PATH_KEY)?
-            && local_file
-            && !path_value.extract::<String>().is_ok_and(|text| {
-                text.contains(URL_SCHEME_SEPARATOR) || text.starts_with(MOTHERDUCK_PATH_PREFIX)
-            })
+        if let Some(path_value) = local_attach_file(mapping)?
             && let Some(file) = anchored_file_path(&path_value, project_dir)?
         {
             copy.set_item(ATTACH_PATH_KEY, file)?;
@@ -208,6 +198,59 @@ fn anchor_attach_paths(config: &Bound<'_, PyDict>, project_dir: &Bound<'_, PyAny
         anchored.push(copy.into_any());
     }
     config.set_item(ATTACH_KEY, pyo3::types::PyList::new(py, anchored)?)
+}
+
+fn local_attach_file<'py>(mapping: &Bound<'py, PyDict>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    let local = match mapping.get_item(ATTACH_TYPE_KEY)? {
+        None => true,
+        Some(kind) => kind
+            .extract::<String>()
+            .is_ok_and(|kind| LOCAL_ATTACH_TYPES.contains(&kind.to_ascii_lowercase().as_str())),
+    };
+    Ok(mapping.get_item(ATTACH_PATH_KEY)?.filter(|value| {
+        local
+            && !value.extract::<String>().is_ok_and(|text| {
+                text.contains(URL_SCHEME_SEPARATOR) || text.starts_with(MOTHERDUCK_PATH_PREFIX)
+            })
+    }))
+}
+
+/// Use the resolved adapter connection, including local attachments, not authored TOML guesses.
+pub(crate) fn local_database_files(
+    adapter: &str,
+    config: &Bound<'_, PyDict>,
+) -> PyResult<Vec<String>> {
+    let Some((_, key)) = LOCAL_DATABASE_PATH_KEYS
+        .iter()
+        .find(|(name, _)| *name == adapter)
+    else {
+        return Ok(Vec::new());
+    };
+    let mut files: Vec<String> = Vec::new();
+    if let Some(value) = config.get_item(*key)?
+        && let Ok(file) = value.extract::<String>()
+        && !file.is_empty()
+        && file != DUCKDB_MEMORY_DATABASE
+        && !file.contains(URL_SCHEME_SEPARATOR)
+        && !file.starts_with(MOTHERDUCK_PATH_PREFIX)
+    {
+        files.push(file);
+    }
+    if adapter == DUCKDB_ADAPTER
+        && let Some(entries) = config.get_item(ATTACH_KEY)?
+        && let Ok(entries) = entries.try_iter()
+    {
+        for entry in entries {
+            if let Ok(mapping) = entry?.cast_into::<PyDict>()
+                && let Some(value) = local_attach_file(&mapping)?
+                && let Ok(file) = value.extract::<String>()
+                && file != DUCKDB_MEMORY_DATABASE
+            {
+                files.push(file);
+            }
+        }
+    }
+    Ok(files)
 }
 
 /// Resolve dbt profiles, relative DuckDB paths, and the command group's warehouse.

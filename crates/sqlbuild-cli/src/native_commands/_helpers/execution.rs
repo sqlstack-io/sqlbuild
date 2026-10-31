@@ -1,19 +1,25 @@
 //! Running a Python-free command: its checks, then its output with the observed services.
 
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
+use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
+use tokio::io::AsyncReadExt;
 use tokio::process::{Child, Command};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
+use tokio::time::MissedTickBehavior;
+use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream, Value};
 use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
@@ -25,7 +31,7 @@ use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
 use crate::native_commands::_helpers::decision::{control_database, text};
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
-use crate::native_commands::_helpers::paths::project_location;
+use crate::native_commands::_helpers::paths::{location_database_files, project_location};
 use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
@@ -41,6 +47,43 @@ use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationServe, LostStdout, NativeCommand, NativeInvocation,
     ProjectLocation,
 };
+
+/// Health IO remains native even while a user-code child holds its interpreter's GIL.
+pub(crate) async fn report_location_health(
+    options: &LocationServe,
+    bearer: &str,
+    session_id: Uuid,
+    health: LocationHealth,
+) {
+    let report = LocationHealthReport {
+        event_id: Uuid::now_v7(),
+        session_id,
+        target: options.target.clone(),
+        health,
+    };
+    if let Err(error) =
+        report_remote_location_health((&options.server_url, bearer), options.location_id, &report)
+            .await
+    {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("Location health report failed: {error}\n"),
+        )]));
+    }
+}
+
+pub(crate) async fn location_heartbeats(
+    options: &LocationServe,
+    bearer: &str,
+    session_id: Uuid,
+) -> Result<(), ControlError> {
+    let mut clock = tokio::time::interval(Duration::from_secs(30));
+    clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    loop {
+        clock.tick().await;
+        report_location_health(options, bearer, session_id, LocationHealth::Heartbeat {}).await;
+    }
+}
 
 pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, ControlError> {
     if namespace
@@ -112,10 +155,8 @@ pub(crate) fn publish_child(
     script: &Path,
     generation: i64,
 ) -> io::Result<Child> {
-    let mut command = Command::new(script);
+    let mut command = location_child(options, script);
     command
-        .arg("--project-dir")
-        .arg(&options.project_dir)
         .args([
             "location",
             "publish",
@@ -129,15 +170,62 @@ pub(crate) fn publish_child(
     if let Some(image) = &options.image_id {
         command.args(["--image-id", image]);
     }
+    command.stdout(Stdio::inherit()).spawn()
+}
+
+/// Capture the ordinary debug check's exact local file paths without contaminating publication stdout.
+pub(crate) async fn check_location_connection(
+    options: &LocationServe,
+    script: &Path,
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<(bool, Vec<PathBuf>)>, ControlError> {
+    let mut child = location_child(options, script)
+        .args(["debug", "--target", &options.target, "--json"])
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| ControlError::Invalid("location debug output is unavailable".into()))?;
+    let mut output: Vec<u8> = Vec::new();
+    tokio::pin!(stopped);
+    let connected = tokio::select! {
+        result = &mut stopped => {
+            child.kill().await?;
+            result?;
+            return Ok(None);
+        },
+        result = async { tokio::try_join!(child.wait(), stdout.read_to_end(&mut output)) } => result?.0.success(),
+    };
+    let files: Vec<String> = match serde_json::from_slice::<serde_json::Value>(&output)
+        .and_then(|report| serde_json::from_value(report["local_files"].clone()))
+    {
+        Ok(files) => files,
+        Err(_) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                "Location connection check did not produce a valid report; retaining the published snapshot.\n",
+            )]));
+            return Ok(Some((false, Vec::new())));
+        }
+    };
+    Ok(Some((
+        connected,
+        location_database_files(&options.project_dir, files),
+    )))
+}
+
+fn location_child(options: &LocationServe, script: &Path) -> Command {
+    let mut command = Command::new(script);
+    command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {
         command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
     }
     command
         .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()
+        .kill_on_drop(true);
+    command
 }
 
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.

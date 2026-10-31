@@ -39,6 +39,8 @@ class LocationReloadTestCase:
     target: str
     expected_generation: int
     expected_stop_code: int
+    database: str
+    expected_connection: bool
 
 
 @dataclass(frozen=True)
@@ -46,3 +48,13 @@ class LocationShutdownTestCase:
     description: str
     signal: int
     expected_exit_code: int
+    minimum_heartbeats: int
+    blocked_command: str
+
+
+@dataclass(frozen=True)
+class LocationDatabaseTestCase:
+    description: str
+    database: str
+    expected_generation: int
+    connection_toml: str

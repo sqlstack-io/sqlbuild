@@ -1,16 +1,22 @@
 //! Coalesce source edits and retain the last good publication across isolated compiler failures.
 
-use std::path::Path;
+use std::future::Future;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use sqlbuild_orchestration::platform::models::LocationHealth;
 use sqlbuild_orchestration::store::errors::ControlError;
 use tokio::time::{Instant, MissedTickBehavior};
+use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    location_generation, publish_child, shutdown_signal,
+    check_location_connection, location_generation, location_heartbeats, publish_child,
+    report_location_health, shutdown_signal,
 };
-use crate::native_commands::_helpers::paths::{location_inputs, location_rules};
+use crate::native_commands::_helpers::paths::{
+    exclude_location_databases, location_watch, observe_location_inputs,
+};
 use crate::native_commands::_helpers::terminal::write_output;
 use crate::native_commands::models::LocationServe;
 
@@ -19,11 +25,20 @@ pub(super) async fn run_location(
     script: &Path,
     bearer: &str,
 ) -> Result<(), ControlError> {
-    let rules = location_rules();
-    let mut observed = location_inputs(&options.project_dir, &rules);
-    let mut attempted = None;
-    let mut changed_at = Instant::now();
-    let mut retry_at = None;
+    let session_id = Uuid::now_v7();
+    tokio::select! {
+        result = watch_location(&options, script, bearer, session_id) => result,
+        result = location_heartbeats(&options, bearer, session_id) => result,
+    }
+}
+
+async fn watch_location(
+    options: &LocationServe,
+    script: &Path,
+    bearer: &str,
+    session_id: Uuid,
+) -> Result<(), ControlError> {
+    let mut watch = location_watch(&options.project_dir);
     let mut clock = tokio::time::interval(Duration::from_millis(250));
     clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let stopped = shutdown_signal();
@@ -37,28 +52,19 @@ pub(super) async fn run_location(
             result = &mut stopped => return result,
             _ = clock.tick() => {},
         }
-        let current = location_inputs(&options.project_dir, &rules);
-        if observed != current {
-            observed = current;
-            changed_at = Instant::now();
-        }
-        if attempted.as_ref() == Some(&observed)
-            && retry_at.is_none_or(|retry| Instant::now() < retry)
-        {
+        let ready;
+        (watch, ready) = observe_location_inputs(&options.project_dir, watch);
+        if !ready {
             continue;
         }
-        if attempted.is_some() && changed_at.elapsed() < Duration::from_millis(250) {
-            continue;
-        }
-        attempted = Some(observed.clone());
         let generation = tokio::select! {
             result = &mut stopped => return result,
-            generation = location_generation(&options, bearer) => generation?,
+            generation = location_generation(options, bearer) => generation?,
         };
         let generation = match generation {
             Some(generation) => generation,
             None => {
-                retry_at = Some(Instant::now() + Duration::from_secs(5));
+                watch.retry_at = Some(Instant::now() + Duration::from_secs(5));
                 continue;
             }
         };
@@ -66,7 +72,7 @@ pub(super) async fn run_location(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
         )]));
-        let mut child = publish_child(&options, script, generation)?;
+        let mut child = publish_child(options, script, generation)?;
         let result = tokio::select! {
             result = &mut stopped => {
                 child.kill().await?;
@@ -75,17 +81,59 @@ pub(super) async fn run_location(
             result = child.wait() => result?,
         };
         if result.success() {
-            retry_at = None;
-            drop(write_output(&[(
-                Stream::Stderr,
-                "Code location ready; watching for changes.\n",
-            )]));
+            watch.retry_at = None;
+            let Some(files) = check_published_location(
+                options,
+                script,
+                (bearer, session_id, generation),
+                stopped.as_mut(),
+            )
+            .await?
+            else {
+                return Ok(());
+            };
+            watch = exclude_location_databases(&options.project_dir, files, watch);
         } else {
-            retry_at = Some(Instant::now() + Duration::from_secs(30));
+            watch.retry_at = Some(Instant::now() + Duration::from_secs(30));
+            tokio::select! {
+                result = &mut stopped => return result,
+                () = report_location_health(options, bearer, session_id, LocationHealth::CompileFailed { generation }) => {},
+            }
             drop(write_output(&[(
                 Stream::Stderr,
                 "Location reload failed; retaining last good snapshot. Retrying on change or in 30 seconds.\n",
             )]));
         }
     }
+}
+
+async fn check_published_location(
+    options: &LocationServe,
+    script: &Path,
+    (bearer, session_id, generation): (&str, Uuid, i64),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<Vec<PathBuf>>, ControlError> {
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Checking location connection with sqb debug...\n",
+    )]));
+    tokio::pin!(stopped);
+    let Some((connected, files)) =
+        check_location_connection(options, script, stopped.as_mut()).await?
+    else {
+        return Ok(None);
+    };
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = report_location_health(options, bearer, session_id, LocationHealth::Connection { generation, healthy: connected }) => {},
+    }
+    drop(write_output(&[(
+        Stream::Stderr,
+        if connected {
+            "Code location ready; connection check passed; watching for changes.\n"
+        } else {
+            "Code location published; connection check failed; watching for changes.\n"
+        },
+    )]));
+    Ok(Some(files))
 }

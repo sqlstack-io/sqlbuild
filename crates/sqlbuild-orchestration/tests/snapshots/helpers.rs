@@ -241,6 +241,25 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
         .await
         .expect("publish good snapshot");
     let connection = rusqlite::Connection::open(&path).expect("open fault injection connection");
+    connection
+        .execute_batch(
+            "DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version=2",
+        )
+        .expect("reconstruct the previous schema without changing existing facts");
+    migrate_store(&store)
+        .await
+        .expect("upgrade the previous schema");
+    migrate_store(&store)
+        .await
+        .expect("repeat the migration without changes");
+    assert_eq!(
+        current_snapshot(&store, location, "development")
+            .await
+            .expect("read upgraded store")
+            .expect("snapshot survives upgrade")
+            .record,
+        good
+    );
     // Fail after immutable bodies were inserted but before switching the current pointer.
     connection.execute_batch("CREATE TRIGGER fail_snapshot_switch BEFORE UPDATE ON sqb_current_snapshots BEGIN SELECT RAISE(ABORT, 'synthetic publication failure'); END").expect("install publication failure");
     input.generation = 2;
@@ -279,7 +298,7 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
         },
         SchemaRejectionCase {
             description: "migration version is unknown",
-            update_sql: "UPDATE sqb_schema_migrations SET version=2",
+            update_sql: "UPDATE sqb_schema_migrations SET version=999 WHERE version=2",
         },
     ] {
         connection
