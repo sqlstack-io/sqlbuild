@@ -6,12 +6,13 @@ use rayon::ThreadPool;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, TransformKind};
+use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, SchemaColumn};
 use sqlquack_semantics::query_lineage;
-use sqlquack_syntax::{ComplexityGuardOptions, Dialect, ParseOptions};
+use sqlquack_syntax::Dialect;
 
-use crate::lineage::constants::MAX_FUNCTION_CALL_DEPTH;
-use crate::lineage::models::{LineageConfidence, LineageTransformKind};
+use crate::sqlquack_analysis::_helpers::outputs::{
+    confidence, lineage_parse_options, transform_kind,
+};
 use crate::sqlquack_analysis::_helpers::schema::{
     RelationColumns, relation_key, schema_columns, sqlquack_dialect,
 };
@@ -44,12 +45,7 @@ fn model_lineage(
         model
             .schema
             .iter()
-            .map(|(relation, columns)| {
-                (
-                    relation_key(relation, profile),
-                    schema_columns(columns.iter().map(|(name, _)| name.as_str())),
-                )
-            })
+            .map(|(relation, columns)| (relation_key(relation, profile), column_names(columns)))
             .collect(),
     );
     let references: HashMap<String, (&str, &str)> = model
@@ -62,26 +58,27 @@ fn model_lineage(
             )
         })
         .collect();
-    let options = ParseOptions {
-        complexity_guard: Some(ComplexityGuardOptions {
-            max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
-            ..ComplexityGuardOptions::default()
-        }),
-    };
     let context = LineageContext {
         profile,
         schema: &schema,
         sql: None,
     };
-    let lineage = query_lineage(model.sql, dialect, &options, context).ok()?;
-    Some(
-        lineage
-            .outputs
-            .iter()
-            .filter(|output| !output.name.is_empty())
-            .map(|output| lineage_column(output, &references, profile))
-            .collect(),
-    )
+    match query_lineage(model.sql, dialect, &lineage_parse_options(), context) {
+        Ok(lineage) => Some(
+            lineage
+                .outputs
+                .iter()
+                .filter(|output| !output.name.is_empty())
+                .map(|output| lineage_column(output, &references, profile))
+                .collect(),
+        ),
+        Err(_unreadable) => None,
+    }
+}
+
+/// A relation's schema columns from its `(column, type)` pairs.
+fn column_names(columns: &[(String, String)]) -> Vec<SchemaColumn> {
+    schema_columns(columns.iter().map(|(name, _)| name.as_str()))
 }
 
 fn lineage_column(
@@ -100,22 +97,10 @@ fn lineage_column(
             profile.resolved_identifier(&source.column, source.quoted),
         ));
     }
-    let transform: LineageTransformKind = match output.kind {
-        TransformKind::Constant => LineageTransformKind::Constant,
-        TransformKind::Direct => LineageTransformKind::Direct,
-        TransformKind::Cast => LineageTransformKind::Cast,
-        TransformKind::Expression => LineageTransformKind::Expression,
-        TransformKind::Aggregation => LineageTransformKind::Aggregation,
-    };
-    let confidence: LineageConfidence = match (output.resolved, sources.is_empty()) {
-        (true, _) => LineageConfidence::High,
-        (false, false) => LineageConfidence::Medium,
-        (false, true) => LineageConfidence::Unknown,
-    };
     CompileLineageColumn {
         output_column: output.name.clone(),
-        transform,
-        confidence,
+        transform: transform_kind(output.kind),
+        confidence: confidence(output.resolved, !sources.is_empty()),
         sources: sources.into_iter().collect(),
     }
 }

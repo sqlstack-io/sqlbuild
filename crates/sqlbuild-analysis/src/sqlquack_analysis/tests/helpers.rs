@@ -1,8 +1,11 @@
 use crate::sqlquack_analysis::main::compile_lineage::compile_lineage;
 use crate::sqlquack_analysis::models::{CompileLineageColumn, CompiledModelSql};
 
-/// The lines of one model's compile lineage over orders and an export with a quoted column.
-pub(crate) fn compile_lines(dialect: &str, sql: &str) -> Option<Option<Vec<String>>> {
+const NO_ANSWER: &str = "no answer";
+const UNREAD: &str = "unread";
+
+/// One model's compile lineage lines over orders and an export with a quoted column.
+pub(crate) fn compile_lines(dialect: &str, sql: &str) -> Vec<String> {
     let references: Vec<(String, String, String)> = vec![
         owned(("ORDERS_REL", "model", "orders")),
         owned(("EXPORTS_REL", "seed", "listing_export")),
@@ -29,12 +32,13 @@ pub(crate) fn compile_lines(dialect: &str, sql: &str) -> Option<Option<Vec<Strin
         .num_threads(1)
         .build()
         .expect("the pool builds");
-    let mut lineage = compile_lineage(dialect, &[model], &pool).expect("lineage runs")?;
-    Some(
-        lineage
-            .pop()
-            .flatten()
-            .map(|columns| columns.iter().map(described).collect()),
+    let lineage = compile_lineage(dialect, &[model], &pool).expect("lineage runs");
+    let Some(mut models) = lineage else {
+        return vec![NO_ANSWER.to_owned()];
+    };
+    models.pop().flatten().map_or_else(
+        || vec![UNREAD.to_owned()],
+        |columns| columns.iter().map(described).collect(),
     )
 }
 
