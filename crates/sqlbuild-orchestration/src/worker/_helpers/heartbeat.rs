@@ -5,7 +5,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crate::runs::models::RunExecution;
-use crate::worker::_helpers::response::http_client;
 use crate::worker::errors::WorkerError;
 use crate::worker::models::{WorkerClient, WorkerSession};
 
@@ -62,13 +61,13 @@ pub(crate) async fn start_session(
                 }
             };
             runtime.block_on(async move {
-                let heartbeat = match http_client(client.authorization.clone()) {
-                    Ok(http) => WorkerClient {
-                        client: http,
+                let heartbeat = match client.connection.independent() {
+                    Ok(connection) => WorkerClient {
+                        connection,
                         ..client
                     },
                     Err(error) => {
-                        let _ = ready.send(Err(error));
+                        let _ = ready.send(Err(WorkerError::from(error)));
                         return;
                     }
                 };

@@ -5,12 +5,12 @@ use std::sync::atomic::AtomicBool;
 
 use uuid::Uuid;
 
+use crate::api::models::ControlClient;
 use crate::runs::models::RunExecution;
 
 #[derive(Clone, Debug)]
 pub struct WorkerClient {
-    pub(crate) client: reqwest::Client,
-    pub(crate) authorization: reqwest::header::HeaderValue,
+    pub(crate) connection: ControlClient,
     pub(crate) run_url: reqwest::Url,
     pub(crate) run_id: Uuid,
     pub(crate) claim_id: Uuid,

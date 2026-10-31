@@ -28,3 +28,10 @@ pub struct HeartbeatResponse {
 pub struct ApiErrorBody {
     pub error: String,
 }
+
+#[derive(Clone, Debug)]
+pub(crate) struct ControlClient {
+    pub(crate) client: reqwest::Client,
+    pub(crate) authorization: reqwest::header::HeaderValue,
+    pub(crate) base_url: reqwest::Url,
+}

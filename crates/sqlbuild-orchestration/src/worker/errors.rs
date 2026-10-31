@@ -15,3 +15,13 @@ pub enum WorkerError {
     #[error("run cancellation was requested before execution")]
     Cancelled,
 }
+
+impl From<crate::api::errors::ClientError> for WorkerError {
+    fn from(error: crate::api::errors::ClientError) -> Self {
+        match error {
+            crate::api::errors::ClientError::Configuration(message) => Self::Configuration(message),
+            crate::api::errors::ClientError::Transport(error) => Self::Transport(error),
+            crate::api::errors::ClientError::Rejected(status) => Self::Rejected(status),
+        }
+    }
+}

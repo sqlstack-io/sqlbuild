@@ -7,6 +7,16 @@ use axum::response::{IntoResponse, Response};
 use crate::api::models::ApiErrorBody;
 use crate::store::errors::ControlError;
 
+#[derive(Debug, thiserror::Error)]
+pub enum ClientError {
+    #[error("invalid API connection: {0}")]
+    Configuration(&'static str),
+    #[error("API request failed: {0}")]
+    Transport(#[from] reqwest::Error),
+    #[error("API rejected the request with HTTP {0}")]
+    Rejected(reqwest::StatusCode),
+}
+
 #[derive(Debug)]
 pub struct ApiError {
     pub(crate) status: StatusCode,
