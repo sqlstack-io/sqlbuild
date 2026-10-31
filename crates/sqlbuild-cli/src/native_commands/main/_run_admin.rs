@@ -12,6 +12,7 @@ use sqlbuild_orchestration::platform::main::location_work::location_work;
 use sqlbuild_orchestration::platform::main::request_location_work::request_location_work;
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::request_job_run::request_job_run;
+use sqlbuild_orchestration::runs::main::request_rerun::request_rerun;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
@@ -49,6 +50,10 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         }
         ControlAdmin::RequestJobRun(request) => {
             let applied = request_job_run(&store, &context, &request).await?;
+            Ok(json!({"run_id": request.run_id, "applied": applied}))
+        }
+        ControlAdmin::Rerun(request) => {
+            let applied = request_rerun(&store, &context, &request).await?;
             Ok(json!({"run_id": request.run_id, "applied": applied}))
         }
         ControlAdmin::RequestLocationWork(request) => {

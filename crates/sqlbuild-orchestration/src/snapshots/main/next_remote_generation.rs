@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::main::connect_client::connect_client;
-use crate::snapshots::models::CurrentSnapshot;
+use crate::snapshots::models::SnapshotRecord;
 
 pub async fn next_remote_generation(
     server_url: &str,
@@ -21,10 +21,10 @@ pub async fn next_remote_generation(
         "targets",
         target,
         "snapshots",
+        "metadata",
     ])?;
-    match client_response::<CurrentSnapshot>(connection.client.get(url)).await {
+    match client_response::<SnapshotRecord>(connection.client.get(url)).await {
         Ok(current) => current
-            .record
             .generation
             .checked_add(1)
             .ok_or(ClientError::Configuration(

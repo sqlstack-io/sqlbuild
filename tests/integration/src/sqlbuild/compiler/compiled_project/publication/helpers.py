@@ -322,7 +322,14 @@ def scheduled_worker(
             "server_url": api.url,
             "max_workers": 1,
         } | deployment.configuration
-        _ = configuration.write_text(json.dumps({deployment.kind: [launcher]}))
+        _ = configuration.write_text(
+            json.dumps(
+                {
+                    deployment.kind: [launcher],
+                    "concurrency_limits": test_case.concurrency_limits,
+                }
+            )
+        )
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
             _ = control.executescript(test_case.store_setup)
@@ -380,10 +387,14 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     return run
 
 
-def running_statement(worker: ScheduledWorker) -> dict[str, Any]:
+def running_statement(worker: ScheduledWorker, *, job_key: str | None = None) -> dict[str, Any]:
     """The worker has started the real long query, not merely entered its Python interpreter."""
     active: dict[str, Any] = wait_for_run(
-        worker.api, worker.process, worker.log, pending=frozenset({"queued", "launched"})
+        worker.api,
+        worker.process,
+        worker.log,
+        pending=frozenset({"queued", "launched"}),
+        job_key=job_key,
     )
     assert active["status"] == "running", worker.log.read_text()
     deadline: float = time.monotonic() + 15
@@ -398,9 +409,11 @@ def running_statement(worker: ScheduledWorker) -> dict[str, Any]:
     return active
 
 
-def cancel_running_statement(worker: ScheduledWorker) -> None:
+def cancel_running_statement(
+    worker: ScheduledWorker, *, job_key: str | None = None, run_id: str | None = None
+) -> None:
     """Wait for the real long-running query before exercising the administrative cancel command."""
-    active: dict[str, Any] = running_statement(worker)
+    active: dict[str, Any] = running_statement(worker, job_key=job_key)
     cancelled: subprocess.CompletedProcess[str] = subprocess.run(
         [
             str(Path(sys.executable).with_name("sqb")),
@@ -408,7 +421,7 @@ def cancel_running_statement(worker: ScheduledWorker) -> None:
             "--database-env",
             "SQLBUILD_SCHEDULER_TEST_STORE",
             "cancel-run",
-            active["run_id"],
+            run_id or active["run_id"],
             "--event-id",
             str(uuid4()),
             "--reason",
@@ -428,6 +441,7 @@ def wait_for_run(
     log: Path,
     *,
     pending: frozenset[str] = frozenset({"queued", "launched", "running", "unresponsive"}),
+    job_key: str | None = None,
 ) -> dict[str, Any]:
     """A terminal API projection must follow the scheduler's actual isolated warehouse execution."""
     request: Request = Request(
@@ -440,7 +454,10 @@ def wait_for_run(
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
         with urlopen(request, timeout=2) as response:
-            current = next(iter(json.load(response)), current)
+            runs: list[dict[str, Any]] = json.load(response)
+            by_job: dict[str | None, dict[str, Any]] = {run["job_key"]: run for run in runs}
+            by_job[None] = next(iter(runs), current)
+            current = by_job.get(job_key, current)
         time.sleep(0.02)
     return current
 

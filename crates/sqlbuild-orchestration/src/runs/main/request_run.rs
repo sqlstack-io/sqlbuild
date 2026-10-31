@@ -1,6 +1,6 @@
 //! Queue a frozen, already authorized request without recreating work on transport retries.
 
-use crate::runs::_helpers::request::publish_request;
+use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::RunRequest;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;

@@ -102,7 +102,17 @@ class WorkerExecutionTestCase:
     files: dict[str, str] = field(default_factory=dict)
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
+    concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
+
+
+@dataclass(frozen=True)
+class GroupExecutionTestCase(WorkerExecutionTestCase):
+    description: str
+    on_failure: Literal["skip_dependents", "skip_downstream_jobs", "stop_group"] = "skip_dependents"
+    expected_child_statuses: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    expected_totals: tuple[str, str | None] = ("skipped", "model:broken_orders")
+    expected_marts_started: bool = True
 
 
 @dataclass(frozen=True)

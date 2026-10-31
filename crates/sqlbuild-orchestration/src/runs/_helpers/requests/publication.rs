@@ -1,14 +1,43 @@
-//! Validate and publish a frozen request inside the caller's audit transaction.
+//! Validate and publish frozen requests inside the caller's audit transaction.
 
 use std::collections::BTreeSet;
 
 use serde_json::json;
+use uuid::Uuid;
 
+use crate::credentials::models::AuditContext;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::RunRequest;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+
+/// Check the original authored request before reading mutable publication pointers or outcomes.
+pub(crate) async fn request_retry(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (run_id, event_id, request): (Uuid, Uuid, &serde_json::Value),
+) -> Result<(ControlTransaction, bool), ControlError> {
+    let (transaction, previous) = query(
+        transaction,
+        "SELECT a.actor, a.after_json FROM sqb_runs r LEFT JOIN sqb_security_audit a ON a.event_id=$1 WHERE r.run_id=$2",
+        vec![Parameter::Id(event_id), Parameter::Id(run_id)],
+    ).await?;
+    let Some(previous) = previous.first() else {
+        return Ok((transaction, false));
+    };
+    if previous.get("actor") != Some(&json!(context.actor))
+        || previous
+            .get("after_json")
+            .and_then(|after| after.get("request"))
+            != Some(request)
+    {
+        return Err(ControlError::Invalid(
+            "run ID already has different request content".into(),
+        ));
+    }
+    Ok((transaction, true))
+}
 
 pub(crate) async fn publish_request(
     transaction: ControlTransaction,
@@ -35,6 +64,11 @@ pub(crate) async fn publish_request(
             ));
         }
         return Ok((transaction, false));
+    }
+    if request.parent_run_id.is_some() {
+        return Err(ControlError::Invalid(
+            "group children are created atomically with their pinned parent".into(),
+        ));
     }
     let (transaction, nodes) = query(
         transaction,

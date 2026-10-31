@@ -23,11 +23,24 @@ pub(crate) struct WorkerBuild {
 
 impl WorkerBuild {
     pub(crate) fn new(worker: &Bound<'_, NativeOrchestrationWorker>) -> PyResult<Arc<Self>> {
-        Ok(Arc::new(Self {
+        let state = Arc::new(Self {
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
-        }))
+        });
+        for key in state.execution.skipped_nodes.keys() {
+            state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None))?;
+        }
+        Ok(state)
+    }
+
+    pub(crate) fn has_work(&self) -> bool {
+        self.execution
+            .claim
+            .request
+            .selection
+            .iter()
+            .any(|key| !self.execution.skipped_nodes.contains_key(key))
     }
 
     pub(crate) fn check_cancelled(&self, py: Python<'_>) -> PyResult<()> {
@@ -103,7 +116,7 @@ impl WorkerBuild {
                 outcome,
                 rows_affected,
                 error_code,
-                skipped_because_of: None,
+                skipped_because_of: self.execution.skipped_nodes.get(key).cloned(),
             },
         )?;
         self.completed

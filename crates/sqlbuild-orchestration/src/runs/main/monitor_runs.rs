@@ -3,7 +3,7 @@
 use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::runs::_helpers::publish_change::publish_change;
+use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::constants::{HEARTBEAT_TIMEOUT_SECONDS, MONITOR_BATCH_SIZE};
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest};
 use crate::scheduler::main::check_lease::check_lease;

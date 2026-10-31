@@ -33,6 +33,15 @@ impl Launchers {
             .map(Launcher::Local)
             .chain(self.docker.iter().map(Launcher::Docker))
     }
+
+    pub(in crate::workers) fn dispatch_scopes(&self) -> BTreeSet<(Uuid, String)> {
+        self.locations()
+            .map(|location| {
+                let scope = location.scope();
+                (scope.location_id, scope.target.to_owned())
+            })
+            .collect()
+    }
 }
 
 pub(in crate::workers) fn read_configuration(

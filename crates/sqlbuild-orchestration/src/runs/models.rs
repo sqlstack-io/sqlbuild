@@ -63,6 +63,16 @@ pub enum RunStatus {
     PresumedFailed,
 }
 
+impl RunStatus {
+    #[must_use]
+    pub const fn is_terminal(self) -> bool {
+        !matches!(
+            self,
+            Self::Queued | Self::Launched | Self::Running | Self::Unresponsive
+        )
+    }
+}
+
 /// The authorized selection and pinned execution inputs are immutable once requested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunRequest {
@@ -96,6 +106,17 @@ pub struct JobRunRequest {
     pub location_id: Uuid,
     pub target: String,
     pub job_key: String,
+    pub reason: String,
+    pub priority: i64,
+}
+
+/// A retry derives its execution scope from a terminal run, never from caller selectors.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RerunRequest {
+    pub run_id: Uuid,
+    pub source_run_id: Uuid,
+    pub from_failure: bool,
     pub reason: String,
     pub priority: i64,
 }
@@ -166,6 +187,9 @@ pub struct RunExecution {
     pub environment_hash: String,
     pub sqb_version: String,
     pub node_hashes: BTreeMap<String, String>,
+    /// Derived from completed sibling facts and pinned lineage, never a mutable request rewrite.
+    #[serde(default)]
+    pub skipped_nodes: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -271,12 +295,67 @@ pub(crate) struct QueueCandidate {
     pub(crate) queued_at: DateTime<Utc>,
 }
 
+/// Fairness covers runnable launcher scopes, not queues the installation cannot dispatch.
+#[derive(Clone, Copy, Debug)]
+pub struct RunDispatch<'a> {
+    pub scope: Option<(Uuid, &'a str)>,
+    pub eligible: Option<&'a BTreeSet<(Uuid, String)>>,
+}
+
+impl<'a> From<Option<(Uuid, &'a str)>> for RunDispatch<'a> {
+    fn from(scope: Option<(Uuid, &'a str)>) -> Self {
+        Self {
+            scope,
+            eligible: None,
+        }
+    }
+}
+
+impl<'a> From<(Uuid, &'a str)> for RunDispatch<'a> {
+    fn from(scope: (Uuid, &'a str)) -> Self {
+        Some(scope).into()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct ChangingRun {
     pub(crate) status: RunStatus,
     pub(crate) worker_instance: Option<Uuid>,
     pub(crate) cancel_requested_at: Option<DateTime<Utc>>,
     pub(crate) node_counts_json: BTreeMap<String, i64>,
+}
+
+/// Virtual parents and physical children use the same lifecycle evidence during group progress.
+#[derive(Debug, Deserialize)]
+pub(crate) struct GroupRun {
+    pub(crate) request_json: RunRequest,
+    pub(crate) queued_at: DateTime<Utc>,
+    #[serde(flatten)]
+    pub(crate) state: ChangingRun,
+}
+
+/// Parent overlap locks and installation-wide limits occupy different resource namespaces.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ConcurrencyResource {
+    Limit(String),
+    Overlap(Uuid, String, String),
+}
+
+/// A transaction-local safety calculation, never a second persisted allocation ledger.
+#[derive(Debug)]
+pub(crate) struct GroupCapacity {
+    pub(crate) available: BTreeMap<ConcurrencyResource, i64>,
+    pub(crate) held: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
+    pub(crate) needed: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
+    pub(crate) waiting: Vec<QueueCandidate>,
+}
+
+#[derive(Debug)]
+pub(crate) struct GroupContext {
+    pub(crate) parent: GroupRun,
+    pub(crate) children: Vec<GroupRun>,
+    pub(crate) definitions: crate::declarations::models::Definitions,
+    pub(crate) critical_failed: bool,
 }
 
 /// Differing retries retain conflict evidence while preserving the first output bytes.

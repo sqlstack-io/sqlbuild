@@ -1,4 +1,4 @@
-//! Global Recall keys cannot escape a worker's claim namespace.
+//! Namespace Recall facts and validate artifact ownership before publication.
 
 use std::collections::BTreeMap;
 

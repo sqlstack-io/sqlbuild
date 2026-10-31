@@ -8,7 +8,7 @@ use serde_json::json;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
-use sqlbuild_orchestration::runs::models::JobRunRequest;
+use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -89,8 +89,9 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                 work: LocationWork::CheckConnection {},
             }))
         }
-        Some("change-trigger" | "cancel-run" | "request-run") => {
-            let identity_option = if action.as_deref() == Some("request-run") {
+        Some("change-trigger" | "cancel-run" | "request-run" | "rerun-run") => {
+            let identity_option = if matches!(action.as_deref(), Some("request-run" | "rerun-run"))
+            {
                 "--run-id"
             } else {
                 "--event-id"
@@ -101,7 +102,22 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
             if reason.trim().is_empty() {
                 return Err(ControlError::Invalid("--reason must not be blank".into()));
             }
-            if action.as_deref() == Some("request-run") {
+            if matches!(action.as_deref(), Some("request-run" | "rerun-run")) {
+                let priority = match namespace.get("admin_priority") {
+                    Some(Value::Int(value)) => value.parse::<i64>().map_err(|_| {
+                        ControlError::Invalid("--priority must fit a signed 64-bit integer".into())
+                    })?,
+                    _ => 0,
+                };
+                if action.as_deref() == Some("rerun-run") {
+                    return Ok(ControlAdmin::Rerun(RerunRequest {
+                        run_id: event_id,
+                        source_run_id: id,
+                        from_failure: flag(namespace, "admin_from_failure"),
+                        reason,
+                        priority,
+                    }));
+                }
                 let target = text(namespace, "admin_target").unwrap_or_default();
                 let job_key = text(namespace, "admin_job").unwrap_or_default();
                 if target.trim().is_empty() || job_key.trim().is_empty() {
@@ -109,12 +125,6 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                         "target and job must not be blank".into(),
                     ));
                 }
-                let priority = match namespace.get("admin_priority") {
-                    Some(Value::Int(value)) => value.parse::<i64>().map_err(|_| {
-                        ControlError::Invalid("--priority must fit a signed 64-bit integer".into())
-                    })?,
-                    _ => 0,
-                };
                 return Ok(ControlAdmin::RequestJobRun(JobRunRequest {
                     run_id: event_id,
                     location_id: id,

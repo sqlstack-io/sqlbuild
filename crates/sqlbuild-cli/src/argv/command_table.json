@@ -449,6 +449,74 @@
           }
          },
          {
+          "name": "rerun-run",
+          "parser": {
+           "prog": "sqb admin rerun-run",
+           "description": "Retry a terminal run using its pinned snapshot and settings, with an atomic security audit.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": ["-h", "--help"],
+             "dest": "help",
+             "nargs": 0,
+             "default": {"suppress": true},
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "SOURCE_RUN_ID",
+             "required": true,
+             "help": "terminal source run UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": ["--run-id"],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "new run UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store_true",
+             "options": ["--from-failure"],
+             "dest": "admin_from_failure",
+             "nargs": 0,
+             "default": false,
+             "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--priority"],
+             "dest": "admin_priority",
+             "type": "int",
+             "help": "signed queue priority; higher values run first (default: 0)",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--reason"],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
           "name": "request-run",
           "parser": {
            "prog": "sqb admin request-run",
@@ -799,6 +867,11 @@
           "dest": "request-run",
           "metavar": "request-run",
           "help": "queue a pinned published job with an atomic security audit"
+         },
+         {
+          "dest": "rerun-run",
+          "metavar": "rerun-run",
+          "help": "retry a terminal run or exactly its failed and skipped nodes"
          },
          {
           "dest": "cancel-run",

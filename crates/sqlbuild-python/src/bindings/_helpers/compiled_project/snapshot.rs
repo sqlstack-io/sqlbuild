@@ -15,13 +15,13 @@ use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_re
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode, SnapshotRecord};
 
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
-    AuthoredJob, compile_declarations, discover_declarations,
+    AuthoredDeclaration, compile_declarations, discover_declarations,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::native_host::orchestration_declarations::validate_jobs;
+use crate::bindings::_helpers::native_host::orchestration_declarations::collect_declarations;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
 use crate::bindings::_helpers::records::fields::field;
 
@@ -126,11 +126,11 @@ pub(crate) fn build_orchestration_snapshot(
         None => discover_declarations(py, &project_dir)?,
     };
     if !declarations.is_empty() {
-        validate_jobs(py, &declarations)?;
+        let declarations = collect_declarations(py, declarations)?;
         let authored = declarations
             .iter()
-            .map(|declaration| declaration.extract::<AuthoredJob>())
-            .collect::<PyResult<Vec<AuthoredJob>>>()?;
+            .map(|declaration| declaration.extract::<AuthoredDeclaration>())
+            .collect::<PyResult<Vec<AuthoredDeclaration>>>()?;
         let graph = project.lineage_graph(py)?;
         input = compile_declarations(input, graph.bind(py).get().graph(), authored)?;
     }

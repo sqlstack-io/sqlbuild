@@ -1,4 +1,4 @@
-//! Resolve output ownership from the physical claim and normalize Recall input before append.
+//! Normalize Recall output under its physical claim's invocation envelope.
 
 use chrono::{DateTime, SecondsFormat};
 use sqlbuild_recall::records::main::output_row::output_row;

@@ -9,6 +9,7 @@ use crate::api::_helpers::authentication::require_location;
 use crate::api::errors::ApiError;
 use crate::credentials::models::TokenIdentity;
 use crate::snapshots::main::current_snapshot::current_snapshot;
+use crate::snapshots::main::current_snapshot_record::current_snapshot_record;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{CurrentSnapshot, SnapshotInput, SnapshotRecord};
 use crate::store::models::ControlStore;
@@ -53,4 +54,24 @@ pub(crate) async fn current(
             message: "no successful snapshot".into(),
         })?;
     Ok(Json(current))
+}
+
+#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/snapshots/metadata",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = SnapshotRecord), (status = 401, description = "Invalid credential"),
+        (status = 403, description = "Location not authorized"), (status = 404, description = "No successful snapshot")),
+    security(("bearer" = [])))]
+pub(crate) async fn metadata(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+) -> Result<Json<SnapshotRecord>, ApiError> {
+    require_location(&identity, location_id)?;
+    let record = current_snapshot_record(&store, location_id, &target)
+        .await?
+        .ok_or_else(|| ApiError {
+            status: StatusCode::NOT_FOUND,
+            message: "no successful snapshot".into(),
+        })?;
+    Ok(Json(record))
 }

@@ -125,6 +125,7 @@ pub(crate) struct DueTrigger {
     pub(crate) image_id: Option<String>,
     pub(crate) definition_json: TriggerDefinition,
     pub(crate) job_json: JobDefinition,
+    pub(crate) run_kind: crate::runs::models::RunKind,
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
     pub(crate) status: TriggerStatus,

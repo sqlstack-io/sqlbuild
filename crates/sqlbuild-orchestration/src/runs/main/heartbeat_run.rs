@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::runs::_helpers::events::append_run_event;
+use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::models::{RunChange, RunChangeRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;

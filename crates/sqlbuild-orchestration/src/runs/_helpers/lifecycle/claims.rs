@@ -1,9 +1,13 @@
-//! A rejected candidate rolls back its entire savepoint, including any partial write set.
+//! Reserve write claims and concurrency slots inside the candidate's rollback savepoint.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 
-use crate::runs::models::RunRequest;
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::runs::_helpers::lifecycle::events::append_run_event;
+use crate::runs::models::{RunClaim, RunRequest};
 use crate::scheduler::models::Overlap;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -21,8 +25,9 @@ pub(crate) async fn reserve_claims(
         let rows;
         (transaction, rows) = query(
             transaction,
-            "SELECT r.run_id FROM sqb_runs r JOIN sqb_run_liveness l ON l.run_id=r.run_id \
-             WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 LIMIT 1",
+            "SELECT r.run_id FROM sqb_runs r LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id \
+             WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
+             AND (l.run_id IS NOT NULL OR (r.kind='group' AND r.status='running')) LIMIT 1",
             vec![
                 Parameter::Id(request.location_id),
                 Parameter::Text(request.target.clone()),
@@ -46,6 +51,18 @@ pub(crate) async fn reserve_claims(
         }
     }
     for group in &request.concurrency_groups {
+        if let Some(parent_id) = request.parent_run_id {
+            let inherited;
+            (transaction, inherited) = query(
+                transaction,
+                "SELECT slot FROM sqb_concurrency_slots WHERE group_key=$1 AND run_id=$2",
+                vec![Parameter::Text(group.clone()), Parameter::Id(parent_id)],
+            )
+            .await?;
+            if !inherited.is_empty() {
+                continue;
+            }
+        }
         let limit = limits
             .get(group)
             .ok_or_else(|| {
@@ -81,4 +98,36 @@ pub(crate) async fn reserve_claims(
         }
     }
     Ok((transaction, true))
+}
+
+/// Publish ownership only after every physical claim has been reserved in this transaction.
+pub(crate) async fn publish_claim(
+    transaction: ControlTransaction,
+    request: RunRequest,
+) -> Result<(ControlTransaction, RunClaim), ControlError> {
+    let claim = RunClaim {
+        claim_id: Uuid::new_v5(&request.run_id, b"run_claimed"),
+        request,
+    };
+    let now = transaction.now;
+    let (transaction, _) = query(transaction,
+        "INSERT INTO sqb_run_liveness (run_id, worker_instance, claimed_at, last_heartbeat_at) VALUES ($1,$2,$3,$3)",
+        vec![Parameter::Id(claim.request.run_id), Parameter::Id(claim.claim_id), Parameter::Time(now)]).await?;
+    let (transaction, cursor) = append_run_event(
+        transaction,
+        (claim.request.run_id, claim.claim_id),
+        "run_claimed",
+        json!({"claim": claim}),
+    )
+    .await?;
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_runs SET last_event_storage_id=$1 WHERE run_id=$2",
+        vec![
+            Parameter::Integer(cursor),
+            Parameter::Id(claim.request.run_id),
+        ],
+    )
+    .await?;
+    Ok((transaction, claim))
 }

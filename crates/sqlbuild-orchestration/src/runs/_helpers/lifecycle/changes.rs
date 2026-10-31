@@ -1,4 +1,4 @@
-//! Validate lifecycle authority before publishing any fact or releasing physical write claims.
+//! Lifecycle authority checks precede fact publication and physical claim release.
 
 use crate::runs::models::{
     ChangingRun, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,

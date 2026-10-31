@@ -16,6 +16,7 @@ use sqlbuild_orchestration::runs::models::{
     RunAuthority, RunChange, RunChangeRequest, RunExecution, RunStatus,
 };
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
+use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::main::verify_execution::verify_execution;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
@@ -108,10 +109,47 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             assert!(openapi["components"]["schemas"]["SnapshotInput"].is_object());
             assert!(openapi["components"]["schemas"]["RunChangeRequest"].is_object());
             assert!(openapi["components"]["schemas"]["RunExecution"].is_object());
+            assert_eq!(
+                next_remote_generation(
+                    &api.url,
+                    &location_token.bearer,
+                    location_id,
+                    "development"
+                )
+                .await
+                .expect("first generation"),
+                1
+            );
             let input = snapshot(location_id);
             let published = publish_remote_snapshot(&api.url, &location_token.bearer, &input)
                 .await
                 .expect("publish retained native data");
+            let metadata: SnapshotRecord = client
+                .get(format!("{path}/metadata"))
+                .bearer_auth(&location_token.bearer)
+                .send()
+                .await
+                .expect("metadata response")
+                .json()
+                .await
+                .expect("metadata record without project bodies");
+            assert_eq!(metadata, published);
+            assert_eq!(
+                next_remote_generation(
+                    &api.url,
+                    &location_token.bearer,
+                    location_id,
+                    "development"
+                )
+                .await
+                .expect("reconcile published generation"),
+                2
+            );
+            assert!(matches!(
+                next_remote_generation(&api.url, &location_token.bearer, other, "development")
+                    .await,
+                Err(ClientError::Rejected(StatusCode::FORBIDDEN))
+            ));
             let response = client
                 .get(&path)
                 .bearer_auth(&location_token.bearer)
