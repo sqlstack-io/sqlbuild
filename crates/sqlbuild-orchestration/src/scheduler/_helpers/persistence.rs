@@ -61,6 +61,7 @@ pub(crate) async fn persist_ticks(
                     write_set.clone()
                 },
                 settings: trigger.job_json.settings.clone(),
+                window: None,
                 concurrency_groups: trigger.job_json.concurrency_groups.clone(),
                 overlap: trigger.job_json.overlap,
             };

@@ -80,6 +80,7 @@ pub(crate) fn request(
         write_set: selection.clone(),
         selection,
         settings: BTreeMap::new(),
+        window: None,
         concurrency_groups: BTreeSet::new(),
         overlap: Overlap::Allow,
     }

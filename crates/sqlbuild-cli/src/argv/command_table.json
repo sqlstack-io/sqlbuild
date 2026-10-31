@@ -585,6 +585,34 @@
             },
             {
              "kind": "store",
+             "options": ["--start-cursor-ts"],
+             "dest": "admin_start_cursor_ts",
+             "help": "backfill timestamp start (RFC3339); requires --end-cursor-ts",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--end-cursor-ts"],
+             "dest": "admin_end_cursor_ts",
+             "help": "inclusive backfill timestamp end (RFC3339); requires --start-cursor-ts",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--start-cursor-int"],
+             "dest": "admin_start_cursor_int",
+             "help": "backfill integer start; requires --end-cursor-int",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--end-cursor-int"],
+             "dest": "admin_end_cursor_int",
+             "help": "inclusive backfill integer end; requires --start-cursor-int",
+             "group": 1
+            },
+            {
+             "kind": "store",
              "options": [
               "--priority"
              ],

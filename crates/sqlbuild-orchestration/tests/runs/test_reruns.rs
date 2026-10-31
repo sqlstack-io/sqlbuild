@@ -9,7 +9,7 @@ use crate::runs::main::{
 };
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RerunRequest, RunAuthority, RunChange, RunChangeRequest, RunOrigin,
-    RunOutcome, RunStatus,
+    RunOutcome, RunStatus, RunWindow,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -80,6 +80,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     job_key: "daily_orders".into(),
                     reason: "Build orders".into(),
                     priority: 1,
+                    window: Some(RunWindow::Integer { start: -3, end: 11 }),
                 },
             )
             .await
@@ -285,6 +286,10 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     assert_eq!(claim.request.origin, RunOrigin::Rerun);
                     assert_eq!(claim.request.priority, 7);
                     assert_eq!(claim.request.settings, settings[expected_job]);
+                    assert_eq!(
+                        claim.request.window,
+                        Some(RunWindow::Integer { start: -3, end: 11 })
+                    );
                     selected.extend(claim.request.selection.iter().cloned());
                     succeed(store, &claim).await;
                 }

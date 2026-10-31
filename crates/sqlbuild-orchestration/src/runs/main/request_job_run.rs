@@ -7,7 +7,7 @@ use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
 use crate::runs::_helpers::requests::job::frozen_job_request;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
-use crate::runs::models::JobRunRequest;
+use crate::runs::models::{JobRunRequest, RunWindow};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -27,6 +27,14 @@ pub async fn request_job_run(
     {
         return Err(ControlError::Invalid(
             "job run needs an actor, granting role, target, job and reason".into(),
+        ));
+    }
+    if request.window.as_ref().is_some_and(|window| match window {
+        RunWindow::Timestamp { start, end } => start > end,
+        RunWindow::Integer { start, end } => start > end,
+    }) {
+        return Err(ControlError::Invalid(
+            "backfill window start must not follow end".into(),
         ));
     }
     let event_id = Uuid::new_v5(&request.run_id, b"manual-job-request");
