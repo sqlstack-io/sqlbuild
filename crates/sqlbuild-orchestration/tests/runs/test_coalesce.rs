@@ -1,21 +1,20 @@
 use std::collections::BTreeMap;
 
+use crate::declarations::main::list_triggers::list_triggers;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::list_runs::list_runs;
+use crate::scheduler::models::TickDecision;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
-use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
-use sqlbuild_orchestration::scheduler::models::TickDecision;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::helpers::snapshot;
-use crate::location_helpers::create_location;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::CoalescedRunTestCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::snapshot;
+use crate::runs::tests::test_types::CoalescedRunTestCase;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks_wait_in_a_new_run_instead_of_covering_executing_work()

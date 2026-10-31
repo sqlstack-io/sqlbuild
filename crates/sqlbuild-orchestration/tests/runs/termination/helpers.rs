@@ -1,11 +1,9 @@
 //! Terminal facts exercise claim release through the public run lifecycle.
 
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,
-};
-use sqlbuild_orchestration::scheduler::models::SchedulerLease;
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::runs::main::change_run::change_run;
+use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome};
+use crate::scheduler::models::SchedulerLease;
+use crate::store::models::ControlStore;
 use uuid::Uuid;
 
 pub(crate) async fn finish(store: &ControlStore, lease: &SchedulerLease, claim: &RunClaim) {

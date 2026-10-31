@@ -2,13 +2,26 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::runs::_helpers::requests::publication::publish_request;
+use crate::runs::models::{RunKind, RunOrigin, RunRequest};
+use crate::scheduler::models::Overlap;
+use crate::snapshots::models::{SnapshotInput, SnapshotNode};
+use crate::store::errors::ControlError;
+use crate::store::main::begin::begin;
+use crate::store::main::commit::commit;
+use crate::store::models::{ControlStore, TransactionMode};
 use serde_json::json;
-use sqlbuild_orchestration::runs::main::request_run::request_run;
-use sqlbuild_orchestration::runs::models::{RunKind, RunOrigin, RunRequest};
-use sqlbuild_orchestration::scheduler::models::Overlap;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
+
+pub(crate) async fn request_run(
+    store: &ControlStore,
+    request: &RunRequest,
+) -> Result<bool, ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    let (transaction, applied) = publish_request(transaction, request).await?;
+    commit(transaction).await?;
+    Ok(applied)
+}
 
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {

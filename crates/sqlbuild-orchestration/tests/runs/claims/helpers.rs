@@ -2,11 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::models::{
+use crate::runs::main::change_run::change_run;
+use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome,
 };
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::models::ControlStore;
 use uuid::Uuid;
 
 pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {

@@ -1,25 +1,25 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::heartbeat_run::heartbeat_run;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
+use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::heartbeat_run::heartbeat_run;
+use crate::runs::main::list_runs::list_runs;
+use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest};
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
 
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::{queue, request, snapshot};
-use crate::lease_helpers::expire_lease;
-use crate::location_helpers::create_location;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::{ClaimFailureTestCase, TransactionFault};
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::test_types::{ClaimFailureTestCase, TransactionFault};
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::lease_helpers::expire_lease;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_failures_during_claim_publication_when_retried_then_claims_slots_liveness_facts_and_projection_commit_together()

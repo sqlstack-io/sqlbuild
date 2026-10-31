@@ -1,15 +1,17 @@
-//! Contention and expiry exercise public APIs against the real databases, not fake clocks.
+//! Contention and expiry exercise scheduler ownership against real databases, not fake clocks.
 
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
-use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+pub(crate) use crate::scheduler::main::_acquire_lease::acquire_lease;
+pub(crate) use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
+pub(crate) use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
+use crate::scheduler::main::renew_lease::renew_lease;
+use crate::store::errors::ControlError;
+use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::lease_helpers::expire_lease;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store};
-use crate::store_test_types::Backend;
+use crate::store::tests::lease_helpers::expire_lease;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     let test_store = open_test_store(backend).await?;

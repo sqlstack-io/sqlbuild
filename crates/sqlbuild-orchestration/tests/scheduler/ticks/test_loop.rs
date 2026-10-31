@@ -2,20 +2,22 @@
 
 use std::time::Duration;
 
-use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
-use sqlbuild_orchestration::scheduler::main::scheduler_cycle::scheduler_cycle;
-use sqlbuild_orchestration::scheduler::models::SchedulerState;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
+use crate::scheduler::main::run_scheduler::run_scheduler;
+use crate::scheduler::models::SchedulerState;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::lease_helpers::expire_lease;
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::ticks::helpers::snapshot;
-use crate::ticks::test_types::{IdleLauncher, TickTransactionTestCase};
+use crate::credentials::tests::location_helpers::create_location;
+use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
+use crate::scheduler::tests::contracts::ticks::test_types::{
+    IdleLauncher, TickTransactionTestCase,
+};
+use crate::store::tests::lease_helpers::expire_lease;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drains_due_work_and_idle_shutdown_is_prompt()
@@ -75,13 +77,10 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
                     .1
                     .leader
             );
-            let runs = sqlbuild_orchestration::runs::main::list_runs::list_runs(
-                store,
-                (location, "development"),
-                100,
-            )
-            .await
-            .expect("queued run");
+            let runs =
+                crate::runs::main::list_runs::list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("queued run");
             assert_eq!(runs.len(), test_case.expected_runs);
             let (stop, shutdown) = tokio::sync::watch::channel(false);
             let (_changed, changes) = tokio::sync::watch::channel(());

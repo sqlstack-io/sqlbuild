@@ -1,9 +1,9 @@
-//! Idempotency and commit-order paging through the public store API.
+//! Idempotency and commit-order paging through real store transactions.
 
-use crate::helpers::recall_contract;
-use crate::store_helpers::run;
-use crate::store_test_types::Backend;
-use crate::test_types::RecallTestCase;
+use crate::store::tests::helpers::recall_contract;
+use crate::store::tests::store_helpers::run;
+use crate::store::tests::store_test_types::Backend;
+use crate::store::tests::test_types::RecallTestCase;
 
 #[test]
 fn given_native_recall_facts_when_retried_and_paged_then_content_and_commit_order_are_preserved() {

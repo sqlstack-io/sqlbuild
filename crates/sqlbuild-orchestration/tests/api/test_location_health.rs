@@ -1,23 +1,21 @@
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::platform::main::report_remote_location_health::report_remote_location_health;
+use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::helpers::read_recall_events;
 use chrono::Utc;
 use reqwest::StatusCode;
 use serde_json::json;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
-use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::models::{
-    LocationHealth, LocationHealthObservation, LocationHealthReport,
-};
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
-use crate::helpers::{start_api, stop_api};
-use crate::location_helpers::create_location;
-use crate::run_helpers::snapshot;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::LocationHealthTestCase;
+use crate::api::tests::helpers::{start_api, stop_api};
+use crate::api::tests::test_types::LocationHealthTestCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::snapshot;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_scoped_location_observations_when_retried_or_read_then_history_and_authority_are_preserved()

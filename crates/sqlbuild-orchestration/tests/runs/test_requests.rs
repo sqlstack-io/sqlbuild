@@ -2,24 +2,24 @@
 
 use std::collections::BTreeMap;
 
+use crate::credentials::models::AuditContext;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::list_runs::list_runs;
+use crate::runs::main::request_job_run::request_job_run;
+use crate::runs::models::{JobRunRequest, RunStatus};
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::helpers::read_recall_events;
 use serde_json::json;
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::runs::main::request_job_run::request_job_run;
-use sqlbuild_orchestration::runs::models::{JobRunRequest, RunStatus};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::snapshot;
-use crate::location_helpers::create_location;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::{RunLifecycleTestCase, TransactionFault};
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::snapshot;
+use crate::runs::tests::test_types::{RunLifecycleTestCase, TransactionFault};
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_and_frozen_execution_commit_once()

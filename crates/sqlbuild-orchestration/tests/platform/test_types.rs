@@ -1,8 +1,8 @@
+use crate::platform::models::PlatformEvent;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlbuild_orchestration::platform::models::PlatformEvent;
 
-use crate::store_test_types::Backend;
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct WatchdogTestCase {
     pub(crate) description: &'static str,

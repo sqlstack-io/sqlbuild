@@ -3,38 +3,37 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use crate::credentials::main::create_principal::create_principal;
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::revoke_token::revoke_token;
+use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
+use crate::declarations::main::change_trigger::change_trigger;
+use crate::declarations::main::list_triggers::list_triggers;
+use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
+use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome};
+use crate::runs::tests::helpers::request_run;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::helpers::publish_recall;
+use crate::worker::main::connect_worker::connect_worker;
 use chrono::Utc;
 use reqwest::StatusCode;
 use serde_json::json;
-use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
-use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
-use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
-use sqlbuild_orchestration::declarations::models::{TriggerChange, TriggerChangeRequest};
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::request_run::request_run;
-use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::publish_recall::publish_recall;
-use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_recall::records::main::output_row::output_row;
 use sqlbuild_recall::records::models::{OutputStream, RowEnvelope};
 use uuid::Uuid;
 
-use crate::helpers::{read_json, start_api, stop_api};
-use crate::location_helpers::create_location;
-use crate::output_helpers::chunk;
-use crate::recall_helpers::recall_contract;
-use crate::run_helpers::{request, snapshot};
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::ApiReadTestCase;
+use crate::api::tests::helpers::{read_json, start_api, stop_api};
+use crate::api::tests::output_helpers::chunk;
+use crate::api::tests::recall_helpers::recall_contract;
+use crate::api::tests::test_types::ApiReadTestCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::{request, snapshot};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_published_locations_and_scheduled_work_when_read_through_http_then_resources_and_histories_remain_scoped()

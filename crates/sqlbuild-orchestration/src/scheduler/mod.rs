@@ -7,4 +7,4 @@ pub mod models;
 pub mod types;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

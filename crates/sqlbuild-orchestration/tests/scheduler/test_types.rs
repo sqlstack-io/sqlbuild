@@ -1,6 +1,6 @@
 //! Leadership scenarios run independently on both supported engines.
 
-use crate::store_test_types::Backend;
+use crate::store::tests::store_test_types::Backend;
 
 #[derive(Debug)]
 pub(crate) struct LeadershipTestCase {

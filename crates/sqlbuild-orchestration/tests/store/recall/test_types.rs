@@ -1,6 +1,6 @@
 //! Expected Recall storage outcomes for both supported databases.
 
-use crate::store_test_types::Backend;
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct RecallTestCase {
     pub(crate) description: &'static str,

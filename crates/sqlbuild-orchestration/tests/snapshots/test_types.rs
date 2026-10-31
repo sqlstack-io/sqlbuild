@@ -1,6 +1,6 @@
 //! Cases that alter a disposable schema to verify startup rejection.
 
-use crate::store_test_types::Backend;
+use crate::store::tests::store_test_types::Backend;
 
 #[derive(Debug)]
 pub(super) struct SchemaRejectionCase {

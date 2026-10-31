@@ -2,28 +2,30 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::json;
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::runs::main::{
+use crate::credentials::models::AuditContext;
+use crate::runs::main::{
     advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
     list_runs::list_runs, request_job_run::request_job_run, request_rerun::request_rerun,
 };
-use sqlbuild_orchestration::runs::models::{
+use crate::runs::models::{
     JobRunRequest, NodeOutcome, RerunRequest, RunAuthority, RunChange, RunChangeRequest, RunOrigin,
     RunOutcome, RunStatus,
 };
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use serde_json::json;
 use uuid::Uuid;
 
-use crate::claim_helpers::{slot_counts, succeed};
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::snapshot;
-use crate::location_helpers::create_location;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::{RerunExecutionTestCase, RunLifecycleTestCase, TransactionFault};
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::claim_helpers::{slot_counts, succeed};
+use crate::runs::tests::helpers::snapshot;
+use crate::runs::tests::test_types::{
+    RerunExecutionTestCase, RunLifecycleTestCase, TransactionFault,
+};
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_nodes_retry_atomically()

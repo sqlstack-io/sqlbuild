@@ -17,7 +17,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 /// A removed or paused trigger is inert; a lost fence rolls back every write, including Recall.
-pub async fn evaluate_trigger(
+pub(crate) async fn evaluate_trigger(
     store: &ControlStore,
     lease: &SchedulerLease,
     trigger_id: Uuid,

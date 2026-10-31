@@ -2,10 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use sqlbuild_orchestration::runs::models::{RerunRequest, RunStatus};
+use crate::runs::models::{RerunRequest, RunStatus};
 
-pub(crate) use crate::fault_types::TransactionFault;
-use crate::store_test_types::Backend;
+pub(crate) use crate::store::tests::fault_types::TransactionFault;
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct ScopedClaimTestCase {
     pub(crate) description: &'static str,

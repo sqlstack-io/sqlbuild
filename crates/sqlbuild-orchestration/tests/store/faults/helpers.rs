@@ -1,8 +1,8 @@
 //! Database-trigger fault injection at durable publication boundaries.
 
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::models::ControlStore;
 
-use crate::fault_types::TransactionFault;
+use crate::store::tests::fault_types::TransactionFault;
 
 pub(crate) async fn install_fault(store: &ControlStore, point: &TransactionFault) {
     let ControlStore::Postgres(pool) = store else {

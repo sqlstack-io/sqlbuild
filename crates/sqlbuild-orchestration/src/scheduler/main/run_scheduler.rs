@@ -2,7 +2,7 @@
 
 use tokio::sync::watch;
 
-use crate::scheduler::main::scheduler_cycle::scheduler_cycle;
+use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::types::RunLauncher;
 use crate::store::errors::ControlError;
