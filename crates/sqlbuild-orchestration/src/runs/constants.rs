@@ -8,3 +8,5 @@ pub(crate) const MONITOR_BATCH_SIZE: usize = 100;
 
 pub(crate) const OUTPUT_BATCH_CHUNKS: usize = 256;
 pub(crate) const OUTPUT_BATCH_BYTES: usize = 1_048_576;
+pub(crate) const RECALL_BATCH_ROWS: usize = 500;
+pub(crate) const RECALL_INVOCATION_ID_BYTES: usize = 256;

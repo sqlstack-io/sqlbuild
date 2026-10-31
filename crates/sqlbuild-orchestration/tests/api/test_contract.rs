@@ -378,17 +378,25 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                 (Uuid::now_v7(), &worker.bearer),
                 (run_id, &location_token.bearer),
             ] {
-                assert_eq!(
-                    client
-                        .post(format!("{}/api/runs/{output_run}/output", api.url))
-                        .bearer_auth(credential)
-                        .json(&json!([]))
-                        .send()
-                        .await
-                        .expect("output scope denial")
-                        .status(),
-                    StatusCode::FORBIDDEN
-                );
+                for (endpoint, body) in [
+                    ("output", json!([])),
+                    (
+                        "recall",
+                        json!({"invocation_id": "execution", "records": []}),
+                    ),
+                ] {
+                    assert_eq!(
+                        client
+                            .post(format!("{}/api/runs/{output_run}/{endpoint}", api.url))
+                            .bearer_auth(credential)
+                            .json(&body)
+                            .send()
+                            .await
+                            .expect("publication scope denial")
+                            .status(),
+                        StatusCode::FORBIDDEN
+                    );
+                }
             }
             let mut forged = json!(crate::output_helpers::chunk(
                 0,

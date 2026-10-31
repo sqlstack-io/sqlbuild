@@ -24,10 +24,13 @@ use uuid::Uuid;
 use crate::helpers::{start_api, stop_api};
 use crate::location_helpers::create_location;
 use crate::output_helpers::{chunk, output_contract};
+use crate::recall_helpers::recall_contract;
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::{ApiContractTestCase, TestApi, WorkerRedirectTestCase};
+use crate::test_types::{
+    ApiContractTestCase, TestApi, WorkerDeadlineTestCase, WorkerRedirectTestCase,
+};
 
 #[test]
 fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_and_reports_are_retryable()
@@ -142,6 +145,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 .await
                 .expect("verified start");
             output_contract(store, &worker, identity.1).await;
+            let recall_batch = recall_contract(store, &worker, identity.1).await;
             assert_eq!(session.execution.claim, claim, "{}", test_case.description);
             assert_eq!(
                 start_worker(&worker, &baseline)
@@ -208,6 +212,10 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 )
                 .await
                 .expect("finish");
+            assert!(matches!(
+                worker.publish_recall(&recall_batch).await,
+                Err(WorkerError::Rejected(reqwest::StatusCode::UNAUTHORIZED))
+            ));
             assert!(matches!(
                 worker
                     .publish_output(&[chunk(
@@ -367,6 +375,98 @@ fn given_a_credentialed_worker_when_the_server_redirects_then_the_redirect_is_no
                 test_case.description
             );
             stop_api(api).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_slow_recall_server_when_the_delivery_deadline_expires_then_the_native_store_stops_waiting()
+ {
+    use sqlbuild_recall::records::models::RowEnvelope;
+    use sqlbuild_recall::store::errors::StoreErrorKind;
+    use sqlbuild_recall::writer::models::SessionStore;
+    use std::time::{Duration, Instant};
+
+    let test_cases = [
+        WorkerDeadlineTestCase {
+            description: "HTTP wait expires within the close budget",
+            budget: Duration::from_millis(50),
+            expected_kind: StoreErrorKind::Busy,
+            expected_arrival: true,
+        },
+        WorkerDeadlineTestCase {
+            description: "expired budget sends no request",
+            budget: Duration::ZERO,
+            expected_kind: StoreErrorKind::Busy,
+            expected_arrival: false,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("bind slow server");
+            let url = format!(
+                "http://{}",
+                listener.local_addr().expect("slow server address")
+            );
+            let arrived = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let observed = arrived.clone();
+            let application = Router::new().route(
+                "/api/runs/{run_id}/recall",
+                axum::routing::post(move || {
+                    let arrived = arrived.clone();
+                    async move {
+                        arrived.store(true, std::sync::atomic::Ordering::SeqCst);
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        axum::Json(sqlbuild_recall::store::models::InsertOutcome::default())
+                    }
+                }),
+            );
+            let task = tokio::spawn(async move { axum::serve(listener, application).await });
+            let client = connect_worker(
+                &url,
+                "synthetic-worker-bearer",
+                (Uuid::now_v7(), Uuid::now_v7()),
+            )
+            .expect("connect worker to slow server");
+            let SessionStore::Hosted(opener) = client.recall_store() else {
+                panic!("hosted store")
+            };
+            tokio::task::spawn_blocking(move || {
+                let envelope = RowEnvelope {
+                    invocation_id: "deadline".into(),
+                    invocation_started_at: "2026-01-02T03:04:05Z".into(),
+                    producer_version: "test".into(),
+                };
+                let store = opener
+                    .open(&envelope, Instant::now() + Duration::from_secs(1))
+                    .expect("open HTTP store");
+                let started = Instant::now();
+                let error = store
+                    .insert(&[], started + test_case.budget)
+                    .expect_err("deadline rejects delivery");
+                assert_eq!(
+                    error.kind, test_case.expected_kind,
+                    "{}",
+                    test_case.description
+                );
+                assert!(
+                    started.elapsed() < Duration::from_secs(1),
+                    "{}",
+                    test_case.description
+                );
+            })
+            .await
+            .expect("join slow-server publication");
+            assert_eq!(
+                observed.load(std::sync::atomic::Ordering::SeqCst),
+                test_case.expected_arrival,
+                "{}",
+                test_case.description
+            );
+            task.abort();
+            let _ = task.await;
         });
     }
 }

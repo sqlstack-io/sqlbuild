@@ -4,6 +4,8 @@ mod helpers;
 mod location_helpers;
 #[path = "api/output/helpers.rs"]
 mod output_helpers;
+#[path = "api/recall/helpers.rs"]
+mod recall_helpers;
 #[path = "runs/helpers.rs"]
 mod run_helpers;
 #[path = "store/helpers.rs"]

@@ -3,7 +3,8 @@
 use crate::schema::models::Table;
 
 /// One stored value.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum RecallValue {
     Null,
     Integer(i64),
@@ -34,6 +35,15 @@ pub struct RecallRow {
 }
 
 impl RecallRow {
+    /// Validate schema-typed values and rebuild the receiver-owned envelope and content digest.
+    pub fn from_values(
+        envelope: &RowEnvelope,
+        table: Table,
+        values: &std::collections::BTreeMap<String, RecallValue>,
+    ) -> Result<Self, crate::records::errors::RecordError> {
+        crate::records::_helpers::record_row::record_row(envelope, table, values)
+    }
+
     /// The value of `column`, if the row has it.
     #[must_use]
     pub fn value(&self, column: &str) -> Option<&RecallValue> {

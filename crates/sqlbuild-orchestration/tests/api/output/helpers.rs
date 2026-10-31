@@ -21,7 +21,7 @@ pub(crate) fn chunk(sequence: u64, stream: OutputStream, data: &[u8]) -> OutputC
     }
 }
 
-async fn stored_bytes(store: &ControlStore, invocation: &str) -> Vec<(i64, Vec<u8>)> {
+pub(crate) async fn stored_bytes(store: &ControlStore, invocation: &str) -> Vec<(i64, Vec<u8>)> {
     let sql = "SELECT sequence, data FROM recall_output WHERE invocation_id=$1 ORDER BY sequence";
     let ControlStore::Postgres(pool) = store else {
         let ControlStore::Sqlite(path) = store else {

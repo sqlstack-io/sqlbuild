@@ -12,6 +12,7 @@ use crate::api::_helpers::{run_reads, runs, snapshots, trigger_reads};
     runs::report,
     runs::heartbeat,
     runs::output,
+    runs::recall,
     run_reads::recent,
     run_reads::nodes,
     trigger_reads::current,

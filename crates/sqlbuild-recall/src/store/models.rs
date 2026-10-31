@@ -54,7 +54,7 @@ pub enum QuarantineOutcome {
 }
 
 /// A row whose key was already stored with different content; the first row is kept.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct ConflictEvidence {
     pub table: Table,
     pub record_key: String,
@@ -63,7 +63,9 @@ pub struct ConflictEvidence {
 }
 
 /// What one insert batch did, per table.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
 pub struct InsertOutcome {
     /// Rows written or already present with equal content, by table.
     pub delivered: Vec<(Table, u64)>,

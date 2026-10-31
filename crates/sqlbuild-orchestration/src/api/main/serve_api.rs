@@ -6,6 +6,7 @@ use axum::{Json, Router, middleware};
 
 use crate::api::_helpers::authentication::authenticate;
 use crate::api::_helpers::{run_reads, runs, snapshots, trigger_reads};
+use crate::api::constants::BODY_BYTES;
 use crate::api::main::openapi_document::openapi_document;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -46,7 +47,8 @@ pub async fn serve_api(
         .route("/api/runs/{run_id}/events", post(runs::report))
         .route("/api/runs/{run_id}/heartbeat", post(runs::heartbeat))
         .route("/api/runs/{run_id}/output", post(runs::output))
-        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
+        .route("/api/runs/{run_id}/recall", post(runs::recall))
+        .layer(DefaultBodyLimit::max(BODY_BYTES))
         .route_layer(middleware::from_fn_with_state(store.clone(), authenticate));
     let application = protected
         .route(

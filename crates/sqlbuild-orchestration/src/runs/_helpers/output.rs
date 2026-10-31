@@ -6,13 +6,13 @@ use sqlbuild_recall::records::models::{OutputChunk, RecallRow, RowEnvelope};
 use uuid::Uuid;
 
 use crate::runs::constants::{OUTPUT_BATCH_BYTES, OUTPUT_BATCH_CHUNKS};
-use crate::runs::models::OutputMetadata;
+use crate::runs::models::ClaimMetadata;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-pub(crate) async fn output_envelope(
+pub(crate) async fn claim_envelope(
     transaction: ControlTransaction,
     (run_id, claim_id): (Uuid, Uuid),
 ) -> Result<(ControlTransaction, RowEnvelope), ControlError> {
@@ -24,8 +24,8 @@ pub(crate) async fn output_envelope(
         vec![Parameter::Id(run_id), Parameter::Id(claim_id)],
     )
     .await?;
-    let metadata: OutputMetadata = decode_row(rows.into_iter().next().ok_or_else(|| {
-        ControlError::Invalid("output does not belong to an active run claim".into())
+    let metadata: ClaimMetadata = decode_row(rows.into_iter().next().ok_or_else(|| {
+        ControlError::Invalid("publication does not belong to an active run claim".into())
     })?)?;
     Ok((
         transaction,

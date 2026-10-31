@@ -273,8 +273,23 @@ pub struct OutputPublication {
     pub conflicts: u32,
 }
 
+/// One invocation's records; the server owns its claim namespace, start time and version.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RecallBatch {
+    pub invocation_id: String,
+    pub records: Vec<RecallRecord>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RecallRecord {
+    pub table: sqlbuild_recall::schema::models::Table,
+    pub values: BTreeMap<String, sqlbuild_recall::records::models::RecallValue>,
+}
+
 #[derive(Debug, Deserialize)]
-pub(crate) struct OutputMetadata {
+pub(crate) struct ClaimMetadata {
     pub(crate) claimed_at: DateTime<Utc>,
     pub(crate) sqb_version: String,
 }

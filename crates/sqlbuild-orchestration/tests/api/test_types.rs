@@ -14,6 +14,13 @@ pub(crate) struct WorkerRedirectTestCase {
     pub(crate) expected_status: reqwest::StatusCode,
 }
 
+pub(crate) struct WorkerDeadlineTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) budget: std::time::Duration,
+    pub(crate) expected_kind: sqlbuild_recall::store::errors::StoreErrorKind,
+    pub(crate) expected_arrival: bool,
+}
+
 pub(crate) struct ApiReadTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

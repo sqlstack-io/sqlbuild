@@ -3,7 +3,7 @@
 use sqlbuild_recall::records::models::OutputChunk;
 use uuid::Uuid;
 
-use crate::runs::_helpers::output::{output_envelope, output_rows};
+use crate::runs::_helpers::output::{claim_envelope, output_rows};
 use crate::runs::models::OutputPublication;
 use crate::store::errors::ControlError;
 use crate::store::main::append_recall::append_recall;
@@ -18,7 +18,7 @@ pub async fn publish_run_output(
     chunks: &[OutputChunk],
 ) -> Result<OutputPublication, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (mut transaction, envelope) = output_envelope(transaction, (run_id, claim_id)).await?;
+    let (mut transaction, envelope) = claim_envelope(transaction, (run_id, claim_id)).await?;
     let mut published = OutputPublication::default();
     for row in output_rows(&envelope, chunks)? {
         let outcome;
