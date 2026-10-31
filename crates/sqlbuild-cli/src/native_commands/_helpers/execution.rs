@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
+use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
-use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
@@ -45,8 +45,8 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
-    LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationPublication,
+    LocationServe, LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::models::Workers;
@@ -57,7 +57,7 @@ pub(crate) async fn compile_generation(
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<bool>, ControlError> {
+) -> Result<Option<(bool, Option<DateTime<Utc>>)>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationCompileRequest {
@@ -89,7 +89,8 @@ pub(crate) async fn compile_generation(
         }
     };
     let published = record.is_some();
-    if let Some(record) = record {
+    let refresh_at = record.as_ref().and_then(|(_, refresh_at)| *refresh_at);
+    if let Some((record, _)) = record {
         let output = serde_json::to_string(&record)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
@@ -99,14 +100,14 @@ pub(crate) async fn compile_generation(
             )));
         }
     }
-    Ok(Some(published))
+    Ok(Some((published, refresh_at)))
 }
 
 /// The child is retained by its owning task while this exchange can be cancelled.
 pub(crate) async fn exchange_location_generation(
     compiler: &mut LocationCompiler,
     generation: i64,
-) -> Result<Option<SnapshotRecord>, ControlError> {
+) -> Result<Option<LocationPublication>, ControlError> {
     compiler
         .stdin
         .write_all(format!("{generation}\n").as_bytes())

@@ -16,6 +16,8 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
+chrono.workspace = true
+chrono-tz.workspace = true
 fensu-policy.workspace = true
 mimalloc.workspace = true
 pyo3.workspace = true

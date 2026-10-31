@@ -2631,6 +2631,8 @@ dependencies = [
 name = "sqlbuild-python"
 version = "0.186.2"
 dependencies = [
+ "chrono",
+ "chrono-tz",
  "fensu-policy",
  "mimalloc",
  "pyo3",

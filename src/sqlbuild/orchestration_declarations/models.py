@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Literal
 
 
@@ -50,3 +51,30 @@ class JobGroup:
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
+
+
+@dataclass(frozen=True, kw_only=True)
+class CalendarWindow:
+    """Timezone-aware, half-open interval for an upcoming calendar evaluation."""
+
+    start: datetime
+    end: datetime
+
+
+@dataclass(frozen=True, kw_only=True, eq=False)
+class CalendarSchedule:
+    """Decorate a location callback returning upcoming timezone-aware datetimes."""
+
+    job: Job | JobGroup
+    description: str
+    horizon: str
+    timezone: str
+    starts_at: str | None = None
+    default_status: Literal["running", "paused"] = "running"
+    catch_up: Literal["latest", "all"] = "latest"
+    max_catch_up: int | None = None
+    targets: tuple[str, ...] = ()
+    function: Callable[..., Iterable[datetime]] | None = field(default=None, repr=False)
+
+    def __call__(self, function: Callable[..., Iterable[datetime]]) -> CalendarSchedule:
+        return replace(self, function=function)

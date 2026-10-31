@@ -3,7 +3,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use pyo3::FromPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
@@ -17,13 +16,16 @@ use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    GroupDefinition, JobDefinition, OnFailure, Schedule, TriggerDefinition,
+    Definitions, GroupDefinition, JobDefinition, OnFailure, TriggerDefinition,
 };
 use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    authored_setting, module_jobs,
+    AuthoredDeclaration, AuthoredGroup, AuthoredJob, module_jobs,
+};
+use crate::bindings::_helpers::native_host::orchestration_triggers::{
+    compile_calendars, compile_cron,
 };
 
 /// Dedicated declaration modules are imported only in the code-location interpreter.
@@ -55,82 +57,10 @@ pub(crate) fn discover_declarations<'py>(
     Ok(declarations)
 }
 
-#[derive(FromPyObject)]
-struct AuthoredSchedule {
-    cron: String,
-    timezone: String,
-    #[pyo3(from_py_with = authored_setting)]
-    starts_at: Value,
-    default_status: String,
-    catch_up: String,
-    #[pyo3(from_py_with = authored_setting)]
-    max_catch_up: Value,
-}
-
-#[derive(FromPyObject)]
-pub(crate) struct AuthoredJob {
-    name: String,
-    description: String,
-    select: String,
-    exclude: String,
-    overlap: String,
-    on_failure: String,
-    #[pyo3(from_py_with = authored_setting)]
-    settings: Value,
-    #[pyo3(from_py_with = authored_setting)]
-    concurrency: Value,
-    concurrency_groups: Vec<String>,
-    schedule: Option<AuthoredSchedule>,
-    targets: Vec<String>,
-}
-
-#[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
-struct AuthoredJobReference {
-    name: String,
-}
-
-#[derive(FromPyObject)]
-pub(crate) struct AuthoredGroup {
-    name: String,
-    description: String,
-    jobs: Vec<AuthoredJobReference>,
-    after: BTreeMap<AuthoredJobReference, Vec<AuthoredJobReference>>,
-    overlap: String,
-    concurrency_groups: Vec<String>,
-    schedule: Option<AuthoredSchedule>,
-    targets: Vec<String>,
-}
-
-#[derive(FromPyObject)]
-pub(crate) enum AuthoredDeclaration {
-    Job(AuthoredJob),
-    Group(AuthoredGroup),
-}
-
-impl AuthoredSchedule {
-    fn compile(self, name: &str, description: &str) -> PyResult<TriggerDefinition> {
-        let catch_up = if self.max_catch_up.is_null() {
-            Value::String(self.catch_up)
-        } else {
-            serde_json::json!({self.catch_up: {"max_runs": self.max_catch_up}})
-        };
-        Ok(TriggerDefinition {
-            description: description.into(),
-            job_key: name.into(),
-            schedule: Schedule::Cron { expression: self.cron, timezone: self.timezone },
-            starts_at: serde_json::from_value(self.starts_at)
-                .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
-            default_status: serde_json::from_value(Value::String(self.default_status))
-                .map_err(|error| PyValueError::new_err(format!("default_status: {error}")))?,
-            catch_up: serde_json::from_value(catch_up).map_err(|error| PyValueError::new_err(format!(
-                "catch_up: {error}; use 'latest' without a bound or 'all' with a positive max_catch_up"
-            )))?,
-        })
-    }
-}
-
 pub(crate) fn compile_declarations(
+    py: Python<'_>,
     mut input: SnapshotInput,
+    project_dir: &Path,
     graph: &ProjectGraph,
     declarations: Vec<AuthoredDeclaration>,
 ) -> PyResult<SnapshotInput> {
@@ -148,10 +78,12 @@ pub(crate) fn compile_declarations(
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
     let mut authored_groups: Vec<AuthoredGroup> = Vec::new();
     let mut authored_jobs: Vec<AuthoredJob> = Vec::new();
+    let mut authored_calendars = Vec::new();
     for declaration in declarations {
         match declaration {
             AuthoredDeclaration::Job(job) => authored_jobs.push(job),
             AuthoredDeclaration::Group(group) => authored_groups.push(group),
+            AuthoredDeclaration::Calendar(calendar) => authored_calendars.push(calendar),
         }
     }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
@@ -193,7 +125,7 @@ pub(crate) fn compile_declarations(
         if let Some(schedule) = job.schedule {
             triggers.insert(
                 job.name.clone(),
-                schedule.compile(&job.name, &job.description)?,
+                compile_cron(schedule.bind(py), &job.name, &job.description)?,
             );
         }
         jobs.insert(
@@ -244,7 +176,7 @@ pub(crate) fn compile_declarations(
         if let Some(schedule) = group.schedule {
             triggers.insert(
                 group.name.clone(),
-                schedule.compile(&group.name, &group.description)?,
+                compile_cron(schedule.bind(py), &group.name, &group.description)?,
             );
         }
         groups.insert(
@@ -263,6 +195,20 @@ pub(crate) fn compile_declarations(
             },
         );
     }
+    let Definitions {
+        jobs,
+        groups,
+        triggers,
+    } = compile_calendars(
+        py,
+        (project_dir, &input.target),
+        authored_calendars,
+        Definitions {
+            jobs,
+            groups,
+            triggers,
+        },
+    )?;
     for (key, document) in [
         ("jobs", serde_json::to_value(jobs)),
         ("groups", serde_json::to_value(groups)),

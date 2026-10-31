@@ -2661,6 +2661,7 @@ module_layers = [
     "model_config=front",
     "native_host=infra",
     "native_host/model_lookup=project",
+    "native_host/orchestration_triggers=project",
     "native_threads=infra",
     "output_capture=output",
     "plan_command=commands",

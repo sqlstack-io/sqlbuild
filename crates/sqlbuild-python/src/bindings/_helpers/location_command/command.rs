@@ -1,13 +1,16 @@
 //! Compile in the location interpreter and publish data through its scoped HTTP credential.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
+use chrono::{DateTime, Utc};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
+use sqlbuild_orchestration::declarations::models::{Schedule, TriggerDefinition};
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
@@ -129,7 +132,12 @@ fn compile_location<'py>(
         view,
         &serde_json::to_string(input).map_err(|error| PyValueError::new_err(error.to_string()))?,
         project_dir.extract()?,
-        None,
+        // Workers verify nodes and environment, not dynamic calendar declarations.
+        arguments
+            .value("action")?
+            .extract::<Option<String>>()?
+            .is_some_and(|action| action == "execute")
+            .then(Vec::new),
     )?;
     status(py, "Location snapshot compiled.")?;
     Ok((snapshot, discovered))
@@ -159,7 +167,7 @@ pub(super) fn location_arguments<'py>(
 pub(super) fn publish_location(
     py: Python<'_>,
     arguments: &KeywordArguments<'_>,
-) -> PyResult<SnapshotRecord> {
+) -> PyResult<(SnapshotRecord, Option<DateTime<Utc>>)> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -182,6 +190,22 @@ pub(super) fn publish_location(
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
     let (snapshot, _) = compile_location(py, arguments, &input)?;
+    let triggers: BTreeMap<String, TriggerDefinition> = serde_json::from_value(
+        snapshot
+            .input
+            .documents
+            .get("triggers")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({})),
+    )
+    .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let refresh_at = triggers
+        .values()
+        .filter_map(|trigger| match &trigger.schedule {
+            Schedule::Calendar { refresh_at, .. } => Some(*refresh_at),
+            Schedule::Cron { .. } => None,
+        })
+        .min();
     status(py, "Publishing location snapshot...")?;
     let record = snapshot.publication(
             py,
@@ -196,7 +220,7 @@ pub(super) fn publish_location(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-    Ok(record)
+    Ok((record, refresh_at))
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -249,7 +273,7 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let record = publish_location(py, &arguments)?;
+        let (record, _) = publish_location(py, &arguments)?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {

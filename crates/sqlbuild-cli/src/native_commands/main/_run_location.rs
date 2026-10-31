@@ -4,6 +4,7 @@ use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use chrono::Utc;
 use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationWorkClient, LocationWorkPoll,
@@ -110,13 +111,15 @@ async fn watch_location(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
         )]));
-        let Some(published) =
+        let Some((published, refresh_at)) =
             compile_generation(&requests, generation, &watch.observed.0, stopped.as_mut()).await?
         else {
             return Ok(());
         };
         if published {
-            watch.retry_at = None;
+            watch.retry_at = refresh_at.map(|deadline| {
+                Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default()
+            });
             published_generation = Some(generation);
             let Some(files) = check_published_location(
                 options,

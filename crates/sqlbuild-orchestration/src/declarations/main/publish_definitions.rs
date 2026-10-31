@@ -3,7 +3,8 @@
 use uuid::Uuid;
 
 use crate::declarations::_helpers::trigger_state::trigger_timing;
-use crate::declarations::models::{Definitions, PreviousTriggerState};
+use crate::declarations::models::{Definitions, PreviousTriggerState, Schedule};
+use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -52,12 +53,44 @@ pub(crate) async fn publish_definitions(
     (transaction, _) = query(transaction,
         "UPDATE sqb_triggers SET removed_in_snapshot_id=$1 WHERE location_id=$2 AND target=$3 AND removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(snapshot.snapshot_id), Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone())]).await?;
-    for (name, trigger) in definitions.triggers {
+    for (name, mut trigger) in definitions.triggers {
         let id = Uuid::new_v5(
             &snapshot.location_id,
             &serde_json::to_vec(&(&snapshot.target, "schedule", &name))
                 .map_err(|error| ControlError::Invalid(error.to_string()))?,
         );
+        let previous;
+        (transaction, previous) = query(transaction,
+            "SELECT t.definition_json, s.started_at, s.last_tick_for, s.status_override FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id WHERE s.trigger_id=$1",
+            vec![Parameter::Id(id)]).await?;
+        let state = previous
+            .into_iter()
+            .next()
+            .map(decode_row::<PreviousTriggerState>)
+            .transpose()?;
+        if let Some(state) = &state
+            && let Schedule::Calendar {
+                times: previous_times,
+                ..
+            } = &state.definition_json.schedule
+            && let Schedule::Calendar { times, .. } = &mut trigger.schedule
+        {
+            times.extend(
+                previous_times
+                    .iter()
+                    .filter(|time| {
+                        **time >= state.started_at
+                            && **time <= snapshot.published_at
+                            && state.last_tick_for.is_none_or(|last| **time > last)
+                    })
+                    .copied(),
+            );
+            if times.len() > MAX_TICKS_PER_BATCH {
+                return Err(ControlError::Invalid(format!(
+                    "calendar {name} pending and upcoming times exceed {MAX_TICKS_PER_BATCH}; let the scheduler drain pending ticks before refreshing"
+                )));
+            }
+        }
         let definition = serde_json::to_value(&trigger)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         (transaction, _) = query(transaction,
@@ -65,13 +98,6 @@ pub(crate) async fn publish_definitions(
              ON CONFLICT (trigger_id) DO UPDATE SET job_key=excluded.job_key, definition_json=excluded.definition_json, snapshot_id=excluded.snapshot_id, removed_in_snapshot_id=NULL",
             vec![Parameter::Id(id), Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name),
                 Parameter::Text(trigger.job_key.clone()), Parameter::Json(definition), Parameter::Id(snapshot.snapshot_id)]).await?;
-        let previous;
-        (transaction, previous) = query(transaction, "SELECT started_at, last_tick_for, status_override FROM sqb_trigger_state WHERE trigger_id=$1", vec![Parameter::Id(id)]).await?;
-        let state = previous
-            .into_iter()
-            .next()
-            .map(decode_row::<PreviousTriggerState>)
-            .transpose()?;
         let started_at = state.as_ref().map_or(
             trigger.starts_at.unwrap_or(snapshot.published_at),
             |state| state.started_at,
