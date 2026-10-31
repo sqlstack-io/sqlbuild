@@ -36,7 +36,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
         LocationReloadTestCase(
             "healthy connection",
             "development",
-            5,
+            7,
             int(sys.platform == "win32"),
             "warehouse.duckdb",
             True,
@@ -44,7 +44,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
         LocationReloadTestCase(
             "failed connection with encoded target",
             "preview #1",
-            5,
+            7,
             int(sys.platform == "win32"),
             "missing/warehouse.duckdb",
             False,
@@ -56,8 +56,12 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
     test_case: LocationReloadTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     project: Path = tmp_path / "project"
+    compiler_pid: Path = tmp_path / "compiler.pid"
     declaration: str = (
         "from sqlbuild.orchestration import job\n"
+        "import os\nfrom pathlib import Path\n"
+        f"Path({str(compiler_pid)!r}).write_text(str(os.getpid()))\n"
+        'print("Orders declaration loaded.")\n'
         'daily_orders = job("daily_orders", select="orders", description="Build orders.")\n'
     )
     files: dict[str, str] = TYPE_PROOF_FILES | {
@@ -65,6 +69,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         + f"\n[connections.local]\ndatabase = {json.dumps(test_case.database)}\n"
         + f'\n[targets.{json.dumps(test_case.target)}]\nschema = "main"\n',
         "orchestration/orders.py": declaration,
+        "sinks/orders.py": 'print("Loading orders sink", flush=True)\n',
     }
     write_files(project_dir=project, files=files)
     _ = subprocess.run(["git", "init", "-q", str(project)], check=True, capture_output=True)
@@ -90,6 +95,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         publications: Path = project / "publications.jsonl"
         with location_process(arguments, log, publications) as process:
             first: dict[str, Any] = wait_for_generation(api, test_case.target, 1, process, log)
+            first_interpreter: int = int(compiler_pid.read_text())
             heartbeat: dict[str, Any] = wait_for_location_health(
                 api, test_case.target, {"kind": "heartbeat"}, process, log
             )
@@ -110,19 +116,34 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
                 )
             second: dict[str, Any] = wait_for_generation(api, test_case.target, 2, process, log)
             assert second["record"]["snapshot_id"] != first["record"]["snapshot_id"]
+            assert int(compiler_pid.read_text()) == first_interpreter
             assert "CAST(13 AS INTEGER)" in second["nodes"]["model:stg_orders"]["raw_sql"]
             assert {change["subject_key"] for change in second["changes"]} == {"model:stg_orders"}
 
-            _ = (project / "orchestration/orders.py").write_text("invalid Python declaration !\n")
-            wait_for_log(process, log, "Location reload failed; retaining last good snapshot.")
+            _ = staging.write_text("SELECT FROM invalid SQL !\n")
             _ = wait_for_location_health(
                 api, test_case.target, {"kind": "compile_failed", "generation": 3}, process, log
             )
             assert current_snapshot(api, test_case.target)["record"] == second["record"]
+            _ = staging.write_text(
+                files["models/stg_orders.sql"].replace("CAST(5 AS INTEGER)", "CAST(14 AS INTEGER)")
+            )
+            recovered: dict[str, Any] = wait_for_generation(api, test_case.target, 3, process, log)
+            assert int(compiler_pid.read_text()) == first_interpreter
+            assert "CAST(14 AS INTEGER)" in recovered["nodes"]["model:stg_orders"]["raw_sql"]
+
+            _ = (project / "orchestration/orders.py").write_text("invalid Python declaration !\n")
+            wait_for_log(process, log, "Location reload failed; retaining last good snapshot.")
+            _ = wait_for_location_health(
+                api, test_case.target, {"kind": "compile_failed", "generation": 4}, process, log
+            )
+            assert current_snapshot(api, test_case.target)["record"] == recovered["record"]
             _ = (project / "orchestration/orders.py").write_text(
                 declaration.replace("Build orders.", "Refresh order totals.")
             )
-            third: dict[str, Any] = wait_for_generation(api, test_case.target, 3, process, log)
+            third: dict[str, Any] = wait_for_generation(api, test_case.target, 4, process, log)
+            replacement_interpreter: int = int(compiler_pid.read_text())
+            assert replacement_interpreter != first_interpreter
             assert (
                 third["documents"]["jobs"]["daily_orders"]["description"] == "Refresh order totals."
             )
@@ -143,19 +164,34 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
                 check=True,
                 capture_output=True,
             )
-            committed: dict[str, Any] = wait_for_generation(api, test_case.target, 4, process, log)
+            committed: dict[str, Any] = wait_for_generation(api, test_case.target, 5, process, log)
+            assert int(compiler_pid.read_text()) == replacement_interpreter
             assert committed["nodes"] == third["nodes"]
+            _ = (project / "sqlbuild_project.toml").write_text(
+                files["sqlbuild_project.toml"].replace('schema = "main"', 'schema = "reporting"')
+            )
+            configured: dict[str, Any] = wait_for_generation(api, test_case.target, 6, process, log)
+            assert int(compiler_pid.read_text()) == replacement_interpreter
+            assert (
+                configured["nodes"]["model:orders"]["definition"]["destination"]["schema"]
+                == "reporting"
+            )
+            assert (
+                configured["nodes"]["model:orders"]["raw_sql"]
+                == committed["nodes"]["model:orders"]["raw_sql"]
+            )
             process.terminate()
             assert process.wait(timeout=5) == test_case.expected_stop_code
         with location_process(arguments, log, publications) as process:
             restarted: dict[str, Any] = wait_for_generation(
                 api, test_case.target, test_case.expected_generation, process, log
             )
-            assert restarted["nodes"] == third["nodes"]
+            assert int(compiler_pid.read_text()) != replacement_interpreter
+            assert restarted["nodes"] == configured["nodes"]
             restarted_health: dict[str, Any] = wait_for_location_health(
                 api,
                 test_case.target,
-                {"kind": "connection", "generation": 5, "healthy": test_case.expected_connection},
+                {"kind": "connection", "generation": 7, "healthy": test_case.expected_connection},
                 process,
                 log,
             )
@@ -171,7 +207,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         records: list[dict[str, Any]] = [
             json.loads(line) for line in publications.read_text().splitlines()
         ]
-        assert [record["generation"] for record in records] == [1, 2, 3, 4, 5]
+        assert [record["generation"] for record in records] == [1, 2, 3, 4, 5, 6, 7]
         assert api.bearer not in log.read_text() + publications.read_text()
         assert not (project / ".sqlbuild/control.sqlite3").exists()
         assert (project / "warehouse.duckdb").exists() == test_case.expected_connection
@@ -186,9 +222,9 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             signal.SIGTERM,
             0,
             2,
-            "publish",
+            "runtime",
         ),
-        LocationShutdownTestCase("interrupt compiling interpreter", signal.SIGINT, 0, 1, "publish"),
+        LocationShutdownTestCase("interrupt compiling interpreter", signal.SIGINT, 0, 1, "runtime"),
         LocationShutdownTestCase(
             "terminate connection checking interpreter", signal.SIGTERM, 0, 1, "debug"
         ),

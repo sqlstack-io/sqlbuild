@@ -122,9 +122,7 @@ fn print_object(value: &Bound<'_, PyAny>, stream: Option<&str>, end: Option<&str
     if let Some(end) = end {
         keywords.set_item("end", end)?;
     }
-    py.import("builtins")?
-        .getattr("print")?
-        .call((value,), Some(&keywords))?;
+    imported(py, "builtins", "print")?.call((value,), Some(&keywords))?;
     Ok(())
 }
 
@@ -766,6 +764,31 @@ fn parsed_invocation<'py>(
             Ok(exit_code)
         };
     }
+    let namespace = args.getattr("__dict__")?.cast_into::<PyDict>()?;
+    let command: Option<String> = namespace
+        .get_item("command")?
+        .map(|value| value.extract())
+        .transpose()?;
+    let location_command: Option<String> = namespace
+        .get_item("location_command")?
+        .map(|value| value.extract())
+        .transpose()?;
+    if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
+        return within(&host::redirect_stdout_to_stderr(py)?, |_| {
+            execute_parsed_invocation(args, handlers, identity, use_color)
+        });
+    }
+    execute_parsed_invocation(args, handlers, identity, use_color)
+}
+
+/// Runtime stream routing must cover extension discovery, invocation scopes and their teardown.
+fn execute_parsed_invocation<'py>(
+    args: Bound<'py, PyAny>,
+    handlers: Option<Bound<'py, PyAny>>,
+    identity: &Bound<'py, PyAny>,
+    use_color: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py = args.py();
     let facts: CommandFacts = command_facts(&args)?;
     let policy: InvocationPolicy = invocation_policy(&facts);
     let recall: InvocationRecall = if policy.recalled {

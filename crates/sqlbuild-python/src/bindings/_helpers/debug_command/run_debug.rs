@@ -41,6 +41,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -384,15 +385,23 @@ pub(crate) fn run_debug_command(
     } else {
         project_dir.extract()?
     };
-    let report: DebugReport = build_report(
-        py,
-        &project_dir,
-        (
-            arguments.value("selected_target")?,
-            !arguments.flag("no_connection")?,
-        ),
-    )?;
-    let text: String = if arguments.flag("json_output")? {
+    let json_output = arguments.flag("json_output")?;
+    let build = || {
+        build_report(
+            py,
+            &project_dir,
+            (
+                arguments.value("selected_target")?,
+                !arguments.flag("no_connection")?,
+            ),
+        )
+    };
+    let report: DebugReport = if json_output {
+        within(&redirect_stdout_to_stderr(py)?, |_| build())?
+    } else {
+        build()?
+    };
+    let text: String = if json_output {
         format_debug_json(&report) + "\n"
     } else {
         let use_color: bool = !arguments.flag("no_color")? && stdout_supports_color(py)?;

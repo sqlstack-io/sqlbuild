@@ -6,19 +6,21 @@ use std::time::Duration;
 
 use sqlbuild_orchestration::platform::models::LocationHealth;
 use sqlbuild_orchestration::store::errors::ControlError;
+use tokio::sync::mpsc;
 use tokio::time::{Instant, MissedTickBehavior};
 use uuid::Uuid;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    check_location_connection, location_generation, location_heartbeats, publish_child,
+    check_location_connection, compile_generation, location_generation, location_heartbeats,
     report_location_health, shutdown_signal,
 };
 use crate::native_commands::_helpers::paths::{
     exclude_location_databases, location_watch, observe_location_inputs,
 };
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::models::LocationServe;
+use crate::native_commands::main::_location_compiler::run_location_compiler;
+use crate::native_commands::models::{LocationCompileRequest, LocationServe};
 
 pub(super) async fn run_location(
     options: LocationServe,
@@ -26,17 +28,23 @@ pub(super) async fn run_location(
     bearer: &str,
 ) -> Result<(), ControlError> {
     let session_id = Uuid::now_v7();
-    tokio::select! {
-        result = watch_location(&options, script, bearer, session_id) => result,
-        result = location_heartbeats(&options, bearer, session_id) => result,
-    }
+    let (requests, receiver) = mpsc::channel(1);
+    let serving = async {
+        tokio::select! {
+            result = watch_location(&options, script, (bearer, session_id), requests) => result,
+            result = location_heartbeats(&options, bearer, session_id) => result,
+        }
+    };
+    let (serving, compiler) =
+        tokio::join!(serving, run_location_compiler(&options, script, receiver));
+    serving.and(compiler)
 }
 
 async fn watch_location(
     options: &LocationServe,
     script: &Path,
-    bearer: &str,
-    session_id: Uuid,
+    (bearer, session_id): (&str, Uuid),
+    requests: mpsc::Sender<LocationCompileRequest>,
 ) -> Result<(), ControlError> {
     let mut watch = location_watch(&options.project_dir);
     let mut clock = tokio::time::interval(Duration::from_millis(250));
@@ -72,15 +80,12 @@ async fn watch_location(
             Stream::Stderr,
             &format!("Compiling location generation {generation} in an isolated interpreter...\n"),
         )]));
-        let mut child = publish_child(options, script, generation)?;
-        let result = tokio::select! {
-            result = &mut stopped => {
-                child.kill().await?;
-                return result;
-            },
-            result = child.wait() => result?,
+        let Some(published) =
+            compile_generation(&requests, generation, &watch.observed.0, stopped.as_mut()).await?
+        else {
+            return Ok(());
         };
-        if result.success() {
+        if published {
             watch.retry_at = None;
             let Some(files) = check_published_location(
                 options,

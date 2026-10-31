@@ -106,8 +106,8 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish", "serve"],
-        "help": "publish one snapshot or watch and reload the project",
+        "choices": ["publish", "serve", "runtime"],
+        "help": "publish one snapshot, watch and reload, or run the supervisor's stdio compiler",
         "group": 0
        },
        {

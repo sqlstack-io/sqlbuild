@@ -10,13 +10,14 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
+use sqlbuild_orchestration::snapshots::models::SnapshotRecord;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::MissedTickBehavior;
 use uuid::Uuid;
@@ -44,9 +45,81 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationServe, LostStdout, NativeCommand, NativeInvocation,
-    ProjectLocation,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
+    LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
+
+/// Request one publication without transferring interpreter ownership to a cancellable future.
+pub(crate) async fn compile_generation(
+    requests: &mpsc::Sender<LocationCompileRequest>,
+    generation: i64,
+    sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<bool>, ControlError> {
+    let (reply, publication) = oneshot::channel();
+    requests
+        .send(LocationCompileRequest {
+            generation,
+            python_sources: sources
+                .iter()
+                .filter(|stamp| stamp.relative_path.ends_with(".py"))
+                .cloned()
+                .collect(),
+            reply,
+        })
+        .await
+        .map_err(|_| ControlError::Invalid("location compiler stopped".into()))?;
+    tokio::pin!(stopped);
+    let result = tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        result = publication => result.map_err(|_| ControlError::Invalid("location compiler stopped before replying".into()))?,
+    };
+    let record = match result {
+        Ok(record) => record,
+        Err(error) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!(
+                    "Location compiler failed; generation {generation} may already be published: {error}\n"
+                ),
+            )]));
+            None
+        }
+    };
+    let published = record.is_some();
+    if let Some(record) = record {
+        let output = serde_json::to_string(&record)
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
+            return Err(ControlError::Invalid(format!(
+                "Snapshot {} was published, but result delivery failed",
+                record.snapshot_id
+            )));
+        }
+    }
+    Ok(Some(published))
+}
+
+/// The child is retained by its owning task while this exchange can be cancelled.
+pub(crate) async fn exchange_location_generation(
+    compiler: &mut LocationCompiler,
+    generation: i64,
+) -> Result<Option<SnapshotRecord>, ControlError> {
+    compiler
+        .stdin
+        .write_all(format!("{generation}\n").as_bytes())
+        .await?;
+    compiler.stdin.flush().await?;
+    let mut line = String::new();
+    if compiler.stdout.read_line(&mut line).await? == 0 {
+        return Err(ControlError::Invalid(
+            "location interpreter exited before replying".into(),
+        ));
+    }
+    serde_json::from_str(&line).map_err(|_| {
+        ControlError::Invalid("location interpreter returned an invalid publication record".into())
+    })
+}
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
 pub(crate) async fn report_location_health(
@@ -150,27 +223,22 @@ pub(crate) async fn location_generation(
 }
 
 /// The installed interpreter owns user imports; the supervisor never imports Python.
-pub(crate) fn publish_child(
-    options: &LocationServe,
-    script: &Path,
-    generation: i64,
-) -> io::Result<Child> {
+pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> io::Result<Child> {
     let mut command = location_child(options, script);
     command
         .args([
             "location",
-            "publish",
+            "runtime",
             "--server",
             &options.server_url,
             "--location-id",
         ])
         .arg(options.location_id.to_string())
-        .args(["--target", &options.target, "--generation"])
-        .arg(generation.to_string());
+        .args(["--target", &options.target]);
     if let Some(image) = &options.image_id {
         command.args(["--image-id", image]);
     }
-    command.stdout(Stdio::inherit()).spawn()
+    command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
 }
 
 /// Capture the ordinary debug check's exact local file paths without contaminating publication stdout.

@@ -148,6 +148,25 @@ pub(crate) struct LocationWatch {
     pub(crate) retry_at: Option<tokio::time::Instant>,
 }
 
+/// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
+#[derive(Debug)]
+pub(crate) struct LocationCompileRequest {
+    pub(crate) generation: i64,
+    pub(crate) python_sources: Vec<PathStamp>,
+    pub(crate) reply: tokio::sync::oneshot::Sender<
+        Result<Option<sqlbuild_orchestration::snapshots::models::SnapshotRecord>, String>,
+    >,
+}
+
+/// Only this task owns the isolated interpreter and its private stdio protocol.
+#[derive(Debug)]
+pub(crate) struct LocationCompiler {
+    pub(crate) child: tokio::process::Child,
+    pub(crate) stdin: tokio::process::ChildStdin,
+    pub(crate) stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
+    pub(crate) python_sources: Vec<PathStamp>,
+}
+
 /// What Python's buffered stdout does with output its reader no longer takes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum LostStdout {

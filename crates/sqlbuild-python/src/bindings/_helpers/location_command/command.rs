@@ -8,7 +8,7 @@ use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Py
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
-use sqlbuild_orchestration::snapshots::models::SnapshotInput;
+use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
@@ -17,6 +17,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::{
 };
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
+use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
@@ -130,14 +131,11 @@ fn compile_location<'py>(
     Ok(snapshot)
 }
 
-/// One publication is also the isolated compiler boundary a reloading location can invoke.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn run_location_command<'py>(
+pub(super) fn location_arguments<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
-) -> PyResult<i32> {
-    let arguments = KeywordArguments::read(
+) -> PyResult<KeywordArguments<'py>> {
+    KeywordArguments::read(
         py,
         "run_location_command",
         options,
@@ -151,34 +149,37 @@ pub(crate) fn run_location_command<'py>(
             ],
             &["image_id", "action"],
         ),
-    )?;
-    let publication = (|| {
-        if arguments
-            .value("action")?
-            .extract::<Option<String>>()?
-            .is_some_and(|action| action != PUBLISH_ACTION)
-        {
-            return Err(PyValueError::new_err(
-                "location serve must run through the native sqb executable",
-            ));
-        }
-        let bearer = std::env::var("SQLBUILD_LOCATION_TOKEN").map_err(|_| {
-            PyValueError::new_err(
-                "SQLBUILD_LOCATION_TOKEN must contain a UTF-8 location credential",
-            )
-        })?;
-        if bearer.trim().is_empty() {
-            return Err(PyValueError::new_err(
-                "SQLBUILD_LOCATION_TOKEN must not be blank",
-            ));
-        }
-        let directory = arguments
-            .value("project_dir")?
-            .extract::<std::path::PathBuf>()?;
-        let input = metadata(py, &arguments, &directory)?;
-        let snapshot = compile_location(py, &arguments, &input)?;
-        status(py, "Publishing location snapshot...")?;
-        let record = snapshot.publication(
+    )
+}
+
+pub(super) fn publish_location(
+    py: Python<'_>,
+    arguments: &KeywordArguments<'_>,
+) -> PyResult<SnapshotRecord> {
+    if arguments
+        .value("action")?
+        .extract::<Option<String>>()?
+        .is_some_and(|action| action != PUBLISH_ACTION)
+    {
+        return Err(PyValueError::new_err(
+            "location serve must run through the native sqb executable",
+        ));
+    }
+    let bearer = std::env::var("SQLBUILD_LOCATION_TOKEN").map_err(|_| {
+        PyValueError::new_err("SQLBUILD_LOCATION_TOKEN must contain a UTF-8 location credential")
+    })?;
+    if bearer.trim().is_empty() {
+        return Err(PyValueError::new_err(
+            "SQLBUILD_LOCATION_TOKEN must not be blank",
+        ));
+    }
+    let directory = arguments
+        .value("project_dir")?
+        .extract::<std::path::PathBuf>()?;
+    let input = metadata(py, arguments, &directory)?;
+    let snapshot = compile_location(py, arguments, &input)?;
+    status(py, "Publishing location snapshot...")?;
+    let record = snapshot.publication(
             py,
             &arguments.value("server_url")?.extract::<String>()?,
             &bearer,
@@ -190,6 +191,28 @@ pub(crate) fn run_location_command<'py>(
             };
             PyValueError::new_err(message)
         })?;
+    status(py, "Location snapshot published.")?;
+    Ok(record)
+}
+
+/// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
+#[pyfunction]
+#[pyo3(signature = (**options))]
+pub(crate) fn run_location_command<'py>(
+    py: Python<'py>,
+    options: Option<Bound<'py, PyDict>>,
+) -> PyResult<i32> {
+    let arguments = location_arguments(py, options.clone())?;
+    if arguments
+        .value("action")?
+        .extract::<Option<String>>()?
+        .as_deref()
+        == Some("runtime")
+    {
+        return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
+    }
+    let publication = (|| {
+        let record = publish_location(py, &arguments)?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {
@@ -198,7 +221,6 @@ pub(crate) fn run_location_command<'py>(
                 record.snapshot_id
             ))
         })?;
-        status(py, "Location snapshot published.")?;
         Ok(0)
     })();
     if publication.is_err() {
