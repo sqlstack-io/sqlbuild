@@ -45,6 +45,7 @@ fn model_lineage(
         model
             .schema
             .iter()
+            .filter(|(_, columns)| !columns.is_empty())
             .map(|(relation, columns)| (relation_key(relation, profile), column_names(columns)))
             .collect(),
     );

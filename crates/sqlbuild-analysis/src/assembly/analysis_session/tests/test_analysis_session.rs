@@ -244,7 +244,7 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
 fn given_finished_sessions_when_reading_model_facts_then_keeps_only_native_successes() {
     let test_cases = [
         SessionFactsTestCase {
-            description: "native lineage keeps typed output columns and sources",
+            description: "native lineage keeps typed outputs and sources, never a column the relation lacks",
             models: &[
                 (
                     "stg_orders",
@@ -263,7 +263,7 @@ fn given_finished_sessions_when_reading_model_facts_then_keeps_only_native_succe
                 "Some([\"order_id INTEGER non_null\", \"doubled DOUBLE unknown\"]) \
                  order_id<-[(\"raw_orders\", \"order_id\")] \
                  doubled<-[(\"raw_orders\", \"amount\")]",
-                "Some([\"missing_column - unknown\"]) missing_column<-[(\"raw_orders\", \"missing_column\")]",
+                "Some([\"missing_column - unknown\"]) missing_column<-[]",
             ],
         },
         SessionFactsTestCase {

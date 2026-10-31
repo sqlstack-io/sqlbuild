@@ -1,6 +1,5 @@
 //! The session's phases: Python's uncached model analysis, wave by wave.
 
-use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -161,9 +160,6 @@ impl AnalysisSession {
                     placeholders: std::mem::take(&mut model.placeholders),
                 });
             }
-        }
-        if let Ok(pool) = pool.as_ref() {
-            sqlquack_lineage(&request, &mut models, pool)?;
         }
         let mut model_facts: HashMap<String, SessionModelFacts> = HashMap::new();
         let mut dynamic_proofs: HashMap<String, ContractProof> = HashMap::new();
@@ -544,7 +540,47 @@ impl AnalysisSession {
                 self.publish(*model)?;
             }
         }
+        self.sqlquack_lineage(&models)?;
         self.store_cached(&models);
+        Ok(())
+    }
+
+    /// SQLQuack's lineage in place of the analysis's, for the wave's models the cache did not answer.
+    fn sqlquack_lineage(&mut self, models: &[usize]) -> Result<(), String> {
+        let analysed: Vec<usize> = models
+            .iter()
+            .copied()
+            .filter(|model| !self.cached(*model))
+            .collect();
+        if analysed.is_empty() {
+            return Ok(());
+        }
+        let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
+        let mut inputs: Vec<CompiledModelSql<'_>> = Vec::with_capacity(analysed.len());
+        for model in &analysed {
+            let outcome: &ModelOutcome = self.outcomes[*model]
+                .as_ref()
+                .ok_or("a wave model was not analysed")?;
+            inputs.push(CompiledModelSql {
+                sql: &outcome.cleaned_sql,
+                references: &self.request.models[*model].lineage_references,
+                schema: &outcome.validated_schema,
+            });
+        }
+        let Some(lineages) = compile_lineage(&self.request.dialect, &inputs, &pool)? else {
+            return Ok(());
+        };
+        for (model, lineage) in analysed.into_iter().zip(lineages) {
+            let outcome: &mut ModelOutcome = self.outcome_mut(model)?;
+            let (Some(lineage), true) = (lineage, outcome.analysis.analysis_succeeded) else {
+                continue;
+            };
+            let rows: Vec<LineageRow> = lineage.into_iter().map(lineage_row).collect();
+            outcome.analysis.lineage = match &outcome.analysis.lineage {
+                LineageFacts::Native(_) => LineageFacts::Native(rows),
+                LineageFacts::NativeFacts(_) => LineageFacts::NativeFacts(rows),
+            };
+        }
         Ok(())
     }
 
@@ -911,42 +947,6 @@ fn model_context(model: &ModelRequest) -> String {
 
 /// Each model's lineage rows from SQLQuack when it analyses the dialect; a model it cannot read
 /// keeps polyglot's rows.
-fn sqlquack_lineage(
-    request: &SessionRequest,
-    models: &mut [ModelOutcome],
-    pool: &ThreadPool,
-) -> Result<(), String> {
-    let cleaned: Vec<Cow<'_, str>> = models
-        .iter()
-        .map(resolved_cleaned_sql)
-        .collect::<Result<_, String>>()?;
-    let inputs: Vec<CompiledModelSql<'_>> = request
-        .models
-        .iter()
-        .zip(models.iter())
-        .zip(&cleaned)
-        .map(|((model, outcome), sql)| CompiledModelSql {
-            sql,
-            references: &model.lineage_references,
-            schema: &outcome.validated_schema,
-        })
-        .collect();
-    let Some(lineages) = compile_lineage(&request.dialect, &inputs, pool)? else {
-        return Ok(());
-    };
-    for (outcome, lineage) in models.iter_mut().zip(lineages) {
-        let (Some(lineage), true) = (lineage, outcome.analysis.analysis_succeeded) else {
-            continue;
-        };
-        let rows: Vec<LineageRow> = lineage.into_iter().map(lineage_row).collect();
-        outcome.analysis.lineage = match outcome.analysis.lineage {
-            LineageFacts::Native(_) => LineageFacts::Native(rows),
-            LineageFacts::NativeFacts(_) => LineageFacts::NativeFacts(rows),
-        };
-    }
-    Ok(())
-}
-
 fn lineage_row(column: CompileLineageColumn) -> LineageRow {
     LineageRow {
         output_column: column.output_column,
