@@ -9,6 +9,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::lineage::main::build_fast_lineage::build_fast_lineage;
 use sqlbuild_analysis::lineage::main::build_rich_lineage::build_rich_lineage;
+use sqlbuild_analysis::lineage::main::build_sqlquack_lineage::build_sqlquack_lineage;
 use sqlbuild_analysis::lineage::main::direct_semantic_uses::direct_semantic_uses;
 use sqlbuild_analysis::lineage::models::{
     DirectSemanticUse, FastLineageModel, FastLineageOutcome, FastLineageRequest, LineageColumn,
@@ -36,6 +37,7 @@ use crate::bindings::types::CompilerDetach;
 
 const FAST_MODE: &str = "fast";
 const RICH_MODE: &str = "rich";
+const SQLQUACK_MODE: &str = "sqlquack";
 const GENERIC_DIALECT: &str = "generic";
 
 /// The project's column lineage graph in `mode`, or `None` without SQL analysis.
@@ -47,7 +49,7 @@ pub(crate) fn build_project_column_lineage<'py>(
     model_names: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Option<Py<PyAny>>> {
     let mode: String = mode.str()?.extract()?;
-    if mode != FAST_MODE && mode != RICH_MODE {
+    if mode != FAST_MODE && mode != RICH_MODE && mode != SQLQUACK_MODE {
         return Ok(None);
     }
     let classes: LineageClasses<'py> = LineageClasses::new(project.py())?;
@@ -61,7 +63,7 @@ pub(crate) fn build_project_column_lineage<'py>(
     let lineage: Bound<'py, PyAny> = if mode == FAST_MODE {
         fast_lineage(&classes, project, dialect, &models)?
     } else {
-        rich_lineage(&classes, project, dialect, &models)?
+        rich_lineage(&classes, project, dialect, &models, mode == SQLQUACK_MODE)?
     };
     Ok(Some(lineage.unbind()))
 }
@@ -320,6 +322,7 @@ fn rich_lineage<'py>(
     project: &Bound<'py, PyAny>,
     dialect: Option<&Bound<'py, PyAny>>,
     models: &[Bound<'py, PyAny>],
+    sqlquack: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = classes.py();
     let outcomes: Vec<RichLineageOutcome> = if models.is_empty() {
@@ -333,7 +336,14 @@ fn rich_lineage<'py>(
                 .map(|model| native_field(model, "query_sql")?.extract())
                 .collect::<PyResult<_>>()?,
         };
-        py.compiler_detach(|| build_rich_lineage(&request))
+        let names: Vec<String> = models
+            .iter()
+            .map(|model| native_field(model, "name")?.extract())
+            .collect::<PyResult<_>>()?;
+        py.compiler_detach(|| match sqlquack {
+            true => build_sqlquack_lineage(&request, &names),
+            false => build_rich_lineage(&request),
+        })
             .map_err(compiler_error)?
     };
     let built: Bound<'py, PyDict> = PyDict::new(py);

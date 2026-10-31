@@ -1,11 +1,12 @@
 //! Plain-data request and outcomes for fast column lineage.
 
-/// The SQLBuild resource kinds a `__ref`, `__source` or `__seed` call names.
+/// The SQLBuild resource kinds a `__ref`, `__source`, `__seed` or `__table_fn` call names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LineageResourceType {
     Model,
     Source,
     Seed,
+    TableFn,
 }
 
 /// A semantic column use projected onto a project resource and authored SQL.
@@ -29,6 +30,7 @@ impl LineageResourceType {
             Self::Model => "model",
             Self::Source => "source",
             Self::Seed => "seed",
+            Self::TableFn => "table_fn",
         }
     }
 
@@ -38,6 +40,7 @@ impl LineageResourceType {
             "model" => Some(Self::Model),
             "source" => Some(Self::Source),
             "seed" => Some(Self::Seed),
+            "table_fn" => Some(Self::TableFn),
             _ => None,
         }
     }

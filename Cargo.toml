@@ -83,6 +83,8 @@ polyglot-sql-function-catalogs = { git = "https://github.com/sqlstack-io/polyglo
     "dialect-duckdb",
 ] }
 blake3 = { version = "1", features = ["rayon"] }
+sqlquack-semantics = "0.2.0"
+sqlquack-syntax = "0.2.0"
 # Only sqlbuild-build-features uses these: each enables in the sqb build exactly the features the
 # extension build resolves for that crate, so both builds share one compile of every common crate.
 arrayvec = "0.7"
