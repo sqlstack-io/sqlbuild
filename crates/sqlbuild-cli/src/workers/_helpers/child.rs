@@ -22,6 +22,8 @@ impl WorkerChild {
             Self::Local(child) => Ok(child
                 .try_wait()?
                 .map(|exit| WorkerExit::Code(exit_code(exit)))),
+            #[cfg(target_os = "linux")]
+            Self::RecoveredLocal(child) => child.try_wait(),
             Self::Docker(child) => child.try_wait().await,
         }
     }
@@ -41,6 +43,8 @@ impl WorkerChild {
     pub(in crate::workers) async fn terminate(&mut self) -> Result<(), ControlError> {
         match self {
             Self::Local(child) => terminate(child),
+            #[cfg(target_os = "linux")]
+            Self::RecoveredLocal(child) => child.signal(rustix::process::Signal::TERM),
             Self::Docker(child) => child.signal("SIGTERM").await,
         }
     }
@@ -51,6 +55,8 @@ impl WorkerChild {
                 child.start_kill()?;
                 Ok(())
             }
+            #[cfg(target_os = "linux")]
+            Self::RecoveredLocal(child) => child.signal(rustix::process::Signal::KILL),
             Self::Docker(child) => child.signal("SIGKILL").await,
         }
     }

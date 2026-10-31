@@ -219,6 +219,15 @@ impl Workers {
                     Utc::now() + TimeDelta::days(7),
                 )
                 .await?;
+                let local_command = match location {
+                    Launcher::Local(location) => Some(prepare_spawn(
+                        location,
+                        claim,
+                        &credential.bearer,
+                        &self.control_variable,
+                    )?),
+                    Launcher::Docker(_) => None,
+                };
                 publish(
                     store,
                     lease,
@@ -226,16 +235,17 @@ impl Workers {
                     ("local-launched", RunChange::Launched { container_id }),
                 )
                 .await?;
-                let launched = match location {
-                    Launcher::Local(location) => {
-                        spawn(location, claim, &credential.bearer, &self.control_variable).map(
-                            |child| {
-                                worker.child = Some(WorkerChild::Local(child));
-                            },
-                        )
-                    }
-                    Launcher::Docker(location) => {
-                        if let Some(WorkerChild::Docker(child)) = &worker.child {
+                let launched = match local_command {
+                    Some(mut command) => command
+                        .spawn()
+                        .map(|child| {
+                            worker.child = Some(WorkerChild::Local(child));
+                        })
+                        .map_err(ControlError::from),
+                    None => {
+                        if let (Launcher::Docker(location), Some(WorkerChild::Docker(child))) =
+                            (location, &worker.child)
+                        {
                             child
                                 .launch(location, claim, &credential.bearer, &self.control_variable)
                                 .await?;
@@ -275,13 +285,14 @@ impl Workers {
     }
 }
 
-fn spawn(
+fn prepare_spawn(
     location: &LocalLauncher,
     claim: &RunClaim,
     bearer: &str,
     control_variable: &str,
-) -> Result<Child, ControlError> {
-    Ok(Command::new(&location.executable)
+) -> Result<Command, ControlError> {
+    let mut command = Command::new(&location.executable);
+    command
         .args(arguments(&Launcher::Local(location).scope(), claim))
         .arg(&location.project_dir)
         .current_dir(&location.project_dir)
@@ -294,8 +305,10 @@ fn spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
-        .kill_on_drop(true)
-        .spawn()?)
+        .kill_on_drop(true);
+    #[cfg(target_os = "linux")]
+    crate::workers::_helpers::local::inherit_claim(&mut command, location, claim)?;
+    Ok(command)
 }
 
 pub(in crate::workers) async fn publish(
