@@ -36,6 +36,13 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             expected_stderr: "Control administration failed: invalid control-plane data: location name is required\n",
         },
         CommandTestCase {
+            description: "blank principal rejected before store initialization",
+            arguments: &["admin", "create-principal", "   "],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: principal name is required\n",
+        },
+        CommandTestCase {
             description: "invalid credential ID rejected before store initialization",
             arguments: &["admin", "revoke-token", "not-a-uuid"],
             expected_success: false,

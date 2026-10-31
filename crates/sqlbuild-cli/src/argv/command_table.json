@@ -163,6 +163,59 @@
           }
          },
          {
+          "name": "create-principal",
+          "parser": {
+           "prog": "sqb admin create-principal",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "principal label; creation grants no permissions",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--kind"
+             ],
+             "dest": "admin_principal_kind",
+             "choices": [
+              "person",
+              "service_account"
+             ],
+             "default": "person",
+             "help": "identity kind (default: person)",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
           "name": "issue-location-token",
           "parser": {
            "prog": "sqb admin issue-location-token",
@@ -196,6 +249,55 @@
              "metavar": "LOCATION_ID",
              "required": true,
              "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--expires-at"
+             ],
+             "dest": "admin_expires_at",
+             "required": true,
+             "help": "future expiry as an RFC3339 timestamp with timezone",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "issue-principal-token",
+          "parser": {
+           "prog": "sqb admin issue-principal-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "PRINCIPAL_ID",
+             "required": true,
+             "help": "principal UUID",
              "group": 0
             },
             {
@@ -258,9 +360,19 @@
           "help": "register a location with an atomic security audit record"
          },
          {
+          "dest": "create-principal",
+          "metavar": "create-principal",
+          "help": "create a person or service account without granting permissions"
+         },
+         {
           "dest": "issue-location-token",
           "metavar": "issue-location-token",
           "help": "issue a bounded location credential, returned once as JSON"
+         },
+         {
+          "dest": "issue-principal-token",
+          "metavar": "issue-principal-token",
+          "help": "issue a bounded principal credential, returned once as JSON"
          },
          {
           "dest": "revoke-token",

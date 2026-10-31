@@ -2,9 +2,10 @@
 
 use serde_json::{Value, json};
 use sqlbuild_orchestration::credentials::main::create_location::create_location;
+use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
+use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -27,14 +28,12 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             let id = create_location(&store, &name, &context).await?;
             Ok(json!({"location_id": id, "name": name}))
         }
-        ControlAdmin::IssueLocationToken(location_id, expires_at) => {
-            let token = issue_token(
-                &store,
-                &context,
-                CredentialScope::Location { location_id },
-                expires_at,
-            )
-            .await?;
+        ControlAdmin::CreatePrincipal(name, kind) => {
+            let id = create_principal(&store, &context, (&name, kind)).await?;
+            Ok(json!({"principal_id": id, "name": name, "kind": kind}))
+        }
+        ControlAdmin::IssueToken(scope, expires_at) => {
+            let token = issue_token(&store, &context, scope, expires_at).await?;
             Ok(json!(token))
         }
         ControlAdmin::RevokeToken(token_id) => {

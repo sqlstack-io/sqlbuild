@@ -5,6 +5,13 @@ pub(crate) struct AdminTestCase {
     pub(crate) expected_actions: [&'static str; 4],
 }
 
+pub(crate) struct PrincipalAdminTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) kind: &'static str,
+    pub(crate) expected_name: &'static str,
+    pub(crate) expected_actions: [&'static str; 3],
+}
+
 #[cfg(unix)]
 pub(crate) struct AdminDeliveryTestCase {
     pub(crate) description: &'static str,

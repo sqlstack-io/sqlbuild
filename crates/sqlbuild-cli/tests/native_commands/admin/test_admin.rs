@@ -15,7 +15,7 @@ use crate::admin_helpers::{administer, audit_actions};
 use crate::helpers::{api_ready, start_control};
 #[cfg(unix)]
 use crate::test_admin::test_types::AdminDeliveryTestCase;
-use crate::test_admin::test_types::AdminTestCase;
+use crate::test_admin::test_types::{AdminTestCase, PrincipalAdminTestCase};
 
 #[test]
 fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scoped_publication_and_revocation_are_audited()
@@ -108,6 +108,124 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
             actions.sort();
             assert_eq!(
                 actions, test_case.expected_actions,
+                "{}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[test]
+fn given_native_principal_administration_when_issuing_credentials_then_identity_is_audited_without_granting_location_permissions()
+ {
+    let test_cases = [
+        PrincipalAdminTestCase {
+            description: "a person credential has no implicit location authority",
+            kind: "person",
+            expected_name: "orders operator / café",
+            expected_actions: ["principal.created", "token.issued", "token.revoked"],
+        },
+        PrincipalAdminTestCase {
+            description: "a service account credential has no implicit location authority",
+            kind: "service_account",
+            expected_name: "orders automation",
+            expected_actions: ["principal.created", "token.issued", "token.revoked"],
+        },
+    ];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let mut control = start_control(&["server", "--port", "0", "--no-scheduler"]);
+            let url = api_ready(&mut control).await;
+            let principal = administer(
+                &control,
+                &[
+                    "create-principal",
+                    test_case.expected_name,
+                    "--kind",
+                    test_case.kind,
+                ],
+            );
+            let principal_id = Uuid::parse_str(
+                principal["principal_id"]
+                    .as_str()
+                    .expect(test_case.description),
+            )
+            .expect(test_case.description);
+            assert_eq!(
+                principal["name"], test_case.expected_name,
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                principal["kind"], test_case.kind,
+                "{}",
+                test_case.description
+            );
+            let expiry = (Utc::now() + Duration::hours(1)).to_rfc3339();
+            let credential = administer(
+                &control,
+                &[
+                    "issue-principal-token",
+                    &principal_id.to_string(),
+                    "--expires-at",
+                    &expiry,
+                ],
+            );
+            assert_eq!(
+                credential["identity"]["scope"]["kind"], "principal",
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                credential["identity"]["scope"]["principal_id"],
+                principal_id.to_string(),
+                "{}",
+                test_case.description
+            );
+            let bearer = credential["bearer"].as_str().expect(test_case.description);
+            let snapshot = SnapshotInput {
+                location_id: Uuid::now_v7(),
+                target: "development".into(),
+                generation: 1,
+                git_revision: None,
+                git_dirty: false,
+                git_author: None,
+                image_id: None,
+                environment_hash: "orders-environment".into(),
+                sqb_version: env!("CARGO_PKG_VERSION").into(),
+                nodes: BTreeMap::new(),
+                documents: BTreeMap::new(),
+            };
+            assert!(
+                matches!(
+                    publish_remote_snapshot(&url, bearer, &snapshot).await,
+                    Err(ClientError::Rejected(reqwest::StatusCode::FORBIDDEN))
+                ),
+                "{}",
+                test_case.description
+            );
+            let token_id = credential["identity"]["token_id"]
+                .as_str()
+                .expect(test_case.description);
+            let revoked = administer(&control, &["revoke-token", token_id]);
+            assert_eq!(revoked["revoked"], true, "{}", test_case.description);
+            assert!(
+                matches!(
+                    publish_remote_snapshot(&url, bearer, &snapshot).await,
+                    Err(ClientError::Rejected(reqwest::StatusCode::UNAUTHORIZED))
+                ),
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                audit_actions(&control, bearer),
+                test_case.expected_actions,
                 "{}",
                 test_case.description
             );

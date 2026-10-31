@@ -4,6 +4,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -44,16 +45,27 @@ pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
 
 pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, ControlError> {
     let value = text(namespace, "admin_subject").unwrap_or_default();
-    if text(namespace, "admin_command").as_deref() == Some("create-location") {
+    let action = text(namespace, "admin_command");
+    if action.as_deref() == Some("create-location") {
         if value.trim().is_empty() {
             return Err(ControlError::Invalid("location name is required".into()));
         }
         return Ok(ControlAdmin::CreateLocation(value));
     }
+    if action.as_deref() == Some("create-principal") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("principal name is required".into()));
+        }
+        let kind = match text(namespace, "admin_principal_kind").as_deref() {
+            Some("service_account") => PrincipalKind::ServiceAccount,
+            _ => PrincipalKind::Person,
+        };
+        return Ok(ControlAdmin::CreatePrincipal(value, kind));
+    }
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid location or token UUID is required".into()))?;
-    match text(namespace, "admin_command").as_deref() {
-        Some("issue-location-token") => {
+    match action.as_deref() {
+        Some("issue-location-token" | "issue-principal-token") => {
             let expiry = DateTime::parse_from_rfc3339(
                 &text(namespace, "admin_expires_at").unwrap_or_default(),
             )
@@ -64,7 +76,11 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     "token expiry must be in the future".into(),
                 ));
             }
-            Ok(ControlAdmin::IssueLocationToken(id, expiry))
+            let scope = match action.as_deref() {
+                Some("issue-principal-token") => CredentialScope::Principal { principal_id: id },
+                _ => CredentialScope::Location { location_id: id },
+            };
+            Ok(ControlAdmin::IssueToken(scope, expiry))
         }
         Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
         _ => Err(ControlError::Invalid(

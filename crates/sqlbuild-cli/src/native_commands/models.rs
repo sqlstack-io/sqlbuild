@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -10,7 +11,8 @@ use crate::argv::models::Namespace;
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
     CreateLocation(String),
-    IssueLocationToken(Uuid, DateTime<Utc>),
+    CreatePrincipal(String, PrincipalKind),
+    IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
 }
 
