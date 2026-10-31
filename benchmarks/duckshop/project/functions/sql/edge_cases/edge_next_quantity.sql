@@ -5,4 +5,4 @@ FUNCTION (
   returns INTEGER,
 );
 
-SELECT quantity + 1
+quantity + 1
