@@ -7,6 +7,7 @@ pub fn test_outcome_status(outcome: &str) -> &'static str {
         "pass" => "PASS",
         "error" => "ERROR",
         "timeout" => "TIMEOUT",
+        "refused" => "REFUSED",
         _ => "FAIL",
     }
 }

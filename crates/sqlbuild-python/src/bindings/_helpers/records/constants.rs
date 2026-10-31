@@ -692,6 +692,8 @@ const TEST_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("test_timeout", FieldDefault::None),
         FieldSpec::new("since", FieldDefault::None),
         FieldSpec::new("explain", FieldDefault::False),
+        FieldSpec::new("local", FieldDefault::False),
+        FieldSpec::new("strict", FieldDefault::False),
     ],
 };
 const REFACTOR_COMMAND_REQUEST: RecordSpec = RecordSpec {

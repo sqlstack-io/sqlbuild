@@ -10,6 +10,7 @@ class SqlTestOutcome(StrEnum):
     FAIL = "fail"
     ERROR = "error"
     TIMEOUT = "timeout"
+    REFUSED = "refused"
 
 
 class SqlTestDifferenceDirection(StrEnum):

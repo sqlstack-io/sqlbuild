@@ -1,6 +1,8 @@
 //! The failing row detail of one SQL expectation row.
 
-use crate::progress::constants::{ASSERTION_PREFIX, ERROR_OUTCOME, PASS_OUTCOME, TIMEOUT_OUTCOME};
+use crate::progress::constants::{
+    ASSERTION_PREFIX, ERROR_OUTCOME, PASS_OUTCOME, REFUSED_OUTCOME, TIMEOUT_OUTCOME,
+};
 use crate::progress::models::ExpectationStep;
 use crate::progress::types::DifferenceSample;
 
@@ -21,10 +23,17 @@ fn sample_lines(label: &str, samples: &[DifferenceSample]) -> Vec<String> {
     lines
 }
 
-/// Row counts, samples and differing columns of a failing step; empty when it passed, errored or timed out.
+/// Row counts, samples and differing columns of a failing step; empty when it did not run to a comparison.
 #[must_use]
 pub fn format_expectation_detail(step: &ExpectationStep) -> String {
-    if [PASS_OUTCOME, ERROR_OUTCOME, TIMEOUT_OUTCOME].contains(&step.outcome.as_str()) {
+    if [
+        PASS_OUTCOME,
+        ERROR_OUTCOME,
+        TIMEOUT_OUTCOME,
+        REFUSED_OUTCOME,
+    ]
+    .contains(&step.outcome.as_str())
+    {
         return String::new();
     }
     if step.model_name.starts_with(ASSERTION_PREFIX) {

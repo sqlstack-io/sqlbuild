@@ -1,4 +1,5 @@
 pub mod parameterized_test_label;
+pub mod render_test_assumptions;
 pub mod render_test_completion;
 pub mod render_test_inspection;
 pub mod render_test_ready;

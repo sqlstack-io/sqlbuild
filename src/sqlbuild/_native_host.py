@@ -457,6 +457,7 @@ _TARGETS: dict[str, tuple[str, str]] = {
     ),
     "TestPipelineCallbacks": ("sqlbuild.executor.pipeline.models", "TestPipelineCallbacks"),
     "RunItemTimeouts": ("sqlbuild.runtime.execution_limits.models", "RunItemTimeouts"),
+    "LocalTestOptions": ("sqlbuild.executor.testing.models", "LocalTestOptions"),
     "ScenarioTestSettings": ("sqlbuild.executor.scenario.models", "ScenarioTestSettings"),
     "execute_python_checks": (
         "sqlbuild.executor.python_nodes.main._checks",

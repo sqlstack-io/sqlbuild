@@ -72,7 +72,7 @@ fn given_result_enums_when_read_by_value_then_they_match_the_python_members() {
             description: "SqlTestOutcome round-trips its Python values",
             values: values::<SqlTestOutcome>(),
             parsed: parsed::<SqlTestOutcome>(),
-            expected_values: vec!["pass", "fail", "error", "timeout"],
+            expected_values: vec!["pass", "fail", "error", "timeout", "refused"],
         },
         EnumValueTestCase {
             description: "ItemKind round-trips its Python values",

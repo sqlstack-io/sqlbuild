@@ -49,3 +49,9 @@ pub(super) struct ReadyTestCase {
     pub(super) counts: (usize, usize),
     pub(super) expected_text: &'static str,
 }
+
+pub(super) struct AssumptionsTestCase {
+    pub(super) description: &'static str,
+    pub(super) assumptions: Vec<Vec<String>>,
+    pub(super) expected_text: &'static str,
+}

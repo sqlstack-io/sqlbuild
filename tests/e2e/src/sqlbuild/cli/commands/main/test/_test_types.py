@@ -613,3 +613,27 @@ class PythonUdfConnectionsE2ETestCase:
     database: str
     concurrency: int
     expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
+class LocalEngineE2ETestCase:
+    """Test case for `sqb test --local` through a stand-in SQLQuack executable."""
+
+    description: str
+    arguments: tuple[str, ...]
+    expected_exit_code: int
+    expected_stdout_fragments: tuple[str, ...] = field(default_factory=tuple)
+    expected_stderr_fragments: tuple[str, ...] = field(default_factory=tuple)
+    unexpected_stdout_fragments: tuple[str, ...] = field(default_factory=tuple)
+    converter_version: str = "0.2.0"
+    converter_name: str = "sqlquack"
+    expected_conversion_count: int = 0
+    expected_converter_arguments: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class RealLocalEngineE2ETestCase:
+    """Test case for `sqb test --local` through the installed SQLQuack executable."""
+
+    description: str
+    expected_stdout_fragments: tuple[str, ...]

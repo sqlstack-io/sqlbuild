@@ -1,5 +1,6 @@
 use crate::cli_text::models::CliStyle;
 use crate::test_command::main::parameterized_test_label::parameterized_test_label;
+use crate::test_command::main::render_test_assumptions::render_test_assumptions;
 use crate::test_command::main::render_test_completion::render_test_completion;
 use crate::test_command::main::render_test_inspection::render_test_inspection;
 use crate::test_command::main::render_test_ready::render_test_ready;
@@ -10,8 +11,8 @@ use crate::test_command::main::test_outcome_status::test_outcome_status;
 use crate::test_command::models::{TestFailure, TestInspectionEntry, TestPlanWarning};
 use crate::test_command::tests::helpers::parameter;
 use crate::test_command::tests::test_types::{
-    CompletionTestCase, GroupTestCase, InspectionTestCase, LabelTestCase, OutcomeTestCase,
-    ReadyTestCase, WidthTestCase,
+    AssumptionsTestCase, CompletionTestCase, GroupTestCase, InspectionTestCase, LabelTestCase,
+    OutcomeTestCase, ReadyTestCase, WidthTestCase,
 };
 
 const PLAIN: CliStyle = CliStyle { use_color: false };
@@ -99,6 +100,11 @@ fn given_outcomes_when_rendering_status_then_distinguishes_errors_from_failures(
             description: "an assertion failure is FAIL",
             outcome: "fail",
             expected_status: "FAIL",
+        },
+        OutcomeTestCase {
+            description: "a local conversion refusal is REFUSED",
+            outcome: "refused",
+            expected_status: "REFUSED",
         },
     ];
 
@@ -190,6 +196,18 @@ fn given_results_when_completing_then_renders_summary_failures_and_exit_code() {
             expected_text: "\nPASS=1  FAIL=1  TOTAL=2\n\nFailures:\n\n  orders_unique\n    error     test failed\n",
             expected_exit_code: 1,
         },
+        CompletionTestCase {
+            description: "a refused test is counted apart from failures and never passes",
+            counts: (1, 2),
+            failures: vec![TestFailure {
+                label: "orders_local".to_owned(),
+                error_message: Some("refused".to_owned()),
+                error_code: Some("T006".to_owned()),
+                error_help: None,
+            }],
+            expected_text: "\nPASS=1  FAIL=0  REFUSED=1  TOTAL=2\n\nFailures:\n\n  orders_local\n    error     [T006] refused\n",
+            expected_exit_code: 1,
+        },
     ];
 
     for test_case in test_cases {
@@ -263,6 +281,37 @@ fn given_plan_when_inspecting_then_lists_boundaries_and_counts_errors() {
                 test_case.expected_text.to_owned(),
                 test_case.expected_exit_code
             ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_local_results_when_summarising_assumptions_then_counts_tests_per_assumption() {
+    let test_cases = [
+        AssumptionsTestCase {
+            description: "no assumption writes nothing",
+            assumptions: vec![Vec::new(), Vec::new()],
+            expected_text: "",
+        },
+        AssumptionsTestCase {
+            description: "each assumption lists the tests relying on it, sorted by name",
+            assumptions: vec![
+                vec!["session_timezone_utc".to_owned()],
+                vec![
+                    "source_variant_json".to_owned(),
+                    "session_timezone_utc".to_owned(),
+                ],
+            ],
+            expected_text: "\nAssumptions relied on (rerun with --strict to refuse them):\n  session_timezone_utc  2 tests\n  source_variant_json   1 test\n",
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            render_test_assumptions(&test_case.assumptions, PLAIN),
+            test_case.expected_text,
             "{}",
             test_case.description
         );

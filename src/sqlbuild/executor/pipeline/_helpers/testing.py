@@ -5,10 +5,11 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextvars import copy_context
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
 
@@ -24,6 +25,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
 from sqlbuild.adapter.contract.models import FunctionInfo
 from sqlbuild.compiler.compile.types import FunctionLanguage
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.build.models import FunctionExecutionResult
 from sqlbuild.executor.functions.main._execute import execute_function
 from sqlbuild.executor.pipeline._helpers.connections import (
@@ -43,9 +45,20 @@ from sqlbuild.executor.pipeline.main.raise_warehouse_connection_failure import (
 from sqlbuild.executor.pipeline.models import TemporaryTestFunctions, TestPipelineCallbacks
 from sqlbuild.executor.scheduling.classes.recovering_connection_pool import RecoveringConnectionPool
 from sqlbuild.executor.scheduling.types import ExecutionStatus
-from sqlbuild.executor.testing.constants import SQL_TEST_EXECUTION_ERROR_CODE
+from sqlbuild.executor.testing.constants import (
+    LOCAL_TEST_ENGINE_CODE,
+    SOURCE_DIALECT,
+    SQL_TEST_EXECUTION_ERROR_CODE,
+)
 from sqlbuild.executor.testing.main._execute import execute_sql_test
-from sqlbuild.executor.testing.models import SqlTestExecutionResult, StepResult
+from sqlbuild.executor.testing.main._execute_local import execute_local_sql_test
+from sqlbuild.executor.testing.main._local_engine import resolve_local_test_engine
+from sqlbuild.executor.testing.models import (
+    LocalTestEngine,
+    LocalTestOptions,
+    SqlTestExecutionResult,
+    StepResult,
+)
 from sqlbuild.executor.testing.types import SqlTestOutcome
 from sqlbuild.runtime.execution_limits.classes.connection_recovery import ConnectionRecovery
 from sqlbuild.runtime.execution_limits.models import RunItemTimeouts
@@ -77,13 +90,26 @@ def run_test_pipeline(
     run_id: str | None = None,
     max_concurrency: int = 1,
     timeouts: RunItemTimeouts | None = None,
+    local: LocalTestOptions | None = None,
 ) -> tuple[SqlTestExecutionResult, ...]:
-    """Execute all SQL unit tests from a compiled plan."""
+    """Execute all SQL unit tests from a compiled plan, on the warehouse or locally."""
 
     entries: tuple[SqlTestPlanEntry, ...] = plan.test_entries
     if not entries:
         return ()
     resolved_callbacks: TestPipelineCallbacks = callbacks or TestPipelineCallbacks()
+    if local is not None:
+        return _run_local_test_pipeline(
+            plan=plan,
+            adapter=adapter,
+            project_dir=local.project_dir,
+            strict=local.strict,
+            session_parameters=_session_parameters(connection_config),
+            callbacks=resolved_callbacks,
+            run_id=run_id or uuid4().hex,
+            max_concurrency=max_concurrency,
+            timeouts=timeouts or RunItemTimeouts(),
+        )
     worker_count: int = min(max(1, max_concurrency), len(entries))
     if resolved_callbacks.on_connection_start is not None:
         resolved_callbacks.on_connection_start(worker_count)
@@ -316,6 +342,11 @@ def _execute_test_entry(
         if result.outcome != SqlTestOutcome.PASS:
             lifecycle.failed(error_code=result.error_code)
         return result
+
+
+def _session_parameters(connection_config: dict[str, object]) -> dict[str, object] | None:
+    parameters: object = connection_config.get("session_parameters")
+    return cast(dict[str, object], parameters) if isinstance(parameters, dict) else None
 
 
 def _test_resource_name(entry: SqlTestPlanEntry) -> str:
@@ -586,3 +617,89 @@ def _build_missing_function_result(
         error_code=SQL_TEST_EXECUTION_ERROR_CODE,
         error_message=error_message,
     )
+
+
+def _run_local_test_pipeline(
+    *,
+    plan: PlanOutput,
+    adapter: BaseAdapter,
+    project_dir: Path,
+    strict: bool,
+    session_parameters: Mapping[str, object] | None,
+    callbacks: TestPipelineCallbacks,
+    run_id: str,
+    max_concurrency: int,
+    timeouts: RunItemTimeouts,
+) -> tuple[SqlTestExecutionResult, ...]:
+    """Execute every planned test on in-memory DuckDB; no warehouse connection is opened."""
+
+    dialect: str | None = adapter.sql_analysis_dialect()
+    if dialect != SOURCE_DIALECT:
+        raise ExecutorInputError(
+            f"`sqb test --local` converts Snowflake tests; this target's dialect is {dialect}",
+            code=LOCAL_TEST_ENGINE_CODE,
+            help="Run `sqb test` without --local; this target can run its tests directly.",
+        )
+    entries: tuple[SqlTestPlanEntry, ...] = plan.test_entries
+    if callbacks.on_progress is not None:
+        callbacks.on_progress("Finding SQLQuack...")
+    engine: LocalTestEngine = resolve_local_test_engine(
+        project_dir=project_dir, strict=strict, session_parameters=session_parameters
+    )
+    if callbacks.on_progress is not None:
+        callbacks.on_progress(f"Running tests on local DuckDB: {engine.describe()}")
+    worker_count: int = min(max(1, max_concurrency), len(entries))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures: list[Future[SqlTestExecutionResult]] = [
+            cast(
+                Future[SqlTestExecutionResult],
+                executor.submit(
+                    copy_context().run,
+                    _execute_local_entry,
+                    entry=entry,
+                    adapter=adapter,
+                    engine=engine,
+                    callbacks=callbacks,
+                    run_id=run_id,
+                    timeouts=timeouts,
+                ),
+            )
+            for entry in entries
+        ]
+        results: list[SqlTestExecutionResult] = []
+        for future in futures:
+            result: SqlTestExecutionResult = future.result()
+            results.append(result)
+            if callbacks.on_test_complete is not None:
+                callbacks.on_test_complete(result)
+    return tuple(results)
+
+
+def _execute_local_entry(
+    *,
+    entry: SqlTestPlanEntry,
+    adapter: BaseAdapter,
+    engine: LocalTestEngine,
+    callbacks: TestPipelineCallbacks,
+    run_id: str,
+    timeouts: RunItemTimeouts,
+) -> SqlTestExecutionResult:
+    with ResourceAttemptLifecycle(
+        resource_id=sql_test_resource_id(
+            test_name=entry.name,
+            source_path=entry.source_path,
+            block_index=entry.block_index,
+            case_name=entry.case_name,
+        ),
+        resource_kind="test",
+        resource_name=entry.name,
+        run_id=run_id,
+    ) as lifecycle:
+        if callbacks.on_test_start is not None:
+            callbacks.on_test_start(entry)
+        result: SqlTestExecutionResult = execute_local_sql_test(
+            test_entry=entry, adapter=adapter, engine=engine, timeouts=timeouts
+        )
+        if result.outcome != SqlTestOutcome.PASS:
+            lifecycle.failed(error_code=result.error_code)
+        return result

@@ -1754,6 +1754,30 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--local"
+        ],
+        "dest": "test_local",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "run Snowflake tests on an in-memory DuckDB, converted by the sqlquack executable; no warehouse connection",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--strict"
+        ],
+        "dest": "test_strict",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "with --local, refuse tests whose conversion relies on a named assumption",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--json-output"
