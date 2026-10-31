@@ -127,3 +127,18 @@ class BackfillExecutionTestCase(WorkerExecutionTestCase):
     description: str
     window_arguments: tuple[str, ...] = ()
     expected_window: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CalendarRejectionTestCase:
+    description: str
+    expression: str
+    expected_message: str
+    horizon: str = "8s"
+    timezone: str = "UTC"
+
+
+@dataclass(frozen=True)
+class CalendarRefreshTestCase:
+    description: str
+    expected_timezone: str

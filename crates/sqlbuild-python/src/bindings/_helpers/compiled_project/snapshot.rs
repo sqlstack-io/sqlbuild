@@ -15,7 +15,7 @@ use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_re
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode, SnapshotRecord};
 
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
-    AuthoredDeclaration, compile_declarations, discover_declarations,
+    compile_declarations, discover_declarations,
 };
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
@@ -126,13 +126,15 @@ pub(crate) fn build_orchestration_snapshot(
         None => discover_declarations(py, &project_dir)?,
     };
     if !declarations.is_empty() {
-        let declarations = collect_declarations(py, declarations)?;
-        let authored = declarations
-            .iter()
-            .map(|declaration| declaration.extract::<AuthoredDeclaration>())
-            .collect::<PyResult<Vec<AuthoredDeclaration>>>()?;
+        let authored = collect_declarations(py, declarations)?;
         let graph = project.lineage_graph(py)?;
-        input = compile_declarations(input, graph.bind(py).get().graph(), authored)?;
+        input = compile_declarations(
+            py,
+            input,
+            &project_dir,
+            graph.bind(py).get().graph(),
+            authored,
+        )?;
     }
     Ok(NativeOrchestrationSnapshot { input })
 }

@@ -247,3 +247,126 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
         });
     }
 }
+
+#[test]
+fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_survive_and_only_future_times_are_replaced()
+ {
+    use crate::runs::main::list_runs::list_runs;
+    use crate::scheduler::main::list_ticks::list_ticks;
+    use crate::scheduler::tests::contracts::ticks::test_types::TickTransactionTestCase;
+    use serde_json::json;
+
+    for test_case in [
+        TickTransactionTestCase {
+            description: "SQLite retains due calendar ticks",
+            backend: Backend::Sqlite,
+            expected_ticks: 3,
+            expected_runs: 1,
+        },
+        TickTransactionTestCase {
+            description: "PostgreSQL retains due calendar ticks",
+            backend: Backend::Postgres,
+            expected_ticks: 3,
+            expected_runs: 1,
+        },
+    ] {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            publish_snapshot(store, &input)
+                .await
+                .expect("publish pending calendar");
+            input.generation = 2;
+            let future: chrono::DateTime<chrono::Utc> =
+                "2031-01-01T00:00:00Z".parse().expect("future");
+            input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] = json!(
+                (0..10_000)
+                    .map(|seconds| future + chrono::TimeDelta::seconds(seconds))
+                    .collect::<Vec<_>>()
+            );
+            assert!(
+                publish_snapshot(store, &input)
+                    .await
+                    .expect_err("pending ticks cannot be truncated to fit a refreshed horizon")
+                    .to_string()
+                    .contains("let the scheduler drain pending ticks")
+            );
+            input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
+                json!(["2031-01-01T00:00:00Z"]);
+            publish_snapshot(store, &input)
+                .await
+                .expect("refresh while scheduler is offline");
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("refreshed trigger")
+                .remove(0);
+            assert_eq!(
+                serde_json::to_value(&trigger.definition_json.schedule).expect("calendar")["times"],
+                json!([
+                    "2020-01-01T00:00:00Z",
+                    "2020-01-02T00:00:00Z",
+                    "2020-01-03T00:00:00Z",
+                    "2031-01-01T00:00:00Z"
+                ]),
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                trigger.next_due_at,
+                Some("2020-01-01T00:00:00Z".parse().expect("due"))
+            );
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("election")
+                .expect("lease");
+            let plan = evaluate_trigger(store, &lease, trigger.trigger_id)
+                .await
+                .expect("catch up")
+                .expect("trigger");
+            assert_eq!(plan.actions.len(), test_case.expected_ticks);
+            assert_eq!(
+                list_ticks(store, trigger.trigger_id, 100)
+                    .await
+                    .expect("ticks")
+                    .len(),
+                test_case.expected_ticks
+            );
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("coalesced run")
+                    .len(),
+                test_case.expected_runs
+            );
+            input.generation = 3;
+            input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
+                json!(["2032-01-01T00:00:00Z"]);
+            publish_snapshot(store, &input)
+                .await
+                .expect("refresh after catch-up");
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("drained trigger")
+                .remove(0);
+            assert_eq!(
+                serde_json::to_value(&trigger.definition_json.schedule).expect("calendar")["times"],
+                json!(["2032-01-01T00:00:00Z"])
+            );
+            assert_eq!(
+                list_ticks(store, trigger.trigger_id, 100)
+                    .await
+                    .expect("immutable tick history")
+                    .len(),
+                test_case.expected_ticks
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}

@@ -142,6 +142,7 @@ pub(crate) struct EditableTriggerState {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct PreviousTriggerState {
+    pub(crate) definition_json: TriggerDefinition,
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
     pub(crate) status_override: Option<TriggerStatus>,

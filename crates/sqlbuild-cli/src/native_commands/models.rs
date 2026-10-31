@@ -152,14 +152,18 @@ pub(crate) struct LocationWatch {
     pub(crate) retry_at: Option<tokio::time::Instant>,
 }
 
+/// Private interpreter response: publication metadata and its earliest calendar refresh deadline.
+pub(crate) type LocationPublication = (
+    sqlbuild_orchestration::snapshots::models::SnapshotRecord,
+    Option<DateTime<Utc>>,
+);
+
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
 #[derive(Debug)]
 pub(crate) struct LocationCompileRequest {
     pub(crate) generation: i64,
     pub(crate) python_sources: Vec<PathStamp>,
-    pub(crate) reply: tokio::sync::oneshot::Sender<
-        Result<Option<sqlbuild_orchestration::snapshots::models::SnapshotRecord>, String>,
-    >,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<Option<LocationPublication>, String>>,
 }
 
 /// Only this task owns the isolated interpreter and its private stdio protocol.
