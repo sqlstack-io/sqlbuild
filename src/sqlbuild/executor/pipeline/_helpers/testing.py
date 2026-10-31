@@ -46,6 +46,7 @@ from sqlbuild.executor.pipeline.models import TemporaryTestFunctions, TestPipeli
 from sqlbuild.executor.scheduling.classes.recovering_connection_pool import RecoveringConnectionPool
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.executor.testing.constants import (
+    LOCAL_PLAN_ACTION,
     LOCAL_TEST_ENGINE_CODE,
     SOURCE_DIALECT,
     SQL_TEST_EXECUTION_ERROR_CODE,
@@ -104,7 +105,7 @@ def run_test_pipeline(
             adapter=adapter,
             project_dir=local.project_dir,
             strict=local.strict,
-            session_parameters=_session_parameters(connection_config),
+            connection_config=connection_config,
             callbacks=resolved_callbacks,
             run_id=run_id or uuid4().hex,
             max_concurrency=max_concurrency,
@@ -342,11 +343,6 @@ def _execute_test_entry(
         if result.outcome != SqlTestOutcome.PASS:
             lifecycle.failed(error_code=result.error_code)
         return result
-
-
-def _session_parameters(connection_config: dict[str, object]) -> dict[str, object] | None:
-    parameters: object = connection_config.get("session_parameters")
-    return cast(dict[str, object], parameters) if isinstance(parameters, dict) else None
 
 
 def _test_resource_name(entry: SqlTestPlanEntry) -> str:
@@ -625,7 +621,7 @@ def _run_local_test_pipeline(
     adapter: BaseAdapter,
     project_dir: Path,
     strict: bool,
-    session_parameters: Mapping[str, object] | None,
+    connection_config: Mapping[str, object],
     callbacks: TestPipelineCallbacks,
     run_id: str,
     max_concurrency: int,
@@ -644,7 +640,7 @@ def _run_local_test_pipeline(
     if callbacks.on_progress is not None:
         callbacks.on_progress("Finding SQLQuack...")
     engine: LocalTestEngine = resolve_local_test_engine(
-        project_dir=project_dir, strict=strict, session_parameters=session_parameters
+        project_dir=project_dir, strict=strict, connection_config=connection_config
     )
     if callbacks.on_progress is not None:
         callbacks.on_progress(f"Running tests on local DuckDB: {engine.describe()}")
@@ -694,6 +690,7 @@ def _execute_local_entry(
         resource_kind="test",
         resource_name=entry.name,
         run_id=run_id,
+        plan_action=LOCAL_PLAN_ACTION,
     ) as lifecycle:
         if callbacks.on_test_start is not None:
             callbacks.on_test_start(entry)

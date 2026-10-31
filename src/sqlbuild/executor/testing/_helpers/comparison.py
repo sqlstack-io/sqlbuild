@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any
 
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_sql
@@ -13,6 +14,7 @@ from sqlbuild.diagnostics.classes.diagnostic_record_redactor import DiagnosticRe
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 from sqlbuild.executor.testing._helpers.difference_samples import add_difference_samples
 from sqlbuild.executor.testing.classes.sql_test_actual_outputs import SqlTestActualOutputs
+from sqlbuild.executor.testing.constants import LOCAL_COMPARISON_COLUMNS
 from sqlbuild.executor.testing.models import StepResult
 from sqlbuild.executor.testing.types import SqlTestOutcome
 
@@ -136,3 +138,40 @@ def build_step_results(rows: list[Any]) -> list[StepResult]:
             )
         )
     return step_results
+
+
+def plan_row_mismatch(*, rows: tuple[Any, ...], test_entry: SqlTestPlanEntry) -> str | None:
+    """Why comparison rows do not match the test's rendered plan, or `None` when they do."""
+
+    expected: list[tuple[int, str]] = [
+        (index, step.model_name)
+        for index, step in enumerate(test_entry.chain)
+        if step.expected_cte_sql is not None
+    ]
+    expected.extend(
+        (len(test_entry.chain) + index, f"assertion {assertion.name}")
+        for index, assertion in enumerate(test_entry.assertions)
+    )
+    if not all(_comparison_row(row) for row in rows):
+        return f"a comparison row is not {LOCAL_COMPARISON_COLUMNS} counted columns"
+    actual: list[tuple[int, str]] = sorted((int(row[0]), row[1]) for row in rows)
+    if actual != expected:
+        return f"the comparison returned steps {actual}, but the plan has steps {expected}"
+    return None
+
+
+def _comparison_row(row: Any) -> bool:
+    if not isinstance(row, tuple) or len(row) != LOCAL_COMPARISON_COLUMNS:
+        return False
+    counts: tuple[Any, ...] = (row[0], *row[2:])
+    return isinstance(row[1], str) and all(_count(value) for value in counts)
+
+
+def _count(value: Any) -> bool:
+    """A whole non-negative number, as an integer or a NUMBER(38, 0) decimal."""
+
+    if isinstance(value, bool) or not isinstance(value, int | Decimal):
+        return False
+    if isinstance(value, Decimal) and not value.is_finite():
+        return False
+    return value >= 0 and value == int(value)

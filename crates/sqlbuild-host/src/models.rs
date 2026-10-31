@@ -669,6 +669,7 @@ pub struct SqlTestExecutionResult<V> {
     pub real_model_count: Option<i64>,
     pub timeout: Option<ItemTimeoutReport>,
     pub assumptions: Vec<String>,
+    pub local_sql: Option<String>,
 }
 
 /// Everything one build executed, as the executor returns it. Mirrors `sqlbuild.executor.build.models.BuildExecutionResult`; `V` is a host value.

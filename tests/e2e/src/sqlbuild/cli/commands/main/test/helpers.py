@@ -2520,13 +2520,33 @@ elif "ZONED_AT" in sql and "--strict" in arguments:
     ]
 elif "ZONED_AT" in sql:
     report["assumptions"] = ["session_timezone_utc"]
+mode = Path(__file__).with_name("mode").read_text(encoding="utf-8").strip()
+exit_code = 0 if report["converted"] else 1
+if mode == "empty":
+    report["sql"] = "SELECT 0, 'customer_orders', 0, 0, 0, 0 WHERE FALSE"
+elif mode == "short":
+    report["sql"] = "SELECT 0, 'customer_orders', 2, 2"
+elif mode == "fractional":
+    report["sql"] = "SELECT 0, 'customer_orders', 2.5, 2, 0, 0"
+elif mode == "wrong_step":
+    report["sql"] = "SELECT 7, 'customer_orders', 2, 2, 0, 0"
+elif mode == "nonzero_exit":
+    exit_code = 3
+elif mode == "string_false":
+    report["converted"] = "false"
+elif mode == "refusals_with_converted":
+    report["refusals"] = [{"construct": "fn:ANY", "category": "missing rule", "reason": "stand-in"}]
+elif mode == "assumes_anyway":
+    report["assumptions"] = ["session_timezone_utc"]
+elif mode == "invalid_json":
+    report = "not a report"
 print(json.dumps(report))
-sys.exit(0 if report["converted"] else 1)
+sys.exit(exit_code)
 """
 
 
-def write_fake_sqlquack(*, directory: Path, version: str) -> Path:
-    """A stand-in `sqlquack`: passes SQL through, refuses or guards by marker, logs conversions."""
+def write_fake_sqlquack(*, directory: Path, version: str, mode: str = "faithful") -> Path:
+    """A stand-in `sqlquack` logging conversions; a `mode` other than faithful reports badly."""
 
     directory.mkdir(parents=True, exist_ok=True)
     executable: Path = directory / "sqlquack"
@@ -2534,6 +2554,7 @@ def write_fake_sqlquack(*, directory: Path, version: str) -> Path:
         f"#!{sys.executable}\n" + _FAKE_SQLQUACK.replace("VERSION", version), encoding="utf-8"
     )
     executable.chmod(0o755)
+    (directory / "mode").write_text(mode, encoding="utf-8")
     (directory / "calls.jsonl").write_text("", encoding="utf-8")
     return executable
 
@@ -2545,13 +2566,13 @@ def read_fake_sqlquack_conversions(*, directory: Path) -> tuple[tuple[str, ...],
     return tuple(tuple(json.loads(line)) for line in lines)
 
 
-_LOCAL_PROJECT: str = (
-    'name = "duckshop_local"\nadapter = "snowflake"\n\n'
+_LOCAL_PROJECT_NAME: str = 'name = "duckshop_local"\nadapter = "snowflake"\n\n'
+_LOCAL_CONNECTION: str = (
     "[connection]\n"
     'account = "example-no-login.invalid"\nuser = "NO_LOGIN"\npassword = "not-a-credential"\n'
-    "session_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n\n"
-    '[defaults]\ndatabase = "ANALYTICS"\nschema = "PUBLIC"\n'
+    "session_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n"
 )
+_LOCAL_DEFAULTS: str = '\n[defaults]\ndatabase = "ANALYTICS"\nschema = "PUBLIC"\n'
 _LOCAL_ORDERS: str = (
     "__source__raw_orders AS (\n"
     "  SELECT 1 AS order_id, 10 AS customer_id, 'completed' AS status\n"
@@ -2590,12 +2611,12 @@ def _local_test(*, name: str, orders: str, model: str, expected: str) -> str:
     )
 
 
-def build_local_engine_project_files() -> dict[str, str]:
+def build_local_engine_project_files(*, connection: str) -> dict[str, str]:
     """A Snowflake DuckShop project whose tests pass, fail, refuse, guard and assume."""
 
     orders: str = _LOCAL_ORDERS
     return {
-        "sqlbuild_project.toml": _LOCAL_PROJECT,
+        "sqlbuild_project.toml": _LOCAL_PROJECT_NAME + connection + _LOCAL_DEFAULTS,
         "sqlquack.toml": "schema_version = 1\n",
         "sources/raw_orders.yml": _local_source(
             columns=(("order_id", "INTEGER"), ("customer_id", "INTEGER"), ("status", "VARCHAR"))
@@ -2668,7 +2689,7 @@ def build_real_local_engine_project_files(*, policy: str) -> dict[str, str]:
 
     orders: str = _REAL_LOCAL_ORDERS
     return {
-        "sqlbuild_project.toml": _LOCAL_PROJECT,
+        "sqlbuild_project.toml": (_LOCAL_PROJECT_NAME + _LOCAL_CONNECTION + _LOCAL_DEFAULTS),
         "sqlquack.toml": policy,
         "sources/raw_orders.yml": _local_source(
             columns=(

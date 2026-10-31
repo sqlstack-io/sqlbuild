@@ -28,8 +28,6 @@ Positional `SELECTOR` arguments work like `--select`, and both forms can be comb
 | `--test-timeout <duration>` | Time limit for each test in this run, such as `30s` or `2m`, or `disabled`; overrides `TEST(timeout ...)`, the target and `[settings] test_timeout` |
 | `--since <ref>` | Run only the tests affected by changes since the merge base of `<ref>` and `HEAD` (see [Run only affected tests](#run-only-affected-tests)); `@base` reads `[git] base_ref` |
 | `--explain` | With `--since`, print why each selected test was selected |
-| `--local` | Run Snowflake tests on an in-memory DuckDB, converted by the `sqlquack` executable, without connecting to the warehouse (see [Run tests locally](#run-tests-locally)) |
-| `--strict` | With `--local`, refuse tests whose conversion relies on a named assumption |
 
 Test names are globally unique, so a bare test name selects exactly that test. `test:<name>` is the
 explicit form and accepts the same glob patterns as names, such as `test:orders_*`. A bare pattern
@@ -53,33 +51,6 @@ counted under `TIMEOUT=` and excluded from `FAIL=` in the summary line
 (`PASS=4  FAIL=0  TIMEOUT=1  TOTAL=5`), and the run continues with the remaining tests. In `--json`
 output, `summary.fail_count` still includes timed-out tests, and `summary.timeout_count` reports how
 many of them timed out. A timeout still fails the run: `sqb test` exits non-zero.
-
-## Run tests locally
-
-`sqb test --local` runs a Snowflake project's unit tests without a warehouse connection. Each
-test's comparison statement is converted to DuckDB SQL by the
-SQLQuack converter and run on its own in-memory DuckDB
-in UTC; the pass and fail rule is the same as on the warehouse.
-
-- **Converter.** `sqb` runs the `sqlquack` executable named by `SQLBUILD_SQLQUACK`, else the one on
-  `PATH`, and refuses one older than 0.2.0 (`T007`). The project's `sqlquack.toml`, when present,
-  is the policy the conversion may rely on; without it, every known divergence is refused.
-- **Session.** The connection's `session_parameters` are passed to the converter, which refuses
-  statements whose result would depend on a parameter it has not been proven under.
-- **Refusals.** A test SQLQuack cannot convert with proof is reported as `REFUSED` (`T006`) with
-  each refused construct and the reason, counted under `REFUSED=`, and never passes. So is a test
-  whose converted statement stops at one of SQLQuack's run-time guards, which raise when a value
-  could behave differently on DuckDB. `REFUSED` fails the run like `FAIL`; in `--json` output,
-  `summary.refused_count` counts these tests.
-- **Assumptions.** A conversion may rely on a named assumption, such as `session_timezone_utc`
-  (the warehouse session runs in UTC). The summary lists each assumption with the number of tests
-  relying on it, and each test check in `--json` output lists its `assumptions`. `--strict` refuses
-  those tests instead.
-
-```bash
-sqb test --local
-sqb test --local --strict stg_orders
-```
 
 ## Run only affected tests
 

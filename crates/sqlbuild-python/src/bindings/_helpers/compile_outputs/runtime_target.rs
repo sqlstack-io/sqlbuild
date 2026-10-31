@@ -1,6 +1,6 @@
 //! SQL test artifact paths, and the executed SQL and Python check results written to `target/run`.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use pyo3::prelude::{
@@ -25,6 +25,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 
 const RUN_DIR: &str = "run";
 const TESTS_DIR: &str = "tests";
+const LOCAL_SQL_HEADER: &str = "-- the DuckDB statement SQLQuack converted this test to";
 const CHECKS_DIR: &str = "checks";
 const PYTHON_CHECKS_FILE: &str = "python_checks.json";
 const PYTHON_CHECK_KIND: &str = "python_check";
@@ -179,9 +180,9 @@ pub(crate) fn write_test_runtime_target(
     plan: &Bound<'_, PyAny>,
     results: &[SqlTestExecutionResult<Bound<'_, PyAny>>],
 ) -> PyResult<()> {
-    let mut executed: HashSet<TestKey> = HashSet::new();
+    let mut executed: HashMap<TestKey, Option<&str>> = HashMap::new();
     for result in results {
-        executed.insert(TestKey {
+        let key = TestKey {
             name: result.test_name.clone(),
             source_path: result.source_path.as_ref().map(|path| {
                 path.to_string_lossy()
@@ -189,15 +190,19 @@ pub(crate) fn write_test_runtime_target(
             }),
             block_index: result.block_index,
             case_name: result.case_name.clone(),
-        });
+        };
+        executed.insert(key, result.local_sql.as_deref());
     }
     let tests_dir: Bound<'_, PyAny> = target_dir.div(RUN_DIR)?.div(TESTS_DIR)?;
     for entry in native_field(plan, "test_entries")?.try_iter()? {
         let entry: Bound<'_, PyAny> = entry?;
-        if !executed.contains(&test_key(&entry, "name")?) {
+        let Some(local_sql) = executed.get(&test_key(&entry, "name")?) else {
             continue;
-        }
-        let sql: String = single_comparison_sql(&entry, adapter)?;
+        };
+        let sql: String = match local_sql {
+            Some(local_sql) => format!("{LOCAL_SQL_HEADER}\n{local_sql}"),
+            None => single_comparison_sql(&entry, adapter)?,
+        };
         write_text(
             &tests_dir.div(planned_sql_test_path(&entry)?)?,
             &format!("{}\n", sql.trim_end_matches(python_isspace)),

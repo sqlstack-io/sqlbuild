@@ -640,6 +640,7 @@ fn complete(
             error_message: result.error_message.clone(),
             error_code: result.error_code.clone(),
             error_help: result.error_help.clone(),
+            refused: result.outcome == SqlTestOutcome::Refused,
         });
     }
     let passed: usize = results.len() - failures.len();
@@ -649,6 +650,7 @@ fn complete(
     };
     let assumptions: Vec<Vec<String>> = results
         .iter()
+        .filter(|result| result.outcome != SqlTestOutcome::Refused)
         .map(|result| result.assumptions.clone())
         .collect();
     stream.call_method1(
@@ -691,7 +693,7 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::TestInvocation)?,
-        !inspect_only,
+        !inspect_only && !local,
     )?;
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let project_dir: Bound<'_, PyAny> = native_field(&invocation, "effective_project_dir")?;

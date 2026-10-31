@@ -68,6 +68,8 @@ class SqlTestExecutionResult:
     timeout: ItemTimeoutReport | None = None
     assumptions: tuple[str, ...] = field(default_factory=tuple)
     """Named assumptions a local conversion relied on; empty on the warehouse."""
+    local_sql: str | None = None
+    """The DuckDB statement a local test ran; `None` on the warehouse."""
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,8 @@ class LocalTestEngine:
     policy: Path | None
     strict: bool
     session_parameters: tuple[tuple[str, str], ...] = ()
+    session_refusal: str | None = None
+    """Why the caller's session cannot be told to SQLQuack, refusing every test."""
 
     def describe(self) -> str:
         """One line naming the converter, its policy and mode."""

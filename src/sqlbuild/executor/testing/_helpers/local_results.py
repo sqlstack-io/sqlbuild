@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import time
+
 from sqlbuild._native import SqlTestPlanEntry
+from sqlbuild.executor.testing._helpers.timeout_result import timed_out_result
 from sqlbuild.executor.testing.constants import REFUSAL_DISPLAY_LIMIT
 from sqlbuild.executor.testing.models import SqlQuackConversion, SqlTestExecutionResult, StepResult
 from sqlbuild.executor.testing.types import SqlTestOutcome
+from sqlbuild.runtime.execution_limits.models import ItemTimeoutPolicy, ItemTimeoutReport
+from sqlbuild.runtime.execution_limits.types import CancellationOutcome, ItemKind
 
 
 def refused_message(*, test_entry: SqlTestPlanEntry, conversion: SqlQuackConversion) -> str:
@@ -29,6 +34,7 @@ def single_step_result(
     error_code: str,
     error_message: str,
     assumptions: tuple[str, ...] = (),
+    local_sql: str | None = None,
 ) -> SqlTestExecutionResult:
     """A result whose only step carries the outcome and its error."""
 
@@ -59,4 +65,36 @@ def single_step_result(
         error_message=error_message,
         real_model_count=test_entry.real_model_count,
         assumptions=assumptions,
+        local_sql=local_sql,
+    )
+
+
+def remaining_seconds(
+    *, policy: ItemTimeoutPolicy | None, started: float, cap: float | None
+) -> float | None:
+    """What is left of the test's time limit, capped at `cap`; `None` when neither limits it."""
+
+    limits: list[float] = [] if cap is None else [cap]
+    if policy is not None:
+        limits.append(max(0.0, policy.seconds - (time.monotonic() - started)))
+    return min(limits) if limits else None
+
+
+def local_timed_out_result(
+    *, test_entry: SqlTestPlanEntry, policy: ItemTimeoutPolicy, started: float
+) -> SqlTestExecutionResult:
+    """The test's TIMEOUT result after its limit ran out locally."""
+
+    return timed_out_result(
+        test_entry=test_entry,
+        report=ItemTimeoutReport(
+            kind=ItemKind.TEST,
+            name=test_entry.name,
+            limit=policy.limit,
+            source=policy.source,
+            elapsed_seconds=time.monotonic() - started,
+            query_ids=(),
+            cancellation=CancellationOutcome.CONFIRMED,
+            cancellation_detail=None,
+        ),
     )

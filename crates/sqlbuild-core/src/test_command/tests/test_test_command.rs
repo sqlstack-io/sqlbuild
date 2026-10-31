@@ -181,6 +181,7 @@ fn given_results_when_completing_then_renders_summary_failures_and_exit_code() {
                 error_message: Some("first\nsecond".to_owned()),
                 error_code: Some("T003".to_owned()),
                 error_help: Some("fix it".to_owned()),
+                refused: false,
             }],
             expected_text: "\nPASS=0  FAIL=1  TOTAL=1\n\nFailures:\n\n  orders_assert\n    error     [T003] first\n              second\n                = help: fix it\n",
             expected_exit_code: 1,
@@ -202,10 +203,33 @@ fn given_results_when_completing_then_renders_summary_failures_and_exit_code() {
             failures: vec![TestFailure {
                 label: "orders_local".to_owned(),
                 error_message: Some("refused".to_owned()),
-                error_code: Some("T006".to_owned()),
+                error_code: Some("T009".to_owned()),
                 error_help: None,
+                refused: true,
             }],
-            expected_text: "\nPASS=1  FAIL=0  REFUSED=1  TOTAL=2\n\nFailures:\n\n  orders_local\n    error     [T006] refused\n",
+            expected_text: "\nPASS=1  FAIL=0  REFUSED=1  TOTAL=2\n\nFailures:\n\n  orders_local\n    error     [T009] refused\n",
+            expected_exit_code: 1,
+        },
+        CompletionTestCase {
+            description: "a refusal is counted by its outcome, not by its error code",
+            counts: (0, 2),
+            failures: vec![
+                TestFailure {
+                    label: "orders_guard".to_owned(),
+                    error_message: Some("guard".to_owned()),
+                    error_code: Some("C417".to_owned()),
+                    error_help: None,
+                    refused: true,
+                },
+                TestFailure {
+                    label: "orders_wrong".to_owned(),
+                    error_message: Some("wrong".to_owned()),
+                    error_code: Some("T009".to_owned()),
+                    error_help: None,
+                    refused: false,
+                },
+            ],
+            expected_text: "\nPASS=0  FAIL=1  REFUSED=1  TOTAL=2\n\nFailures:\n\n  orders_guard\n    error     [C417] guard\n\n  orders_wrong\n    error     [T009] wrong\n",
             expected_exit_code: 1,
         },
     ];

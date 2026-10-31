@@ -627,8 +627,16 @@ class LocalEngineE2ETestCase:
     unexpected_stdout_fragments: tuple[str, ...] = field(default_factory=tuple)
     converter_version: str = "0.2.0"
     converter_name: str = "sqlquack"
+    converter_mode: str = "faithful"
+    connection: str = (
+        "[connection]\n"
+        'account = "example-no-login.invalid"\nuser = "NO_LOGIN"\npassword = "not-a-credential"\n'
+        "session_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n"
+    )
     expected_conversion_count: int = 0
     expected_converter_arguments: tuple[str, ...] = field(default_factory=tuple)
+    expected_run_files: tuple[str, ...] = field(default_factory=tuple)
+    """Globs under the project each matching a written local statement."""
 
 
 @dataclass(frozen=True)

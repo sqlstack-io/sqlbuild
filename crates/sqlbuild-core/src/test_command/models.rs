@@ -39,4 +39,6 @@ pub struct TestFailure {
     pub error_message: Option<String>,
     pub error_code: Option<String>,
     pub error_help: Option<String>,
+    /// Whether the test was refused (counted under REFUSED), whatever its code.
+    pub refused: bool,
 }

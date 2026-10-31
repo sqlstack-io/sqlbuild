@@ -10,7 +10,7 @@ from sqlbuild.executor.testing.constants import LOCAL_DUCKDB_CONNECTION
 from sqlbuild.executor.testing.models import LocalStatementRun
 
 
-def run_converted_statement(*, sql: str, timeout_seconds: int | None) -> LocalStatementRun:
+def run_converted_statement(*, sql: str, timeout_seconds: float | None) -> LocalStatementRun:
     """The statement's rows, or the error DuckDB raised; interrupted after `timeout_seconds`."""
 
     adapter: DuckDbAdapter = DuckDbAdapter()
