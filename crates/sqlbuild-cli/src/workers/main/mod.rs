@@ -1,1 +1,1 @@
-pub(crate) mod open_local_workers;
+pub(crate) mod open_workers;

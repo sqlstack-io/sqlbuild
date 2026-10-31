@@ -48,8 +48,8 @@ use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
     LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
-use crate::workers::main::open_local_workers::open_local_workers;
-use crate::workers::models::LocalWorkers;
+use crate::workers::main::open_workers::open_workers;
+use crate::workers::models::Workers;
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
@@ -314,8 +314,8 @@ pub(crate) async fn open_control_store(
 }
 
 /// Decode privileged CLI configuration before handing process ownership to the workers domain.
-pub(crate) fn open_control_workers(namespace: &Namespace) -> Result<LocalWorkers, ControlError> {
-    open_local_workers(
+pub(crate) fn open_control_workers(namespace: &Namespace) -> Result<Workers, ControlError> {
+    open_workers(
         text(namespace, "control_launchers").as_deref(),
         text(namespace, "control_database_env")
             .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into()),

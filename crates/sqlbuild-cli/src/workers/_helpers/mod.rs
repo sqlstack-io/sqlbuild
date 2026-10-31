@@ -1,3 +1,7 @@
+mod child;
 pub(super) mod configuration;
-mod local;
+mod docker;
+mod invocation;
+mod recovery;
 mod shutdown;
+mod supervisor;

@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
+use sqlbuild_orchestration::runs::main::list_run_claims::list_run_claims;
 use sqlbuild_orchestration::runs::main::list_runs::list_runs;
 use sqlbuild_orchestration::runs::models::RunStatus;
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
@@ -87,6 +88,31 @@ fn given_higher_priority_work_for_other_scopes_when_a_local_launcher_claims_then
                 "{}",
                 test_case.description
             );
+            assert_eq!(
+                list_run_claims(store, (location, "development"), None)
+                    .await
+                    .expect("recover queued claim"),
+                vec![claim.clone()],
+                "recovery includes a committed claim before launch"
+            );
+            assert!(
+                list_run_claims(store, (location, "development"), Some(claim.request.run_id))
+                    .await
+                    .expect("page after claimed run")
+                    .is_empty()
+            );
+            assert!(
+                list_run_claims(store, (other, "development"), None)
+                    .await
+                    .expect("unclaimed neighboring location")
+                    .is_empty()
+            );
+            assert!(
+                list_run_claims(store, (location, "secondary"), None)
+                    .await
+                    .expect("unclaimed neighboring target")
+                    .is_empty()
+            );
             assert!(
                 claim_next_run(
                     store,
@@ -99,6 +125,12 @@ fn given_higher_priority_work_for_other_scopes_when_a_local_launcher_claims_then
                 .is_none()
             );
             finish(store, &lease, &claim).await;
+            assert!(
+                list_run_claims(store, (location, "development"), None)
+                    .await
+                    .expect("terminal claims are not recoverable")
+                    .is_empty()
+            );
             let next = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("unrestricted claim")

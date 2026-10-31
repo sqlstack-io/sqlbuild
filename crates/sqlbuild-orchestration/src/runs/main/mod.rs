@@ -2,6 +2,7 @@ pub mod change_run;
 pub mod claim_next_run;
 pub mod heartbeat_run;
 pub(crate) mod job_write_set;
+pub mod list_run_claims;
 pub mod list_run_nodes;
 pub mod list_runs;
 pub mod monitor_runs;
