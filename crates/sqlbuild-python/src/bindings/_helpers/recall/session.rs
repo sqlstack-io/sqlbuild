@@ -36,6 +36,7 @@ use sqlbuild_recall::writer::models::{
     DeliverySummary, RecallSession, SessionConfig, SessionStore, SetupOutcome,
 };
 
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::recall::clickhouse_store::{
@@ -56,6 +57,8 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 /// What the invocation records: its session, when enabled, and the resolved target and adapter.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct InvocationRecall {
+    /// The verified worker remains owned until Recall has drained and its claim can be released.
+    pub(crate) worker: Arc<Mutex<Option<Arc<WorkerBuild>>>>,
     pub(crate) session: Option<Arc<RecallSession>>,
     pub(crate) target: Option<String>,
     pub(crate) adapter: Option<String>,
@@ -409,35 +412,38 @@ fn quarantined_notice(path: &Path) -> Option<String> {
 fn started_session(
     py: Python<'_>,
     (args, identity, facts): (&Bound<'_, PyAny>, &Bound<'_, PyAny>, &CommandFacts),
-    (settings, project_dir): (&RecallSettings, &Path),
+    (settings, project_dir, hosted): (&RecallSettings, &Path, Option<SessionStore>),
 ) -> PyResult<Option<Arc<RecallSession>>> {
-    let store: SessionStore = match &settings.store {
-        StoreLocation::Sqlite { path } => {
-            notify(py, quarantined_notice(path));
-            if let Some(reason) = store_location_problem(path) {
-                notify(py, permission_notice((settings, project_dir), &reason));
+    let store: SessionStore = match hosted {
+        Some(store) => store,
+        None => match &settings.store {
+            StoreLocation::Sqlite { path } => {
+                notify(py, quarantined_notice(path));
+                if let Some(reason) = store_location_problem(path) {
+                    notify(py, permission_notice((settings, project_dir), &reason));
+                    return Ok(None);
+                }
+                SessionStore::Sqlite(path.clone())
+            }
+            StoreLocation::ClickHouse {
+                config, database, ..
+            } => SessionStore::Hosted(Arc::new(ClickHouseStoreOpener {
+                location: ClickHouseLocation::new(config, database, settings.retention_days),
+                retention_notice: notice_due,
+                project_dir: project_dir.to_path_buf(),
+                information: Mutex::default(),
+            })),
+            StoreLocation::Unsupported {
+                connection,
+                adapter,
+            } => {
+                notify(
+                    py,
+                    unsupported_notice((settings, project_dir), (connection, adapter)),
+                );
                 return Ok(None);
             }
-            SessionStore::Sqlite(path.clone())
-        }
-        StoreLocation::ClickHouse {
-            config, database, ..
-        } => SessionStore::Hosted(Arc::new(ClickHouseStoreOpener {
-            location: ClickHouseLocation::new(config, database, settings.retention_days),
-            retention_notice: notice_due,
-            project_dir: project_dir.to_path_buf(),
-            information: Mutex::default(),
-        })),
-        StoreLocation::Unsupported {
-            connection,
-            adapter,
-        } => {
-            notify(
-                py,
-                unsupported_notice((settings, project_dir), (connection, adapter)),
-            );
-            return Ok(None);
-        }
+        },
     };
     let Some(invocation_id) = text_value(&native_field(identity, "invocation_id")?)? else {
         return Ok(None);
@@ -462,11 +468,42 @@ fn started_session(
         max_output_bytes: settings.max_output_bytes,
         heartbeat_interval: heartbeat_interval(),
         setup_budget: Duration::ZERO,
-        maintenance: true,
+        maintenance: !worker_invocation(args, facts)?,
         defer_context: true,
         audit_evidence: settings.audit_evidence,
     });
     Ok(Some(Arc::new(session)))
+}
+
+fn worker_invocation(args: &Bound<'_, PyAny>, facts: &CommandFacts) -> PyResult<bool> {
+    Ok(facts.command.as_deref() == Some("location")
+        && attribute(args, "location_command")?
+            .extract::<Option<String>>()?
+            .as_deref()
+            == Some("execute"))
+}
+
+fn worker_store(args: &Bound<'_, PyAny>) -> PyResult<SessionStore> {
+    let identity = (
+        attribute(args, "location_run_id")?
+            .extract::<String>()?
+            .parse()
+            .map_err(|_| PyValueError::new_err("run ID must be a UUID"))?,
+        attribute(args, "location_claim_id")?
+            .extract::<String>()?
+            .parse()
+            .map_err(|_| PyValueError::new_err("claim ID must be a UUID"))?,
+    );
+    let bearer = std::env::var("SQLBUILD_RUN_TOKEN")
+        .map_err(|_| PyValueError::new_err("execute requires SQLBUILD_RUN_TOKEN"))?;
+    let url = attribute(args, "location_server_url")?.extract::<String>()?;
+    args.py().detach(|| {
+        sqlbuild_orchestration::worker::main::connect_worker::connect_worker(
+            &url, &bearer, identity,
+        )
+        .map(|client| client.recall_store())
+        .map_err(|error| PyValueError::new_err(error.to_string()))
+    })
 }
 
 /// Begin recording when Recall is enabled, without waiting on the store. Only the write connection is resolved; a write connection without a read connection is kept for the command to fail with, and other unresolvable settings record nothing.
@@ -482,7 +519,7 @@ pub(crate) fn start_invocation_recall(
         selected_target: text_value(&args.getattr("target")?)?,
         purpose: StorePurpose::Record,
     };
-    let settings: RecallSettings = match resolve_recall_settings(&request) {
+    let mut settings: RecallSettings = match resolve_recall_settings(&request) {
         Ok(settings) => settings,
         Err(error) if error.invalid_configuration => {
             return Ok(InvocationRecall {
@@ -492,14 +529,25 @@ pub(crate) fn start_invocation_recall(
         }
         Err(_unreachable_store) => return Ok(InvocationRecall::default()),
     };
+    let hosted = if worker_invocation(args, facts)? {
+        settings.enabled = true;
+        Some(worker_store(args)?)
+    } else {
+        None
+    };
     let session: Option<Arc<RecallSession>> = if settings.enabled && settings.project_name.is_some()
     {
-        started_session(py, (args, identity, facts), (&settings, &project_dir))?
+        started_session(
+            py,
+            (args, identity, facts),
+            (&settings, &project_dir, hosted),
+        )?
     } else {
         None
     };
     let audit_evidence: AuditEvidence = settings.audit_evidence;
     Ok(InvocationRecall {
+        worker: Arc::default(),
         session,
         target: settings.target.clone(),
         adapter: settings.project_adapter.clone(),

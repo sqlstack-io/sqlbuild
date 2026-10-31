@@ -23,12 +23,13 @@ use crate::bindings::_helpers::init_command::command::run_init_command;
 use crate::bindings::_helpers::janitor::janitor_command::run_janitor_command;
 use crate::bindings::_helpers::lineage::lineage_command::run_lineage_command;
 use crate::bindings::_helpers::load::load_command::run_load_command;
-use crate::bindings::_helpers::location_command::command::run_location_command;
+use crate::bindings::_helpers::location_command::command::run_location;
 use crate::bindings::_helpers::plan_command::plan::run_plan_command;
 use crate::bindings::_helpers::plan_command::rules::run_rules_command;
 use crate::bindings::_helpers::query_command::dag::run_dag_command;
 use crate::bindings::_helpers::query_command::query::run_query_command;
 use crate::bindings::_helpers::recall::command::run_recall_command;
+use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::refactor::refactor_command::run_refactor_command;
 use crate::bindings::_helpers::review_command::command::run_review_command;
@@ -313,6 +314,7 @@ fn call_route<'py>(
     invocation: &Invocation<'py>,
     route: &Route,
     handler: Option<Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = invocation.py();
     let mut positional: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -340,7 +342,7 @@ fn call_route<'py>(
     }
     match handler {
         Some(handler) => handler.call(PyTuple::new(py, positional)?, Some(&keywords)),
-        None => run_implementation(route.implementation, (positional, keywords)),
+        None => run_implementation(route.implementation, (positional, keywords), recall),
     }
 }
 
@@ -359,6 +361,7 @@ fn argument<'py>(
 fn run_implementation<'py>(
     name: &str,
     arguments: (Vec<Bound<'py, PyAny>>, Bound<'py, PyDict>),
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = arguments.1.py();
     let request = || -> PyResult<Bound<'py, PyAny>> {
@@ -388,7 +391,7 @@ fn run_implementation<'py>(
         "run_janitor_command" => run_janitor_command(py, &request()?)?,
         "run_lineage_command" => run_lineage_command(py, &request()?)?,
         "run_load_command" => run_load_command(py, &request()?)?,
-        "run_location_command" => run_location_command(py, options())?,
+        "run_location_command" => run_location(py, options(), Some(recall))?,
         "run_plan_command" => run_plan_command(&request()?)?,
         "run_playground_command" => run_playground_command(py, &request()?)?,
         "run_query_command" => run_query_command(py, options())?,
@@ -419,6 +422,7 @@ fn run_implementation<'py>(
 fn routed_command<'py>(
     args: &Bound<'py, PyAny>,
     handlers: Option<&Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let raw_project_dir: Bound<'py, PyAny> = native_field(args, "project_dir")?;
@@ -458,7 +462,7 @@ fn routed_command<'py>(
             if let Some(failure) = failure {
                 return Err(user_error(py, failure));
             }
-            call_route(&invocation, route, handler)
+            call_route(&invocation, route, handler, recall)
         }
     }
 }
@@ -467,6 +471,7 @@ fn routed_command<'py>(
 pub(crate) fn dispatch_command<'py>(
     args: &Bound<'py, PyAny>,
     handlers: Option<Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let warehouse: Bound<'py, PyAny> = native_field(args, "warehouse")?;
@@ -495,7 +500,7 @@ pub(crate) fn dispatch_command<'py>(
         )?,
     )?
     .into_any();
-    within(&scope, |_| routed_command(args, handlers.as_ref()))
+    within(&scope, |_| routed_command(args, handlers.as_ref(), recall))
 }
 
 /// The parsed values that select a route, read from the namespace.

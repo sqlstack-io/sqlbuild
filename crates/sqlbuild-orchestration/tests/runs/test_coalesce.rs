@@ -63,7 +63,7 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
             evaluate_trigger(store, &lease, trigger)
                 .await
                 .expect("first tick");
-            let claim = claim_next_run(store, &lease, &BTreeMap::new())
+            let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim first run")
                 .expect("scheduled run");

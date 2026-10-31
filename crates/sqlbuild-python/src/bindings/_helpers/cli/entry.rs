@@ -17,6 +17,7 @@ use sqlbuild_cli::dispatch::main::invocation_policy::invocation_policy;
 use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPolicy};
 
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
+use sqlbuild_orchestration::runs::models::RunOutcome;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
@@ -545,7 +546,11 @@ fn observed_dispatch<'py>(
         if let Some(session) = &invocation.recall.session {
             session.publish_context(false);
         }
-        return dispatch_command(&invocation.args, invocation.handlers.clone());
+        return dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        );
     }
     let command: String = invocation.command_name();
     drop(take_failure_cause());
@@ -601,11 +606,14 @@ fn observed_dispatch<'py>(
             "invocation_started",
             started_payload()?,
         )?)?;
-        let dispatched: PyResult<Bound<'py, PyAny>> =
-            match dispatch_command(&invocation.args, invocation.handlers.clone()) {
-                Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-                dispatched => dispatched,
-            };
+        let dispatched: PyResult<Bound<'py, PyAny>> = match dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        ) {
+            Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
+            dispatched => dispatched,
+        };
         match dispatched {
             Ok(exit_code) => {
                 let payload: Bound<'py, PyDict> = PyDict::new(py);
@@ -864,6 +872,30 @@ fn execute_parsed_invocation<'py>(
         Ok(_) | Err(_) => None,
     };
     let finished: PyResult<()> = finish_invocation_recall(py, &recall, exit_status);
+    let worker = recall
+        .worker
+        .lock()
+        .map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err("worker completion lock is unavailable")
+        })?
+        .take();
+    if let Some(worker) = worker {
+        let code = match &finished {
+            Ok(()) => exit_status.unwrap_or(1),
+            Err(_) => 1,
+        };
+        let outcome = worker.finish(py, i32::try_from(code).unwrap_or(1))?;
+        host::write_console(
+            py,
+            "stderr",
+            &format!("Worker execution completed: {}\n", outcome.as_str()),
+        )?;
+        if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {
+            dispatched?;
+            finished?;
+            return exit(py, code.max(1));
+        }
+    }
     let exit_code: Bound<'py, PyAny> = dispatched?;
     finished?;
     Ok(exit_code)

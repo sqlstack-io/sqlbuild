@@ -10,3 +10,4 @@ pub mod dispatch;
 pub mod launcher;
 pub mod native_commands;
 pub mod replay;
+pub(crate) mod workers;

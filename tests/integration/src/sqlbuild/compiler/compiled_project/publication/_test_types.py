@@ -1,7 +1,9 @@
 """Publication cases and isolated server credentials."""
 
-from dataclasses import dataclass
-from typing import NamedTuple
+from dataclasses import dataclass, field
+from pathlib import Path
+from subprocess import Popen
+from typing import Literal, NamedTuple
 
 
 class SnapshotApi(NamedTuple):
@@ -14,6 +16,14 @@ class ClaimedWorker(NamedTuple):
     run_id: str
     claim_id: str
     bearer: str
+
+
+class ScheduledWorker(NamedTuple):
+    api: SnapshotApi
+    project: Path
+    control_store: Path
+    process: Popen[bytes]
+    log: Path
 
 
 @dataclass(frozen=True)
@@ -65,3 +75,16 @@ class LocationWorkTestCase:
     description: str
     database: str
     expected_connection: bool
+
+
+@dataclass(frozen=True)
+class WorkerExecutionTestCase:
+    description: str
+    model_sql: str
+    warehouse_query: str
+    expected_status: str
+    expected_rows: list[tuple[int]]
+    expected_node_count: int = 1
+    files: dict[str, str] = field(default_factory=dict)
+    store_setup: str = ""
+    launcher: Literal["native", "uncooperative"] = "native"

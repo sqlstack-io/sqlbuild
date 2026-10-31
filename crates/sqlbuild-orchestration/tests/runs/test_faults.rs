@@ -88,7 +88,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                 };
                 install_fault(store, &point).await;
                 assert!(
-                    claim_next_run(store, &lease, &limits).await.is_err(),
+                    claim_next_run(store, &lease, &limits, None).await.is_err(),
                     "{} at {table}",
                     point.description
                 );
@@ -117,14 +117,14 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
             install_fault(store, &expiry).await;
             assert!(
                 matches!(
-                    claim_next_run(store, &lease, &limits).await,
+                    claim_next_run(store, &lease, &limits, None).await,
                     Err(ControlError::Fenced)
                 ),
                 "{}",
                 expiry.description
             );
             remove_fault(store, &expiry).await;
-            let claim = claim_next_run(store, &lease, &limits)
+            let claim = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("retry complete claim")
                 .expect("no leaked claims or slots");
@@ -136,7 +136,7 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
                 test_case.description
             );
             assert!(
-                claim_next_run(store, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None)
                     .await
                     .expect("already claimed run is not relaunched")
                     .is_none()

@@ -68,7 +68,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 .await
                 .expect("acquire")
                 .expect("leader");
-            let claim = claim_next_run(store, &lease, &BTreeMap::new())
+            let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim")
                 .expect("work");
@@ -247,7 +247,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 &request((location, publication.snapshot_id), 2, 0, &["orders"]),
             )
             .await;
-            let cancelled_claim = claim_next_run(store, &lease, &BTreeMap::new())
+            let cancelled_claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim another run")
                 .expect("queued work");

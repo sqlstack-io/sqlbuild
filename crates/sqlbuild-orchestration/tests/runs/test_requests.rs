@@ -162,7 +162,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 "orders-load".into(),
                 std::num::NonZeroU32::new(1).expect("positive group limit"),
             )]);
-            let claim = claim_next_run(store, &lease, &limits)
+            let claim = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim")
                 .expect("queued request");

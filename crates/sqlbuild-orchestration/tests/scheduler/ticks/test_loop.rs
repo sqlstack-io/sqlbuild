@@ -15,7 +15,7 @@ use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::ticks::helpers::snapshot;
-use crate::ticks::test_types::TickTransactionTestCase;
+use crate::ticks::test_types::{IdleLauncher, TickTransactionTestCase};
 
 #[test]
 fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drains_due_work_and_idle_shutdown_is_prompt()
@@ -85,7 +85,12 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
             assert_eq!(runs.len(), test_case.expected_runs);
             let (stop, shutdown) = tokio::sync::watch::channel(false);
             let (_changed, changes) = tokio::sync::watch::channel(());
-            let mut running = Box::pin(run_scheduler(&second, second_state, shutdown, changes));
+            let mut running = Box::pin(run_scheduler(
+                &second,
+                second_state,
+                (shutdown, changes),
+                IdleLauncher,
+            ));
             tokio::select! {
                 result = &mut running => panic!("loop ended before shutdown: {result:?}"),
                 _ = tokio::time::sleep(Duration::from_millis(50)) => {},

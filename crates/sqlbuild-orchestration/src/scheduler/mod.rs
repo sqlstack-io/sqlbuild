@@ -4,7 +4,7 @@ pub(crate) mod _helpers;
 pub mod constants;
 pub mod main;
 pub mod models;
-pub(crate) mod types;
+pub mod types;
 
 #[cfg(test)]
 mod tests;

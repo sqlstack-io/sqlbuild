@@ -6,12 +6,13 @@ import hashlib
 import json
 import os
 import secrets
+import signal
 import sqlite3
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager, contextmanager, nullcontext, suppress
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
@@ -21,10 +22,16 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+import duckdb
+import pytest
+
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
+    ScheduledWorker,
     SnapshotApi,
+    WorkerExecutionTestCase,
 )
+from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 
 class RejectedPublicationOutput(StringIO):
@@ -208,6 +215,183 @@ def current_snapshot(api: SnapshotApi, target: str) -> dict[str, Any]:
     with urlopen(request, timeout=5) as response:
         result: dict[str, Any] = json.load(response)
     return result
+
+
+def native_launcher(directory: Path, executable: str) -> AbstractContextManager[str]:
+    """Use the installed native launcher without a synthetic child."""
+    del directory
+    return nullcontext(executable)
+
+
+@contextmanager
+def uncooperative_launcher(directory: Path, executable: str) -> Iterator[str]:
+    """Own a synthetic process that ignores TERM, including cleanup after a failed assertion."""
+    del executable
+    script: Path = directory / "worker"
+    _ = script.write_text(
+        f"#!{sys.executable}\nimport os, signal, time\nfrom pathlib import Path\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        "Path('worker.pid').write_text(str(os.getpid()))\n"
+        "time.sleep(90)\n"
+    )
+    script.chmod(0o700)
+    try:
+        yield str(script)
+    finally:
+        with suppress(FileNotFoundError, ProcessLookupError):
+            os.kill(int((directory / "project/worker.pid").read_text()), signal.SIGKILL)
+
+
+@contextmanager
+def scheduled_worker(
+    directory: Path, monkeypatch: pytest.MonkeyPatch, test_case: WorkerExecutionTestCase
+) -> Iterator[ScheduledWorker]:
+    """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
+    project: Path = directory / "project"
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
+            ),
+            "orchestration/orders.py": (
+                "from sqlbuild.orchestration import job, schedule\n"
+                'annual_orders = job("annual_orders", select="orders", '
+                'description="Build orders.", '
+                'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
+                'starts_at="2000-01-01T00:00:00Z"))\n'
+            ),
+        }
+        | test_case.files,
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    launchers: dict[str, Callable[[Path, str], AbstractContextManager[str]]] = {
+        "native": native_launcher,
+        "uncooperative": uncooperative_launcher,
+    }
+    with (
+        snapshot_api(directory / "control") as api,
+        launchers[test_case.launcher](directory, executable) as launch_executable,
+    ):
+        published: subprocess.CompletedProcess[str] = subprocess.run(
+            [
+                executable,
+                "location",
+                "publish",
+                "--project-dir",
+                str(project),
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+                "--server",
+                api.url,
+                "--generation",
+                "1",
+            ],
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert published.returncode == 0, published.stderr
+        configuration: Path = directory / "launchers.json"
+        _ = configuration.write_text(
+            json.dumps(
+                {
+                    "local": [
+                        {
+                            "location_id": api.location_id,
+                            "target": "development",
+                            "project_dir": str(project),
+                            "executable": launch_executable,
+                            "server_url": api.url,
+                            "max_workers": 1,
+                        }
+                    ]
+                }
+            )
+        )
+        control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
+        with sqlite3.connect(control_store) as control:
+            _ = control.executescript(test_case.store_setup)
+        monkeypatch.setenv("SQLBUILD_SCHEDULER_TEST_STORE", f"sqlite://{control_store}")
+        log: Path = directory / "scheduler.log"
+        with location_process(
+            [
+                executable,
+                "scheduler",
+                "--database-env",
+                "SQLBUILD_SCHEDULER_TEST_STORE",
+                "--launchers",
+                str(configuration),
+            ],
+            log,
+            directory / "scheduler.stdout",
+        ) as process:
+            yield ScheduledWorker(api, project, control_store, process, log)
+
+
+def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -> dict[str, Any]:
+    """Run/node outcomes, Recall, claims and the physical warehouse agree."""
+    api, project, control_store, process, log = worker
+    run: dict[str, Any] = wait_for_run(api, process, log)
+    assert run["node_counts_json"] == {test_case.expected_status: test_case.expected_node_count}, (
+        log.read_text()
+    )
+    assert run["job_key"] == "annual_orders"
+    assert "Worker launched for run" in log.read_text()
+    runs_url: str = f"{api.url}/api/locations/{api.location_id}/targets/development/runs"
+    headers: dict[str, str] = {"Authorization": f"Bearer {api.bearer}"}
+    with urlopen(
+        Request(f"{runs_url}/{run['run_id']}/nodes", headers=headers), timeout=5
+    ) as response:
+        nodes: list[dict[str, Any]] = json.load(response)
+    assert nodes[0]["node_key"] == "model:orders"
+    assert nodes[0]["started_at"] is not None
+    assert nodes[0]["ended_at"] is not None
+    with sqlite3.connect(control_store) as control:
+        contexts: list[tuple[str | None]] = control.execute(
+            "SELECT external_context FROM recall_invocations WHERE command = 'location'"
+        ).fetchall()
+        assert contexts, log.read_text()
+        assert all(
+            context is not None and json.loads(context)["run_id"] == run["run_id"]
+            for (context,) in contexts
+        )
+        assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
+    with duckdb.connect(str(project / "warehouse.duckdb"), read_only=True) as warehouse:
+        assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+    return run
+
+
+def wait_for_run(
+    api: SnapshotApi,
+    process: subprocess.Popen[bytes],
+    log: Path,
+    *,
+    pending: frozenset[str] = frozenset({"queued", "launched", "running", "unresponsive"}),
+) -> dict[str, Any]:
+    """A terminal API projection must follow the scheduler's actual isolated warehouse execution."""
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/targets/development/runs",
+        headers={"Authorization": f"Bearer {api.bearer}"},
+    )
+    deadline: float = time.monotonic() + 30
+    current: dict[str, Any] = {"status": "queued"}
+    while current["status"] in pending:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        with urlopen(request, timeout=2) as response:
+            current = next(iter(json.load(response)), current)
+        time.sleep(0.02)
+    return current
 
 
 def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any]) -> ClaimedWorker:

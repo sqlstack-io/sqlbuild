@@ -1,5 +1,6 @@
 //! `sqb build`: resolve, compile, gate, execute and report one direct build.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -17,6 +18,7 @@ use crate::bindings::_helpers::build_command::planning::{
     compile_build_plan, enforce_build_plan_policies, run_defer_clone_prephase,
     write_compile_target, write_plan_text,
 };
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::diagnostics::trackers::BuildPhaseTimingTracker;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -38,6 +40,14 @@ fn run_with_providers(context: &BuildContext<'_>) -> PyResult<i32> {
 }
 
 fn run_planned_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
+    if let Some(worker) = &context.worker {
+        worker.check_cancelled(context.py())?;
+        if !context.get("effective_defer_clone_from")?.is_none() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "worker defer-clone requires claimed boundary writers and is not yet supported",
+            ));
+        }
+    }
     run_defer_clone_prephase(context)?;
     let cache_scope: Bound<'_, PyAny> = call_with(
         &host::entry(context.py(), AdapterHost::RelationMetadataCacheScope)?,
@@ -49,6 +59,9 @@ fn run_planned_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -
 /// Plan and run the build, sharing one relation metadata cache from planning to the run's end.
 fn run_cached_build(context: &BuildContext<'_>, providers: &Bound<'_, PyAny>) -> PyResult<i32> {
     let pipeline: Bound<'_, PyAny> = compile_build_plan(context)?;
+    if let Some(worker) = &context.worker {
+        worker.enforce_plan_writers(&pipeline)?;
+    }
     write_plan_text(context, &pipeline)?;
     enforce_build_plan_policies(context, &pipeline)?;
     write_compile_target(context, &pipeline)?;
@@ -74,9 +87,11 @@ fn run_within_limits(
     request: &Bound<'_, PyAny>,
     tracker: &Bound<'_, PyAny>,
     started: Instant,
+    worker: Option<Arc<WorkerBuild>>,
 ) -> PyResult<i32> {
     let py: Python<'_> = request.py();
-    let context: BuildContext<'_> = resolve_build_context(request, tracker, started)?;
+    let mut context: BuildContext<'_> = resolve_build_context(request, tracker, started)?;
+    context.worker = worker;
     let limits: Bound<'_, PyAny> = context.get("execution_limits")?;
     let deadline: Bound<'_, PyAny> = call_with(
         &host::entry(py, ExecutorHost::ExecutionDeadlineScope)?,
@@ -97,6 +112,15 @@ fn run_within_limits(
 #[pyfunction]
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_build_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
+    run_build(py, request, None)
+}
+
+/// A claim owner survives planning, execution and connection cleanup before terminal reporting.
+pub(crate) fn run_build(
+    py: Python<'_>,
+    request: &Bound<'_, PyAny>,
+    worker: Option<Arc<WorkerBuild>>,
+) -> PyResult<i32> {
     let tracker: Bound<'_, PyAny> = BuildPhaseTimingTracker::new(py, None)
         .and_then(|value| pyo3::Bound::new(py, value))
         .map(pyo3::Bound::into_any)?;
@@ -107,7 +131,7 @@ pub(crate) fn run_build_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     within(&reporting, |_| {
         within(&tracker.call_method0("scope")?, |_| {
             let started: Instant = Instant::now();
-            run_within_limits(request, &tracker, started).inspect_err(|_| {
+            run_within_limits(request, &tracker, started, worker.clone()).inspect_err(|_| {
                 let verbose: bool = native_field(request, "verbose")
                     .and_then(|value| value.is_truthy())
                     .unwrap_or(false)

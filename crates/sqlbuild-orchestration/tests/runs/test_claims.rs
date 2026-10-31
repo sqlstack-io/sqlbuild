@@ -16,7 +16,103 @@ use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::terminal_helpers::finish;
-use crate::test_types::{BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase};
+use crate::test_types::{
+    BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, ScopedClaimTestCase,
+};
+
+#[test]
+fn given_higher_priority_work_for_other_scopes_when_a_local_launcher_claims_then_only_its_location_and_target_are_reserved()
+ {
+    let test_cases = [
+        ScopedClaimTestCase {
+            description: "SQLite local dispatch cannot reserve another location or target",
+            backend: Backend::Sqlite,
+            expected_selected_run: 1,
+            expected_unscoped_run: 3,
+        },
+        ScopedClaimTestCase {
+            description: "PostgreSQL local dispatch cannot reserve another location or target",
+            backend: Backend::Postgres,
+            expected_selected_run: 1,
+            expected_unscoped_run: 3,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let other = create_location(store, "inventory", "test-admin")
+                .await
+                .expect("other location");
+            let published = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("snapshot");
+            let other_published = publish_snapshot(store, &snapshot(other))
+                .await
+                .expect("other location snapshot");
+            let mut secondary = snapshot(location);
+            secondary.target = "secondary".into();
+            let secondary = publish_snapshot(store, &secondary)
+                .await
+                .expect("other target snapshot");
+            let wanted = request((location, published.snapshot_id), 1, 0, &["orders"]);
+            let mut other_target = request((location, secondary.snapshot_id), 2, 10, &["orders"]);
+            other_target.target = "secondary".into();
+            let other_location = request((other, other_published.snapshot_id), 3, 20, &["orders"]);
+            for input in [&wanted, &other_target, &other_location] {
+                queue(store, input).await;
+            }
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let claim = claim_next_run(
+                store,
+                &lease,
+                &BTreeMap::new(),
+                Some((location, "development")),
+            )
+            .await
+            .expect("scoped claim")
+            .expect("matching work");
+            assert_eq!(
+                claim.request.run_id,
+                Uuid::from_u128(test_case.expected_selected_run),
+                "{}",
+                test_case.description
+            );
+            assert!(
+                claim_next_run(
+                    store,
+                    &lease,
+                    &BTreeMap::new(),
+                    Some((location, "development"))
+                )
+                .await
+                .expect("scope exhausted")
+                .is_none()
+            );
+            finish(store, &lease, &claim).await;
+            let next = claim_next_run(store, &lease, &BTreeMap::new(), None)
+                .await
+                .expect("unrestricted claim")
+                .expect("other work was not reserved");
+            assert_eq!(
+                next.request.run_id,
+                Uuid::from_u128(test_case.expected_unscoped_run),
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
 
 #[test]
 fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rollback_and_terminal_facts_release_claims()
@@ -65,8 +161,8 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
             let second = second_store(store).await;
             let limits = BTreeMap::new();
             let (first, other) = tokio::join!(
-                claim_next_run(store, &lease, &limits),
-                claim_next_run(&second, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None),
+                claim_next_run(&second, &lease, &limits, None)
             );
             let first = first.expect("first claimant").expect("claim available");
             let other = other
@@ -87,14 +183,14 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
                 test_case.description
             );
             assert!(
-                claim_next_run(store, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None)
                     .await
                     .expect("blocked run stays queued")
                     .is_none()
             );
             queue(store, &request(scope, 4, 9, &["customers", "orders"])).await;
             queue(store, &request(scope, 5, 0, &["customers"])).await;
-            let independent = claim_next_run(store, &lease, &limits)
+            let independent = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("try partially conflicting candidate")
                 .expect("independent work proceeds");
@@ -109,7 +205,7 @@ fn given_overlapping_priority_queues_when_two_launchers_claim_then_conflicts_rol
                 .expect("orders owner");
             finish(store, &lease, orders).await;
             finish(store, &lease, &independent).await;
-            let next = claim_next_run(store, &lease, &limits)
+            let next = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("terminal cleanup committed")
                 .expect("next priority run claims both nodes");
@@ -193,23 +289,23 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
                 queue(store, &input).await;
             }
             assert!(
-                claim_next_run(store, &lease, &BTreeMap::new())
+                claim_next_run(store, &lease, &BTreeMap::new(), None)
                     .await
                     .is_err(),
                 "unknown groups cannot silently become unlimited"
             );
-            let first = claim_next_run(store, &lease, &limits)
+            let first = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("first slot")
                 .expect("available");
-            let second = claim_next_run(store, &lease, &limits)
+            let second = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("second slot")
                 .expect("available");
             assert_eq!(first.request.run_id, Uuid::from_u128(1));
             assert_eq!(second.request.run_id, Uuid::from_u128(2));
             assert!(
-                claim_next_run(store, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None)
                     .await
                     .expect("group full")
                     .is_none()
@@ -220,13 +316,13 @@ fn given_named_group_limits_when_capacity_is_lowered_then_active_high_slots_stil
                 NonZeroU32::new(1).expect("nonzero lowered limit"),
             );
             assert!(
-                claim_next_run(store, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None)
                     .await
                     .expect("high slot counts after limit reduction")
                     .is_none()
             );
             finish(store, &lease, &second).await;
-            let third = claim_next_run(store, &lease, &limits)
+            let third = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("released group")
                 .expect("third queued run");
@@ -276,7 +372,7 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 .expect("leader");
             let limits = BTreeMap::new();
             queue(store, &request(scope, 1, 0, &["orders"])).await;
-            claim_next_run(store, &lease, &limits)
+            claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim blocker")
                 .expect("available");
@@ -292,7 +388,7 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
             }
             queue(store, &request(scope, 105, -1, &["customers"])).await;
             let started = std::time::Instant::now();
-            let independent = claim_next_run(store, &lease, &limits)
+            let independent = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("scan past a full blocked page")
                 .expect("independent work");
