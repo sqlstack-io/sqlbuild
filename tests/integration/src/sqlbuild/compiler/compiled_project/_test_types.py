@@ -190,3 +190,10 @@ class QuotedHookBoundaryTestCase:
     description: str
     argument: str
     expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnapshotCatalogTestCase:
+    description: str
+    files: dict[str, str]
+    expected_kinds: frozenset[str]

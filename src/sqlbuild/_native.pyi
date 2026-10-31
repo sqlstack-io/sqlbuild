@@ -1738,6 +1738,17 @@ class NativeCompiledAudit:
     @property
     def meta(self) -> dict[str, object] | None: ...
 
+class NativeOrchestrationSnapshot:
+    """A compiled data-only publication retained natively until transport."""
+
+    def to_json(self) -> str: ...
+
+def build_orchestration_snapshot(
+    project: CompiledProjectView,
+    metadata_json: str,
+    project_dir: Path,
+) -> NativeOrchestrationSnapshot: ...
+
 class NativeProjectView:
     @property
     def run_id(self) -> str: ...

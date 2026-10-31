@@ -3,4 +3,8 @@ pub(crate) mod project;
 pub(crate) mod registration;
 pub(crate) mod rows;
 pub(crate) mod schema_facts;
+pub(crate) mod snapshot;
+pub(crate) mod snapshot_boundary;
+pub(crate) mod snapshot_models;
+pub(crate) mod snapshot_resources;
 pub(crate) mod values;
