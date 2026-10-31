@@ -90,6 +90,7 @@ pub fn build_sqlquack_lineage(
         let context = LineageContext {
             profile,
             schema: &schema,
+            sql: None,
         };
         let traced: Vec<(usize, (RichLineageOutcome, Vec<SchemaColumn>))> = pool.install(|| {
             pending

@@ -68,6 +68,7 @@ fn model_lineage(
     let context = LineageContext {
         profile,
         schema: &schema,
+        sql: None,
     };
     let lineage = query_lineage(model.sql, dialect, &options, context).ok()?;
     Some(
@@ -91,15 +92,10 @@ fn lineage_column(
         let Some((kind, resource)) = references.get(&source.relation) else {
             continue;
         };
-        let quoted: bool = schema.0.get(&source.relation).is_some_and(|columns| {
-            columns
-                .iter()
-                .any(|column| column.quoted && column.name == source.column)
-        });
         sources.insert((
             (*kind).to_owned(),
             (*resource).to_owned(),
-            profile.resolved_identifier(&source.column, quoted),
+            profile.resolved_identifier(&source.column, source.quoted),
         ));
     }
     let transform: LineageTransformKind = match output.kind {
