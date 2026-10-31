@@ -1,3 +1,4 @@
+pub(crate) mod append_control_event;
 pub(crate) mod append_recall;
 pub(crate) mod begin;
 pub(crate) mod commit;

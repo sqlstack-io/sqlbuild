@@ -1,7 +1,7 @@
 use std::process::Command;
 use std::time::Duration;
 
-use crate::helpers::{api_ready, isolated_binary, leader_count, start_control};
+use crate::helpers::{api_ready, health_counts, isolated_binary, start_control};
 
 #[test]
 fn given_a_standalone_binary_when_printing_control_help_or_openapi_then_python_and_database_access_are_not_required()
@@ -66,12 +66,14 @@ async fn given_a_standalone_binary_when_serving_with_or_without_a_scheduler_then
             .expect("protected native API");
         assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
         tokio::time::timeout(Duration::from_secs(5), async {
-            while leader_count(&control) != Some(i64::from(scheduler)) {
+            while !health_counts(&control).is_some_and(|(leaders, heartbeats)| {
+                leaders == i64::from(scheduler) && heartbeats > 0
+            }) {
                 tokio::time::sleep(Duration::from_millis(20)).await;
             }
         })
         .await
-        .expect("embedded scheduler enabled exactly when requested");
+        .expect("watchdog records health with or without the optional scheduler");
         #[cfg(unix)]
         crate::helpers::terminate(&mut control).await;
     }
@@ -82,7 +84,7 @@ async fn given_a_standalone_scheduler_when_started_without_python_then_it_migrat
  {
     let mut control = start_control(&["scheduler"]);
     tokio::time::timeout(Duration::from_secs(5), async {
-        while leader_count(&control) != Some(1) {
+        while health_counts(&control).map(|(leaders, _)| leaders) != Some(1) {
             assert!(
                 control
                     .child

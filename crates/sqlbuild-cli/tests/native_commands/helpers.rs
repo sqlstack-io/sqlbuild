@@ -65,16 +65,19 @@ pub(crate) async fn api_ready(control: &mut TestControl) -> String {
     .expect("native API becomes ready")
 }
 
-pub(crate) fn leader_count(control: &TestControl) -> Option<i64> {
+pub(crate) fn health_counts(control: &TestControl) -> Option<(i64, i64)> {
     let connection = rusqlite::Connection::open_with_flags(
         control.directory.path().join(".sqlbuild/control.sqlite3"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
     )
     .ok()?;
     connection
-        .query_row("SELECT COUNT(*) FROM sqb_scheduler_lease", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT (SELECT COUNT(*) FROM sqb_scheduler_lease), \
+             (SELECT COUNT(*) FROM recall_events WHERE event_type='platform_heartbeat')",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
         .ok()
 }
 

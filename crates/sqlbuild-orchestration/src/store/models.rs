@@ -22,6 +22,18 @@ pub struct RecallAppendOutcome {
     pub conflict: Option<ConflictEvidence>,
 }
 
+/// A control-plane fact shares Recall's durable sequencing and conflict handling.
+#[derive(Debug)]
+pub(crate) struct ControlEvent<'a> {
+    pub(crate) event_id: Uuid,
+    pub(crate) invocation_id: String,
+    pub(crate) event_type: &'a str,
+    pub(crate) producer: &'static str,
+    pub(crate) occurred_at: DateTime<Utc>,
+    pub(crate) run_id: Option<Uuid>,
+    pub(crate) payload: serde_json::Value,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TransactionMode {
     Read,
