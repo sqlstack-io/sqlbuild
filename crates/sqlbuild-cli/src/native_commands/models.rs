@@ -126,6 +126,16 @@ pub(crate) struct ProjectLocation {
     pub(crate) resolved: PathBuf,
 }
 
+/// A long-running location owns no control-store credentials or executable user objects.
+#[derive(Debug)]
+pub(crate) struct LocationServe {
+    pub(crate) project_dir: PathBuf,
+    pub(crate) server_url: String,
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) image_id: Option<String>,
+}
+
 /// What Python's buffered stdout does with output its reader no longer takes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum LostStdout {

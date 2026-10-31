@@ -12,6 +12,7 @@ use crate::launcher::constants::{
 };
 use crate::native_commands::main::parse_native_invocation::parse_native_invocation;
 use crate::native_commands::main::run_control_invocation::run_control_invocation;
+use crate::native_commands::main::run_location_invocation::run_location_invocation;
 use crate::native_commands::main::run_native_invocation::run_native_invocation;
 use crate::native_commands::models::NativeParse;
 use crate::replay::main::serve_reused_compile::serve_reused_compile;
@@ -55,6 +56,11 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
         report_missing_python_cli(&program);
         return HANDOFF_FAILURE_EXIT_CODE;
     };
+    if let Ok(NativeParse::Invocation { namespace, .. }) = &native
+        && let Some(code) = run_location_invocation(namespace, &script)
+    {
+        return code;
+    }
     let mut handed: Vec<OsString> = Vec::with_capacity(arguments.len() + 1);
     let record: Option<(PathBuf, String)> = launch_record(&program, &script, &arguments);
     if let Some((path, key)) = &record

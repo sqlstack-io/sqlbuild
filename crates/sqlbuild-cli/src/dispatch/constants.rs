@@ -515,13 +515,14 @@ pub(crate) const DEBUG_ROUTE: Route = routed(
     },
 );
 
-const LOCATION_ARGUMENTS: [Field; 6] = [
+const LOCATION_ARGUMENTS: [Field; 7] = [
     field("project_dir", Source::EffectiveProjectDir),
     SELECTED_TARGET,
     same("location_id"),
     attr("server_url", "location_server_url"),
     attr("generation", "location_generation"),
     attr("image_id", "location_image_id"),
+    attr("action", "location_command"),
 ];
 pub(crate) const LOCATION_ROUTE: Route = routed(
     "run_location",

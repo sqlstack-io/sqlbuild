@@ -31,3 +31,18 @@ class SnapshotWorkerTestCase:
     original_sql: str
     replacement_sql: str
     expected_error: str
+
+
+@dataclass(frozen=True)
+class LocationReloadTestCase:
+    description: str
+    target: str
+    expected_generation: int
+    expected_stop_code: int
+
+
+@dataclass(frozen=True)
+class LocationShutdownTestCase:
+    description: str
+    signal: int
+    expected_exit_code: int

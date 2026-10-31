@@ -2498,6 +2498,7 @@ dependencies = [
  "reqwest",
  "rusqlite",
  "rustix",
+ "same-file",
  "serde",
  "serde_json",
  "sqlbuild-build-features",

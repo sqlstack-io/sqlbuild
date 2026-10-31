@@ -128,6 +128,7 @@ chrono-tz = "0.10"
 croner = "=3.0.1"
 flate2 = "1"
 proptest = "1"
+same-file = "1"
 semver = "1"
 # Pin SQLx's driver crates together: its umbrella also resolves an incompatible SQLite engine.
 sqlx-core = { version = "=0.8.6", default-features = false, features = ["_rt-tokio", "_tls-rustls-ring-webpki", "chrono", "uuid", "json"] }

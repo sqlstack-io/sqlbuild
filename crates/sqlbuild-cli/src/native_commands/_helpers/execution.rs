@@ -2,36 +2,143 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::time::SystemTime;
 
+use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
+use tokio::process::{Child, Command};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 
-use crate::argv::models::{Namespace, Stream};
+use crate::argv::models::{Namespace, Stream, Value};
 use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
 use crate::compute_logs::main::abandon_capture::abandon_capture;
 use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
-use crate::native_commands::_helpers::decision::control_database;
+use crate::native_commands::_helpers::decision::{control_database, text};
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
 use crate::native_commands::_helpers::paths::project_location;
 use crate::native_commands::_helpers::project_facts::has_no_runtime_extensions;
 use crate::native_commands::_helpers::rules::run_rules;
 use crate::native_commands::_helpers::skills::{run_skills, skill_freshness_notice};
-use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
-use crate::native_commands::constants::{UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND};
+use crate::native_commands::_helpers::terminal::{
+    finish_lost_stdout, terminal_columns, write_output,
+};
+use crate::native_commands::constants::{
+    COLUMNS_VARIABLE, FALLBACK_COLUMNS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+};
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
+    CommandOutput, InstalledPackage, LocationServe, LostStdout, NativeCommand, NativeInvocation,
+    ProjectLocation,
 };
+
+pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, ControlError> {
+    if namespace
+        .get("location_generation")
+        .is_some_and(|value| *value != Value::None)
+    {
+        return Err(ControlError::Invalid(
+            "serve derives --generation from the server; do not supply it".into(),
+        ));
+    }
+    let project_dir = text(namespace, "project_dir")
+        .map_or_else(std::env::current_dir, |directory| {
+            std::fs::canonicalize(directory)
+        })?;
+    if !project_dir.is_dir() {
+        return Err(ControlError::Invalid("project directory must exist".into()));
+    }
+    let location_id = text(namespace, "location_id")
+        .unwrap_or_default()
+        .parse()
+        .map_err(|_| ControlError::Invalid("location ID must be a UUID".into()))?;
+    let target = text(namespace, "target").unwrap_or_default();
+    if target.trim().is_empty() {
+        return Err(ControlError::Invalid("target must not be blank".into()));
+    }
+    Ok(LocationServe {
+        project_dir,
+        server_url: text(namespace, "location_server_url").unwrap_or_default(),
+        location_id,
+        target,
+        image_id: text(namespace, "location_image_id"),
+    })
+}
+
+/// Reconcile from the server after restarts or lost acknowledgements; transient outages retry.
+pub(crate) async fn location_generation(
+    options: &LocationServe,
+    bearer: &str,
+) -> Result<Option<i64>, ControlError> {
+    match next_remote_generation(
+        &options.server_url,
+        bearer,
+        options.location_id,
+        &options.target,
+    )
+    .await
+    {
+        Ok(generation) => Ok(Some(generation)),
+        Err(error) => {
+            if matches!(&error, ClientError::Configuration(_))
+                || matches!(&error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
+            {
+                return Err(ControlError::Invalid(error.to_string()));
+            }
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!(
+                    "Location generation lookup failed; retaining last good snapshot and retrying: {error}\n"
+                ),
+            )]));
+            Ok(None)
+        }
+    }
+}
+
+/// The installed interpreter owns user imports; the supervisor never imports Python.
+pub(crate) fn publish_child(
+    options: &LocationServe,
+    script: &Path,
+    generation: i64,
+) -> io::Result<Child> {
+    let mut command = Command::new(script);
+    command
+        .arg("--project-dir")
+        .arg(&options.project_dir)
+        .args([
+            "location",
+            "publish",
+            "--server",
+            &options.server_url,
+            "--location-id",
+        ])
+        .arg(options.location_id.to_string())
+        .args(["--target", &options.target, "--generation"])
+        .arg(generation.to_string());
+    if let Some(image) = &options.image_id {
+        command.args(["--image-id", image]);
+    }
+    if terminal_columns().is_err() {
+        command.env(COLUMNS_VARIABLE, FALLBACK_COLUMNS.to_string());
+    }
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true)
+        .spawn()
+}
 
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
 pub(crate) async fn open_control_store(
@@ -48,7 +155,7 @@ pub(crate) async fn open_control_store(
     Ok(store)
 }
 
-async fn shutdown_signal() -> Result<(), ControlError> {
+pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {
     #[cfg(unix)]
     {
         let mut terminate =

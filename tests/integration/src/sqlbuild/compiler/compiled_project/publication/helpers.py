@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -31,6 +32,60 @@ class RejectedPublicationOutput(StringIO):
 
     def write(self, text: str) -> int:
         raise OSError("synthetic publication result delivery failure")
+
+
+@contextmanager
+def location_process(
+    arguments: list[str], log: Path, publications: Path
+) -> Iterator[subprocess.Popen[bytes]]:
+    """Own and reap the supervisor even when an assertion interrupts a reload."""
+    with log.open("ab") as stderr, publications.open("ab") as stdout:
+        process: subprocess.Popen[bytes] = subprocess.Popen(arguments, stderr=stderr, stdout=stdout)
+        try:
+            yield process
+        finally:
+            process.terminate()
+            try:
+                _ = process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                _ = process.wait(timeout=5)
+
+
+def wait_for_generation(
+    api: SnapshotApi, target: str, generation: int, process: subprocess.Popen[bytes], log: Path
+) -> dict[str, Any]:
+    deadline: float = time.monotonic() + 15
+    current: dict[str, Any] = {"record": {"generation": 0}}
+    while current["record"]["generation"] < generation:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, (
+            f"Generation {generation} was not published: {log.read_text()}"
+        )
+        try:
+            current = current_snapshot(api, target)
+        except HTTPError as error:
+            assert error.code == 404
+        time.sleep(0.02)
+    assert current["record"]["generation"] == generation, log.read_text()
+    return current
+
+
+def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str) -> None:
+    deadline: float = time.monotonic() + 15
+    while text not in log.read_text():
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        time.sleep(0.02)
+
+
+def wait_for_interpreter(process: subprocess.Popen[bytes], pidfile: Path, log: Path) -> int:
+    deadline: float = time.monotonic() + 15
+    while not pidfile.exists():
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        time.sleep(0.02)
+    return int(pidfile.read_text())
 
 
 def api_address(process: subprocess.Popen[bytes], log: Path) -> str:

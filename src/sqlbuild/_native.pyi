@@ -1777,6 +1777,7 @@ def run_location_command(
     generation: int,
     server_url: str,
     image_id: str | None = None,
+    action: str = "publish",
 ) -> int: ...
 
 class NativeProjectView:

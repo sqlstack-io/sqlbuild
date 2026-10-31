@@ -106,8 +106,8 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish"],
-        "help": "compile the project and publish one immutable snapshot",
+        "choices": ["publish", "serve"],
+        "help": "publish one snapshot or watch and reload the project",
         "group": 0
        },
        {
@@ -139,8 +139,7 @@
         "options": ["--generation"],
         "dest": "location_generation",
         "type": "int",
-        "required": true,
-        "help": "positive generation newer than the last successful publication",
+        "help": "required for publish; serve derives the next generation from the server",
         "group": 1
        },
        {

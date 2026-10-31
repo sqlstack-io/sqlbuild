@@ -2,10 +2,64 @@
 
 use std::path::{Component, Path, PathBuf};
 
+use sqlbuild_cache::digest::constants::{
+    EXCLUDED_DIRECTORIES, EXCLUDED_ROOT_DIRECTORIES, PRESENCE_ONLY_FILE_SUFFIXES,
+};
+use sqlbuild_cache::project_snapshot::main::snapshot_project_files::snapshot_project_files;
+use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
+use sqlbuild_core::git_revisions::main::head_commit::head_commit;
 use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::ProjectLocation;
+use crate::replay::main::output_file_identities::output_file_identities;
+
+/// Observe the same project inputs as compiler reuse, excluding redirected command output.
+pub(crate) fn location_rules() -> SnapshotRules {
+    SnapshotRules {
+        excluded: EXCLUDED_DIRECTORIES
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        excluded_root: EXCLUDED_ROOT_DIRECTORIES
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        presence_suffixes: PRESENCE_ONLY_FILE_SUFFIXES
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+        output_files: output_file_identities(),
+    }
+}
+
+/// Git commits matter to publication metadata even when no working-tree file changes.
+pub(crate) fn location_inputs(
+    root: &Path,
+    rules: &SnapshotRules,
+) -> (Vec<PathStamp>, Option<String>) {
+    let mut stamps = snapshot_project_files(root, rules);
+    #[cfg(windows)]
+    {
+        let output: Vec<same_file::Handle> =
+            [same_file::Handle::stdout(), same_file::Handle::stderr()]
+                .into_iter()
+                .flatten()
+                .filter(|handle| {
+                    handle
+                        .as_file()
+                        .metadata()
+                        .is_ok_and(|metadata| metadata.is_file())
+                })
+                .collect();
+        stamps.retain(|stamp| {
+            same_file::Handle::from_path(root.join(&stamp.relative_path))
+                .map_or(true, |handle| !output.contains(&handle))
+        });
+    }
+    stamps.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
+    (stamps, head_commit(root))
+}
 
 /// `Path(text)`: repeated separators, `.` parts and trailing separators dropped.
 pub(crate) fn pathlib_path(text: &Path) -> PathBuf {

@@ -16,6 +16,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::{
     NativeOrchestrationSnapshot, build_orchestration_snapshot,
 };
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
+use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
@@ -39,7 +40,10 @@ fn metadata(
         .parse()
         .map_err(|_| PyValueError::new_err("location ID must be a UUID"))?;
     let target: String = arguments.value("selected_target")?.extract()?;
-    let generation: i64 = arguments.value("generation")?.extract()?;
+    let generation = arguments
+        .value("generation")?
+        .extract::<Option<i64>>()?
+        .ok_or_else(|| PyValueError::new_err("publish requires --generation"))?;
     if target.trim().is_empty() || generation < 1 {
         return Err(PyValueError::new_err(
             "target must not be blank and generation must be positive",
@@ -145,10 +149,19 @@ pub(crate) fn run_location_command<'py>(
                 "generation",
                 "server_url",
             ],
-            &["image_id"],
+            &["image_id", "action"],
         ),
     )?;
     let publication = (|| {
+        if arguments
+            .value("action")?
+            .extract::<Option<String>>()?
+            .is_some_and(|action| action != PUBLISH_ACTION)
+        {
+            return Err(PyValueError::new_err(
+                "location serve must run through the native sqb executable",
+            ));
+        }
         let bearer = std::env::var("SQLBUILD_LOCATION_TOKEN").map_err(|_| {
             PyValueError::new_err(
                 "SQLBUILD_LOCATION_TOKEN must contain a UTF-8 location credential",
