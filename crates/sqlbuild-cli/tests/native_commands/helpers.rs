@@ -6,8 +6,10 @@ use crate::test_types::{ServiceTestCase, TestControl};
 
 pub(crate) fn isolated_binary(directory: &Path) -> std::path::PathBuf {
     let binary = directory.join(format!("sqb{}", std::env::consts::EXE_SUFFIX));
-    std::fs::copy(env!("CARGO_BIN_EXE_sqb"), &binary)
-        .expect("copy standalone binary without Python CLI");
+    // Do not open the executable for writing: concurrent process launches can inherit
+    // the copy's writable descriptor until exec, making this launch fail with ETXTBSY.
+    std::fs::hard_link(env!("CARGO_BIN_EXE_sqb"), &binary)
+        .expect("link standalone binary without Python CLI");
     binary
 }
 
