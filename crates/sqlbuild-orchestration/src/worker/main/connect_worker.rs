@@ -1,10 +1,9 @@
 //! Bound worker requests have deadlines and must never follow credential-bearing redirects.
 
-use std::time::Duration;
-
-use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+use reqwest::header::HeaderValue;
 use uuid::Uuid;
 
+use crate::worker::_helpers::response::http_client;
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;
 
@@ -37,16 +36,10 @@ pub fn connect_worker(
     let mut authorization = HeaderValue::from_str(&format!("Bearer {bearer}"))
         .map_err(|_| WorkerError::Configuration("run bearer is not a valid HTTP credential"))?;
     authorization.set_sensitive(true);
-    let mut headers = HeaderMap::new();
-    headers.insert(AUTHORIZATION, authorization);
-    let client = reqwest::Client::builder()
-        .default_headers(headers)
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(30))
-        .connect_timeout(Duration::from_secs(10))
-        .build()?;
+    let client = http_client(authorization.clone())?;
     Ok(WorkerClient {
         client,
+        authorization,
         run_url,
         run_id,
         claim_id,

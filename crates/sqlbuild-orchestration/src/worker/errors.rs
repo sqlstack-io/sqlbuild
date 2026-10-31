@@ -8,6 +8,8 @@ pub enum WorkerError {
     Transport(#[from] reqwest::Error),
     #[error("worker API rejected the request with HTTP {0}")]
     Rejected(reqwest::StatusCode),
+    #[error("worker heartbeat could not start: {0}")]
+    Heartbeat(#[from] std::io::Error),
     #[error(transparent)]
     Verification(#[from] crate::store::errors::ControlError),
     #[error("run cancellation was requested before execution")]

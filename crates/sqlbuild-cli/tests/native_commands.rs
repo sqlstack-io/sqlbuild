@@ -4,3 +4,5 @@ mod helpers;
 mod test_control;
 #[path = "native_commands/test_types.rs"]
 mod test_types;
+#[path = "native_commands/worker/test_worker.rs"]
+mod worker;

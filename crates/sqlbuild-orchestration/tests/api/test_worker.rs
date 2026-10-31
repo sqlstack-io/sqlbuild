@@ -137,13 +137,16 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
             )
             .await
             .expect("record process launch");
-            let execution = start_worker(&worker, &baseline)
+            let session = start_worker(&worker, &baseline)
                 .await
                 .expect("verified start");
-            assert_eq!(execution.claim, claim, "{}", test_case.description);
+            assert_eq!(session.execution.claim, claim, "{}", test_case.description);
             assert_eq!(
-                start_worker(&worker, &baseline).await.expect("retry start"),
-                execution,
+                start_worker(&worker, &baseline)
+                    .await
+                    .expect("retry start")
+                    .execution,
+                session.execution,
                 "{}",
                 test_case.description
             );
@@ -300,6 +303,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 "{}",
                 test_case.description
             );
+            drop(session);
             stop_api(api).await;
             close_test_store(fixture).await;
         });
