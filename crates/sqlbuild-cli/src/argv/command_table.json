@@ -79,6 +79,967 @@
    "group": 0,
    "parsers": [
     {
+     "name": "location",
+     "parser": {
+      "prog": "sqb location",
+      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database. Results are JSON; progress goes to stderr.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": ["-h", "--help"],
+        "dest": "help",
+        "nargs": 0,
+        "default": {"suppress": true},
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [],
+        "dest": "location_command",
+        "required": true,
+        "choices": ["publish", "serve", "runtime", "execute"],
+        "help": "publish one snapshot, watch and reload, or run the supervisor's stdio compiler",
+        "group": 0
+       },
+       {
+        "kind": "store",
+        "options": ["--server"],
+        "dest": "location_server_url",
+        "required": true,
+        "help": "control API HTTP or HTTPS origin, without credentials",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--location-id"],
+        "dest": "location_id",
+        "required": true,
+        "help": "registered location UUID",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--target"],
+        "dest": "target",
+        "required": true,
+        "help": "configured project target to compile",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--generation"],
+        "dest": "location_generation",
+        "type": "int",
+        "help": "required for publish; serve derives the next generation from the server",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--image-id"],
+        "dest": "location_image_id",
+        "help": "immutable deployment image identity to pin for workers",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--run-id"],
+        "dest": "location_run_id",
+        "help": "frozen run UUID for execute; requires SQLBUILD_RUN_TOKEN",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--claim-id"],
+        "dest": "location_claim_id",
+        "help": "active claim UUID for execute",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--project-dir", "--sqb-project-dir"],
+        "dest": "project_dir",
+        "default": {"suppress": true},
+        "help": "SQLBuild project directory (default: the current directory)",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
+     "name": "admin",
+     "parser": {
+      "prog": "sqb admin",
+      "description": "Privileged local administration using direct control database access. Results are JSON; issued bearer credentials appear only once on stdout.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "parsers",
+        "dest": "admin_command",
+        "nargs": "A...",
+        "required": true,
+        "group": 0,
+        "parsers": [
+         {
+          "name": "create-location",
+          "parser": {
+           "prog": "sqb admin create-location",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "location label; identity is assigned by the control store",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "create-principal",
+          "parser": {
+           "prog": "sqb admin create-principal",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "principal label; creation grants no permissions",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--kind"
+             ],
+             "dest": "admin_principal_kind",
+             "choices": [
+              "person",
+              "service_account"
+             ],
+             "default": "person",
+             "help": "identity kind (default: person)",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "issue-location-token",
+          "parser": {
+           "prog": "sqb admin issue-location-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "LOCATION_ID",
+             "required": true,
+             "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--expires-at"
+             ],
+             "dest": "admin_expires_at",
+             "required": true,
+             "help": "future expiry as an RFC3339 timestamp with timezone",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "issue-principal-token",
+          "parser": {
+           "prog": "sqb admin issue-principal-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "PRINCIPAL_ID",
+             "required": true,
+             "help": "principal UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--expires-at"
+             ],
+             "dest": "admin_expires_at",
+             "required": true,
+             "help": "future expiry as an RFC3339 timestamp with timezone",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "revoke-token",
+          "parser": {
+           "prog": "sqb admin revoke-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "TOKEN_ID",
+             "required": true,
+             "help": "credential UUID, never its bearer secret",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "rerun-run",
+          "parser": {
+           "prog": "sqb admin rerun-run",
+           "description": "Retry a terminal run using its pinned snapshot and settings, with an atomic security audit.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": ["-h", "--help"],
+             "dest": "help",
+             "nargs": 0,
+             "default": {"suppress": true},
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "SOURCE_RUN_ID",
+             "required": true,
+             "help": "terminal source run UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": ["--run-id"],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "new run UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store_true",
+             "options": ["--from-failure"],
+             "dest": "admin_from_failure",
+             "nargs": 0,
+             "default": false,
+             "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--priority"],
+             "dest": "admin_priority",
+             "type": "int",
+             "help": "signed queue priority; higher values run first (default: 0)",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--reason"],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "request-run",
+          "parser": {
+           "prog": "sqb admin request-run",
+           "description": "Queue a published job using privileged database access. Selection, image, settings and write claims come from the snapshot; the request and audit commit together.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "LOCATION_ID",
+             "required": true,
+             "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_job",
+             "metavar": "JOB",
+             "required": true,
+             "help": "published job name",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--target"
+             ],
+             "dest": "admin_target",
+             "required": true,
+             "help": "published target name",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--run-id"
+             ],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "run UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--priority"
+             ],
+             "dest": "admin_priority",
+             "type": "int",
+             "help": "signed queue priority; higher values run first (default: 0)",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reason"
+             ],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "check-location",
+          "parser": {
+           "prog": "sqb admin check-location",
+           "description": "Request an outbound connection check on a published location using privileged database access.",
+           "groups": [
+            {"title": "positional arguments"},
+            {"title": "options"}
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": ["-h", "--help"],
+             "dest": "help",
+             "nargs": 0,
+             "default": {"suppress": true},
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "LOCATION_ID",
+             "required": true,
+             "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": ["--target"],
+             "dest": "admin_target",
+             "required": true,
+             "help": "published target name",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--request-id"],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "request UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": ["--reason"],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "location-work",
+          "parser": {
+           "prog": "sqb admin location-work",
+           "description": "Read an outbound location request and its immutable result using privileged database access.",
+           "groups": [
+            {"title": "positional arguments"},
+            {"title": "options"}
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": ["-h", "--help"],
+             "dest": "help",
+             "nargs": 0,
+             "default": {"suppress": true},
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "REQUEST_ID",
+             "required": true,
+             "help": "location work request UUID",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "cancel-run",
+          "parser": {
+           "prog": "sqb admin cancel-run",
+           "description": "Request cancellation through privileged database access; the fact, projection and security audit commit together. Active warehouse claims remain held until execution ends.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "RUN_ID",
+             "required": true,
+             "help": "run UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--event-id"
+             ],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "request UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reason"
+             ],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the cancellation fact and security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "change-trigger",
+          "parser": {
+           "prog": "sqb admin change-trigger",
+           "description": "Change runtime trigger state using privileged database access; the fact, projection and security audit commit together.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "TRIGGER_ID",
+             "required": true,
+             "help": "current trigger UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_trigger_change",
+             "metavar": "CHANGE",
+             "choices": [
+              "enable",
+              "pause",
+              "reset-default",
+              "set-cursor",
+              "reset-cursor"
+             ],
+             "required": true,
+             "help": "runtime change; reset-default restores the published status default",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--event-id"
+             ],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "request UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reason"
+             ],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the operator fact and security audit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--cursor"
+             ],
+             "dest": "admin_cursor",
+             "help": "RFC3339 timestamp with offset; required only for set-cursor",
+             "group": 1
+            }
+           ]
+          }
+         }
+        ],
+        "choices_help": [
+         {
+          "dest": "create-location",
+          "metavar": "create-location",
+          "help": "register a location with an atomic security audit record"
+         },
+         {
+          "dest": "create-principal",
+          "metavar": "create-principal",
+          "help": "create a person or service account without granting permissions"
+         },
+         {
+          "dest": "issue-location-token",
+          "metavar": "issue-location-token",
+          "help": "issue a bounded location credential, returned once as JSON"
+         },
+         {
+          "dest": "issue-principal-token",
+          "metavar": "issue-principal-token",
+          "help": "issue a bounded principal credential, returned once as JSON"
+         },
+         {
+          "dest": "revoke-token",
+          "metavar": "revoke-token",
+          "help": "revoke a credential by UUID"
+         },
+         {
+          "dest": "request-run",
+          "metavar": "request-run",
+          "help": "queue a pinned published job with an atomic security audit"
+         },
+         {
+          "dest": "rerun-run",
+          "metavar": "rerun-run",
+          "help": "retry a terminal run or exactly its failed and skipped nodes"
+         },
+         {
+          "dest": "cancel-run",
+          "metavar": "cancel-run",
+          "help": "request run cancellation with an atomic audit and retry identity"
+         },
+         {
+          "dest": "check-location",
+          "metavar": "check-location",
+          "help": "request an outbound location connection check with an atomic audit"
+         },
+         {
+          "dest": "location-work",
+          "metavar": "location-work",
+          "help": "read a location work request and its result"
+         },
+         {
+          "dest": "change-trigger",
+          "metavar": "change-trigger",
+          "help": "change trigger status or cursor with an atomic audit and retry identity"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "name": "server",
+     "parser": {
+      "prog": "sqb server",
+      "description": "Run the native control API and scheduler without importing project Python.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--launchers"],
+        "dest": "control_launchers",
+        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--host"
+        ],
+        "dest": "control_host",
+        "default": "127.0.0.1",
+        "help": "IP address to listen on (default: 127.0.0.1)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--port"
+        ],
+        "dest": "control_port",
+        "default": 8000,
+        "type": "int",
+        "help": "TCP port, or 0 to choose a free port (default: 8000)",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--no-scheduler"
+        ],
+        "dest": "control_no_scheduler",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "serve the API without the embedded scheduler",
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
+         "--openapi"
+        ],
+        "dest": "control_openapi",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "print the OpenAPI contract as JSON without opening a database",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
+     "name": "scheduler",
+     "parser": {
+      "prog": "sqb scheduler",
+      "description": "Run the lease-guarded native scheduler against the server's control database.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--launchers"],
+        "dest": "control_launchers",
+        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
      "name": "compile",
      "parser": {
       "prog": "sqb compile",
@@ -7592,6 +8553,26 @@
     }
    ],
    "choices_help": [
+    {
+     "dest": "location",
+     "metavar": "location",
+     "help": "compile and publish code-location snapshots over HTTP"
+    },
+    {
+     "dest": "admin",
+     "metavar": "admin",
+     "help": "administer locations and credentials through privileged database access"
+    },
+    {
+     "dest": "server",
+     "metavar": "server",
+     "help": "run the native control API and scheduler"
+    },
+    {
+     "dest": "scheduler",
+     "metavar": "scheduler",
+     "help": "run a standalone lease-guarded scheduler"
+    },
     {
      "dest": "cost",
      "metavar": "cost",

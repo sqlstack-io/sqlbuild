@@ -237,7 +237,7 @@ impl NativeCompiledSeed {
         })
     }
 
-    fn current_destination(&self, py: Python<'_>) -> PyResult<DestinationFact> {
+    pub(crate) fn current_destination(&self, py: Python<'_>) -> PyResult<DestinationFact> {
         if let Some(defaulted) = &self.defaulted {
             return Ok(defaulted.clone());
         }

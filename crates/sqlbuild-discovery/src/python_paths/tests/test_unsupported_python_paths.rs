@@ -11,6 +11,8 @@ fn given_project_python_when_listing_unsupported_paths_then_only_undocumented_ro
             files: &[
                 "adapter.py",
                 "python/orders.py",
+                "orchestration/jobs.py",
+                "orchestration/nested/calendar.py",
                 "functions/python/f.py",
                 "macros/m.py",
                 "models/_macros/m.py",

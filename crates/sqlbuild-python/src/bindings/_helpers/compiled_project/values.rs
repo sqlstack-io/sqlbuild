@@ -9,6 +9,7 @@ use serde_json::{Map, Number, Value};
 
 use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::models::NativeRecord;
 
 const DATACLASS_FIELDS: &str = "__dataclass_fields__";
 const INSTANCE_DICT: &str = "__dict__";
@@ -48,6 +49,16 @@ pub(crate) fn plain_value(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     }
     if let Ok(mapping) = value.downcast::<PyDict>() {
         return object_value(mapping);
+    }
+    if let Ok(record) = value.cast::<NativeRecord>() {
+        let record = record.get();
+        let mut entries = Vec::with_capacity(record.values.len());
+        for (field, item) in record.spec.fields.iter().zip(&record.values) {
+            if !field.name.starts_with(PRIVATE_PREFIX) {
+                entries.push((field.name.to_owned(), plain_value(item.bind(value.py()))?));
+            }
+        }
+        return Ok(sorted_object(entries));
     }
     object_like_value(value)
 }

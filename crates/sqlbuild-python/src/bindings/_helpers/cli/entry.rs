@@ -17,6 +17,7 @@ use sqlbuild_cli::dispatch::main::invocation_policy::invocation_policy;
 use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPolicy};
 
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
+use sqlbuild_orchestration::runs::models::RunOutcome;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
@@ -122,9 +123,7 @@ fn print_object(value: &Bound<'_, PyAny>, stream: Option<&str>, end: Option<&str
     if let Some(end) = end {
         keywords.set_item("end", end)?;
     }
-    py.import("builtins")?
-        .getattr("print")?
-        .call((value,), Some(&keywords))?;
+    imported(py, "builtins", "print")?.call((value,), Some(&keywords))?;
     Ok(())
 }
 
@@ -547,7 +546,11 @@ fn observed_dispatch<'py>(
         if let Some(session) = &invocation.recall.session {
             session.publish_context(false);
         }
-        return dispatch_command(&invocation.args, invocation.handlers.clone());
+        return dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        );
     }
     let command: String = invocation.command_name();
     drop(take_failure_cause());
@@ -603,11 +606,14 @@ fn observed_dispatch<'py>(
             "invocation_started",
             started_payload()?,
         )?)?;
-        let dispatched: PyResult<Bound<'py, PyAny>> =
-            match dispatch_command(&invocation.args, invocation.handlers.clone()) {
-                Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-                dispatched => dispatched,
-            };
+        let dispatched: PyResult<Bound<'py, PyAny>> = match dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        ) {
+            Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
+            dispatched => dispatched,
+        };
         match dispatched {
             Ok(exit_code) => {
                 let payload: Bound<'py, PyDict> = PyDict::new(py);
@@ -766,6 +772,31 @@ fn parsed_invocation<'py>(
             Ok(exit_code)
         };
     }
+    let namespace = args.getattr("__dict__")?.cast_into::<PyDict>()?;
+    let command: Option<String> = namespace
+        .get_item("command")?
+        .map(|value| value.extract())
+        .transpose()?;
+    let location_command: Option<String> = namespace
+        .get_item("location_command")?
+        .map(|value| value.extract())
+        .transpose()?;
+    if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
+        return within(&host::redirect_stdout_to_stderr(py)?, |_| {
+            execute_parsed_invocation(args, handlers, identity, use_color)
+        });
+    }
+    execute_parsed_invocation(args, handlers, identity, use_color)
+}
+
+/// Runtime stream routing must cover extension discovery, invocation scopes and their teardown.
+fn execute_parsed_invocation<'py>(
+    args: Bound<'py, PyAny>,
+    handlers: Option<Bound<'py, PyAny>>,
+    identity: &Bound<'py, PyAny>,
+    use_color: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py = args.py();
     let facts: CommandFacts = command_facts(&args)?;
     let policy: InvocationPolicy = invocation_policy(&facts);
     let recall: InvocationRecall = if policy.recalled {
@@ -841,6 +872,30 @@ fn parsed_invocation<'py>(
         Ok(_) | Err(_) => None,
     };
     let finished: PyResult<()> = finish_invocation_recall(py, &recall, exit_status);
+    let worker = recall
+        .worker
+        .lock()
+        .map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err("worker completion lock is unavailable")
+        })?
+        .take();
+    if let Some(worker) = worker {
+        let code = match &finished {
+            Ok(()) => exit_status.unwrap_or(1),
+            Err(_) => 1,
+        };
+        let outcome = worker.finish(py, i32::try_from(code).unwrap_or(1))?;
+        host::write_console(
+            py,
+            "stderr",
+            &format!("Worker execution completed: {}\n", outcome.as_str()),
+        )?;
+        if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {
+            dispatched?;
+            finished?;
+            return exit(py, code.max(1));
+        }
+    }
     let exit_code: Bound<'py, PyAny> = dispatched?;
     finished?;
     Ok(exit_code)

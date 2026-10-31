@@ -24,6 +24,7 @@ rusqlite.workspace = true
 rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 signal-hook.workspace = true
 sqlbuild-analysis.workspace = true
 sqlbuild-attachments.workspace = true
@@ -35,6 +36,7 @@ sqlbuild-cursor.workspace = true
 sqlbuild-discovery.workspace = true
 sqlbuild-host.workspace = true
 sqlbuild-model-config.workspace = true
+sqlbuild-orchestration.workspace = true
 sqlbuild-project.workspace = true
 sqlbuild-pysource.workspace = true
 sqlbuild-recall.workspace = true
@@ -45,6 +47,8 @@ sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
 stacker.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

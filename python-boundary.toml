@@ -13,6 +13,21 @@
 remaining_lines = 0
 
 [[stays]]
+path = "orchestration.py"
+rule = 3
+note = "Public orchestration facade: re-exports only."
+
+[[stays]]
+path = "orchestration_declarations/models.py"
+rule = 3
+note = "Public job and schedule authoring records only; selection resolution, validation and scheduling stay native."
+
+[[stays]]
+path = "orchestration_declarations/main/compile_snapshot.py"
+rule = 3
+note = "Public declaration compiler: one-line delegation to build_orchestration_snapshot; no Python discovery, validation or snapshot logic."
+
+[[stays]]
 path = "executor"
 rule = 1
 note = "Runs plans against warehouses; a separate later decision."

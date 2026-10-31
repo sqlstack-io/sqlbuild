@@ -1,6 +1,14 @@
+use std::collections::BTreeMap;
+
+use serde_json::json;
+
+use crate::argv::main::job_settings_arguments::job_settings_arguments;
 use crate::argv::models::{ArgvOutcome, Value};
 use crate::argv::tests::helpers::{parse, strings};
-use crate::argv::tests::test_types::{ExitTestCase, HelpTextTestCase, ParsedValueTestCase};
+use crate::argv::tests::test_types::{
+    ExitTestCase, HelpTextTestCase, JobSettingsRejectionTestCase, JobSettingsTestCase,
+    ParsedValueTestCase,
+};
 
 #[test]
 fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values() {
@@ -170,5 +178,93 @@ fn given_command_help_when_parsing_then_hidden_options_are_left_out() {
         assert_eq!(outcome.parsed, Err(0), "{}", test_case.description);
         assert_eq!(present, test_case.expected_present, "{help}");
         assert_eq!(absent, test_case.expected_absent, "{help}");
+    }
+}
+
+#[test]
+fn given_job_settings_when_validating_then_values_survive_the_build_parser() {
+    let test_cases = [
+        JobSettingsTestCase {
+            description: "inverse flags and option-like values survive the build parser",
+            settings: BTreeMap::from([
+                ("concurrency".into(), json!(3)),
+                ("load_sources".into(), json!(false)),
+                ("reload".into(), json!(false)),
+                ("run_tests".into(), json!(false)),
+                ("full_refresh".into(), json!(true)),
+                ("warehouse".into(), json!("--full-refresh")),
+            ]),
+            expected_values: vec![
+                ("concurrency", Value::Int("3".into())),
+                ("load_sources", Value::Bool(false)),
+                ("reload", Value::Bool(false)),
+                ("run_tests", Value::Bool(false)),
+                ("full_refresh", Value::Bool(true)),
+                ("warehouse", Value::Str("--full-refresh".into())),
+            ],
+            expected_empty: false,
+        },
+        JobSettingsTestCase {
+            description: "default-valued flags do not become explicit options",
+            settings: BTreeMap::from([
+                ("run_tests".into(), json!(true)),
+                ("full_refresh".into(), json!(false)),
+                ("debug".into(), json!(false)),
+            ]),
+            expected_values: vec![],
+            expected_empty: true,
+        },
+    ];
+    for test_case in test_cases {
+        let settings = job_settings_arguments(&test_case.settings).expect(test_case.description);
+        assert_eq!(
+            settings.is_empty(),
+            test_case.expected_empty,
+            "{}",
+            test_case.description
+        );
+        let mut arguments: Vec<String> = vec!["build".to_owned()];
+        arguments.extend(settings);
+        let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+        let parsed = parse(&arguments).parsed.expect(test_case.description);
+        for (name, expected_value) in test_case.expected_values {
+            assert_eq!(
+                parsed.get(name),
+                Some(&expected_value),
+                "{}",
+                test_case.description
+            );
+        }
+    }
+}
+
+#[test]
+fn given_conflicting_job_settings_when_validating_then_options_are_rejected() {
+    let test_cases = [
+        JobSettingsRejectionTestCase {
+            description: "no-load conflicts with reload",
+            settings: BTreeMap::from([
+                ("load_sources".into(), json!(false)),
+                ("reload".into(), json!(true)),
+            ]),
+            expected_error: "mutually exclusive",
+        },
+        JobSettingsRejectionTestCase {
+            description: "load conflicts with reload",
+            settings: BTreeMap::from([
+                ("load_sources".into(), json!(true)),
+                ("reload".into(), json!(true)),
+            ]),
+            expected_error: "mutually exclusive",
+        },
+    ];
+    for test_case in test_cases {
+        assert!(
+            job_settings_arguments(&test_case.settings)
+                .expect_err(test_case.description)
+                .contains(test_case.expected_error),
+            "{}",
+            test_case.description
+        );
     }
 }

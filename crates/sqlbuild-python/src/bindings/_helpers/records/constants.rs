@@ -982,6 +982,7 @@ const CLI_ENTRYPOINT_HANDLERS: RecordSpec = RecordSpec {
         FieldSpec::new("run_refactor", FieldDefault::None),
         FieldSpec::new("run_recall", FieldDefault::None),
         FieldSpec::new("run_review", FieldDefault::None),
+        FieldSpec::new("run_location", FieldDefault::None),
     ],
 };
 const COMMAND_WAREHOUSE_SCOPE: RecordSpec = RecordSpec {
@@ -1560,6 +1561,7 @@ const CLI_COMMAND: EnumSpec = EnumSpec {
         ("DIFF", "diff"),
         ("REVIEW", "review"),
         ("DEBUG", "debug"),
+        ("LOCATION", "location"),
         ("LINEAGE", "lineage"),
         ("QUERY", "query"),
         ("COST", "cost"),

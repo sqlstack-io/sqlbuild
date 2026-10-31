@@ -1,6 +1,16 @@
-//! Which parsed invocations run without Python, decided from the parsed values alone.
+//! Resolve native invocations and control-service settings from parsed arguments.
 
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+
+use chrono::{DateTime, Utc};
+use serde_json::json;
+use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
+use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::store::errors::ControlError;
+use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
@@ -12,7 +22,8 @@ use crate::native_commands::constants::{
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{
-    CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions, SkillsOptions,
+    ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
+    SkillsOptions,
 };
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
 
@@ -25,15 +36,191 @@ pub(crate) fn review_json_failure(arguments: &[String], outcome: &ArgvOutcome) -
             .is_some_and(|failure| failure.prog == REVIEW_PROG)
 }
 
-fn text(namespace: &Namespace, name: &str) -> Option<String> {
+pub(crate) fn text(namespace: &Namespace, name: &str) -> Option<String> {
     match namespace.get(name) {
         Some(Value::Str(text) | Value::Path(text)) => Some(text.clone()),
         _ => None,
     }
 }
 
-fn flag(namespace: &Namespace, name: &str) -> bool {
+pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
     namespace.get(name) == Some(&Value::Bool(true))
+}
+
+pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, ControlError> {
+    let value = text(namespace, "admin_subject").unwrap_or_default();
+    let action = text(namespace, "admin_command");
+    if action.as_deref() == Some("create-location") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("location name is required".into()));
+        }
+        return Ok(ControlAdmin::CreateLocation(value));
+    }
+    if action.as_deref() == Some("create-principal") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("principal name is required".into()));
+        }
+        let kind = match text(namespace, "admin_principal_kind").as_deref() {
+            Some("service_account") => PrincipalKind::ServiceAccount,
+            _ => PrincipalKind::Person,
+        };
+        return Ok(ControlAdmin::CreatePrincipal(value, kind));
+    }
+    let id = Uuid::parse_str(&value)
+        .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
+    match action.as_deref() {
+        Some("location-work") => Ok(ControlAdmin::LocationWork(id)),
+        Some("check-location") => {
+            let request_id =
+                Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                    .map_err(|_| ControlError::Invalid("--request-id must be a UUID".into()))?;
+            let target = text(namespace, "admin_target").unwrap_or_default();
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if target.trim().is_empty() || reason.trim().is_empty() {
+                return Err(ControlError::Invalid(
+                    "target and reason must not be blank".into(),
+                ));
+            }
+            Ok(ControlAdmin::RequestLocationWork(LocationWorkRequest {
+                request_id,
+                location_id: id,
+                target,
+                reason,
+                work: LocationWork::CheckConnection {},
+            }))
+        }
+        Some("change-trigger" | "cancel-run" | "request-run" | "rerun-run") => {
+            let identity_option = if matches!(action.as_deref(), Some("request-run" | "rerun-run"))
+            {
+                "--run-id"
+            } else {
+                "--event-id"
+            };
+            let event_id = Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                .map_err(|_| ControlError::Invalid(format!("{identity_option} must be a UUID")))?;
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if reason.trim().is_empty() {
+                return Err(ControlError::Invalid("--reason must not be blank".into()));
+            }
+            if matches!(action.as_deref(), Some("request-run" | "rerun-run")) {
+                let priority = match namespace.get("admin_priority") {
+                    Some(Value::Int(value)) => value.parse::<i64>().map_err(|_| {
+                        ControlError::Invalid("--priority must fit a signed 64-bit integer".into())
+                    })?,
+                    _ => 0,
+                };
+                if action.as_deref() == Some("rerun-run") {
+                    return Ok(ControlAdmin::Rerun(RerunRequest {
+                        run_id: event_id,
+                        source_run_id: id,
+                        from_failure: flag(namespace, "admin_from_failure"),
+                        reason,
+                        priority,
+                    }));
+                }
+                let target = text(namespace, "admin_target").unwrap_or_default();
+                let job_key = text(namespace, "admin_job").unwrap_or_default();
+                if target.trim().is_empty() || job_key.trim().is_empty() {
+                    return Err(ControlError::Invalid(
+                        "target and job must not be blank".into(),
+                    ));
+                }
+                return Ok(ControlAdmin::RequestJobRun(JobRunRequest {
+                    run_id: event_id,
+                    location_id: id,
+                    target,
+                    job_key,
+                    reason,
+                    priority,
+                }));
+            }
+            if action.as_deref() == Some("cancel-run") {
+                return Ok(ControlAdmin::CancelRun {
+                    event_id,
+                    run_id: id,
+                    reason,
+                });
+            }
+            let mut change = json!({
+                "kind": text(namespace, "admin_trigger_change").unwrap_or_default().replace('-', "_"),
+            });
+            let cursor = text(namespace, "admin_cursor");
+            if let Some(cursor) = &cursor {
+                change["time"] = json!(cursor);
+            }
+            let change: TriggerChange = serde_json::from_value(change)
+                .map_err(|error| ControlError::Invalid(format!("trigger change: {error}")))?;
+            if cursor.is_some() && !matches!(change, TriggerChange::SetCursor { .. }) {
+                return Err(ControlError::Invalid(
+                    "--cursor is only valid for set-cursor".into(),
+                ));
+            }
+            Ok(ControlAdmin::ChangeTrigger {
+                event_id,
+                trigger_id: id,
+                change,
+                reason,
+            })
+        }
+        Some("issue-location-token" | "issue-principal-token") => {
+            let expiry = DateTime::parse_from_rfc3339(
+                &text(namespace, "admin_expires_at").unwrap_or_default(),
+            )
+            .map_err(|_| ControlError::Invalid("--expires-at must be an RFC3339 timestamp".into()))?
+            .with_timezone(&Utc);
+            if expiry <= Utc::now() {
+                return Err(ControlError::Invalid(
+                    "token expiry must be in the future".into(),
+                ));
+            }
+            let scope = match action.as_deref() {
+                Some("issue-principal-token") => CredentialScope::Principal { principal_id: id },
+                _ => CredentialScope::Location { location_id: id },
+            };
+            Ok(ControlAdmin::IssueToken(scope, expiry))
+        }
+        Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
+        _ => Err(ControlError::Invalid(
+            "an administration command is required".into(),
+        )),
+    }
+}
+
+pub(crate) fn control_address(
+    namespace: &Namespace,
+    standalone: bool,
+) -> Result<Option<SocketAddr>, ControlError> {
+    if standalone {
+        return Ok(None);
+    }
+    let host: IpAddr = text(namespace, "control_host")
+        .unwrap_or_else(|| "127.0.0.1".into())
+        .parse()
+        .map_err(|_| ControlError::Invalid("--host must be an IP address".into()))?;
+    let port = match namespace.get("control_port") {
+        Some(Value::Int(value)) => value
+            .parse::<u16>()
+            .map_err(|_| ControlError::Invalid("--port must be between 0 and 65535".into()))?,
+        _ => 8000,
+    };
+    Ok(Some(SocketAddr::new(host, port)))
+}
+
+pub(crate) fn control_database(namespace: &Namespace) -> Result<String, ControlError> {
+    let variable = text(namespace, "control_database_env")
+        .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into());
+    match std::env::var(&variable) {
+        Ok(value) => Ok(value),
+        Err(std::env::VarError::NotPresent) => Ok(PathBuf::from(
+            text(namespace, "project_dir").unwrap_or_else(|| ".".into()),
+        )
+        .join(".sqlbuild/control.sqlite3")
+        .to_string_lossy()
+        .into_owned()),
+        Err(std::env::VarError::NotUnicode(_)) => Err(ControlError::Invalid(
+            "control database variable must be UTF-8".into(),
+        )),
+    }
 }
 
 /// The strings of a list attribute, or `None` when it holds anything else.

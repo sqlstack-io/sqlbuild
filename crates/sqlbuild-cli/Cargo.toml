@@ -17,7 +17,9 @@ path = "src/bin/sqlbuild.rs"
 
 [dependencies]
 blake3.workspace = true
+chrono.workspace = true
 getrandom.workspace = true
+reqwest.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
 sqlbuild-build-features.workspace = true
@@ -26,15 +28,20 @@ sqlbuild-config.workspace = true
 sqlbuild-core.workspace = true
 sqlbuild-cursor.workspace = true
 sqlbuild-model-config.workspace = true
+sqlbuild-orchestration.workspace = true
 sqlbuild-rules.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 ctrlc.workspace = true
+same-file.workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true
 tempfile.workspace = true
 
 [lints]

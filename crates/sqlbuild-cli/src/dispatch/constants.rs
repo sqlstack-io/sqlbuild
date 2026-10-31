@@ -515,6 +515,27 @@ pub(crate) const DEBUG_ROUTE: Route = routed(
     },
 );
 
+const LOCATION_ARGUMENTS: [Field; 9] = [
+    field("project_dir", Source::EffectiveProjectDir),
+    SELECTED_TARGET,
+    same("location_id"),
+    attr("server_url", "location_server_url"),
+    attr("generation", "location_generation"),
+    attr("image_id", "location_image_id"),
+    attr("action", "location_command"),
+    attr("run_id", "location_run_id"),
+    attr("claim_id", "location_claim_id"),
+];
+pub(crate) const LOCATION_ROUTE: Route = routed(
+    "run_location",
+    "run_location_command",
+    &LOCATION_ARGUMENTS,
+    CallShape {
+        slot_positional: 0,
+        implementation_keywords: true,
+    },
+);
+
 const JANITOR_FIELDS: [Field; 11] = [
     PROJECT_DIR,
     NO_COLOR,

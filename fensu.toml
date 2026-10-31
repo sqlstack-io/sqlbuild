@@ -229,7 +229,7 @@ reason = "Native code resolves these through the sqlbuild._native_host name tabl
 
 [[targets.python.dead_code.roots]]
 modules = ["sqlbuild.compiler.discovery._helpers.filesystem.project_modules"]
-symbols = ["import_python_root_module", "install_python_root_package", "load_materialize_function", "load_provider_module", "load_python_node_module", "load_sink_module", "module_functions", "module_provider_classes", "parameter_annotations", "provider_usages", "requires_arguments", "restore_python_root_modules", "source_line", "validate_event_exporter_signature"]
+symbols = ["import_python_root_module", "install_python_root_package", "load_materialize_function", "load_orchestration_module", "load_provider_module", "load_python_node_module", "load_sink_module", "module_functions", "module_provider_classes", "parameter_annotations", "provider_usages", "requires_arguments", "restore_python_root_modules", "source_line", "validate_event_exporter_signature"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
@@ -1566,6 +1566,24 @@ reason = "CompactAnalysisJob holds a prepared analysis closure, which cannot imp
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
+path = "crates/sqlbuild-orchestration/src/credentials/models.rs"
+symbols = ["IssuedToken"]
+reason = "IssuedToken implements Debug manually to redact its bearer credential; deriving Debug would expose the secret."
+
+[[targets.rust.rule_exceptions]]
+rule = "XSB072"
+path = "crates/sqlbuild-python/src/bindings/_helpers/compiled_project/snapshot.rs"
+symbols = ["NativeOrchestrationSnapshot"]
+reason = "The pyclass module attribute names sqlbuild._native but executes no Python call. The struct retains only SnapshotInput; binding functions remain checked."
+
+[[targets.rust.rule_exceptions]]
+rule = "XSB072"
+path = "crates/sqlbuild-python/src/bindings/_helpers/compiled_project/snapshot_worker.rs"
+symbols = ["NativeOrchestrationWorker"]
+reason = "The pyclass module attribute names sqlbuild._native but executes no Python call. The struct retains only native worker ownership; binding functions remain checked."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
 path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
 
@@ -1617,6 +1635,7 @@ crate_names = [
     "sqlbuild-discovery",
     "sqlbuild-host",
     "sqlbuild-model-config",
+    "sqlbuild-orchestration",
     "sqlbuild-project",
     "sqlbuild-pysource",
     "sqlbuild-python",
@@ -2635,6 +2654,7 @@ module_layers = [
     "lineage/lineage_command=commands",
     "lineage/lineage_facts=project",
     "load=commands",
+    "location_command=commands",
     "macro_bridge=front",
     "manifest=compile",
     "microbatches=plan",

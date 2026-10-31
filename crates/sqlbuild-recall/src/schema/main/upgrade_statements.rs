@@ -1,6 +1,7 @@
 //! `upgrade_statements`: what an administrator runs to bring an observed store up to this build's schema.
 
-use crate::schema::_helpers::rendering::sqlite_identifier;
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::schema::_helpers::version_row::version_row_statement;
 use crate::schema::constants::{ALL_TABLES, RECALL_SCHEMA_VERSION};
 use crate::schema::main::add_column_statement::add_column_statement;

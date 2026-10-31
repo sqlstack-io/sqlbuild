@@ -244,6 +244,17 @@ def load_sink_module(*, file_path: Path, project_dir: Path) -> ModuleType:
     )
 
 
+def load_orchestration_module(*, file_path: Path, project_dir: Path) -> ModuleType:
+    """Execute an orchestration module with the project's normal package imports."""
+
+    return _load_project_package_module(
+        file_path=file_path,
+        project_dir=project_dir,
+        file_label="orchestration",
+        error_type=PythonNodeDiscoveryError,
+    )
+
+
 def load_materialize_function(
     *, file_path: Path, project_dir: Path
 ) -> Callable[..., object] | None:
@@ -338,6 +349,8 @@ def _exec_project_module(
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
     except Exception as error:
+        if sys.modules.get(module_name) is module:
+            sys.modules.pop(module_name, None)
         raise error_type(
             f"Failed to import {file_label} file {file_path.relative_to(project_dir)}: {error}"
         ) from error

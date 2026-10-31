@@ -4,7 +4,14 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use crate::records::models::{RecallValue, RowEnvelope};
-use crate::schema::models::Table;
+use crate::schema::models::{ColumnType, Table};
+
+/// A relational insert or lookup and its borrowed, typed parameters.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecallStatement<'a> {
+    pub sql: String,
+    pub values: Vec<(&'a RecallValue, ColumnType)>,
+}
 
 /// One open store file. Only one thread uses a store.
 #[derive(Debug)]
@@ -47,7 +54,7 @@ pub enum QuarantineOutcome {
 }
 
 /// A row whose key was already stored with different content; the first row is kept.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 pub struct ConflictEvidence {
     pub table: Table,
     pub record_key: String,
@@ -56,7 +63,9 @@ pub struct ConflictEvidence {
 }
 
 /// What one insert batch did, per table.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
 pub struct InsertOutcome {
     /// Rows written or already present with equal content, by table.
     pub delivered: Vec<(Table, u64)>,

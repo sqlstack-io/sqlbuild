@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from sqlbuild.orchestration import Schedule
+
 
 @dataclass(frozen=True)
 class HeaderProjectionTestCase:
@@ -190,3 +192,72 @@ class QuotedHookBoundaryTestCase:
     description: str
     argument: str
     expected_sql: str
+
+
+@dataclass(frozen=True)
+class SnapshotCatalogTestCase:
+    description: str
+    files: dict[str, str]
+    expected_kinds: frozenset[str]
+
+
+@dataclass(frozen=True)
+class SnapshotRejectionTestCase:
+    description: str
+    files: dict[str, str]
+    nodes: dict[str, object]
+    expected_compiler_errors: bool
+    expected_message: str
+
+
+@dataclass(frozen=True)
+class SnapshotEnvironmentTestCase:
+    description: str
+    first_lockfile: str
+    second_lockfile: str
+    expected_environment_count: int
+
+
+@dataclass(frozen=True)
+class SnapshotScheduleTestCase:
+    description: str
+    schedule: Schedule
+    expected_selection: tuple[str, ...]
+    expected_controls: dict[str, object] = field(
+        default_factory=lambda: {
+            "starts_at": None,
+            "default_status": "running",
+            "catch_up": "latest",
+        }
+    )
+
+
+@dataclass(frozen=True)
+class SnapshotDeclarationRejectionTestCase:
+    description: str
+    job_description: str = "Orders."
+    select: str = "orders"
+    cron: str = "0 2 * * *"
+    timezone: str = "UTC"
+    settings: dict[str, object] = field(default_factory=dict)
+    concurrency: int | None = None
+    copies: int = 1
+    expected_message: str = ""
+    schedule: Schedule | None = None
+
+
+@dataclass(frozen=True)
+class SnapshotDiscoveryTestCase:
+    description: str
+    files: dict[str, str]
+    expected_jobs: tuple[str, ...]
+    declarations: tuple[()] | None = None
+    expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SnapshotDiscoveryRejectionTestCase:
+    description: str
+    files: dict[str, str]
+    expected_error: type[Exception]
+    expected_message: str

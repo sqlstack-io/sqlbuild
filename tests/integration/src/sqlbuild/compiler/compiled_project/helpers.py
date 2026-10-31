@@ -8,7 +8,8 @@ from collections import Counter
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from uuid import UUID
 
 import pytest
 
@@ -46,6 +47,20 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 if TYPE_CHECKING:
     from sqlbuild._native import CompileInputsView
+
+METADATA: dict[str, Any] = {
+    "location_id": str(UUID(int=1)),
+    "target": "development",
+    "generation": 1,
+    "git_revision": None,
+    "git_dirty": False,
+    "git_author": None,
+    "image_id": None,
+    "environment_hash": "test-environment",
+    "sqb_version": "not-the-installed-version",
+    "nodes": {},
+    "documents": {},
+}
 
 TYPE_PROOF_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (

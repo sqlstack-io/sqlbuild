@@ -260,6 +260,22 @@ impl NativeCompiledModel {
         self.read(py, |record, py| read(compiled_of(record)?, py))
     }
 
+    /// Read the effective destination, including namespace overlays, without a Python projection.
+    pub(crate) fn read_destination<T>(
+        &self,
+        py: Python<'_>,
+        read: impl FnOnce(&DestinationFact) -> PyResult<T>,
+    ) -> PyResult<T> {
+        self.compiled(py, |compiled, _| {
+            read(
+                self.overlay
+                    .destination
+                    .as_ref()
+                    .unwrap_or(&compiled.destination),
+            )
+        })
+    }
+
     /// This view's typed analysis as the owner's model facts read it, and the model's name.
     pub(crate) fn analysis_fact(&self, py: Python<'_>) -> PyResult<(String, ModelAnalysisFact)> {
         self.read(py, |record, _| {
@@ -552,16 +568,11 @@ impl NativeCompiledModel {
 
     #[getter]
     pub(crate) fn destination(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        self.compiled(py, |compiled, py| {
+        self.read_destination(py, |destination| {
             self.projections
                 .destination
                 .get_or_try_init(py, || {
                     let classes: InputViewClasses<'_> = view_classes(&self.owner, py)?;
-                    let destination: &DestinationFact = self
-                        .overlay
-                        .destination
-                        .as_ref()
-                        .unwrap_or(&compiled.destination);
                     relation_location(&classes.compiled, destination)
                 })
                 .map(|destination| destination.clone_ref(py))
@@ -612,12 +623,7 @@ impl NativeCompiledModel {
     /// `(database, schema, name)` of the model's destination.
     #[getter]
     pub(crate) fn destination_row(&self, py: Python<'_>) -> PyResult<DestinationRow> {
-        self.compiled(py, |compiled, _| {
-            let destination: &DestinationFact = self
-                .overlay
-                .destination
-                .as_ref()
-                .unwrap_or(&compiled.destination);
+        self.read_destination(py, |destination| {
             Ok((
                 destination.database.clone(),
                 destination.schema.clone(),

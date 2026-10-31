@@ -1738,6 +1738,48 @@ class NativeCompiledAudit:
     @property
     def meta(self) -> dict[str, object] | None: ...
 
+class NativeOrchestrationSnapshot:
+    """A compiled data-only publication retained natively until transport."""
+
+    def to_json(self) -> str: ...
+    def publish(self, server_url: str, bearer: str) -> str: ...
+    def start_worker(
+        self, server_url: str, bearer: str, identity: tuple[str, str]
+    ) -> NativeOrchestrationWorker: ...
+
+class NativeOrchestrationWorker:
+    """A verified claim owner with joined native heartbeat teardown."""
+
+    def execution_json(self) -> str: ...
+    def cancel_requested(self) -> bool: ...
+    def report(self, event_id: str, change_json: str) -> bool: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+def build_orchestration_snapshot(
+    project: CompiledProjectView,
+    metadata_json: str,
+    project_dir: Path,
+    *,
+    declarations: Sequence[object] | None = None,
+) -> NativeOrchestrationSnapshot: ...
+def run_location_command(
+    *,
+    project_dir: Path,
+    location_id: str,
+    selected_target: str,
+    generation: int,
+    server_url: str,
+    image_id: str | None = None,
+    action: str = "publish",
+) -> int: ...
+
 class NativeProjectView:
     @property
     def run_id(self) -> str: ...
@@ -7270,6 +7312,7 @@ class CliEntrypointHandlers(NativeRecord):
     run_refactor: Callable[..., int] | None
     run_recall: Callable[..., int] | None
     run_review: Callable[..., int] | None
+    run_location: Callable[..., int] | None
     def __init__(
         self,
         run_compile: Callable[[CompileCommandRequest], int],
@@ -7306,6 +7349,7 @@ class CliEntrypointHandlers(NativeRecord):
         run_refactor: Callable[..., int] | None = None,
         run_recall: Callable[..., int] | None = None,
         run_review: Callable[..., int] | None = None,
+        run_location: Callable[..., int] | None = None,
     ) -> None: ...
 
 class CommandWarehouseScope(NativeRecord):
@@ -8021,6 +8065,7 @@ class CliCommand(StrEnum):
     DIFF = "diff"
     REVIEW = "review"
     DEBUG = "debug"
+    LOCATION = "location"
     LINEAGE = "lineage"
     QUERY = "query"
     COST = "cost"

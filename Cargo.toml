@@ -10,6 +10,7 @@ members = [
     "crates/sqlbuild-config",
     "crates/sqlbuild-host",
     "crates/sqlbuild-recall",
+    "crates/sqlbuild-orchestration",
     "crates/sqlbuild-discovery",
     "crates/sqlbuild-scopes",
     "crates/sqlbuild-model-config",
@@ -39,6 +40,7 @@ order = [
     "sqlbuild-config",
     "sqlbuild-host",
     "sqlbuild-recall",
+    "sqlbuild-orchestration",
     "sqlbuild-model-config",
     "sqlbuild-discovery",
     "sqlbuild-render",
@@ -62,6 +64,7 @@ publish = false
 rust-version = "1.88"
 
 [workspace.dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 fensu-policy = "=0.22.0"
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"
@@ -112,13 +115,27 @@ errno = "0.3"
 windows-sys = { version = "0.61", default-features = false, features = ["Win32_System_Diagnostics_Debug"] }
 # Recall's local store: SQLite compiled in, so every build has the same engine version.
 rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
-rustix = { version = "1.1.4", default-features = false, features = ["fs", "std", "termios"] }
+rustix = { version = "1.1.4", default-features = false, features = ["fs", "process", "std", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 # Every crate relies on insertion-ordered JSON objects, which the extension has always built with.
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+croner = "=3.0.1"
+flate2 = "1"
+proptest = "1"
+same-file = "1"
+semver = "1"
+# Pin SQLx's driver crates together: its umbrella also resolves an incompatible SQLite engine.
+sqlx-core = { version = "=0.8.6", default-features = false, features = ["_rt-tokio", "_tls-rustls-ring-webpki", "chrono", "uuid", "json"] }
+sqlx-postgres = { version = "=0.8.6", default-features = false, features = ["chrono", "uuid", "json"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "process", "net"] }
+uuid = { version = "=1.18.1", features = ["v5", "v7", "serde"] }
+utoipa = { version = "5", features = ["chrono", "uuid"] }
 sqlbuild-analysis = { path = "crates/sqlbuild-analysis" }
 sqlbuild-attachments = { path = "crates/sqlbuild-attachments" }
 sqlbuild-build-features = { path = "crates/sqlbuild-build-features" }
@@ -133,6 +150,7 @@ sqlbuild-render = { path = "crates/sqlbuild-render" }
 sqlbuild-refactor = { path = "crates/sqlbuild-refactor" }
 sqlbuild-rules = { path = "crates/sqlbuild-rules" }
 sqlbuild-model-config = { path = "crates/sqlbuild-model-config" }
+sqlbuild-orchestration = { path = "crates/sqlbuild-orchestration" }
 sqlbuild-project = { path = "crates/sqlbuild-project" }
 sqlbuild-pysource = { path = "crates/sqlbuild-pysource" }
 sqlbuild-recall = { path = "crates/sqlbuild-recall" }
@@ -141,6 +159,7 @@ sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+subtle = "2"
 tempfile = "3"
 toml = "0.9"
 toml_edit = { version = "0.25", default-features = false, features = ["parse"] }

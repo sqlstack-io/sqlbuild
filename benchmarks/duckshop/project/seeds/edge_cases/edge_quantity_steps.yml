@@ -1,0 +1,7 @@
+seeds:
+  - name: edge_quantity_steps
+    description: Quantities whose seed destination inherits the target namespace.
+    tags: [edge_case]
+    columns:
+      - name: quantity
+        type: INTEGER

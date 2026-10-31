@@ -28,7 +28,9 @@ use crate::bindings::_helpers::boundary::python_calls::{
 };
 use crate::bindings::_helpers::cli::failure_cause::{FailureCause, report_failure_cause};
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
-use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::command_runtime::connection::{
+    local_database_files, project_connection_config,
+};
 use crate::bindings::_helpers::command_runtime::runtime_errors::{
     expected_resolution_error, resolution_message,
 };
@@ -39,6 +41,7 @@ use crate::bindings::_helpers::command_runtime::warehouses::{
 use crate::bindings::_helpers::compile_attachment::target::build_effective_target_namespace;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
+use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -357,6 +360,7 @@ fn build_report(
         ConnectionCheck::Skipped
     };
     Ok(DebugReport {
+        local_files: local_database_files(&facts.adapter_name, &connection_config)?,
         runtime: debug_runtime_lines(&runtime(py)?),
         configuration: debug_configuration_lines(&facts, &warehouses),
         providers: debug_provider_lines(&providers(&context.discovered_inputs)?),
@@ -381,15 +385,23 @@ pub(crate) fn run_debug_command(
     } else {
         project_dir.extract()?
     };
-    let report: DebugReport = build_report(
-        py,
-        &project_dir,
-        (
-            arguments.value("selected_target")?,
-            !arguments.flag("no_connection")?,
-        ),
-    )?;
-    let text: String = if arguments.flag("json_output")? {
+    let json_output = arguments.flag("json_output")?;
+    let build = || {
+        build_report(
+            py,
+            &project_dir,
+            (
+                arguments.value("selected_target")?,
+                !arguments.flag("no_connection")?,
+            ),
+        )
+    };
+    let report: DebugReport = if json_output {
+        within(&redirect_stdout_to_stderr(py)?, |_| build())?
+    } else {
+        build()?
+    };
+    let text: String = if json_output {
         format_debug_json(&report) + "\n"
     } else {
         let use_color: bool = !arguments.flag("no_color")? && stdout_supports_color(py)?;
