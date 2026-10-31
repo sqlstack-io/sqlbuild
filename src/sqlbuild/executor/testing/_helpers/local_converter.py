@@ -9,11 +9,13 @@ from collections.abc import Mapping
 from typing import Any
 
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
+from sqlbuild.executor.testing._helpers.local_duckdb import run_converted_statement
 from sqlbuild.executor.testing.constants import (
     LOCAL_TEST_ENGINE_CODE,
     SQLQUACK_CONVERT_TIMEOUT_SECONDS,
 )
 from sqlbuild.executor.testing.models import (
+    LocalStatementRun,
     LocalTestEngine,
     SqlQuackConversion,
     SqlQuackRefusal,
@@ -69,3 +71,19 @@ def _refusal(item: Mapping[str, Any]) -> SqlQuackRefusal:
         category=str(item.get("category", "")),
         reason=str(item.get("reason", "")),
     )
+
+
+def run_converted_query(*, engine: LocalTestEngine, sql: str) -> LocalStatementRun:
+    """Convert and run one diagnostic query; raises when it is refused or fails."""
+
+    conversion: SqlQuackConversion = convert_statement(engine=engine, sql=sql)
+    if not conversion.converted:
+        raise ExecutorInputError(
+            "SQLQuack refused the query: "
+            + "; ".join(refusal.describe() for refusal in conversion.refusals),
+            code=LOCAL_TEST_ENGINE_CODE,
+        )
+    run: LocalStatementRun = run_converted_statement(sql=conversion.sql, timeout_seconds=None)
+    if run.error is not None:
+        raise ExecutorInputError(run.error, code=LOCAL_TEST_ENGINE_CODE)
+    return run

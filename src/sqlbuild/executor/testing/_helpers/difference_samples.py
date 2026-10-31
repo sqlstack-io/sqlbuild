@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any, Final
 
@@ -33,8 +33,9 @@ def add_difference_samples(
     adapter: BaseAdapter,
     connection: Any,
     relations: Mapping[int, str] | None = None,
+    execute: Callable[[str], Any] | None = None,
 ) -> list[StepResult]:
-    """Attach bounded, redacted samples to failed expected-output steps."""
+    """Attach bounded, redacted samples to failed steps, run by `execute` when given."""
 
     sampled_results: list[StepResult] = []
     expected_steps: tuple[tuple[int, ChainStep], ...] = tuple(
@@ -59,6 +60,7 @@ def add_difference_samples(
                 adapter=adapter,
                 connection=connection,
                 actual_relation=actual_relation,
+                execute=execute,
             )
         if step_result.missing_row_count is not None and step_result.missing_row_count > 0:
             missing_samples = _best_effort_difference_samples(
@@ -68,6 +70,7 @@ def add_difference_samples(
                 adapter=adapter,
                 connection=connection,
                 actual_relation=actual_relation,
+                execute=execute,
             )
         sampled_results.append(
             replace(
@@ -117,6 +120,7 @@ def _fetch_difference_samples(
     adapter: BaseAdapter,
     connection: Any,
     actual_relation: str | None,
+    execute: Callable[[str], Any] | None,
 ) -> tuple[SqlTestDifferenceSample, ...]:
     sql: str = render_sql_test_difference_sample_sql(
         test_entry=test_entry,
@@ -127,7 +131,9 @@ def _fetch_difference_samples(
         sql_analysis_dialect=adapter.sql_analysis_dialect(),
         actual_relation=actual_relation,
     )
-    cursor: Any = adapter.execute(connection=connection, sql=sql)
+    cursor: Any = (
+        execute(sql) if execute is not None else adapter.execute(connection=connection, sql=sql)
+    )
     description: Any | None = getattr(cursor, "description", None)
     if description is None:
         return ()
@@ -156,6 +162,7 @@ def _best_effort_difference_samples(
     adapter: BaseAdapter,
     connection: Any,
     actual_relation: str | None,
+    execute: Callable[[str], Any] | None,
 ) -> tuple[SqlTestDifferenceSample, ...]:
     """Return samples when available without replacing a known comparison failure."""
 
@@ -167,6 +174,7 @@ def _best_effort_difference_samples(
             adapter=adapter,
             connection=connection,
             actual_relation=actual_relation,
+            execute=execute,
         )
     except ItemTimeoutError:
         raise

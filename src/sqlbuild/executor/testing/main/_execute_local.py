@@ -9,7 +9,11 @@ from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_sql
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.testing._helpers.comparison import build_step_results
-from sqlbuild.executor.testing._helpers.local_converter import convert_statement
+from sqlbuild.executor.testing._helpers.difference_samples import add_difference_samples
+from sqlbuild.executor.testing._helpers.local_converter import (
+    convert_statement,
+    run_converted_query,
+)
 from sqlbuild.executor.testing._helpers.local_duckdb import run_converted_statement
 from sqlbuild.executor.testing._helpers.local_results import refused_message, single_step_result
 from sqlbuild.executor.testing._helpers.timeout_policy import sql_test_timeout
@@ -80,7 +84,13 @@ def execute_local_sql_test(
             policy=policy,
             elapsed_seconds=time.monotonic() - started,
         )
-    step_results: list[StepResult] = build_step_results(list(run.rows))
+    step_results: list[StepResult] = add_difference_samples(
+        step_results=build_step_results(list(run.rows)),
+        test_entry=test_entry,
+        adapter=adapter,
+        connection=None,
+        execute=lambda sql: run_converted_query(engine=engine, sql=sql),
+    )
     failed: list[str] = [
         step.model_name for step in step_results if step.outcome == SqlTestOutcome.FAIL
     ]
