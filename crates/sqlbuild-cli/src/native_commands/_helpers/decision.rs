@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::runs::models::JobRunRequest;
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -67,12 +68,40 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
     match action.as_deref() {
-        Some("change-trigger" | "cancel-run") => {
+        Some("change-trigger" | "cancel-run" | "request-run") => {
+            let identity_option = if action.as_deref() == Some("request-run") {
+                "--run-id"
+            } else {
+                "--event-id"
+            };
             let event_id = Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
-                .map_err(|_| ControlError::Invalid("--event-id must be a UUID".into()))?;
+                .map_err(|_| ControlError::Invalid(format!("{identity_option} must be a UUID")))?;
             let reason = text(namespace, "admin_reason").unwrap_or_default();
             if reason.trim().is_empty() {
                 return Err(ControlError::Invalid("--reason must not be blank".into()));
+            }
+            if action.as_deref() == Some("request-run") {
+                let target = text(namespace, "admin_target").unwrap_or_default();
+                let job_key = text(namespace, "admin_job").unwrap_or_default();
+                if target.trim().is_empty() || job_key.trim().is_empty() {
+                    return Err(ControlError::Invalid(
+                        "target and job must not be blank".into(),
+                    ));
+                }
+                let priority = match namespace.get("admin_priority") {
+                    Some(Value::Int(value)) => value.parse::<i64>().map_err(|_| {
+                        ControlError::Invalid("--priority must fit a signed 64-bit integer".into())
+                    })?,
+                    _ => 0,
+                };
+                return Ok(ControlAdmin::RequestJobRun(JobRunRequest {
+                    run_id: event_id,
+                    location_id: id,
+                    target,
+                    job_key,
+                    reason,
+                    priority,
+                }));
             }
             if action.as_deref() == Some("cancel-run") {
                 return Ok(ControlAdmin::CancelRun {

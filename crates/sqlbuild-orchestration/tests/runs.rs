@@ -28,5 +28,7 @@ mod test_faults;
 mod test_lifecycle;
 #[path = "runs/test_monitor.rs"]
 mod test_monitor;
+#[path = "runs/test_requests.rs"]
+mod test_requests;
 #[path = "runs/test_types.rs"]
 mod test_types;

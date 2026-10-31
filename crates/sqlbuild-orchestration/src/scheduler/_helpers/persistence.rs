@@ -1,8 +1,8 @@
 //! Deterministic tick insertion gates all run facts; retries cannot queue a second run.
 
 use serde_json::json;
-use std::collections::BTreeSet;
 
+use crate::runs::main::job_write_set::job_write_set;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
@@ -16,18 +16,12 @@ pub(crate) async fn persist_ticks(
     plan: &TickPlan,
 ) -> Result<ControlTransaction, ControlError> {
     let now = transaction.now;
-    let (mut transaction, rows) = query(transaction,
-        "SELECT n.node_key FROM sqb_snapshot_nodes n JOIN sqb_job_nodes j ON j.node_key=n.node_key \
-         WHERE n.snapshot_id=$1 AND j.location_id=$2 AND j.target=$3 AND j.job_key=$4 AND n.node_kind IN ('model','seed','function')",
-        vec![Parameter::Id(trigger.snapshot_id), Parameter::Id(trigger.location_id), Parameter::Text(trigger.target.clone()), Parameter::Text(trigger.job_key.clone())]).await?;
-    let write_set: BTreeSet<String> = rows
-        .into_iter()
-        .filter_map(|row| {
-            row.get("node_key")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_owned)
-        })
-        .collect();
+    let (mut transaction, write_set) = job_write_set(
+        transaction,
+        trigger.snapshot_id,
+        (trigger.location_id, &trigger.target, &trigger.job_key),
+    )
+    .await?;
     for action in &plan.actions {
         let (outcome, run, covered) = match action.decision {
             TickDecision::Requested { run_id } => ("requested", Some(run_id), None),

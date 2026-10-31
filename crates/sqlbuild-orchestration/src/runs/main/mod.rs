@@ -1,11 +1,13 @@
 pub mod change_run;
 pub mod claim_next_run;
 pub mod heartbeat_run;
+pub(crate) mod job_write_set;
 pub mod list_run_nodes;
 pub mod list_runs;
 pub mod monitor_runs;
 pub mod publish_run_output;
 pub mod publish_run_recall;
 pub(crate) mod queue_run;
+pub mod request_job_run;
 pub mod request_run;
 pub mod run_execution;

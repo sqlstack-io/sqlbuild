@@ -88,6 +88,18 @@ pub struct RunRequest {
     pub overlap: crate::scheduler::models::Overlap,
 }
 
+/// A trusted operator names a published job; execution inputs are never supplied by the caller.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JobRunRequest {
+    pub run_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub job_key: String,
+    pub reason: String,
+    pub priority: i64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunRecord {
     pub run_id: Uuid,

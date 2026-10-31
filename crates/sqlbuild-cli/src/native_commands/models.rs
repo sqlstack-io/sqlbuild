@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::runs::models::JobRunRequest;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -15,6 +16,7 @@ pub(crate) enum ControlAdmin {
     CreatePrincipal(String, PrincipalKind),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
+    RequestJobRun(JobRunRequest),
     CancelRun {
         event_id: Uuid,
         run_id: Uuid,

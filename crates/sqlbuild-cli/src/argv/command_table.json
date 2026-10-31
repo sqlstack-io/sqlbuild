@@ -353,6 +353,95 @@
           }
          },
          {
+          "name": "request-run",
+          "parser": {
+           "prog": "sqb admin request-run",
+           "description": "Queue a published job using privileged database access. Selection, image, settings and write claims come from the snapshot; the request and audit commit together.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "LOCATION_ID",
+             "required": true,
+             "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_job",
+             "metavar": "JOB",
+             "required": true,
+             "help": "published job name",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--target"
+             ],
+             "dest": "admin_target",
+             "required": true,
+             "help": "published target name",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--run-id"
+             ],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "run UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--priority"
+             ],
+             "dest": "admin_priority",
+             "type": "int",
+             "help": "signed queue priority; higher values run first (default: 0)",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reason"
+             ],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the security audit",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
           "name": "cancel-run",
           "parser": {
            "prog": "sqb admin cancel-run",
@@ -523,6 +612,11 @@
           "dest": "revoke-token",
           "metavar": "revoke-token",
           "help": "revoke a credential by UUID"
+         },
+         {
+          "dest": "request-run",
+          "metavar": "request-run",
+          "help": "queue a pinned published job with an atomic security audit"
          },
          {
           "dest": "cancel-run",

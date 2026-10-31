@@ -9,12 +9,8 @@ use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::request_run::request_run;
-use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunKind, RunOrigin, RunRequest,
-};
+use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use sqlbuild_orchestration::store::main::open_store::open_store;
@@ -64,33 +60,40 @@ pub(crate) async fn start_claimed_worker(
                 python_source: None,
             },
         )]),
-        documents: BTreeMap::new(),
+        documents: BTreeMap::from([(
+            "jobs".into(),
+            serde_json::json!({"daily_orders": {
+                "description": "Build orders", "selection": ["orders"], "overlap": "allow", "settings": {"full_refresh": true}
+            }}),
+        )]),
     };
-    let publication = publish_snapshot(&store, &baseline).await.expect("snapshot");
+    publish_snapshot(&store, &baseline).await.expect("snapshot");
     let run_id = Uuid::now_v7();
-    let request = RunRequest {
-        run_id,
-        location_id,
-        target: "development".into(),
-        snapshot_id: publication.snapshot_id,
-        image_id: None,
-        kind: RunKind::Adhoc,
-        origin: RunOrigin::Manual,
-        job_key: None,
-        parent_run_id: None,
-        root_run_id: run_id,
-        trigger_id: None,
-        tick_id: None,
-        rerun_of_run_id: None,
-        requested_by: "test-admin".into(),
-        priority: 0,
-        selection: ["orders".into()].into(),
-        write_set: ["orders".into()].into(),
-        settings: BTreeMap::new(),
-        concurrency_groups: Default::default(),
-        overlap: Overlap::Allow,
-    };
-    request_run(&store, &request).await.expect("queue run");
+    let location = location_id.to_string();
+    let run = run_id.to_string();
+    let arguments = [
+        "request-run",
+        &location,
+        "daily_orders",
+        "--target",
+        "development",
+        "--run-id",
+        &run,
+        "--priority",
+        "-3",
+        "--reason",
+        "Refresh orders",
+    ];
+    let requested = administer(control, &arguments);
+    assert_eq!(requested["run_id"], run);
+    assert_eq!(requested["applied"], true);
+    assert_eq!(administer(control, &arguments)["applied"], false);
+    let connection = rusqlite::Connection::open(&path).expect("audit connection");
+    let count: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM sqb_security_audit WHERE action='job.run_requested' AND actor='local-control-store-owner' AND granting_role='control-store-owner' AND json_extract(scope_json,'$.run_id')=?1",
+        [&run], |row| row.get(0)).expect("trusted manual request audit");
+    assert_eq!(count, 1);
+    drop(connection);
     let lease = acquire_lease(&store, Uuid::now_v7())
         .await
         .expect("acquire lease")
@@ -99,6 +102,11 @@ pub(crate) async fn start_claimed_worker(
         .await
         .expect("claim")
         .expect("queued work");
+    assert_eq!(claim.request.priority, -3);
+    assert_eq!(
+        claim.request.settings.get("full_refresh"),
+        Some(&serde_json::json!(true))
+    );
     let identity = (run_id, claim.claim_id);
     let token = issue_token(
         &store,
