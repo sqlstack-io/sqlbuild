@@ -1,5 +1,6 @@
 //! The session's phases: Python's uncached model analysis, wave by wave.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -29,7 +30,11 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, dict_from_pairs, same_keys, same_relations,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
+use crate::assembly::analysis_session::constants::{
+    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, TRANSFORM_AGGREGATION, TRANSFORM_CAST,
+    TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY,
+    UNKNOWN_TYPE,
+};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
@@ -37,11 +42,14 @@ use crate::assembly::analysis_session::models::{
     RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
 };
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
+use crate::lineage::models::{LineageConfidence, LineageTransformKind};
 use crate::semantic_validation::models::DiagnosticRow;
 use crate::semantic_validation::models::ProjectCatalog;
 use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_arguments;
 use crate::sql_macros::models::SqlMacroFinding;
 use crate::sql_macros::types::ArgumentCheckInput;
+use crate::sqlquack_analysis::main::compile_lineage::compile_lineage;
+use crate::sqlquack_analysis::models::{CompileLineageColumn, CompiledModelSql};
 
 /// What an internal native failure of the session names.
 const SESSION_CONTEXT: &str = "native model analysis";
@@ -153,6 +161,9 @@ impl AnalysisSession {
                     placeholders: std::mem::take(&mut model.placeholders),
                 });
             }
+        }
+        if let Ok(pool) = pool.as_ref() {
+            sqlquack_lineage(&request, &mut models, pool)?;
         }
         let mut model_facts: HashMap<String, SessionModelFacts> = HashMap::new();
         let mut dynamic_proofs: HashMap<String, ContractProof> = HashMap::new();
@@ -896,4 +907,62 @@ fn output_sources(row: &LineageRow) -> (String, Vec<(String, String)>) {
 /// The failure context naming one model.
 fn model_context(model: &ModelRequest) -> String {
     format!("{SESSION_CONTEXT} of model '{}'", model.name)
+}
+
+/// Each model's lineage rows from SQLQuack when it analyses the dialect; a model it cannot read
+/// keeps polyglot's rows.
+fn sqlquack_lineage(
+    request: &SessionRequest,
+    models: &mut [ModelOutcome],
+    pool: &ThreadPool,
+) -> Result<(), String> {
+    let cleaned: Vec<Cow<'_, str>> = models
+        .iter()
+        .map(resolved_cleaned_sql)
+        .collect::<Result<_, String>>()?;
+    let inputs: Vec<CompiledModelSql<'_>> = request
+        .models
+        .iter()
+        .zip(models.iter())
+        .zip(&cleaned)
+        .map(|((model, outcome), sql)| CompiledModelSql {
+            sql,
+            references: &model.lineage_references,
+            schema: &outcome.validated_schema,
+        })
+        .collect();
+    let Some(lineages) = compile_lineage(&request.dialect, &inputs, pool)? else {
+        return Ok(());
+    };
+    for (outcome, lineage) in models.iter_mut().zip(lineages) {
+        let (Some(lineage), true) = (lineage, outcome.analysis.analysis_succeeded) else {
+            continue;
+        };
+        let rows: Vec<LineageRow> = lineage.into_iter().map(lineage_row).collect();
+        outcome.analysis.lineage = match outcome.analysis.lineage {
+            LineageFacts::Native(_) => LineageFacts::Native(rows),
+            LineageFacts::NativeFacts(_) => LineageFacts::NativeFacts(rows),
+        };
+    }
+    Ok(())
+}
+
+fn lineage_row(column: CompileLineageColumn) -> LineageRow {
+    LineageRow {
+        output_column: column.output_column,
+        transform_code: match column.transform {
+            LineageTransformKind::Direct => TRANSFORM_DIRECT,
+            LineageTransformKind::Cast => TRANSFORM_CAST,
+            LineageTransformKind::Expression => TRANSFORM_EXPRESSION,
+            LineageTransformKind::Aggregation => TRANSFORM_AGGREGATION,
+            LineageTransformKind::Star => TRANSFORM_STAR,
+            LineageTransformKind::Constant => TRANSFORM_CONSTANT,
+        },
+        confidence_code: match column.confidence {
+            LineageConfidence::High => CONFIDENCE_HIGH,
+            LineageConfidence::Medium => CONFIDENCE_MEDIUM,
+            LineageConfidence::Unknown => CONFIDENCE_UNKNOWN,
+        },
+        sources: column.sources,
+    }
 }
