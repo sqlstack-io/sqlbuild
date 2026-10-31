@@ -93,3 +93,13 @@ pub(crate) struct RichDialectTestCase {
     pub(crate) names: &'static [&'static str],
     pub(crate) expected_known: bool,
 }
+
+pub(crate) struct SqlQuackLineageTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    /// Each model's name and compiled SQL, in project order; the last one is checked.
+    pub(crate) models: &'static [(&'static str, &'static str)],
+    /// One `output transform confidence nullability [type:resource.column ...]` line per column.
+    pub(crate) expected_lines: &'static [&'static str],
+    pub(crate) expected_has_star: bool,
+}

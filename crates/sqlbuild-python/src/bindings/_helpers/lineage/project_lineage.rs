@@ -344,7 +344,7 @@ fn rich_lineage<'py>(
             true => build_sqlquack_lineage(&request, &names),
             false => build_rich_lineage(&request),
         })
-            .map_err(compiler_error)?
+        .map_err(compiler_error)?
     };
     let built: Bound<'py, PyDict> = PyDict::new(py);
     let mut edges: Vec<Bound<'py, PyAny>> = Vec::new();

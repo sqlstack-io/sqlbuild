@@ -2,6 +2,8 @@
 mod build_fast_lineage;
 #[path = "tests/test_build_rich_lineage.rs"]
 mod build_rich_lineage;
+#[path = "tests/test_build_sqlquack_lineage.rs"]
+mod build_sqlquack_lineage;
 #[path = "tests/test_direct_semantic_uses.rs"]
 mod direct_semantic_uses;
 #[path = "tests/test_environment_markers.rs"]

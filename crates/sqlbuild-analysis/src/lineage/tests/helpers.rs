@@ -2,6 +2,7 @@ use polyglot_sql::{DialectType, SchemaValidationOptions};
 
 use crate::lineage::main::build_fast_lineage::build_fast_lineage;
 use crate::lineage::main::build_rich_lineage::build_rich_lineage;
+use crate::lineage::main::build_sqlquack_lineage::build_sqlquack_lineage;
 use crate::lineage::models::RelationFingerprint;
 use crate::lineage::models::{
     FastLineageModel, FastLineageOutcome, FastLineageRequest, LineageColumn, LineageOutcomeParts,
@@ -181,6 +182,43 @@ fn described_rich_column(column: &RichLineageColumn) -> String {
         column.nullability.as_str(),
         upstream.join(" ")
     )
+}
+
+/// Status, column lines and star flag of each named model's SQLQuack lineage, in request order.
+pub(crate) fn sqlquack_outcomes(
+    dialect: &str,
+    models: &[(&str, &str)],
+) -> Vec<(&'static str, Vec<String>, bool)> {
+    let mut schema = rich_schema();
+    schema.push(RichSchemaResource {
+        resource_type: LineageResourceType::Model,
+        name: "listing_export".to_owned(),
+        assigned: typed(&[("listingId", Some("VARCHAR")), ("status", Some("VARCHAR"))]),
+        defaulted: typed(&[("\"listingId\"", None)]),
+    });
+    let request = RichLineageRequest {
+        dialect: dialect.to_owned(),
+        schema,
+        models: models.iter().map(|(_, sql)| (*sql).to_owned()).collect(),
+    };
+    let names: Vec<String> = models.iter().map(|(name, _)| (*name).to_owned()).collect();
+    build_sqlquack_lineage(&request, &names)
+        .expect("the lineage pool builds")
+        .into_iter()
+        .map(|outcome| {
+            let LineageOutcomeParts {
+                status,
+                columns,
+                has_star,
+                ..
+            } = outcome.into_parts();
+            (
+                status,
+                columns.iter().map(described_rich_column).collect(),
+                has_star,
+            )
+        })
+        .collect()
 }
 
 /// The typed schema `wheel_cases.py` gave the wheel, spelled through assigned and defaulted columns.

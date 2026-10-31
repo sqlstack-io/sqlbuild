@@ -6,20 +6,23 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlquack_semantics::dialects::constants::{DUCKDB, SNOWFLAKE};
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_semantics::lineage::main::query_lineage::query_lineage;
-use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, TransformKind};
+use sqlquack_semantics::lineage::models::{
+    LineageContext, OutputLineage, SchemaColumn, TransformKind,
+};
 use sqlquack_semantics::lineage::types::LineageSchema;
+use sqlquack_semantics::query_lineage;
 use sqlquack_syntax::{ComplexityGuardOptions, Dialect, ParseOptions};
 
 use crate::lineage::_helpers::references::{
     PhysicalResource, normalized_sql, physical_resource_name, physical_resources,
 };
 use crate::lineage::_helpers::rich_lineage::schema_names;
-use crate::lineage::constants::{MAX_FUNCTION_CALL_DEPTH, RICH_LINEAGE_WORKER_STACK_BYTES, RICH_LINEAGE_WORKERS};
+use crate::lineage::constants::{
+    MAX_FUNCTION_CALL_DEPTH, RICH_LINEAGE_WORKER_STACK_BYTES, RICH_LINEAGE_WORKERS,
+};
 use crate::lineage::models::{
     LineageColumn, LineageConfidence, LineageNullability, LineageResourceType, LineageSource,
-    LineageTransformKind,
-    RichLineageColumn, RichLineageOutcome, RichLineageRequest,
+    LineageTransformKind, RichLineageColumn, RichLineageOutcome, RichLineageRequest,
 };
 
 const DUCKDB_DIALECT: &str = "duckdb";
@@ -29,35 +32,41 @@ const TABLE_FUNCTION_CALL: &str = "__table_fn(";
 const MAX_LEARNING_PASSES: usize = 64;
 
 /// The known resources' columns by resolved physical name.
-struct ResourceColumns(HashMap<String, Vec<String>>);
+#[derive(Debug)]
+struct ResourceColumns(HashMap<String, Vec<SchemaColumn>>);
 
 impl LineageSchema for ResourceColumns {
-    fn columns(&self, relation: &str) -> Option<&[String]> {
+    fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
         self.0.get(relation).map(Vec::as_slice)
     }
 }
 
 /// One outcome per model, in request order; `names` names each model of the request.
 ///
-/// A model whose columns the schema does not list takes the outputs its own lineage finds, and
-/// the models reading it are traced again, until nothing more is learnt.
+/// A model whose own lineage finds all its outputs is read by those outputs, exactly as they
+/// resolve, rather than by the schema's names; the models reading it are traced again until
+/// nothing more is learnt.
 pub fn build_sqlquack_lineage(
     request: &RichLineageRequest,
     names: &[String],
 ) -> Result<Vec<RichLineageOutcome>, String> {
-    let (dialect, profile): (Dialect, &'static dyn DialectProfile) = match request.dialect.as_str() {
+    let (dialect, profile): (Dialect, &'static dyn DialectProfile) = match request.dialect.as_str()
+    {
         SNOWFLAKE_DIALECT => (Dialect::Snowflake, &SNOWFLAKE),
         DUCKDB_DIALECT => (Dialect::DuckDB, &DUCKDB),
         other => return Err(format!("SQLQuack does not analyse the {other} dialect")),
     };
-    let mut known: HashMap<String, Vec<String>> = request
+    let mut known: HashMap<String, Vec<SchemaColumn>> = request
         .schema
         .iter()
         .map(schema_names)
         .filter(|resource| !resource.columns.is_empty())
         .map(|resource| {
             let physical = physical_resource_name(resource.resource_type, &resource.name);
-            (profile.resolved_identifier(&physical, false), resource.columns)
+            (
+                profile.resolved_identifier(&physical, false),
+                schema_columns(resource.columns),
+            )
         })
         .collect();
     let model_keys: Vec<String> = names
@@ -82,26 +91,31 @@ pub fn build_sqlquack_lineage(
             profile,
             schema: &schema,
         };
-        let traced: Vec<(usize, RichLineageOutcome)> = pool.install(|| {
+        let traced: Vec<(usize, (RichLineageOutcome, Vec<SchemaColumn>))> = pool.install(|| {
             pending
                 .par_iter()
                 .map(|index| {
                     catch_compiler_panic(|| {
-                        Ok((*index, model_lineage(&request.models[*index], dialect, context)))
+                        Ok((
+                            *index,
+                            model_lineage(&request.models[*index], dialect, context),
+                        ))
                     })
                 })
                 .collect::<Result<Vec<_>, String>>()
         })?;
         let mut learnt: Vec<String> = Vec::new();
-        for (index, outcome) in traced {
+        for (index, (outcome, outputs)) in traced {
             let key = &model_keys[index];
-            if let (RichLineageOutcome::Built { columns, has_star: false }, false) =
-                (&outcome, known.contains_key(key))
-            {
-                let _ = known.insert(
-                    key.clone(),
-                    columns.iter().map(|column| column.column.output_column.clone()).collect(),
-                );
+            let complete = matches!(
+                outcome,
+                RichLineageOutcome::Built {
+                    has_star: false,
+                    ..
+                }
+            );
+            if complete && !outputs.is_empty() && known.get(key) != Some(&outputs) {
+                let _ = known.insert(key.clone(), outputs);
                 learnt.push(key.clone());
             }
             outcomes[index] = Some(outcome);
@@ -121,7 +135,12 @@ pub fn build_sqlquack_lineage(
     Ok(outcomes.into_iter().flatten().collect())
 }
 
-fn model_lineage(query_sql: &str, dialect: Dialect, context: LineageContext<'_>) -> RichLineageOutcome {
+/// A model's outcome, and its output columns as later models read them.
+fn model_lineage(
+    query_sql: &str,
+    dialect: Dialect,
+    context: LineageContext<'_>,
+) -> (RichLineageOutcome, Vec<SchemaColumn>) {
     let options = ParseOptions {
         complexity_guard: Some(ComplexityGuardOptions {
             max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
@@ -131,7 +150,7 @@ fn model_lineage(query_sql: &str, dialect: Dialect, context: LineageContext<'_>)
     let (normalized, functions) = table_function_calls(&normalized_sql(query_sql));
     let lineage = match query_lineage(&normalized, dialect, &options, context) {
         Ok(lineage) => lineage,
-        Err(error) => return RichLineageOutcome::Skipped(error),
+        Err(error) => return (RichLineageOutcome::Skipped(error), Vec::new()),
     };
     let resources: HashMap<String, PhysicalResource> = physical_resources(query_sql)
         .into_iter()
@@ -154,13 +173,57 @@ fn model_lineage(query_sql: &str, dialect: Dialect, context: LineageContext<'_>)
             nullability: LineageNullability::Unknown,
         })
         .collect();
-    RichLineageOutcome::Built {
-        columns,
-        has_star: lineage.open_star,
-    }
+    let outputs = lineage
+        .outputs
+        .iter()
+        .filter(|output| !output.name.is_empty())
+        .map(|output| SchemaColumn {
+            name: output.name.clone(),
+            quoted: context.profile.resolved_identifier(&output.name, false) != output.key,
+        })
+        .collect();
+    (
+        RichLineageOutcome::Built {
+            columns,
+            has_star: lineage.open_star,
+        },
+        outputs,
+    )
 }
 
-fn lineage_column(output: &OutputLineage, resources: &HashMap<String, PhysicalResource>) -> LineageColumn {
+/// A resource's column names as the schema lists them: a name written in double quotes is a
+/// quoted identifier, and so is the same name listed without them.
+fn schema_columns(names: Vec<String>) -> Vec<SchemaColumn> {
+    let quoted: Vec<&str> = names
+        .iter()
+        .filter_map(|name| name.strip_prefix('"')?.strip_suffix('"'))
+        .collect();
+    let mut columns: Vec<SchemaColumn> = Vec::with_capacity(names.len());
+    for name in &names {
+        let column = match name
+            .strip_prefix('"')
+            .and_then(|name| name.strip_suffix('"'))
+        {
+            Some(inner) => SchemaColumn {
+                name: inner.to_owned(),
+                quoted: true,
+            },
+            None => SchemaColumn {
+                name: name.clone(),
+                quoted: quoted.contains(&name.as_str()),
+            },
+        };
+        if !columns.contains(&column) {
+            columns.push(column);
+        }
+    }
+    columns
+}
+
+fn lineage_column(
+    output: &OutputLineage,
+    resources: &HashMap<String, PhysicalResource>,
+) -> LineageColumn {
     let upstream: BTreeSet<(&'static str, String, String)> = output
         .sources
         .iter()
@@ -176,9 +239,9 @@ fn lineage_column(output: &OutputLineage, resources: &HashMap<String, PhysicalRe
     let upstream_columns: Vec<LineageSource> = upstream
         .into_iter()
         .filter_map(|(kind, name, column)| {
-            let resource = resources
-                .values()
-                .find(|resource| resource.resource_type.as_str() == kind && resource.resource_name == name)?;
+            let resource = resources.values().find(|resource| {
+                resource.resource_type.as_str() == kind && resource.resource_name == name
+            })?;
             Some(LineageSource {
                 resource_type: resource.resource_type,
                 resource_name: name,
@@ -216,7 +279,10 @@ fn table_function_calls(sql: &str) -> (String, Vec<PhysicalResource>) {
         text.push_str(&rest[..start]);
         let after = &rest[start + TABLE_FUNCTION_CALL.len()..];
         let quoted = after.trim_start();
-        let quote = quoted.chars().next().filter(|quote| *quote == '\'' || *quote == '"');
+        let quote = quoted
+            .chars()
+            .next()
+            .filter(|quote| *quote == '\'' || *quote == '"');
         let call = quote.and_then(|quote| {
             let name_end = quoted[1..].find(quote)? + 1;
             let closed = quoted[name_end + 1..].trim_start().strip_prefix(')')?;
