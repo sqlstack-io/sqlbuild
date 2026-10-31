@@ -24,7 +24,9 @@ def run_converted_statement(*, sql: str, timeout_seconds: int | None) -> LocalSt
         )
         timer.start()
     try:
-        rows: list[Any] = adapter.execute(connection=connection, sql=sql).fetchall()
+        cursor: Any = adapter.execute(connection=connection, sql=sql)
+        rows: list[Any] = cursor.fetchall()
+        columns: tuple[str, ...] = tuple(str(column[0]) for column in cursor.description or ())
     except Exception as error:  # noqa: BLE001 - any engine error is this test's result
         return LocalStatementRun(
             rows=(), error=f"{type(error).__name__}: {error}", timed_out=timed_out.is_set()
@@ -33,4 +35,4 @@ def run_converted_statement(*, sql: str, timeout_seconds: int | None) -> LocalSt
         if timer is not None:
             timer.cancel()
         adapter.close(connection)
-    return LocalStatementRun(rows=tuple(rows), error=None, timed_out=False)
+    return LocalStatementRun(rows=tuple(rows), error=None, timed_out=False, columns=columns)

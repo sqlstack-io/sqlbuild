@@ -122,6 +122,18 @@ class LocalStatementRun:
     rows: tuple[Any, ...]
     error: str | None
     timed_out: bool
+    columns: tuple[str, ...] = ()
+
+    @property
+    def description(self) -> tuple[tuple[str], ...]:
+        """The column names in a DB-API cursor's description shape."""
+
+        return tuple((column,) for column in self.columns)
+
+    def fetchall(self) -> list[Any]:
+        """The rows, as a DB-API cursor returns them."""
+
+        return list(self.rows)
 
 
 @dataclass(frozen=True)

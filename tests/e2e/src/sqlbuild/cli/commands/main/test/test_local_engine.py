@@ -41,11 +41,12 @@ _REAL_SQLQUACK: Path = Path(
                 "fn:UNCONVERTIBLE_FN (missing rule): no rule converts fn:UNCONVERTIBLE_FN",
                 "was refused at run time by SQLQuack's `json_fidelity` guard: a guarded value",
                 "[T003] test 'customer_orders_wrong_count' failed for models: customer_orders",
+                "differing column order_count: actual=2, expected=3",
                 "Assumptions relied on (rerun with --strict to refuse them):",
                 "session_timezone_utc  1 test",
             ),
             unexpected_stdout_fragments=("3:9",),
-            expected_conversion_count=5,
+            expected_conversion_count=7,
             expected_converter_arguments=(
                 "--json",
                 "--session",
@@ -138,6 +139,7 @@ def test_given_snowflake_tests_when_testing_locally_then_sqlquack_results_are_re
             expected_stdout_fragments=(
                 "PASS=1  FAIL=1  REFUSED=1  TOTAL=3",
                 "customer_totals_wrong_sum",
+                "differing column TOTAL_AMOUNT: actual=12.50, expected=99.00",
                 "no rule converts fn:UNCONVERTIBLE_FN",
             ),
         ),
