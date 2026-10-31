@@ -116,7 +116,10 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 request_job_run(store, &context, &request),
                 request_job_run(store, &context, &request)
             );
-            assert_ne!(first.expect("first request"), retry.expect("concurrent retry"));
+            assert_ne!(
+                first.expect("first request"),
+                retry.expect("concurrent retry")
+            );
             let facts = read_recall_events(store, 0, 100)
                 .await
                 .expect("request facts");

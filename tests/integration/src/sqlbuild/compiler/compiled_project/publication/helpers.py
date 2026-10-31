@@ -13,6 +13,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from io import StringIO
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -23,6 +24,13 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedWorker,
     SnapshotApi,
 )
+
+
+class RejectedPublicationOutput(StringIO):
+    """A caller loses only the result stream, after the real API accepts a publication."""
+
+    def write(self, text: str) -> int:
+        raise OSError("synthetic publication result delivery failure")
 
 
 def api_address(process: subprocess.Popen[bytes], log: Path) -> str:

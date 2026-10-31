@@ -59,6 +59,7 @@ pub(crate) mod janitor;
 pub(crate) mod lifecycle_events;
 pub(crate) mod lineage;
 pub(crate) mod load;
+pub(crate) mod location_command;
 pub(crate) mod macro_bridge;
 pub(crate) mod manifest;
 pub(crate) mod microbatches;

@@ -23,6 +23,7 @@ use crate::bindings::_helpers::init_command::command::run_init_command;
 use crate::bindings::_helpers::janitor::janitor_command::run_janitor_command;
 use crate::bindings::_helpers::lineage::lineage_command::run_lineage_command;
 use crate::bindings::_helpers::load::load_command::run_load_command;
+use crate::bindings::_helpers::location_command::command::run_location_command;
 use crate::bindings::_helpers::plan_command::plan::run_plan_command;
 use crate::bindings::_helpers::plan_command::rules::run_rules_command;
 use crate::bindings::_helpers::query_command::dag::run_dag_command;
@@ -387,6 +388,7 @@ fn run_implementation<'py>(
         "run_janitor_command" => run_janitor_command(py, &request()?)?,
         "run_lineage_command" => run_lineage_command(py, &request()?)?,
         "run_load_command" => run_load_command(py, &request()?)?,
+        "run_location_command" => run_location_command(py, options())?,
         "run_plan_command" => run_plan_command(&request()?)?,
         "run_playground_command" => run_playground_command(py, &request()?)?,
         "run_query_command" => run_query_command(py, options())?,

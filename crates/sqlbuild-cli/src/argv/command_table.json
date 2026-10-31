@@ -79,6 +79,89 @@
    "group": 0,
    "parsers": [
     {
+     "name": "location",
+     "parser": {
+      "prog": "sqb location",
+      "description": "Compile and publish a project from its own Python environment. Uses SQLBUILD_LOCATION_TOKEN for scoped HTTP access, never the control database. Results are JSON; progress goes to stderr.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": ["-h", "--help"],
+        "dest": "help",
+        "nargs": 0,
+        "default": {"suppress": true},
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [],
+        "dest": "location_command",
+        "required": true,
+        "choices": ["publish"],
+        "help": "compile the project and publish one immutable snapshot",
+        "group": 0
+       },
+       {
+        "kind": "store",
+        "options": ["--server"],
+        "dest": "location_server_url",
+        "required": true,
+        "help": "control API HTTP or HTTPS origin, without credentials",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--location-id"],
+        "dest": "location_id",
+        "required": true,
+        "help": "registered location UUID",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--target"],
+        "dest": "target",
+        "required": true,
+        "help": "configured project target to compile",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--generation"],
+        "dest": "location_generation",
+        "type": "int",
+        "required": true,
+        "help": "positive generation newer than the last successful publication",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--image-id"],
+        "dest": "location_image_id",
+        "help": "immutable deployment image identity to pin for workers",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--project-dir", "--sqb-project-dir"],
+        "dest": "project_dir",
+        "default": {"suppress": true},
+        "help": "SQLBuild project directory (default: the current directory)",
+        "group": 1
+       }
+      ]
+     }
+    },
+    {
      "name": "admin",
      "parser": {
       "prog": "sqb admin",
@@ -8274,6 +8357,11 @@
     }
    ],
    "choices_help": [
+    {
+     "dest": "location",
+     "metavar": "location",
+     "help": "compile and publish code-location snapshots over HTTP"
+    },
     {
      "dest": "admin",
      "metavar": "admin",

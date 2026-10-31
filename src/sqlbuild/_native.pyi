@@ -1769,6 +1769,15 @@ def build_orchestration_snapshot(
     *,
     declarations: Sequence[object] | None = None,
 ) -> NativeOrchestrationSnapshot: ...
+def run_location_command(
+    *,
+    project_dir: Path,
+    location_id: str,
+    selected_target: str,
+    generation: int,
+    server_url: str,
+    image_id: str | None = None,
+) -> int: ...
 
 class NativeProjectView:
     @property
@@ -7302,6 +7311,7 @@ class CliEntrypointHandlers(NativeRecord):
     run_refactor: Callable[..., int] | None
     run_recall: Callable[..., int] | None
     run_review: Callable[..., int] | None
+    run_location: Callable[..., int] | None
     def __init__(
         self,
         run_compile: Callable[[CompileCommandRequest], int],
@@ -7338,6 +7348,7 @@ class CliEntrypointHandlers(NativeRecord):
         run_refactor: Callable[..., int] | None = None,
         run_recall: Callable[..., int] | None = None,
         run_review: Callable[..., int] | None = None,
+        run_location: Callable[..., int] | None = None,
     ) -> None: ...
 
 class CommandWarehouseScope(NativeRecord):
@@ -8053,6 +8064,7 @@ class CliCommand(StrEnum):
     DIFF = "diff"
     REVIEW = "review"
     DEBUG = "debug"
+    LOCATION = "location"
     LINEAGE = "lineage"
     QUERY = "query"
     COST = "cost"

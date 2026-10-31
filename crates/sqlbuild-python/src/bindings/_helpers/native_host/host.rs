@@ -65,6 +65,14 @@ pub(crate) fn entry<'py>(py: Python<'py>, id: impl Into<HostId>) -> PyResult<Bou
     PythonHost(py).entry(id.into())
 }
 
+/// Write through the interpreter's live console, respecting redirection and surfacing delivery errors.
+pub(crate) fn write_console(py: Python<'_>, stream: &str, text: &str) -> PyResult<()> {
+    let stream = py.import("sys")?.getattr(stream)?;
+    stream.call_method1("write", (text,))?;
+    stream.call_method0("flush")?;
+    Ok(())
+}
+
 /// `log_debug_event(logger=logging.getLogger(logger), message=message)`.
 pub(crate) fn log_debug_message(py: Python<'_>, logger: &str, message: &str) -> PyResult<()> {
     let kwargs: Bound<'_, PyDict> = PyDict::new(py);

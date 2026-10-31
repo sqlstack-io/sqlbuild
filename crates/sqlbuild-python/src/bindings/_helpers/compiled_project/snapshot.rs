@@ -10,8 +10,9 @@ use pyo3::prelude::{
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use serde_json::Value;
 use sqlbuild_core::models::DiagnosticSeverity;
+use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
+use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode, SnapshotRecord};
 
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
     AuthoredJob, compile_declarations, discover_declarations,
@@ -30,6 +31,26 @@ pub(crate) struct NativeOrchestrationSnapshot {
     pub(crate) input: SnapshotInput,
 }
 
+impl NativeOrchestrationSnapshot {
+    /// Native callers retain transport errors so they can report an uncertain acknowledgement.
+    pub(crate) fn publication(
+        &self,
+        py: Python<'_>,
+        server_url: &str,
+        bearer: &str,
+    ) -> PyResult<Result<SnapshotRecord, ClientError>> {
+        py.detach(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
+            let result = runtime.block_on(publish_remote_snapshot(server_url, bearer, &self.input));
+            runtime.shutdown_timeout(std::time::Duration::from_secs(1));
+            Ok(result)
+        })
+    }
+}
+
 #[pymethods]
 impl NativeOrchestrationSnapshot {
     /// Serialize only at the public boundary; native transports can use the retained input.
@@ -40,14 +61,10 @@ impl NativeOrchestrationSnapshot {
 
     /// Publish retained data without projecting it through Python, releasing the GIL during IO.
     fn publish(&self, py: Python<'_>, server_url: &str, bearer: &str) -> PyResult<String> {
+        let record = self
+            .publication(py, server_url, bearer)?
+            .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
         py.detach(|| {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
-            let result = runtime.block_on(publish_remote_snapshot(server_url, bearer, &self.input));
-            runtime.shutdown_timeout(std::time::Duration::from_secs(1));
-            let record = result.map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
             serde_json::to_string(&record)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))
         })

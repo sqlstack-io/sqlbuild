@@ -2654,6 +2654,7 @@ module_layers = [
     "lineage/lineage_command=commands",
     "lineage/lineage_facts=project",
     "load=commands",
+    "location_command=commands",
     "macro_bridge=front",
     "manifest=compile",
     "microbatches=plan",
