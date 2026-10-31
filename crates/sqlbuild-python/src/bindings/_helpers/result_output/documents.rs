@@ -572,6 +572,10 @@ pub(crate) fn test_execution_json<'py>(
         .iter()
         .filter(|result| result.outcome == SqlTestOutcome::Timeout)
         .count();
+    let refused_count = results
+        .iter()
+        .filter(|result| result.outcome == SqlTestOutcome::Refused)
+        .count();
     let fail_count: usize = results.len() - pass_count;
     emitted(
         &projection,
@@ -584,6 +588,7 @@ pub(crate) fn test_execution_json<'py>(
                     ("pass_count", pass_count),
                     ("fail_count", fail_count),
                     ("timeout_count", timeout_count),
+                    ("refused_count", refused_count),
                     ("total_count", results.len()),
                 ],
             )?,

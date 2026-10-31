@@ -207,10 +207,17 @@ pub enum SqlTestOutcome {
     Fail,
     Error,
     Timeout,
+    Refused,
 }
 
 impl ResultEnum for SqlTestOutcome {
-    const ALL: &'static [Self] = &[Self::Pass, Self::Fail, Self::Error, Self::Timeout];
+    const ALL: &'static [Self] = &[
+        Self::Pass,
+        Self::Fail,
+        Self::Error,
+        Self::Timeout,
+        Self::Refused,
+    ];
 
     fn value(self) -> &'static str {
         match self {
@@ -218,6 +225,7 @@ impl ResultEnum for SqlTestOutcome {
             Self::Fail => "fail",
             Self::Error => "error",
             Self::Timeout => "timeout",
+            Self::Refused => "refused",
         }
     }
 }
@@ -660,6 +668,7 @@ pub struct SqlTestExecutionResult<V> {
     pub error_message: Option<String>,
     pub real_model_count: Option<i64>,
     pub timeout: Option<ItemTimeoutReport>,
+    pub assumptions: Vec<String>,
 }
 
 /// Everything one build executed, as the executor returns it. Mirrors `sqlbuild.executor.build.models.BuildExecutionResult`; `V` is a host value.

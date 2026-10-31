@@ -82,7 +82,7 @@ def _compare(
     cursor: Any = adapter.execute(connection=connection, sql=comparison_sql)
     rows: list[Any] = cursor.fetchall()
     return add_difference_samples(
-        step_results=_build_step_results(rows),
+        step_results=build_step_results(rows),
         test_entry=test_entry,
         adapter=adapter,
         connection=connection,
@@ -108,7 +108,7 @@ def _stored_output_missing(*, adapter: BaseAdapter, error: BaseException) -> boo
     return False
 
 
-def _build_step_results(rows: list[Any]) -> list[StepResult]:
+def build_step_results(rows: list[Any]) -> list[StepResult]:
     """Convert comparison query rows into per-model step results."""
 
     step_results: list[StepResult] = []

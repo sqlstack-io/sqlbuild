@@ -10,6 +10,7 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyInt, PyString, PyTuple};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::definition_changes::models::{ExecutedItem, SelectedItem};
 use sqlbuild_core::cli_text::models::CliStyle;
+use sqlbuild_core::test_command::main::render_test_assumptions::render_test_assumptions;
 use sqlbuild_core::test_command::main::render_test_completion::render_test_completion;
 use sqlbuild_core::test_command::main::render_test_inspection::render_test_inspection;
 use sqlbuild_core::test_command::main::render_test_ready::render_test_ready;
@@ -67,6 +68,7 @@ const EXPECT_LABEL: &str = "expect";
 const UNKNOWN_GROUP: &str = "(unknown)";
 const EXECUTION_COMMAND: &str = "sqb test";
 const UNKNOWN_CASE_CODE: &str = "S008";
+const STRICT_WITHOUT_LOCAL_CODE: &str = "T008";
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
@@ -266,9 +268,13 @@ impl TestCallbackRelay {
 }
 
 fn unknown_case(py: Python<'_>, message: String) -> PyErr {
+    planner_input_error(py, UNKNOWN_CASE_CODE, message)
+}
+
+fn planner_input_error(py: Python<'_>, code: &str, message: String) -> PyErr {
     let raised = (|| {
         let options: Bound<'_, PyDict> = PyDict::new(py);
-        options.set_item("code", UNKNOWN_CASE_CODE)?;
+        options.set_item("code", code)?;
         error_class(py, ErrorId::PlannerInput)?.call((message,), Some(&options))
     })();
     match raised {
@@ -482,6 +488,7 @@ fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
     (concurrency, timeout): (i64, &RunTimeout),
+    local: Bound<'py, PyAny>,
 ) -> PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
@@ -595,6 +602,7 @@ fn run_tests<'py>(
                 ("callbacks", callbacks),
                 ("run_id", pipeline.getattr("project")?.getattr("run_id")?),
                 ("timeouts", timeout_record(py, timeout)?),
+                ("local", local),
             ],
         )?
         .try_iter()?
@@ -639,12 +647,16 @@ fn complete(
     let style: CliStyle = CliStyle {
         use_color: invocation.getattr("use_color")?.is_truthy()?,
     };
+    let assumptions: Vec<Vec<String>> = results
+        .iter()
+        .map(|result| result.assumptions.clone())
+        .collect();
     stream.call_method1(
         "write",
-        (render_test_completion(
-            (passed, results.len()),
-            &failures,
-            style,
+        (format!(
+            "{}{}",
+            render_test_completion((passed, results.len()), &failures, style),
+            render_test_assumptions(&assumptions, style)
         ),),
     )?;
     stream.call_method0("flush")?;
@@ -667,6 +679,15 @@ fn complete(
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
     let inspect_only: bool = request.getattr("inspect")?.is_truthy()?;
+    let local: bool = native_field(request, "local")?.is_truthy()?;
+    let strict: Bound<'_, PyAny> = native_field(request, "strict")?;
+    if strict.is_truthy()? && !local {
+        return Err(planner_input_error(
+            py,
+            STRICT_WITHOUT_LOCAL_CODE,
+            "--strict applies only to local tests; add --local".to_owned(),
+        ));
+    }
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::TestInvocation)?,
@@ -728,8 +749,20 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         request.getattr("test_timeout")?.extract()?,
         TimeoutKind::Test,
     )?;
-    let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> =
-        run_tests(&invocation, &pipeline, (concurrency, &timeout))?;
+    let local_options: Bound<'_, PyAny> = if local {
+        call_with(
+            &host::entry(py, ExecutorHost::LocalTestOptions)?,
+            &[("project_dir", project_dir.clone()), ("strict", strict)],
+        )?
+    } else {
+        py.None().into_bound(py)
+    };
+    let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> = run_tests(
+        &invocation,
+        &pipeline,
+        (concurrency, &timeout),
+        local_options,
+    )?;
     write_test_runtime_target(
         (
             &native_field(&invocation, "effective_project_dir")?

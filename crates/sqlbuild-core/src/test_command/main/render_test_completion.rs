@@ -3,7 +3,9 @@
 use crate::cli_text::main::format_coded_error::format_coded_error;
 use crate::cli_text::main::format_summary_footer::format_summary_footer;
 use crate::cli_text::models::{CliStyle, SummaryCount};
-use crate::test_command::constants::{DEFAULT_ERROR, ERROR_LABEL, ERROR_LABEL_WIDTH, TIMEOUT_CODE};
+use crate::test_command::constants::{
+    DEFAULT_ERROR, ERROR_LABEL, ERROR_LABEL_WIDTH, REFUSED_CODE, TIMEOUT_CODE,
+};
 use crate::test_command::models::TestFailure;
 use crate::text::main::python_splitlines::python_splitlines;
 
@@ -51,16 +53,22 @@ pub fn render_test_completion(
     failures: &[TestFailure],
     style: CliStyle,
 ) -> String {
-    let timed_out: usize = failures
-        .iter()
-        .filter(|failure| failure.error_code.as_deref() == Some(TIMEOUT_CODE))
-        .count();
+    let coded = |code: &str| {
+        failures
+            .iter()
+            .filter(|failure| failure.error_code.as_deref() == Some(code))
+            .count()
+    };
+    let (timed_out, refused): (usize, usize) = (coded(TIMEOUT_CODE), coded(REFUSED_CODE));
     let mut counts: Vec<SummaryCount> = vec![
         count("PASS", passed),
-        count("FAIL", total - passed - timed_out.min(total - passed)),
+        count("FAIL", (total - passed).saturating_sub(timed_out + refused)),
     ];
     if timed_out > 0 {
         counts.push(count("TIMEOUT", timed_out));
+    }
+    if refused > 0 {
+        counts.push(count("REFUSED", refused));
     }
     counts.push(count("TOTAL", total));
     let summary: String = format_summary_footer(style, &counts, None);

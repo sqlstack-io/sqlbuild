@@ -818,6 +818,11 @@ symbols = ["RunItemTimeouts"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."
 
 [[targets.python.dead_code.roots]]
+modules = ["sqlbuild.executor.testing.models"]
+symbols = ["LocalTestOptions"]
+reason = "Native code resolves these through the sqlbuild._native_host name table."
+
+[[targets.python.dead_code.roots]]
 modules = ["sqlbuild.runtime.observability.classes.event_dispatcher"]
 symbols = ["EventDispatcher"]
 reason = "Native code resolves these through the sqlbuild._native_host name table."

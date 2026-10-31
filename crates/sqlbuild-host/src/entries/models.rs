@@ -280,6 +280,7 @@ pub enum ExecutorHost {
     SelectScenarioSnapshotCaptureCandidates,
     TestPipelineCallbacks,
     RunItemTimeouts,
+    LocalTestOptions,
     ScenarioTestSettings,
     ExecutePythonChecks,
     ExecuteIngressPythonLoaderNodes,

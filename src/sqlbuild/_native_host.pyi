@@ -354,6 +354,7 @@ from sqlbuild.executor.scenario.models import (
 )
 from sqlbuild.executor.scenario.models import ScenarioTestSettings as ScenarioTestSettings
 from sqlbuild.executor.scheduling.types import ExecutionStatus as ExecutionStatus
+from sqlbuild.executor.testing.models import LocalTestOptions as LocalTestOptions
 from sqlbuild.executor.testing.models import SqlTestExecutionResult as SqlTestExecutionResult
 from sqlbuild.integrations.dagster.constants import (
     ASSET_SELECTION_COMMANDS as ASSET_SELECTION_COMMANDS,

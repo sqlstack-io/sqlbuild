@@ -395,6 +395,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::Executor,
     },
     HostEntry {
+        name: "LocalTestOptions",
+        kind: HostKind::Class,
+        edge: HostEdge::Executor,
+    },
+    HostEntry {
         name: "ScenarioTestSettings",
         kind: HostKind::Class,
         edge: HostEdge::Executor,

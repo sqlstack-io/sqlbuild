@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from sqlbuild._native import SqlTestParameterDeclaration, SqlValue
 from sqlbuild.executor.testing.types import SqlTestOutcome
@@ -65,3 +66,67 @@ class SqlTestExecutionResult:
     error_message: str | None = None
     real_model_count: int | None = None
     timeout: ItemTimeoutReport | None = None
+    assumptions: tuple[str, ...] = field(default_factory=tuple)
+    """Named assumptions a local conversion relied on; empty on the warehouse."""
+
+
+@dataclass(frozen=True)
+class LocalTestEngine:
+    """The SQLQuack executable, policy and caller session a local test run converts with."""
+
+    executable: Path
+    version: str
+    policy: Path | None
+    strict: bool
+    session_parameters: tuple[tuple[str, str], ...] = ()
+
+    def describe(self) -> str:
+        """One line naming the converter, its policy and mode."""
+
+        policy: str = (
+            str(self.policy) if self.policy is not None else "built-in (refuses every divergence)"
+        )
+        mode: str = "strict" if self.strict else "assumptions allowed"
+        return f"SQLQuack {self.version} at {self.executable}; policy {policy}; {mode}"
+
+
+@dataclass(frozen=True)
+class SqlQuackRefusal:
+    """Why SQLQuack refused one construct of a statement."""
+
+    construct: str
+    category: str
+    reason: str
+
+    def describe(self) -> str:
+        """`construct (category): reason`; positions are in the rendered statement, so omitted."""
+
+        return f"{self.construct} ({self.category}): {self.reason}"
+
+
+@dataclass(frozen=True)
+class SqlQuackConversion:
+    """SQLQuack's report for one statement: DuckDB SQL, or the refusals."""
+
+    converted: bool
+    sql: str
+    refusals: tuple[SqlQuackRefusal, ...] = ()
+    assumptions: tuple[str, ...] = ()
+    notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LocalStatementRun:
+    """The rows one converted statement returned on DuckDB, or its error."""
+
+    rows: tuple[Any, ...]
+    error: str | None
+    timed_out: bool
+
+
+@dataclass(frozen=True)
+class LocalTestOptions:
+    """`sqb test --local`: the project whose SQLQuack policy applies, and strict mode."""
+
+    project_dir: Path
+    strict: bool = False

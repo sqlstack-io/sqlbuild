@@ -218,6 +218,9 @@ pub(crate) fn sql_test_checks<'py>(
             ("error_help", any(py, &result.error_help)?),
             ("error_message", any(py, &result.error_message)?),
         ]);
+        if !result.assumptions.is_empty() {
+            entries.push(("assumptions", any(py, &result.assumptions)?));
+        }
         entries.push((
             "steps",
             tuple_of(

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -2477,3 +2478,234 @@ def prepare_since_repository(*, tmp_path: Path, extra_files: Mapping[str, str]) 
     )
     commit_project_on_main(repository=project)
     return project
+
+
+_FAKE_SQLQUACK: str = """
+import json
+import sys
+from pathlib import Path
+
+arguments = sys.argv[1:]
+if arguments == ["--version"]:
+    print("sqlquack VERSION")
+    sys.exit(0)
+with Path(__file__).with_name("calls.jsonl").open("a", encoding="utf-8") as calls:
+    calls.write(json.dumps(arguments) + "\\n")
+text = Path(arguments[-1]).read_text(encoding="utf-8")
+sql = text.upper()
+report = {"converted": True, "sql": text, "refusals": [], "assumptions": [], "notes": []}
+if "UNCONVERTIBLE_FN" in sql:
+    report["converted"] = False
+    report["sql"] = ""
+    report["refusals"] = [
+        {
+            "construct": "fn:UNCONVERTIBLE_FN",
+            "category": "missing rule",
+            "reason": "no rule converts fn:UNCONVERTIBLE_FN",
+            "line": 3,
+            "column": 9,
+        }
+    ]
+elif "GUARDED_VALUE" in sql:
+    report["sql"] = "SELECT CAST('json_fidelity#0123456789ab: a guarded value' AS INTEGER)"
+elif "ZONED_AT" in sql and "--strict" in arguments:
+    report["converted"] = False
+    report["sql"] = ""
+    report["refusals"] = [
+        {
+            "construct": "node:cast",
+            "category": "outside a rule's type conditions",
+            "reason": "node:cast relies on assumption session_timezone_utc",
+        }
+    ]
+elif "ZONED_AT" in sql:
+    report["assumptions"] = ["session_timezone_utc"]
+print(json.dumps(report))
+sys.exit(0 if report["converted"] else 1)
+"""
+
+
+def write_fake_sqlquack(*, directory: Path, version: str) -> Path:
+    """A stand-in `sqlquack`: passes SQL through, refuses or guards by marker, logs conversions."""
+
+    directory.mkdir(parents=True, exist_ok=True)
+    executable: Path = directory / "sqlquack"
+    executable.write_text(
+        f"#!{sys.executable}\n" + _FAKE_SQLQUACK.replace("VERSION", version), encoding="utf-8"
+    )
+    executable.chmod(0o755)
+    (directory / "calls.jsonl").write_text("", encoding="utf-8")
+    return executable
+
+
+def read_fake_sqlquack_conversions(*, directory: Path) -> tuple[tuple[str, ...], ...]:
+    """Each argument list the stand-in `sqlquack` converted with, in order."""
+
+    lines: list[str] = (directory / "calls.jsonl").read_text(encoding="utf-8").splitlines()
+    return tuple(tuple(json.loads(line)) for line in lines)
+
+
+_LOCAL_PROJECT: str = (
+    'name = "duckshop_local"\nadapter = "snowflake"\n\n'
+    "[connection]\n"
+    'account = "example-no-login.invalid"\nuser = "NO_LOGIN"\npassword = "not-a-credential"\n'
+    "session_parameters = { QUOTED_IDENTIFIERS_IGNORE_CASE = true }\n\n"
+    '[defaults]\ndatabase = "ANALYTICS"\nschema = "PUBLIC"\n'
+)
+_LOCAL_ORDERS: str = (
+    "__source__raw_orders AS (\n"
+    "  SELECT 1 AS order_id, 10 AS customer_id, 'completed' AS status\n"
+    "  UNION ALL SELECT 2, 10, 'completed'\n"
+    "  UNION ALL SELECT 3, 11, 'cancelled'\n"
+    "),\n"
+)
+_REAL_LOCAL_ORDERS: str = (
+    "__source__raw_orders AS (\n"
+    "  SELECT CAST(column1 AS NUMBER(38,0)) AS order_id,\n"
+    "    CAST(column2 AS NUMBER(38,0)) AS customer_id,\n"
+    "    CAST(column3 AS NUMBER(12,2)) AS amount,\n"
+    "    CAST(column4 AS VARCHAR) AS status\n"
+    "  FROM VALUES (1, 10, 5.00, 'completed'), (2, 10, 7.50, 'completed'),\n"
+    "    (3, 11, 3.25, 'cancelled')\n"
+    "),\n"
+)
+
+
+def _local_source(*, columns: tuple[tuple[str, str], ...]) -> str:
+    listed: str = "".join(f"      - name: {name}\n        type: {kind}\n" for name, kind in columns)
+    return (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n"
+        "    database: raw\n    schema: shop\n    table: orders\n    columns:\n" + listed
+    )
+
+
+def _local_model(*, description: str, select: str) -> str:
+    return f"MODEL (description '{description}');\n\n{select}\nFROM __source(\"raw_orders\")\n"
+
+
+def _local_test(*, name: str, orders: str, model: str, expected: str) -> str:
+    return (
+        f'TEST (name "{name}");\n\nWITH\n{orders}'
+        f"__expected__{model} AS (\n  {expected}\n)\nSELECT 1\n"
+    )
+
+
+def build_local_engine_project_files() -> dict[str, str]:
+    """A Snowflake DuckShop project whose tests pass, fail, refuse, guard and assume."""
+
+    orders: str = _LOCAL_ORDERS
+    return {
+        "sqlbuild_project.toml": _LOCAL_PROJECT,
+        "sqlquack.toml": "schema_version = 1\n",
+        "sources/raw_orders.yml": _local_source(
+            columns=(("order_id", "INTEGER"), ("customer_id", "INTEGER"), ("status", "VARCHAR"))
+        ),
+        "models/customer_orders.sql": _local_model(
+            description="Completed orders per customer.",
+            select="SELECT customer_id, COUNT(*) AS order_count",
+        )
+        + "WHERE status = 'completed'\nGROUP BY customer_id\n",
+        "models/order_labels.sql": _local_model(
+            description="Orders with a label.",
+            select="SELECT order_id, UNCONVERTIBLE_FN(status) AS label",
+        ),
+        "models/order_guards.sql": _local_model(
+            description="Orders with a guarded value.",
+            select="SELECT order_id, 'guarded_value' AS guarded",
+        ),
+        "models/order_zones.sql": _local_model(
+            description="Orders with a zoned marker.",
+            select="SELECT order_id, 'zoned_at' AS zoned_at",
+        ),
+        "tests/unit/test_customer_orders.sql": _local_test(
+            name="customer_orders_count_completed",
+            orders=orders,
+            model="customer_orders",
+            expected="SELECT 10 AS customer_id, 2 AS order_count",
+        ),
+        "tests/unit/test_customer_orders_wrong.sql": _local_test(
+            name="customer_orders_wrong_count",
+            orders=orders,
+            model="customer_orders",
+            expected="SELECT 10 AS customer_id, 3 AS order_count",
+        ),
+        "tests/unit/test_order_labels.sql": _local_test(
+            name="order_labels_are_refused",
+            orders=orders,
+            model="order_labels",
+            expected="SELECT 1 AS order_id, 'x' AS label",
+        ),
+        "tests/unit/test_order_guards.sql": _local_test(
+            name="order_guards_raise",
+            orders=orders,
+            model="order_guards",
+            expected="SELECT 1 AS order_id, 'guarded_value' AS guarded",
+        ),
+        "tests/unit/test_order_zones.sql": _local_test(
+            name="order_zones_rely_on_utc",
+            orders=orders,
+            model="order_zones",
+            expected=(
+                "SELECT 1 AS order_id, 'zoned_at' AS zoned_at "
+                "UNION ALL SELECT 2 AS order_id, 'zoned_at' AS zoned_at "
+                "UNION ALL SELECT 3 AS order_id, 'zoned_at' AS zoned_at"
+            ),
+        ),
+    }
+
+
+def _real_expected_totals(*, total: str) -> str:
+    return (
+        "SELECT CAST(column1 AS NUMBER(38,0)) AS customer_id,\n"
+        "    CAST(column2 AS NUMBER(18,0)) AS order_count,\n"
+        "    CAST(column3 AS NUMBER(38,2)) AS total_amount\n"
+        f"  FROM VALUES (10, 2, {total})"
+    )
+
+
+def build_real_local_engine_project_files(*, policy: str) -> dict[str, str]:
+    """A Snowflake DuckShop project for the real SQLQuack: one pass, one failure, one refusal."""
+
+    orders: str = _REAL_LOCAL_ORDERS
+    return {
+        "sqlbuild_project.toml": _LOCAL_PROJECT,
+        "sqlquack.toml": policy,
+        "sources/raw_orders.yml": _local_source(
+            columns=(
+                ("order_id", "NUMBER(38,0)"),
+                ("customer_id", "NUMBER(38,0)"),
+                ("amount", "NUMBER(12,2)"),
+                ("status", "VARCHAR"),
+            )
+        ),
+        "models/customer_totals.sql": _local_model(
+            description="Completed order totals per customer.",
+            select="SELECT customer_id, COUNT(*) AS order_count, SUM(amount) AS total_amount",
+        )
+        + "WHERE status = 'completed'\nGROUP BY customer_id\n",
+        "models/order_labels.sql": _local_model(
+            description="Orders with an unconvertible label.",
+            select="SELECT order_id, UNCONVERTIBLE_FN(status) AS label",
+        ),
+        "tests/unit/test_customer_totals.sql": _local_test(
+            name="customer_totals_sum_completed",
+            orders=orders,
+            model="customer_totals",
+            expected=_real_expected_totals(total="12.50"),
+        ),
+        "tests/unit/test_customer_totals_wrong.sql": _local_test(
+            name="customer_totals_wrong_sum",
+            orders=orders,
+            model="customer_totals",
+            expected=_real_expected_totals(total="99.00"),
+        ),
+        "tests/unit/test_order_labels.sql": _local_test(
+            name="order_labels_are_refused",
+            orders=orders,
+            model="order_labels",
+            expected=(
+                "SELECT CAST(column1 AS NUMBER(38,0)) AS order_id, "
+                "CAST(column2 AS VARCHAR) AS label FROM VALUES (1, 'x')"
+            ),
+        ),
+    }
