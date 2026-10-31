@@ -2,17 +2,15 @@
 
 use std::collections::BTreeMap;
 
+use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunClaim, RunRequest};
+use crate::scheduler::models::SchedulerLease;
+use crate::store::models::ControlStore;
 use chrono::{TimeDelta, Utc};
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunClaim, RunRequest,
-};
-use sqlbuild_orchestration::scheduler::models::SchedulerLease;
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::helpers::queue;
+use crate::runs::tests::helpers::queue;
 
 pub(crate) async fn start_run(
     store: &ControlStore,

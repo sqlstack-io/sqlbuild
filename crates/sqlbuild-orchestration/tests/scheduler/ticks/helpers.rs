@@ -2,28 +2,28 @@
 
 use std::collections::BTreeMap;
 
+use crate::declarations::main::list_triggers::list_triggers;
+use crate::runs::main::list_runs::list_runs;
+use crate::scheduler::main::_acquire_lease::acquire_lease;
+use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
+use crate::scheduler::main::list_ticks::list_ticks;
+use crate::scheduler::models::TickOutcome;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::models::{SnapshotInput, SnapshotNode};
+use crate::store::errors::ControlError;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::models::ControlStore;
 use serde_json::{Value, json};
-use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
-use sqlbuild_orchestration::scheduler::main::list_ticks::list_ticks;
-use sqlbuild_orchestration::scheduler::models::TickOutcome;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
-use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::lease_helpers::expire_lease;
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store};
-use crate::store_test_types::Backend;
-use crate::ticks::test_types::TransactionFault;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::scheduler::tests::contracts::ticks::test_types::TransactionFault;
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::helpers::read_recall_events;
+use crate::store::tests::lease_helpers::expire_lease;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {

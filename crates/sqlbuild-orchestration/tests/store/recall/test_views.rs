@@ -1,9 +1,8 @@
 //! Durable Recall views preserve the published execution records.
 
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::read_recall_view::read_recall_view;
 use serde_json::json;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::publish_recall::publish_recall;
-use sqlbuild_orchestration::store::main::read_recall_view::read_recall_view;
 use sqlbuild_recall::records::main::artifact_rows::artifact_rows;
 use sqlbuild_recall::records::main::delivery_row::delivery_row;
 use sqlbuild_recall::records::main::event_object_row::event_object_row;
@@ -14,9 +13,10 @@ use sqlbuild_recall::records::models::{
     ArtifactInput, DeliveryCounts, InvocationContext, OutputChunk, OutputStream, RowEnvelope,
 };
 
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::RecallViewTestCase;
+use crate::store::tests::helpers::publish_recall;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
+use crate::store::tests::test_types::RecallViewTestCase;
 
 #[test]
 fn given_native_context_output_and_audits_when_reading_views_then_both_databases_preserve_their_meaning()

@@ -2,21 +2,21 @@
 
 use std::collections::BTreeMap;
 
+use crate::snapshots::main::current_snapshot::current_snapshot;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::models::{SnapshotInput, SnapshotNode};
+use crate::store::errors::ControlError;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::open_store::open_store;
+use crate::store::models::ControlStore;
 use serde_json::json;
-use sqlbuild_orchestration::snapshots::main::current_snapshot::current_snapshot;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
-use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::open_store::open_store;
-use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store};
-use crate::store_test_types::Backend;
-use crate::test_types::SchemaRejectionCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::snapshots::tests::test_types::SchemaRejectionCase;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
+use crate::store::tests::store_test_types::Backend;
 
 fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {

@@ -1,5 +1,12 @@
 use crate::test_types::TestControl;
 
+pub(crate) struct LeaseCapture {
+    pub(crate) lease: Option<
+        tokio::sync::oneshot::Sender<sqlbuild_orchestration::scheduler::models::SchedulerLease>,
+    >,
+    pub(crate) shutdown: tokio::sync::watch::Sender<bool>,
+}
+
 pub(crate) struct WorkerHeartbeatTestCase {
     pub(crate) description: &'static str,
     pub(crate) interruption: fn(WorkerControl, &mut TestControl),

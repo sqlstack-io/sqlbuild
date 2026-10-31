@@ -1,10 +1,10 @@
 //! Real-database setup shared by storage, scheduling, and queue contracts.
 
-use sqlbuild_orchestration::store::main::open_store::open_store;
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::main::open_store::open_store;
+use crate::store::models::ControlStore;
 use uuid::Uuid;
 
-use crate::store_test_types::{Backend, TestStore};
+use crate::store::tests::store_test_types::{Backend, TestStore};
 
 pub(crate) fn run<T>(future: impl std::future::Future<Output = T>) -> T {
     tokio::runtime::Builder::new_current_thread()

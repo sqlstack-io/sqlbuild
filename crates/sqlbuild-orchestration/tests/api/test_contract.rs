@@ -1,34 +1,32 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use crate::api::errors::ClientError;
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::revoke_token::revoke_token;
+use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::list_runs::list_runs;
+use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunExecution, RunStatus};
+use crate::runs::tests::helpers::request_run;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::next_remote_generation::next_remote_generation;
+use crate::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
+use crate::snapshots::main::verify_execution::verify_execution;
+use crate::snapshots::models::{SnapshotInput, SnapshotRecord};
+use crate::store::main::migrate_store::migrate_store;
 use chrono::Utc;
 use reqwest::StatusCode;
 use serde_json::json;
-use sqlbuild_orchestration::api::errors::ClientError;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::runs::main::request_run::request_run;
-use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunExecution, RunStatus,
-};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
-use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
-use sqlbuild_orchestration::snapshots::main::verify_execution::verify_execution;
-use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::helpers::{start_api, stop_api};
-use crate::location_helpers::create_location;
-use crate::run_helpers::{queue, request, snapshot};
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::ApiContractTestCase;
+use crate::api::tests::helpers::{start_api, stop_api};
+use crate::api::tests::test_types::ApiContractTestCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retries_and_terminal_expiry_are_enforced()
@@ -436,7 +434,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                     );
                 }
             }
-            let mut forged = json!(crate::output_helpers::chunk(
+            let mut forged = json!(crate::api::tests::output_helpers::chunk(
                 0,
                 sqlbuild_recall::records::models::OutputStream::Stdout,
                 b"forged"
@@ -502,7 +500,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             let terminal = RunChangeRequest {
                 event_id: Uuid::now_v7(),
                 change: RunChange::Finished {
-                    outcome: sqlbuild_orchestration::runs::models::RunOutcome::Cancelled,
+                    outcome: crate::runs::models::RunOutcome::Cancelled,
                     reason: "worker acknowledged cancellation".into(),
                     exit_code: Some(143),
                 },

@@ -11,10 +11,14 @@ use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope,
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
+use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
+use sqlbuild_orchestration::scheduler::models::{SchedulerLease, SchedulerState};
+use sqlbuild_orchestration::scheduler::types::RunLauncher;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
+use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::open_store::open_store;
+use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_orchestration::worker::models::WorkerSession;
@@ -23,7 +27,33 @@ use uuid::Uuid;
 use crate::admin_helpers::administer;
 use crate::helpers::isolated_binary;
 use crate::test_types::TestControl;
-use crate::worker::test_types::WorkerControl;
+use crate::worker::test_types::{LeaseCapture, WorkerControl};
+
+impl RunLauncher for LeaseCapture {
+    async fn poll(
+        &mut self,
+        _store: &ControlStore,
+        lease: Option<&SchedulerLease>,
+    ) -> Result<(), ControlError> {
+        if let Some(lease) = lease {
+            self.lease
+                .take()
+                .expect("first scheduler lease")
+                .send(lease.clone())
+                .expect("lease receiver");
+            self.shutdown.send(true).expect("scheduler shutdown");
+        }
+        Ok(())
+    }
+
+    async fn shutdown(
+        &mut self,
+        _store: &ControlStore,
+        _lease: Option<&SchedulerLease>,
+    ) -> Result<(), ControlError> {
+        Ok(())
+    }
+}
 
 pub(crate) async fn start_claimed_worker(
     control: &TestControl,
@@ -120,10 +150,25 @@ pub(crate) async fn claim_worker_run(
         [&run], |row| row.get(0)).expect("trusted manual request audit");
     assert_eq!(count, 1);
     drop(connection);
-    let lease = acquire_lease(&store, Uuid::now_v7())
-        .await
-        .expect("acquire lease")
-        .expect("leader");
+    let (lease_sender, lease_receiver) = tokio::sync::oneshot::channel();
+    let (shutdown, signal) = tokio::sync::watch::channel(false);
+    let (_changes, changes) = tokio::sync::watch::channel(());
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        run_scheduler(
+            &store,
+            SchedulerState::new(Uuid::now_v7()),
+            (signal, changes),
+            LeaseCapture {
+                lease: Some(lease_sender),
+                shutdown,
+            },
+        ),
+    )
+    .await
+    .expect("scheduler acquires leadership promptly")
+    .expect("scheduler shutdown");
+    let lease = lease_receiver.await.expect("public scheduler leadership");
     let claim = claim_next_run(
         &store,
         &lease,

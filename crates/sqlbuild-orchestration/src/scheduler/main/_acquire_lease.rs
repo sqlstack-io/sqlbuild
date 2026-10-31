@@ -12,7 +12,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 /// An existing live lease is never stolen, including by a duplicate caller with the same holder.
-pub async fn acquire_lease(
+pub(crate) async fn acquire_lease(
     store: &ControlStore,
     holder: Uuid,
 ) -> Result<Option<SchedulerLease>, ControlError> {

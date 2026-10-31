@@ -3,28 +3,28 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
 
-use serde_json::json;
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::runs::main::{
+use crate::credentials::models::AuditContext;
+use crate::runs::main::{
     advance_groups::advance_groups, claim_next_run::claim_next_run, list_runs::list_runs,
     request_job_run::request_job_run,
 };
-use sqlbuild_orchestration::runs::models::{JobRunRequest, RunDispatch, RunStatus};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::runs::models::{JobRunRequest, RunDispatch, RunStatus};
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use serde_json::json;
 use uuid::Uuid;
 
-use crate::claim_helpers::{slot_counts, succeed};
-use crate::helpers::{queue, request, snapshot};
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::{
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::claim_helpers::{slot_counts, succeed};
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::test_types::{
     AdmissionParent, GroupAdmissionTestCase, GroupQueueTestCase, MixedAdmissionTestCase,
     RunLifecycleTestCase,
 };
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queue_order_win() {

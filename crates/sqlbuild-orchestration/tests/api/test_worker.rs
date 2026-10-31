@@ -1,36 +1,36 @@
 use std::collections::BTreeMap;
 
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::runs::main::change_run::change_run;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::list_runs::list_runs;
+use crate::runs::models::{
+    NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
+};
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
+use crate::store::main::migrate_store::migrate_store;
+use crate::worker::errors::WorkerError;
+use crate::worker::main::connect_worker::connect_worker;
+use crate::worker::main::start_worker::start_worker;
 use axum::Router;
 use axum::response::Redirect;
 use axum::routing::get;
 use chrono::Utc;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
-use sqlbuild_orchestration::runs::main::change_run::change_run;
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::runs::models::{
-    NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
-};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::worker::errors::WorkerError;
-use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
-use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use uuid::Uuid;
 
-use crate::helpers::{start_api, stop_api};
-use crate::location_helpers::create_location;
-use crate::output_helpers::{chunk, output_contract};
-use crate::recall_helpers::recall_contract;
-use crate::run_helpers::{queue, request, snapshot};
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::{
+use crate::api::tests::helpers::{start_api, stop_api};
+use crate::api::tests::output_helpers::{chunk, output_contract};
+use crate::api::tests::recall_helpers::recall_contract;
+use crate::api::tests::test_types::{
     ApiContractTestCase, TestApi, WorkerDeadlineTestCase, WorkerRedirectTestCase,
 };
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_and_reports_are_retryable()

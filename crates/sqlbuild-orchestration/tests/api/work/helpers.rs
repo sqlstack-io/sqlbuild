@@ -1,6 +1,6 @@
 //! Fault injection changes only disposable test stores, never product time or lease semantics.
 
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn execute(store: &ControlStore, sql: &str) {
     let ControlStore::Postgres(pool) = store else {

@@ -1,7 +1,6 @@
-use sqlbuild_orchestration::runs::models::RunStatus;
-use sqlbuild_orchestration::store::errors::ControlError;
-
-use crate::store_test_types::Backend;
+use crate::runs::models::RunStatus;
+use crate::store::errors::ControlError;
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct ApiContractTestCase {
     pub(crate) description: &'static str,

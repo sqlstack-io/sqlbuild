@@ -1,26 +1,26 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::runs::main::list_run_claims::list_run_claims;
-use sqlbuild_orchestration::runs::main::list_runs::list_runs;
-use sqlbuild_orchestration::runs::models::RunStatus;
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::runs::main::list_run_claims::list_run_claims;
+use crate::runs::main::list_runs::list_runs;
+use crate::runs::models::RunStatus;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
 
-use crate::claim_helpers::succeed;
-use crate::helpers::{queue, request, snapshot};
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::terminal_helpers::finish;
-use crate::test_types::{
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::claim_helpers::succeed;
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::terminal_helpers::finish;
+use crate::runs::tests::test_types::{
     BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, ScopedClaimTestCase,
 };
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_higher_priority_work_for_other_scopes_when_a_local_launcher_claims_then_only_its_location_and_target_are_reserved()
@@ -413,11 +413,9 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 for id in batch {
                     queue(store, &request(scope, *id, 0, &["orders"])).await;
                 }
-                lease = sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease(
-                    store, &lease,
-                )
-                .await
-                .expect("keep leader live while preparing backlog");
+                lease = crate::scheduler::main::renew_lease::renew_lease(store, &lease)
+                    .await
+                    .expect("keep leader live while preparing backlog");
             }
             queue(store, &request(scope, 105, -1, &["customers"])).await;
             let started = std::time::Instant::now();

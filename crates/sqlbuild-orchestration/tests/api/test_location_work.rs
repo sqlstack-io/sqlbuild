@@ -1,27 +1,27 @@
-use chrono::{Duration, Utc};
-use reqwest::StatusCode;
-use sqlbuild_orchestration::api::errors::ClientError;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
-use sqlbuild_orchestration::platform::main::connect_location_work::connect_location_work;
-use sqlbuild_orchestration::platform::main::location_work::location_work;
-use sqlbuild_orchestration::platform::main::report_location_health::report_location_health;
-use sqlbuild_orchestration::platform::main::request_location_work::request_location_work;
-use sqlbuild_orchestration::platform::models::{
+use crate::api::errors::ClientError;
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::platform::main::connect_location_work::connect_location_work;
+use crate::platform::main::location_work::location_work;
+use crate::platform::main::report_location_health::report_location_health;
+use crate::platform::main::request_location_work::request_location_work;
+use crate::platform::models::{
     LocationHealth, LocationHealthReport, LocationWork, LocationWorkOutcome, LocationWorkPoll,
     LocationWorkRecord, LocationWorkRequest, LocationWorkResult,
 };
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
+use chrono::{Duration, Utc};
+use reqwest::StatusCode;
 use uuid::Uuid;
 
-use crate::helpers::{start_api, stop_api};
-use crate::location_helpers::create_location;
-use crate::run_helpers::snapshot;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::LocationWorkTestCase;
-use crate::work_helpers::execute;
+use crate::api::tests::helpers::{start_api, stop_api};
+use crate::api::tests::test_types::LocationWorkTestCase;
+use crate::api::tests::work_helpers::execute;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::runs::tests::helpers::snapshot;
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable_results_are_enforced()

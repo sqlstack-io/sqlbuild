@@ -1,7 +1,7 @@
 //! Independent database handles for multi-replica integration contracts.
 
-use sqlbuild_orchestration::store::main::open_store::open_store;
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::main::open_store::open_store;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn second_store(store: &ControlStore) -> ControlStore {
     let ControlStore::Postgres(pool) = store else {

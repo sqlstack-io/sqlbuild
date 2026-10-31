@@ -1,4 +1,4 @@
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn location_state(store: &ControlStore) -> (i64, i64) {
     let sql = "SELECT (SELECT COUNT(*) FROM sqb_locations), \

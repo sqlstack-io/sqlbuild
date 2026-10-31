@@ -1,6 +1,6 @@
 //! Expire the persisted lease without introducing a fake control-store clock.
 
-use sqlbuild_orchestration::store::models::ControlStore;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn expire_lease(store: &ControlStore) {
     let ControlStore::Postgres(pool) = store else {

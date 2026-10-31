@@ -1,7 +1,7 @@
-use crate::helpers::{snapshot_contract, sqlite_failed_publish_and_schema_floor};
-use crate::store_helpers::run;
-use crate::store_test_types::Backend;
-use crate::test_types::{RecoveryTestCase, SnapshotTestCase};
+use crate::snapshots::tests::helpers::{snapshot_contract, sqlite_failed_publish_and_schema_floor};
+use crate::snapshots::tests::test_types::{RecoveryTestCase, SnapshotTestCase};
+use crate::store::tests::store_helpers::run;
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_control_store_when_snapshots_publish_then_generations_sources_and_changes_are_consistent()

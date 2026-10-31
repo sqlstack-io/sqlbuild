@@ -1,24 +1,24 @@
 //! Operator trigger facts remain consistent across publication and retry boundaries.
 
-use sqlbuild_orchestration::credentials::models::AuditContext;
-use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
-use sqlbuild_orchestration::declarations::main::list_trigger_events::list_trigger_events;
-use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
-use sqlbuild_orchestration::declarations::models::{
-    TriggerChange, TriggerChangeRequest, TriggerStatus,
-};
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::credentials::models::AuditContext;
+use crate::declarations::main::change_trigger::change_trigger;
+use crate::declarations::main::list_trigger_events::list_trigger_events;
+use crate::declarations::main::list_triggers::list_triggers;
+use crate::declarations::models::{TriggerChange, TriggerChangeRequest, TriggerStatus};
+use crate::scheduler::main::_acquire_lease::acquire_lease;
+use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::location_helpers::create_location;
-use crate::store_helpers::{close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::ticks::helpers::{snapshot, trigger_audits};
-use crate::ticks::test_types::{TransactionFault, TriggerControlsTestCase};
+use crate::credentials::tests::location_helpers::create_location;
+use crate::scheduler::tests::contracts::ticks::helpers::{snapshot, trigger_audits};
+use crate::scheduler::tests::contracts::ticks::test_types::{
+    TransactionFault, TriggerControlsTestCase,
+};
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_state_remain_consistent()

@@ -1,16 +1,55 @@
 //! Recall publication fixtures exercise the control store's durable append boundary.
 
+use crate::store::errors::ControlError;
+use crate::store::main::append_recall::append_recall;
+use crate::store::main::begin::begin;
+use crate::store::main::commit::commit;
+use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::query::query;
+use crate::store::models::{ControlStore, Parameter, RecallAppendOutcome, TransactionMode};
+use crate::store::types::Row;
 use serde_json::json;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::publish_recall::publish_recall;
-use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use sqlbuild_recall::records::main::artifact_rows::artifact_rows;
 use sqlbuild_recall::records::main::event_object_row::event_object_row;
 use sqlbuild_recall::records::models::{ArtifactInput, RecallRow, RowEnvelope};
 
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store};
-use crate::store_test_types::Backend;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
+use crate::store::tests::store_test_types::Backend;
+
+pub(crate) async fn publish_recall(
+    store: &ControlStore,
+    rows: &[RecallRow],
+) -> Result<Vec<RecallAppendOutcome>, ControlError> {
+    let mut transaction = begin(store, TransactionMode::Write).await?;
+    let mut outcomes = Vec::with_capacity(rows.len());
+    for row in rows {
+        let outcome;
+        (transaction, outcome) = append_recall(transaction, row).await?;
+        outcomes.push(outcome);
+    }
+    commit(transaction).await?;
+    Ok(outcomes)
+}
+
+pub(crate) async fn read_recall_events(
+    store: &ControlStore,
+    after: i64,
+    limit: u32,
+) -> Result<Vec<Row>, ControlError> {
+    let transaction = begin(store, TransactionMode::Read).await?;
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT * FROM recall_events WHERE storage_id > $1 ORDER BY storage_id LIMIT $2",
+        vec![
+            Parameter::Integer(after),
+            Parameter::Integer(i64::from(limit.min(1000))),
+        ],
+    )
+    .await?;
+    commit(transaction).await?;
+    Ok(rows)
+}
 
 pub(crate) fn event(id: &str, occurred_at: &str, duration_ms: f64) -> RecallRow {
     event_object_row(&RowEnvelope { invocation_id: "orders-build".into(),

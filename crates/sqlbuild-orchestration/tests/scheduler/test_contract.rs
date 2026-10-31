@@ -1,7 +1,7 @@
-use crate::helpers::leadership_contract;
-use crate::store_helpers::run;
-use crate::store_test_types::Backend;
-use crate::test_types::LeadershipTestCase;
+use crate::scheduler::tests::contracts::helpers::leadership_contract;
+use crate::scheduler::tests::contracts::test_types::LeadershipTestCase;
+use crate::store::tests::store_helpers::run;
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_two_schedulers_when_leadership_expires_then_only_the_new_epoch_can_renew() {

@@ -1,19 +1,19 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
-use sqlbuild_orchestration::platform::models::PlatformEvent;
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use crate::platform::main::run_watchdog::run_watchdog;
+use crate::platform::models::PlatformEvent;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::helpers::{snapshot, wait_for_scans};
-use crate::location_helpers::create_location;
-use crate::replica_helpers::second_store;
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::test_types::WatchdogTestCase;
+use crate::credentials::tests::location_helpers::create_location;
+use crate::platform::tests::helpers::{snapshot, wait_for_scans};
+use crate::platform::tests::test_types::WatchdogTestCase;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_durable_deduplicated_and_independent_of_leadership()

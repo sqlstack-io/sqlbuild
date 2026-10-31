@@ -1,9 +1,8 @@
 use std::time::Duration;
 
-use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::store::models::ControlStore;
-
-use crate::test_types::TestApi;
+use crate::api::main::serve_api::serve_api;
+use crate::api::tests::test_types::TestApi;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")

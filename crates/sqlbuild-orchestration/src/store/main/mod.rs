@@ -6,8 +6,6 @@ pub(crate) mod decode_row;
 pub mod list_recall_invocations;
 pub mod migrate_store;
 pub mod open_store;
-pub mod publish_recall;
 pub(crate) mod query;
-pub mod read_recall_events;
 pub mod read_recall_view;
 pub(crate) mod refresh_clock;

@@ -8,7 +8,7 @@ use crate::runs::constants::MONITOR_BATCH_SIZE;
 use crate::runs::main::monitor_runs::monitor_runs;
 use crate::scheduler::_helpers::drain_due_triggers::drain_due_triggers;
 use crate::scheduler::constants::RENEW_INTERVAL_SECONDS;
-use crate::scheduler::main::acquire_lease::acquire_lease;
+use crate::scheduler::main::_acquire_lease::acquire_lease;
 use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::{SchedulerCycle, SchedulerState};
 use crate::store::errors::ControlError;
@@ -17,7 +17,7 @@ use crate::store::main::commit::commit;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, TransactionMode};
 
-pub async fn scheduler_cycle(
+pub(crate) async fn scheduler_cycle(
     store: &ControlStore,
     mut state: SchedulerState,
 ) -> Result<(SchedulerState, SchedulerCycle), ControlError> {

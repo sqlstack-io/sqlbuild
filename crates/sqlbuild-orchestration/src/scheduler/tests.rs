@@ -1,3 +1,5 @@
+#[path = "../../tests/scheduler/test_contracts.rs"]
+pub(crate) mod contracts;
 #[path = "tests/helpers.rs"]
 mod helpers;
 #[path = "tests/test_backlog.rs"]

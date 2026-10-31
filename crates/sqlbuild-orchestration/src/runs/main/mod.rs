@@ -13,5 +13,4 @@ pub mod publish_run_recall;
 pub(crate) mod queue_run;
 pub mod request_job_run;
 pub mod request_rerun;
-pub mod request_run;
 pub mod run_execution;

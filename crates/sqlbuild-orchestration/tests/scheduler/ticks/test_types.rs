@@ -1,7 +1,7 @@
 //! Database cases and expected scheduler tick outcomes.
 
-pub(crate) use crate::fault_types::TransactionFault;
-use crate::store_test_types::Backend;
+pub(crate) use crate::store::tests::fault_types::TransactionFault;
+use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct TickTransactionTestCase {
     pub(crate) description: &'static str,
@@ -18,20 +18,20 @@ pub(crate) struct TriggerControlsTestCase {
 
 pub(crate) struct IdleLauncher;
 
-impl sqlbuild_orchestration::scheduler::types::RunLauncher for IdleLauncher {
+impl crate::scheduler::types::RunLauncher for IdleLauncher {
     async fn poll(
         &mut self,
-        _store: &sqlbuild_orchestration::store::models::ControlStore,
-        _lease: Option<&sqlbuild_orchestration::scheduler::models::SchedulerLease>,
-    ) -> Result<(), sqlbuild_orchestration::store::errors::ControlError> {
+        _store: &crate::store::models::ControlStore,
+        _lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
         Ok(())
     }
 
     async fn shutdown(
         &mut self,
-        _store: &sqlbuild_orchestration::store::models::ControlStore,
-        _lease: Option<&sqlbuild_orchestration::scheduler::models::SchedulerLease>,
-    ) -> Result<(), sqlbuild_orchestration::store::errors::ControlError> {
+        _store: &crate::store::models::ControlStore,
+        _lease: Option<&crate::scheduler::models::SchedulerLease>,
+    ) -> Result<(), crate::store::errors::ControlError> {
         Ok(())
     }
 }

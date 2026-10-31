@@ -1,26 +1,26 @@
 use std::collections::BTreeMap;
 
+use crate::credentials::main::authenticate_token::authenticate_token;
+use crate::credentials::main::create_location::create_location;
+use crate::credentials::main::create_principal::create_principal;
+use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::revoke_token::revoke_token;
+use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
+use crate::runs::main::claim_next_run::claim_next_run;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::main::migrate_store::migrate_store;
 use chrono::{Duration, Utc};
-use sqlbuild_orchestration::credentials::main::authenticate_token::authenticate_token;
-use sqlbuild_orchestration::credentials::main::create_location::create_location;
-use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
-use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
-use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
-use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
-use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::{location_state, stored_hashes};
-use crate::replica_helpers::second_store;
-use crate::run_helpers::{queue, request, snapshot};
-use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
-use crate::store_test_types::Backend;
-use crate::terminal_helpers::finish;
-use crate::test_types::{CredentialTestCase, TransactionFault};
+use crate::credentials::tests::helpers::{location_state, stored_hashes};
+use crate::credentials::tests::test_types::{CredentialTestCase, TransactionFault};
+use crate::runs::tests::helpers::{queue, request, snapshot};
+use crate::runs::tests::terminal_helpers::finish;
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_test_types::Backend;
 
 #[test]
 fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_them_and_audit_failure_rolls_back()
