@@ -1748,6 +1748,8 @@ def build_orchestration_snapshot(
     project: CompiledProjectView,
     metadata_json: str,
     project_dir: Path,
+    *,
+    declarations: Sequence[object] | None = None,
 ) -> NativeOrchestrationSnapshot: ...
 
 class NativeProjectView:

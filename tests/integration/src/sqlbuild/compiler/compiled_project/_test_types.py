@@ -214,3 +214,21 @@ class SnapshotEnvironmentTestCase:
     first_lockfile: str
     second_lockfile: str
     expected_environment_count: int
+
+
+@dataclass(frozen=True)
+class SnapshotScheduleTestCase:
+    description: str
+    timezone: str
+    expected_selection: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SnapshotDeclarationRejectionTestCase:
+    description: str
+    job_description: str = "Orders."
+    select: str = "orders"
+    cron: str = "0 2 * * *"
+    timezone: str = "UTC"
+    copies: int = 1
+    expected_message: str = ""

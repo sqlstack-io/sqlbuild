@@ -4,16 +4,21 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python};
+use pyo3::prelude::{
+    Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python,
+};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use serde_json::Value;
 use sqlbuild_core::models::DiagnosticSeverity;
 use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
+use crate::bindings::_helpers::compiled_project::snapshot_declarations::compile_declarations;
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
+use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
+use crate::bindings::_helpers::native_host::orchestration_declarations::validate_jobs;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
 use crate::bindings::_helpers::records::fields::field;
 
@@ -49,12 +54,14 @@ impl NativeOrchestrationSnapshot {
 
 /// Compile catalog nodes from their owners, never from Python model or graph projections.
 #[pyfunction]
+#[pyo3(signature = (project, metadata_json, project_dir, *, declarations=None))]
 pub(crate) fn build_orchestration_snapshot(
-    py: Python<'_>,
     project: PyRef<'_, NativeProjectView>,
     metadata_json: &str,
     project_dir: PathBuf,
+    declarations: Option<Vec<Bound<'_, PyAny>>>,
 ) -> PyResult<NativeOrchestrationSnapshot> {
+    let py = project.py();
     let mut input: SnapshotInput = serde_json::from_str(metadata_json)
         .map_err(|error| PyValueError::new_err(error.to_string()))?;
     if !input.nodes.is_empty() {
@@ -83,6 +90,16 @@ pub(crate) fn build_orchestration_snapshot(
     let owner = project.owner().bind(py).borrow();
     input.nodes = model_nodes(py, &project, &owner, input.nodes)?;
     input.nodes = resource_nodes(py, &project, &owner, input.nodes)?;
+    drop(owner);
+    if let Some(declarations) = declarations {
+        validate_jobs(py, &declarations)?;
+        let authored = declarations
+            .iter()
+            .map(plain_value)
+            .collect::<PyResult<Vec<_>>>()?;
+        let graph = project.lineage_graph(py)?;
+        input = compile_declarations(input, graph.bind(py).get().graph(), authored)?;
+    }
     Ok(NativeOrchestrationSnapshot { input })
 }
 

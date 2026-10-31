@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -16,10 +17,13 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
+from sqlbuild.orchestration import Job, compile_snapshot, job, schedule
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
+    SnapshotDeclarationRejectionTestCase,
     SnapshotEnvironmentTestCase,
     SnapshotRejectionTestCase,
+    SnapshotScheduleTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     FUNCTION_PROJECT_FILES,
@@ -266,3 +270,130 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
     assert changed == json.loads(
         build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotScheduleTestCase(
+            description="daylight saving zone",
+            timezone="Europe/London",
+            expected_selection=("model:orders",),
+        ),
+        SnapshotScheduleTestCase(
+            description="fixed offset zone", timezone="UTC", expected_selection=("model:orders",)
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_selection_and_cron(
+    tmp_path: Path, test_case: SnapshotScheduleTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    nightly: Job = job(
+        "nightly_orders",
+        description="Refresh order reporting.",
+        select="+orders",
+        exclude="stg_orders",
+        overlap="queue",
+        concurrency_groups=("order_reporting",),
+        schedule=schedule(cron="15 2 * * *", timezone=test_case.timezone),
+        targets=("development",),
+    )
+    excluded: Job = replace(nightly, name="other_target", targets=("production",))
+    first: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=[nightly, excluded],
+        ).to_json()
+    )
+    assert first["documents"]["jobs"] == {
+        "nightly_orders": {
+            "description": "Refresh order reporting.",
+            "selection": list(test_case.expected_selection),
+            "settings": {},
+            "overlap": "queue",
+            "on_failure": "skip_dependents",
+            "concurrency_groups": ["order_reporting"],
+        }
+    }
+    trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
+    assert trigger["job_key"] == "nightly_orders"
+    assert trigger["schedule"] == {
+        "kind": "cron",
+        "expression": "15 2 * * *",
+        "timezone": test_case.timezone,
+    }
+    edited: Job = replace(nightly, schedule=schedule(cron="30 3 * * *", timezone="UTC"))
+    second: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=[edited],
+        ).to_json()
+    )
+    assert second["documents"]["triggers"].keys() == first["documents"]["triggers"].keys()
+    assert second["documents"]["triggers"]["nightly_orders"]["schedule"]["expression"] == (
+        "30 3 * * *"
+    )
+    assert second["nodes"] == first["nodes"]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotDeclarationRejectionTestCase(
+            description="blank description",
+            job_description=" ",
+            expected_message="needs a description",
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="blank selection", select="", expected_message="needs a selection"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="missing model", select="missing", expected_message="missing"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="invalid cron", cron="not a cron", expected_message="cron"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="invalid timezone", timezone="Unknown/Zone", expected_message="time zone"
+        ),
+        SnapshotDeclarationRejectionTestCase(
+            description="duplicate names", copies=2, expected_message="duplicate job orders"
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_invalid_declarations_when_compiling_then_native_validation_rejects_them(
+    tmp_path: Path, test_case: SnapshotDeclarationRejectionTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    declarations: list[Job] = [
+        job(
+            "orders",
+            description=test_case.job_description,
+            select=test_case.select,
+            schedule=schedule(cron=test_case.cron, timezone=test_case.timezone),
+        )
+    ] * test_case.copies
+    with pytest.raises(ValueError, match=test_case.expected_message):
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=declarations,
+        )
