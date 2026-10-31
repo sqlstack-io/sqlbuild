@@ -15,7 +15,7 @@ def compile_snapshot(
     project: CompiledProjectView,
     metadata_json: str,
     project_dir: Path,
-    declarations: Sequence[Job] = (),
+    declarations: Sequence[Job] | None = None,
 ) -> NativeOrchestrationSnapshot:
     """Compile authoring records and retained project facts into a data-only snapshot."""
     return build_orchestration_snapshot(

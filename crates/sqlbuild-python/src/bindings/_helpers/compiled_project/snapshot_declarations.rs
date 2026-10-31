@@ -1,13 +1,18 @@
 //! Compile authoring records against retained graph data before publication.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
+use pyo3::FromPyObject;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::PyResult;
-use serde::Deserialize;
+use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::ProjectGraph;
+use sqlbuild_core::constants::PYTHON_INIT_MODULE_STEM;
+use sqlbuild_discovery::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
+use sqlbuild_discovery::tree::main::rglob::rglob;
+use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
     JobDefinition, OnFailure, Schedule, TriggerDefinition, TriggerStatus,
@@ -15,22 +20,51 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::scheduler::models::{CatchUp, Overlap};
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
+use crate::bindings::_helpers::native_host::orchestration_declarations::module_jobs;
+
+/// Dedicated declaration modules are imported only in the code-location interpreter.
+pub(crate) fn discover_declarations<'py>(
+    py: Python<'py>,
+    project_dir: &Path,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let tree = ProjectTree::new(project_dir);
+    let files = py
+        .detach(|| {
+            rglob(&tree, ORCHESTRATION_DIRECTORY, |entry| {
+                !entry.is_dir
+                    && entry.name.ends_with(PYTHON_FILE_SUFFIX)
+                    && entry.name.strip_suffix(PYTHON_FILE_SUFFIX) != Some(PYTHON_INIT_MODULE_STEM)
+            })
+        })
+        .map_err(|error| {
+            PyValueError::new_err(format!("orchestration discovery failed: {error:?}"))
+        })?;
+    let mut declarations: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut seen: BTreeSet<usize> = BTreeSet::new();
+    for file in files {
+        for job in module_jobs(py, &tree.absolute(&file), project_dir)? {
+            if seen.insert(job.as_ptr() as usize) {
+                declarations.push(job);
+            }
+        }
+    }
+    Ok(declarations)
+}
+
+#[derive(FromPyObject)]
 struct AuthoredSchedule {
     cron: String,
     timezone: String,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AuthoredJob {
+#[derive(FromPyObject)]
+pub(crate) struct AuthoredJob {
     name: String,
     description: String,
     select: String,
     exclude: String,
-    overlap: Overlap,
-    on_failure: OnFailure,
+    overlap: String,
+    on_failure: String,
     concurrency_groups: Vec<String>,
     schedule: Option<AuthoredSchedule>,
     targets: Vec<String>,
@@ -39,7 +73,7 @@ struct AuthoredJob {
 pub(crate) fn compile_declarations(
     mut input: SnapshotInput,
     graph: &ProjectGraph,
-    declarations: Vec<Value>,
+    declarations: Vec<AuthoredJob>,
 ) -> PyResult<SnapshotInput> {
     if declarations.is_empty() {
         return Ok(input);
@@ -52,9 +86,7 @@ pub(crate) fn compile_declarations(
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
     let mut names: BTreeSet<String> = BTreeSet::new();
-    for declaration in declarations {
-        let job: AuthoredJob = serde_json::from_value(declaration)
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+    for job in declarations {
         if !names.insert(job.name.clone()) {
             return Err(PyValueError::new_err(format!("duplicate job {}", job.name)));
         }
@@ -101,8 +133,10 @@ pub(crate) fn compile_declarations(
                 description: job.description,
                 selection,
                 settings: BTreeMap::new(),
-                overlap: job.overlap,
-                on_failure: job.on_failure,
+                overlap: serde_json::from_value::<Overlap>(Value::String(job.overlap))
+                    .map_err(|error| PyValueError::new_err(error.to_string()))?,
+                on_failure: serde_json::from_value::<OnFailure>(Value::String(job.on_failure))
+                    .map_err(|error| PyValueError::new_err(error.to_string()))?,
                 concurrency_groups: job.concurrency_groups.into_iter().collect(),
             },
         );

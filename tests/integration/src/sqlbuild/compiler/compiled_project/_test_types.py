@@ -232,3 +232,19 @@ class SnapshotDeclarationRejectionTestCase:
     timezone: str = "UTC"
     copies: int = 1
     expected_message: str = ""
+
+
+@dataclass(frozen=True)
+class SnapshotDiscoveryTestCase:
+    description: str
+    files: dict[str, str]
+    expected_jobs: tuple[str, ...]
+    declarations: tuple[()] | None = None
+
+
+@dataclass(frozen=True)
+class SnapshotDiscoveryRejectionTestCase:
+    description: str
+    files: dict[str, str]
+    expected_error: type[Exception]
+    expected_message: str

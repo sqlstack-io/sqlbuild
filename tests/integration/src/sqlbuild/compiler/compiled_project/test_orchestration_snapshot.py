@@ -11,6 +11,7 @@ import pytest
 
 from sqlbuild._native import (
     NativeOrchestrationSnapshot,
+    PythonNodeDiscoveryError,
     build_compiled_project,
     build_orchestration_snapshot,
     discover_project_inputs,
@@ -21,6 +22,8 @@ from sqlbuild.orchestration import Job, compile_snapshot, job, schedule
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
     SnapshotDeclarationRejectionTestCase,
+    SnapshotDiscoveryRejectionTestCase,
+    SnapshotDiscoveryTestCase,
     SnapshotEnvironmentTestCase,
     SnapshotRejectionTestCase,
     SnapshotScheduleTestCase,
@@ -397,3 +400,116 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             project_dir=tmp_path,
             declarations=declarations,
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotDiscoveryTestCase(
+            description="relative imports aliases and factory containers",
+            files={
+                "orchestration/shared.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
+                ),
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "from .shared import staging\n"
+                    "alias = staging\n"
+                    "def factory():\n"
+                    "    return [job('daily', description='Daily orders.', select='orders')]\n"
+                    "jobs = [factory(), staging]\n"
+                    "jobs.append(jobs)\n"
+                ),
+            },
+            expected_jobs=("daily", "staging"),
+        ),
+        SnapshotDiscoveryTestCase(
+            description="explicit empty declarations do not execute project files",
+            files={"orchestration/jobs.py": "raise RuntimeError('must not import')\n"},
+            expected_jobs=(),
+            declarations=(),
+        ),
+        SnapshotDiscoveryTestCase(
+            description="DuckShop edge-case declaration containers",
+            files={
+                "orchestration/edge_cases/definitions.py": Path(
+                    "benchmarks/duckshop/project/orchestration/edge_cases/definitions.py"
+                ).read_text(),
+                "models/orders.sql": TYPE_PROOF_FILES["models/orders.sql"].replace(
+                    "MODEL (", "MODEL (tags ['edge_case'],", 1
+                ),
+            },
+            expected_jobs=("edge_snapshot_orders",),
+        ),
+        SnapshotDiscoveryTestCase(
+            description="a project without declarations has no job document",
+            files={},
+            expected_jobs=(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_declaration_modules_when_compiling_then_native_discovery_collects_jobs(
+    tmp_path: Path, test_case: SnapshotDiscoveryTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | test_case.files)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    publication: dict[str, Any] = json.loads(
+        compile_snapshot(
+            project=project,
+            metadata_json=json.dumps(METADATA),
+            project_dir=tmp_path,
+            declarations=test_case.declarations,
+        ).to_json()
+    )
+    assert tuple(publication["documents"].get("jobs", {})) == test_case.expected_jobs
+    for definition in publication["documents"].get("jobs", {}).values():
+        assert set(definition["selection"]) <= publication["nodes"].keys()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotDiscoveryRejectionTestCase(
+            description="distinct objects cannot share a job name",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job\n"
+                    "jobs = [job('daily', description='Orders.', select='orders') for _ in range(2)]\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message="duplicate job daily",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="broken imports fail on every retry",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/failed_import.py"
+                ).read_text()
+            },
+            expected_error=PythonNodeDiscoveryError,
+            expected_message="Failed to import orchestration file orchestration/jobs.py",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_broken_declaration_modules_when_compiling_then_no_partial_snapshot_is_returned(
+    tmp_path: Path, test_case: SnapshotDiscoveryRejectionTestCase
+) -> None:
+    write_files(project_dir=tmp_path, files=TYPE_PROOF_FILES | test_case.files)
+    project: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    for _ in range(2):
+        with pytest.raises(test_case.expected_error, match=test_case.expected_message):
+            compile_snapshot(
+                project=project, metadata_json=json.dumps(METADATA), project_dir=tmp_path
+            )

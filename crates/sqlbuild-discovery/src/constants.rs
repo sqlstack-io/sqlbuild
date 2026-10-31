@@ -2,6 +2,8 @@
 
 /// Root of SQL model files.
 pub const MODELS_DIRECTORY: &str = "models";
+/// Root of code-location orchestration declarations, never imported by the scheduler.
+pub const ORCHESTRATION_DIRECTORY: &str = "orchestration";
 /// Suffix of SQL files.
 pub const SQL_FILE_SUFFIX: &str = ".sql";
 /// The folder below a resource tree that holds grouped scoped declarations.
