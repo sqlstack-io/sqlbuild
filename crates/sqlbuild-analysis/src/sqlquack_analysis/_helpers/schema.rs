@@ -41,7 +41,9 @@ pub(crate) fn relation_key(name: &str, profile: &dyn DialectProfile) -> String {
 
 /// A relation's column names: one written in double quotes is a quoted identifier, and so is the
 /// same name listed without them.
-pub(crate) fn schema_columns<'a>(names: impl Iterator<Item = &'a str> + Clone) -> Vec<SchemaColumn> {
+pub(crate) fn schema_columns<'a>(
+    names: impl Iterator<Item = &'a str> + Clone,
+) -> Vec<SchemaColumn> {
     let quoted: Vec<&str> = names.clone().filter_map(unquoted).collect();
     let mut columns: Vec<SchemaColumn> = Vec::new();
     for name in names {

@@ -32,8 +32,8 @@ use crate::assembly::analysis_session::_helpers::mappings::{
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::constants::{
     CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, TRANSFORM_AGGREGATION, TRANSFORM_CAST,
-    TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY,
-    UNKNOWN_TYPE,
+    TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR,
+    UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{

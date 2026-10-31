@@ -56,7 +56,10 @@ fn model_lineage(
         .references
         .iter()
         .map(|(name, kind, resource)| {
-            (relation_key(name, profile), (kind.as_str(), resource.as_str()))
+            (
+                relation_key(name, profile),
+                (kind.as_str(), resource.as_str()),
+            )
         })
         .collect();
     let options = ParseOptions {
@@ -76,7 +79,7 @@ fn model_lineage(
             .outputs
             .iter()
             .filter(|output| !output.name.is_empty())
-            .map(|output| lineage_column(output, &references, &schema, profile))
+            .map(|output| lineage_column(output, &references, profile))
             .collect(),
     )
 }
@@ -84,7 +87,6 @@ fn model_lineage(
 fn lineage_column(
     output: &OutputLineage,
     references: &HashMap<String, (&str, &str)>,
-    schema: &RelationColumns,
     profile: &dyn DialectProfile,
 ) -> CompileLineageColumn {
     let mut sources: BTreeSet<(String, String, String)> = BTreeSet::new();
