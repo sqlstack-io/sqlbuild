@@ -29,7 +29,7 @@ use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
-use crate::native_commands::_helpers::decision::{control_database, text};
+use crate::native_commands::_helpers::decision::{control_database, flag, text};
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
 use crate::native_commands::_helpers::paths::{location_database_files, project_location};
@@ -48,6 +48,8 @@ use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
     LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
+use crate::workers::main::open_local_workers::open_local_workers;
+use crate::workers::models::LocalWorkers;
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(
@@ -309,6 +311,16 @@ pub(crate) async fn open_control_store(
     migrate_store(&store).await?;
     drop(write_output(&[(Stream::Stderr, "Control store ready\n")]));
     Ok(store)
+}
+
+/// Decode privileged CLI configuration before handing process ownership to the workers domain.
+pub(crate) fn open_control_workers(namespace: &Namespace) -> Result<LocalWorkers, ControlError> {
+    open_local_workers(
+        text(namespace, "control_launchers").as_deref(),
+        text(namespace, "control_database_env")
+            .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into()),
+        !flag(namespace, "control_no_scheduler"),
+    )
 }
 
 pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {

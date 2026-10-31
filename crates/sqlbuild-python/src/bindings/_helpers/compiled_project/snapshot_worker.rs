@@ -11,6 +11,7 @@ use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_orchestration::worker::models::{WorkerClient, WorkerSession};
 use uuid::Uuid;
 
+use crate::bindings::_helpers::compiled_project::constants::REPORT_ATTEMPTS;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 
 struct WorkerOwner {
@@ -26,6 +27,61 @@ pub(crate) struct NativeOrchestrationWorker {
 }
 
 impl NativeOrchestrationWorker {
+    /// SIGTERM may arrive before the periodic heartbeat observes the durable cancellation fact.
+    pub(crate) fn refresh_cancellation(&self, py: Python<'_>) -> PyResult<bool> {
+        py.detach(|| {
+            let owner = self.owner.lock().map_err(|_| unavailable())?;
+            let owner = owner.as_ref().ok_or_else(unavailable)?;
+            if owner.session.cancel_requested() {
+                return Ok(true);
+            }
+            owner
+                .runtime
+                .block_on(owner.client.heartbeat())
+                .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+        })
+    }
+
+    /// Native execution reads the retained request, never caller-provided selection or settings.
+    pub(crate) fn execution(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<sqlbuild_orchestration::runs::models::RunExecution> {
+        py.detach(|| {
+            let owner = self.owner.lock().map_err(|_| unavailable())?;
+            Ok(owner
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .session
+                .execution
+                .clone())
+        })
+    }
+
+    /// A bounded retry keeps the exact event identity across an uncertain acknowledgement.
+    pub(crate) fn change(&self, py: Python<'_>, key: &str, change: RunChange) -> PyResult<()> {
+        py.detach(|| {
+            let owner = self.owner.lock().map_err(|_| unavailable())?;
+            let owner = owner.as_ref().ok_or_else(unavailable)?;
+            let event_id = Uuid::new_v5(&owner.session.execution.claim.claim_id, key.as_bytes());
+            owner.runtime.block_on(async {
+                let mut attempts = 0;
+                loop {
+                    attempts += 1;
+                    match owner.client.report(event_id, change.clone()).await {
+                        Ok(_) => return Ok(()),
+                        Err(sqlbuild_orchestration::worker::errors::WorkerError::Transport(_))
+                            if attempts < REPORT_ATTEMPTS =>
+                        {
+                            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                        }
+                        Err(error) => return Err(PyRuntimeError::new_err(error.to_string())),
+                    }
+                }
+            })
+        })
+    }
+
     /// Verify this retained baseline before the caller applies run settings or opens a warehouse.
     pub(crate) fn start(
         snapshot: &NativeOrchestrationSnapshot,
@@ -77,7 +133,7 @@ impl NativeOrchestrationWorker {
     }
 
     /// Cancellation remains sticky; a closed worker cannot authorize further work.
-    fn cancel_requested(&self, py: Python<'_>) -> bool {
+    pub(crate) fn cancel_requested(&self, py: Python<'_>) -> bool {
         py.detach(|| {
             self.owner.lock().map_or(true, |owner| {
                 owner

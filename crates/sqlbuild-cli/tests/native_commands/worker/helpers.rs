@@ -98,10 +98,15 @@ pub(crate) async fn start_claimed_worker(
         .await
         .expect("acquire lease")
         .expect("leader");
-    let claim = claim_next_run(&store, &lease, &BTreeMap::new())
-        .await
-        .expect("claim")
-        .expect("queued work");
+    let claim = claim_next_run(
+        &store,
+        &lease,
+        &BTreeMap::new(),
+        Some((location_id, "development")),
+    )
+    .await
+    .expect("claim")
+    .expect("queued work");
     assert_eq!(claim.request.priority, -3);
     assert_eq!(
         claim.request.settings.get("full_refresh"),

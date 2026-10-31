@@ -58,7 +58,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             queue(store, &request(scope, 1, 2, &["customers", "orders"])).await;
             queue(store, &request(scope, 2, 1, &["customers", "orders"])).await;
             let limits = BTreeMap::new();
-            let claim = claim_next_run(store, &lease, &limits)
+            let claim = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim")
                 .expect("available");
@@ -246,7 +246,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     before
                 );
                 assert!(
-                    claim_next_run(store, &lease, &limits)
+                    claim_next_run(store, &lease, &limits, None)
                         .await
                         .expect("claims retained")
                         .is_none()
@@ -292,7 +292,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     .expect("heartbeat reports pending cancellation")
             );
             assert!(
-                claim_next_run(store, &lease, &limits)
+                claim_next_run(store, &lease, &limits, None)
                     .await
                     .expect("cancel request does not release an executing run's claims")
                     .is_none()
@@ -345,7 +345,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             assert_eq!(nodes[0].status, "success");
             assert_eq!(nodes[0].rows_affected, Some(17));
             assert_eq!(nodes[1].error_code.as_deref(), Some("E100"));
-            let following = claim_next_run(store, &lease, &limits)
+            let following = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim following run")
                 .expect("released capacity");
@@ -472,7 +472,7 @@ fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_l
                 .expect("elect")
                 .expect("leader");
             assert!(
-                claim_next_run(store, &lease, &BTreeMap::new())
+                claim_next_run(store, &lease, &BTreeMap::new(), None)
                     .await
                     .expect("cancelled work cannot launch")
                     .is_none()

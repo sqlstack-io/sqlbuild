@@ -46,6 +46,14 @@ pub async fn serve_api(
             get(run_reads::nodes),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/runs/{run_id}/invocations",
+            get(run_reads::invocations),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/runs/{run_id}/recall/{view}",
+            get(run_reads::recall),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/triggers",
             get(trigger_reads::current),
         )

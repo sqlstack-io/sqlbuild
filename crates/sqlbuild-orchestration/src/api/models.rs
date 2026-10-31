@@ -22,6 +22,8 @@ use crate::api::_helpers::{
     runs::recall,
     run_reads::recent,
     run_reads::nodes,
+    run_reads::invocations,
+    run_reads::recall,
     trigger_reads::current,
     trigger_reads::events,
     trigger_reads::ticks
@@ -32,6 +34,27 @@ pub(crate) struct ControlApi;
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadQuery {
     pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunRecallQuery {
+    pub(crate) invocation: String,
+    pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunRecallPath {
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) run_id: uuid::Uuid,
+    pub(crate) view: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ReadResource {
+    Run,
+    Trigger,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]

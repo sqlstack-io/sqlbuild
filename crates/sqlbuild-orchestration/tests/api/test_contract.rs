@@ -183,7 +183,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                 .await
                 .expect("elect")
                 .expect("leader");
-            let claim = claim_next_run(store, &lease, &BTreeMap::new())
+            let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim")
                 .expect("work");

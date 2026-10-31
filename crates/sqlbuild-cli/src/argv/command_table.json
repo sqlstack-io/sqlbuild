@@ -106,7 +106,7 @@
         "options": [],
         "dest": "location_command",
         "required": true,
-        "choices": ["publish", "serve", "runtime"],
+        "choices": ["publish", "serve", "runtime", "execute"],
         "help": "publish one snapshot, watch and reload, or run the supervisor's stdio compiler",
         "group": 0
        },
@@ -147,6 +147,20 @@
         "options": ["--image-id"],
         "dest": "location_image_id",
         "help": "immutable deployment image identity to pin for workers",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--run-id"],
+        "dest": "location_run_id",
+        "help": "frozen run UUID for execute; requires SQLBUILD_RUN_TOKEN",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--claim-id"],
+        "dest": "location_claim_id",
+        "help": "active claim UUID for execute",
         "group": 1
        },
        {
@@ -851,6 +865,13 @@
        },
        {
         "kind": "store",
+        "options": ["--launchers"],
+        "dest": "control_launchers",
+        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": [
          "--host"
         ],
@@ -933,6 +954,13 @@
         "dest": "control_database_env",
         "default": "SQLBUILD_CONTROL_DATABASE_URL",
         "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--launchers"],
+        "dest": "control_launchers",
+        "help": "installation-owned JSON file of local location/target launchers and concurrency limits",
         "group": 1
        }
       ]

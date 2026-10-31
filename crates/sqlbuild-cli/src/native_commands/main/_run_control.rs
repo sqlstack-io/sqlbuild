@@ -10,7 +10,9 @@ use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{control_address, flag};
-use crate::native_commands::_helpers::execution::{open_control_store, supervise_control_roles};
+use crate::native_commands::_helpers::execution::{
+    open_control_store, open_control_workers, supervise_control_roles,
+};
 use crate::native_commands::_helpers::terminal::write_output;
 
 async fn stopped(mut shutdown: watch::Receiver<bool>) {
@@ -27,6 +29,7 @@ pub(crate) async fn run_control(
 ) -> Result<(), ControlError> {
     let address = control_address(namespace, standalone)?;
     let store = open_control_store(namespace).await?;
+    let workers = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
     let (_changes, changes) = watch::channel(());
     let mut tasks = tokio::task::JoinSet::new();
@@ -66,8 +69,8 @@ pub(crate) async fn run_control(
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
-                shutdown,
-                changes,
+                (shutdown, changes),
+                workers,
             )
             .await
         });

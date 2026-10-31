@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
-use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
@@ -18,10 +18,12 @@ use crate::bindings::_helpers::compiled_project::snapshot::{
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
+use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
+use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -41,9 +43,11 @@ fn metadata(
         .parse()
         .map_err(|_| PyValueError::new_err("location ID must be a UUID"))?;
     let target: String = arguments.value("selected_target")?.extract()?;
+    let action = arguments.value("action")?.extract::<Option<String>>()?;
     let generation = arguments
         .value("generation")?
         .extract::<Option<i64>>()?
+        .or_else(|| (action.as_deref() == Some("execute")).then_some(1))
         .ok_or_else(|| PyValueError::new_err("publish requires --generation"))?;
     if target.trim().is_empty() || generation < 1 {
         return Err(PyValueError::new_err(
@@ -101,7 +105,7 @@ fn compile_location<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
     input: &SnapshotInput,
-) -> PyResult<NativeOrchestrationSnapshot> {
+) -> PyResult<(NativeOrchestrationSnapshot, Bound<'py, PyAny>)> {
     status(py, "Discovering location project...")?;
     let ProjectAdapter {
         project_dir,
@@ -128,7 +132,7 @@ fn compile_location<'py>(
         None,
     )?;
     status(py, "Location snapshot compiled.")?;
-    Ok(snapshot)
+    Ok((snapshot, discovered))
 }
 
 pub(super) fn location_arguments<'py>(
@@ -147,7 +151,7 @@ pub(super) fn location_arguments<'py>(
                 "generation",
                 "server_url",
             ],
-            &["image_id", "action"],
+            &["image_id", "action", "run_id", "claim_id"],
         ),
     )
 }
@@ -177,7 +181,7 @@ pub(super) fn publish_location(
         .value("project_dir")?
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
-    let snapshot = compile_location(py, arguments, &input)?;
+    let (snapshot, _) = compile_location(py, arguments, &input)?;
     status(py, "Publishing location snapshot...")?;
     let record = snapshot.publication(
             py,
@@ -202,7 +206,40 @@ pub(crate) fn run_location_command<'py>(
     py: Python<'py>,
     options: Option<Bound<'py, PyDict>>,
 ) -> PyResult<i32> {
+    run_location(py, options, None)
+}
+
+/// CLI dispatch retains the verified worker through invocation history delivery.
+pub(crate) fn run_location<'py>(
+    py: Python<'py>,
+    options: Option<Bound<'py, PyDict>>,
+    recall: Option<&InvocationRecall>,
+) -> PyResult<i32> {
     let arguments = location_arguments(py, options.clone())?;
+    if arguments
+        .value("action")?
+        .extract::<Option<String>>()?
+        .as_deref()
+        == Some("execute")
+    {
+        let directory = arguments
+            .value("project_dir")?
+            .extract::<std::path::PathBuf>()?;
+        let input = metadata(py, &arguments, &directory)?;
+        let bearer = std::env::var("SQLBUILD_RUN_TOKEN")
+            .map_err(|_| PyValueError::new_err("execute requires SQLBUILD_RUN_TOKEN"))?;
+        let identity = (
+            arguments.value("run_id")?.extract::<String>()?,
+            arguments.value("claim_id")?.extract::<String>()?,
+        );
+        let (snapshot, discovered) = compile_location(py, &arguments, &input)?;
+        return execute_worker(
+            py,
+            (&snapshot, discovered),
+            &arguments,
+            (&bearer, identity, recall),
+        );
+    }
     if arguments
         .value("action")?
         .extract::<Option<String>>()?

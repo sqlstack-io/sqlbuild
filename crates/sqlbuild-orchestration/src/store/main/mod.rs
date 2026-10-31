@@ -3,6 +3,7 @@ pub(crate) mod append_recall;
 pub(crate) mod begin;
 pub(crate) mod commit;
 pub(crate) mod decode_row;
+pub mod list_recall_invocations;
 pub mod migrate_store;
 pub mod open_store;
 pub mod publish_recall;

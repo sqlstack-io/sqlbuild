@@ -104,3 +104,35 @@ pub(crate) fn config_value_to_python(py: Python<'_>, value: ConfigValue) -> PyRe
         }
     }
 }
+
+/// JSON-backed configuration keeps integer widths and recursively constructs native Python values.
+pub(crate) fn json_value_to_python<'py>(
+    py: Python<'py>,
+    value: &serde_json::Value,
+) -> PyResult<Bound<'py, PyAny>> {
+    use serde_json::Value;
+    match value {
+        Value::Null => Ok(py.None().into_bound(py)),
+        Value::Bool(value) => value.into_bound_py_any(py),
+        Value::String(value) => value.into_bound_py_any(py),
+        Value::Number(value) => match (value.as_i64(), value.as_u64()) {
+            (Some(value), _) => value.into_bound_py_any(py),
+            (None, Some(value)) => value.into_bound_py_any(py),
+            (None, None) => value.as_f64().unwrap_or(f64::NAN).into_bound_py_any(py),
+        },
+        Value::Array(items) => {
+            let values = items
+                .iter()
+                .map(|item| json_value_to_python(py, item))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(PyList::new(py, values)?.into_any())
+        }
+        Value::Object(entries) => {
+            let table = PyDict::new(py);
+            for (key, item) in entries {
+                table.set_item(key, json_value_to_python(py, item)?)?;
+            }
+            Ok(table.into_any())
+        }
+    }
+}

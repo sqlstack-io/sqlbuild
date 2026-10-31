@@ -13,16 +13,24 @@ use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope,
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
 use sqlbuild_orchestration::declarations::models::{TriggerChange, TriggerChangeRequest};
+use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::main::request_run::request_run;
+use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome};
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use sqlbuild_orchestration::store::main::publish_recall::publish_recall;
+use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
+use sqlbuild_recall::records::main::output_row::output_row;
+use sqlbuild_recall::records::models::{OutputStream, RowEnvelope};
 use uuid::Uuid;
 
 use crate::helpers::{read_json, start_api, stop_api};
 use crate::location_helpers::create_location;
+use crate::output_helpers::chunk;
+use crate::recall_helpers::recall_contract;
 use crate::run_helpers::{request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
@@ -145,10 +153,15 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             )
             .await
             .expect("principal token");
-            let claim = claim_next_run(store, &lease, &BTreeMap::new())
-                .await
-                .expect("claim")
-                .expect("work");
+            let claim = claim_next_run(
+                store,
+                &lease,
+                &BTreeMap::new(),
+                Some((location_id, "development")),
+            )
+            .await
+            .expect("claim")
+            .expect("work");
             let worker = issue_token(
                 store,
                 &audit,
@@ -174,13 +187,123 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             let trigger_path = format!("{prefix}/triggers");
             let event_path = format!("{trigger_path}/{trigger_id}/events");
             let tick_path = format!("{trigger_path}/{trigger_id}/ticks");
+            let invocation_path = format!("{prefix}/runs/{}/invocations", claim.request.run_id);
+            let recall_path = format!(
+                "{prefix}/runs/{}/recall/events?invocation=worker/{}/execution",
+                claim.request.run_id, claim.claim_id
+            );
             let paths = [
                 &run_path,
                 &node_path,
                 &trigger_path,
                 &event_path,
                 &tick_path,
+                &invocation_path,
+                &recall_path,
             ];
+            let connection = connect_worker(
+                &api.url,
+                &worker.bearer,
+                (claim.request.run_id, claim.claim_id),
+            )
+            .expect("worker HTTP connection");
+            recall_contract(store, &connection, claim.claim_id).await;
+            let output = chunk(0, OutputStream::Stdout, b"orders worker output");
+            connection
+                .publish_output(std::slice::from_ref(&output))
+                .await
+                .expect("output-only namespace");
+            let neighboring = RowEnvelope {
+                invocation_id: format!("worker/{}-other", claim.claim_id),
+                invocation_started_at: "2026-01-02T03:04:05Z".into(),
+                producer_version: "test".into(),
+            };
+            publish_recall(store, &[output_row(&neighboring, &output)])
+                .await
+                .expect("neighboring namespace");
+            let invocations = read_json(&client, (&invocation_path, &token.bearer)).await;
+            let invocation_ids = invocations
+                .as_array()
+                .expect("run invocations")
+                .iter()
+                .map(|row| {
+                    row["invocation_id"]
+                        .as_str()
+                        .expect("invocation ID")
+                        .to_owned()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                invocation_ids,
+                vec![
+                    format!("scheduler/{}", claim.request.run_id),
+                    format!("worker/{}", claim.claim_id),
+                    format!("worker/{}/another-invocation", claim.claim_id),
+                    format!("worker/{}/backlog", claim.claim_id),
+                    format!("worker/{}/execution", claim.claim_id),
+                    format!("worker/{}/native-writer", claim.claim_id),
+                ]
+            );
+            let evidence = read_json(&client, (&recall_path, &token.bearer)).await;
+            assert_eq!(evidence.as_array().expect("worker events").len(), 1);
+            assert_eq!(evidence[0]["duration_ms"], json!(12.75));
+            assert_eq!(evidence[0]["row_count"], json!(9));
+            assert_eq!(
+                read_json(&client, (&format!("{recall_path}&limit=0"), &token.bearer)).await,
+                json!([])
+            );
+            for path in [
+                recall_path.replace(
+                    &format!("worker/{}/execution", claim.claim_id),
+                    &format!("scheduler/{}", foreign_run.run_id),
+                ),
+                recall_path.replace(
+                    &format!("worker/{}/execution", claim.claim_id),
+                    &format!("worker/{}-other/execution", claim.claim_id),
+                ),
+                recall_path.replace(
+                    &format!("/runs/{}/", claim.request.run_id),
+                    &format!("/runs/{}/", manual_ids[0]),
+                ),
+                recall_path.replace(
+                    &format!("/runs/{}/", claim.request.run_id),
+                    &format!("/runs/{}/", foreign_run.run_id),
+                ),
+                recall_path.replace("/development/", "/validation/"),
+            ] {
+                assert_eq!(
+                    client
+                        .get(path)
+                        .bearer_auth(&token.bearer)
+                        .send()
+                        .await
+                        .expect("Recall scope denial")
+                        .status(),
+                    StatusCode::NOT_FOUND
+                );
+            }
+            assert_eq!(
+                client
+                    .get(recall_path.replace("/recall/events?", "/recall/unknown?"))
+                    .bearer_auth(&token.bearer)
+                    .send()
+                    .await
+                    .expect("unknown view")
+                    .status(),
+                StatusCode::BAD_REQUEST
+            );
+            let scheduler_path = format!(
+                "{prefix}/runs/{}/recall/events?invocation=scheduler/{}",
+                claim.request.run_id, claim.request.run_id
+            );
+            let history = read_json(&client, (&scheduler_path, &token.bearer)).await;
+            assert!(
+                history
+                    .as_array()
+                    .expect("run history")
+                    .iter()
+                    .any(|row| row["event_type"] == "run_claimed")
+            );
             let runs = read_json(&client, (&run_path, &token.bearer)).await;
             assert_eq!(
                 runs.as_array().expect("runs").len(),
@@ -214,7 +337,7 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             assert_eq!(ticks[0]["outcome"], "requested");
             assert_eq!(ticks[0]["scheduled_for"], "2020-01-03T00:00:00Z");
             assert_eq!(ticks[1]["outcome"], "covered");
-            for path in [&run_path, &event_path, &tick_path] {
+            for path in [&run_path, &event_path, &tick_path, &invocation_path] {
                 assert_eq!(
                     read_json(&client, (&format!("{path}?limit=1"), &token.bearer))
                         .await
@@ -275,9 +398,14 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 node_path.replace(&manual_ids[0].to_string(), &foreign_run.run_id.to_string()),
                 event_path.replace(&trigger_id.to_string(), &foreign_trigger.to_string()),
                 tick_path.replace(&trigger_id.to_string(), &foreign_trigger.to_string()),
+                invocation_path.replace(
+                    &claim.request.run_id.to_string(),
+                    &foreign_run.run_id.to_string(),
+                ),
                 node_path.replace("/development/", "/validation/"),
                 event_path.replace("/development/", "/validation/"),
                 tick_path.replace("/development/", "/validation/"),
+                invocation_path.replace("/development/", "/validation/"),
             ] {
                 assert_eq!(
                     client
@@ -322,6 +450,8 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             for path in [
                 "/api/locations/{location_id}/targets/{target}/runs",
                 "/api/locations/{location_id}/targets/{target}/runs/{run_id}/nodes",
+                "/api/locations/{location_id}/targets/{target}/runs/{run_id}/invocations",
+                "/api/locations/{location_id}/targets/{target}/runs/{run_id}/recall/{view}",
                 "/api/locations/{location_id}/targets/{target}/triggers",
                 "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/events",
                 "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks",
@@ -345,6 +475,32 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 events
             );
             assert_eq!(read_json(&client, (&tick_path, &token.bearer)).await, ticks);
+            change_run(
+                store,
+                RunAuthority::Scheduler(&lease),
+                &RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: claim.request.run_id,
+                    claim_id: Some(claim.claim_id),
+                    change: RunChange::Finished {
+                        outcome: RunOutcome::Failed,
+                        reason: "Stop scoped read fixture".into(),
+                        exit_code: Some(1),
+                    },
+                },
+            )
+            .await
+            .expect("terminalize worker and release liveness");
+            assert_eq!(
+                read_json(&client, (&invocation_path, &token.bearer)).await,
+                invocations,
+                "invocation discovery uses retained facts, not active liveness"
+            );
+            assert_eq!(
+                read_json(&client, (&recall_path, &token.bearer)).await,
+                evidence,
+                "historical Recall remains authorized after the active claim is removed"
+            );
             revoke_token(store, &audit, token.identity.token_id)
                 .await
                 .expect("revoke location");

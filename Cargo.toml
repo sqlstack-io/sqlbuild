@@ -115,7 +115,7 @@ errno = "0.3"
 windows-sys = { version = "0.61", default-features = false, features = ["Win32_System_Diagnostics_Debug"] }
 # Recall's local store: SQLite compiled in, so every build has the same engine version.
 rusqlite = { version = "0.37", features = ["bundled", "column_decltype"] }
-rustix = { version = "1.1.4", default-features = false, features = ["fs", "std", "termios"] }
+rustix = { version = "1.1.4", default-features = false, features = ["fs", "process", "std", "termios"] }
 saphyr-parser = "0.1"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

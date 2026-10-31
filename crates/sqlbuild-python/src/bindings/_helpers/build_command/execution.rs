@@ -225,6 +225,10 @@ pub(crate) fn prepare_build_execution<'py>(
             ],
         )?),
     )
+    .map(|mut value| {
+        value.worker = context.worker.clone();
+        value
+    })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
     let concurrency = context.concurrency()?.limit;

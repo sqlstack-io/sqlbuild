@@ -5,6 +5,13 @@ use sqlbuild_orchestration::runs::models::RunStatus;
 pub(crate) use crate::fault_types::TransactionFault;
 use crate::store_test_types::Backend;
 
+pub(crate) struct ScopedClaimTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_selected_run: u128,
+    pub(crate) expected_unscoped_run: u128,
+}
+
 pub(crate) struct PriorityClaimsTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

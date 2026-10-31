@@ -12,6 +12,7 @@ use sqlbuild_rules::configuration::errors::RulesConfigLoadError;
 use sqlbuild_rules::configuration::main::load_rules_config::load_rules_config as load_config;
 use sqlbuild_rules::models::RulesConfig;
 
+use crate::bindings::_helpers::boundary::config_values::json_value_to_python;
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record;
@@ -64,31 +65,6 @@ fn option_scalar<'py>(py: Python<'py>, value: &Value) -> PyResult<Option<Bound<'
     }
 }
 
-/// A list option item as JSON decoding yields it.
-fn option_item<'py>(py: Python<'py>, value: &Value) -> PyResult<Bound<'py, PyAny>> {
-    match value {
-        Value::Array(items) => {
-            let values: Vec<Bound<'py, PyAny>> = items
-                .iter()
-                .map(|item| option_item(py, item))
-                .collect::<PyResult<_>>()?;
-            Ok(pyo3::types::PyList::new(py, values)?.into_any())
-        }
-        Value::Object(entries) => {
-            let table: Bound<'py, PyDict> = PyDict::new(py);
-            for (key, item) in entries {
-                table.set_item(key, option_item(py, item)?)?;
-            }
-            Ok(table.into_any())
-        }
-        Value::Null => Ok(py.None().into_bound(py)),
-        Value::Number(number) if number.as_i64().is_none() && number.as_u64().is_none() => {
-            number.as_f64().unwrap_or(f64::NAN).into_bound_py_any(py)
-        }
-        other => Ok(option_scalar(py, other)?.unwrap_or_else(|| py.None().into_bound(py))),
-    }
-}
-
 fn rule_options<'py>(py: Python<'py>, config: &RulesConfig) -> PyResult<Bound<'py, PyAny>> {
     let result: Bound<'py, PyDict> = PyDict::new(py);
     for (code, options) in &config.rule_options {
@@ -97,7 +73,7 @@ fn rule_options<'py>(py: Python<'py>, config: &RulesConfig) -> PyResult<Bound<'p
             if let Value::Array(items) = value {
                 let tuple: Vec<Bound<'py, PyAny>> = items
                     .iter()
-                    .map(|item| option_item(py, item))
+                    .map(|item| json_value_to_python(py, item))
                     .collect::<PyResult<_>>()?;
                 values.set_item(name, PyTuple::new(py, tuple)?)?;
             } else if let Some(scalar) = option_scalar(py, value)? {

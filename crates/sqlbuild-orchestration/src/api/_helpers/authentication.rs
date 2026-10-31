@@ -7,9 +7,11 @@ use axum::response::Response;
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
+use crate::api::models::ReadResource;
 use crate::credentials::main::authenticate_token::authenticate_token;
 use crate::credentials::models::{CredentialScope, TokenIdentity};
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub(crate) async fn authenticate(
     State(store): State<ControlStore>,
@@ -47,6 +49,43 @@ pub(crate) fn require_location(
         return Err(ApiError {
             status: StatusCode::FORBIDDEN,
             message: "credential does not authorize this location".into(),
+        });
+    }
+    Ok(())
+}
+
+/// A guessed resource ID never widens the already authenticated location and target.
+pub(crate) async fn require_resource(
+    store: &ControlStore,
+    (location_id, target): (Uuid, &str),
+    (resource, id): (ReadResource, Uuid),
+) -> Result<(), ApiError> {
+    let (statement, missing) = match resource {
+        ReadResource::Run => (
+            "SELECT run_id FROM sqb_runs WHERE run_id=$1 AND location_id=$2 AND target=$3",
+            "run not found",
+        ),
+        ReadResource::Trigger => (
+            "SELECT trigger_id FROM sqb_triggers WHERE trigger_id=$1 AND location_id=$2 AND target=$3",
+            "trigger not found",
+        ),
+    };
+    let transaction = begin(store, TransactionMode::Read).await?;
+    let (transaction, rows) = query(
+        transaction,
+        statement,
+        vec![
+            Parameter::Id(id),
+            Parameter::Id(location_id),
+            Parameter::Text(target.into()),
+        ],
+    )
+    .await?;
+    commit(transaction).await?;
+    if rows.is_empty() {
+        return Err(ApiError {
+            status: StatusCode::NOT_FOUND,
+            message: missing.into(),
         });
     }
     Ok(())

@@ -1,23 +1,19 @@
 //! Trigger definitions and immutable history are visible only within the authenticated location.
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::require_location;
+use crate::api::_helpers::authentication::{require_location, require_resource};
 use crate::api::errors::ApiError;
-use crate::api::models::ReadQuery;
+use crate::api::models::{ReadQuery, ReadResource};
 use crate::credentials::models::TokenIdentity;
 use crate::declarations::main::list_trigger_events::list_trigger_events;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChangeRecord, TriggerRecord};
 use crate::scheduler::main::list_ticks::list_ticks;
 use crate::scheduler::models::TickRecord;
-use crate::store::main::begin::begin;
-use crate::store::main::commit::commit;
-use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::ControlStore;
 
 #[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/triggers",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
@@ -45,7 +41,12 @@ pub(crate) async fn events(
     Query(options): Query<ReadQuery>,
 ) -> Result<Json<Vec<TriggerChangeRecord>>, ApiError> {
     require_location(&identity, location_id)?;
-    require_trigger(&store, (location_id, &target, trigger_id)).await?;
+    require_resource(
+        &store,
+        (location_id, &target),
+        (ReadResource::Trigger, trigger_id),
+    )
+    .await?;
     Ok(Json(
         list_trigger_events(&store, trigger_id, options.limit.unwrap_or(100)).await?,
     ))
@@ -64,33 +65,13 @@ pub(crate) async fn ticks(
     Query(options): Query<ReadQuery>,
 ) -> Result<Json<Vec<TickRecord>>, ApiError> {
     require_location(&identity, location_id)?;
-    require_trigger(&store, (location_id, &target, trigger_id)).await?;
+    require_resource(
+        &store,
+        (location_id, &target),
+        (ReadResource::Trigger, trigger_id),
+    )
+    .await?;
     Ok(Json(
         list_ticks(&store, trigger_id, options.limit.unwrap_or(100)).await?,
     ))
-}
-
-async fn require_trigger(
-    store: &ControlStore,
-    (location_id, target, trigger_id): (Uuid, &str, Uuid),
-) -> Result<(), ApiError> {
-    let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT trigger_id FROM sqb_triggers WHERE trigger_id=$1 AND location_id=$2 AND target=$3",
-        vec![
-            Parameter::Id(trigger_id),
-            Parameter::Id(location_id),
-            Parameter::Text(target.into()),
-        ],
-    )
-    .await?;
-    commit(transaction).await?;
-    if rows.is_empty() {
-        return Err(ApiError {
-            status: StatusCode::NOT_FOUND,
-            message: "trigger not found".into(),
-        });
-    }
-    Ok(())
 }

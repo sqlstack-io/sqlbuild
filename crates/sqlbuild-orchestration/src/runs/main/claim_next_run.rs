@@ -24,6 +24,7 @@ pub async fn claim_next_run(
     store: &ControlStore,
     lease: &SchedulerLease,
     limits: &BTreeMap<String, NonZeroU32>,
+    scope: Option<(Uuid, &str)>,
 ) -> Result<Option<RunClaim>, ControlError> {
     let mut transaction = check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
     let locking = if matches!(transaction.connection, Some(Connection::Postgres(_))) {
@@ -37,11 +38,14 @@ pub async fn claim_next_run(
         (transaction, rows) = query(transaction,
             &format!("SELECT r.request_json, r.queued_at FROM sqb_runs r WHERE r.status='queued' AND r.cancel_requested_at IS NULL \
              AND NOT EXISTS (SELECT 1 FROM sqb_run_liveness l WHERE l.run_id=r.run_id) \
+             AND ($4 IS NULL OR (r.location_id=$4 AND r.target=$5)) \
              AND ($1 IS NULL OR r.priority<$1 OR (r.priority=$1 AND (r.queued_at>$2 OR (r.queued_at=$2 AND r.run_id>$3)))) \
              ORDER BY r.priority DESC, r.queued_at, r.run_id LIMIT 100{locking}"),
             vec![after.as_ref().map_or(Parameter::Null(ColumnType::Integer), |value| Parameter::Integer(value.request_json.priority)),
                 Parameter::OptionalTime(after.as_ref().map(|value| value.queued_at)),
-                Parameter::OptionalId(after.as_ref().map(|value| value.request_json.run_id))]).await?;
+                Parameter::OptionalId(after.as_ref().map(|value| value.request_json.run_id)),
+                Parameter::OptionalId(scope.map(|(location, _)| location)),
+                Parameter::OptionalText(scope.map(|(_, target)| target.to_owned()))]).await?;
         if rows.is_empty() {
             commit(check_lease(transaction, lease).await?).await?;
             return Ok(None);

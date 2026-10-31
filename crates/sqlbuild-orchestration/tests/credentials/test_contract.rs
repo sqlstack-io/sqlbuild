@@ -191,7 +191,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 .await
                 .expect("elect")
                 .expect("leader");
-            let claim = claim_next_run(store, &lease, &BTreeMap::new())
+            let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim")
                 .expect("work");

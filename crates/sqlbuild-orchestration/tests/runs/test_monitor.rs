@@ -80,7 +80,7 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
             start_run(store, &lease, &request(scope, 2, 0, &["customers"])).await;
             age_heartbeat(store, Uuid::from_u128(2), 40).await;
             queue(store, &request(scope, 3, 0, &["inventory"])).await;
-            let launching = claim_next_run(store, &lease, &BTreeMap::new())
+            let launching = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim")
                 .expect("launching");
@@ -247,7 +247,7 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
                 .expect("takeover")
                 .expect("successor");
             assert!(
-                claim_next_run(store, &successor, &BTreeMap::new())
+                claim_next_run(store, &successor, &BTreeMap::new(), None)
                     .await
                     .expect("write claims remain held after heartbeat loss and takeover")
                     .is_none()

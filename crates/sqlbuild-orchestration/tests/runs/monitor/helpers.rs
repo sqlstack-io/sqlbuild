@@ -20,7 +20,7 @@ pub(crate) async fn start_run(
     input: &RunRequest,
 ) -> RunClaim {
     queue(store, input).await;
-    let claim = claim_next_run(store, lease, &BTreeMap::new())
+    let claim = claim_next_run(store, lease, &BTreeMap::new(), None)
         .await
         .expect("claim queued run")
         .expect("run available");

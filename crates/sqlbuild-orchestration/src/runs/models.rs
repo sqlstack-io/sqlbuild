@@ -307,3 +307,13 @@ pub(crate) struct ClaimMetadata {
     pub(crate) claimed_at: DateTime<Utc>,
     pub(crate) sqb_version: String,
 }
+
+/// A physical launcher uses the database clock and current liveness, never an old run event.
+#[derive(Debug, Deserialize)]
+pub struct RunObservation {
+    pub status: RunStatus,
+    pub cancel_requested_at: Option<DateTime<Utc>>,
+    pub claimed_at: Option<DateTime<Utc>>,
+    pub last_heartbeat_at: Option<DateTime<Utc>>,
+    pub observed_at: DateTime<Utc>,
+}

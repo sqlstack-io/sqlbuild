@@ -1,7 +1,7 @@
 //! Live progress rows, completion rows and runtime diagnostics of `sqb build`.
 
 use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -31,6 +31,7 @@ use crate::bindings::_helpers::build_progress::terminal::{
     consume_terminal, flush, join_spinner, projector, release, shared_lines, start_spinner,
     terminal_columns, tty_flag, write,
 };
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced_keywords;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
@@ -85,11 +86,8 @@ fn sql_test_resource_id(result: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 /// The resource name and projector identity of a completion.
-fn resource_identity(
-    result: &Bound<'_, PyAny>,
-    kind: ResultKind,
-) -> PyResult<Option<(String, String)>> {
-    Ok(match kind {
+pub(crate) fn resource_identity(result: &Bound<'_, PyAny>) -> PyResult<Option<(String, String)>> {
+    Ok(match result_kind(result)? {
         ResultKind::Model => {
             let name: String = text(result, "model_name")?;
             Some((name.clone(), format!("model:{name}")))
@@ -141,6 +139,7 @@ struct CallbackState {
 /// Encapsulates live build progress output state and callbacks.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct BuildProgressCallbacks {
+    pub(crate) worker: Option<Arc<WorkerBuild>>,
     plan: Py<PyAny>,
     stream: Py<PyAny>,
     lines: Py<PyAny>,
@@ -453,6 +452,7 @@ impl BuildProgressCallbacks {
         }
         let lines: Bound<'_, PyAny> = shared_lines(py)?;
         Ok(Self {
+            worker: None,
             plan: plan.unbind(),
             is_tty: tty_flag(&stdout)? && !debug,
             stream: stream.unbind(),
@@ -484,6 +484,9 @@ impl BuildProgressCallbacks {
     ) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let callbacks: &Self = slf.get();
+        if let Some(worker) = &callbacks.worker {
+            worker.start(py, &name, resource_kind)?;
+        }
         if let Some(projector) = &callbacks.projector {
             let options: Bound<'_, PyDict> = PyDict::new(py);
             options.set_item("resource_name", name)?;
@@ -579,10 +582,15 @@ impl BuildProgressCallbacks {
     fn on_node_complete(slf: &Bound<'_, Self>, node_result: &Bound<'_, PyAny>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let callbacks: &Self = slf.get();
+        if let Some(worker) = &callbacks.worker
+            && let Some((_, key)) = resource_identity(node_result)?
+        {
+            worker.completed(node_result, &key)?;
+        }
         let kind: ResultKind = result_kind(node_result)?;
         let mut result: Bound<'_, PyAny> = node_result.clone();
         if let Some(projector) = &callbacks.projector
-            && let Some((name, identity)) = resource_identity(node_result, kind)?
+            && let Some((name, identity)) = resource_identity(node_result)?
         {
             let Some(duration_ms) = consume_terminal(projector.bind(py), &name, Some(&identity))?
             else {
