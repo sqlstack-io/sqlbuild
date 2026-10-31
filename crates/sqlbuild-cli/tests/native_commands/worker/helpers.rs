@@ -1,12 +1,13 @@
 //! Privileged test operators stay separate from the API-only worker session.
 
 use std::collections::BTreeMap;
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::{Duration, SystemTime};
 
 use sqlbuild_orchestration::credentials::main::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
+use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope, IssuedToken};
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
@@ -20,6 +21,7 @@ use sqlbuild_orchestration::worker::models::WorkerSession;
 use uuid::Uuid;
 
 use crate::admin_helpers::administer;
+use crate::helpers::isolated_binary;
 use crate::test_types::TestControl;
 use crate::worker::test_types::WorkerControl;
 
@@ -27,6 +29,30 @@ pub(crate) async fn start_claimed_worker(
     control: &TestControl,
     url: &str,
 ) -> (WorkerSession, WorkerControl) {
+    let (worker, baseline, token) = claim_worker_run(control, None).await;
+    change_run(
+        &worker.store,
+        RunAuthority::Scheduler(&worker.lease),
+        &RunChangeRequest {
+            event_id: Uuid::now_v7(),
+            run_id: worker.identity.0,
+            claim_id: Some(worker.identity.1),
+            change: RunChange::Launched { container_id: None },
+        },
+    )
+    .await
+    .expect("launched worker");
+    let client = connect_worker(url, &token.bearer, worker.identity).expect("worker connection");
+    let session = start_worker(&client, &baseline)
+        .await
+        .expect("verified worker");
+    (session, worker)
+}
+
+pub(crate) async fn claim_worker_run(
+    control: &TestControl,
+    image_id: Option<&str>,
+) -> (WorkerControl, SnapshotInput, IssuedToken) {
     let path = control.directory.path().join(".sqlbuild/control.sqlite3");
     let store = open_store(path.to_str().expect("test database path"))
         .await
@@ -47,7 +73,7 @@ pub(crate) async fn start_claimed_worker(
         git_revision: None,
         git_dirty: false,
         git_author: None,
-        image_id: None,
+        image_id: image_id.map(str::to_owned),
         environment_hash: "orders-environment".into(),
         sqb_version: env!("CARGO_PKG_VERSION").into(),
         nodes: BTreeMap::from([(
@@ -124,30 +150,16 @@ pub(crate) async fn start_claimed_worker(
     )
     .await
     .expect("run-scoped token");
-    change_run(
-        &store,
-        RunAuthority::Scheduler(&lease),
-        &RunChangeRequest {
-            event_id: Uuid::now_v7(),
-            run_id,
-            claim_id: Some(identity.1),
-            change: RunChange::Launched { container_id: None },
-        },
-    )
-    .await
-    .expect("launched worker");
-    let client = connect_worker(url, &token.bearer, identity).expect("worker connection");
-    let session = start_worker(&client, &baseline)
-        .await
-        .expect("verified worker");
     (
-        session,
         WorkerControl {
             store,
             context,
+            lease,
             token_id: token.identity.token_id,
             identity,
         },
+        baseline,
+        token,
     )
 }
 
@@ -229,4 +241,82 @@ pub(crate) fn revoke_worker(worker: WorkerControl, _control: &mut TestControl) {
 pub(crate) fn disconnect_worker(_worker: WorkerControl, control: &mut TestControl) {
     control.child.kill().expect("stop API process");
     control.child.wait().expect("reap API process");
+}
+
+pub(crate) fn start_recovery_scheduler(
+    control: &TestControl,
+    url: &str,
+    location_id: Uuid,
+) -> TestControl {
+    let directory = tempfile::tempdir().expect("recovery scheduler logs");
+    let configuration = directory.path().join("launchers.json");
+    let launcher = serde_json::json!({"docker": [{
+        "location_id": location_id, "target": "development", "server_url": url,
+        "max_workers": 1, "socket": directory.path().join("docker.sock"),
+        "location_container": "orders-location", "executable": "sqb"
+    }]});
+    std::fs::write(&configuration, launcher.to_string()).expect("Docker scope configuration");
+    let stderr = directory.path().join("scheduler.log");
+    let child = Command::new(isolated_binary(directory.path()))
+        .args([
+            "scheduler",
+            "--database-env",
+            "SQLBUILD_RECOVERY_TEST_STORE",
+            "--launchers",
+        ])
+        .arg(configuration)
+        .current_dir(directory.path())
+        .env("PATH", "")
+        .env(
+            "SQLBUILD_RECOVERY_TEST_STORE",
+            control.directory.path().join(".sqlbuild/control.sqlite3"),
+        )
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&stderr).expect("scheduler stderr"))
+        .spawn()
+        .expect("replacement scheduler");
+    TestControl {
+        child,
+        directory,
+        stderr,
+    }
+}
+
+pub(crate) async fn wait_for_worker_log(control: &mut TestControl, expected: &str) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        for _ in 0..250 {
+            let log = std::fs::read_to_string(&control.stderr).expect("worker supervision log");
+            assert!(
+                control
+                    .child
+                    .try_wait()
+                    .expect("scheduler status")
+                    .is_none(),
+                "{log}"
+            );
+            let Some(_) = log.find(expected) else {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                continue;
+            };
+            return;
+        }
+        panic!("worker supervision exhausted readiness attempts");
+    })
+    .await
+    .expect("worker supervision phase completes");
+}
+
+pub(crate) async fn wait_for_worker_exit(control: &mut TestControl) -> ExitStatus {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        for _ in 0..250 {
+            let Some(exit) = control.child.try_wait().expect("scheduler exit") else {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                continue;
+            };
+            return exit;
+        }
+        panic!("worker supervision exhausted shutdown attempts");
+    })
+    .await
+    .expect("shutdown publishes retained terminal evidence")
 }

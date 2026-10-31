@@ -4,8 +4,6 @@ import json
 import os
 import signal
 import sqlite3
-import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -32,11 +30,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WorkerExecutionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    cancel_running_statement,
     claimed_worker,
     scheduled_worker,
     snapshot_api,
     wait_for_log,
-    wait_for_run,
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -224,7 +222,7 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
             "cancelled",
             [(0,)],
-        )
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -232,38 +230,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
-        active: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, pending=frozenset({"queued", "launched"})
-        )
-        assert active["status"] == "running", worker.log.read_text()
-        deadline: float = time.monotonic() + 15
-        with sqlite3.connect(worker.control_store) as control:
-            while not control.execute(
-                "SELECT 1 FROM recall_artifacts WHERE CAST(content AS TEXT) LIKE ?",
-                ("%range(10000000000)%",),
-            ).fetchone():
-                assert worker.process.poll() is None, worker.log.read_text()
-                assert time.monotonic() < deadline, worker.log.read_text()
-                time.sleep(0.02)
-        cancelled: subprocess.CompletedProcess[str] = subprocess.run(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "admin",
-                "--database-env",
-                "SQLBUILD_SCHEDULER_TEST_STORE",
-                "cancel-run",
-                active["run_id"],
-                "--event-id",
-                str(uuid4()),
-                "--reason",
-                "Cancel the active test statement.",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-        assert cancelled.returncode == 0, cancelled.stderr
+        cancel_running_statement(worker)
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
 

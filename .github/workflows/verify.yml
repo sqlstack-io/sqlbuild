@@ -283,7 +283,13 @@ jobs:
         run: make check-ci
       - name: Run native checks
         run: make rust-check
+      - name: Prepare Docker worker tests
+        run: |
+          docker info > /dev/null
+          docker pull alpine:3.23
       - name: Run unit and integration tests
+        env:
+          SQLBUILD_REQUIRE_DOCKER_TESTS: "1"
         run: make test
 
   e2e_shards:

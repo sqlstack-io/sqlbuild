@@ -11,10 +11,10 @@ use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 
-use crate::workers::_helpers::local::{exit_code, publish, terminal, terminate};
-use crate::workers::models::{LocalWorker, LocalWorkers};
+use crate::workers::_helpers::supervisor::{publish, terminal};
+use crate::workers::models::{ClaimedWorker, WorkerChild, WorkerExit, Workers};
 
-impl LocalWorker {
+impl ClaimedWorker {
     async fn reap(
         &mut self,
         store: &ControlStore,
@@ -26,9 +26,11 @@ impl LocalWorker {
         if self.exit.is_some() {
             return Ok(());
         }
+        let mut killed = false;
         if self.stopping.is_none() {
-            if terminate(child).is_err() {
+            if child.terminate().await.is_err() {
                 child.kill().await?;
+                killed = true;
             }
             self.stopping = Some(Instant::now());
         }
@@ -40,10 +42,9 @@ impl LocalWorker {
                     self.exit = Some(exit?);
                     return Ok(());
                 }
-                _ = tokio::time::sleep_until(deadline.into()) => {
+                _ = tokio::time::sleep_until(deadline.into()), if !killed => {
                     child.kill().await?;
-                    self.exit = Some(child.wait().await?);
-                    return Ok(());
+                    killed = true;
                 }
                 _ = renew.tick(), if lease.is_some() => {
                     if let Some(lease) = lease
@@ -66,9 +67,9 @@ impl LocalWorker {
         if !terminal(state.status) {
             let lease = lease.ok_or(ControlError::Fenced)?;
             let reason = if self.child.is_none() {
-                "local worker launch preparation failed before a child started"
+                "worker launch preparation failed before a child started"
             } else {
-                "scheduler stopped its local worker and reaped the child"
+                "scheduler confirmed its worker stopped or absent"
             };
             publish(
                 store,
@@ -83,7 +84,7 @@ impl LocalWorker {
                             RunOutcome::Failed
                         },
                         reason: reason.into(),
-                        exit_code: self.exit.map(exit_code),
+                        exit_code: self.exit.and_then(WorkerExit::code),
                     },
                 ),
             )
@@ -93,7 +94,7 @@ impl LocalWorker {
     }
 }
 
-impl LocalWorkers {
+impl Workers {
     pub(in crate::workers) async fn shutdown_workers(
         &mut self,
         store: &ControlStore,
@@ -101,9 +102,31 @@ impl LocalWorkers {
     ) -> Result<(), ControlError> {
         let mut retrying = false;
         let mut renew = tokio::time::interval(Duration::from_secs(RENEW_INTERVAL_SECONDS));
+        let mut renewed = Instant::now();
         while !self.active.is_empty() {
             let mut failure = None;
             for index in (0..self.active.len()).rev() {
+                if renewed.elapsed() >= Duration::from_secs(RENEW_INTERVAL_SECONDS)
+                    && let Some(lease) = lease
+                {
+                    if let Err(error) = renew_lease(store, lease).await {
+                        failure = Some(error);
+                    }
+                    renewed = Instant::now();
+                }
+                if let Some(WorkerChild::Docker(child)) = &self.active[index].child {
+                    match child.try_wait().await {
+                        Ok(None) => {
+                            self.active.swap_remove(index);
+                            continue;
+                        }
+                        Ok(exit) => self.active[index].exit = exit,
+                        Err(error) => {
+                            failure.get_or_insert(error);
+                            continue;
+                        }
+                    }
+                }
                 match self.active[index].finish_shutdown(store, lease).await {
                     Ok(()) => {
                         self.active.swap_remove(index);
@@ -121,7 +144,7 @@ impl LocalWorkers {
                 if !retrying {
                     drop(writeln!(
                         std::io::stderr().lock(),
-                        "Retrying worker shutdown publication; stopped workers and their claims remain owned"
+                        "Retrying worker shutdown publication or physical observation; claims remain owned"
                     ));
                     retrying = true;
                 }
@@ -140,7 +163,7 @@ impl LocalWorkers {
         if retrying {
             drop(writeln!(
                 std::io::stderr().lock(),
-                "Worker shutdown publication recovered; claims released"
+                "Worker shutdown recovered; stopped claims released and live containers remain recoverable"
             ));
         }
         Ok(())

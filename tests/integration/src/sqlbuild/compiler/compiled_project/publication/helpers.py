@@ -29,7 +29,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     ClaimedWorker,
     ScheduledWorker,
     SnapshotApi,
+    WorkerDeployment,
     WorkerExecutionTestCase,
+)
+from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker.helpers import (
+    docker_deployment,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
@@ -78,8 +82,10 @@ def wait_for_generation(
     return current
 
 
-def wait_for_log(process: subprocess.Popen[bytes], log: Path, text: str) -> None:
-    deadline: float = time.monotonic() + 15
+def wait_for_log(
+    process: subprocess.Popen[bytes], log: Path, text: str, *, timeout: float = 15
+) -> None:
+    deadline: float = time.monotonic() + timeout
     while text not in log.read_text():
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
@@ -217,14 +223,17 @@ def current_snapshot(api: SnapshotApi, target: str) -> dict[str, Any]:
     return result
 
 
-def native_launcher(directory: Path, executable: str) -> AbstractContextManager[str]:
+def native_launcher(directory: Path, executable: str) -> AbstractContextManager[WorkerDeployment]:
     """Use the installed native launcher without a synthetic child."""
-    del directory
-    return nullcontext(executable)
+    return nullcontext(
+        WorkerDeployment(
+            "local", {"project_dir": str(directory / "project"), "executable": executable}
+        )
+    )
 
 
 @contextmanager
-def uncooperative_launcher(directory: Path, executable: str) -> Iterator[str]:
+def uncooperative_launcher(directory: Path, executable: str) -> Iterator[WorkerDeployment]:
     """Own a synthetic process that ignores TERM, including cleanup after a failed assertion."""
     del executable
     script: Path = directory / "worker"
@@ -236,7 +245,9 @@ def uncooperative_launcher(directory: Path, executable: str) -> Iterator[str]:
     )
     script.chmod(0o700)
     try:
-        yield str(script)
+        yield WorkerDeployment(
+            "local", {"project_dir": str(directory / "project"), "executable": str(script)}
+        )
     finally:
         with suppress(FileNotFoundError, ProcessLookupError):
             os.kill(int((directory / "project/worker.pid").read_text()), signal.SIGKILL)
@@ -270,13 +281,14 @@ def scheduled_worker(
         | test_case.files,
     )
     executable: str = str(Path(sys.executable).with_name("sqb"))
-    launchers: dict[str, Callable[[Path, str], AbstractContextManager[str]]] = {
+    launchers: dict[str, Callable[[Path, str], AbstractContextManager[WorkerDeployment]]] = {
         "native": native_launcher,
+        "docker": docker_deployment,
         "uncooperative": uncooperative_launcher,
     }
     with (
         snapshot_api(directory / "control") as api,
-        launchers[test_case.launcher](directory, executable) as launch_executable,
+        launchers[test_case.launcher](directory, executable) as deployment,
     ):
         published: subprocess.CompletedProcess[str] = subprocess.run(
             [
@@ -293,6 +305,7 @@ def scheduled_worker(
                 api.url,
                 "--generation",
                 "1",
+                *deployment.publication_arguments,
             ],
             env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
             capture_output=True,
@@ -301,23 +314,15 @@ def scheduled_worker(
             check=False,
         )
         assert published.returncode == 0, published.stderr
+        write_files(project_dir=project, files=test_case.files_after_publication)
         configuration: Path = directory / "launchers.json"
-        _ = configuration.write_text(
-            json.dumps(
-                {
-                    "local": [
-                        {
-                            "location_id": api.location_id,
-                            "target": "development",
-                            "project_dir": str(project),
-                            "executable": launch_executable,
-                            "server_url": api.url,
-                            "max_workers": 1,
-                        }
-                    ]
-                }
-            )
-        )
+        launcher: dict[str, Any] = {
+            "location_id": api.location_id,
+            "target": "development",
+            "server_url": api.url,
+            "max_workers": 1,
+        } | deployment.configuration
+        _ = configuration.write_text(json.dumps({deployment.kind: [launcher]}))
         control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
         with sqlite3.connect(control_store) as control:
             _ = control.executescript(test_case.store_setup)
@@ -335,18 +340,17 @@ def scheduled_worker(
             log,
             directory / "scheduler.stdout",
         ) as process:
-            yield ScheduledWorker(api, project, control_store, process, log)
+            yield ScheduledWorker(api, project, control_store, process, log, deployment.docker)
 
 
 def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -> dict[str, Any]:
     """Run/node outcomes, Recall, claims and the physical warehouse agree."""
-    api, project, control_store, process, log = worker
+    api, project, control_store, process, log, _ = worker
     run: dict[str, Any] = wait_for_run(api, process, log)
     assert run["node_counts_json"] == {test_case.expected_status: test_case.expected_node_count}, (
         log.read_text()
     )
     assert run["job_key"] == "annual_orders"
-    assert "Worker launched for run" in log.read_text()
     runs_url: str = f"{api.url}/api/locations/{api.location_id}/targets/development/runs"
     headers: dict[str, str] = {"Authorization": f"Bearer {api.bearer}"}
     with urlopen(
@@ -357,6 +361,11 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     assert nodes[0]["started_at"] is not None
     assert nodes[0]["ended_at"] is not None
     with sqlite3.connect(control_store) as control:
+        assert control.execute(
+            "SELECT count(*) FROM recall_events "
+            "WHERE invocation_id=? AND event_type='run_launched'",
+            (f"scheduler/{run['run_id']}",),
+        ).fetchone() == (1,)
         contexts: list[tuple[str | None]] = control.execute(
             "SELECT external_context FROM recall_invocations WHERE command = 'location'"
         ).fetchall()
@@ -369,6 +378,48 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     with duckdb.connect(str(project / "warehouse.duckdb"), read_only=True) as warehouse:
         assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
     return run
+
+
+def running_statement(worker: ScheduledWorker) -> dict[str, Any]:
+    """The worker has started the real long query, not merely entered its Python interpreter."""
+    active: dict[str, Any] = wait_for_run(
+        worker.api, worker.process, worker.log, pending=frozenset({"queued", "launched"})
+    )
+    assert active["status"] == "running", worker.log.read_text()
+    deadline: float = time.monotonic() + 15
+    with sqlite3.connect(worker.control_store) as control:
+        while not control.execute(
+            "SELECT 1 FROM recall_artifacts WHERE CAST(content AS TEXT) LIKE ?",
+            ("%range(10000000000)%",),
+        ).fetchone():
+            assert worker.process.poll() is None, worker.log.read_text()
+            assert time.monotonic() < deadline, worker.log.read_text()
+            time.sleep(0.02)
+    return active
+
+
+def cancel_running_statement(worker: ScheduledWorker) -> None:
+    """Wait for the real long-running query before exercising the administrative cancel command."""
+    active: dict[str, Any] = running_statement(worker)
+    cancelled: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "admin",
+            "--database-env",
+            "SQLBUILD_SCHEDULER_TEST_STORE",
+            "cancel-run",
+            active["run_id"],
+            "--event-id",
+            str(uuid4()),
+            "--reason",
+            "Cancel the active test statement.",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert cancelled.returncode == 0, cancelled.stderr
 
 
 def wait_for_run(

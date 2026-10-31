@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import Popen
-from typing import Literal, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 
 class SnapshotApi(NamedTuple):
@@ -24,6 +24,20 @@ class ScheduledWorker(NamedTuple):
     control_store: Path
     process: Popen[bytes]
     log: Path
+    docker: "DockerLocation | None" = None
+
+
+class DockerLocation(NamedTuple):
+    image_id: str
+    container: str
+    socket: Path
+
+
+class WorkerDeployment(NamedTuple):
+    kind: str
+    configuration: dict[str, Any]
+    publication_arguments: tuple[str, ...] = ()
+    docker: DockerLocation | None = None
 
 
 @dataclass(frozen=True)
@@ -86,5 +100,13 @@ class WorkerExecutionTestCase:
     expected_rows: list[tuple[int]]
     expected_node_count: int = 1
     files: dict[str, str] = field(default_factory=dict)
+    files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""
-    launcher: Literal["native", "uncooperative"] = "native"
+    launcher: Literal["native", "uncooperative", "docker"] = "native"
+
+
+@dataclass(frozen=True)
+class WorkerRestartTestCase(WorkerExecutionTestCase):
+    description: str
+    shutdown_signal: int = 15
+    expected_scheduler_exit: int = 0
