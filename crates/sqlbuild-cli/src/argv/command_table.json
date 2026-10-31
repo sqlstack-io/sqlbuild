@@ -493,6 +493,7 @@
              "options": ["--from-failure"],
              "dest": "admin_from_failure",
              "nargs": 0,
+             "const": true,
              "default": false,
              "help": "retry exactly the failed and skipped nodes, excluding successful nodes",
              "group": 1

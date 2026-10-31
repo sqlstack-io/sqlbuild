@@ -23,7 +23,7 @@ use crate::helpers::snapshot;
 use crate::location_helpers::create_location;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::test_types::{RunLifecycleTestCase, TransactionFault};
+use crate::test_types::{RerunExecutionTestCase, RunLifecycleTestCase, TransactionFault};
 
 #[test]
 fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_nodes_retry_atomically()
@@ -57,11 +57,6 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 ip_address: None,
             };
             let mut input = snapshot(location);
-            input
-                .nodes
-                .get_mut("inventory")
-                .expect("inventory")
-                .definition["deps"] = json!(["orders"]);
             input.documents.insert("jobs".into(), json!({
                 "staging": {"description": "Stage orders", "selection": ["orders", "customers"], "concurrency_groups": ["warehouse"], "settings": {"vars": {"batch": 23}}},
                 "marts": {"description": "Build inventory", "selection": ["inventory"], "concurrency_groups": ["inventory_limit"]},
@@ -69,7 +64,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             }));
             input.documents.insert("groups".into(), json!({"daily_orders": {
                 "description": "Build daily orders", "selection": ["customers", "orders", "inventory", "products"],
-                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["staging"], "completed": []}
+                "concurrency_groups": ["warehouse"], "jobs": {"staging": [], "marts": ["completed"], "completed": ["staging"]}
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish");
             let source_id = Uuid::now_v7();
@@ -88,7 +83,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             .await
             .expect("request group");
             let retry = RerunRequest {
-                run_id: Uuid::now_v7(),
+                run_id: Uuid::from_u128(1),
                 source_run_id: source_id,
                 from_failure: true,
                 reason: "Retry failed orders".into(),
@@ -103,16 +98,30 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 .expect("elect")
                 .expect("leader");
             let limits = BTreeMap::from([
-                ("warehouse".into(), std::num::NonZeroU32::new(1).unwrap()),
+                (
+                    "warehouse".into(),
+                    std::num::NonZeroU32::new(1).expect("positive capacity"),
+                ),
                 (
                     "inventory_limit".into(),
-                    std::num::NonZeroU32::new(1).unwrap(),
+                    std::num::NonZeroU32::new(1).expect("positive capacity"),
                 ),
             ]);
             let scope = (location, "development");
             advance_groups(store, &lease, (&limits, scope))
                 .await
                 .expect("admit source");
+            let node_outcomes = BTreeMap::from([
+                ("products", NodeOutcome::Success),
+                ("orders", NodeOutcome::Failed),
+                ("customers", NodeOutcome::Cancelled),
+                ("inventory", NodeOutcome::Skipped),
+            ]);
+            let job_outcomes = BTreeMap::from([
+                ("staging", RunOutcome::Failed),
+                ("completed", RunOutcome::Success),
+                ("marts", RunOutcome::Failed),
+            ]);
             for _ in 0..3 {
                 let claim = claim_next_run(store, &lease, &limits, Some(scope))
                     .await
@@ -120,12 +129,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     .expect("ready child");
                 let mut changes = vec![RunChange::Started];
                 for node in &claim.request.selection {
-                    let outcome = match node.as_str() {
-                        "products" => NodeOutcome::Success,
-                        "orders" => NodeOutcome::Failed,
-                        "customers" => NodeOutcome::Cancelled,
-                        _ => NodeOutcome::Skipped,
-                    };
+                    let outcome = node_outcomes[node.as_str()];
                     changes.push(RunChange::NodeFinished {
                         node_key: node.clone(),
                         outcome,
@@ -136,11 +140,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     });
                 }
                 changes.push(RunChange::Finished {
-                    outcome: if claim.request.selection.contains("products") {
-                        RunOutcome::Success
-                    } else {
-                        RunOutcome::Failed
-                    },
+                    outcome: job_outcomes[claim.request.job_key.as_deref().expect("source job")],
                     reason: "synthetic source outcome".into(),
                     exit_code: Some(1),
                 });
@@ -168,16 +168,16 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             assert_eq!(
                 list_runs(store, scope, 20)
                     .await
-                    .unwrap()
+                    .expect("list completed source")
                     .iter()
                     .find(|run| run.run_id == source_id)
-                    .unwrap()
+                    .expect("source exists")
                     .status,
                 RunStatus::Partial
             );
             input.generation = 2;
             input.image_id = Some("sha256:synthetic-orders-image-2".into());
-            input.documents.get_mut("jobs").unwrap()["staging"]["settings"] =
+            input.documents.get_mut("jobs").expect("job declarations")["staging"]["settings"] =
                 json!({"vars": {"batch": 91}});
             publish_snapshot(store, &input).await.expect("redeploy");
             let fault = TransactionFault {
@@ -192,7 +192,10 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             assert!(request_rerun(store, &context, &retry).await.is_err());
             remove_fault(store, &fault).await;
             assert_eq!(
-                list_runs(store, scope, 20).await.unwrap().len(),
+                list_runs(store, scope, 20)
+                    .await
+                    .expect("list rolled-back runs")
+                    .len(),
                 4,
                 "audit failure rolls back parent and all children"
             );
@@ -211,41 +214,67 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 ..context.clone()
             };
             assert!(request_rerun(store, &other, &retry).await.is_err());
-            for request in [
-                retry.clone(),
-                RerunRequest {
-                    run_id: Uuid::now_v7(),
-                    from_failure: false,
-                    ..retry.clone()
+            let settings = BTreeMap::from([
+                (
+                    "staging",
+                    BTreeMap::from([("vars".into(), json!({"batch": 23}))]),
+                ),
+                ("completed", BTreeMap::new()),
+                ("marts", BTreeMap::new()),
+            ]);
+            for execution in [
+                RerunExecutionTestCase {
+                    description: "failure retry omits successful and cancelled nodes",
+                    request: retry.clone(),
+                    expected_applied: false,
+                    expected_selection: ["orders", "inventory"].map(str::to_owned).into(),
+                    expected_jobs: &["staging", "marts"],
+                },
+                RerunExecutionTestCase {
+                    description: "full retry retains all original nodes",
+                    request: RerunRequest {
+                        run_id: Uuid::now_v7(),
+                        from_failure: false,
+                        ..retry.clone()
+                    },
+                    expected_applied: true,
+                    expected_selection: ["orders", "inventory", "customers", "products"]
+                        .map(str::to_owned)
+                        .into(),
+                    expected_jobs: &["staging", "completed", "marts"],
                 },
             ] {
-                if !request.from_failure {
-                    assert!(request_rerun(store, &context, &request).await.unwrap());
-                }
-                let expected: BTreeSet<String> = if request.from_failure {
-                    ["orders", "inventory"].map(str::to_owned).into()
-                } else {
-                    ["orders", "inventory", "customers", "products"]
-                        .map(str::to_owned)
-                        .into()
-                };
-                let runs = list_runs(store, scope, 20).await.unwrap();
+                let request = execution.request;
+                assert_eq!(
+                    request_rerun(store, &context, &request)
+                        .await
+                        .expect("publish rerun"),
+                    execution.expected_applied,
+                    "{}",
+                    execution.description
+                );
+                let runs = list_runs(store, scope, 20).await.expect("list reruns");
                 assert_eq!(
                     runs.iter()
                         .find(|run| run.run_id == request.run_id)
-                        .unwrap()
+                        .expect("rerun exists")
                         .selection_json,
-                    expected
+                    execution.expected_selection
                 );
                 advance_groups(store, &lease, (&limits, scope))
                     .await
                     .expect("admit rerun");
-                let mut selected = BTreeSet::new();
-                for _ in 0..if request.from_failure { 2 } else { 3 } {
+                let mut selected: BTreeSet<String> = BTreeSet::new();
+                for expected_job in execution.expected_jobs {
                     let claim = claim_next_run(store, &lease, &limits, Some(scope))
                         .await
                         .expect("claim rerun")
                         .expect("ready retry child");
+                    assert_eq!(
+                        claim.request.job_key.as_deref(),
+                        Some(*expected_job),
+                        "a completed intermediate job must not erase its ancestor's wait boundary"
+                    );
                     assert_eq!(claim.request.snapshot_id, published.snapshot_id);
                     assert_eq!(
                         claim.request.image_id,
@@ -253,26 +282,21 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     );
                     assert_eq!(claim.request.origin, RunOrigin::Rerun);
                     assert_eq!(claim.request.priority, 7);
-                    if claim.request.job_key.as_deref() == Some("staging") {
-                        assert_eq!(
-                            claim.request.settings,
-                            BTreeMap::from([("vars".into(), json!({"batch": 23}))])
-                        );
-                    }
+                    assert_eq!(claim.request.settings, settings[expected_job]);
                     selected.extend(claim.request.selection.iter().cloned());
                     succeed(store, &claim).await;
                 }
-                assert_eq!(selected, expected);
+                assert_eq!(selected, execution.expected_selection);
                 advance_groups(store, &lease, (&limits, scope))
                     .await
                     .expect("finish rerun");
                 assert_eq!(
                     list_runs(store, scope, 20)
                         .await
-                        .unwrap()
+                        .expect("list finished reruns")
                         .iter()
                         .find(|run| run.run_id == request.run_id)
-                        .unwrap()
+                        .expect("finished rerun exists")
                         .status,
                     test_case.expected_status,
                     "{}",

@@ -442,6 +442,7 @@ def wait_for_run(
     *,
     pending: frozenset[str] = frozenset({"queued", "launched", "running", "unresponsive"}),
     job_key: str | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """A terminal API projection must follow the scheduler's actual isolated warehouse execution."""
     request: Request = Request(
@@ -457,7 +458,9 @@ def wait_for_run(
             runs: list[dict[str, Any]] = json.load(response)
             by_job: dict[str | None, dict[str, Any]] = {run["job_key"]: run for run in runs}
             by_job[None] = next(iter(runs), current)
-            current = by_job.get(job_key, current)
+            by_id: dict[str | None, dict[str, Any]] = {run["run_id"]: run for run in runs}
+            by_id[None] = by_job.get(job_key, current)
+            current = by_id.get(run_id, current)
         time.sleep(0.02)
     return current
 
