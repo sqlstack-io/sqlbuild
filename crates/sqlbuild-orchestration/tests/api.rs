@@ -16,9 +16,13 @@ mod store_test_types;
 mod test_contract;
 #[path = "api/test_location_health.rs"]
 mod test_location_health;
+#[path = "api/test_location_work.rs"]
+mod test_location_work;
 #[path = "api/test_reads.rs"]
 mod test_reads;
 #[path = "api/test_types.rs"]
 mod test_types;
 #[path = "api/test_worker.rs"]
 mod test_worker;
+#[path = "api/work/helpers.rs"]
+mod work_helpers;

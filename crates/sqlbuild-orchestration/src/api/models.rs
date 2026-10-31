@@ -2,12 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::_helpers::{location_health, run_reads, runs, snapshots, trigger_reads};
+use crate::api::_helpers::{
+    location_health, location_work, run_reads, runs, snapshots, trigger_reads,
+};
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
     location_health::report,
     location_health::recent,
+    location_work::poll,
+    location_work::complete,
+    location_work::result,
     snapshots::publish,
     snapshots::current,
     runs::execution,

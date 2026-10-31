@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::JobRunRequest;
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
@@ -68,6 +69,26 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
     match action.as_deref() {
+        Some("location-work") => Ok(ControlAdmin::LocationWork(id)),
+        Some("check-location") => {
+            let request_id =
+                Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                    .map_err(|_| ControlError::Invalid("--request-id must be a UUID".into()))?;
+            let target = text(namespace, "admin_target").unwrap_or_default();
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if target.trim().is_empty() || reason.trim().is_empty() {
+                return Err(ControlError::Invalid(
+                    "target and reason must not be blank".into(),
+                ));
+            }
+            Ok(ControlAdmin::RequestLocationWork(LocationWorkRequest {
+                request_id,
+                location_id: id,
+                target,
+                reason,
+                work: LocationWork::CheckConnection {},
+            }))
+        }
         Some("change-trigger" | "cancel-run" | "request-run") => {
             let identity_option = if action.as_deref() == Some("request-run") {
                 "--run-id"

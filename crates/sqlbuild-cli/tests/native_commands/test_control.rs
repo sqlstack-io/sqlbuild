@@ -50,6 +50,30 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             expected_stderr: "",
         },
         CommandTestCase {
+            description: "native location work help",
+            arguments: &["admin", "check-location", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb admin check-location ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
+            description: "blank location work reason rejected before store initialization",
+            arguments: &[
+                "admin",
+                "check-location",
+                "00000000-0000-0000-0000-000000000001",
+                "--target",
+                "development",
+                "--request-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                " ",
+            ],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: target and reason must not be blank\n",
+        },
+        CommandTestCase {
             description: "blank job rejected before store initialization",
             arguments: &[
                 "admin",

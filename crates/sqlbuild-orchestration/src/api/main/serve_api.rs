@@ -5,7 +5,9 @@ use axum::routing::{get, post};
 use axum::{Json, Router, middleware};
 
 use crate::api::_helpers::authentication::authenticate;
-use crate::api::_helpers::{location_health, run_reads, runs, snapshots, trigger_reads};
+use crate::api::_helpers::{
+    location_health, location_work, run_reads, runs, snapshots, trigger_reads,
+};
 use crate::api::constants::BODY_BYTES;
 use crate::api::main::openapi_document::openapi_document;
 use crate::store::errors::ControlError;
@@ -19,6 +21,14 @@ pub async fn serve_api(
 ) -> Result<(), ControlError> {
     migrate_store(&store).await?;
     let protected = Router::new()
+        .route(
+            "/api/locations/{location_id}/work/poll",
+            post(location_work::poll),
+        )
+        .route(
+            "/api/locations/{location_id}/work/{request_id}",
+            get(location_work::result).post(location_work::complete),
+        )
         .route(
             "/api/locations/{location_id}/health",
             get(location_health::recent).post(location_health::report),

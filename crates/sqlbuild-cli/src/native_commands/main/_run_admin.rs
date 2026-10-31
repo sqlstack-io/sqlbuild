@@ -8,6 +8,8 @@ use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
+use sqlbuild_orchestration::platform::main::location_work::location_work;
+use sqlbuild_orchestration::platform::main::request_location_work::request_location_work;
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::request_job_run::request_job_run;
 use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
@@ -48,6 +50,13 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ControlAdmin::RequestJobRun(request) => {
             let applied = request_job_run(&store, &context, &request).await?;
             Ok(json!({"run_id": request.run_id, "applied": applied}))
+        }
+        ControlAdmin::RequestLocationWork(request) => {
+            let applied = request_location_work(&store, &context, &request).await?;
+            Ok(json!({"request_id": request.request_id, "applied": applied}))
+        }
+        ControlAdmin::LocationWork(request_id) => {
+            Ok(json!(location_work(&store, request_id).await?))
         }
         ControlAdmin::CancelRun {
             event_id,

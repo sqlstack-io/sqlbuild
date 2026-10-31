@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::JobRunRequest;
 use uuid::Uuid;
 
@@ -18,6 +19,8 @@ pub(crate) enum ControlAdmin {
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
     RequestJobRun(JobRunRequest),
+    RequestLocationWork(LocationWorkRequest),
+    LocationWork(Uuid),
     CancelRun {
         event_id: Uuid,
         run_id: Uuid,

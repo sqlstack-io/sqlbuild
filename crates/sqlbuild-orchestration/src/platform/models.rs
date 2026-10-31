@@ -4,7 +4,16 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::api::models::ControlClient;
 use crate::declarations::models::TriggerDefinition;
+
+/// One pooled outbound connection; the location never receives a store handle.
+#[derive(Clone, Debug)]
+pub struct LocationWorkClient {
+    pub(crate) connection: ControlClient,
+    pub(crate) work_url: reqwest::Url,
+    pub(crate) location_id: Uuid,
+}
 
 /// Locations report bounded facts, never connection strings or user exception text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -29,6 +38,76 @@ pub struct LocationHealthReport {
 pub struct LocationHealthObservation {
     pub received_at: DateTime<Utc>,
     pub report: LocationHealthReport,
+}
+
+/// Only named location operations cross this boundary, never arbitrary SQL or Python.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum LocationWork {
+    CheckConnection {},
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationWorkRequest {
+    pub request_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub reason: String,
+    pub work: LocationWork,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationWorkPoll {
+    pub session_id: Uuid,
+    pub target: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationWorkClaim {
+    pub request: LocationWorkRequest,
+    pub generation: i64,
+    pub claim_id: Uuid,
+    pub session_id: Uuid,
+    pub lease_expires_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum LocationWorkOutcome {
+    Connection { healthy: bool },
+    Superseded {},
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationWorkResult {
+    pub claim_id: Uuid,
+    pub session_id: Uuid,
+    pub outcome: LocationWorkOutcome,
+}
+
+/// Expiry is derived from the deadline; only requests, leases and completed results are stored.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct LocationWorkRecord {
+    pub request_json: LocationWorkRequest,
+    pub requested_by: String,
+    pub requested_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub generation: i64,
+    pub result_json: Option<LocationWorkResult>,
+    pub completed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredLocationWork {
+    #[serde(flatten)]
+    pub(crate) record: LocationWorkRecord,
+    pub(crate) claim_id: Option<Uuid>,
+    pub(crate) session_id: Option<Uuid>,
+    pub(crate) claimed_until: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

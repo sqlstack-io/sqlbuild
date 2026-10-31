@@ -1,5 +1,6 @@
 pub(super) mod _cost_report_options;
 pub(super) mod _location_compiler;
+pub(super) mod _location_work;
 pub(super) mod _run_admin;
 pub(super) mod _run_control;
 pub(super) mod _run_cost;

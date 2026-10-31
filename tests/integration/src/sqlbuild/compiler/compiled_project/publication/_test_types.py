@@ -58,3 +58,10 @@ class LocationDatabaseTestCase:
     database: str
     expected_generation: int
     connection_toml: str
+
+
+@dataclass(frozen=True)
+class LocationWorkTestCase:
+    description: str
+    database: str
+    expected_connection: bool

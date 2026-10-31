@@ -39,3 +39,9 @@ pub(crate) struct LocationHealthTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_observations: usize,
 }
+
+pub(crate) struct LocationWorkTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_generation: i64,
+}

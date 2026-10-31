@@ -120,6 +120,25 @@ def wait_for_interpreter(process: subprocess.Popen[bytes], pidfile: Path, log: P
     return int(pidfile.read_text())
 
 
+def wait_for_location_work(
+    api: SnapshotApi, request_id: str, process: subprocess.Popen[bytes], log: Path
+) -> dict[str, Any]:
+    """Observe completion through the scoped API rather than private coordination tables."""
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/work/{request_id}",
+        headers={"Authorization": f"Bearer {api.bearer}"},
+    )
+    deadline: float = time.monotonic() + 15
+    result: dict[str, Any] = {"result_json": None}
+    while result["result_json"] is None:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        with urlopen(request, timeout=2) as response:
+            result = json.load(response)
+        time.sleep(0.02)
+    return result
+
+
 def api_address(process: subprocess.Popen[bytes], log: Path) -> str:
     """Wait for bounded native startup, never publishing an unready address."""
     deadline: float = time.monotonic() + 10

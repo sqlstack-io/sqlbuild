@@ -3,7 +3,9 @@
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::store::_helpers::migration::{LOCATION_INSTANCES, SCHEMA, render, verify_migrations};
+use crate::store::_helpers::migration::{
+    LOCATION_INSTANCES, LOCATION_WORK, SCHEMA, render, verify_migrations,
+};
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -25,8 +27,12 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     .await?;
     let recall_statements = recall_schema(store);
     let digest = sha256_hex(format!("{SCHEMA}\n{}", recall_statements.join(";\n")).as_bytes());
-    let location_digest = sha256_hex(LOCATION_INSTANCES.as_bytes());
-    let digests = [digest.clone(), location_digest.clone()];
+    let additions = [
+        ("location_instances", LOCATION_INSTANCES),
+        ("location_work", LOCATION_WORK),
+    ];
+    let mut digests = vec![digest.clone()];
+    digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));
     let current = verify_migrations(&rows, &digests)?;
     if rows.is_empty() {
         for statement in SCHEMA
@@ -48,8 +54,11 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
              VALUES (1, 'control_store', $1, $2, $3)",
             vec![Parameter::Text(digest), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
     }
-    if rows.len() < digests.len() {
-        for statement in LOCATION_INSTANCES
+    for (index, (name, sql)) in additions.into_iter().enumerate() {
+        if index + 1 < rows.len() {
+            continue;
+        }
+        for statement in sql
             .split(';')
             .map(str::trim)
             .filter(|statement| !statement.is_empty())
@@ -59,8 +68,9 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         let now = transaction.now;
         (transaction, _) = query(transaction,
             "INSERT INTO sqb_schema_migrations (version, name, checksum, min_server_version, applied_at) \
-             VALUES (2, 'location_instances', $1, $2, $3)",
-            vec![Parameter::Text(location_digest), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
+             VALUES ($1, $2, $3, $4, $5)",
+            vec![Parameter::Integer(index as i64 + 2), Parameter::Text(name.into()),
+                Parameter::Text(digests[index + 1].clone()), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
     }
     commit(transaction).await
 }

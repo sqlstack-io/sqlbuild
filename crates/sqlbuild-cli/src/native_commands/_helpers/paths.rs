@@ -70,7 +70,7 @@ fn location_rules() -> SnapshotRules {
 }
 
 /// Git commits matter to publication metadata even when no working-tree file changes.
-fn location_inputs(
+pub(crate) fn location_inputs(
     root: &Path,
     rules: &SnapshotRules,
     local_files: &[PathBuf],
