@@ -25,6 +25,7 @@ pub async fn serve_api(
         .route("/api/runs/{run_id}/execution", get(runs::execution))
         .route("/api/runs/{run_id}/events", post(runs::report))
         .route("/api/runs/{run_id}/heartbeat", post(runs::heartbeat))
+        .route("/api/runs/{run_id}/output", post(runs::output))
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
         .route_layer(middleware::from_fn_with_state(store.clone(), authenticate));
     let application = protected

@@ -374,6 +374,39 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                     .status(),
                 StatusCode::FORBIDDEN
             );
+            for (output_run, credential) in [
+                (Uuid::now_v7(), &worker.bearer),
+                (run_id, &location_token.bearer),
+            ] {
+                assert_eq!(
+                    client
+                        .post(format!("{}/api/runs/{output_run}/output", api.url))
+                        .bearer_auth(credential)
+                        .json(&json!([]))
+                        .send()
+                        .await
+                        .expect("output scope denial")
+                        .status(),
+                    StatusCode::FORBIDDEN
+                );
+            }
+            let mut forged = json!(crate::output_helpers::chunk(
+                0,
+                sqlbuild_recall::records::models::OutputStream::Stdout,
+                b"forged"
+            ));
+            forged["invocation_id"] = json!("scheduler/another-run");
+            assert_eq!(
+                client
+                    .post(format!("{}/api/runs/{run_id}/output", api.url))
+                    .bearer_auth(&worker.bearer)
+                    .json(&json!([forged]))
+                    .send()
+                    .await
+                    .expect("body cannot choose its output namespace")
+                    .status(),
+                StatusCode::UNPROCESSABLE_ENTITY
+            );
             let cancellation = RunChangeRequest {
                 event_id: Uuid::now_v7(),
                 change: RunChange::CancelRequested {

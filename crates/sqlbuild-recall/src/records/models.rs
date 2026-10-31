@@ -62,7 +62,10 @@ pub struct RowEnvelope {
 }
 
 /// A process output stream.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum OutputStream {
     Stdout,
     Stderr,
@@ -89,7 +92,8 @@ impl OutputStream {
 }
 
 /// One exact-byte output chunk.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OutputChunk {
     /// Per invocation, from 0, shared by both streams.
     pub sequence: u64,
@@ -105,7 +109,18 @@ pub struct OutputChunk {
 }
 
 /// Output of one stream that was not recorded because it exceeded `max_output_bytes`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct OmittedOutput {
     pub bytes: u64,
     /// Sequences this gap accounts for, its own included.

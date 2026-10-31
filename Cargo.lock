@@ -2658,11 +2658,13 @@ dependencies = [
  "chrono",
  "rusqlite",
  "rustix",
+ "serde",
  "serde_json",
  "sha2",
  "sqlbuild-config",
  "sqlbuild-core",
  "tempfile",
+ "utoipa",
 ]
 
 [[package]]

@@ -23,6 +23,7 @@ use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use uuid::Uuid;
 
 use crate::helpers::{start_api, stop_api};
+use crate::output_helpers::{chunk, output_contract};
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
@@ -140,6 +141,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
             let session = start_worker(&worker, &baseline)
                 .await
                 .expect("verified start");
+            output_contract(store, &worker, identity.1).await;
             assert_eq!(session.execution.claim, claim, "{}", test_case.description);
             assert_eq!(
                 start_worker(&worker, &baseline)
@@ -206,6 +208,16 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 )
                 .await
                 .expect("finish");
+            assert!(matches!(
+                worker
+                    .publish_output(&[chunk(
+                        5,
+                        sqlbuild_recall::records::models::OutputStream::Stdout,
+                        b"late"
+                    )])
+                    .await,
+                Err(WorkerError::Rejected(reqwest::StatusCode::UNAUTHORIZED))
+            ));
             let runs = list_runs(store, (location, "development"), 10)
                 .await
                 .expect("completed");

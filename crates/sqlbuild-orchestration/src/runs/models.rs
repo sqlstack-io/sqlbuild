@@ -264,3 +264,17 @@ pub(crate) struct ChangingRun {
     pub(crate) cancel_requested_at: Option<DateTime<Utc>>,
     pub(crate) node_counts_json: BTreeMap<String, i64>,
 }
+
+/// Differing retries retain conflict evidence while preserving the first output bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct OutputPublication {
+    pub inserted: u32,
+    pub duplicates: u32,
+    pub conflicts: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OutputMetadata {
+    pub(crate) claimed_at: DateTime<Utc>,
+    pub(crate) sqb_version: String,
+}

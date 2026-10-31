@@ -10,7 +10,8 @@ use crate::api::_helpers::{runs, snapshots};
     snapshots::current,
     runs::execution,
     runs::report,
-    runs::heartbeat
+    runs::heartbeat,
+    runs::output
 ))]
 pub(crate) struct ControlApi;
 

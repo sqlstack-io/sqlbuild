@@ -1,5 +1,7 @@
 #[path = "api/helpers.rs"]
 mod helpers;
+#[path = "api/output/helpers.rs"]
+mod output_helpers;
 #[path = "runs/helpers.rs"]
 mod run_helpers;
 #[path = "store/helpers.rs"]

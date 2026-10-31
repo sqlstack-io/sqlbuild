@@ -1,10 +1,11 @@
 //! A worker's authenticated HTTP requests carry only its own run and claim.
 
+use sqlbuild_recall::records::models::OutputChunk;
 use uuid::Uuid;
 
 use crate::api::main::client_response::client_response;
 use crate::api::models::{HeartbeatResponse, MutationResponse};
-use crate::runs::models::{RunChange, RunChangeRequest, RunExecution};
+use crate::runs::models::{OutputPublication, RunChange, RunChangeRequest, RunExecution};
 use crate::worker::errors::WorkerError;
 use crate::worker::models::WorkerClient;
 
@@ -43,6 +44,20 @@ impl WorkerClient {
         )
         .await?;
         Ok(result.applied)
+    }
+
+    /// Retry the same chunks after an uncertain response; differing retries never overwrite bytes.
+    pub async fn publish_output(
+        &self,
+        chunks: &[OutputChunk],
+    ) -> Result<OutputPublication, WorkerError> {
+        Ok(client_response(
+            self.connection
+                .client
+                .post(format!("{}output", self.run_url))
+                .json(chunks),
+        )
+        .await?)
     }
 
     /// Run independently from warehouse execution; cancellation is a cooperative request.
