@@ -39,8 +39,7 @@ pub(crate) fn relation_key(name: &str, profile: &dyn DialectProfile) -> String {
         .join(RELATION_PART_SEPARATOR)
 }
 
-/// A relation's column names: one written in double quotes is a quoted identifier, and so is the
-/// same name listed without them.
+/// A relation's columns: a name in double quotes, or listed elsewhere in them, is quoted.
 pub(crate) fn schema_columns<'a>(
     names: impl Iterator<Item = &'a str> + Clone,
 ) -> Vec<SchemaColumn> {

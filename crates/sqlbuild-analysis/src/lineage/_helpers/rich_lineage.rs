@@ -12,10 +12,11 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
 use crate::lineage::_helpers::references::{
-    PhysicalResource, normalized_sql, physical_resource_name, physical_resources,
+    normalized_sql, physical_resource_name, physical_resources,
 };
 use crate::lineage::_helpers::stars::star_lineage;
 use crate::lineage::constants::{MAX_FUNCTION_CALL_DEPTH, STAR_COLUMN_NAME, UNKNOWN_COLUMN_TYPE};
+use crate::lineage::models::PhysicalResource;
 use crate::lineage::models::{
     LineageColumn, LineageConfidence, LineageNullability, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind, RichLineageColumn,

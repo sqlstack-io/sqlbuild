@@ -2,21 +2,28 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use rayon::ThreadPool;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
+use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, SchemaColumn};
 use sqlquack_semantics::query_lineage;
 use sqlquack_syntax::Dialect;
 
-use crate::lineage::_helpers::references::{
-    PhysicalResource, normalized_sql, physical_resource_name, physical_resources,
-};
+use crate::lineage::constants::{RICH_LINEAGE_WORKER_STACK_BYTES, RICH_LINEAGE_WORKERS};
+use crate::lineage::main::model_references::model_references;
+use crate::lineage::main::physical_name::physical_name;
 use crate::lineage::models::{
-    LineageColumn, LineageNullability, LineageResourceType, LineageSource, RichLineageColumn,
-    RichLineageOutcome,
+    LineageColumn, LineageNullability, LineageResourceType, LineageSource, PhysicalResource,
+    RichLineageColumn, RichLineageOutcome, RichLineageRequest,
 };
 use crate::sqlquack_analysis::_helpers::outputs::{
     confidence, lineage_parse_options, transform_kind,
 };
+use crate::sqlquack_analysis::_helpers::schema::{RelationColumns, schema_columns};
 use crate::sqlquack_analysis::constants::TABLE_FUNCTION_CALL;
+use crate::sqlquack_analysis::models::LearningPass;
+use crate::sqlquack_analysis::types::TracedModel;
 
 /// A model's outcome, and its output columns as later models read them.
 pub(crate) fn model_lineage(
@@ -24,12 +31,13 @@ pub(crate) fn model_lineage(
     dialect: Dialect,
     context: LineageContext<'_>,
 ) -> (RichLineageOutcome, Vec<SchemaColumn>) {
-    let (normalized, functions) = table_function_calls(&normalized_sql(query_sql));
+    let (normalized, references) = model_references(query_sql);
+    let (normalized, functions) = table_function_calls(&normalized);
     let lineage = match query_lineage(&normalized, dialect, &lineage_parse_options(), context) {
         Ok(lineage) => lineage,
         Err(error) => return (RichLineageOutcome::Skipped(error), Vec::new()),
     };
-    let resources: HashMap<String, PhysicalResource> = physical_resources(query_sql)
+    let resources: HashMap<String, PhysicalResource> = references
         .into_iter()
         .chain(functions)
         .map(|resource| {
@@ -69,15 +77,133 @@ pub(crate) fn model_lineage(
     )
 }
 
-/// Whether `sql` reads any of the `learnt` resources, by resolved physical name.
-pub(crate) fn reads_learnt(sql: &str, learnt: &[String], context: LineageContext<'_>) -> bool {
-    physical_resources(sql).iter().any(|resource| {
-        learnt.contains(
-            &context
-                .profile
-                .resolved_identifier(&resource.physical_name, false),
-        )
+/// The request schema's columns by resolved physical name, for resources that list any.
+pub(crate) fn known_columns(
+    request: &RichLineageRequest,
+    profile: &dyn DialectProfile,
+) -> HashMap<String, Vec<SchemaColumn>> {
+    let mut known: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    for resource in &request.schema {
+        let names = resource.assigned.iter().chain(&resource.defaulted);
+        let columns: Vec<SchemaColumn> = schema_columns(names.map(|(name, _)| name.as_str()));
+        if columns.is_empty() {
+            continue;
+        }
+        let physical: String = physical_name(resource.resource_type, &resource.name);
+        let _ = known.insert(profile.resolved_identifier(&physical, false), columns);
+    }
+    known
+}
+
+/// Each named model's resolved physical name.
+pub(crate) fn model_keys(names: &[String], profile: &dyn DialectProfile) -> Vec<String> {
+    names
+        .iter()
+        .map(|name| {
+            profile.resolved_identifier(&physical_name(LineageResourceType::Model, name), false)
+        })
+        .collect()
+}
+
+/// The worker pool rich lineage traces `models` models on.
+pub(crate) fn lineage_pool(models: usize) -> Result<ThreadPool, String> {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(RICH_LINEAGE_WORKERS.min(models.max(1)))
+        .stack_size(RICH_LINEAGE_WORKER_STACK_BYTES)
+        .build()
+        .map_err(|error| error.to_string())
+}
+
+/// Trace the pending models against the known columns; what they teach, and who reads it.
+pub(crate) fn learning_pass(
+    (request, keys): (&RichLineageRequest, &[String]),
+    (known, pending): (&HashMap<String, Vec<SchemaColumn>>, &[usize]),
+    (dialect, profile): (Dialect, &'static dyn DialectProfile),
+    pool: &ThreadPool,
+) -> Result<LearningPass, String> {
+    let schema = RelationColumns(known.clone());
+    let context = LineageContext {
+        profile,
+        schema: &schema,
+        sql: None,
+    };
+    let traced: Vec<TracedModel> = trace_pass(request, pending, (dialect, context), pool)?;
+    let learnt: Vec<(String, Vec<SchemaColumn>)> = newly_learnt(&traced, keys, known);
+    let learnt_keys: Vec<String> = learnt.iter().map(|(key, _)| key.clone()).collect();
+    let readers: Vec<usize> = readers(request, &learnt_keys, context);
+    Ok(LearningPass {
+        traced,
+        learnt,
+        readers,
     })
+}
+
+/// The lineage of each pending model, traced on `pool`.
+fn trace_pass(
+    request: &RichLineageRequest,
+    pending: &[usize],
+    (dialect, context): (Dialect, LineageContext<'_>),
+    pool: &ThreadPool,
+) -> Result<Vec<TracedModel>, String> {
+    pool.install(|| {
+        pending
+            .par_iter()
+            .map(|index| {
+                catch_compiler_panic(|| {
+                    Ok((
+                        *index,
+                        model_lineage(&request.models[*index], dialect, context),
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()
+    })
+}
+
+/// The models whose lineage found all their outputs, by key, where those outputs are new.
+fn newly_learnt(
+    traced: &[TracedModel],
+    keys: &[String],
+    known: &HashMap<String, Vec<SchemaColumn>>,
+) -> Vec<(String, Vec<SchemaColumn>)> {
+    let mut learnt: Vec<(String, Vec<SchemaColumn>)> = Vec::new();
+    for (index, (outcome, outputs)) in traced {
+        let complete: bool = matches!(
+            outcome,
+            RichLineageOutcome::Built {
+                has_star: false,
+                ..
+            }
+        );
+        let key: &String = &keys[*index];
+        if complete && !outputs.is_empty() && known.get(key) != Some(outputs) {
+            learnt.push((key.clone(), outputs.clone()));
+        }
+    }
+    learnt
+}
+
+/// The models that read any of the `learnt` resources, by resolved physical name.
+fn readers(
+    request: &RichLineageRequest,
+    learnt: &[String],
+    context: LineageContext<'_>,
+) -> Vec<usize> {
+    let mut readers: Vec<usize> = Vec::new();
+    for (index, sql) in request.models.iter().enumerate() {
+        let (_, references) = model_references(sql);
+        let reads: bool = references.iter().any(|resource| {
+            learnt.contains(
+                &context
+                    .profile
+                    .resolved_identifier(&resource.physical_name, false),
+            )
+        });
+        if reads {
+            readers.push(index);
+        }
+    }
+    readers
 }
 
 fn lineage_column(
@@ -125,7 +251,7 @@ fn table_function_calls(sql: &str) -> (String, Vec<PhysicalResource>) {
         let after = &rest[start + TABLE_FUNCTION_CALL.len()..];
         match table_function_name(after) {
             Some((name, closed)) => {
-                let physical_name = physical_resource_name(LineageResourceType::TableFn, name);
+                let physical_name = physical_name(LineageResourceType::TableFn, name);
                 text.push_str(&physical_name);
                 functions.push(PhysicalResource {
                     resource_type: LineageResourceType::TableFn,

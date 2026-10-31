@@ -8,9 +8,10 @@ use crate::lineage::_helpers::projections::{
     UnreadableExpression, classify_transform, is_star, projection_output_name,
     projection_upstream_columns, set_expression_selects, table_alias_map, unaliased,
 };
-use crate::lineage::_helpers::references::{PhysicalResource, normalized_sql, physical_resources};
+use crate::lineage::_helpers::references::{normalized_sql, physical_resources};
 use crate::lineage::_helpers::stars::star_lineage;
 use crate::lineage::constants::{KIND_SELECT, KIND_UNION, MAX_FUNCTION_CALL_DEPTH};
+use crate::lineage::models::PhysicalResource;
 use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType, LineageSource,
     LineageTransformKind,

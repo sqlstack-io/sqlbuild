@@ -3,15 +3,7 @@
 use crate::lineage::constants::{
     PHYSICAL_NAME_REPLACEMENT, PHYSICAL_RESOURCE_PREFIX, REFERENCE_PREFIX, UDF_CALL,
 };
-use crate::lineage::models::LineageResourceType;
-
-/// A physical SQL identifier mapped to its SQLBuild resource.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PhysicalResource {
-    pub(crate) resource_type: LineageResourceType,
-    pub(crate) resource_name: String,
-    pub(crate) physical_name: String,
-}
+use crate::lineage::models::{LineageResourceType, PhysicalResource};
 
 const REFERENCE_KINDS: [(&str, LineageResourceType); 3] = [
     ("ref(", LineageResourceType::Model),

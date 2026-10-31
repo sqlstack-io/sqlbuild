@@ -289,3 +289,11 @@ impl RelationFingerprint {
         }
     }
 }
+
+/// A physical SQL identifier mapped to its SQLBuild resource.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhysicalResource {
+    pub resource_type: LineageResourceType,
+    pub resource_name: String,
+    pub physical_name: String,
+}

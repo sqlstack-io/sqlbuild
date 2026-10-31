@@ -1,6 +1,9 @@
 //! What SQLQuack analysis reads and returns for compiled models.
 
+use sqlquack_semantics::lineage::models::SchemaColumn;
+
 use crate::lineage::models::{LineageConfidence, LineageTransformKind};
+use crate::sqlquack_analysis::types::TracedModel;
 
 /// One model as compile analysed it: its cleaned SQL, references and the schema it was bound to.
 #[derive(Debug, Clone, Copy)]
@@ -21,4 +24,12 @@ pub struct CompileLineageColumn {
     pub confidence: LineageConfidence,
     /// `(resource type, resource name, column)`, the column as it resolves, sorted.
     pub sources: Vec<(String, String, String)>,
+}
+
+/// One learning pass of rich lineage: what it traced, the outputs it learnt, the models to retrace.
+#[derive(Debug)]
+pub(crate) struct LearningPass {
+    pub(crate) traced: Vec<TracedModel>,
+    pub(crate) learnt: Vec<(String, Vec<SchemaColumn>)>,
+    pub(crate) readers: Vec<usize>,
 }

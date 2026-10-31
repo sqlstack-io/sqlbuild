@@ -2,7 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::lineage::_helpers::references::{PhysicalResource, physical_resource_name};
+use crate::lineage::_helpers::references::physical_resource_name;
+use crate::lineage::models::PhysicalResource;
 use crate::lineage::models::{
     LineageColumn, LineageConfidence, LineageSchemaResource, LineageSource, LineageTransformKind,
 };

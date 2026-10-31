@@ -9,7 +9,6 @@ use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::lineage::main::build_fast_lineage::build_fast_lineage;
 use sqlbuild_analysis::lineage::main::build_rich_lineage::build_rich_lineage;
-use sqlbuild_analysis::lineage::main::build_sqlquack_lineage::build_sqlquack_lineage;
 use sqlbuild_analysis::lineage::main::direct_semantic_uses::direct_semantic_uses;
 use sqlbuild_analysis::lineage::models::{
     DirectSemanticUse, FastLineageModel, FastLineageOutcome, FastLineageRequest, LineageColumn,
@@ -18,6 +17,7 @@ use sqlbuild_analysis::lineage::models::{
 use sqlbuild_analysis::lineage_graph::main::analysis_dialect::analysis_dialect;
 use sqlbuild_analysis::lineage_graph::models::AnalysisDialect;
 use sqlbuild_analysis::semantic_validation::models as validation;
+use sqlbuild_analysis::sqlquack_analysis::main::build_sqlquack_lineage::build_sqlquack_lineage;
 
 use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
@@ -63,7 +63,7 @@ pub(crate) fn build_project_column_lineage<'py>(
     let lineage: Bound<'py, PyAny> = if mode == FAST_MODE {
         fast_lineage(&classes, project, dialect, &models)?
     } else {
-        rich_lineage(&classes, project, dialect, &models, mode == SQLQUACK_MODE)?
+        rich_lineage(&classes, (project, dialect), &models, mode == SQLQUACK_MODE)?
     };
     Ok(Some(lineage.unbind()))
 }
@@ -319,8 +319,7 @@ fn unknown_dialect_error(py: Python<'_>, dialect: &str) -> PyErr {
 
 fn rich_lineage<'py>(
     classes: &LineageClasses<'py>,
-    project: &Bound<'py, PyAny>,
-    dialect: Option<&Bound<'py, PyAny>>,
+    (project, dialect): (&Bound<'py, PyAny>, Option<&Bound<'py, PyAny>>),
     models: &[Bound<'py, PyAny>],
     sqlquack: bool,
 ) -> PyResult<Bound<'py, PyAny>> {

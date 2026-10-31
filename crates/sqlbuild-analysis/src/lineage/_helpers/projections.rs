@@ -6,11 +6,11 @@ use polyglot_sql::{Expression, ExpressionWalk, ast_json};
 use serde_json::Value;
 
 use crate::lineage::_helpers::python_payload::{PythonValue, python_payload};
-use crate::lineage::_helpers::references::PhysicalResource;
 use crate::lineage::constants::{
     AGGREGATE_KINDS, CAST_KINDS, KIND_ALIAS, KIND_COLUMN, KIND_SELECT, KIND_TABLE, PAYLOAD_COLUMN,
     PAYLOAD_NAME, PAYLOAD_TABLE, SET_OPERATION_KINDS, SET_OPERATION_SIDES, STAR_COLUMN_NAME,
 };
+use crate::lineage::models::PhysicalResource;
 use crate::lineage::models::{
     LineageConfidence, LineageResourceType, LineageSource, LineageTransformKind,
 };

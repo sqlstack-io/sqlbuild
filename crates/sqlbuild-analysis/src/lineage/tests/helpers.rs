@@ -2,7 +2,6 @@ use polyglot_sql::{DialectType, SchemaValidationOptions};
 
 use crate::lineage::main::build_fast_lineage::build_fast_lineage;
 use crate::lineage::main::build_rich_lineage::build_rich_lineage;
-use crate::lineage::main::build_sqlquack_lineage::build_sqlquack_lineage;
 use crate::lineage::models::RelationFingerprint;
 use crate::lineage::models::{
     FastLineageModel, FastLineageOutcome, FastLineageRequest, LineageColumn, LineageOutcomeParts,
@@ -10,6 +9,7 @@ use crate::lineage::models::{
     RichSchemaResource,
 };
 use crate::semantic_validation::models::ProjectCatalog;
+use crate::sqlquack_analysis::main::build_sqlquack_lineage::build_sqlquack_lineage;
 
 pub(crate) fn strings(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()

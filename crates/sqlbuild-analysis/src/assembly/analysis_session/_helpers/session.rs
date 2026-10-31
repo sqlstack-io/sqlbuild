@@ -945,8 +945,7 @@ fn model_context(model: &ModelRequest) -> String {
     format!("{SESSION_CONTEXT} of model '{}'", model.name)
 }
 
-/// Each model's lineage rows from SQLQuack when it analyses the dialect; a model it cannot read
-/// keeps polyglot's rows.
+/// A compile lineage column as the session's lineage row.
 fn lineage_row(column: CompileLineageColumn) -> LineageRow {
     LineageRow {
         output_column: column.output_column,
