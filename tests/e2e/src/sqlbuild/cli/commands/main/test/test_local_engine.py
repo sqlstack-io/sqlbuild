@@ -226,6 +226,21 @@ _REAL_SQLQUACK: Path = Path(
             converter_version="0.2.0-rc1",
         ),
         LocalEngineE2ETestCase(
+            description="a conversion that uses up the time limit is a timeout",
+            arguments=(
+                "test",
+                "--local",
+                "--test-timeout",
+                "1s",
+                "--select",
+                "customer_orders_count_completed",
+            ),
+            expected_exit_code=1,
+            expected_stdout_fragments=("PASS=0  FAIL=0  TIMEOUT=1  TOTAL=1",),
+            converter_mode="slow",
+            expected_conversion_count=1,
+        ),
+        LocalEngineE2ETestCase(
             description="strict mode needs --local",
             arguments=("test", "--strict"),
             expected_exit_code=1,

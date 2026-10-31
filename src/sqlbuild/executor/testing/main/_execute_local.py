@@ -130,10 +130,10 @@ def _judged(
                 f"{', '.join(conversion.assumptions)}"
             ),
         )
-    run: LocalStatementRun = run_converted_statement(
-        sql=conversion.sql,
-        timeout_seconds=remaining_seconds(policy=policy, started=started, cap=None),
-    )
+    remaining: float | None = remaining_seconds(policy=policy, started=started, cap=None)
+    if policy is not None and remaining is not None and remaining <= 0:
+        return local_timed_out_result(test_entry=test_entry, policy=policy, started=started)
+    run: LocalStatementRun = run_converted_statement(sql=conversion.sql, timeout_seconds=remaining)
     if run.error is not None:
         return _failed_run_result(
             test_entry=test_entry, run=run, conversion=conversion, policy=policy, started=started

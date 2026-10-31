@@ -2538,6 +2538,9 @@ elif mode == "refusals_with_converted":
     report["refusals"] = [{"construct": "fn:ANY", "category": "missing rule", "reason": "stand-in"}]
 elif mode == "assumes_anyway":
     report["assumptions"] = ["session_timezone_utc"]
+elif mode == "slow":
+    import time
+    time.sleep(3)
 elif mode == "invalid_json":
     report = "not a report"
 print(json.dumps(report))
