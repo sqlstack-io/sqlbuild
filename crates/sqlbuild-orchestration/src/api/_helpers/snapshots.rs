@@ -5,8 +5,9 @@ use axum::http::StatusCode;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
+use crate::api::_helpers::authentication::require_location;
 use crate::api::errors::ApiError;
-use crate::credentials::models::{CredentialScope, TokenIdentity};
+use crate::credentials::models::TokenIdentity;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{CurrentSnapshot, SnapshotInput, SnapshotRecord};
@@ -52,14 +53,4 @@ pub(crate) async fn current(
             message: "no successful snapshot".into(),
         })?;
     Ok(Json(current))
-}
-
-fn require_location(identity: &TokenIdentity, location_id: Uuid) -> Result<(), ApiError> {
-    if identity.scope != (CredentialScope::Location { location_id }) {
-        return Err(ApiError {
-            status: StatusCode::FORBIDDEN,
-            message: "credential does not authorize this location".into(),
-        });
-    }
-    Ok(())
 }

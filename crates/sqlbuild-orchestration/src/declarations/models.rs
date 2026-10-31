@@ -16,7 +16,7 @@ pub enum OnFailure {
     StopGroup,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TriggerStatus {
     #[default]
@@ -50,7 +50,7 @@ pub struct JobDefinition {
     pub concurrency_groups: BTreeSet<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Schedule {
     Cron {
@@ -63,7 +63,7 @@ pub enum Schedule {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TriggerDefinition {
     pub description: String,
@@ -83,7 +83,7 @@ pub struct Definitions {
     pub triggers: BTreeMap<String, TriggerDefinition>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,
     pub name: String,
@@ -95,7 +95,7 @@ pub struct TriggerRecord {
 }
 
 /// Operator changes are immutable facts; clearing an override restores the published code default.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TriggerChange {
     Enable,
@@ -105,7 +105,7 @@ pub enum TriggerChange {
     ResetCursor,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TriggerChangeRequest {
     pub event_id: uuid::Uuid,
@@ -115,7 +115,7 @@ pub struct TriggerChangeRequest {
     pub change: TriggerChange,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriggerChangeRecord {
     pub request_json: TriggerChangeRequest,
     pub occurred_at: DateTime<Utc>,

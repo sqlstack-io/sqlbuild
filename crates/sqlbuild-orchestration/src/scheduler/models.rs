@@ -47,13 +47,16 @@ pub struct CronSchedule {
     pub(crate) timezone: chrono_tz::Tz,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CatchUp {
     #[default]
     Latest,
     /// Process the oldest bounded batch; later due times remain due for the next transaction.
-    All { max_runs: std::num::NonZeroUsize },
+    All {
+        #[schema(value_type = usize, minimum = 1)]
+        max_runs: std::num::NonZeroUsize,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -127,7 +130,7 @@ pub(crate) struct DueTrigger {
     pub(crate) status: TriggerStatus,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TickOutcome {
     Requested,
@@ -137,7 +140,7 @@ pub enum TickOutcome {
     Deferred,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TickRecord {
     pub tick_id: Uuid,
     pub trigger_id: Uuid,

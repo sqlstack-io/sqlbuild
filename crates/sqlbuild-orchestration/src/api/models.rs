@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::_helpers::{runs, snapshots};
+use crate::api::_helpers::{run_reads, runs, snapshots, trigger_reads};
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
@@ -11,9 +11,20 @@ use crate::api::_helpers::{runs, snapshots};
     runs::execution,
     runs::report,
     runs::heartbeat,
-    runs::output
+    runs::output,
+    run_reads::recent,
+    run_reads::nodes,
+    trigger_reads::current,
+    trigger_reads::events,
+    trigger_reads::ticks
 ))]
 pub(crate) struct ControlApi;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadQuery {
+    pub(crate) limit: Option<u32>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MutationResponse {

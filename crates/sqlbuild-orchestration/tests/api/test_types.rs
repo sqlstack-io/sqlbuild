@@ -14,6 +14,13 @@ pub(crate) struct WorkerRedirectTestCase {
     pub(crate) expected_status: reqwest::StatusCode,
 }
 
+pub(crate) struct ApiReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_runs: usize,
+    pub(crate) expected_ticks: usize,
+}
+
 pub(crate) struct TestApi {
     pub(crate) url: String,
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,

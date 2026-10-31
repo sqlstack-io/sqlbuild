@@ -48,7 +48,7 @@ impl RunOrigin {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RunStatus {
     Queued,
@@ -88,7 +88,7 @@ pub struct RunRequest {
     pub overlap: crate::scheduler::models::Overlap,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunRecord {
     pub run_id: Uuid,
     pub location_id: Uuid,
@@ -128,7 +128,7 @@ impl NodeOutcome {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunNodeRecord {
     pub node_key: String,
     pub attempt: i64,

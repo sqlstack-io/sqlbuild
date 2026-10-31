@@ -53,3 +53,18 @@ pub(crate) async fn stop_api(api: TestApi) {
         .expect("join API server")
         .expect("API server stopped cleanly");
 }
+
+pub(crate) async fn read_json(
+    client: &reqwest::Client,
+    (url, bearer): (&str, &str),
+) -> serde_json::Value {
+    let response = client
+        .get(url)
+        .bearer_auth(bearer)
+        .send()
+        .await
+        .expect("HTTP read");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    response.json().await.expect("typed JSON response")
+}

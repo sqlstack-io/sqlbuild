@@ -5,7 +5,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router, middleware};
 
 use crate::api::_helpers::authentication::authenticate;
-use crate::api::_helpers::{runs, snapshots};
+use crate::api::_helpers::{run_reads, runs, snapshots, trigger_reads};
 use crate::api::main::openapi_document::openapi_document;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -21,6 +21,26 @@ pub async fn serve_api(
         .route(
             "/api/locations/{location_id}/targets/{target}/snapshots",
             get(snapshots::current).post(snapshots::publish),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/runs",
+            get(run_reads::recent),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/runs/{run_id}/nodes",
+            get(run_reads::nodes),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/triggers",
+            get(trigger_reads::current),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/events",
+            get(trigger_reads::events),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks",
+            get(trigger_reads::ticks),
         )
         .route("/api/runs/{run_id}/execution", get(runs::execution))
         .route("/api/runs/{run_id}/events", post(runs::report))

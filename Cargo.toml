@@ -64,7 +64,7 @@ publish = false
 rust-version = "1.88"
 
 [workspace.dependencies]
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 fensu-policy = "=0.22.0"
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"

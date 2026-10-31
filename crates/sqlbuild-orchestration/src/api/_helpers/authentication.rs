@@ -4,9 +4,11 @@ use axum::extract::{Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::Response;
+use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::credentials::main::authenticate_token::authenticate_token;
+use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::store::models::ControlStore;
 
 pub(crate) async fn authenticate(
@@ -35,4 +37,17 @@ pub(crate) async fn authenticate(
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+pub(crate) fn require_location(
+    identity: &TokenIdentity,
+    location_id: Uuid,
+) -> Result<(), ApiError> {
+    if identity.scope != (CredentialScope::Location { location_id }) {
+        return Err(ApiError {
+            status: StatusCode::FORBIDDEN,
+            message: "credential does not authorize this location".into(),
+        });
+    }
+    Ok(())
 }
