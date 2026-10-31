@@ -211,6 +211,8 @@ pub enum RunChange {
     Recovered,
     CancelRequested {
         actor: String,
+        #[serde(default)]
+        reason: String,
     },
     Finished {
         outcome: RunOutcome,
@@ -248,7 +250,7 @@ pub struct RunChangeRequest {
 pub enum RunAuthority<'a> {
     Scheduler(&'a crate::scheduler::models::SchedulerLease),
     Worker { run_id: Uuid, claim_id: Uuid },
-    Operator(&'a str),
+    Operator(&'a crate::credentials::models::AuditContext),
 }
 
 #[derive(Clone, Debug, Deserialize)]

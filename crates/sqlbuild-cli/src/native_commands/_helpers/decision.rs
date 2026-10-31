@@ -67,12 +67,19 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
     match action.as_deref() {
-        Some("change-trigger") => {
+        Some("change-trigger" | "cancel-run") => {
             let event_id = Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
                 .map_err(|_| ControlError::Invalid("--event-id must be a UUID".into()))?;
             let reason = text(namespace, "admin_reason").unwrap_or_default();
             if reason.trim().is_empty() {
                 return Err(ControlError::Invalid("--reason must not be blank".into()));
+            }
+            if action.as_deref() == Some("cancel-run") {
+                return Ok(ControlAdmin::CancelRun {
+                    event_id,
+                    run_id: id,
+                    reason,
+                });
             }
             let mut change = json!({
                 "kind": text(namespace, "admin_trigger_change").unwrap_or_default().replace('-', "_"),

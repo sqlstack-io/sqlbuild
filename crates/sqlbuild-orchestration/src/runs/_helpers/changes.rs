@@ -55,8 +55,10 @@ pub(crate) fn validate_authority(
                         }
                 )
         }
-        RunAuthority::Operator(actor) => {
-            matches!(&request.change, RunChange::CancelRequested { actor: recorded } if !actor.trim().is_empty() && actor == recorded)
+        RunAuthority::Operator(context) => {
+            matches!(&request.change, RunChange::CancelRequested { actor, reason }
+                if !context.actor.trim().is_empty() && context.actor == *actor
+                    && !context.granting_role.trim().is_empty() && !reason.trim().is_empty())
         }
     };
     if !allowed {

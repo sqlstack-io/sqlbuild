@@ -15,6 +15,11 @@ pub(crate) enum ControlAdmin {
     CreatePrincipal(String, PrincipalKind),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
+    CancelRun {
+        event_id: Uuid,
+        run_id: Uuid,
+        reason: String,
+    },
     ChangeTrigger {
         event_id: Uuid,
         trigger_id: Uuid,

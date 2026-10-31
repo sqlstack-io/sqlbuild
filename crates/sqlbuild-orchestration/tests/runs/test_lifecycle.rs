@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::main::heartbeat_run::heartbeat_run;
@@ -75,9 +76,15 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 run_id: Uuid::from_u128(2),
                 claim_id: Uuid::now_v7(),
             };
+            let operator = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "operator".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
             assert!(change_run(store, other_worker, &started).await.is_err());
             assert!(
-                change_run(store, RunAuthority::Operator("test-operator"), &started)
+                change_run(store, RunAuthority::Operator(&operator), &started)
                     .await
                     .is_err()
             );
@@ -268,6 +275,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 event_id: Uuid::now_v7(),
                 change: RunChange::CancelRequested {
                     actor: "test-operator".into(),
+                    reason: "Stop the orders build".into(),
                 },
                 ..started.clone()
             };
@@ -275,7 +283,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 change_run(store, worker, &cancel).await.is_err(),
                 "workers cannot impersonate operators"
             );
-            change_run(store, RunAuthority::Operator("test-operator"), &cancel)
+            change_run(store, RunAuthority::Operator(&operator), &cancel)
                 .await
                 .expect("record cancellation");
             assert!(
@@ -386,22 +394,78 @@ fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_l
                 claim_id: None,
                 change: RunChange::CancelRequested {
                     actor: "test-operator".into(),
+                    reason: "Cancel queued orders".into(),
                 },
             };
+            let operator = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "operator".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let other = AuditContext {
+                actor: "another-operator".into(),
+                ..operator.clone()
+            };
             assert!(
-                change_run(store, RunAuthority::Operator("another-operator"), &request)
+                change_run(store, RunAuthority::Operator(&other), &request)
                     .await
                     .is_err()
             );
+            let before_events = read_recall_events(store, 0, 100)
+                .await
+                .expect("facts before audit failure");
+            let point = TransactionFault {
+                description: "cancellation audit failure rolls back terminal facts and projections",
+                table: "sqb_security_audit",
+                operation: "INSERT",
+                condition: "",
+                sqlite_body: "SELECT RAISE(ABORT,'injected cancellation audit failure')",
+                postgres_body: "RAISE EXCEPTION 'injected cancellation audit failure'",
+            };
+            install_fault(store, &point).await;
             assert!(
-                change_run(store, RunAuthority::Operator("test-operator"), &request)
+                change_run(store, RunAuthority::Operator(&operator), &request)
+                    .await
+                    .is_err(),
+                "{}",
+                point.description
+            );
+            remove_fault(store, &point).await;
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("cancel rollback")
+                    .remove(0)
+                    .status,
+                RunStatus::Queued
+            );
+            assert_eq!(
+                read_recall_events(store, 0, 100)
+                    .await
+                    .expect("fact rollback"),
+                before_events
+            );
+            assert!(
+                change_run(store, RunAuthority::Operator(&operator), &request)
                     .await
                     .expect("cancel before launch")
             );
             assert!(
-                !change_run(store, RunAuthority::Operator("test-operator"), &request)
+                !change_run(store, RunAuthority::Operator(&operator), &request)
                     .await
                     .expect("retry cancellation")
+            );
+            let mut changed = request.clone();
+            changed.change = RunChange::CancelRequested {
+                actor: operator.actor.clone(),
+                reason: "Different cancellation reason".into(),
+            };
+            assert!(
+                change_run(store, RunAuthority::Operator(&operator), &changed)
+                    .await
+                    .is_err(),
+                "retry identity includes the cancellation reason"
             );
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await

@@ -419,6 +419,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                 event_id: Uuid::now_v7(),
                 change: RunChange::CancelRequested {
                     actor: "test-admin".into(),
+                    reason: "Stop the orders build".into(),
                 },
                 ..started.clone()
             };
@@ -447,7 +448,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                     .expect("heartbeat response"),
                 json!({"cancel_requested": false})
             );
-            change_run(store, RunAuthority::Operator("test-admin"), &cancellation)
+            change_run(store, RunAuthority::Operator(&audit), &cancellation)
                 .await
                 .expect("operator cancellation");
             let response: serde_json::Value = client

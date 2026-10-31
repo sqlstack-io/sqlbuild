@@ -8,6 +8,8 @@ use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
+use sqlbuild_orchestration::runs::main::change_run::change_run;
+use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeRequest};
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -41,6 +43,27 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ControlAdmin::RevokeToken(token_id) => {
             let revoked = revoke_token(&store, &context, token_id).await?;
             Ok(json!({"token_id": token_id, "revoked": revoked}))
+        }
+        ControlAdmin::CancelRun {
+            event_id,
+            run_id,
+            reason,
+        } => {
+            let applied = change_run(
+                &store,
+                RunAuthority::Operator(&context),
+                &RunChangeRequest {
+                    event_id,
+                    run_id,
+                    claim_id: None,
+                    change: RunChange::CancelRequested {
+                        actor: context.actor.clone(),
+                        reason,
+                    },
+                },
+            )
+            .await?;
+            Ok(json!({"event_id": event_id, "run_id": run_id, "applied": applied}))
         }
         ControlAdmin::ChangeTrigger {
             event_id,

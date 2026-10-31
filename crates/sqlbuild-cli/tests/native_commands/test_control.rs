@@ -36,6 +36,28 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             expected_stderr: "",
         },
         CommandTestCase {
+            description: "native cancellation help",
+            arguments: &["admin", "cancel-run", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb admin cancel-run ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
+            description: "blank cancellation reason rejected before store initialization",
+            arguments: &[
+                "admin",
+                "cancel-run",
+                "00000000-0000-0000-0000-000000000001",
+                "--event-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                " ",
+            ],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: --reason must not be blank\n",
+        },
+        CommandTestCase {
             description: "blank trigger reason rejected before store initialization",
             arguments: &[
                 "admin",

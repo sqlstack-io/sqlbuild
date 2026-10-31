@@ -2,9 +2,10 @@
 
 use serde_json::json;
 
+use crate::credentials::main::append_audit::append_audit;
 use crate::runs::_helpers::changes::{validate_authority, validate_change, validate_retry};
 use crate::runs::_helpers::publish_change::publish_change;
-use crate::runs::models::{ChangingRun, RunAuthority, RunChangeRequest};
+use crate::runs::models::{ChangingRun, RunAuthority, RunChange, RunChangeRequest};
 use crate::scheduler::main::check_lease::check_lease;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -50,6 +51,29 @@ pub async fn change_run(
     )?;
     validate_change(&state, request)?;
     let mut transaction = publish_change(transaction, request, &state).await?;
+    if let (RunAuthority::Operator(context), RunChange::CancelRequested { reason, .. }) =
+        (authority, &request.change)
+    {
+        let mut rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT location_id, target, status, cancel_requested_at FROM sqb_runs WHERE run_id=$1",
+            vec![Parameter::Id(request.run_id)],
+        )
+        .await?;
+        let after = rows.remove(0);
+        transaction = append_audit(
+            transaction,
+            context,
+            (request.event_id, "run.cancel_requested"),
+            (
+                json!({"location_id": after["location_id"], "target": after["target"], "run_id": request.run_id}),
+                json!({"status": state.status, "cancel_requested_at": state.cancel_requested_at}),
+                json!({"status": after["status"], "cancel_requested_at": after["cancel_requested_at"], "reason": reason}),
+            ),
+        )
+        .await?;
+    }
     if let RunAuthority::Scheduler(lease) = authority {
         transaction = check_lease(transaction, lease).await?;
     }

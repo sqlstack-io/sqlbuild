@@ -23,6 +23,7 @@ use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use sqlbuild_orchestration::worker::models::WorkerSession;
 use uuid::Uuid;
 
+use crate::admin_helpers::administer;
 use crate::test_types::TestControl;
 use crate::worker::test_types::WorkerControl;
 
@@ -137,25 +138,63 @@ pub(crate) async fn start_claimed_worker(
     )
 }
 
-pub(crate) fn cancel_worker(worker: WorkerControl, _control: &mut TestControl) {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("independent operator runtime");
-    runtime
-        .block_on(change_run(
-            &worker.store,
-            RunAuthority::Operator("test-admin"),
-            &RunChangeRequest {
-                event_id: Uuid::now_v7(),
-                run_id: worker.identity.0,
-                claim_id: Some(worker.identity.1),
-                change: RunChange::CancelRequested {
-                    actor: "test-admin".into(),
-                },
+pub(crate) fn cancel_worker(worker: WorkerControl, control: &mut TestControl) {
+    let event_id = Uuid::now_v7().to_string();
+    let run_id = worker.identity.0.to_string();
+    let arguments = [
+        "cancel-run",
+        &run_id,
+        "--event-id",
+        &event_id,
+        "--reason",
+        "Stop the orders build",
+    ];
+    let applied = administer(control, &arguments);
+    assert_eq!(applied["run_id"], run_id);
+    assert_eq!(applied["event_id"], event_id);
+    assert_eq!(applied["applied"], true);
+    assert_eq!(administer(control, &arguments)["applied"], false);
+    let connection =
+        rusqlite::Connection::open(control.directory.path().join(".sqlbuild/control.sqlite3"))
+            .expect("observe durable cancellation audit");
+    connection
+        .query_row(
+            "SELECT actor, granting_role, scope_json, before_json, after_json FROM sqb_security_audit WHERE event_id=?1 AND action='run.cancel_requested'",
+            [&event_id],
+            |row| {
+                let actor: String = row.get(0)?;
+                let role: String = row.get(1)?;
+                let scope: String = row.get(2)?;
+                let before: String = row.get(3)?;
+                let after: String = row.get(4)?;
+                let scope: serde_json::Value = serde_json::from_str(&scope).expect("audit scope");
+                let before: serde_json::Value = serde_json::from_str(&before).expect("before state");
+                let after: serde_json::Value = serde_json::from_str(&after).expect("after state");
+                assert_eq!(actor, "local-control-store-owner");
+                assert_eq!(role, "control-store-owner");
+                assert_eq!(scope["run_id"], run_id);
+                assert_eq!(scope["target"], "development");
+                assert!(scope["location_id"].is_string());
+                assert_eq!(before["status"], "running");
+                assert!(before["cancel_requested_at"].is_null());
+                assert_eq!(after["status"], "running");
+                assert!(after["cancel_requested_at"].is_string());
+                assert_eq!(after["reason"], "Stop the orders build");
+                Ok(())
             },
-        ))
-        .expect("request cancellation while worker runtime is blocked");
+        )
+        .expect("same-transaction operator history");
+    let claims: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqb_write_claims WHERE run_id=?1",
+            [&run_id],
+            |row| row.get(0),
+        )
+        .expect("physical claims after cancellation request");
+    assert_eq!(
+        claims, 1,
+        "cancellation is not proof of physical termination"
+    );
 }
 
 pub(crate) fn revoke_worker(worker: WorkerControl, _control: &mut TestControl) {

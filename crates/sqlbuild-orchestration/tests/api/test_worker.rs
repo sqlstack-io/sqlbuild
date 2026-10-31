@@ -282,13 +282,19 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
             .expect("another launched process");
             change_run(
                 store,
-                RunAuthority::Operator("test-operator"),
+                RunAuthority::Operator(&AuditContext {
+                    actor: "test-operator".into(),
+                    granting_role: "operator".into(),
+                    request_id: Uuid::now_v7(),
+                    ip_address: None,
+                }),
                 &RunChangeRequest {
                     event_id: Uuid::now_v7(),
                     run_id: cancelled_identity.0,
                     claim_id: Some(cancelled_identity.1),
                     change: RunChange::CancelRequested {
                         actor: "test-operator".into(),
+                        reason: "Stop before execution".into(),
                     },
                 },
             )
