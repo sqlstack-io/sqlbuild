@@ -1,10 +1,9 @@
 //! Forward-only migration under the same lock used by all other control-plane writes.
 
-use semver::Version;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::store::_helpers::migration::{SCHEMA, render};
+use crate::store::_helpers::migration::{SCHEMA, render, verify_migrations};
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -24,28 +23,9 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         vec![],
     )
     .await?;
-    let current = Version::parse(env!("CARGO_PKG_VERSION"))
-        .map_err(|error| ControlError::Schema(error.to_string()))?;
     let recall_statements = recall_schema(store);
     let digest = sha256_hex(format!("{SCHEMA}\n{}", recall_statements.join(";\n")).as_bytes());
-    for row in &rows {
-        let minimum = row
-            .get("min_server_version")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| {
-                ControlError::Schema("migration lacks a minimum server version".into())
-            })?;
-        let minimum =
-            Version::parse(minimum).map_err(|error| ControlError::Schema(error.to_string()))?;
-        if row.get("version").and_then(|value| value.as_i64()) != Some(1)
-            || minimum > current
-            || row.get("checksum").and_then(|value| value.as_str()) != Some(digest.as_str())
-        {
-            return Err(ControlError::Schema(
-                "unknown migration, checksum mismatch, or minimum server version not met".into(),
-            ));
-        }
-    }
+    let current = verify_migrations(&rows, &digest)?;
     if rows.is_empty() {
         for statement in SCHEMA
             .split(';')

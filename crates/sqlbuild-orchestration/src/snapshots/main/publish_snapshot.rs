@@ -1,6 +1,6 @@
 //! Publish a complete generation and its current pointer in one transaction.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde_json::Value;
 use uuid::Uuid;
@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::declarations::main::publish_definitions::publish_definitions;
 use crate::declarations::main::snapshot_definitions::snapshot_definitions;
 use crate::snapshots::_helpers::preparation::prepare_snapshot;
-use crate::snapshots::_helpers::publication::store_nodes;
-use crate::snapshots::models::{PreparedSnapshot, SnapshotChange, SnapshotInput, SnapshotRecord};
+use crate::snapshots::_helpers::publication::{store_changes, store_nodes};
+use crate::snapshots::models::{PreparedSnapshot, SnapshotInput, SnapshotRecord};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -81,32 +81,7 @@ pub async fn publish_snapshot(
             "INSERT INTO sqb_snapshot_documents (snapshot_id, kind, document_hash) VALUES ($1, $2, $3)",
             vec![Parameter::Id(record.snapshot_id), Parameter::Text(kind), Parameter::Text(hash)]).await?;
     }
-    let keys: BTreeSet<&String> = previous.keys().chain(hashes.keys()).collect();
-    let mut sequence = 0;
-    for key in keys {
-        let before = previous.get(key);
-        let after = hashes.get(key);
-        if before == after {
-            continue;
-        }
-        let change = SnapshotChange {
-            change_kind: match (before, after) {
-                (None, _) => "added",
-                (_, None) => "removed",
-                _ => "changed",
-            }
-            .into(),
-            subject_key: key.clone(),
-            before_hash: before.cloned(),
-            after_hash: after.cloned(),
-        };
-        (transaction, _) = query(transaction,
-            "INSERT INTO sqb_snapshot_changes (snapshot_id, change_seq, change_kind, subject_key, before_hash, after_hash) \
-             VALUES ($1,$2,$3,$4,$5,$6)", vec![Parameter::Id(record.snapshot_id), Parameter::Integer(sequence),
-                Parameter::Text(change.change_kind), Parameter::Text(change.subject_key),
-                Parameter::OptionalText(change.before_hash), Parameter::OptionalText(change.after_hash)]).await?;
-        sequence += 1;
-    }
+    transaction = store_changes(transaction, record.snapshot_id, &previous, &hashes).await?;
     (transaction, _) = query(transaction,
         "INSERT INTO sqb_current_snapshots (location_id, target, snapshot_id, since) VALUES ($1,$2,$3,$4) \
          ON CONFLICT (location_id, target) DO UPDATE SET snapshot_id=excluded.snapshot_id, since=excluded.since",

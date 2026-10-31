@@ -1,6 +1,9 @@
-//! Which parsed invocations run without Python, decided from the parsed values alone.
+//! Resolve native invocations and control-service settings from parsed arguments.
 
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+
+use sqlbuild_orchestration::store::errors::ControlError;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
@@ -34,6 +37,43 @@ pub(crate) fn text(namespace: &Namespace, name: &str) -> Option<String> {
 
 pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
     namespace.get(name) == Some(&Value::Bool(true))
+}
+
+pub(crate) fn control_address(
+    namespace: &Namespace,
+    standalone: bool,
+) -> Result<Option<SocketAddr>, ControlError> {
+    if standalone {
+        return Ok(None);
+    }
+    let host: IpAddr = text(namespace, "control_host")
+        .unwrap_or_else(|| "127.0.0.1".into())
+        .parse()
+        .map_err(|_| ControlError::Invalid("--host must be an IP address".into()))?;
+    let port = match namespace.get("control_port") {
+        Some(Value::Int(value)) => value
+            .parse::<u16>()
+            .map_err(|_| ControlError::Invalid("--port must be between 0 and 65535".into()))?,
+        _ => 8000,
+    };
+    Ok(Some(SocketAddr::new(host, port)))
+}
+
+pub(crate) fn control_database(namespace: &Namespace) -> Result<String, ControlError> {
+    let variable = text(namespace, "control_database_env")
+        .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into());
+    match std::env::var(&variable) {
+        Ok(value) => Ok(value),
+        Err(std::env::VarError::NotPresent) => Ok(PathBuf::from(
+            text(namespace, "project_dir").unwrap_or_else(|| ".".into()),
+        )
+        .join(".sqlbuild/control.sqlite3")
+        .to_string_lossy()
+        .into_owned()),
+        Err(std::env::VarError::NotUnicode(_)) => Err(ControlError::Invalid(
+            "control database variable must be UTF-8".into(),
+        )),
+    }
 }
 
 /// The strings of a list attribute, or `None` when it holds anything else.

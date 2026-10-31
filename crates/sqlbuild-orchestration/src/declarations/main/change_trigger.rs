@@ -1,11 +1,9 @@
 //! Apply an operator fact and its projection in one transaction, with retry-safe request identity.
 
-use chrono::TimeDelta;
-
+use crate::declarations::_helpers::trigger_state::trigger_timing;
 use crate::declarations::models::{
     EditableTriggerState, TriggerChange, TriggerChangeRequest, TriggerStatus,
 };
-use crate::scheduler::main::next_schedule_time::next_schedule_time;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -60,20 +58,12 @@ pub async fn change_trigger(
         TriggerChange::SetCursor { time } => state.last_tick_for = Some(time),
         TriggerChange::ResetCursor => state.last_tick_for = None,
     }
-    let status = state
-        .status_override
-        .unwrap_or(state.definition_json.default_status);
-    let after = state.last_tick_for.unwrap_or(
-        state
-            .started_at
-            .checked_sub_signed(TimeDelta::microseconds(1))
-            .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
-    );
-    let next = if status == TriggerStatus::Running {
-        next_schedule_time(&state.definition_json.schedule, after)?
-    } else {
-        None
-    };
+    let (status, next) = trigger_timing(
+        &state.definition_json,
+        state.started_at,
+        state.last_tick_for,
+        state.status_override,
+    )?;
     let now = transaction.now;
     let (transaction, _) = query(transaction,
         "INSERT INTO sqb_trigger_state_events (event_id, trigger_id, occurred_at, snapshot_id, request_json) VALUES ($1,$2,$3,$4,$5)",

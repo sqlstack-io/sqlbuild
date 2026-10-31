@@ -1,10 +1,9 @@
 //! Publish definition projections inside the current-snapshot transaction.
 
-use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::declarations::models::{Definitions, PreviousTriggerState, TriggerStatus};
-use crate::scheduler::main::next_schedule_time::next_schedule_time;
+use crate::declarations::_helpers::trigger_state::trigger_timing;
+use crate::declarations::models::{Definitions, PreviousTriggerState};
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -67,24 +66,12 @@ pub(crate) async fn publish_definitions(
             trigger.starts_at.unwrap_or(snapshot.published_at),
             |state| state.started_at,
         );
-        let default = trigger.default_status;
-        let status = state
-            .as_ref()
-            .and_then(|state| state.status_override)
-            .unwrap_or(default);
-        let after = state
-            .as_ref()
-            .and_then(|state| state.last_tick_for)
-            .unwrap_or(
-                started_at
-                    .checked_sub_signed(TimeDelta::microseconds(1))
-                    .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
-            );
-        let next = if status == TriggerStatus::Running {
-            next_schedule_time(&trigger.schedule, after)?
-        } else {
-            None
-        };
+        let (status, next) = trigger_timing(
+            &trigger,
+            started_at,
+            state.as_ref().and_then(|state| state.last_tick_for),
+            state.as_ref().and_then(|state| state.status_override),
+        )?;
         (transaction, _) = query(transaction,
             "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at, updated_at) VALUES ($1,$2,$3,$4,$5) \
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at, updated_at=excluded.updated_at",

@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::runs::_helpers::changes::{validate_authority, validate_change};
+use crate::runs::_helpers::changes::{validate_authority, validate_change, validate_retry};
 use crate::runs::_helpers::events::append_run_event;
 use crate::runs::_helpers::projection::project_change;
 use crate::runs::models::{ChangingRun, RunAuthority, RunChange, RunChangeRequest, RunOutcome};
@@ -33,16 +33,7 @@ pub async fn change_run(
     )
     .await?;
     if let Some(previous) = previous.first() {
-        if previous.get("payload") != Some(&body)
-            || previous
-                .get("invocation_id")
-                .and_then(serde_json::Value::as_str)
-                != Some(format!("scheduler/{}", request.run_id).as_str())
-        {
-            return Err(ControlError::Invalid(
-                "run change event ID already has different content".into(),
-            ));
-        }
+        validate_retry(previous, request, &body)?;
         commit(transaction).await?;
         return Ok(false);
     }

@@ -4,6 +4,25 @@ use crate::runs::models::{
     ChangingRun, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
 use crate::store::errors::ControlError;
+use crate::store::types::Row;
+
+pub(crate) fn validate_retry(
+    previous: &Row,
+    request: &RunChangeRequest,
+    body: &serde_json::Value,
+) -> Result<(), ControlError> {
+    if previous.get("payload") != Some(body)
+        || previous
+            .get("invocation_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(format!("scheduler/{}", request.run_id).as_str())
+    {
+        return Err(ControlError::Invalid(
+            "run change event ID already has different content".into(),
+        ));
+    }
+    Ok(())
+}
 
 pub(crate) fn validate_authority(
     authority: RunAuthority<'_>,
