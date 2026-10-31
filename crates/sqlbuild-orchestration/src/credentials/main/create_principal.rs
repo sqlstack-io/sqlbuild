@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::_helpers::audit::audit;
+use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, PrincipalKind};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -38,7 +38,7 @@ pub async fn create_principal(
     )
     .await?;
     commit(
-        audit(
+        append_audit(
             transaction,
             context,
             (Uuid::new_v5(&id, b"created"), "principal.created"),

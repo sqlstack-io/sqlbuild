@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::declarations::models::TriggerChange;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -14,6 +15,12 @@ pub(crate) enum ControlAdmin {
     CreatePrincipal(String, PrincipalKind),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
+    ChangeTrigger {
+        event_id: Uuid,
+        trigger_id: Uuid,
+        change: TriggerChange,
+        reason: String,
+    },
 }
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.

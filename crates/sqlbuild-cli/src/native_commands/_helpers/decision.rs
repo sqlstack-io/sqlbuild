@@ -4,7 +4,9 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use serde_json::json;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -63,8 +65,36 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
         return Ok(ControlAdmin::CreatePrincipal(value, kind));
     }
     let id = Uuid::parse_str(&value)
-        .map_err(|_| ControlError::Invalid("a valid location or token UUID is required".into()))?;
+        .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
     match action.as_deref() {
+        Some("change-trigger") => {
+            let event_id = Uuid::parse_str(&text(namespace, "admin_event_id").unwrap_or_default())
+                .map_err(|_| ControlError::Invalid("--event-id must be a UUID".into()))?;
+            let reason = text(namespace, "admin_reason").unwrap_or_default();
+            if reason.trim().is_empty() {
+                return Err(ControlError::Invalid("--reason must not be blank".into()));
+            }
+            let mut change = json!({
+                "kind": text(namespace, "admin_trigger_change").unwrap_or_default().replace('-', "_"),
+            });
+            let cursor = text(namespace, "admin_cursor");
+            if let Some(cursor) = &cursor {
+                change["time"] = json!(cursor);
+            }
+            let change: TriggerChange = serde_json::from_value(change)
+                .map_err(|error| ControlError::Invalid(format!("trigger change: {error}")))?;
+            if cursor.is_some() && !matches!(change, TriggerChange::SetCursor { .. }) {
+                return Err(ControlError::Invalid(
+                    "--cursor is only valid for set-cursor".into(),
+                ));
+            }
+            Ok(ControlAdmin::ChangeTrigger {
+                event_id,
+                trigger_id: id,
+                change,
+                reason,
+            })
+        }
         Some("issue-location-token" | "issue-principal-token") => {
             let expiry = DateTime::parse_from_rfc3339(
                 &text(namespace, "admin_expires_at").unwrap_or_default(),

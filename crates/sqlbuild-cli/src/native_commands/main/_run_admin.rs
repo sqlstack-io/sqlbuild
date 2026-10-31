@@ -6,6 +6,8 @@ use sqlbuild_orchestration::credentials::main::create_principal::create_principa
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::AuditContext;
+use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
+use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -39,6 +41,26 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ControlAdmin::RevokeToken(token_id) => {
             let revoked = revoke_token(&store, &context, token_id).await?;
             Ok(json!({"token_id": token_id, "revoked": revoked}))
+        }
+        ControlAdmin::ChangeTrigger {
+            event_id,
+            trigger_id,
+            change,
+            reason,
+        } => {
+            let applied = change_trigger(
+                &store,
+                &context,
+                &TriggerChangeRequest {
+                    event_id,
+                    trigger_id,
+                    actor: context.actor.clone(),
+                    reason,
+                    change,
+                },
+            )
+            .await?;
+            Ok(json!({"event_id": event_id, "trigger_id": trigger_id, "applied": applied}))
         }
     }
 }

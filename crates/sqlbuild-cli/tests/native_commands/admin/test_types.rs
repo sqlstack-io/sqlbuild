@@ -2,7 +2,7 @@ pub(crate) struct AdminTestCase {
     pub(crate) description: &'static str,
     pub(crate) location_name: &'static str,
     pub(crate) expected_name: &'static str,
-    pub(crate) expected_actions: [&'static str; 4],
+    pub(crate) expected_actions: [&'static str; 9],
 }
 
 pub(crate) struct PrincipalAdminTestCase {
@@ -10,6 +10,14 @@ pub(crate) struct PrincipalAdminTestCase {
     pub(crate) kind: &'static str,
     pub(crate) expected_name: &'static str,
     pub(crate) expected_actions: [&'static str; 3],
+}
+
+pub(crate) struct TriggerAdminTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) change: &'static str,
+    pub(crate) cursor_arguments: &'static [&'static str],
+    pub(crate) expected_status: &'static str,
+    pub(crate) expected_cursor: Option<&'static str>,
 }
 
 #[cfg(unix)]

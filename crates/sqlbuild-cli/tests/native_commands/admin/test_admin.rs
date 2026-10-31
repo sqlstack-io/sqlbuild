@@ -8,14 +8,14 @@ use std::collections::BTreeMap;
 use chrono::{Duration, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
-use sqlbuild_orchestration::snapshots::models::SnapshotInput;
+use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use uuid::Uuid;
 
-use crate::admin_helpers::{administer, audit_actions};
+use crate::admin_helpers::{administer, audit_actions, invoke_admin, read_triggers};
 use crate::helpers::{api_ready, start_control};
 #[cfg(unix)]
 use crate::test_admin::test_types::AdminDeliveryTestCase;
-use crate::test_admin::test_types::{AdminTestCase, PrincipalAdminTestCase};
+use crate::test_admin::test_types::{AdminTestCase, PrincipalAdminTestCase, TriggerAdminTestCase};
 
 #[test]
 fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scoped_publication_and_revocation_are_audited()
@@ -29,6 +29,11 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
             "location.created",
             "token.issued",
             "token.revoked",
+            "trigger.changed",
+            "trigger.changed",
+            "trigger.changed",
+            "trigger.changed",
+            "trigger.changed",
         ],
     }];
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -78,13 +83,52 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
                 image_id: None,
                 environment_hash: "orders-environment".into(),
                 sqb_version: env!("CARGO_PKG_VERSION").into(),
-                nodes: BTreeMap::new(),
-                documents: BTreeMap::new(),
+                nodes: BTreeMap::from([("model:orders".into(), SnapshotNode {
+                    kind: "model".into(),
+                    definition: serde_json::json!({"materialization": "table"}),
+                    raw_sql: Some("select 1 as order_id".into()),
+                    compiled_sql: Some("select 1 as order_id".into()),
+                    python_source: None,
+                })]),
+                documents: BTreeMap::from([
+                    ("jobs".into(), serde_json::json!({"orders": {"description": "Refresh orders.", "selection": ["model:orders"]}})),
+                    ("triggers".into(), serde_json::json!({"daily_orders": {
+                        "description": "Daily orders.", "job_key": "orders", "default_status": "paused",
+                        "schedule": {"kind": "cron", "expression": "0 2 * * *", "timezone": "UTC"},
+                    }})),
+                ]),
             };
             let published = publish_remote_snapshot(&url, bearer, &snapshot)
                 .await
                 .expect("operator-issued credential publishes");
             assert_eq!(published.location_id, location_id);
+            let trigger_id = read_triggers(&url, bearer, (location_id, "development")).await[0].trigger_id.to_string();
+            for case in [
+                TriggerAdminTestCase { description: "enable overrides the paused code default", change: "enable", cursor_arguments: &[], expected_status: "running", expected_cursor: None },
+                TriggerAdminTestCase { description: "pause overrides an enabled trigger", change: "pause", cursor_arguments: &[], expected_status: "paused", expected_cursor: None },
+                TriggerAdminTestCase { description: "reset-default restores the paused code default", change: "reset-default", cursor_arguments: &[], expected_status: "paused", expected_cursor: None },
+                TriggerAdminTestCase { description: "set-cursor normalizes the timestamp offset", change: "set-cursor", cursor_arguments: &["--cursor", "2026-07-03T01:17:23+05:30"], expected_status: "paused", expected_cursor: Some("2026-07-02T19:47:23+00:00") },
+                TriggerAdminTestCase { description: "reset-cursor removes the durable cursor", change: "reset-cursor", cursor_arguments: &[], expected_status: "paused", expected_cursor: None },
+            ] {
+                let event_id = Uuid::now_v7().to_string();
+                let mut arguments = vec!["change-trigger", &trigger_id, case.change, "--event-id", &event_id, "--reason", "Order refresh maintenance"];
+                arguments.extend_from_slice(case.cursor_arguments);
+                for expected in [true, false] {
+                    let result = administer(&control, &arguments);
+                    assert_eq!(result["applied"], expected, "{}", case.description);
+                    assert_eq!(result["event_id"], event_id);
+                }
+                let mut conflict = arguments.clone();
+                conflict[6] = "Different request content";
+                assert!(!invoke_admin(&control, &conflict).status.success(), "{}", case.description);
+                let triggers = read_triggers(&url, bearer, (location_id, "development")).await;
+                assert_eq!(triggers[0].status.as_str(), case.expected_status, "{}", case.description);
+                assert_eq!(triggers[0].last_tick_for.map(|value| value.to_rfc3339()).as_deref(), case.expected_cursor, "{}", case.description);
+            }
+            snapshot.generation = 2;
+            snapshot.documents.get_mut("triggers").expect("trigger document")["daily_orders"]["default_status"] = serde_json::json!("running");
+            publish_remote_snapshot(&url, bearer, &snapshot).await.expect("publish a new default");
+            assert_eq!(read_triggers(&url, bearer, (location_id, "development")).await[0].status.as_str(), "running", "reset-default removed the operator override");
             snapshot.location_id = other_id;
             assert!(matches!(
                 publish_remote_snapshot(&url, bearer, &snapshot).await,

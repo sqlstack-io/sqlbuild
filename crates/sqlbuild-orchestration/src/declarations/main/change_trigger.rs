@@ -1,5 +1,9 @@
 //! Apply an operator fact and its projection in one transaction, with retry-safe request identity.
 
+use serde_json::json;
+
+use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::models::AuditContext;
 use crate::declarations::_helpers::trigger_state::trigger_timing;
 use crate::declarations::models::{
     EditableTriggerState, TriggerChange, TriggerChangeRequest, TriggerStatus,
@@ -14,11 +18,12 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 /// Authorization belongs to the API boundary; `actor` is the authenticated principal, not client input.
 pub async fn change_trigger(
     store: &ControlStore,
+    context: &AuditContext,
     request: &TriggerChangeRequest,
 ) -> Result<bool, ControlError> {
-    if request.actor.trim().is_empty() {
+    if request.actor.trim().is_empty() || request.actor != context.actor {
         return Err(ControlError::Invalid(
-            "trigger changes require an actor".into(),
+            "trigger changes require the authenticated audit actor".into(),
         ));
     }
     let body =
@@ -51,6 +56,10 @@ pub async fn change_trigger(
         decode_row(rows.into_iter().next().ok_or_else(|| {
             ControlError::Invalid("trigger does not exist in the current snapshot".into())
         })?)?;
+    let before = json!({
+        "status_override": state.status_override,
+        "last_tick_for": state.last_tick_for,
+    });
     match request.change {
         TriggerChange::Enable => state.status_override = Some(TriggerStatus::Running),
         TriggerChange::Pause => state.status_override = Some(TriggerStatus::Paused),
@@ -72,6 +81,23 @@ pub async fn change_trigger(
         "UPDATE sqb_trigger_state SET status=$1, status_override=$2, last_tick_for=$3, next_due_at=$4, updated_at=$5 WHERE trigger_id=$6",
         vec![Parameter::Text(status.as_str().into()), Parameter::OptionalText(state.status_override.map(|value| value.as_str().into())), Parameter::OptionalTime(state.last_tick_for),
             Parameter::OptionalTime(next), Parameter::Time(now), Parameter::Id(request.trigger_id)]).await?;
-    commit(transaction).await?;
+    commit(
+        append_audit(
+            transaction,
+            context,
+            (request.event_id, "trigger.changed"),
+            (
+                json!({"trigger_id": request.trigger_id, "snapshot_id": state.snapshot_id}),
+                before,
+                json!({
+                    "status_override": state.status_override,
+                    "last_tick_for": state.last_tick_for,
+                    "reason": request.reason,
+                }),
+            ),
+        )
+        .await?,
+    )
+    .await?;
     Ok(true)
 }

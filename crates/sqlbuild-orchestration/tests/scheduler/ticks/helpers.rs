@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::json;
+use serde_json::{Value, json};
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
 use sqlbuild_orchestration::runs::main::list_runs::list_runs;
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
@@ -14,6 +14,7 @@ use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
+use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::fault_helpers::{install_fault, remove_fault};
@@ -57,6 +58,51 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
             ),
         ]),
     }
+}
+
+async fn trigger_audit_rows(store: &ControlStore) -> Vec<(String, String, String, String, String)> {
+    let sql = "SELECT CAST(event_id AS TEXT), actor, granting_role, CAST(before_json AS TEXT), CAST(after_json AS TEXT) FROM sqb_security_audit WHERE action='trigger.changed'";
+    let ControlStore::Postgres(pool) = store else {
+        let ControlStore::Sqlite(path) = store else {
+            unreachable!()
+        };
+        return rusqlite::Connection::open(path)
+            .expect("inspect trigger audit")
+            .prepare(sql)
+            .expect("audit query")
+            .query_map([], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            })
+            .expect("read trigger audits")
+            .collect::<Result<_, _>>()
+            .expect("audit rows");
+    };
+    sqlx_core::query_as::query_as(sql)
+        .fetch_all(pool)
+        .await
+        .expect("trigger audits")
+}
+
+pub(crate) async fn trigger_audits(store: &ControlStore) -> Vec<Value> {
+    trigger_audit_rows(store)
+        .await
+        .into_iter()
+        .map(|(event_id, actor, granting_role, before, after)| {
+            json!({
+                "event_id": event_id,
+                "actor": actor,
+                "granting_role": granting_role,
+                "before_json": serde_json::from_str::<Value>(&before).expect("before state"),
+                "after_json": serde_json::from_str::<Value>(&after).expect("after state"),
+            })
+        })
+        .collect()
 }
 
 pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usize)> {

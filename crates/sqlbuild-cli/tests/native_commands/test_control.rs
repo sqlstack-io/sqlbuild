@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use crate::helpers::{api_ready, isolated_binary, start_control, wait_for_health};
-use crate::test_types::{CommandTestCase, OpenApiTestCase, ServiceTestCase};
+use crate::test_types::{CommandTestCase, OpenApiTestCase, ServiceTestCase, TriggerCursorTestCase};
 
 #[test]
 fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_python_and_database_access_are_not_required()
@@ -29,6 +29,45 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             expected_stderr: "",
         },
         CommandTestCase {
+            description: "native trigger administration help",
+            arguments: &["admin", "change-trigger", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb admin change-trigger ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
+            description: "blank trigger reason rejected before store initialization",
+            arguments: &[
+                "admin",
+                "change-trigger",
+                "00000000-0000-0000-0000-000000000001",
+                "pause",
+                "--event-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                " ",
+            ],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: --reason must not be blank\n",
+        },
+        CommandTestCase {
+            description: "set-cursor requires a timestamp before store initialization",
+            arguments: &[
+                "admin",
+                "change-trigger",
+                "00000000-0000-0000-0000-000000000001",
+                "set-cursor",
+                "--event-id",
+                "00000000-0000-0000-0000-000000000002",
+                "--reason",
+                "Refresh orders",
+            ],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: trigger change: missing field `time`\n",
+        },
+        CommandTestCase {
             description: "blank location rejected before store initialization",
             arguments: &["admin", "create-location", "   "],
             expected_success: false,
@@ -47,7 +86,7 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             arguments: &["admin", "revoke-token", "not-a-uuid"],
             expected_success: false,
             expected_stdout_prefix: "",
-            expected_stderr: "Control administration failed: invalid control-plane data: a valid location or token UUID is required\n",
+            expected_stderr: "Control administration failed: invalid control-plane data: a valid subject UUID is required\n",
         },
         CommandTestCase {
             description: "invalid expiry rejected before store initialization",
@@ -115,6 +154,75 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_a_cursor_free_trigger_change_when_a_cursor_is_supplied_then_it_fails_before_opening_the_store()
+ {
+    let test_cases = [
+        TriggerCursorTestCase {
+            description: "enable rejects an extra cursor",
+            change: "enable",
+            expected_success: false,
+        },
+        TriggerCursorTestCase {
+            description: "pause rejects an extra cursor",
+            change: "pause",
+            expected_success: false,
+        },
+        TriggerCursorTestCase {
+            description: "reset-default rejects an extra cursor",
+            change: "reset-default",
+            expected_success: false,
+        },
+        TriggerCursorTestCase {
+            description: "reset-cursor rejects an extra cursor",
+            change: "reset-cursor",
+            expected_success: false,
+        },
+    ];
+    let directory = tempfile::tempdir().expect("isolated CLI directory");
+    let binary = isolated_binary(directory.path());
+    for test_case in test_cases {
+        for cursor in ["2026-01-01T00:00:00Z", "nonsense"] {
+            let output = Command::new(&binary)
+                .args([
+                    "admin",
+                    "change-trigger",
+                    "00000000-0000-0000-0000-000000000001",
+                    test_case.change,
+                    "--event-id",
+                    "00000000-0000-0000-0000-000000000002",
+                    "--reason",
+                    "Refresh orders",
+                    "--cursor",
+                    cursor,
+                ])
+                .current_dir(directory.path())
+                .env("PATH", "")
+                .env("SQLBUILD_CONTROL_DATABASE_URL", "unsupported://not-opened")
+                .output()
+                .expect("standalone native command");
+            assert_eq!(
+                output.status.success(),
+                test_case.expected_success,
+                "{}: {cursor}",
+                test_case.description
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&output.stderr),
+                "Control administration failed: invalid control-plane data: --cursor is only valid for set-cursor\n",
+                "{}: {cursor}",
+                test_case.description
+            );
+            assert!(
+                output.stdout.is_empty(),
+                "{}: {cursor}",
+                test_case.description
+            );
+            assert!(!directory.path().join(".sqlbuild").exists());
+        }
     }
 }
 

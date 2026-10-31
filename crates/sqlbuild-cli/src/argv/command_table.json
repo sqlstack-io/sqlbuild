@@ -351,6 +351,91 @@
             }
            ]
           }
+         },
+         {
+          "name": "change-trigger",
+          "parser": {
+           "prog": "sqb admin change-trigger",
+           "description": "Change runtime trigger state using privileged database access; the fact, projection and security audit commit together.",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "TRIGGER_ID",
+             "required": true,
+             "help": "current trigger UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_trigger_change",
+             "metavar": "CHANGE",
+             "choices": [
+              "enable",
+              "pause",
+              "reset-default",
+              "set-cursor",
+              "reset-cursor"
+             ],
+             "required": true,
+             "help": "runtime change; reset-default restores the published status default",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--event-id"
+             ],
+             "dest": "admin_event_id",
+             "required": true,
+             "help": "request UUID; reuse it with identical arguments after an uncertain result",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--reason"
+             ],
+             "dest": "admin_reason",
+             "required": true,
+             "help": "nonblank reason recorded with the operator fact and security audit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--cursor"
+             ],
+             "dest": "admin_cursor",
+             "help": "RFC3339 timestamp with offset; required only for set-cursor",
+             "group": 1
+            }
+           ]
+          }
          }
         ],
         "choices_help": [
@@ -378,6 +463,11 @@
           "dest": "revoke-token",
           "metavar": "revoke-token",
           "help": "revoke a credential by UUID"
+         },
+         {
+          "dest": "change-trigger",
+          "metavar": "change-trigger",
+          "help": "change trigger status or cursor with an atomic audit and retry identity"
          }
         ]
        }

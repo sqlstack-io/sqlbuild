@@ -1,5 +1,6 @@
 //! Operator trigger facts remain consistent across publication and retry boundaries.
 
+use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::main::list_trigger_events::list_trigger_events;
 use sqlbuild_orchestration::declarations::main::list_triggers::list_triggers;
@@ -16,7 +17,7 @@ use crate::fault_helpers::{install_fault, remove_fault};
 use crate::location_helpers::create_location;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
-use crate::ticks::helpers::snapshot;
+use crate::ticks::helpers::{snapshot, trigger_audits};
 use crate::ticks::test_types::{TransactionFault, TriggerControlsTestCase};
 
 #[test]
@@ -59,7 +60,13 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 reason: "maintenance".into(),
                 change: TriggerChange::Pause,
             };
-            assert!(change_trigger(store, &pause).await.expect("pause"));
+            let audit = AuditContext {
+                actor: "orders-operator".into(),
+                granting_role: "operator".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            assert!(change_trigger(store, &audit, &pause).await.expect("pause"));
             let paused = list_triggers(store, location, "development")
                 .await
                 .expect("paused trigger")
@@ -86,27 +93,49 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 change: TriggerChange::Enable,
                 ..pause.clone()
             };
-            let fault = TransactionFault {
-                description: "operator event and projection",
-                table: "sqb_trigger_state",
-                operation: "UPDATE",
-                condition: "",
-                sqlite_body: "SELECT RAISE(ABORT,'injected state failure')",
-                postgres_body: "RAISE EXCEPTION 'injected state failure'",
-            };
-            install_fault(store, &fault).await;
-            assert!(change_trigger(store, &enable).await.is_err());
-            remove_fault(store, &fault).await;
-            assert_eq!(
-                list_trigger_events(store, trigger_id, 100)
-                    .await
-                    .expect("rolled-back fact")
-                    .len(),
-                1
-            );
-            assert!(change_trigger(store, &enable).await.expect("retry enable"));
+            for fault in [
+                TransactionFault {
+                    description: "operator event and projection",
+                    table: "sqb_trigger_state",
+                    operation: "UPDATE",
+                    condition: "",
+                    sqlite_body: "SELECT RAISE(ABORT,'injected state failure')",
+                    postgres_body: "RAISE EXCEPTION 'injected state failure'",
+                },
+                TransactionFault {
+                    description: "operator security audit",
+                    table: "sqb_security_audit",
+                    operation: "INSERT",
+                    condition: "",
+                    sqlite_body: "SELECT RAISE(ABORT,'injected audit failure')",
+                    postgres_body: "RAISE EXCEPTION 'injected audit failure'",
+                },
+            ] {
+                install_fault(store, &fault).await;
+                assert!(change_trigger(store, &audit, &enable).await.is_err());
+                remove_fault(store, &fault).await;
+                assert_eq!(
+                    list_trigger_events(store, trigger_id, 100)
+                        .await
+                        .expect("rolled-back fact")
+                        .len(),
+                    1
+                );
+                assert_eq!(
+                    list_triggers(store, location, "development")
+                        .await
+                        .expect("rolled back projection")[0]
+                        .status,
+                    TriggerStatus::Paused
+                );
+            }
             assert!(
-                !change_trigger(store, &pause)
+                change_trigger(store, &audit, &enable)
+                    .await
+                    .expect("retry enable")
+            );
+            assert!(
+                !change_trigger(store, &audit, &pause)
                     .await
                     .expect("retry old pause is inert")
             );
@@ -115,7 +144,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 ..pause.clone()
             };
             assert!(
-                change_trigger(store, &conflict).await.is_err(),
+                change_trigger(store, &audit, &conflict).await.is_err(),
                 "same event ID cannot change content"
             );
             input.generation = 2;
@@ -139,7 +168,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 change: TriggerChange::ResetDefault,
                 ..pause.clone()
             };
-            change_trigger(store, &reset)
+            change_trigger(store, &audit, &reset)
                 .await
                 .expect("restore new code default");
             assert_eq!(
@@ -157,7 +186,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 change: TriggerChange::SetCursor { time },
                 ..pause.clone()
             };
-            change_trigger(store, &cursor)
+            change_trigger(store, &audit, &cursor)
                 .await
                 .expect("set durable cursor");
             assert_eq!(
@@ -172,7 +201,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 change: TriggerChange::ResetCursor,
                 ..pause.clone()
             };
-            change_trigger(store, &reset_cursor)
+            change_trigger(store, &audit, &reset_cursor)
                 .await
                 .expect("reset cursor");
             assert!(
@@ -191,6 +220,29 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                     .iter()
                     .all(|event| event.request_json.actor == "orders-operator")
             );
+            let other_actor = AuditContext {
+                actor: "customers-operator".into(),
+                ..audit.clone()
+            };
+            assert!(change_trigger(store, &other_actor, &pause).await.is_err());
+            let audits = trigger_audits(store).await;
+            assert_eq!(audits.len(), test_case.expected_events);
+            assert!(
+                audits
+                    .iter()
+                    .all(|row| row["actor"] == "orders-operator"
+                        && row["granting_role"] == "operator")
+            );
+            let cleared = audits
+                .iter()
+                .find(|row| row["event_id"] == reset_cursor.event_id.to_string())
+                .expect("cursor reset audit");
+            assert_eq!(
+                cleared["before_json"]["last_tick_for"],
+                "2020-01-02T00:00:00Z"
+            );
+            assert!(cleared["after_json"]["last_tick_for"].is_null());
+            assert_eq!(cleared["after_json"]["reason"], "maintenance");
             close_test_store(fixture).await;
         });
     }

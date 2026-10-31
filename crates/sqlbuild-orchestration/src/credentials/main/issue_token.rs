@@ -7,9 +7,9 @@ use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::credentials::_helpers::audit::audit;
 use crate::credentials::_helpers::scopes::{scope_is_active, scope_parameters};
 use crate::credentials::constants::TOKEN_SECRET_BYTES;
+use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, CredentialScope, IssuedToken, TokenIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -65,7 +65,7 @@ pub async fn issue_token(
         expires_at,
     };
     commit(
-        audit(
+        append_audit(
             transaction,
             context,
             (Uuid::new_v5(&token_id, b"issued"), "token.issued"),

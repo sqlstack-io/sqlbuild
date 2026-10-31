@@ -9,6 +9,12 @@ pub(crate) struct CommandTestCase {
     pub(crate) expected_stderr: &'static str,
 }
 
+pub(crate) struct TriggerCursorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) change: &'static str,
+    pub(crate) expected_success: bool,
+}
+
 pub(crate) struct OpenApiTestCase {
     pub(crate) description: &'static str,
     pub(crate) expected_path: &'static str,

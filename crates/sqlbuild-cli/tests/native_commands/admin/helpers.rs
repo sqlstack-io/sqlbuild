@@ -1,13 +1,29 @@
 //! Run the isolated native executable; never include returned bearer bytes in assertion messages.
 
-use std::process::Command;
+use std::process::{Command, Output};
 
 use serde_json::Value;
+use sqlbuild_orchestration::declarations::models::TriggerRecord;
+use uuid::Uuid;
 
 use crate::test_types::TestControl;
 
 pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
-    let output = Command::new(
+    let output = invoke_admin(control, arguments);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "Opening control store...\nControl store ready\nControl administration completed successfully\n"
+    );
+    serde_json::from_slice(&output.stdout).expect("JSON-only admin stdout")
+}
+
+pub(crate) fn invoke_admin(control: &TestControl, arguments: &[&str]) -> Output {
+    Command::new(
         control
             .directory
             .path()
@@ -19,17 +35,39 @@ pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
     .env("PATH", "")
     .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
     .output()
-    .expect("native administration process");
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stderr),
-        "Opening control store...\nControl store ready\nControl administration completed successfully\n"
-    );
-    serde_json::from_slice(&output.stdout).expect("JSON-only admin stdout")
+    .expect("native administration process")
+}
+
+pub(crate) async fn read_triggers(
+    url: &str,
+    bearer: &str,
+    (location, target): (Uuid, &str),
+) -> Vec<TriggerRecord> {
+    let mut endpoint = reqwest::Url::parse(url).expect("API address");
+    endpoint
+        .path_segments_mut()
+        .expect("API path")
+        .pop_if_empty()
+        .extend([
+            "api",
+            "locations",
+            &location.to_string(),
+            "targets",
+            target,
+            "triggers",
+        ]);
+    reqwest::Client::new()
+        .get(endpoint)
+        .bearer_auth(bearer)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+        .expect("trigger response")
+        .error_for_status()
+        .expect("authorized trigger read")
+        .json()
+        .await
+        .expect("trigger records")
 }
 
 pub(crate) fn audit_actions(control: &TestControl, bearer: &str) -> Vec<String> {

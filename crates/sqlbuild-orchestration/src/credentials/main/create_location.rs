@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::_helpers::audit::audit;
+use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -27,7 +27,7 @@ pub async fn create_location(
         "INSERT INTO sqb_locations (location_id, name, created_by, created_at) VALUES ($1, $2, $3, $4)",
         vec![Parameter::Id(id), Parameter::Text(name.into()), Parameter::Text(context.actor.clone()), Parameter::Time(now)]).await?;
     commit(
-        audit(
+        append_audit(
             transaction,
             context,
             (Uuid::new_v5(&id, b"created"), "location.created"),

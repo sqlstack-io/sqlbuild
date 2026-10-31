@@ -8,7 +8,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-pub(crate) async fn audit(
+pub(crate) async fn append_audit(
     transaction: ControlTransaction,
     context: &AuditContext,
     (event_id, action): (Uuid, &str),

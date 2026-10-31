@@ -115,13 +115,15 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 reason: "Pause orders refresh".into(),
                 change: TriggerChange::Pause,
             };
-            change_trigger(store, &change).await.expect("pause trigger");
             let audit = AuditContext {
                 actor: "test-admin".into(),
                 granting_role: "admin".into(),
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
+            change_trigger(store, &audit, &change)
+                .await
+                .expect("pause trigger");
             let expiry = Utc::now() + chrono::Duration::hours(1);
             let token = issue_token(
                 store,
