@@ -3,8 +3,8 @@
 use sqlbuild_recall::store::models::InsertOutcome;
 use uuid::Uuid;
 
-use crate::runs::_helpers::output::claim_envelope;
-use crate::runs::_helpers::recall::{append_records, claim_record};
+use crate::runs::_helpers::lifecycle::output::claim_envelope;
+use crate::runs::_helpers::lifecycle::recall::{append_records, claim_record};
 use crate::runs::constants::{RECALL_BATCH_ROWS, RECALL_INVOCATION_ID_BYTES};
 use crate::runs::models::RecallBatch;
 use crate::store::errors::ControlError;

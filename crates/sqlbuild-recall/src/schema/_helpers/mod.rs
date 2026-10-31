@@ -1,5 +1,4 @@
 pub(crate) mod clickhouse_views;
-pub(crate) mod postgres_views;
 pub(crate) mod relational_tables;
 pub(crate) mod relational_views;
 pub(crate) mod rendering;

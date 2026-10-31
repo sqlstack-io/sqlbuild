@@ -2,8 +2,8 @@
 
 use serde_json::json;
 
-use crate::runs::_helpers::events::append_run_event;
-use crate::runs::_helpers::projection::project_change;
+use crate::runs::_helpers::lifecycle::events::append_run_event;
+use crate::runs::_helpers::lifecycle::projection::project_change;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -22,9 +22,19 @@ pub(crate) async fn publish_change(
     )
     .await?;
     let mut transaction = project_change(transaction, request, state).await?;
-    if matches!(request.change, RunChange::CancelRequested { .. })
-        && state.worker_instance.is_none()
-    {
+    let mut cancel_unstarted = matches!(request.change, RunChange::CancelRequested { .. })
+        && state.worker_instance.is_none();
+    if cancel_unstarted {
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT kind FROM sqb_runs WHERE run_id=$1",
+            vec![Parameter::Id(request.run_id)],
+        )
+        .await?;
+        cancel_unstarted = rows.first().and_then(|row| row["kind"].as_str()) != Some("group");
+    }
+    if cancel_unstarted {
         let terminal = RunChangeRequest {
             event_id: uuid::Uuid::new_v5(&request.event_id, b"cancelled-before-launch"),
             run_id: request.run_id,

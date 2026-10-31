@@ -19,7 +19,7 @@ pub(crate) async fn persist_ticks(
     let (mut transaction, write_set) = job_write_set(
         transaction,
         trigger.snapshot_id,
-        (trigger.location_id, &trigger.target, &trigger.job_key),
+        &trigger.job_json.selection,
     )
     .await?;
     for action in &plan.actions {
@@ -44,7 +44,7 @@ pub(crate) async fn persist_ticks(
                 target: trigger.target.clone(),
                 snapshot_id: trigger.snapshot_id,
                 image_id: trigger.image_id.clone(),
-                kind: RunKind::Job,
+                kind: trigger.run_kind,
                 origin: RunOrigin::Schedule,
                 job_key: Some(trigger.job_key.clone()),
                 parent_run_id: None,
@@ -55,7 +55,11 @@ pub(crate) async fn persist_ticks(
                 requested_by: "system:scheduler".into(),
                 priority: 0,
                 selection: trigger.job_json.selection.clone(),
-                write_set: write_set.clone(),
+                write_set: if trigger.run_kind == RunKind::Group {
+                    Default::default()
+                } else {
+                    write_set.clone()
+                },
                 settings: trigger.job_json.settings.clone(),
                 concurrency_groups: trigger.job_json.concurrency_groups.clone(),
                 overlap: trigger.job_json.overlap,

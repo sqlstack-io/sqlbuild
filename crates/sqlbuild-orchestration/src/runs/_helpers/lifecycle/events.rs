@@ -1,4 +1,4 @@
-//! All orchestration transitions share Recall's invocation sequence and transaction.
+//! Lifecycle facts share Recall's invocation sequence and transaction.
 
 use serde_json::Value;
 use uuid::Uuid;

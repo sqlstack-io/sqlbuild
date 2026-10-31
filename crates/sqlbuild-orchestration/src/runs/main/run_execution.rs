@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use uuid::Uuid;
 
+use crate::runs::_helpers::groups::selection::skipped_nodes;
 use crate::runs::models::{ExecutionMetadata, RunClaim, RunExecution};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -45,6 +46,7 @@ pub async fn run_execution(
             Ok((fields["node_key"].clone(), fields["node_hash"].clone()))
         })
         .collect::<Result<_, ControlError>>()?;
+    let (transaction, skipped_nodes) = skipped_nodes(transaction, &metadata.request_json).await?;
     commit(transaction).await?;
     Ok(Some(RunExecution {
         claim: RunClaim {
@@ -54,5 +56,6 @@ pub async fn run_execution(
         environment_hash: metadata.environment_hash,
         sqb_version: metadata.sqb_version,
         node_hashes,
+        skipped_nodes,
     }))
 }

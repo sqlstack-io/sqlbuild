@@ -555,6 +555,29 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             expected_jobs=("daily", "staging"),
         ),
         SnapshotDiscoveryTestCase(
+            description="group-only references retain lineage and explicit waits",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job, job_group\n"
+                    "def factory():\n"
+                    "    staging = job('staging', description='Stage orders.', select='stg_orders')\n"
+                    "    marts = job('marts', description='Build orders.', select='orders')\n"
+                    "    inventory = job('inventory', description='Repeat staging.', select='stg_orders')\n"
+                    "    return job_group('daily', description='Ordered jobs.', "
+                    "jobs=[marts, inventory, staging], after={inventory: [staging]})\n"
+                    "daily = factory()\n"
+                ),
+            },
+            expected_jobs=("inventory", "marts", "staging"),
+            expected_groups={
+                "daily": {
+                    "inventory": ["staging"],
+                    "marts": ["inventory", "staging"],
+                    "staging": [],
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="explicit empty declarations do not execute project files",
             files={"orchestration/jobs.py": "raise RuntimeError('must not import')\n"},
             expected_jobs=(),
@@ -570,7 +593,16 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "MODEL (", "MODEL (tags ['edge_case'],", 1
                 ),
             },
-            expected_jobs=("edge_snapshot_orders",),
+            expected_jobs=(
+                "edge_snapshot_inventory",
+                "edge_snapshot_orders",
+                "edge_snapshot_products",
+            ),
+            expected_groups={
+                "edge_snapshot_group": {"edge_snapshot_orders": []},
+                "edge_inventory_group": {"edge_snapshot_inventory": []},
+                "edge_products_group": {"edge_snapshot_products": []},
+            },
         ),
         SnapshotDiscoveryTestCase(
             description="a project without declarations has no job document",
@@ -598,6 +630,10 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         ).to_json()
     )
     assert tuple(publication["documents"].get("jobs", {})) == test_case.expected_jobs
+    assert {
+        name: definition["jobs"]
+        for name, definition in publication["documents"].get("groups", {}).items()
+    } == test_case.expected_groups
     for definition in publication["documents"].get("jobs", {}).values():
         assert set(definition["selection"]) <= publication["nodes"].keys()
 
@@ -605,6 +641,44 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
 @pytest.mark.parametrize(
     "test_case",
     [
+        SnapshotDiscoveryRejectionTestCase(
+            description="group members are jobs, not nested groups",
+            files={
+                "orchestration/jobs.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/nested_groups.py"
+                ).read_text(),
+            },
+            expected_error=TypeError,
+            expected_message="group members must be Job objects",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="explicit group cycles cannot publish",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job, job_group\n"
+                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
+                    "marts = job('marts', description='Build orders.', select='orders')\n"
+                    "daily = job_group('daily', description='Cyclic jobs.', "
+                    "jobs=[marts, staging], after={staging: [marts]})\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message="group dependencies contain a cycle",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="group waits cannot refer to nonmember jobs",
+            files={
+                "orchestration/jobs.py": (
+                    "from sqlbuild.orchestration import job, job_group\n"
+                    "staging = job('staging', description='Stage orders.', select='stg_orders')\n"
+                    "marts = job('marts', description='Build orders.', select='orders')\n"
+                    "daily = job_group('daily', description='Unknown upstream.', "
+                    "jobs=[marts], after={marts: [staging]})\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message="group needs known jobs and dependencies within its membership",
+        ),
         SnapshotDiscoveryRejectionTestCase(
             description="distinct objects cannot share a job name",
             files={

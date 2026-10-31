@@ -1,4 +1,4 @@
-//! Updating one node adjusts bounded status counters instead of rescanning every node per event.
+//! Node lifecycle projections adjust bounded counters instead of rescanning nodes per event.
 
 use std::collections::BTreeMap;
 

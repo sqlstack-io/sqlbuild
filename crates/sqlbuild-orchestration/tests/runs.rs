@@ -1,3 +1,5 @@
+#[path = "runs/claims/helpers.rs"]
+mod claim_helpers;
 #[path = "store/faults/helpers.rs"]
 mod fault_helpers;
 #[path = "store/faults/test_types.rs"]
@@ -24,11 +26,17 @@ mod test_claims;
 mod test_coalesce;
 #[path = "runs/test_faults.rs"]
 mod test_faults;
+#[path = "runs/test_group_admission.rs"]
+mod test_group_admission;
+#[path = "runs/test_groups.rs"]
+mod test_groups;
 #[path = "runs/test_lifecycle.rs"]
 mod test_lifecycle;
 #[path = "runs/test_monitor.rs"]
 mod test_monitor;
 #[path = "runs/test_requests.rs"]
 mod test_requests;
+#[path = "runs/test_reruns.rs"]
+mod test_reruns;
 #[path = "runs/test_types.rs"]
 mod test_types;

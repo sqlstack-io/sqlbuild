@@ -50,6 +50,14 @@ pub struct JobDefinition {
     pub concurrency_groups: BTreeSet<String>,
 }
 
+/// A virtual parent shares run controls, but only its physical children claim node writers.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GroupDefinition {
+    #[serde(flatten)]
+    pub job: JobDefinition,
+    pub jobs: BTreeMap<String, BTreeSet<String>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Schedule {
@@ -80,6 +88,7 @@ pub struct TriggerDefinition {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Definitions {
     pub jobs: BTreeMap<String, JobDefinition>,
+    pub groups: BTreeMap<String, GroupDefinition>,
     pub triggers: BTreeMap<String, TriggerDefinition>,
 }
 

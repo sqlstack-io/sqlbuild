@@ -11,6 +11,7 @@ use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
+use crate::claim_helpers::succeed;
 use crate::helpers::{queue, request, snapshot};
 use crate::location_helpers::create_location;
 use crate::replica_helpers::second_store;
@@ -435,6 +436,98 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 "claim scan exceeded five seconds: {}",
                 test_case.description
             );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_blocked_multi_limit_waiter_when_younger_work_arrives_then_shared_limits_drain_without_blocking_unrelated_work()
+ {
+    let test_cases = [
+        GroupLimitTestCase {
+            description: "SQLite protects priority across atomic limit sets",
+            backend: Backend::Sqlite,
+            expected_unblocked_run: 4,
+        },
+        GroupLimitTestCase {
+            description: "PostgreSQL protects priority across atomic limit sets",
+            backend: Backend::Postgres,
+            expected_unblocked_run: 4,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let published = publish_snapshot(store, &snapshot(location))
+                .await
+                .expect("snapshot");
+            let scope = (location, published.snapshot_id);
+            for (id, priority, nodes, groups) in [
+                (1, 100, &["inventory"][..], &["inventory_limit"][..]),
+                (
+                    2,
+                    10,
+                    &["orders"][..],
+                    &["orders_limit", "inventory_limit"][..],
+                ),
+                (3, 1, &["customers"][..], &["orders_limit"][..]),
+                (4, 0, &["products"][..], &[][..]),
+            ] {
+                let mut input = request(scope, id, priority, nodes);
+                input.concurrency_groups = groups.iter().map(|key| (*key).into()).collect();
+                queue(store, &input).await;
+            }
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::from([
+                ("orders_limit".into(), NonZeroU32::new(1).expect("one")),
+                ("inventory_limit".into(), NonZeroU32::new(1).expect("one")),
+            ]);
+            let blocker = claim_next_run(store, &lease, &limits, None)
+                .await
+                .expect("claim")
+                .expect("highest priority");
+            assert_eq!(blocker.request.run_id, Uuid::from_u128(1));
+            let unrelated = claim_next_run(store, &lease, &limits, None)
+                .await
+                .expect("claim")
+                .expect("unrelated");
+            assert_eq!(
+                unrelated.request.run_id,
+                Uuid::from_u128(test_case.expected_unblocked_run),
+                "{}",
+                test_case.description
+            );
+            assert!(
+                claim_next_run(store, &lease, &limits, None)
+                    .await
+                    .expect("wait")
+                    .is_none()
+            );
+            succeed(store, &blocker).await;
+            let protected = claim_next_run(store, &lease, &limits, None)
+                .await
+                .expect("claim")
+                .expect("older waiter");
+            assert_eq!(protected.request.run_id, Uuid::from_u128(2));
+            succeed(store, &protected).await;
+            let younger = claim_next_run(store, &lease, &limits, None)
+                .await
+                .expect("claim")
+                .expect("younger retry");
+            assert_eq!(younger.request.run_id, Uuid::from_u128(3));
+            succeed(store, &younger).await;
+            succeed(store, &unrelated).await;
             close_test_store(fixture).await;
         });
     }

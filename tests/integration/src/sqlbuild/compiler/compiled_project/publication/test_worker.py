@@ -5,11 +5,13 @@ import os
 import signal
 import sqlite3
 import time
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+import duckdb
 import pytest
 
 from sqlbuild._native import (
@@ -26,6 +28,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
+    GroupExecutionTestCase,
     SnapshotWorkerTestCase,
     WorkerExecutionTestCase,
 )
@@ -35,9 +38,218 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     scheduled_worker,
     snapshot_api,
     wait_for_log,
+    wait_for_run,
     worker_result,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        GroupExecutionTestCase(
+            "group execution preserves independent downstream work",
+            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "SELECT amount FROM orders",
+            "partial",
+            [(11,)],
+            expected_child_statuses={"staging": ("partial",), "marts": ("partial",)},
+        ),
+        GroupExecutionTestCase(
+            "successful jobs honor compiled boundaries",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM totals",
+            "success",
+            [(17,)],
+            expected_child_statuses={"staging": ("success",), "marts": ("success",)},
+            expected_totals=("success", None),
+        ),
+        GroupExecutionTestCase(
+            "whole downstream job is blocked without building an empty selection",
+            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
+            "partial",
+            [(0,)],
+            on_failure="skip_downstream_jobs",
+            expected_child_statuses={"staging": ("partial",), "marts": ("failed",)},
+        ),
+        GroupExecutionTestCase(
+            "job failure stops the group",
+            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
+            "failed",
+            [(0,)],
+            on_failure="stop_group",
+            expected_child_statuses={"staging": ("partial", "cancelled"), "marts": ("cancelled",)},
+            expected_totals=("cancelled", None),
+            expected_marts_started=False,
+        ),
+        GroupExecutionTestCase(
+            "critical node stops the group under the default policy",
+            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
+            "failed",
+            [(0,)],
+            expected_child_statuses={"staging": ("partial", "cancelled"), "marts": ("cancelled",)},
+            expected_totals=("cancelled", None),
+            expected_marts_started=False,
+            files={
+                "models/broken_orders.sql": (
+                    "MODEL (description 'Critical orders.', materialized table, critical true);\n"
+                    "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)\n"
+                ),
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_failure_policy_hold(
+    test_case: GroupExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_dir: Path = tmp_path / "project"
+    project_dir.mkdir()
+    with duckdb.connect(str(project_dir / "warehouse.duckdb")) as warehouse:
+        warehouse.execute("CREATE TABLE broken_orders AS SELECT 99 AS amount")
+    test_case = replace(
+        test_case,
+        files={
+            "models/orders.sql": (
+                "MODEL (description 'Independent orders.', materialized table);\n"
+                'SELECT amount FROM __ref("stg_orders")\n'
+            ),
+            "models/stg_orders.sql": (
+                "MODEL (description 'Staged orders.', materialized table);\nSELECT 11 AS amount\n"
+            ),
+            "models/broken_orders.sql": (
+                "MODEL (description 'Source values.', materialized table);\n" + test_case.model_sql
+            ),
+            "models/totals.sql": (
+                "MODEL (description 'Dependent totals.', materialized table);\n"
+                'SELECT amount FROM __ref("broken_orders")\n'
+            ),
+            "orchestration/orders.py": (
+                "from sqlbuild.orchestration import job, job_group, schedule\n"
+                'staging = job("staging", description="Stage orders.", '
+                f'select="stg_orders broken_orders", on_failure="{test_case.on_failure}")\n'
+                'marts = job("marts", description="Build independent marts.", select="orders totals")\n'
+                'annual_orders = job_group("annual_orders", description="Stage then build marts.", '
+                "jobs=[marts, staging], "
+                'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
+                'starts_at="2000-01-01T00:00:00Z"))\n'
+            ),
+        }
+        | test_case.files,
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        parent: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert parent["status"] == test_case.expected_status, worker.log.read_text()
+        request: Request = Request(
+            f"{worker.api.url}/api/locations/{worker.api.location_id}/targets/development/runs",
+            headers={"Authorization": f"Bearer {worker.api.bearer}"},
+        )
+        with urlopen(request, timeout=5) as response:
+            runs: dict[str, Any] = {run["job_key"]: run for run in json.load(response)}
+        assert set(runs) == {"annual_orders", *test_case.expected_child_statuses}
+        assert all(
+            runs[name]["status"] in statuses
+            for name, statuses in test_case.expected_child_statuses.items()
+        )
+        assert (runs["marts"]["started_at"] is not None) == test_case.expected_marts_started
+        assert runs["staging"]["ended_at"] <= (
+            runs["marts"]["started_at"] or runs["staging"]["ended_at"]
+        )
+        with sqlite3.connect(worker.control_store) as control:
+            assert (
+                control.execute(
+                    "SELECT parent_run_id, root_run_id FROM sqb_runs WHERE kind='job' ORDER BY job_key"
+                ).fetchall()
+                == [(runs["annual_orders"]["run_id"],) * 2] * 2
+            )
+            assert (
+                control.execute(
+                    "SELECT status, skipped_because_of FROM sqb_run_nodes WHERE run_id=? AND node_key='model:totals'",
+                    (runs["marts"]["run_id"],),
+                ).fetchone()
+                == test_case.expected_totals
+            )
+            assert control.execute(
+                "SELECT status FROM sqb_run_nodes WHERE run_id=? AND node_key='model:broken_orders'",
+                (runs["staging"]["run_id"],),
+            ).fetchone() == ({"success": "success"}.get(test_case.expected_status, "failed"),)
+            assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
+            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+        with duckdb.connect(str(project_dir / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            description="opposing parent and independent child limits",
+            model_sql="SELECT 11 AS amount",
+            warehouse_query="SELECT amount FROM orders UNION ALL SELECT amount FROM inventory ORDER BY amount",
+            expected_status="success",
+            expected_rows=[(11,), (23,)],
+            concurrency_limits={"orders_limit": 1, "inventory_limit": 1},
+            files={
+                "models/inventory.sql": (
+                    "MODEL (description 'Inventory.', materialized table);\nSELECT 23 AS amount\n"
+                ),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, job_group, schedule\n"
+                    "orders = job('orders_job', description='Build orders.', select='orders', "
+                    "concurrency_groups=('inventory_limit',))\n"
+                    "inventory = job('inventory_job', description='Build inventory.', select='inventory', "
+                    "concurrency_groups=('orders_limit',))\n"
+                    "annual_orders = job_group('annual_orders', description='Orders group.', jobs=[orders], "
+                    "concurrency_groups=('orders_limit',), "
+                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "annual_inventory = job_group('annual_inventory', description='Inventory group.', "
+                    "jobs=[inventory], concurrency_groups=('inventory_limit',), "
+                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                ),
+            },
+            store_setup=(
+                "CREATE TABLE test_slot_claims (run_id TEXT, group_key TEXT, occupied INTEGER);\n"
+                "CREATE TRIGGER test_observe_slots AFTER INSERT ON sqb_concurrency_slots BEGIN "
+                "INSERT INTO test_slot_claims SELECT NEW.run_id, NEW.group_key, count(*) "
+                "FROM sqb_concurrency_slots WHERE group_key=NEW.group_key; END;\n"
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_opposing_group_limits_when_scheduled_then_both_real_workers_finish_without_hoisting_limits(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        orders: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        inventory: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_inventory"
+        )
+        assert orders["status"] == inventory["status"] == "success", worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            assert control.execute(
+                "SELECT r.job_key, c.group_key, max(c.occupied) FROM test_slot_claims c "
+                "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key ORDER BY r.job_key"
+            ).fetchall() == [
+                ("annual_inventory", "inventory_limit", 1),
+                ("annual_orders", "orders_limit", 1),
+                ("inventory_job", "orders_limit", 1),
+                ("orders_job", "inventory_limit", 1),
+            ]
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE status='success'"
+            ).fetchone() == (4,)
+            assert control.execute("SELECT count(*) FROM sqb_concurrency_slots").fetchone() == (0,)
+            assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
 
 @pytest.mark.parametrize(
@@ -168,6 +380,27 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             [(23,)],
         ),
         WorkerExecutionTestCase(
+            "authored variables and reload use ordinary build argument conversion",
+            "SELECT @@batch AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(23,)],
+            files={
+                "sqlbuild_project.toml": (
+                    'name = "orders"\nadapter = "duckdb"\n[vars]\nbatch = "3"\n'
+                    '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                    '[targets.development]\nschema = "main"\n'
+                ),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, schedule\n"
+                    "annual_orders = job('annual_orders', select='orders', description='Build orders.', "
+                    "settings={'vars': {'batch': 23}, 'reload': True, 'run_tests': False}, "
+                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', "
+                    "starts_at='2000-01-01T00:00:00Z'))\n"
+                ),
+            },
+        ),
+        WorkerExecutionTestCase(
             "warehouse error retains failed node evidence",
             "SELECT CAST(value AS BIGINT) AS amount FROM (VALUES ('invalid')) t(value)",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
@@ -233,6 +466,68 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
         cancel_running_statement(worker)
         run: dict[str, Any] = worker_result(worker, test_case)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "parent cancellation interrupts its active child and cancels its waiting child",
+            "SELECT sum(sin(value)) AS amount FROM range(10000000000) t(value)",
+            "SELECT count(*) FROM duckdb_tables() WHERE table_name IN ('orders','totals')",
+            "cancelled",
+            [(0,)],
+            files={
+                "models/totals.sql": (
+                    "MODEL (description 'Downstream totals.', materialized table);\n"
+                    'SELECT amount FROM __ref("orders")\n'
+                ),
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, job_group, schedule\n"
+                    "orders = job('orders', description='Long query.', select='orders')\n"
+                    "totals = job('totals', description='Waiting query.', select='totals')\n"
+                    "annual_orders = job_group('annual_orders', description='Cancellable group.', "
+                    "jobs=[totals, orders], schedule=schedule(cron='0 0 1 1 *', timezone='UTC', "
+                    "starts_at='2000-01-01T00:00:00Z'))\n"
+                ),
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_before_parent_completion(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        parent: dict[str, Any] = wait_for_run(
+            worker.api,
+            worker.process,
+            worker.log,
+            pending=frozenset({"queued"}),
+            job_key="annual_orders",
+        )
+        assert parent["status"] == "running", worker.log.read_text()
+        cancel_running_statement(worker, job_key="orders", run_id=parent["run_id"])
+        completed: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert completed["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            assert control.execute(
+                "SELECT job_key, status FROM sqb_runs ORDER BY job_key"
+            ).fetchall() == [
+                ("annual_orders", "cancelled"),
+                ("orders", "cancelled"),
+                ("totals", "cancelled"),
+            ]
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE parent_run_id=? AND ended_at>?",
+                (parent["run_id"], completed["ended_at"]),
+            ).fetchone() == (0,)
+            assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
+            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
 
 @pytest.mark.parametrize(

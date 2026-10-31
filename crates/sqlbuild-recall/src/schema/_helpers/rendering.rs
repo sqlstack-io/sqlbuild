@@ -68,6 +68,22 @@ pub(crate) fn clickhouse_ttl(spec: &TableSpec, options: &DdlOptions) -> String {
     format!("{} + INTERVAL {days} DAY", spec.expiry_column)
 }
 
+pub(crate) fn json_field(postgres: bool, (column, path): (&str, &str), cast: &str) -> String {
+    if postgres {
+        format!("({column} #>> '{{{}}}'){cast}", path.replace('.', ","))
+    } else {
+        format!("json_extract({column}, '$.{path}')")
+    }
+}
+
+pub(crate) fn relational_cast(postgres: bool, (expression, kind): (&str, &str)) -> String {
+    if postgres {
+        format!("CAST({expression} AS {kind})")
+    } else {
+        expression.into()
+    }
+}
+
 /// The engine clause, replicated with one shard and every replica on a cluster.
 pub(crate) fn clickhouse_engine(spec: &TableSpec, options: &DdlOptions) -> String {
     let version: &str = spec.clickhouse_version.unwrap_or_default();

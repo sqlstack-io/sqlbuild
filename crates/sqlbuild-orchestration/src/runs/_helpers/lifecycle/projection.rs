@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
-use crate::runs::_helpers::nodes::project_node;
+use crate::runs::_helpers::lifecycle::nodes::project_node;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;

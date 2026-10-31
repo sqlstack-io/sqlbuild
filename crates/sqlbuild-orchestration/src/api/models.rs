@@ -15,6 +15,7 @@ use crate::api::_helpers::{
     location_work::result,
     snapshots::publish,
     snapshots::current,
+    snapshots::metadata,
     runs::execution,
     runs::report,
     runs::heartbeat,

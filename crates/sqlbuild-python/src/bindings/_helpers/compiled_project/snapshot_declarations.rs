@@ -14,9 +14,10 @@ use sqlbuild_core::constants::PYTHON_INIT_MODULE_STEM;
 use sqlbuild_discovery::constants::{ORCHESTRATION_DIRECTORY, PYTHON_FILE_SUFFIX};
 use sqlbuild_discovery::tree::main::rglob::rglob;
 use sqlbuild_discovery::tree::models::ProjectTree;
+use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    JobDefinition, OnFailure, Schedule, TriggerDefinition,
+    GroupDefinition, JobDefinition, OnFailure, Schedule, TriggerDefinition,
 };
 use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
@@ -83,23 +84,79 @@ pub(crate) struct AuthoredJob {
     targets: Vec<String>,
 }
 
+#[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
+struct AuthoredJobReference {
+    name: String,
+}
+
+#[derive(FromPyObject)]
+pub(crate) struct AuthoredGroup {
+    name: String,
+    description: String,
+    jobs: Vec<AuthoredJobReference>,
+    after: BTreeMap<AuthoredJobReference, Vec<AuthoredJobReference>>,
+    overlap: String,
+    concurrency_groups: Vec<String>,
+    schedule: Option<AuthoredSchedule>,
+    targets: Vec<String>,
+}
+
+#[derive(FromPyObject)]
+pub(crate) enum AuthoredDeclaration {
+    Job(AuthoredJob),
+    Group(AuthoredGroup),
+}
+
+impl AuthoredSchedule {
+    fn compile(self, name: &str, description: &str) -> PyResult<TriggerDefinition> {
+        let catch_up = if self.max_catch_up.is_null() {
+            Value::String(self.catch_up)
+        } else {
+            serde_json::json!({self.catch_up: {"max_runs": self.max_catch_up}})
+        };
+        Ok(TriggerDefinition {
+            description: description.into(),
+            job_key: name.into(),
+            schedule: Schedule::Cron { expression: self.cron, timezone: self.timezone },
+            starts_at: serde_json::from_value(self.starts_at)
+                .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
+            default_status: serde_json::from_value(Value::String(self.default_status))
+                .map_err(|error| PyValueError::new_err(format!("default_status: {error}")))?,
+            catch_up: serde_json::from_value(catch_up).map_err(|error| PyValueError::new_err(format!(
+                "catch_up: {error}; use 'latest' without a bound or 'all' with a positive max_catch_up"
+            )))?,
+        })
+    }
+}
+
 pub(crate) fn compile_declarations(
     mut input: SnapshotInput,
     graph: &ProjectGraph,
-    declarations: Vec<AuthoredJob>,
+    declarations: Vec<AuthoredDeclaration>,
 ) -> PyResult<SnapshotInput> {
     if declarations.is_empty() {
         return Ok(input);
     }
-    if input.documents.contains_key("jobs") || input.documents.contains_key("triggers") {
+    if ["jobs", "groups", "triggers"]
+        .iter()
+        .any(|key| input.documents.contains_key(*key))
+    {
         return Err(PyValueError::new_err(
             "authored declarations cannot overwrite snapshot job or trigger documents",
         ));
     }
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
+    let mut authored_groups: Vec<AuthoredGroup> = Vec::new();
+    let mut authored_jobs: Vec<AuthoredJob> = Vec::new();
+    for declaration in declarations {
+        match declaration {
+            AuthoredDeclaration::Job(job) => authored_jobs.push(job),
+            AuthoredDeclaration::Group(group) => authored_groups.push(group),
+        }
+    }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
     let mut names: BTreeSet<String> = BTreeSet::new();
-    for job in declarations {
+    for job in authored_jobs {
         if !names.insert(job.name.clone()) {
             return Err(PyValueError::new_err(format!("duplicate job {}", job.name)));
         }
@@ -134,31 +191,9 @@ pub(crate) fn compile_declarations(
                 .map(|(kind, name)| format!("{kind}:{name}"))
                 .collect();
         if let Some(schedule) = job.schedule {
-            let catch_up = if schedule.max_catch_up.is_null() {
-                Value::String(schedule.catch_up)
-            } else {
-                serde_json::json!({schedule.catch_up: {"max_runs": schedule.max_catch_up}})
-            };
             triggers.insert(
                 job.name.clone(),
-                TriggerDefinition {
-                    description: job.description.clone(),
-                    job_key: job.name.clone(),
-                    schedule: Schedule::Cron {
-                        expression: schedule.cron,
-                        timezone: schedule.timezone,
-                    },
-                    starts_at: serde_json::from_value(schedule.starts_at)
-                        .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
-                    default_status: serde_json::from_value(Value::String(schedule.default_status))
-                        .map_err(|error| {
-                            PyValueError::new_err(format!("default_status: {error}"))
-                        })?,
-                    catch_up: serde_json::from_value(catch_up)
-                        .map_err(|error| PyValueError::new_err(format!(
-                            "catch_up: {error}; use 'latest' without a bound or 'all' with a positive max_catch_up"
-                        )))?,
-                },
+                schedule.compile(&job.name, &job.description)?,
             );
         }
         jobs.insert(
@@ -175,8 +210,62 @@ pub(crate) fn compile_declarations(
             },
         );
     }
+    let mut groups: BTreeMap<String, GroupDefinition> = BTreeMap::new();
+    for group in authored_groups {
+        if !names.insert(group.name.clone()) {
+            return Err(PyValueError::new_err(format!(
+                "duplicate job or group {}",
+                group.name
+            )));
+        }
+        if !group.targets.is_empty() && !group.targets.contains(&input.target) {
+            continue;
+        }
+        let members: BTreeSet<String> = group.jobs.iter().map(|job| job.name.clone()).collect();
+        if members.len() != group.jobs.len() {
+            return Err(PyValueError::new_err("group members must be distinct"));
+        }
+        let mut after: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for (job, dependencies) in group.after {
+            after.insert(
+                job.name,
+                dependencies
+                    .into_iter()
+                    .map(|dependency| dependency.name)
+                    .collect(),
+            );
+        }
+        let dependencies = group_dependencies(&input, &jobs, (&members, &after))
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let selection: BTreeSet<String> = members
+            .iter()
+            .flat_map(|name| jobs[name].selection.iter().cloned())
+            .collect();
+        if let Some(schedule) = group.schedule {
+            triggers.insert(
+                group.name.clone(),
+                schedule.compile(&group.name, &group.description)?,
+            );
+        }
+        groups.insert(
+            group.name,
+            GroupDefinition {
+                job: JobDefinition {
+                    description: group.description,
+                    selection,
+                    settings: BTreeMap::new(),
+                    overlap: serde_json::from_value(Value::String(group.overlap))
+                        .map_err(|error| PyValueError::new_err(error.to_string()))?,
+                    on_failure: OnFailure::SkipDependents,
+                    concurrency_groups: group.concurrency_groups.into_iter().collect(),
+                },
+                jobs: dependencies,
+            },
+        );
+    }
     for (key, document) in [
         ("jobs", serde_json::to_value(jobs)),
+        ("groups", serde_json::to_value(groups)),
         ("triggers", serde_json::to_value(triggers)),
     ] {
         input.documents.insert(

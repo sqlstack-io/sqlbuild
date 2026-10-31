@@ -2,7 +2,7 @@
 
 use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
-use crate::schema::_helpers::postgres_views::postgres_view_bodies;
+use crate::schema::_helpers::relational_views::relational_view_bodies;
 use crate::schema::main::view_statements::view_statements;
 use crate::schema::models::{DdlOptions, Dialect};
 
@@ -10,7 +10,7 @@ use crate::schema::models::{DdlOptions, Dialect};
 #[must_use]
 pub fn control_view_statements(postgres: bool) -> Vec<String> {
     if postgres {
-        postgres_view_bodies()
+        relational_view_bodies(true)
             .into_iter()
             .map(|(name, body)| {
                 format!(

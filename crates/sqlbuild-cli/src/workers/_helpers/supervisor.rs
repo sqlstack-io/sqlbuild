@@ -7,11 +7,12 @@ use std::time::{Duration, Instant};
 use chrono::{TimeDelta, Utc};
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
+use sqlbuild_orchestration::runs::main::advance_groups::advance_groups;
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::runs::main::observe_run::observe_run;
 use sqlbuild_orchestration::runs::models::{
-    RunAuthority, RunChange, RunChangeRequest, RunClaim, RunOutcome, RunStatus,
+    RunAuthority, RunChange, RunChangeRequest, RunClaim, RunDispatch, RunOutcome, RunStatus,
 };
 use sqlbuild_orchestration::scheduler::constants::RENEW_INTERVAL_SECONDS;
 use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
@@ -33,6 +34,22 @@ impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
         lease: Option<&SchedulerLease>,
     ) -> Result<(), ControlError> {
         if let Some(lease) = lease {
+            let eligible = self.configuration.dispatch_scopes();
+            for location in self.configuration.locations() {
+                let scope = location.scope();
+                advance_groups(
+                    store,
+                    lease,
+                    (
+                        &self.configuration.concurrency_limits,
+                        RunDispatch {
+                            scope: Some((scope.location_id, scope.target)),
+                            eligible: Some(&eligible),
+                        },
+                    ),
+                )
+                .await?;
+            }
             self.recover(store, lease).await?;
         }
         let mut renewed = Instant::now();
@@ -125,6 +142,7 @@ impl Workers {
         lease: &SchedulerLease,
     ) -> Result<(), ControlError> {
         let mut renewed = Instant::now();
+        let eligible = self.configuration.dispatch_scopes();
         for location in self.configuration.locations() {
             let scope = location.scope();
             let running = self
@@ -144,7 +162,10 @@ impl Workers {
                     store,
                     lease,
                     &self.configuration.concurrency_limits,
-                    Some((scope.location_id, scope.target)),
+                    RunDispatch {
+                        scope: Some((scope.location_id, scope.target)),
+                        eligible: Some(&eligible),
+                    },
                 )
                 .await?
                 else {

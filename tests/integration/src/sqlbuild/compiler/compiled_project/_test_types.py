@@ -252,6 +252,7 @@ class SnapshotDiscoveryTestCase:
     files: dict[str, str]
     expected_jobs: tuple[str, ...]
     declarations: tuple[()] | None = None
+    expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

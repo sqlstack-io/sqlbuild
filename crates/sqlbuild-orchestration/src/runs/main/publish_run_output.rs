@@ -3,7 +3,7 @@
 use sqlbuild_recall::records::models::OutputChunk;
 use uuid::Uuid;
 
-use crate::runs::_helpers::output::{claim_envelope, output_rows};
+use crate::runs::_helpers::lifecycle::output::{claim_envelope, output_rows};
 use crate::runs::models::OutputPublication;
 use crate::store::errors::ControlError;
 use crate::store::main::append_recall::append_recall;

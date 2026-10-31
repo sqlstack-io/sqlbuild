@@ -3,8 +3,10 @@
 use serde_json::json;
 
 use crate::credentials::main::append_audit::append_audit;
-use crate::runs::_helpers::changes::{validate_authority, validate_change, validate_retry};
-use crate::runs::_helpers::publish_change::publish_change;
+use crate::runs::_helpers::lifecycle::changes::{
+    validate_authority, validate_change, validate_retry,
+};
+use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{ChangingRun, RunAuthority, RunChange, RunChangeRequest};
 use crate::scheduler::main::check_lease::check_lease;
 use crate::store::errors::ControlError;

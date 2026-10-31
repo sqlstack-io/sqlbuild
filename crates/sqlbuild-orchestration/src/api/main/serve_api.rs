@@ -38,6 +38,10 @@ pub async fn serve_api(
             get(snapshots::current).post(snapshots::publish),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/snapshots/metadata",
+            get(snapshots::metadata),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/runs",
             get(run_reads::recent),
         )
