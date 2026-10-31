@@ -1,7 +1,10 @@
 //! Create a server-owned location identity independent of its mutable label.
 
+use serde_json::json;
 use uuid::Uuid;
 
+use crate::credentials::_helpers::audit::audit;
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -12,19 +15,30 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 pub async fn create_location(
     store: &ControlStore,
     name: &str,
-    actor: &str,
+    context: &AuditContext,
 ) -> Result<Uuid, ControlError> {
-    if name.trim().is_empty() || actor.trim().is_empty() {
-        return Err(ControlError::Invalid(
-            "location name and actor are required".into(),
-        ));
+    if name.trim().is_empty() {
+        return Err(ControlError::Invalid("location name is required".into()));
     }
     let mut transaction = begin(store, TransactionMode::Write).await?;
     let id = Uuid::now_v7();
     let now = transaction.now;
     (transaction, _) = query(transaction,
         "INSERT INTO sqb_locations (location_id, name, created_by, created_at) VALUES ($1, $2, $3, $4)",
-        vec![Parameter::Id(id), Parameter::Text(name.into()), Parameter::Text(actor.into()), Parameter::Time(now)]).await?;
-    commit(transaction).await?;
+        vec![Parameter::Id(id), Parameter::Text(name.into()), Parameter::Text(context.actor.clone()), Parameter::Time(now)]).await?;
+    commit(
+        audit(
+            transaction,
+            context,
+            (Uuid::new_v5(&id, b"created"), "location.created"),
+            (
+                json!({"location_id": id}),
+                json!(null),
+                json!({"name": name}),
+            ),
+        )
+        .await?,
+    )
+    .await?;
     Ok(id)
 }

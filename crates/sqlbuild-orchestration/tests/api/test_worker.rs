@@ -15,7 +15,6 @@ use sqlbuild_orchestration::runs::models::{
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::worker::errors::WorkerError;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
@@ -23,6 +22,7 @@ use sqlbuild_orchestration::worker::main::start_worker::start_worker;
 use uuid::Uuid;
 
 use crate::helpers::{start_api, stop_api};
+use crate::location_helpers::create_location;
 use crate::output_helpers::{chunk, output_contract};
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};

@@ -3,7 +3,9 @@
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::store::errors::ControlError;
+use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
@@ -15,7 +17,8 @@ use crate::native_commands::constants::{
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::{
-    CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions, SkillsOptions,
+    ControlAdmin, CostOptions, NativeCommand, NativeInvocation, RulesAction, RulesOptions,
+    SkillsOptions,
 };
 use sqlbuild_core::cost_command::constants::DESCENDING_ORDER;
 
@@ -37,6 +40,37 @@ pub(crate) fn text(namespace: &Namespace, name: &str) -> Option<String> {
 
 pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
     namespace.get(name) == Some(&Value::Bool(true))
+}
+
+pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, ControlError> {
+    let value = text(namespace, "admin_subject").unwrap_or_default();
+    if text(namespace, "admin_command").as_deref() == Some("create-location") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("location name is required".into()));
+        }
+        return Ok(ControlAdmin::CreateLocation(value));
+    }
+    let id = Uuid::parse_str(&value)
+        .map_err(|_| ControlError::Invalid("a valid location or token UUID is required".into()))?;
+    match text(namespace, "admin_command").as_deref() {
+        Some("issue-location-token") => {
+            let expiry = DateTime::parse_from_rfc3339(
+                &text(namespace, "admin_expires_at").unwrap_or_default(),
+            )
+            .map_err(|_| ControlError::Invalid("--expires-at must be an RFC3339 timestamp".into()))?
+            .with_timezone(&Utc);
+            if expiry <= Utc::now() {
+                return Err(ControlError::Invalid(
+                    "token expiry must be in the future".into(),
+                ));
+            }
+            Ok(ControlAdmin::IssueLocationToken(id, expiry))
+        }
+        Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
+        _ => Err(ControlError::Invalid(
+            "an administration command is required".into(),
+        )),
+    }
 }
 
 pub(crate) fn control_address(

@@ -6,6 +6,8 @@ mod fault_types;
 mod helpers;
 #[path = "store/leases/helpers.rs"]
 mod lease_helpers;
+#[path = "credentials/locations/helpers.rs"]
+mod location_helpers;
 #[path = "store/replicas/helpers.rs"]
 mod replica_helpers;
 #[path = "store/helpers.rs"]

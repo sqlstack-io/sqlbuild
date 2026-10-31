@@ -6,12 +6,12 @@ use sqlbuild_orchestration::runs::main::list_runs::list_runs;
 use sqlbuild_orchestration::runs::models::RunStatus;
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
 
 use crate::helpers::{queue, request, snapshot};
+use crate::location_helpers::create_location;
 use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;

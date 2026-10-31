@@ -43,6 +43,7 @@ pub(crate) const INIT_COMMAND: &str = "init";
 pub(crate) const SKILLS_COMMAND: &str = "skills";
 pub(crate) const SERVER_COMMAND: &str = "server";
 pub(crate) const SCHEDULER_COMMAND: &str = "scheduler";
+pub(crate) const ADMIN_COMMAND: &str = "admin";
 pub(crate) const RULES_COMMAND: &str = "rules";
 pub(crate) const RULES_LIST_ACTION: &str = "list";
 pub(crate) const RULES_SHOW_ACTION: &str = "show";

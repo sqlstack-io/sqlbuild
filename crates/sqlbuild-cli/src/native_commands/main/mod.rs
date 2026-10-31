@@ -1,4 +1,5 @@
 pub(super) mod _cost_report_options;
+pub(super) mod _run_admin;
 pub(super) mod _run_control;
 pub(super) mod _run_cost;
 pub(crate) mod parse_native_invocation;

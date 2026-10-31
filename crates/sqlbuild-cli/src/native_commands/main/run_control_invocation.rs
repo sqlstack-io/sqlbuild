@@ -5,12 +5,16 @@ use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{flag, text};
 use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
-use crate::native_commands::constants::{SCHEDULER_COMMAND, SERVER_COMMAND};
+use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
+use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
     let command = text(namespace, "command")?;
-    if !matches!(command.as_str(), SERVER_COMMAND | SCHEDULER_COMMAND) {
+    if !matches!(
+        command.as_str(),
+        SERVER_COMMAND | SCHEDULER_COMMAND | ADMIN_COMMAND
+    ) {
         return None;
     }
     if flag(namespace, "control_openapi") {
@@ -42,22 +46,45 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
             return Some(1);
         }
     };
-    Some(
-        match runtime.block_on(run_control(namespace, command == SCHEDULER_COMMAND)) {
-            Ok(()) => {
+    let admin = command == ADMIN_COMMAND;
+    let role = if admin { "administration" } else { "service" };
+    let result = runtime.block_on(async {
+        if admin {
+            run_admin(namespace).await.map(Some)
+        } else {
+            run_control(namespace, command == SCHEDULER_COMMAND)
+                .await
+                .map(|()| None)
+        }
+    });
+    Some(match result {
+        Ok(output) => {
+            let lost =
+                output.and_then(|value| write_output(&[(Stream::Stdout, &format!("{value}\n"))]));
+            if admin && lost.is_some() {
                 drop(write_output(&[(
                     Stream::Stderr,
-                    "Control service stopped successfully\n",
+                    "Control administration JSON result delivery failed; changes may already be committed\n",
                 )]));
-                0
+                return Some(1);
             }
-            Err(error) => {
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    &format!("Control service failed: {error}\n"),
-                )]));
-                1
+            let exit_code = finish_lost_stdout(lost.as_ref(), 0);
+            if exit_code == 0 {
+                let message = if admin {
+                    "Control administration completed successfully\n"
+                } else {
+                    "Control service stopped successfully\n"
+                };
+                drop(write_output(&[(Stream::Stderr, message)]));
             }
-        },
-    )
+            exit_code
+        }
+        Err(error) => {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!("Control {role} failed: {error}\n"),
+            )]));
+            1
+        }
+    })
 }

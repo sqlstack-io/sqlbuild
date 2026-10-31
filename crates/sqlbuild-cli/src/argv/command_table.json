@@ -79,6 +79,200 @@
    "group": 0,
    "parsers": [
     {
+     "name": "admin",
+     "parser": {
+      "prog": "sqb admin",
+      "description": "Privileged local administration using direct control database access. Results are JSON; issued bearer credentials appear only once on stdout.",
+      "groups": [
+       {
+        "title": "positional arguments"
+       },
+       {
+        "title": "options"
+       }
+      ],
+      "actions": [
+       {
+        "kind": "help",
+        "options": [
+         "-h",
+         "--help"
+        ],
+        "dest": "help",
+        "nargs": 0,
+        "default": {
+         "suppress": true
+        },
+        "help": "show this help message and exit",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": [
+         "--database-env"
+        ],
+        "dest": "control_database_env",
+        "default": "SQLBUILD_CONTROL_DATABASE_URL",
+        "help": "environment variable holding the control database URL (default: SQLBUILD_CONTROL_DATABASE_URL; SQLite when unset)",
+        "group": 1
+       },
+       {
+        "kind": "parsers",
+        "dest": "admin_command",
+        "nargs": "A...",
+        "required": true,
+        "group": 0,
+        "parsers": [
+         {
+          "name": "create-location",
+          "parser": {
+           "prog": "sqb admin create-location",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "NAME",
+             "required": true,
+             "help": "location label; identity is assigned by the control store",
+             "group": 0
+            }
+           ]
+          }
+         },
+         {
+          "name": "issue-location-token",
+          "parser": {
+           "prog": "sqb admin issue-location-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "LOCATION_ID",
+             "required": true,
+             "help": "location UUID",
+             "group": 0
+            },
+            {
+             "kind": "store",
+             "options": [
+              "--expires-at"
+             ],
+             "dest": "admin_expires_at",
+             "required": true,
+             "help": "future expiry as an RFC3339 timestamp with timezone",
+             "group": 1
+            }
+           ]
+          }
+         },
+         {
+          "name": "revoke-token",
+          "parser": {
+           "prog": "sqb admin revoke-token",
+           "groups": [
+            {
+             "title": "positional arguments"
+            },
+            {
+             "title": "options"
+            }
+           ],
+           "actions": [
+            {
+             "kind": "help",
+             "options": [
+              "-h",
+              "--help"
+             ],
+             "dest": "help",
+             "nargs": 0,
+             "default": {
+              "suppress": true
+             },
+             "help": "show this help message and exit",
+             "group": 1
+            },
+            {
+             "kind": "store",
+             "options": [],
+             "dest": "admin_subject",
+             "metavar": "TOKEN_ID",
+             "required": true,
+             "help": "credential UUID, never its bearer secret",
+             "group": 0
+            }
+           ]
+          }
+         }
+        ],
+        "choices_help": [
+         {
+          "dest": "create-location",
+          "metavar": "create-location",
+          "help": "register a location with an atomic security audit record"
+         },
+         {
+          "dest": "issue-location-token",
+          "metavar": "issue-location-token",
+          "help": "issue a bounded location credential, returned once as JSON"
+         },
+         {
+          "dest": "revoke-token",
+          "metavar": "revoke-token",
+          "help": "revoke a credential by UUID"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    {
      "name": "server",
      "parser": {
       "prog": "sqb server",
@@ -7719,6 +7913,11 @@
     }
    ],
    "choices_help": [
+    {
+     "dest": "admin",
+     "metavar": "admin",
+     "help": "administer locations and credentials through privileged database access"
+    },
     {
      "dest": "server",
      "metavar": "server",

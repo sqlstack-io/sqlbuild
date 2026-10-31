@@ -8,11 +8,11 @@ use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::scheduler::main::evaluate_trigger::evaluate_trigger;
 use sqlbuild_orchestration::scheduler::models::TickDecision;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::helpers::snapshot;
+use crate::location_helpers::create_location;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::test_types::CoalescedRunTestCase;

@@ -5,14 +5,12 @@ use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
-use sqlbuild_orchestration::store::main::open_store::open_store;
 use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, control_database, flag};
-use crate::native_commands::_helpers::execution::supervise_control_roles;
+use crate::native_commands::_helpers::decision::{control_address, flag};
+use crate::native_commands::_helpers::execution::{open_control_store, supervise_control_roles};
 use crate::native_commands::_helpers::terminal::write_output;
 
 async fn stopped(mut shutdown: watch::Receiver<bool>) {
@@ -28,14 +26,7 @@ pub(crate) async fn run_control(
     standalone: bool,
 ) -> Result<(), ControlError> {
     let address = control_address(namespace, standalone)?;
-    let url = control_database(namespace)?;
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Opening control store...\n",
-    )]));
-    let store = open_store(&url).await?;
-    migrate_store(&store).await?;
-    drop(write_output(&[(Stream::Stderr, "Control store ready\n")]));
+    let store = open_control_store(namespace).await?;
     let (stop, shutdown) = watch::channel(false);
     let (_changes, changes) = watch::channel(());
     let mut tasks = tokio::task::JoinSet::new();

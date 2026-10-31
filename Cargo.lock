@@ -2490,6 +2490,7 @@ name = "sqlbuild-cli"
 version = "0.186.2"
 dependencies = [
  "blake3",
+ "chrono",
  "ctrlc",
  "getrandom 0.4.3",
  "reqwest",

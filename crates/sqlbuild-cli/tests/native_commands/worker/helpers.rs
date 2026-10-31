@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
 
+use sqlbuild_orchestration::credentials::main::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
@@ -16,7 +17,6 @@ use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::worker::main::connect_worker::connect_worker;
 use sqlbuild_orchestration::worker::main::start_worker::start_worker;
@@ -34,7 +34,13 @@ pub(crate) async fn start_claimed_worker(
     let store = open_store(path.to_str().expect("test database path"))
         .await
         .expect("native control store");
-    let location_id = create_location(&store, "orders", "test-admin")
+    let context = AuditContext {
+        actor: "test-admin".into(),
+        granting_role: "admin".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    };
+    let location_id = create_location(&store, "orders", &context)
         .await
         .expect("location");
     let baseline = SnapshotInput {
@@ -93,12 +99,6 @@ pub(crate) async fn start_claimed_worker(
         .expect("claim")
         .expect("queued work");
     let identity = (run_id, claim.claim_id);
-    let context = AuditContext {
-        actor: "test-admin".into(),
-        granting_role: "admin".into(),
-        request_id: Uuid::now_v7(),
-        ip_address: None,
-    };
     let token = issue_token(
         &store,
         &context,

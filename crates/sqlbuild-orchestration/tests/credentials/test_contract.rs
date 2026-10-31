@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use chrono::{Duration, Utc};
 use sqlbuild_orchestration::credentials::main::authenticate_token::authenticate_token;
+use sqlbuild_orchestration::credentials::main::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
@@ -9,12 +10,11 @@ use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope,
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::fault_helpers::{install_fault, remove_fault};
-use crate::helpers::stored_hashes;
+use crate::helpers::{location_state, stored_hashes};
 use crate::replica_helpers::second_store;
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
@@ -69,6 +69,8 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 .await
                 .is_err()
             );
+            assert!(create_location(store, "orders", &context).await.is_err());
+            assert_eq!(location_state(&replica).await, (0, 0));
             remove_fault(store, &fault).await;
             let principal_id = create_principal(
                 store,
@@ -77,9 +79,10 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
             )
             .await
             .expect("principal creation and audit rolled back together");
-            let location_id = create_location(store, "orders", "test-admin")
+            let location_id = create_location(store, "orders", &context)
                 .await
                 .expect("location");
+            assert_eq!(location_state(&replica).await, (1, 1));
             let scopes = [
                 CredentialScope::Principal { principal_id },
                 CredentialScope::Location { location_id },

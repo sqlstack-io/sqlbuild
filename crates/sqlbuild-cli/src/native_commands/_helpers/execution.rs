@@ -5,16 +5,20 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
+use sqlbuild_orchestration::store::main::open_store::open_store;
+use sqlbuild_orchestration::store::models::ControlStore;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 
-use crate::argv::models::Stream;
+use crate::argv::models::{Namespace, Stream};
 use crate::compute_logs::constants::DEFAULT_RETENTION_COUNT;
 use crate::compute_logs::main::abandon_capture::abandon_capture;
 use crate::compute_logs::main::finish_capture::finish_capture;
 use crate::compute_logs::main::open_log_root::open_log_root;
 use crate::compute_logs::main::start_capture::start_capture;
 use crate::compute_logs::models::{CaptureEnd, CaptureStart, OpenCapture};
+use crate::native_commands::_helpers::decision::control_database;
 use crate::native_commands::_helpers::init::run_init;
 use crate::native_commands::_helpers::package::installed_package;
 use crate::native_commands::_helpers::paths::project_location;
@@ -28,6 +32,21 @@ use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
     CommandOutput, InstalledPackage, LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
+
+/// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
+pub(crate) async fn open_control_store(
+    namespace: &Namespace,
+) -> Result<ControlStore, ControlError> {
+    let url = control_database(namespace)?;
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Opening control store...\n",
+    )]));
+    let store = open_store(&url).await?;
+    migrate_store(&store).await?;
+    drop(write_output(&[(Stream::Stderr, "Control store ready\n")]));
+    Ok(store)
+}
 
 async fn shutdown_signal() -> Result<(), ControlError> {
     #[cfg(unix)]

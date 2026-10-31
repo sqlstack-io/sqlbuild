@@ -2,7 +2,17 @@
 
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
 use crate::argv::models::Namespace;
+
+/// Privileged local operations require direct ownership of the control database.
+pub(crate) enum ControlAdmin {
+    CreateLocation(String),
+    IssueLocationToken(Uuid, DateTime<Utc>),
+    RevokeToken(Uuid),
+}
 
 /// Parsing can finish an invocation before package discovery or any Python handoff.
 #[derive(Debug)]

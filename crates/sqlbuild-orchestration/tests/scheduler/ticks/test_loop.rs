@@ -6,11 +6,11 @@ use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::main::scheduler_cycle::scheduler_cycle;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::lease_helpers::expire_lease;
+use crate::location_helpers::create_location;
 use crate::replica_helpers::second_store;
 use crate::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;

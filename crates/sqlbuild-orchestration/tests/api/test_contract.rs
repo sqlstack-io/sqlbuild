@@ -19,11 +19,11 @@ use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_remote_snapshot::publish_remote_snapshot;
 use sqlbuild_orchestration::snapshots::main::verify_execution::verify_execution;
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::helpers::{start_api, stop_api};
+use crate::location_helpers::create_location;
 use crate::run_helpers::{queue, request, snapshot};
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;

@@ -2,6 +2,8 @@
 mod contract;
 #[path = "snapshots/helpers.rs"]
 mod helpers;
+#[path = "credentials/locations/helpers.rs"]
+mod location_helpers;
 #[path = "store/replicas/helpers.rs"]
 mod replica_helpers;
 #[path = "store/helpers.rs"]

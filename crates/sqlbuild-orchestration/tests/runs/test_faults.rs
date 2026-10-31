@@ -9,7 +9,6 @@ use sqlbuild_orchestration::runs::models::{RunAuthority, RunChange, RunChangeReq
 use sqlbuild_orchestration::scheduler::main::acquire_lease::acquire_lease;
 use sqlbuild_orchestration::snapshots::main::publish_snapshot::publish_snapshot;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::create_location::create_location;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::read_recall_events::read_recall_events;
 use uuid::Uuid;
@@ -17,6 +16,7 @@ use uuid::Uuid;
 use crate::fault_helpers::{install_fault, remove_fault};
 use crate::helpers::{queue, request, snapshot};
 use crate::lease_helpers::expire_lease;
+use crate::location_helpers::create_location;
 use crate::store_helpers::{close_test_store, open_test_store, run};
 use crate::store_test_types::Backend;
 use crate::test_types::{ClaimFailureTestCase, TransactionFault};

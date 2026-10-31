@@ -17,6 +17,7 @@ path = "src/bin/sqlbuild.rs"
 
 [dependencies]
 blake3.workspace = true
+chrono.workspace = true
 getrandom.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
