@@ -47,7 +47,11 @@ pub(crate) async fn frozen_job_request(
             snapshot_id,
             image_id,
             kind,
-            origin: RunOrigin::Manual,
+            origin: if request.window.is_some() {
+                RunOrigin::Backfill
+            } else {
+                RunOrigin::Manual
+            },
             job_key: Some(request.job_key.clone()),
             parent_run_id: None,
             root_run_id: request.run_id,
@@ -63,6 +67,7 @@ pub(crate) async fn frozen_job_request(
                 write_set
             },
             settings: definition.settings,
+            window: request.window.clone(),
             concurrency_groups: definition.concurrency_groups,
             overlap: definition.overlap,
         },

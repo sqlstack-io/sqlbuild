@@ -6,7 +6,7 @@ use crate::credentials::models::AuditContext;
 use crate::runs::main::claim_next_run::claim_next_run;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_job_run::request_job_run;
-use crate::runs::models::{JobRunRequest, RunStatus};
+use crate::runs::models::{JobRunRequest, RunOrigin, RunStatus, RunWindow};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
@@ -68,6 +68,10 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 job_key: "daily_orders".into(),
                 reason: "Refresh orders".into(),
                 priority: 7,
+                window: Some(RunWindow::Timestamp {
+                    start: "2026-07-03T01:17:23+05:30".parse().expect("start"),
+                    end: "2026-07-04T01:17:23+05:30".parse().expect("end"),
+                }),
             };
             for invalid in [
                 JobRunRequest {
@@ -84,6 +88,17 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 },
                 JobRunRequest {
                     reason: " ".into(),
+                    ..request.clone()
+                },
+                JobRunRequest {
+                    window: Some(RunWindow::Integer { start: 11, end: 3 }),
+                    ..request.clone()
+                },
+                JobRunRequest {
+                    window: Some(RunWindow::Timestamp {
+                        start: "2026-07-04T01:17:23Z".parse().expect("start"),
+                        end: "2026-07-03T01:17:23Z".parse().expect("end"),
+                    }),
                     ..request.clone()
                 },
             ] {
@@ -139,6 +154,9 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
             let mut changed = request.clone();
             changed.reason = "Different request".into();
             assert!(request_job_run(store, &context, &changed).await.is_err());
+            changed = request.clone();
+            changed.window = Some(RunWindow::Integer { start: 3, end: 11 });
+            assert!(request_job_run(store, &context, &changed).await.is_err());
             let other_actor = AuditContext {
                 actor: "other-operator".into(),
                 ..context.clone()
@@ -168,6 +186,14 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 .expect("queued request");
             assert_eq!(claim.request.run_id, request.run_id);
             assert_eq!(claim.request.snapshot_id, published.snapshot_id);
+            assert_eq!(claim.request.origin, RunOrigin::Backfill);
+            assert_eq!(
+                claim.request.window,
+                Some(RunWindow::Timestamp {
+                    start: "2026-07-02T19:47:23Z".parse().expect("normalized start"),
+                    end: "2026-07-03T19:47:23Z".parse().expect("normalized end"),
+                })
+            );
             assert_eq!(
                 claim.request.image_id.as_deref(),
                 Some("sha256:synthetic-orders-image")
@@ -189,6 +215,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
             assert_eq!(claim.request.requested_by, "test-operator");
             let fresh = JobRunRequest {
                 run_id: Uuid::now_v7(),
+                window: Some(RunWindow::Integer { start: 7, end: 7 }),
                 ..request.clone()
             };
             assert!(

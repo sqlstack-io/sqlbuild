@@ -73,6 +73,20 @@ impl RunStatus {
     }
 }
 
+/// Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RunWindow {
+    Timestamp {
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    },
+    Integer {
+        start: i64,
+        end: i64,
+    },
+}
+
 /// The authorized selection and pinned execution inputs are immutable once requested.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunRequest {
@@ -94,6 +108,8 @@ pub struct RunRequest {
     pub selection: BTreeSet<String>,
     pub write_set: BTreeSet<String>,
     pub settings: BTreeMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
     pub overlap: crate::scheduler::models::Overlap,
 }
@@ -108,6 +124,8 @@ pub struct JobRunRequest {
     pub job_key: String,
     pub reason: String,
     pub priority: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<RunWindow>,
 }
 
 /// A retry derives its execution scope from a terminal run, never from caller selectors.

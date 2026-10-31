@@ -10,7 +10,7 @@ use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
 use sqlbuild_cli::dispatch::models::Dispatch;
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_orchestration::runs::models::RunOutcome;
+use sqlbuild_orchestration::runs::models::{RunOutcome, RunWindow};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::build_command::command::run_build;
@@ -31,8 +31,27 @@ fn build_request<'py>(
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
     let execution = worker.get().execution(py)?;
     let frozen = execution.claim.request;
+    let mut settings = frozen.settings;
+    if let Some(window) = frozen.window {
+        for key in [
+            "start_cursor",
+            "end_cursor",
+            "start_cursor_ts",
+            "end_cursor_ts",
+            "start_cursor_int",
+            "end_cursor_int",
+        ] {
+            settings.remove(key);
+        }
+        let (kind, start, end) = match window {
+            RunWindow::Timestamp { start, end } => ("ts", start.to_rfc3339(), end.to_rfc3339()),
+            RunWindow::Integer { start, end } => ("int", start.to_string(), end.to_string()),
+        };
+        settings.insert(format!("start_cursor_{kind}"), serde_json::json!(start));
+        settings.insert(format!("end_cursor_{kind}"), serde_json::json!(end));
+    }
     let mut argv: Vec<Bound<'py, PyString>> = std::iter::once("build".to_owned())
-        .chain(job_settings_arguments(&frozen.settings).map_err(PyValueError::new_err)?)
+        .chain(job_settings_arguments(&settings).map_err(PyValueError::new_err)?)
         .map(|argument| PyString::new(py, &argument))
         .collect();
     argv.extend([

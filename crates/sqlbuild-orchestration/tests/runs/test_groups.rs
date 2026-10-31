@@ -78,6 +78,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                 job_key: "daily_orders".into(),
                 reason: "Build the group".into(),
                 priority: 1,
+                window: None,
             };
             assert!(
                 request_job_run(store, &context, &request)
@@ -351,6 +352,7 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
                         job_key: job_key.into(),
                         reason: "Build independent groups".into(),
                         priority: 1,
+                        window: None,
                     },
                 )
                 .await

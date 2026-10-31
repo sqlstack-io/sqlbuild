@@ -8,7 +8,7 @@ use serde_json::json;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
-use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
 use sqlbuild_orchestration::store::errors::ControlError;
 use uuid::Uuid;
 
@@ -125,6 +125,50 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                         "target and job must not be blank".into(),
                     ));
                 }
+                let window = match (
+                    text(namespace, "admin_start_cursor_ts"),
+                    text(namespace, "admin_end_cursor_ts"),
+                    text(namespace, "admin_start_cursor_int"),
+                    text(namespace, "admin_end_cursor_int"),
+                ) {
+                    (None, None, None, None) => None,
+                    (Some(start), Some(end), None, None) => Some(RunWindow::Timestamp {
+                        start: DateTime::parse_from_rfc3339(&start)
+                            .map_err(|_| {
+                                ControlError::Invalid(
+                                    "backfill start must be an RFC3339 timestamp with timezone"
+                                        .into(),
+                                )
+                            })?
+                            .with_timezone(&Utc),
+                        end: DateTime::parse_from_rfc3339(&end)
+                            .map_err(|_| {
+                                ControlError::Invalid(
+                                    "backfill end must be an RFC3339 timestamp with timezone"
+                                        .into(),
+                                )
+                            })?
+                            .with_timezone(&Utc),
+                    }),
+                    (None, None, Some(start), Some(end)) => Some(RunWindow::Integer {
+                        start: start.parse().map_err(|_| {
+                            ControlError::Invalid(
+                                "backfill start must be a signed 64-bit integer".into(),
+                            )
+                        })?,
+                        end: end.parse().map_err(|_| {
+                            ControlError::Invalid(
+                                "backfill end must be a signed 64-bit integer".into(),
+                            )
+                        })?,
+                    }),
+                    _ => {
+                        return Err(ControlError::Invalid(
+                            "backfill requires both start and end of exactly one cursor type"
+                                .into(),
+                        ));
+                    }
+                };
                 return Ok(ControlAdmin::RequestJobRun(JobRunRequest {
                     run_id: event_id,
                     location_id: id,
@@ -132,6 +176,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     job_key,
                     reason,
                     priority,
+                    window,
                 }));
             }
             if action.as_deref() == Some("cancel-run") {

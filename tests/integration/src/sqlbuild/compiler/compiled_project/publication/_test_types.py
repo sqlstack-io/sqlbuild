@@ -120,3 +120,10 @@ class WorkerRestartTestCase(WorkerExecutionTestCase):
     description: str
     shutdown_signal: int = 15
     expected_scheduler_exit: int = 0
+
+
+@dataclass(frozen=True)
+class BackfillExecutionTestCase(WorkerExecutionTestCase):
+    description: str
+    window_arguments: tuple[str, ...] = ()
+    expected_window: dict[str, Any] = field(default_factory=dict)

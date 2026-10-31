@@ -90,6 +90,7 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
                         job_key: "daily".into(),
                         reason: "Exercise mixed queue ordering".into(),
                         priority: test_case.parent_priority,
+                        window: None,
                     },
                 )
                 .await
@@ -184,6 +185,7 @@ fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknow
                         job_key: "daily".into(),
                         reason: "Exercise launcher eligibility".into(),
                         priority: 1,
+                        window: None,
                     },
                 )
                 .await
@@ -426,6 +428,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                             job_key: format!("orders_group_{index}"),
                             reason: "Exercise capacity-aware admission".into(),
                             priority: index as i64 + 1,
+                            window: None,
                         },
                     )
                     .await
@@ -585,6 +588,7 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 job_key: "daily".into(),
                 reason: "Older group".into(),
                 priority: 1,
+                window: None,
             };
             request_job_run(store, &actor, &older)
                 .await
@@ -758,6 +762,7 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
                         job_key: format!("group_{index}"),
                         reason: "Exercise blocked group queue".into(),
                         priority: 1,
+                        window: None,
                     },
                 )
                 .await
