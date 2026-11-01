@@ -7,4 +7,5 @@ pub(crate) mod dynamic_pivot;
 pub(crate) mod enrichment;
 pub(crate) mod mappings;
 pub(crate) mod query_columns;
+pub(crate) mod resolution_rows;
 pub(crate) mod session;

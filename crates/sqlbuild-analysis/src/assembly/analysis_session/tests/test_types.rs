@@ -230,3 +230,10 @@ pub(crate) struct TypedMarkerCacheTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_hits: &'static [bool],
 }
+
+pub(crate) struct ResolutionRowsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) polyglot: &'static [(&'static str, usize, &'static str)],
+    pub(crate) sqlquack: &'static [(&'static str, usize, &'static str)],
+    pub(crate) expected_rows: &'static [(&'static str, usize, &'static str)],
+}

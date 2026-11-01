@@ -253,3 +253,5 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
 pub(crate) const RESOLUTION_CODES: [&str; 3] = ["B002", "B003", "B004"];
 /// The quote a catalog column name keeps when it was declared quoted.
 pub(crate) const QUOTE: char = '"';
+/// The severity of a diagnostic that does not fail the model.
+pub(crate) const WARNING_SEVERITY: &str = "warning";

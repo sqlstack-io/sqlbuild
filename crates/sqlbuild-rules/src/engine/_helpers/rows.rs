@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use sqlbuild_analysis::type_system::errors::TypeNormalizationError;
+use sqlbuild_analysis::type_system::main::declared_accepts::declared_accepts;
 use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
 use sqlbuild_analysis::type_system::models::NormalizedType;
 
@@ -138,7 +139,7 @@ fn schema_facts(
                     && !declared.is_empty()
                     && !inferred_type.is_empty() =>
             {
-                comparer.equal(declared, inferred_type)?
+                comparer.accepts(declared, inferred_type)?
             }
             _ => false,
         };
@@ -175,7 +176,7 @@ fn schema_facts(
         let inferred_type: Option<&str> = proof_types.get(family.key.as_str()).copied().flatten();
         let type_proven: bool = match inferred_type {
             Some(inferred_type) if context.include_type_proof && !inferred_type.is_empty() => {
-                comparer.equal(&family.data_type, inferred_type)?
+                comparer.accepts(&family.data_type, inferred_type)?
             }
             _ => false,
         };
@@ -209,10 +210,11 @@ struct Comparer<'a> {
 }
 
 impl Comparer<'_> {
-    fn equal(&self, left: &str, right: &str) -> Result<bool, String> {
-        match (self.normalized(left), self.normalized(right)) {
-            (Ok(left), Ok(right)) => Ok(left == right),
-            _ => (self.fallback.borrow_mut())(left, right),
+    /// Whether `declared` accepts `inferred`: equal or a lossless NUMBER widening (D31).
+    fn accepts(&self, declared: &str, inferred: &str) -> Result<bool, String> {
+        match (self.normalized(declared), self.normalized(inferred)) {
+            (Ok(declared), Ok(inferred)) => Ok(declared_accepts(&declared, &inferred)),
+            _ => (self.fallback.borrow_mut())(declared, inferred),
         }
     }
 

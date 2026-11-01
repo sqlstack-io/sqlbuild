@@ -773,7 +773,8 @@ def test_given_snowflake_count_when_compiling_enforced_contract_then_lossless_wi
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
+        'name = "orders"\nadapter = "snowflake"\n\n[rules]\nselect = ["SQBRCONTRACT105"]\n',
+        encoding="utf-8",
     )
     models: Path = tmp_path / "models"
     models.mkdir()
@@ -792,9 +793,13 @@ def test_given_snowflake_count_when_compiling_enforced_contract_then_lossless_wi
         "  contract enforced\n"
         f"  columns (customer_id (type VARCHAR), statuses (type {test_case.declared_type}))\n"
         ");\n"
-        "SELECT customer_id,\n"
-        "  COUNT(DISTINCT status) OVER (PARTITION BY customer_id) AS statuses\n"
-        'FROM __ref("orders")\n',
+        "WITH counted AS (\n"
+        "  SELECT customer_id,\n"
+        "    COUNT(DISTINCT status) OVER (PARTITION BY customer_id) AS statuses\n"
+        '  FROM __ref("orders")\n'
+        "),\n"
+        "final AS (SELECT customer_id, statuses FROM counted)\n"
+        "SELECT customer_id, statuses FROM final\n",
         encoding="utf-8",
     )
 
@@ -803,3 +808,4 @@ def test_given_snowflake_count_when_compiling_enforced_contract_then_lossless_wi
     output: str = capsys.readouterr().out
     assert exit_code == test_case.expected_exit_code, output
     assert ("error[K002]" in output) == test_case.expected_type_mismatch, output
+    assert "SQBRCONTRACT105" not in output or test_case.expected_type_mismatch, output

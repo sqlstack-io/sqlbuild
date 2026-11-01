@@ -29,10 +29,11 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, dict_from_pairs, same_keys, same_relations,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
+use crate::assembly::analysis_session::_helpers::resolution_rows::with_resolution_rows;
 use crate::assembly::analysis_session::constants::{
-    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, RESOLUTION_CODES,
-    TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT,
-    TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, TRANSFORM_AGGREGATION,
+    TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR,
+    UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -1185,24 +1186,6 @@ impl AnalysisSession {
             quoted_ignore_case: self.catalog.native.quoted_ignore_case,
         }
     }
-}
-
-/// `diagnostics` with its name-resolution rows replaced by SQLQuack's `resolved`, which take the
-/// place of the first one, else follow the rest.
-fn with_resolution_rows(
-    diagnostics: Vec<DiagnosticRow>,
-    resolved: Vec<DiagnosticRow>,
-) -> Vec<DiagnosticRow> {
-    let first: Option<usize> = diagnostics
-        .iter()
-        .position(|row| RESOLUTION_CODES.contains(&row.code.as_str()));
-    let mut rows: Vec<DiagnosticRow> = diagnostics
-        .into_iter()
-        .filter(|row| !RESOLUTION_CODES.contains(&row.code.as_str()))
-        .collect();
-    let at: usize = first.unwrap_or(rows.len()).min(rows.len());
-    rows.splice(at..at, resolved);
-    rows
 }
 
 /// SQLQuack's analysis with polyglot's diagnostics; a star is unresolved only over unknown inputs.

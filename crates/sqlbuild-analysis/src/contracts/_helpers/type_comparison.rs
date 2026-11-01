@@ -6,8 +6,9 @@ use std::collections::HashMap;
 
 use crate::contracts::constants::UPPER_FOLDING_DIALECT;
 use crate::type_system::errors::TypeNormalizationError;
+use crate::type_system::main::declared_accepts::declared_accepts;
 use crate::type_system::main::normalize_type::normalize_type;
-use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily, TypeNormalization};
+use crate::type_system::models::{NormalizedType, TypeNormalization};
 
 /// Whether a declared type accepts an inferred one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,13 +45,11 @@ impl<'a> TypeComparer<'a> {
     ) -> Result<TypeComparison, TypeNormalizationError> {
         let declared: NormalizedType = self.normalized(declared)?;
         let inferred: NormalizedType = self.normalized(inferred)?;
-        Ok(
-            if declared == inferred || widens_losslessly(&inferred, &declared) {
-                TypeComparison::Equal
-            } else {
-                TypeComparison::Different
-            },
-        )
+        Ok(if declared_accepts(&declared, &inferred) {
+            TypeComparison::Equal
+        } else {
+            TypeComparison::Different
+        })
     }
 
     fn normalized(&self, type_sql: &str) -> Result<NormalizedType, TypeNormalizationError> {
@@ -65,21 +64,4 @@ impl<'a> TypeComparer<'a> {
             .insert(type_sql.to_owned(), normalized.clone());
         normalized
     }
-}
-
-/// Whether every `narrow` value fits `wide` exactly: decimals of one scale, `narrow` no more precise.
-fn widens_losslessly(narrow: &NormalizedType, wide: &NormalizedType) -> bool {
-    let digits = |value: &Option<PythonInteger>| -> Option<u64> {
-        value
-            .as_ref()
-            .and_then(|value| value.as_str().parse::<u64>().ok())
-    };
-    narrow.family == TypeFamily::Decimal
-        && wide.family == TypeFamily::Decimal
-        && narrow.scale.is_some()
-        && narrow.scale == wide.scale
-        && matches!(
-            (digits(&narrow.precision), digits(&wide.precision)),
-            (Some(narrow), Some(wide)) if narrow <= wide
-        )
 }
