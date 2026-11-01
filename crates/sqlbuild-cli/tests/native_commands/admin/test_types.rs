@@ -9,7 +9,7 @@ pub(crate) struct PrincipalAdminTestCase {
     pub(crate) description: &'static str,
     pub(crate) kind: &'static str,
     pub(crate) expected_name: &'static str,
-    pub(crate) expected_actions: [&'static str; 3],
+    pub(crate) expected_actions: &'static [&'static str],
 }
 
 pub(crate) struct TriggerAdminTestCase {
