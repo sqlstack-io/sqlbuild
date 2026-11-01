@@ -44,6 +44,12 @@ jobs:
       - name: Check links
         run: python3 scripts/check_links.py dist
 
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Check branding and responsive navigation
+        run: npm test
+
       - name: Upload site
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
