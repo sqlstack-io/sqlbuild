@@ -718,6 +718,30 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="failure and recovery selectors preserve their individual transition kinds",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
+                )
+                .read_text()
+                .replace("NodeEventKind.SUCCESS", "NodeEventKind.FAILED, NodeEventKind.RECOVERED")
+            },
+            expected_jobs=("inventory", "source_orders"),
+            expected_sensors={
+                "on_orders": {
+                    "description": "Build inventory for every genuine orders rebuild.",
+                    "job_key": "inventory",
+                    "when": {
+                        "kind": "node_event",
+                        "selection": ["model:orders"],
+                        "kinds": ["failed", "recovered"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="source-job execution selectors compile to frozen canonical keys",
             files={
                 "orchestration/orders.py": Path(
@@ -955,13 +979,13 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="node_event needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="node event kinds do not imply unapproved failure transitions",
+            description="unknown node event kinds cannot publish",
             files={
                 "orchestration/orders.py": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
                 )
                 .read_text()
-                .replace("kinds=[NodeEventKind.SUCCESS]", "kinds=['failed']")
+                .replace("kinds=[NodeEventKind.SUCCESS]", "kinds=['unknown_event']")
             },
             expected_error=ValueError,
             expected_message="unknown variant",

@@ -244,6 +244,7 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     connection
         .execute_batch(
             "DROP TABLE sqb_development_locations; DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
+             DROP INDEX sqb_node_decisive_history; \
              DROP INDEX sqb_node_finished_cursor; DROP INDEX sqb_node_started_identity; \
              DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; \
              DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; \

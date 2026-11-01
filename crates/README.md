@@ -107,6 +107,23 @@ the goldens in `tests/goldens/compiler`, with stage captures and full discovery,
 analysis coverage required. CI also runs it on Python 3.13 and 3.14, and compiles and builds a
 playground project on Windows.
 
+## Individual node and check transitions
+
+`NodeEventKind.FAILED` matches entry into failure; repeated failures do not retrigger it.
+`RECOVERED` matches an actual successful execution after a failure of that same node/check,
+location and target, independently of its job or whole-run outcome. `SUCCESS` still matches
+each genuine successful execution. A prior start in the same worker claim is required:
+cached, blocked or unexecuted work cannot create a failure or claim a recovery.
+
+WARN is not failure. WARN, SKIPPED and CANCELLED do not clear an earlier actual failure;
+cancellation remains in execution history but is not itself an active health problem.
+Transitions are pure queries over immutable committed start/finish facts in storage order,
+using the latest prior decisive execution, not a persisted mutable health flag. Cursor reset
+recomputes the same transitions and existing run-key uniqueness prevents duplicate runs.
+These consumers require individual committed node facts. Publishing Python checks into
+worker snapshots and defining their frozen membership/retry behavior is a separate execution
+boundary; the consumers do not infer check results from whole-build exit codes or diagnostic text.
+
 ## Control-plane live updates
 
 `GET /api/locations/{location_id}/targets/{target}/changes` streams authenticated SSE

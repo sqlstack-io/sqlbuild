@@ -20,8 +20,8 @@ pub(crate) async fn consume_condition(
         SensorCondition::PlatformEvent { kinds } => {
             consume_platform_events(transaction, evaluation, kinds).await
         }
-        SensorCondition::NodeEvent { selection, .. } => {
-            consume_node_events(transaction, evaluation, selection).await
+        SensorCondition::NodeEvent { selection, kinds } => {
+            consume_node_events(transaction, evaluation, selection, kinds).await
         }
         SensorCondition::RunEvent {
             job_key,

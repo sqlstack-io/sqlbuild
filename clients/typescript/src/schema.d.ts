@@ -497,7 +497,7 @@ export interface components {
             applied: boolean;
         };
         /** @enum {string} */
-        NodeEventKind: "success";
+        NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
         /** @description Output of one stream that was not recorded because it exceeded `max_output_bytes`. */
