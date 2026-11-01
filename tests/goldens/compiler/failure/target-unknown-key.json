@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "D001",
-     "message": "<project>/sqlbuild_project.toml targets.ci contains unknown key(s): warehouse_size. Allowed keys: clone, compile_cache, concurrency, connection, database, default_table_type, defer_clone_from, defer_sources_to, diff, execution_limits, loader_schema, missing_migration_origin, owns_time_travel_retention_namespace, recall, schema, table_type_downgrade, time_travel_retention, time_travel_retention_decrease, vars, warehouses",
+     "message": "<project>/sqlbuild_project.toml targets.ci contains unknown key(s): warehouse_size. Allowed keys: catalog_connection, clone, compile_cache, concurrency, connection, database, default_table_type, defer_clone_from, defer_sources_to, diff, execution_limits, loader_schema, missing_migration_origin, owns_time_travel_retention_namespace, recall, schema, table_type_downgrade, time_travel_retention, time_travel_retention_decrease, vars, warehouses",
      "help": "did you mean 'warehouses'?"
     }
    ]

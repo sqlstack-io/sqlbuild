@@ -162,22 +162,71 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
 }
 
 #[test]
+fn given_native_person_administration_when_issuing_an_api_credential_then_it_is_rejected_without_issuance_auditing()
+ {
+    let test_cases = [PrincipalAdminTestCase {
+        description: "a person cannot receive an API credential",
+        kind: "person",
+        expected_name: "orders operator / café",
+        expected_actions: &["principal.created"],
+    }];
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime");
+    for test_case in test_cases {
+        runtime.block_on(async {
+            let mut control = start_control(&["server", "--port", "0", "--no-scheduler"]);
+            api_ready(&mut control).await;
+            let principal = administer(
+                &control,
+                &[
+                    "create-principal",
+                    test_case.expected_name,
+                    "--kind",
+                    test_case.kind,
+                ],
+            );
+            let expiry = (Utc::now() + Duration::hours(1)).to_rfc3339();
+            let output = invoke_admin(
+                &control,
+                &[
+                    "issue-principal-token",
+                    principal["principal_id"]
+                        .as_str()
+                        .expect(test_case.description),
+                    "--expires-at",
+                    &expiry,
+                ],
+            );
+            assert!(!output.status.success(), "{}", test_case.description);
+            assert!(output.stdout.is_empty(), "{}", test_case.description);
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("token scope is not active"),
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                audit_actions(&control, "no-issued-person-credential"),
+                test_case.expected_actions,
+                "{}",
+                test_case.description
+            );
+            #[cfg(unix)]
+            crate::helpers::terminate(&mut control).await;
+        });
+    }
+}
+
+#[test]
 fn given_native_principal_administration_when_issuing_credentials_then_identity_is_audited_without_granting_location_permissions()
  {
-    let test_cases = [
-        PrincipalAdminTestCase {
-            description: "a person credential has no implicit location authority",
-            kind: "person",
-            expected_name: "orders operator / café",
-            expected_actions: ["principal.created", "token.issued", "token.revoked"],
-        },
-        PrincipalAdminTestCase {
-            description: "a service account credential has no implicit location authority",
-            kind: "service_account",
-            expected_name: "orders automation",
-            expected_actions: ["principal.created", "token.issued", "token.revoked"],
-        },
-    ];
+    let test_cases = [PrincipalAdminTestCase {
+        description: "a service account credential has no implicit location authority",
+        kind: "service_account",
+        expected_name: "orders automation",
+        expected_actions: &["principal.created", "token.issued", "token.revoked"],
+    }];
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
