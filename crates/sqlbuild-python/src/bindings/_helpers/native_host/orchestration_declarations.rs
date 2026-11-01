@@ -46,10 +46,29 @@ pub(crate) struct AuthoredGroup {
     pub(crate) targets: Vec<String>,
 }
 
+#[derive(FromPyObject)]
+pub(crate) struct AuthoredPlatformCondition {
+    pub(crate) kind: String,
+    pub(crate) kinds: Vec<String>,
+}
+
+#[derive(FromPyObject)]
+pub(crate) struct AuthoredSensor {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) when: AuthoredPlatformCondition,
+    pub(crate) run: AuthoredJobReference,
+    #[pyo3(from_py_with = authored_setting)]
+    pub(crate) minimum_interval_seconds: Value,
+    pub(crate) default_status: String,
+    pub(crate) targets: Vec<String>,
+}
+
 pub(crate) enum AuthoredDeclaration {
     Job(AuthoredJob),
     Group(AuthoredGroup),
     Calendar(Py<PyAny>),
+    Sensor(AuthoredSensor),
 }
 
 /// JSON authoring values cross once; the interpreter rejects circular user containers safely.
@@ -77,6 +96,7 @@ pub(crate) fn module_jobs<'py>(
     let calendar_class = py
         .import("sqlbuild.orchestration")?
         .getattr("CalendarSchedule")?;
+    let sensor_class = py.import("sqlbuild.orchestration")?.getattr("Sensor")?;
     let attributes = module.getattr("__dict__")?.cast_into::<PyDict>()?;
     let mut pending: Vec<Bound<'py, PyAny>> = attributes.values().iter().collect();
     let mut seen: HashSet<usize> = HashSet::new();
@@ -88,6 +108,7 @@ pub(crate) fn module_jobs<'py>(
         if value.is_instance(&job_class)?
             || value.is_instance(&group_class)?
             || value.is_instance(&calendar_class)?
+            || value.is_instance(&sensor_class)?
         {
             jobs.push(value);
         } else if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
@@ -106,6 +127,7 @@ pub(crate) fn collect_declarations<'py>(
     let calendar = py
         .import("sqlbuild.orchestration")?
         .getattr("CalendarSchedule")?;
+    let sensor = py.import("sqlbuild.orchestration")?.getattr("Sensor")?;
     let mut roots: HashSet<usize> = HashSet::new();
     for declaration in &declarations {
         if !roots.insert(declaration.as_ptr() as usize) {
@@ -125,7 +147,16 @@ pub(crate) fn collect_declarations<'py>(
         if !seen.insert(declaration.as_ptr() as usize) {
             continue;
         }
-        let authored = if declaration.is_instance(&calendar)? {
+        let authored = if declaration.is_instance(&sensor)? {
+            let target = declaration.getattr("run")?;
+            if !target.is_instance(&job)? && !target.is_instance(&group)? {
+                return Err(PyTypeError::new_err(
+                    "sensor run must be a Job or JobGroup object",
+                ));
+            }
+            pending.push(target);
+            AuthoredDeclaration::Sensor(declaration.extract()?)
+        } else if declaration.is_instance(&calendar)? {
             let target = declaration.getattr("job")?;
             if !target.is_instance(&job)? && !target.is_instance(&group)? {
                 return Err(PyTypeError::new_err(
@@ -159,7 +190,7 @@ pub(crate) fn collect_declarations<'py>(
             AuthoredDeclaration::Group(declaration.extract()?)
         } else if !declaration.is_instance(&job)? {
             return Err(PyTypeError::new_err(
-                "snapshot declarations must be Job, JobGroup or CalendarSchedule objects",
+                "snapshot declarations must be Job, JobGroup, CalendarSchedule or Sensor objects",
             ));
         } else {
             AuthoredDeclaration::Job(declaration.extract()?)

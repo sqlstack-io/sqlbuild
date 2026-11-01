@@ -143,6 +143,9 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "\n@calendar_schedule(job=orders, description='Other target.', horizon='8s', timezone='UTC', targets=('production',))\n"
                 "def excluded_calendar(window):\n    raise ValueError('excluded calendar must not evaluate')\n"
             ),
+            "orchestration/platform_orders.py": Path(
+                "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+            ).read_text(),
             "providers/fulfillment.py": (
                 "import json, os\nfrom pathlib import Path\nfrom datetime import timedelta\n"
                 "from sqlbuild.provider.classes.provider import Provider\n"
@@ -184,10 +187,13 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
             second: dict[str, Any] = wait_for_generation(api, "development", 2, process, log)
             assert first["nodes"] == second["nodes"]
             assert second["changes"] == []
-            assert first["documents"]["triggers"].keys() == {"fulfillment_calendar"}
+            assert first["documents"]["triggers"].keys() == {
+                "fulfillment_calendar",
+                "overdue_orders",
+            }
             with sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3") as control:
                 stored, next_due = control.execute(
-                    "SELECT definition_json, next_due_at FROM sqb_triggers JOIN sqb_trigger_state USING (trigger_id)"
+                    "SELECT definition_json, next_due_at FROM sqb_triggers JOIN sqb_trigger_state USING (trigger_id) WHERE kind = 'schedule'"
                 ).fetchone()
             original_times: list[str] = first["documents"]["triggers"]["fulfillment_calendar"][
                 "schedule"

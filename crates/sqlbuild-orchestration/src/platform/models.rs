@@ -110,6 +110,17 @@ pub(crate) struct StoredLocationWork {
     pub(crate) claimed_until: Option<DateTime<Utc>>,
 }
 
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PlatformEventKind {
+    Heartbeat,
+    SchedulerNoLeader,
+    TickOverdue,
+    CalendarHorizonLow,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlatformEvent {
@@ -129,6 +140,16 @@ pub enum PlatformEvent {
 }
 
 impl PlatformEvent {
+    #[must_use]
+    pub const fn kind(&self) -> PlatformEventKind {
+        match self {
+            Self::Heartbeat { .. } => PlatformEventKind::Heartbeat,
+            Self::SchedulerNoLeader => PlatformEventKind::SchedulerNoLeader,
+            Self::TickOverdue { .. } => PlatformEventKind::TickOverdue,
+            Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
+        }
+    }
+
     #[must_use]
     pub const fn event_type(&self) -> &'static str {
         match self {

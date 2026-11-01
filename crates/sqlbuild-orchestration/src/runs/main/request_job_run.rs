@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
-use crate::runs::_helpers::requests::job::frozen_job_request;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
+use crate::runs::main::frozen_job_request::frozen_job_request;
 use crate::runs::models::{JobRunRequest, RunWindow};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;

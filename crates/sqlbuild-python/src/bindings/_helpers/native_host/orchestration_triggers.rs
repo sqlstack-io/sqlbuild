@@ -9,18 +9,21 @@ use pyo3::FromPyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
-use serde_json::Value;
+use serde_json::{Value, json};
 use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::declarations::models::{Definitions, Schedule, TriggerDefinition};
 use sqlbuild_orchestration::scheduler::constants::MAX_TICKS_PER_BATCH;
+use sqlbuild_orchestration::sensors::models::SensorDefinition;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::native_host::constants::CALENDAR_WINDOW_PARAMETER;
 use crate::bindings::_helpers::native_host::host::entry;
-use crate::bindings::_helpers::native_host::orchestration_declarations::authored_setting;
+use crate::bindings::_helpers::native_host::orchestration_declarations::{
+    AuthoredSensor, authored_setting,
+};
 
 #[derive(FromPyObject)]
 struct AuthoredControls {
@@ -242,4 +245,33 @@ pub(crate) fn compile_calendars(
         }
         Ok(definitions)
     })
+}
+
+pub(crate) fn compile_sensors(
+    target: &str,
+    authored: Vec<AuthoredSensor>,
+    mut definitions: Definitions,
+) -> PyResult<Definitions> {
+    let mut names: BTreeSet<String> = BTreeSet::new();
+    for sensor in authored {
+        if !names.insert(sensor.name.clone()) || definitions.triggers.contains_key(&sensor.name) {
+            return Err(PyValueError::new_err(format!(
+                "duplicate trigger {}",
+                sensor.name
+            )));
+        }
+        if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == target) {
+            continue;
+        }
+        let definition: SensorDefinition = serde_json::from_value(json!({
+            "description": sensor.description,
+            "job_key": sensor.run.name,
+            "when": {"kind": sensor.when.kind, "kinds": sensor.when.kinds},
+            "minimum_interval_seconds": sensor.minimum_interval_seconds,
+            "default_status": sensor.default_status,
+        }))
+        .map_err(|error| PyValueError::new_err(format!("sensor {}: {error}", sensor.name)))?;
+        definitions.sensors.insert(sensor.name, definition);
+    }
+    Ok(definitions)
 }

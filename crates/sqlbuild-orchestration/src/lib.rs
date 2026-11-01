@@ -8,6 +8,7 @@ pub mod declarations;
 pub mod platform;
 pub mod runs;
 pub mod scheduler;
+pub mod sensors;
 pub mod snapshots;
 pub mod store;
 pub mod worker;

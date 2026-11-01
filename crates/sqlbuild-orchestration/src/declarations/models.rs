@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::scheduler::models::{CatchUp, Overlap};
+use crate::sensors::models::SensorDefinition;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -90,6 +91,15 @@ pub struct Definitions {
     pub jobs: BTreeMap<String, JobDefinition>,
     pub groups: BTreeMap<String, GroupDefinition>,
     pub triggers: BTreeMap<String, TriggerDefinition>,
+    pub sensors: BTreeMap<String, SensorDefinition>,
+}
+
+/// Legacy schedule documents retain their stored shape; sensors add a distinct condition shape.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(untagged)]
+pub enum TriggerDeclaration {
+    Schedule(TriggerDefinition),
+    Sensor(SensorDefinition),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -97,7 +107,7 @@ pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,
     pub name: String,
     pub job_key: String,
-    pub definition_json: TriggerDefinition,
+    pub definition_json: TriggerDeclaration,
     pub status: TriggerStatus,
     pub last_tick_for: Option<DateTime<Utc>>,
     pub next_due_at: Option<DateTime<Utc>>,
@@ -133,7 +143,7 @@ pub struct TriggerChangeRecord {
 
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct EditableTriggerState {
-    pub(crate) definition_json: TriggerDefinition,
+    pub(crate) definition_json: TriggerDeclaration,
     pub(crate) snapshot_id: uuid::Uuid,
     pub(crate) started_at: DateTime<Utc>,
     pub(crate) last_tick_for: Option<DateTime<Utc>>,
