@@ -18,9 +18,14 @@ rule = 3
 note = "Public orchestration facade: re-exports only."
 
 [[stays]]
-path = "orchestration_declarations/models.py"
+path = "orchestration_declarations/models/authoring.py"
 rule = 3
 note = "Public job and schedule authoring records only; selection resolution, validation and scheduling stay native."
+
+[[stays]]
+path = "orchestration_declarations/models/sensor_context.py"
+rule = 3
+note = "Only the mutable SensorContext authoring declaration required by ctx.cursor assignment; no Python runtime allowance. Native fenced completion validates and commits proposed progress."
 
 [[stays]]
 path = "orchestration_declarations/types.py"

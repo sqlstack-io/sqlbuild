@@ -20,6 +20,7 @@ pub(crate) async fn consume_platform_events(
         event_storage_id: events
             .last()
             .map_or(evaluation.cursor.event_storage_id, |event| event.storage_id),
+        ..evaluation.cursor.clone()
     };
     let mut run_ids: Vec<Uuid> = Vec::new();
     for event in events

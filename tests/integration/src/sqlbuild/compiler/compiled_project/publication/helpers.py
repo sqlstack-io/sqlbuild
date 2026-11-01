@@ -47,11 +47,13 @@ class RejectedPublicationOutput(StringIO):
 
 @contextmanager
 def location_process(
-    arguments: list[str], log: Path, publications: Path
+    arguments: list[str], log: Path, publications: Path, *, env: dict[str, str] | None = None
 ) -> Iterator[subprocess.Popen[bytes]]:
     """Own and reap the supervisor even when an assertion interrupts a reload."""
     with log.open("ab") as stderr, publications.open("ab") as stdout:
-        process: subprocess.Popen[bytes] = subprocess.Popen(arguments, stderr=stderr, stdout=stdout)
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            arguments, stderr=stderr, stdout=stdout, env=env
+        )
         try:
             yield process
         finally:
@@ -563,3 +565,28 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             ),
         )
     return ClaimedWorker(run_id=run_id, claim_id=claim_id, bearer=bearer)
+
+
+def wait_for_sensor_phase(
+    store: Path, phase: str, *, empty_runs: bool = False, timeout: float = 45
+) -> dict[str, Any]:
+    """Wait for real scheduler facts, optionally requiring a completed skip."""
+    deadline: float = time.monotonic() + timeout
+    row: tuple[str] | None = None
+    while row is None:
+        assert time.monotonic() < deadline, f"Sensor did not record {phase}"
+        with sqlite3.connect(store) as control:
+            row = control.execute(
+                "SELECT fact_json FROM sqb_sensor_evaluation_events WHERE phase=? "
+                "AND (? = FALSE OR fact_json->'outcome'->'run_ids'='[]') "
+                "ORDER BY storage_id DESC LIMIT 1",
+                (phase, empty_runs),
+            ).fetchone()
+        time.sleep(0.05)
+    return json.loads(row[0])
+
+
+def sensor_calls(path: Path, fields: dict[str, Any]) -> list[dict[str, Any]]:
+    """Select recorded callback invocations without inferring execution from declarations."""
+    records: list[dict[str, Any]] = [json.loads(line) for line in path.read_text().splitlines()]
+    return list(filter(lambda record: fields.items() <= record.items(), records))

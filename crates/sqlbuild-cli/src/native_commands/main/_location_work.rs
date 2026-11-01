@@ -16,6 +16,7 @@ use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::check_location_connection;
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
+use crate::native_commands::main::_location_sensor::evaluate_location_sensor;
 use crate::native_commands::models::{LocationServe, LocationWatch};
 
 /// Retry the exact completed result after uncertain delivery; never rerun it to obtain a new result.
@@ -44,11 +45,14 @@ pub(super) async fn run_location_work(
             .to_std()
             .unwrap_or_default();
     let mut files: Vec<PathBuf> = Vec::new();
-    let outcome = if generation == Some(claim.generation) {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Checking requested location connection...\n",
-        )]));
+    let outcome = if generation == Some(claim.generation)
+        && location_inputs(&options.project_dir, &watch.rules, &watch.local_files) == watch.observed
+    {
+        let message = match &claim.request.work {
+            LocationWork::CheckConnection {} => "Checking requested location connection...\n",
+            LocationWork::EvaluateSensor { .. } => "Evaluating requested custom sensor...\n",
+        };
+        drop(write_output(&[(Stream::Stderr, message)]));
         let mut shutting_down = false;
         let expires = async {
             tokio::select! {
@@ -57,11 +61,21 @@ pub(super) async fn run_location_work(
             }
         };
         let checked = match claim.request.work {
-            LocationWork::CheckConnection {} => {
-                check_location_connection(options, script, expires).await?
+            LocationWork::CheckConnection {} => check_location_connection(options, script, expires)
+                .await?
+                .map(|(healthy, files)| (LocationWorkOutcome::Connection { healthy }, files)),
+            LocationWork::EvaluateSensor { evaluation } => {
+                evaluate_location_sensor(options, script, &evaluation, expires)
+                    .await?
+                    .map(|outcome| {
+                        (
+                            LocationWorkOutcome::SensorEvaluation { outcome },
+                            Vec::new(),
+                        )
+                    })
             }
         };
-        let Some((healthy, local_files)) = checked else {
+        let Some((outcome, local_files)) = checked else {
             drop(write_output(&[(
                 Stream::Stderr,
                 "Location work stopped before completion; no result reported.\n",
@@ -76,7 +90,7 @@ pub(super) async fn run_location_work(
         let mut excluded = watch.local_files.clone();
         excluded.extend(files.clone());
         if location_inputs(&options.project_dir, &watch.rules, &excluded) == expected {
-            LocationWorkOutcome::Connection { healthy }
+            outcome
         } else {
             LocationWorkOutcome::Superseded {}
         }

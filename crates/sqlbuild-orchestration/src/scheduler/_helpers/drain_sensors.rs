@@ -4,6 +4,8 @@ use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
+use crate::sensors::main::complete_custom_sensor::complete_custom_sensor;
+use crate::sensors::models::SensorCondition;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -27,7 +29,11 @@ pub(crate) async fn drain_sensors(
         let trigger_id = serde_json::from_value(row["trigger_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         if let Some(request) = begin_sensor_evaluation(store, &lease, trigger_id).await? {
-            complete_builtin_sensor(store, &lease, &request).await?;
+            if matches!(request.definition.when, SensorCondition::Custom { .. }) {
+                complete_custom_sensor(store, &lease, &request).await?;
+            } else {
+                complete_builtin_sensor(store, &lease, &request).await?;
+            }
             evaluated += 1;
         }
         lease = renew_lease(store, &lease).await?;

@@ -8,6 +8,7 @@ use crate::declarations::models::TriggerStatus;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
+use crate::sensors::_helpers::custom::request_evaluation_work;
 use crate::sensors::_helpers::facts::append_evaluation;
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
@@ -75,6 +76,7 @@ pub async fn begin_sensor_evaluation(
     };
     let (transaction, _) =
         append_evaluation(transaction, &request, SensorEvaluationOutcome::Requested).await?;
+    let transaction = request_evaluation_work(transaction, &request).await?;
     commit(check_lease(transaction, lease).await?).await?;
     Ok(Some(request))
 }

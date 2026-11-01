@@ -202,8 +202,8 @@ pub(crate) fn compile_declarations(
         triggers,
         sensors,
     } = compile_sensors(
-        &input.target,
-        graph,
+        py,
+        (project_dir, input.target.as_str(), graph),
         authored_sensors,
         compile_calendars(
             py,

@@ -45,6 +45,10 @@ pub enum SensorCondition {
         selection: BTreeSet<String>,
         kinds: BTreeSet<NodeEventKind>,
     },
+    Custom {
+        function: String,
+        code_hash: String,
+    },
 }
 
 #[derive(
@@ -117,6 +121,24 @@ pub struct SensorDefinition {
 #[serde(deny_unknown_fields)]
 pub struct SensorCursor {
     pub event_storage_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom: Option<String>,
+}
+
+/// Location-owned Python returns data; only the fenced scheduler may apply it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CustomSensorOutcome {
+    Completed {
+        cursor: Option<String>,
+        run_keys: Vec<String>,
+    },
+    Skipped {
+        cursor: Option<String>,
+        reason: String,
+    },
+    Failed,
+    TimedOut,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

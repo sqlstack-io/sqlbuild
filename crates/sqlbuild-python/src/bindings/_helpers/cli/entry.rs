@@ -775,12 +775,14 @@ fn parsed_invocation<'py>(
     let namespace = args.getattr("__dict__")?.cast_into::<PyDict>()?;
     let command: Option<String> = namespace
         .get_item("command")?
-        .map(|value| value.extract())
-        .transpose()?;
+        .map(|value| value.extract::<Option<String>>())
+        .transpose()?
+        .flatten();
     let location_command: Option<String> = namespace
         .get_item("location_command")?
-        .map(|value| value.extract())
-        .transpose()?;
+        .map(|value| value.extract::<Option<String>>())
+        .transpose()?
+        .flatten();
     if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
         return within(&host::redirect_stdout_to_stderr(py)?, |_| {
             execute_parsed_invocation(args, handlers, identity, use_color)

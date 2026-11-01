@@ -26,6 +26,9 @@ use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredSensor, authored_setting,
 };
+use crate::bindings::_helpers::native_host::orchestration_environment::{
+    callback_code_hash, orchestration_code_hash,
+};
 
 #[derive(FromPyObject)]
 struct AuthoredControls {
@@ -250,11 +253,16 @@ pub(crate) fn compile_calendars(
 }
 
 pub(crate) fn compile_sensors(
-    target: &str,
-    graph: &ProjectGraph,
+    py: Python<'_>,
+    (project_dir, target, graph): (&Path, &str, &ProjectGraph),
     authored: Vec<AuthoredSensor>,
     mut definitions: Definitions,
 ) -> PyResult<Definitions> {
+    let sources = if authored.iter().any(|sensor| sensor.function.is_some()) {
+        orchestration_code_hash(project_dir)?
+    } else {
+        String::new()
+    };
     let mut names: BTreeSet<String> = BTreeSet::new();
     for sensor in authored {
         if !names.insert(sensor.name.clone()) || definitions.triggers.contains_key(&sensor.name) {
@@ -266,18 +274,31 @@ pub(crate) fn compile_sensors(
         if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == target) {
             continue;
         }
-        let mut condition = json!({"kind": sensor.when.kind, "kinds": sensor.when.kinds});
-        if let Some(job) = sensor.when.job {
-            condition["job_key"] = json!(job.name);
-        }
-        if let Some(select) = sensor.when.select {
-            let selectors: Vec<String> = select.split_whitespace().map(str::to_owned).collect();
-            condition["selection"] = sensor_nodes(graph, &selectors, "node_event")?;
-        }
-        if let Some(selectors) = sensor.when.executed_successfully {
-            condition["executed_successfully"] =
-                sensor_nodes(graph, &selectors, "executed_successfully")?;
-        }
+        let condition = match (sensor.when, sensor.function) {
+            (Some(when), None) => {
+                let mut condition = json!({"kind": when.kind, "kinds": when.kinds});
+                if let Some(job) = when.job {
+                    condition["job_key"] = json!(job.name);
+                }
+                if let Some(select) = when.select {
+                    let selectors: Vec<String> =
+                        select.split_whitespace().map(str::to_owned).collect();
+                    condition["selection"] = sensor_nodes(graph, &selectors, "node_event")?;
+                }
+                if let Some(selectors) = when.executed_successfully {
+                    condition["executed_successfully"] =
+                        sensor_nodes(graph, &selectors, "executed_successfully")?;
+                }
+                condition
+            }
+            (None, Some(function)) => json!({"kind": "custom", "function": sensor.name,
+                "code_hash": callback_code_hash(function.bind(py), &sources)?}),
+            _ => {
+                return Err(PyValueError::new_err(
+                    "sensor needs either a built-in condition or a decorated polling callback; callbacks with when are not supported yet",
+                ));
+            }
+        };
         let definition: SensorDefinition = serde_json::from_value(json!({
             "description": sensor.description,
             "job_key": sensor.run.name,

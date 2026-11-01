@@ -2655,6 +2655,7 @@ module_layers = [
     "model_config=front",
     "native_host=infra",
     "native_host/model_lookup=project",
+    "native_host/orchestration_sensors=commands",
     "native_host/orchestration_triggers=project",
     "native_threads=infra",
     "output_capture=output",
@@ -2750,3 +2751,8 @@ rule = "FFS120"
 path = "src/sqlbuild/executor/scheduling/classes/recovering_connection_pool.py"
 symbols = ["RecoveringConnectionPool.put"]
 reason = "The override keeps queue.Queue.put's positional protocol, which every pool consumer calls."
+
+[[targets.python.rule_exceptions]]
+rule = "FFS201"
+path = "src/sqlbuild/orchestration_declarations/models/sensor_context.py"
+reason = "Only SensorContext lives here: invocation-local ctx.cursor assignment proposes progress, committed solely by native fenced completion. The package regression guards this declaration-only scope; class-symbol exceptions are unsupported."

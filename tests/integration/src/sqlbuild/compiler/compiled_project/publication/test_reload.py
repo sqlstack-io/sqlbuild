@@ -77,7 +77,8 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
     with snapshot_api(tmp_path / "control") as api:
         monkeypatch.setenv("SQLBUILD_LOCATION_TOKEN", api.bearer)
         # A presentation-only width fallback must not bypass the native-only supervisor.
-        monkeypatch.setenv("COLUMNS", "999999999999999999999999999999")
+        # Keep the adversarial width out of pytest's own terminal reporter.
+        environment: dict[str, str] = os.environ | {"COLUMNS": "999999999999999999999999999999"}
         arguments: list[str] = [
             str(Path(sys.executable).with_name("sqb")),
             "--project-dir",
@@ -93,7 +94,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
         ]
         log: Path = project / "location.log"
         publications: Path = project / "publications.jsonl"
-        with location_process(arguments, log, publications) as process:
+        with location_process(arguments, log, publications, env=environment) as process:
             first: dict[str, Any] = wait_for_generation(api, test_case.target, 1, process, log)
             first_interpreter: int = int(compiler_pid.read_text())
             heartbeat: dict[str, Any] = wait_for_location_health(
@@ -182,7 +183,7 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             )
             process.terminate()
             assert process.wait(timeout=5) == test_case.expected_stop_code
-        with location_process(arguments, log, publications) as process:
+        with location_process(arguments, log, publications, env=environment) as process:
             restarted: dict[str, Any] = wait_for_generation(
                 api, test_case.target, test_case.expected_generation, process, log
             )

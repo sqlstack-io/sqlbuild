@@ -1,7 +1,7 @@
 //! HTTP contracts compiled within the API owner.
 
 #[path = "helpers.rs"]
-mod helpers;
+pub(crate) mod helpers;
 #[path = "output/helpers.rs"]
 mod output_helpers;
 #[path = "recall/helpers.rs"]

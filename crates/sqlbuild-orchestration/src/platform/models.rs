@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::api::models::ControlClient;
 use crate::declarations::models::TriggerDefinition;
+use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
 
 /// One pooled outbound connection; the location never receives a store handle.
 #[derive(Clone, Debug)]
@@ -45,6 +46,10 @@ pub struct LocationHealthObservation {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationWork {
     CheckConnection {},
+    EvaluateSensor {
+        #[schema(value_type = Object)]
+        evaluation: Box<SensorEvaluationRequest>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -78,6 +83,7 @@ pub struct LocationWorkClaim {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationWorkOutcome {
     Connection { healthy: bool },
+    SensorEvaluation { outcome: CustomSensorOutcome },
     Superseded {},
 }
 
