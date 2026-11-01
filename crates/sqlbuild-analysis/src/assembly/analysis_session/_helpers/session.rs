@@ -1064,13 +1064,14 @@ impl AnalysisSession {
                         finding.message.clone(),
                         finding.location,
                         finding.written.clone(),
+                        finding.phase,
                     )
                 })
                 .collect();
             let exact_columns: bool = schemas[model.position]
                 .iter()
                 .any(|(_, columns)| columns.iter().any(|(name, _)| name.starts_with(QUOTE)));
-            let resolved: Vec<DiagnosticRow> =
+            let resolved: Vec<(u8, DiagnosticRow)> =
                 self.catalog
                     .native
                     .finding_rows(&model.cleaned_sql, exact_columns, &findings)?;
@@ -1184,6 +1185,9 @@ impl AnalysisSession {
             return_types: &self.request.function_return_types,
             nullability_rules: self.request.nullability_rules.as_deref().unwrap_or(&[]),
             quoted_ignore_case: self.catalog.native.quoted_ignore_case,
+            known_functions: &self.catalog.native.options.known_functions,
+            known_types: &self.catalog.native.options.known_types,
+            duckdb_arities: self.catalog.native.dialect == polyglot_sql::DialectType::DuckDB,
         }
     }
 }

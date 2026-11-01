@@ -2,10 +2,15 @@ use crate::assembly::analysis_session::_helpers::resolution_rows::with_resolutio
 use crate::assembly::analysis_session::tests::test_types::ResolutionRowsTestCase;
 use crate::semantic_validation::models::DiagnosticRow;
 
+/// SQLBuild's own B101 wording, a row at line 0 in these cases.
+const SPELLING_ROW: &str = "Unknown function 'NVL2' for dialect DuckDB; did you mean COALESCE?";
+
 fn row((code, line, severity): (&str, usize, &str)) -> DiagnosticRow {
+    let messages: [String; 2] = [format!("{code} at {line}"), SPELLING_ROW.to_owned()];
+    let message: String = messages[usize::from(line == 0)].clone();
     DiagnosticRow {
         code: code.to_owned(),
-        message: format!("{code} at {line}"),
+        message,
         line: Some(line),
         column: Some(1),
         start: None,
@@ -18,36 +23,64 @@ fn row((code, line, severity): (&str, usize, &str)) -> DiagnosticRow {
 fn given_routed_findings_when_merging_diagnostics_then_only_shared_ones_stay_errors() {
     let test_cases = [
         ResolutionRowsTestCase {
-            description: "a finding polyglot also reports stays an error in its place",
+            description: "a finding polyglot also reports stays an error; unowned rows stay",
             polyglot: &[
-                ("B101", 1, "error"),
+                ("B000", 1, "error"),
                 ("B002", 2, "error"),
                 ("B210", 3, "error"),
             ],
-            sqlquack: &[("B002", 2, "error")],
+            sqlquack: &[(1, ("B002", 2, "error")), (2, ("B210", 3, "error"))],
             expected_rows: &[
-                ("B101", 1, "error"),
+                ("B000", 1, "error"),
                 ("B002", 2, "error"),
                 ("B210", 3, "error"),
+            ],
+        },
+        ResolutionRowsTestCase {
+            description: "scope rules come before polyglot's other rows, names and types after",
+            polyglot: &[
+                ("B230", 4, "error"),
+                ("B103", 1, "error"),
+                ("B002", 2, "error"),
+            ],
+            sqlquack: &[(1, ("B002", 2, "error")), (0, ("B230", 4, "error"))],
+            expected_rows: &[
+                ("B230", 4, "error"),
+                ("B103", 1, "error"),
+                ("B002", 2, "error"),
             ],
         },
         ResolutionRowsTestCase {
             description: "a finding polyglot does not report is a warning, after the rest",
-            polyglot: &[("B210", 3, "error")],
-            sqlquack: &[("B002", 2, "error")],
-            expected_rows: &[("B210", 3, "error"), ("B002", 2, "warning")],
+            polyglot: &[("B103", 3, "error")],
+            sqlquack: &[(2, ("B212", 2, "error"))],
+            expected_rows: &[("B103", 3, "error"), ("B212", 2, "warning")],
         },
         ResolutionRowsTestCase {
-            description: "a polyglot finding SQLQuack does not report is dropped",
-            polyglot: &[("B003", 4, "error"), ("B005", 5, "error")],
+            description: "polyglot's unknown functions and other owned rows SQLQuack lacks are dropped",
+            polyglot: &[
+                ("B101", 4, "error"),
+                ("B005", 5, "error"),
+                ("B217", 6, "error"),
+            ],
             sqlquack: &[],
-            expected_rows: &[("B005", 5, "error")],
+            expected_rows: &[],
+        },
+        ResolutionRowsTestCase {
+            description: "SQLBuild's own spelling check of a built-in stays",
+            polyglot: &[("B101", 0, "error")],
+            sqlquack: &[],
+            expected_rows: &[("B101", 0, "error")],
         },
     ];
     for test_case in test_cases {
         let merged: Vec<DiagnosticRow> = with_resolution_rows(
             test_case.polyglot.iter().copied().map(row).collect(),
-            test_case.sqlquack.iter().copied().map(row).collect(),
+            test_case
+                .sqlquack
+                .iter()
+                .map(|(phase, found)| (*phase, row(*found)))
+                .collect(),
         );
         assert_eq!(
             merged,

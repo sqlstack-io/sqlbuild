@@ -231,9 +231,13 @@ pub(crate) struct TypedMarkerCacheTestCase {
     pub(crate) expected_hits: &'static [bool],
 }
 
+/// A diagnostic row as `(code, line, severity)`.
+pub(crate) type RowShape = (&'static str, usize, &'static str);
+
 pub(crate) struct ResolutionRowsTestCase {
     pub(crate) description: &'static str,
     pub(crate) polyglot: &'static [(&'static str, usize, &'static str)],
-    pub(crate) sqlquack: &'static [(&'static str, usize, &'static str)],
+    /// SQLQuack's rows, each with its phase: 0 scope rules, 1 names, 2 types.
+    pub(crate) sqlquack: &'static [(u8, RowShape)],
     pub(crate) expected_rows: &'static [(&'static str, usize, &'static str)],
 }

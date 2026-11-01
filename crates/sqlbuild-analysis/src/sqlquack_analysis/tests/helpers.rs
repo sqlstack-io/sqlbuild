@@ -109,6 +109,9 @@ pub(crate) fn compile_types(sql: &str) -> Vec<String> {
         return_types: &[("LISTAGG".to_owned(), "TEXT".to_owned())],
         nullability_rules: &[("UPPER".to_owned(), "first_arg".to_owned())],
         quoted_ignore_case: false,
+        known_functions: &[],
+        known_types: &[],
+        duckdb_arities: false,
     };
     let model = CompiledModelSql {
         sql,

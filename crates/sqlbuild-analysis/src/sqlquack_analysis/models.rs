@@ -41,6 +41,8 @@ pub struct CompileFinding {
     pub location: Option<(usize, usize, usize, usize)>,
     /// The name as written; the message spells it in lower case.
     pub written: String,
+    /// When polyglot reports it: 0 scope rules, 1 names, 2 types.
+    pub phase: u8,
 }
 
 /// One output column's compile lineage.
@@ -75,4 +77,10 @@ pub struct CompileFunctions<'a> {
     pub nullability_rules: &'a [(String, String)],
     /// Whether the session sets QUOTED_IDENTIFIERS_IGNORE_CASE, so quoted names fold too.
     pub quoted_ignore_case: bool,
+    /// The project's declared functions, whose calls the type checks leave alone.
+    pub known_functions: &'a [String],
+    /// The project's declared types, which casts may name.
+    pub known_types: &'a [String],
+    /// Whether calls are checked against DuckDB's function catalog, as polyglot checks them.
+    pub duckdb_arities: bool,
 }

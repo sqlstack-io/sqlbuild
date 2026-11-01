@@ -431,8 +431,8 @@ def test_given_valid_audits_tests_and_hooks_when_building_then_checks_pass(
                     "B215",
                     "SQL test 'test_orders': Set-operation column 2 may fail during runtime "
                     "conversion: accumulated type TIMESTAMP_NTZ, next type VARCHAR",
-                    "Cast set-operation column 2 to the tested model's type TIMESTAMP in the "
-                    "expected or fixture rows, for example `CAST('2026-04-01' AS TIMESTAMP)`",
+                    "Cast set-operation column 2 to the tested model's type TIMESTAMP_NTZ in the "
+                    "expected or fixture rows, for example `CAST('2026-04-01' AS TIMESTAMP_NTZ)`",
                 ),
             ),
         ),

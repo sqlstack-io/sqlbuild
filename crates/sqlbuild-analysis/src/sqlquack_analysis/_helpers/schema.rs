@@ -1,5 +1,6 @@
 //! Dialect profiles and relation schemas as SQLQuack's lineage reads them.
 
+use crate::sqlquack_analysis::_helpers::function_arities::duckdb_arities;
 use std::collections::HashMap;
 
 use sqlquack_semantics::dialects::constants::{DUCKDB, SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
@@ -52,6 +53,27 @@ impl LineageSchema for TypedRelations<'_> {
             SAFE_CAST_RULE => Some(NullabilityRule::SafeCast),
             _ => None,
         }
+    }
+
+    fn known_function(&self, name: &str) -> bool {
+        self.functions
+            .known_functions
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(name))
+    }
+
+    fn function_arities(&self, name: &str, canonical: &str) -> Option<Vec<(usize, Option<usize>)>> {
+        match self.functions.duckdb_arities {
+            true => duckdb_arities(name, canonical),
+            false => None,
+        }
+    }
+
+    fn known_type(&self, name: &str) -> bool {
+        self.functions
+            .known_types
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(name))
     }
 }
 

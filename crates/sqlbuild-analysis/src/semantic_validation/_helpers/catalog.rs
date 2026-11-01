@@ -297,24 +297,25 @@ impl ProjectCatalog {
         })
     }
 
-    /// The diagnostic rows of SQLQuack's name findings in `sql`, mapped as validation errors are.
+    /// The diagnostic rows of SQLQuack's findings in `sql`, mapped as validation errors are, each
+    /// with its phase.
     ///
-    /// Each finding is `(code, message, location, written name)`; the message names it in lower
-    /// case, restored to its written spelling where validation keeps exact names.
+    /// A finding's message names a column in lower case, restored to its written spelling where
+    /// validation keeps exact names.
     pub fn finding_rows(
         &self,
         sql: &str,
         exact_columns: bool,
         findings: &[FindingInput],
-    ) -> Result<Vec<DiagnosticRow>, String> {
+    ) -> Result<Vec<(u8, DiagnosticRow)>, String> {
         let restore: bool = match self.quoted_ignore_case {
             true => sql.contains('"'),
             false => exact_columns,
         };
-        let errors: Vec<ValidationError> = findings
+        let errors: Vec<(u8, ValidationError)> = findings
             .iter()
-            .map(|(code, message, location, written)| {
-                let message: String = match restore {
+            .map(|(code, message, location, written, phase)| {
+                let message: String = match restore && !written.is_empty() {
                     true => message.replacen(
                         &format!("'{}'", written.to_lowercase()),
                         &format!("'{written}'"),
@@ -323,17 +324,18 @@ impl ProjectCatalog {
                     false => message.clone(),
                 };
                 let error = ValidationError::error(message, code);
-                match location {
+                let error = match location {
                     Some((start, end, line, column)) => error
                         .with_location(*line, *column)
                         .with_span(Some(*start), Some(*end)),
                     None => error,
-                }
+                };
+                (*phase, error)
             })
             .collect();
         Ok(diagnostics::map_findings(sql, self.dialect, errors)?
             .into_iter()
-            .map(diagnostic_row)
+            .map(|(phase, error)| (phase, diagnostic_row(error)))
             .collect())
     }
 
@@ -354,8 +356,14 @@ impl ProjectCatalog {
     }
 }
 
-/// A SQLQuack name finding: code, message, `(start, end, line, column)` and the written name.
-pub type FindingInput = (String, String, Option<(usize, usize, usize, usize)>, String);
+/// A SQLQuack finding: code, message, `(start, end, line, column)`, the written name and phase.
+pub type FindingInput = (
+    String,
+    String,
+    Option<(usize, usize, usize, usize)>,
+    String,
+    u8,
+);
 
 /// Count one analysis batch as running on the catalog's pool until dropped.
 struct RunningAnalysis<'a>(&'a AtomicUsize);

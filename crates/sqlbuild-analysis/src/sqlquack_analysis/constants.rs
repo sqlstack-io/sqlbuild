@@ -19,3 +19,6 @@ pub(crate) const VARCHAR_TYPE: &str = "VARCHAR";
 pub(crate) const FIRST_ARGUMENT_RULE: &str = "first_arg";
 pub(crate) const CONDITIONAL_RESULT_RULE: &str = "conditional_result";
 pub(crate) const SAFE_CAST_RULE: &str = "safe_cast";
+/// Grouping syntax DuckDB's ordinary function catalog does not list, taking one argument or more.
+pub(crate) const GROUPING_FUNCTIONS: [&str; 5] =
+    ["grouping", "grouping_id", "grouping sets", "cube", "rollup"];

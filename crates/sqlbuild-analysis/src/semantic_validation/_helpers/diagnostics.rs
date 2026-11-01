@@ -13,6 +13,7 @@ use polyglot_sql::{
     ValidationSeverity,
 };
 use regex::Regex;
+use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
@@ -69,16 +70,73 @@ pub(crate) fn column_pattern() -> Result<&'static Regex, String> {
     COLUMN.as_ref().map_err(Clone::clone)
 }
 
+/// A clause context's label and the byte ranges its pattern matches.
+type ContextMatches = (&'static str, Vec<(usize, usize)>);
+
 struct DiagnosticContext<'a> {
     sql: &'a str,
     dialect: DialectType,
     statements: Option<polyglot_sql::Result<Vec<Expression>>>,
+    /// The character offset each line starts at, indexed once for the SQL's diagnostics.
+    line_starts: Option<Vec<usize>>,
+    /// Where each word of the SQL occurs, indexed once for the SQL's diagnostics.
+    words: Option<FxHashMap<&'a str, Vec<usize>>>,
+    /// Each clause context's matches in the SQL, indexed once for the SQL's diagnostics.
+    contexts: Option<Vec<ContextMatches>>,
 }
 
 impl DiagnosticContext<'_> {
     fn parsed(&mut self) -> &polyglot_sql::Result<Vec<Expression>> {
         self.statements
             .get_or_insert_with(|| Dialect::get(self.dialect).parse(self.sql))
+    }
+
+    /// The 1-based line and column of the character `offset`.
+    fn line_column(&mut self, offset: usize) -> (Option<usize>, Option<usize>) {
+        let sql: &str = self.sql;
+        let starts: &Vec<usize> = self.line_starts.get_or_insert_with(|| line_starts(sql));
+        let line: usize = starts.partition_point(|start| *start <= offset);
+        let column: usize = offset - starts[line - 1] + 1;
+        (Some(line), Some(column))
+    }
+
+    /// Where the word `name` occurs, from the index when it is a word, else by scanning.
+    fn occurrences(&mut self, name: &str) -> Vec<usize> {
+        if name.is_empty() || !name.chars().all(word_character) {
+            return occurrences(self.sql, name);
+        }
+        let sql: &str = self.sql;
+        self.words
+            .get_or_insert_with(|| word_index(sql))
+            .get(name)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// The clause context of the SQL before byte `first`, as `context` reads that prefix.
+    fn context(&mut self, first: usize) -> Result<Option<&'static str>, String> {
+        let sql: &str = self.sql;
+        if self.contexts.is_none() {
+            self.contexts = Some(context_index(sql)?);
+        }
+        let indexed = self.contexts.iter().flatten();
+        let mut latest: Option<(usize, &'static str)> = None;
+        for (label, matches) in indexed {
+            let before: usize = matches.partition_point(|(_, end)| *end <= first);
+            if matches.get(before).is_some_and(|(start, _)| *start < first) {
+                return context(&sql[..first]);
+            }
+            if let Some((start, _)) = before.checked_sub(1).map(|index| matches[index])
+                && latest.is_none_or(|(latest, _)| start > latest)
+            {
+                latest = Some((start, label));
+            }
+        }
+        match latest {
+            Some((_, ORDER_BY)) => context(&sql[..first]),
+            Some((_, label)) => Ok(Some(label)),
+            None => Ok(None),
+        }
     }
 
     fn map(&mut self, mut error: ValidationError) -> Result<Option<ValidationError>, String> {
@@ -89,7 +147,7 @@ impl DiagnosticContext<'_> {
             return Ok(None);
         };
         if let Some(start) = error.start {
-            (error.line, error.column) = line_column(self.sql, start);
+            (error.line, error.column) = self.line_column(start);
         }
         if self.dialect == DialectType::Snowflake
             && (VALUES
@@ -126,13 +184,13 @@ impl DiagnosticContext<'_> {
         }
         if let Some(captures) = column_pattern()?.captures(&error.message) {
             let name = captures[1].rsplit('.').next().unwrap_or(&captures[1]);
-            let occurrences = occurrences(self.sql, name);
+            let occurrences = self.occurrences(name);
             if let Some(&first) = occurrences.first() {
                 if error.line.is_none() && occurrences.len() == 1 {
                     (error.line, error.column) =
-                        line_column(self.sql, self.sql[..first].chars().count());
+                        self.line_column(self.sql[..first].chars().count());
                 }
-                if let Some(context) = context(&self.sql[..first])? {
+                if let Some(context) = self.context(first)? {
                     error.message.push_str(&format!(" (context: {context})"));
                 }
             }
@@ -145,21 +203,27 @@ impl DiagnosticContext<'_> {
     }
 }
 
-/// `errors` in SQLBuild's codes and words, as `map_diagnostics` maps a validation's own.
+/// `errors` in SQLBuild's codes and words, as `map_diagnostics` maps a validation's own, each
+/// keeping its phase.
 pub(crate) fn map_findings(
     sql: &str,
     dialect: DialectType,
-    errors: Vec<ValidationError>,
-) -> Result<Vec<ValidationError>, String> {
+    errors: Vec<(u8, ValidationError)>,
+) -> Result<Vec<(u8, ValidationError)>, String> {
     let mut context = DiagnosticContext {
         sql,
         dialect,
         statements: None,
+        line_starts: None,
+        words: None,
+        contexts: None,
     };
-    let mut mapped: Vec<ValidationError> = Vec::with_capacity(errors.len());
-    for error in errors {
+    let (phases, mut located): (Vec<u8>, Vec<ValidationError>) = errors.into_iter().unzip();
+    locate_type_findings(sql, dialect, &mut located)?;
+    let mut mapped: Vec<(u8, ValidationError)> = Vec::with_capacity(located.len());
+    for (phase, error) in phases.into_iter().zip(located) {
         if let Some(error) = context.map(error)? {
-            mapped.push(error);
+            mapped.push((phase, error));
         }
     }
     Ok(mapped)
@@ -175,6 +239,9 @@ pub(crate) fn map_diagnostics(
         sql,
         dialect,
         statements: None,
+        line_starts: None,
+        words: None,
+        contexts: None,
     };
     let mut native = result.errors;
     locate_type_findings(sql, dialect, &mut native)?;
@@ -238,15 +305,57 @@ fn implicit_conversion_code(number: usize) -> Option<&'static str> {
     }
 }
 
+fn word_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '_'
+}
+
 fn occurrences(sql: &str, name: &str) -> Vec<usize> {
     sql.match_indices(name)
         .filter_map(|(offset, _)| {
-            let word = |ch: char| ch.is_ascii_alphanumeric() || ch == '_';
-            (!sql[..offset].chars().next_back().is_some_and(word)
-                && !sql[offset + name.len()..].chars().next().is_some_and(word))
+            (!sql[..offset]
+                .chars()
+                .next_back()
+                .is_some_and(word_character)
+                && !sql[offset + name.len()..]
+                    .chars()
+                    .next()
+                    .is_some_and(word_character))
             .then_some(offset)
         })
         .collect()
+}
+
+/// The byte offsets of each maximal run of word characters in `sql`, by its text.
+fn word_index(sql: &str) -> FxHashMap<&str, Vec<usize>> {
+    let mut words: FxHashMap<&str, Vec<usize>> = FxHashMap::default();
+    let mut start: Option<usize> = None;
+    for (offset, character) in sql.char_indices().chain([(sql.len(), ' ')]) {
+        match (word_character(character), start) {
+            (true, None) => start = Some(offset),
+            (false, Some(begun)) => {
+                words.entry(&sql[begun..offset]).or_default().push(begun);
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    words
+}
+
+/// Each clause context's matches in `sql`, in order.
+fn context_index(sql: &str) -> Result<Vec<ContextMatches>, String> {
+    Ok(CONTEXTS
+        .as_ref()
+        .map_err(Clone::clone)?
+        .iter()
+        .map(|(label, pattern)| {
+            let matches: Vec<(usize, usize)> = pattern
+                .find_iter(sql)
+                .map(|found| (found.start(), found.end()))
+                .collect();
+            (*label, matches)
+        })
+        .collect())
 }
 
 fn context(prefix: &str) -> Result<Option<&'static str>, String> {
@@ -271,18 +380,16 @@ fn context(prefix: &str) -> Result<Option<&'static str>, String> {
     Ok(Some(label))
 }
 
-fn line_column(sql: &str, offset: usize) -> (Option<usize>, Option<usize>) {
-    let mut line = 1;
-    let mut column = 1;
-    for ch in sql.chars().take(offset) {
-        if ch == '\n' {
-            line += 1;
-            column = 1;
-        } else {
-            column += 1;
-        }
-    }
-    (Some(line), Some(column))
+/// The character offset each line of `sql` starts at, the first line at 0.
+fn line_starts(sql: &str) -> Vec<usize> {
+    let mut starts: Vec<usize> = vec![0];
+    starts.extend(
+        sql.chars()
+            .enumerate()
+            .filter(|(_, character)| *character == '\n')
+            .map(|(offset, _)| offset + 1),
+    );
+    starts
 }
 
 fn unqualified(expression: &Expression, name: &str) -> bool {

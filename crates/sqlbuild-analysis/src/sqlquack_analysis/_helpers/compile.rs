@@ -56,6 +56,7 @@ pub(crate) fn model_lineage(
                         .span
                         .map(|span| (span.start, span.end, span.line, span.column)),
                     written: finding.written,
+                    phase: finding.phase,
                 })
                 .collect(),
             columns: lineage

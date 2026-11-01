@@ -215,7 +215,7 @@
 "models",
 {
 "adapter_rules_cte": "b7b1ae269c682b4ac79805fd",
-"adapter_rules_staging": "4a26439202e23673771c0e43",
+"adapter_rules_staging": "c0a774abd69bc98279c13eae",
 "adapter_rules_untyped_cte": "67c92d41aa309ed10c0b1f06",
 "dotless_i_staging": "19c2a98d51475b2ad696161f",
 "long_s_cte": "35171fc0a8352d9297246ab2",
@@ -631,7 +631,7 @@
 "models",
 {
 "adapter_rules_cte": "b7b1ae269c682b4ac79805fd",
-"adapter_rules_staging": "4a26439202e23673771c0e43",
+"adapter_rules_staging": "c0a774abd69bc98279c13eae",
 "adapter_rules_untyped_cte": "67c92d41aa309ed10c0b1f06",
 "dotless_i_staging": "19c2a98d51475b2ad696161f",
 "long_s_cte": "35171fc0a8352d9297246ab2",
@@ -1047,7 +1047,7 @@
 "models",
 {
 "adapter_rules_cte": "b7b1ae269c682b4ac79805fd",
-"adapter_rules_staging": "4a26439202e23673771c0e43",
+"adapter_rules_staging": "c0a774abd69bc98279c13eae",
 "adapter_rules_untyped_cte": "67c92d41aa309ed10c0b1f06",
 "dotless_i_staging": "19c2a98d51475b2ad696161f",
 "long_s_cte": "35171fc0a8352d9297246ab2",
