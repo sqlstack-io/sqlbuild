@@ -5,8 +5,9 @@ import { ApiError } from '../client';
 import type { PlatformApi } from '../platform-client';
 import type { LocalChangeBus } from '../signals';
 import type {
+	AccessDecision,
 	AccessExplanation,
-	AccessGrantPath,
+	AccessOverview,
 	AccessQuery,
 	Account,
 	ApiToken,
@@ -16,6 +17,7 @@ import type {
 	BuiltInRole,
 	Capability,
 	ConnectionTest,
+	EffectiveAccess,
 	IssuedToken,
 	JanitorEvent,
 	Location,
@@ -38,28 +40,35 @@ import type {
 	RoleAssignment,
 	RoleAssignmentRequest,
 	RoleDefinition,
+	RoleDetail,
 	RoleGrant,
 	Scope,
 	ServerSettings,
 	ServiceAccountRequest,
 	SettingField,
+	SsoMapping,
 	WarehouseConnection
 } from '../types';
+import {
+	ADMIN_ONLY,
+	approvalImpact,
+	baseGrantsOf,
+	definitionText,
+	effective,
+	explain,
+	missingForGrant,
+	plainAction,
+	recentlyMatchedCount,
+	roleAvailableAt,
+	selectorMatches,
+	type AccessData
+} from './access';
 import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { triggerId } from './operate';
 import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
-
-const ADMIN_ONLY: readonly Capability[] = ['location.manage', 'user.manage', 'role.assign', 'token.manage', 'audit.view'];
-
-/** Mock-only selector membership for node-scoped grants. */
-const SELECTOR_NODES: Record<string, string[]> = {
-	'group:finance': ['daily_revenue', 'fact_orders', 'revenue_refresh', 'stg_payments'],
-	'tag:pii': ['dim_customers', 'stg_customers', 'fact_orders'],
-	'group:support': ['support_tickets', 'ticket_backlog']
-};
 
 export type MockPlatformContext = {
 	now: number;
@@ -83,19 +92,14 @@ function randomHex(length: number): string {
 	return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, length);
 }
 
-function matchesSelector(selector: string, node: string): boolean {
-	if (selector === '*') return true;
-	return selector.split(',').every((part) => (SELECTOR_NODES[part] ?? [part]).includes(node));
-}
-
-function createPlatformFixtures(now: number) {
+function createPlatformFixtures(now: number, role: BuiltInRole) {
 	const ago = (minutes: number) => new Date(now - minutes * MIN).toISOString();
 	const ahead = (minutes: number) => new Date(now + minutes * MIN).toISOString();
 	const days = (n: number) => n * 24 * 60;
 
 	// ---- accounts ----
 	const accounts: Account[] = [
-		{ ...DEMO_USER, kind: 'user', email: 'demo@example.com', source: 'oidc', ssoGroups: ['data-platform'], createdAt: ago(days(210)), lastSeenAt: ago(0.1), disabled: false, activeSessions: 2, owner: null, description: null },
+		{ ...DEMO_USER, kind: 'user', email: 'demo@example.com', source: 'oidc', ssoGroups: [], createdAt: ago(days(210)), lastSeenAt: ago(0.1), disabled: false, activeSessions: 2, owner: null, description: null },
 		{ ...ALEX, kind: 'user', email: 'alex@example.com', source: 'oidc', ssoGroups: ['analytics-eng'], createdAt: ago(days(180)), lastSeenAt: ago(25), disabled: false, activeSessions: 1, owner: null, description: null },
 		{ ...SAM, kind: 'user', email: 'sam@example.com', source: 'oidc', ssoGroups: ['analytics-eng', 'finance-analysts'], createdAt: ago(days(95)), lastSeenAt: ago(190), disabled: false, activeSessions: 1, owner: null, description: null },
 		{ ...JORDAN, kind: 'user', email: 'jordan@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(40)), lastSeenAt: ago(days(3)), disabled: false, activeSessions: 0, owner: null, description: null },
@@ -122,129 +126,199 @@ function createPlatformFixtures(now: number) {
 	const builtIn = (name: BuiltInRole, description: string): RoleDefinition => ({
 		name,
 		source: 'built_in',
-		sourceFile: null,
+		definedIn: null,
 		description,
+		extends: null,
 		grants: [{ nodes: ['*'], permissions: ROLE_CAPABILITIES[name] }],
-		pendingApprovalId: null
+		pendingApprovalId: null,
+		holders: 0,
+		recentlyMatched: 0
 	});
+	const custom = (role: Pick<RoleDefinition, 'name' | 'source' | 'definedIn' | 'description' | 'extends' | 'grants' | 'pendingApprovalId'>): RoleDefinition => ({ ...role, holders: 0, recentlyMatched: 0 });
 	const roles: RoleDefinition[] = [
-		builtIn('viewer', 'See everything except SQL and evidence.'),
-		builtIn('operator', 'Run, cancel and rerun jobs; pause triggers; refresh warehouse sync.'),
-		builtIn('developer', 'Operator, plus ad-hoc runs, plan previews, connection tests and evidence.'),
-		builtIn('admin', 'Everything, including users, roles, tokens, locations and the audit log.'),
-		{
+		builtIn('viewer', 'See everything except SQL and sample rows.'),
+		builtIn('operator', 'Run, cancel and rerun jobs; pause triggers; refresh the warehouse sync.'),
+		builtIn('developer', 'Operator, plus ad-hoc runs, full refreshes, plan previews, connection tests and sample rows.'),
+		builtIn('admin', 'Everything, including people, roles, tokens, locations and the audit log.'),
+		custom({
 			name: 'support_viewer',
 			source: 'server_config',
-			sourceFile: 'sqb-server.toml',
-			description: 'Support team: view support models and their SQL.',
-			grants: [{ nodes: ['group:support'], permissions: ['view', 'view.sql'] }],
+			definedIn: 'sqb-server.toml:31',
+			description: 'Support team: see reporting models and their SQL.',
+			extends: 'viewer',
+			grants: [{ nodes: ['group:reporting'], permissions: ['view.sql'] }],
 			pendingApprovalId: null
-		},
-		{
+		}),
+		custom({
+			name: 'platform_on_call',
+			source: 'server_config',
+			definedIn: 'sqb-server.toml:38',
+			description: 'Platform on-call: operate everything and check connections and plans.',
+			extends: 'operator',
+			grants: [{ nodes: ['*'], permissions: ['connection.test', 'plan.preview'] }],
+			pendingApprovalId: null
+		}),
+		custom({
 			name: 'finance_operator',
 			source: 'project',
-			sourceFile: 'roles.toml',
+			definedIn: 'roles.toml:1',
 			description: 'Finance analysts operate finance jobs.',
+			extends: 'viewer',
 			grants: [
-				{ nodes: ['group:finance'], permissions: ['job.run', 'run.adhoc', 'run.cancel', 'view.sql'] },
-				{ nodes: ['group:finance,tag:pii'], permissions: ['view.evidence'] }
+				{ nodes: ['tag:finance'], permissions: ['job.run', 'run.cancel', 'view.sql'] },
+				{ nodes: ['tag:finance,group:marts'], permissions: ['view.evidence'] }
 			],
 			pendingApprovalId: 'appr-3'
-		}
+		}),
+		custom({
+			name: 'reporting_operator',
+			source: 'project',
+			definedIn: 'roles.toml:12',
+			description: 'Operates the reporting group.',
+			extends: 'viewer',
+			grants: [{ nodes: ['group:reporting'], permissions: ['job.run', 'run.cancel'] }],
+			pendingApprovalId: 'appr-4'
+		})
 	];
 
+	const manual = (id: string, principal: Principal, role: string, locationId: string | null, minutesAgo: number, stale = false): RoleAssignment => ({
+		id, principal, role, scope: { locationId }, source: 'manual', ssoGroup: null, definedIn: null, assignedBy: DEMO_USER, assignedAt: ago(minutesAgo), stale
+	});
+	const sso = (id: string, principal: Principal, role: string, locationId: string | null, group: string, minutesAgo: number): RoleAssignment => ({
+		id, principal, role, scope: { locationId }, source: 'sso', ssoGroup: group, definedIn: null, assignedBy: null, assignedAt: ago(minutesAgo), stale: false
+	});
+	const people = [DEMO_USER, ALEX, SAM, JORDAN, OPS_USER, RILEY];
 	const assignments: RoleAssignment[] = [
-		{ id: 'asg-1', principal: DEMO_USER, role: 'admin', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: SYSTEM, assignedAt: ago(days(210)), stale: false },
-		{ id: 'asg-2', principal: ALEX, role: 'developer', scope: { locationId: LOCATION_SHOP_STAGING }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(180)), stale: false },
-		{ id: 'asg-3', principal: ALEX, role: 'operator', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(170)), stale: false },
-		{ id: 'asg-4', principal: SAM, role: 'developer', scope: { locationId: LOCATION_SHOP_STAGING }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(95)), stale: false },
-		{ id: 'asg-5', principal: SAM, role: 'finance_operator', scope: { locationId: LOCATION_SHOP }, source: 'sso', ssoGroup: 'finance-analysts', assignedBy: null, assignedAt: ago(days(95)), stale: false },
-		{ id: 'asg-6', principal: JORDAN, role: 'viewer', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(40)), stale: false },
-		{ id: 'asg-7', principal: JORDAN, role: 'growth_analyst', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(38)), stale: true },
-		{ id: 'asg-8', principal: CI_ACCOUNT, role: 'operator', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(200)), stale: false },
-		{ id: 'asg-9', principal: REPORTING, role: 'viewer', scope: { locationId: LOCATION_MARKETING }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(120)), stale: false },
-		{ id: 'asg-11', principal: OPS_USER, role: 'operator', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(150)), stale: false },
-		{ id: 'asg-10', principal: RILEY, role: 'support_viewer', scope: { locationId: null }, source: 'sso', ssoGroup: 'support-ops', assignedBy: null, assignedAt: ago(days(300)), stale: false }
+		{ ...manual('asg-1', DEMO_USER, role, null, days(210)), assignedBy: SYSTEM },
+		...people.map((p, i): RoleAssignment => ({
+			id: `asg-default-${p.name}`, principal: p, role: 'viewer', scope: { locationId: null }, source: 'built_in', ssoGroup: null,
+			definedIn: 'sqb-server.toml:24', assignedBy: null, assignedAt: accounts[i].createdAt, stale: false
+		})),
+		sso('asg-2', ALEX, 'developer', LOCATION_SHOP_STAGING, 'analytics-eng', days(180)),
+		manual('asg-3', ALEX, 'operator', LOCATION_SHOP, days(170)),
+		sso('asg-4', SAM, 'developer', LOCATION_SHOP_STAGING, 'analytics-eng', days(95)),
+		sso('asg-5', SAM, 'finance_operator', LOCATION_SHOP, 'finance-analysts', days(95)),
+		manual('asg-12', JORDAN, 'reporting_operator', LOCATION_SHOP, days(5)),
+		manual('asg-7', JORDAN, 'growth_analyst', LOCATION_SHOP, days(38), true),
+		{ ...manual('asg-8', CI_ACCOUNT, 'operator', LOCATION_SHOP, days(200)), source: 'policy', definedIn: 'sqb-server.toml:61', assignedBy: null },
+		manual('asg-9', REPORTING, 'viewer', LOCATION_MARKETING, days(120)),
+		manual('asg-11', OPS_USER, 'operator', null, days(150)),
+		sso('asg-13', OPS_USER, 'platform_on_call', null, 'data-platform', days(150)),
+		sso('asg-10', RILEY, 'support_viewer', null, 'support-ops', days(300))
 	];
 
+	const ssoMappings: SsoMapping[] = [
+		{ group: 'data-platform', role: 'platform_on_call', scope: { locationId: null }, definedIn: 'sqb-server.toml:47', membersSynced: 1, lastSyncedAt: ago(1.5) },
+		{ group: 'analytics-eng', role: 'developer', scope: { locationId: LOCATION_SHOP_STAGING }, definedIn: 'sqb-server.toml:52', membersSynced: 2, lastSyncedAt: ago(25) },
+		{ group: 'finance-analysts', role: 'finance_operator', scope: { locationId: LOCATION_SHOP }, definedIn: 'sqb-server.toml:57', membersSynced: 1, lastSyncedAt: ago(190) },
+		{ group: 'support-ops', role: 'support_viewer', scope: { locationId: null }, definedIn: 'sqb-server.toml:62', membersSynced: 1, lastSyncedAt: ago(days(61)) },
+		{ group: 'warehouse-admins', role: 'admin', scope: { locationId: null }, definedIn: 'sqb-server.toml:67', membersSynced: 0, lastSyncedAt: null }
+	];
+
+	const approval = (
+		a: Omit<RoleApproval, 'definitionBefore' | 'definitionAfter' | 'impact' | 'decidedBy' | 'decidedAt' | 'note' | 'state'> &
+			Partial<Pick<RoleApproval, 'decidedBy' | 'decidedAt' | 'note' | 'state'>>
+	): RoleApproval => ({ state: 'pending', decidedBy: null, decidedAt: null, note: null, definitionBefore: '', definitionAfter: '', impact: [], ...a });
 	const approvals: RoleApproval[] = [
-		{
+		approval({
 			id: 'appr-3',
 			role: 'finance_operator',
 			locationId: LOCATION_SHOP,
 			snapshotGeneration: 42,
 			gitRevision: '7d2e41a',
 			gitAuthor: 'Alex Rivera',
+			gitAuthorAccount: 'alex',
 			proposedAt: ago(190),
 			added: [
-				{ nodes: ['group:finance'], permissions: ['run.rewrite_history'] },
-				{ nodes: ['tag:pii'], permissions: ['view.evidence'] }
+				{ nodes: ['tag:finance'], permissions: ['run.rewrite_history'] },
+				{ nodes: ['tag:finance'], permissions: ['view.evidence'] }
 			],
-			removed: [{ nodes: ['group:finance,tag:pii'], permissions: ['view.evidence'] }],
-			state: 'pending',
-			decidedBy: null,
-			decidedAt: null,
-			note: null
-		},
-		{
+			removed: [{ nodes: ['tag:finance'], permissions: ['run.adhoc'] }]
+		}),
+		approval({
+			id: 'appr-4',
+			role: 'reporting_operator',
+			locationId: LOCATION_SHOP,
+			snapshotGeneration: 42,
+			gitRevision: 'e19b3c2',
+			gitAuthor: 'Demo User',
+			gitAuthorAccount: 'demo',
+			proposedAt: ago(190),
+			added: [{ nodes: ['group:reporting'], permissions: ['trigger.toggle'] }],
+			removed: []
+		}),
+		approval({
 			id: 'appr-2',
 			role: 'support_triage',
 			locationId: LOCATION_MARKETING,
 			snapshotGeneration: 16,
 			gitRevision: '2a9e0c4',
 			gitAuthor: 'Sam Okafor',
+			gitAuthorAccount: 'sam',
 			proposedAt: ago(days(9)),
 			added: [{ nodes: ['*'], permissions: ['job.run'] }],
 			removed: [],
 			state: 'rejected',
 			decidedBy: DEMO_USER,
 			decidedAt: ago(days(8)),
-			note: 'Too broad; scope it to group:support.'
-		},
-		{
+			note: 'Too broad; scope it to group:reporting.'
+		}),
+		approval({
 			id: 'appr-1',
 			role: 'finance_operator',
 			locationId: LOCATION_SHOP,
 			snapshotGeneration: 35,
 			gitRevision: 'c03d1f7',
 			gitAuthor: 'Sam Okafor',
+			gitAuthorAccount: 'sam',
 			proposedAt: ago(days(21)),
-			added: [{ nodes: ['group:finance'], permissions: ['run.cancel'] }],
+			added: [{ nodes: ['tag:finance'], permissions: ['run.cancel'] }],
 			removed: [],
 			state: 'approved',
 			decidedBy: DEMO_USER,
 			decidedAt: ago(days(20)),
 			note: 'Finance on-call needs to cancel stuck runs.'
-		}
+		})
 	];
+	for (const a of approvals) {
+		const r = roles.find((x) => x.name === a.role);
+		const current = r?.grants ?? a.removed;
+		const proposed = applyDiff(current, a);
+		const shape = r ?? { name: a.role, source: 'project' as const, description: '', extends: 'viewer' as const, grants: [] };
+		a.definitionBefore = definitionText({ ...(shape as RoleDefinition) }, a.state === 'approved' ? current.filter((g) => !a.added.some((x) => grantKey(x) === grantKey(g))) : withRemoved(current, a.removed));
+		a.definitionAfter = definitionText({ ...(shape as RoleDefinition) }, a.state === 'approved' ? current : proposed);
+	}
 
 	// ---- audit ----
 	let auditSeq = 0;
-	const entry = (minutesAgo: number, e: Omit<AuditEntry, 'id' | 'at' | 'ip' | 'requestId'> & { ip?: string }): AuditEntry => {
+	const entry = (minutesAgo: number, e: Omit<AuditEntry, 'id' | 'at' | 'ip' | 'requestId' | 'decisionId'> & { ip?: string; decisionId?: string }): AuditEntry => {
 		auditSeq += 1;
 		return {
 			id: `aud-${String(auditSeq).padStart(4, '0')}`,
 			at: ago(minutesAgo),
 			ip: e.ip ?? '10.0.4.17',
 			requestId: `req-${randomHex(12)}`,
+			decisionId: null,
 			...e
 		};
 	};
 	const shopProd = { locationId: LOCATION_SHOP };
 	const auditEntries: AuditEntry[] = [
-		entry(2, { actor: DEMO_USER, action: 'warehouse.sync', outcome: 'allowed', scope: { ...shopProd, subject: null }, grantingRole: 'admin', evidenceRead: false, summary: 'Requested a warehouse sync (started)', before: null, after: null }),
+		entry(2, { actor: DEMO_USER, action: 'warehouse.sync', outcome: 'allowed', scope: { ...shopProd, subject: null }, grantingRole: role, evidenceRead: false, summary: 'Requested a warehouse sync (started)', before: null, after: null }),
 		entry(18, { actor: SAM, action: 'view.evidence', outcome: 'allowed', scope: { ...shopProd, subject: 'fact_orders' }, grantingRole: 'finance_operator', evidenceRead: true, summary: 'Read sample rows of fact_orders', before: null, after: null, ip: '10.0.7.33' }),
-		entry(26, { actor: JORDAN, action: 'run.cancel', outcome: 'denied', scope: { ...shopProd, subject: 'run-9d21' }, grantingRole: null, evidenceRead: false, summary: 'Denied: no role grants run.cancel on prod (viewer grants view only)', before: null, after: null, ip: '10.0.9.4' }),
+		entry(26, { actor: JORDAN, action: 'job.run', outcome: 'denied', decisionId: 'dec-4k7q2m', scope: { ...shopProd, subject: 'daily_revenue' }, grantingRole: null, evidenceRead: false, summary: 'Denied: reporting_operator runs jobs on group:reporting only', before: null, after: null, ip: '10.0.9.4' }),
 		entry(42, { actor: CI_ACCOUNT, action: 'job.run', outcome: 'allowed', scope: { ...shopProd, subject: 'checks_only' }, grantingRole: 'operator', evidenceRead: false, summary: 'Launched checks_only', before: null, after: 'run-c40e queued', ip: '10.0.2.8' }),
 		entry(55, { actor: ALEX, action: 'trigger.toggle', outcome: 'allowed', scope: { ...shopProd, subject: 'revenue_refresh' }, grantingRole: 'operator', evidenceRead: false, summary: 'Paused revenue_refresh', before: 'running', after: 'paused', ip: '10.0.7.21' }),
-		entry(70, { actor: ALEX, action: 'run.adhoc', outcome: 'denied', scope: { ...shopProd, subject: 'daily_revenue+' }, grantingRole: null, evidenceRead: false, summary: 'Denied: run.adhoc missing on 4 nodes (daily_revenue, revenue_dashboard, …)', before: null, after: null, ip: '10.0.7.21' }),
-		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed a widening of finance_operator; held for approval', before: null, after: 'pending appr-3', ip: '—' }),
-		entry(300, { actor: DEMO_USER, action: 'token.manage', outcome: 'allowed', scope: { locationId: null, subject: 'tok-2' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated token "Dashboard refresh"', before: 'sqbt_77d0', after: 'sqbt_9a07' }),
-		entry(720, { actor: JORDAN, action: 'connection.test', outcome: 'denied', scope: { ...shopProd, subject: 'prod' }, grantingRole: null, evidenceRead: false, summary: 'Denied: connection.test requires developer or above', before: null, after: null, ip: '10.0.9.4' }),
-		entry(days(1) + 60, { actor: SAM, action: 'view.evidence', outcome: 'denied', scope: { ...shopProd, subject: 'dim_customers' }, grantingRole: null, evidenceRead: false, summary: 'Denied: finance_operator grants view.evidence only on group:finance,tag:pii', before: null, after: null, ip: '10.0.7.33' }),
-		entry(days(2), { actor: DEMO_USER, action: 'location.manage', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'ltok-1' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated the location token', before: 'sqbl_a210', after: 'sqbl_3f9a' }),
-		entry(days(8), { actor: DEMO_USER, action: 'role.reject', outcome: 'allowed', scope: { locationId: LOCATION_MARKETING, subject: 'support_triage' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rejected widening of support_triage', before: 'pending', after: 'rejected' }),
-		entry(days(20), { actor: DEMO_USER, action: 'role.approve', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: 'admin', evidenceRead: false, summary: 'Approved widening of finance_operator (+run.cancel on group:finance)', before: 'pending', after: 'approved' })
+		entry(70, { actor: ALEX, action: 'run.adhoc', outcome: 'denied', decisionId: 'dec-8h3n5w', scope: { ...shopProd, subject: 'daily_revenue+' }, grantingRole: null, evidenceRead: false, summary: 'Denied: operator doesn’t include ad-hoc runs in waffle-shop', before: null, after: null, ip: '10.0.7.21' }),
+		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed giving finance_operator more; held for approval', before: null, after: 'pending appr-3', ip: '—' }),
+		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'reporting_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed giving reporting_operator more; held for approval', before: null, after: 'pending appr-4', ip: '—' }),
+		entry(300, { actor: DEMO_USER, action: 'token.manage', outcome: 'allowed', scope: { locationId: null, subject: 'tok-2' }, grantingRole: role, evidenceRead: false, summary: 'Rotated token "Dashboard refresh"', before: 'sqbt_77d0', after: 'sqbt_9a07' }),
+		entry(720, { actor: JORDAN, action: 'connection.test', outcome: 'denied', decisionId: 'dec-2p9x6r', scope: { ...shopProd, subject: 'prod' }, grantingRole: null, evidenceRead: false, summary: 'Denied: testing connections needs developer or above', before: null, after: null, ip: '10.0.9.4' }),
+		entry(days(1) + 60, { actor: SAM, action: 'view.evidence', outcome: 'denied', decisionId: 'dec-6t1v8c', scope: { ...shopProd, subject: 'dim_customers' }, grantingRole: null, evidenceRead: false, summary: 'Denied: finance_operator shows sample rows only on tag:finance,group:marts', before: null, after: null, ip: '10.0.7.33' }),
+		entry(days(2), { actor: DEMO_USER, action: 'location.manage', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'ltok-1' }, grantingRole: role, evidenceRead: false, summary: 'Rotated the location token', before: 'sqbl_a210', after: 'sqbl_3f9a' }),
+		entry(days(4), { actor: DEMO_USER, action: 'run.rewrite_history', outcome: 'denied', decisionId: 'dec-5r2w9j', scope: { ...shopProd, subject: 'daily_revenue' }, grantingRole: null, evidenceRead: false, summary: 'Denied: no role allowed a full refresh of daily_revenue at the time', before: null, after: null }),
+		entry(days(8), { actor: DEMO_USER, action: 'role.reject', outcome: 'allowed', scope: { locationId: LOCATION_MARKETING, subject: 'support_triage' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rejected the change to support_triage', before: 'pending', after: 'rejected' }),
+		entry(days(20), { actor: DEMO_USER, action: 'role.approve', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: 'admin', evidenceRead: false, summary: 'Approved the change to finance_operator (+run.cancel on tag:finance)', before: 'pending', after: 'approved' })
 	];
 
 	// ---- locations ----
@@ -502,7 +576,7 @@ function createPlatformFixtures(now: number) {
 		janitor('jan-3', 'archive', days(16), 'STAGING', 'view', 'WAFFLE_SHOP.STAGING.STG_COUPONS', 'WAFFLE_SHOP.STAGING._SQB_ARCHIVE__20261013T040000Z__STG_COUPONS', days(16), 'run-jan-6d0')
 	];
 
-	return { accounts, apiTokens, locationTokens, roles, assignments, approvals, auditEntries, locationExtras, warehouseByLocation, providers, migrations, oldNameViews, janitorEvents };
+	return { accounts, apiTokens, locationTokens, roles, assignments, ssoMappings, approvals, auditEntries, locationExtras, warehouseByLocation, providers, migrations, oldNameViews, janitorEvents };
 }
 
 /** How the platform-event sensor (see `platform_health_webhook` in operate.ts) handled an event. */
@@ -556,7 +630,7 @@ export class MockPlatformApi implements PlatformApi {
 
 	constructor(ctx: MockPlatformContext) {
 		this.#ctx = ctx;
-		this.#data = createPlatformFixtures(ctx.now);
+		this.#data = createPlatformFixtures(ctx.now, ctx.role);
 	}
 
 	/** Records an audited read of check evidence (`view.evidence`). */
@@ -823,8 +897,22 @@ export class MockPlatformApi implements PlatformApi {
 
 	async listRoles(locationId: string): Promise<RoleDefinition[]> {
 		this.#require('role.assign');
-		const roles = this.#data.roles.filter((r) => r.source !== 'project' || SHOP_LOCATIONS.includes(locationId));
+		const roles = this.#data.roles.filter((r) => roleAvailableAt(r, locationId)).map((r) => this.#withCounts(r));
 		return this.#ctx.reply(structuredClone(roles));
+	}
+
+	async getRole(locationId: string, name: string): Promise<RoleDetail | null> {
+		this.#require('role.assign');
+		const role = this.#data.roles.find((r) => r.name === name && roleAvailableAt(r, locationId));
+		if (!role) return this.#ctx.reply(null);
+		const detail: RoleDetail = {
+			...this.#withCounts(role),
+			baseGrants: baseGrantsOf(role),
+			selectors: selectorMatches(role),
+			assignments: this.#data.assignments.filter((a) => a.role === role.name),
+			definition: definitionText(role)
+		};
+		return this.#ctx.reply(structuredClone(detail));
 	}
 
 	async listRoleAssignments(): Promise<RoleAssignment[]> {
@@ -835,12 +923,26 @@ export class MockPlatformApi implements PlatformApi {
 	async createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment> {
 		this.#require('role.assign');
 		const principal = this.#data.accounts.find((a) => a.name === request.principal);
-		if (!principal) throw new ApiError(`Unknown principal ${request.principal}`, 404);
-		if (!this.#data.roles.some((r) => r.name === request.role)) throw new ApiError(`Unknown role ${request.role}`, 404);
+		if (!principal) throw new ApiError(`Unknown account ${request.principal}`, 404);
+		const role = this.#data.roles.find((r) => r.name === request.role);
+		if (!role) throw new ApiError(`Unknown role ${request.role}`, 404);
+		const locationIds = request.scope.locationId === null ? this.#ctx.locations.map((l) => l.id) : [request.scope.locationId];
+		if (request.scope.locationId !== null && !roleAvailableAt(role, request.scope.locationId)) {
+			throw new ApiError(`${role.name} isn't defined in ${this.#locationName(request.scope.locationId)}: it comes from another project's policy file`, 422);
+		}
 		const duplicate = this.#data.assignments.some(
-			(a) => a.principal.name === principal.name && a.role === request.role && a.scope.locationId === request.scope.locationId
+			(a) => a.principal.name === principal.name && a.role === request.role && a.scope.locationId === request.scope.locationId && a.source === 'manual'
 		);
 		if (duplicate) throw new ApiError('That assignment already exists', 409);
+		const missing = missingForGrant(this.#access(), this.#ctx.user.name, role, locationIds);
+		if (missing.length) {
+			const m = missing[0];
+			const more = missing.length > 1 ? ` (and ${missing.length - 1} more)` : '';
+			throw new ApiError(
+				`You can only give roles you hold. ${role.name} includes ${m.action} (${plainAction(m.action)}) on ${m.selector ?? 'every node'} in ${this.#locationName(m.locationId)}, which you don't have${more}.`,
+				403
+			);
+		}
 		const assignment: RoleAssignment = {
 			id: `asg-${randomHex(6)}`,
 			principal: { kind: principal.kind, name: principal.name, displayName: principal.displayName },
@@ -848,12 +950,13 @@ export class MockPlatformApi implements PlatformApi {
 			scope: request.scope,
 			source: 'manual',
 			ssoGroup: null,
+			definedIn: null,
 			assignedBy: this.#ctx.user,
 			assignedAt: new Date().toISOString(),
 			stale: false
 		};
 		this.#data.assignments.push(assignment);
-		this.#audit('role.assign', { ...request.scope, subject: principal.name }, `Assigned ${request.role} to ${principal.name}`, null, request.role);
+		this.#audit('role.assign', { ...request.scope, subject: principal.name }, `Gave ${request.role} to ${principal.name}`, null, request.role);
 		return this.#ctx.reply(structuredClone(assignment));
 	}
 
@@ -862,21 +965,30 @@ export class MockPlatformApi implements PlatformApi {
 		const index = this.#data.assignments.findIndex((a) => a.id === assignmentId);
 		if (index < 0) throw new ApiError('Assignment not found', 404);
 		const assignment = this.#data.assignments[index];
-		if (assignment.source === 'sso') throw new ApiError('SSO-derived assignments follow the group mapping in the server config', 409);
-		const ownAdmin = this.#effectiveAssignments(this.#ctx.user.name).filter((a) => a.role === 'admin' && !a.stale);
+		if (assignment.source === 'sso') throw new ApiError(`This comes from the SSO group ${assignment.ssoGroup}; change the group mapping in the server config`, 409);
+		if (assignment.source === 'policy') throw new ApiError(`This is set in ${assignment.definedIn}; change it there`, 409);
+		if (assignment.source === 'built_in') throw new ApiError('Everyone who signs in gets this default role; change default_role in the server config', 409);
+		const ownAdmin = this.#data.assignments.filter((a) => a.principal.name === this.#ctx.user.name && a.role === 'admin' && !a.stale);
 		if (assignment.principal.name === this.#ctx.user.name && assignment.role === 'admin' && ownAdmin.length <= 1) {
 			const scope = { ...assignment.scope, subject: assignment.principal.name };
 			this.#audit('role.assign', scope, `Refused removing ${assignment.principal.name}'s last admin assignment`, 'admin', 'admin', 'denied');
-			throw new ApiError("You can't remove your own last admin assignment: you would lose administration immediately. Ask another admin to remove it.", 409);
+			throw new ApiError("You can't remove your own last admin role: you would lose administration immediately. Ask another admin to remove it.", 409);
 		}
 		this.#data.assignments.splice(index, 1);
 		this.#audit('role.assign', { ...assignment.scope, subject: assignment.principal.name }, `Removed ${assignment.role} from ${assignment.principal.name}`, assignment.role, null);
 		return this.#ctx.reply(undefined);
 	}
 
+	async listSsoMappings(): Promise<SsoMapping[]> {
+		this.#require('role.assign');
+		return this.#ctx.reply(structuredClone(this.#data.ssoMappings));
+	}
+
 	async listRoleApprovals(): Promise<RoleApproval[]> {
 		this.#require('role.assign');
-		return this.#ctx.reply(structuredClone(this.#data.approvals));
+		const data = this.#access();
+		const approvals = this.#data.approvals.map((a) => ({ ...a, impact: a.state === 'pending' ? approvalImpact(data, a) : [] }));
+		return this.#ctx.reply(structuredClone(approvals));
 	}
 
 	async decideRoleApproval(approvalId: string, decision: 'approve' | 'reject', note: string): Promise<RoleApproval> {
@@ -884,17 +996,22 @@ export class MockPlatformApi implements PlatformApi {
 		const approval = this.#data.approvals.find((a) => a.id === approvalId);
 		if (!approval) throw new ApiError('Approval not found', 404);
 		if (approval.state !== 'pending') throw new ApiError(`Already ${approval.state}`, 409);
+		if (!note.trim()) throw new ApiError('Add a comment saying why; it goes in the audit log', 422);
+		if (decision === 'approve' && approval.gitAuthorAccount === this.#ctx.user.name) {
+			this.#audit('role.approve', { locationId: approval.locationId, subject: approval.role }, `Refused approving own change to ${approval.role} (commit ${approval.gitRevision})`, 'pending', 'pending', 'denied');
+			throw new ApiError(`You committed this change (${approval.gitRevision}), so you can't approve it. Another admin has to.`, 403);
+		}
 		approval.state = decision === 'approve' ? 'approved' : 'rejected';
 		approval.decidedBy = this.#ctx.user;
 		approval.decidedAt = new Date().toISOString();
-		approval.note = note.trim() || null;
+		approval.note = note.trim();
 		const role = this.#data.roles.find((r) => r.name === approval.role);
 		if (role) {
 			role.pendingApprovalId = null;
 			if (decision === 'approve') role.grants = applyDiff(role.grants, approval);
 		}
-		this.#audit(decision === 'approve' ? 'role.approve' : 'role.reject', { locationId: approval.locationId, subject: approval.role }, `${decision === 'approve' ? 'Approved' : 'Rejected'} widening of ${approval.role}`, 'pending', approval.state);
-		return this.#ctx.reply(structuredClone(approval));
+		this.#audit(decision === 'approve' ? 'role.approve' : 'role.reject', { locationId: approval.locationId, subject: approval.role }, `${decision === 'approve' ? 'Approved' : 'Rejected'} the change to ${approval.role}`, 'pending', approval.state);
+		return this.#ctx.reply(structuredClone({ ...approval, impact: [] }));
 	}
 
 	// ---- audit and access ----
@@ -911,36 +1028,40 @@ export class MockPlatformApi implements PlatformApi {
 	}
 
 	async explainAccess(query: AccessQuery): Promise<AccessExplanation> {
-		if (query.principal !== this.#ctx.user.name && !this.#can('role.assign') && !this.#can('audit.view')) {
-			throw new ApiError('Explaining another principal requires role.assign or audit.view', 403);
-		}
-		const account = this.#data.accounts.find((a) => a.name === query.principal);
-		if (!account) throw new ApiError(`Unknown principal ${query.principal}`, 404);
-		const grantedBy: AccessGrantPath[] = [];
-		const ignored: AccessExplanation['ignored'] = [];
-		const assignments = this.#effectiveAssignments(account.name);
-		for (const a of assignments) {
-			if (a.scope.locationId !== null && a.scope.locationId !== query.locationId) continue;
-			if (a.stale) {
-				ignored.push({ assignmentId: a.id, role: a.role, reason: 'Role removed from code; the assignment grants nothing' });
-				continue;
-			}
-			const grant = this.#matchingGrant(a.role, query);
-			if (grant) {
-				grantedBy.push({ role: a.role, assignmentId: a.id, assignmentSource: a.source, ssoGroup: a.ssoGroup, scope: a.scope, nodes: grant.nodes.includes('*') ? null : grant.nodes });
-			}
-		}
-		const assigned = new Set(grantedBy.map((g) => g.role));
-		const wouldBeGrantedBy = this.#data.roles
-			.filter((r) => !assigned.has(r.name) && this.#matchingGrant(r.name, query) !== null)
-			.map((r) => r.name);
-		const allowed = grantedBy.length > 0;
-		const on = query.subject ? `${query.subject} in ` : '';
-		const where = `${on}${this.#locationName(query.locationId)}`;
-		const summary = allowed
-			? `${account.name} can ${query.action} on ${where}, granted by ${[...assigned].join(', ')}.`
-			: `${account.name} can't ${query.action} on ${where}: no assigned role grants it${wouldBeGrantedBy.length ? `; ${wouldBeGrantedBy.join(', ')} would` : ''}.`;
-		return this.#ctx.reply({ query, allowed, grantedBy, wouldBeGrantedBy, ignored, summary });
+		this.#requireOther(query.principal);
+		if (!this.#data.accounts.some((a) => a.name === query.principal)) throw new ApiError(`Unknown account ${query.principal}`, 404);
+		return this.#ctx.reply(explain(this.#access(), query));
+	}
+
+	async lookupDecision(decisionId: string): Promise<AccessDecision> {
+		const id = decisionId.trim();
+		const entry = this.#data.auditEntries.find((e) => e.decisionId === id);
+		if (!entry) throw new ApiError(`No denied request has decision ID ${id}. Check it was copied in full, e.g. dec-4k7q2m.`, 404);
+		if (entry.actor.name !== this.#ctx.user.name && !this.#can('audit.view')) throw new ApiError('That decision belongs to someone else; looking it up requires audit.view', 403);
+		const action = entry.action as Capability;
+		return this.#ctx.reply({
+			decisionId: id,
+			at: entry.at,
+			query: { principal: entry.actor.name, action, locationId: entry.scope.locationId ?? this.#ctx.locations[0].id, subject: entry.scope.subject },
+			summary: entry.summary
+		});
+	}
+
+	async effectiveAccess(principal: string): Promise<EffectiveAccess> {
+		this.#requireOther(principal);
+		if (!this.#data.accounts.some((a) => a.name === principal)) throw new ApiError(`Unknown account ${principal}`, 404);
+		return this.#ctx.reply(effective(this.#access(), principal));
+	}
+
+	async listAccessOverview(): Promise<AccessOverview[]> {
+		if (!this.#can('user.manage') && !this.#can('role.assign')) throw new ApiError('Missing permission: user.manage', 403);
+		const data = this.#access();
+		const overview = this.#data.accounts.map((a) => {
+			const cells = effective(data, a.name).cells;
+			const risky = [...new Set(cells.filter((c) => c.coverage !== 'none').map((c) => c.action))].filter((c) => RISKY.includes(c));
+			return { principal: a.name, riskyActions: risky };
+		});
+		return this.#ctx.reply(overview);
 	}
 
 	// ---- settings ----
@@ -988,21 +1109,21 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.locations.find((l) => l.id === locationId)?.name ?? locationId;
 	}
 
-	/** Manual and SSO-derived assignments of one principal. */
-	#effectiveAssignments(principal: string): RoleAssignment[] {
-		return this.#data.assignments.filter((a) => a.principal.name === principal);
+	#access(): AccessData {
+		const { roles, assignments, accounts, approvals } = this.#data;
+		return { roles, assignments, accounts, approvals, locations: this.#ctx.locations };
 	}
 
-	#matchingGrant(roleName: string, query: AccessQuery): RoleGrant | null {
-		const role = this.#data.roles.find((r) => r.name === roleName);
-		if (!role) return null;
-		if (role.source !== 'built_in' && ADMIN_ONLY.includes(query.action)) return null;
-		if (role.source === 'project' && !SHOP_LOCATIONS.includes(query.locationId)) return null;
-		return (
-			role.grants.find(
-				(g) => g.permissions.includes(query.action) && g.nodes.some((selector) => selector === '*' || (query.subject !== null && matchesSelector(selector, query.subject)))
-			) ?? null
-		);
+	#withCounts(role: RoleDefinition): RoleDefinition {
+		const holders = new Set(this.#data.assignments.filter((a) => a.role === role.name && !a.stale).map((a) => a.principal.name)).size;
+		return { ...role, holders, recentlyMatched: recentlyMatchedCount(role) };
+	}
+
+	/** Explaining another account needs role.assign or audit.view. */
+	#requireOther(principal: string) {
+		if (principal !== this.#ctx.user.name && !this.#can('role.assign') && !this.#can('audit.view')) {
+			throw new ApiError('Checking someone else’s access requires role.assign or audit.view', 403);
+		}
 	}
 
 	#issueLocationToken(locationId: string): IssuedToken<LocationToken> {
@@ -1055,6 +1176,7 @@ export class MockPlatformApi implements PlatformApi {
 			outcome,
 			scope,
 			grantingRole: outcome === 'allowed' ? this.#ctx.role : null,
+			decisionId: outcome === 'denied' ? `dec-${randomHex(6)}` : null,
 			evidenceRead: false,
 			summary,
 			before,
@@ -1077,8 +1199,15 @@ function grantKey(grant: RoleGrant): string {
 	return grant.nodes.join('|');
 }
 
+/** The grants as they were before the deploy's narrowing applied. */
+function withRemoved(grants: RoleGrant[], removed: RoleGrant[]): RoleGrant[] {
+	return applyDiff(grants, { added: removed, removed: [] });
+}
+
+const RISKY: readonly Capability[] = ['run.rewrite_history', 'run.adhoc', ...ADMIN_ONLY];
+
 /** Applies an approved proposal: removals first, then additions merged per selector. */
-function applyDiff(grants: RoleGrant[], approval: RoleApproval): RoleGrant[] {
+function applyDiff(grants: RoleGrant[], approval: Pick<RoleApproval, 'added' | 'removed'>): RoleGrant[] {
 	const next = grants.map((g) => ({ nodes: [...g.nodes], permissions: [...g.permissions] }));
 	for (const removed of approval.removed) {
 		const grant = next.find((g) => grantKey(g) === grantKey(removed));

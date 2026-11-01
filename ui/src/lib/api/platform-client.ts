@@ -1,5 +1,7 @@
 import type {
+	AccessDecision,
 	AccessExplanation,
+	AccessOverview,
 	AccessQuery,
 	Account,
 	ApiToken,
@@ -20,9 +22,12 @@ import type {
 	RoleAssignment,
 	RoleAssignmentRequest,
 	RoleDefinition,
+	RoleDetail,
+	EffectiveAccess,
 	Scope,
 	ServerSettings,
 	ServiceAccountRequest,
+	SsoMapping,
 	WarehouseConnection
 } from './types';
 
@@ -83,24 +88,34 @@ export interface PlatformApi {
 	revokeServiceAccountToken(tokenId: string): Promise<ApiToken>;
 
 	// ---- roles and approvals ----
-	/** `role.assign` */
+	/** Roles available in a location: built-in, server config and the location's project roles. `role.assign` */
 	listRoles(locationId: string): Promise<RoleDefinition[]>;
+	/** A role with what its selectors match today and who holds it. `role.assign` */
+	getRole(locationId: string, name: string): Promise<RoleDetail | null>;
 	/** `role.assign` */
 	listRoleAssignments(): Promise<RoleAssignment[]>;
-	/** `role.assign` */
+	/** You can only give a role you hold in that scope. `role.assign` */
 	createRoleAssignment(request: RoleAssignmentRequest): Promise<RoleAssignment>;
-	/** Manual assignments only; SSO-derived ones follow the group mapping. `role.assign` */
+	/** Manual assignments only; SSO, policy and built-in ones follow their source. `role.assign` */
 	deleteRoleAssignment(assignmentId: string): Promise<void>;
+	/** SSO group mappings from the server config. Read-only. `role.assign` */
+	listSsoMappings(): Promise<SsoMapping[]>;
 	/** `role.assign` */
 	listRoleApprovals(): Promise<RoleApproval[]>;
-	/** `role.assign` */
+	/** A comment is required. You can't approve a change you committed. `role.assign` */
 	decideRoleApproval(approvalId: string, decision: 'approve' | 'reject', note: string): Promise<RoleApproval>;
 
 	// ---- audit and access ----
 	/** `audit.view` */
 	listAuditEntries(query?: AuditQuery): Promise<AuditEntry[]>;
-	/** Explaining another principal requires `role.assign` or `audit.view`. */
+	/** Explaining another account requires `role.assign` or `audit.view`. */
 	explainAccess(query: AccessQuery): Promise<AccessExplanation>;
+	/** Looks up a denial by the decision ID in its error message. Your own, or anyone's with `audit.view`. */
+	lookupDecision(decisionId: string): Promise<AccessDecision>;
+	/** Every action × location for one account. Another account requires `role.assign` or `audit.view`. */
+	effectiveAccess(principal: string): Promise<EffectiveAccess>;
+	/** Risky actions per account, for the People and Service accounts tables. `user.manage` or `role.assign` */
+	listAccessOverview(): Promise<AccessOverview[]>;
 
 	// ---- settings ----
 	serverSettings(): Promise<ServerSettings>;

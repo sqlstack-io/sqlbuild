@@ -405,6 +405,21 @@ export class MockApiClient implements ApiClient {
 	explainAccess(...args: Parameters<PlatformApi['explainAccess']>) {
 		return this.#platform.explainAccess(...args);
 	}
+	getRole(...args: Parameters<PlatformApi['getRole']>) {
+		return this.#platform.getRole(...args);
+	}
+	listSsoMappings(...args: Parameters<PlatformApi['listSsoMappings']>) {
+		return this.#platform.listSsoMappings(...args);
+	}
+	lookupDecision(...args: Parameters<PlatformApi['lookupDecision']>) {
+		return this.#platform.lookupDecision(...args);
+	}
+	effectiveAccess(...args: Parameters<PlatformApi['effectiveAccess']>) {
+		return this.#platform.effectiveAccess(...args);
+	}
+	listAccessOverview(...args: Parameters<PlatformApi['listAccessOverview']>) {
+		return this.#platform.listAccessOverview(...args);
+	}
 	serverSettings(...args: Parameters<PlatformApi['serverSettings']>) {
 		return this.#platform.serverSettings(...args);
 	}

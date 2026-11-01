@@ -389,7 +389,10 @@ export const DEPLOYS: DeploySpec[] = [
 			node('activity_report', 'changed', 'Compiled SQL changed: macro pct now rounds to one decimal place', { compiledOnly: true })
 		],
 		orchestration: [{ kind: 'trigger', key: 'revenue_refresh', op: 'changed', detail: 'Cron moved from 06:00 to 05:30' }],
-		roles: [{ role: 'finance_operator', op: 'changed', detail: 'Adds run.rewrite_history on group:finance and widens view.evidence to tag:pii', coverage: { before: 3, after: 5 }, approvalId: 'appr-3' }],
+		roles: [
+			{ role: 'finance_operator', op: 'changed', detail: 'Adds run.rewrite_history and widens view.evidence to tag:finance; drops run.adhoc (already applied)', coverage: { before: 3, after: 3 }, approvalId: 'appr-3' },
+			{ role: 'reporting_operator', op: 'changed', detail: 'Adds trigger.toggle on group:reporting', coverage: { before: 2, after: 2 }, approvalId: 'appr-4' }
+		],
 		environment: null
 	},
 	{
