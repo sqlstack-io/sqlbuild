@@ -478,6 +478,18 @@
           }
          },
          {
+          "name": "rotate-token",
+          "parser": {
+           "prog": "sqb admin rotate-token",
+           "description": "Replace a live credential atomically through direct control-store ownership, retaining its exact scope and expiry. Returns the new bearer once as JSON; the old credential immediately stops working.",
+           "groups": [{"title": "positional arguments"}, {"title": "options"}],
+           "actions": [
+            {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "TOKEN_ID", "required": true, "help": "live credential UUID, never its bearer secret", "group": 0}
+           ]
+          }
+         },
+         {
           "name": "rerun-run",
           "parser": {
            "prog": "sqb admin rerun-run",
@@ -925,6 +937,11 @@
           "dest": "revoke-token",
           "metavar": "revoke-token",
           "help": "revoke a credential by UUID"
+         },
+         {
+          "dest": "rotate-token",
+          "metavar": "rotate-token",
+          "help": "replace a live credential without changing its scope or expiry"
          },
          {
           "dest": "request-run",

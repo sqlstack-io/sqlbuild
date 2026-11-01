@@ -2,7 +2,7 @@ pub(crate) struct AdminTestCase {
     pub(crate) description: &'static str,
     pub(crate) location_name: &'static str,
     pub(crate) expected_name: &'static str,
-    pub(crate) expected_actions: [&'static str; 9],
+    pub(crate) expected_actions: [&'static str; 12],
 }
 
 pub(crate) struct PrincipalAdminTestCase {

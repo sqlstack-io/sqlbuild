@@ -28,7 +28,10 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
             "location.created",
             "location.created",
             "token.issued",
+            "token.issued",
             "token.revoked",
+            "token.revoked",
+            "token.rotated",
             "trigger.changed",
             "trigger.changed",
             "trigger.changed",
@@ -102,6 +105,18 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
                 .await
                 .expect("operator-issued credential publishes");
             assert_eq!(published.location_id, location_id);
+            let rotated = administer(&control, &["rotate-token", credential["identity"]["token_id"].as_str().expect("old token UUID")]);
+            assert_eq!(rotated["identity"]["scope"], credential["identity"]["scope"]);
+            assert_eq!(rotated["identity"]["expires_at"], credential["identity"]["expires_at"]);
+            assert_ne!(rotated["identity"]["token_id"], credential["identity"]["token_id"]);
+            assert_ne!(rotated["bearer"], credential["bearer"]);
+            assert!(matches!(publish_remote_snapshot(&url, bearer, &snapshot).await,
+                Err(ClientError::Rejected(reqwest::StatusCode::UNAUTHORIZED))));
+            let repeated = invoke_admin(&control, &["rotate-token", credential["identity"]["token_id"].as_str().expect("old token UUID")]);
+            assert!(!repeated.status.success());
+            assert!(repeated.stdout.is_empty());
+            let credential = rotated;
+            let bearer = credential["bearer"].as_str().expect("rotated one-time bearer");
             let trigger_id = read_triggers(&url, bearer, (location_id, "development")).await[0].trigger_id.to_string();
             for case in [
                 TriggerAdminTestCase { description: "enable overrides the paused code default", change: "enable", cursor_arguments: &[], expected_status: "running", expected_cursor: None },
