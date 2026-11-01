@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::api::models::DevelopmentScope;
+use crate::api::models::{ApiAuthentication, DevelopmentScope};
 use crate::credentials::main::development_location::development_location;
 use crate::credentials::models::AuditContext;
 use crate::declarations::main::{
@@ -15,7 +15,7 @@ use crate::snapshots::main::{
 };
 use crate::store::main::migrate_store::migrate_store;
 
-use crate::api::tests::helpers::{start_api_with_scope, stop_api};
+use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::DevelopmentTestCase;
 use crate::credentials::tests::helpers::location_state;
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
@@ -82,13 +82,16 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
                 .await
                 .expect("target-specific identity");
             assert_ne!(location, other);
-            let api = start_api_with_scope(
+            let api = start_api_with_authentication(
                 store,
-                Some(DevelopmentScope {
-                    location_id: location,
-                    target: "development".into(),
-                    triggers: false,
-                }),
+                ApiAuthentication {
+                    development_scope: Some(DevelopmentScope {
+                        location_id: location,
+                        target: "development".into(),
+                        triggers: false,
+                    }),
+                    ..ApiAuthentication::default()
+                },
             )
             .await;
             let client = reqwest::Client::new();

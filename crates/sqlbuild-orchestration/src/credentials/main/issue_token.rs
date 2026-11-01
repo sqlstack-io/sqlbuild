@@ -1,14 +1,12 @@
 //! Random bearer secrets are returned once; only their hashes and bounded scopes are durable.
 
-use std::fmt::Write;
-
 use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::credentials::_helpers::scopes::{scope_is_active, scope_parameters};
-use crate::credentials::constants::TOKEN_SECRET_BYTES;
+use crate::credentials::_helpers::secrets::new_bearer;
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, CredentialScope, IssuedToken, TokenIdentity};
 use crate::store::errors::ControlError;
@@ -36,14 +34,7 @@ pub async fn issue_token(
         return Err(ControlError::Invalid("token scope is not active".into()));
     }
     let token_id = Uuid::now_v7();
-    let mut random = [0_u8; TOKEN_SECRET_BYTES];
-    getrandom::fill(&mut random)
-        .map_err(|_| ControlError::Invalid("could not generate a secure token".into()))?;
-    let mut bearer = format!("{token_id}.");
-    for byte in random {
-        write!(bearer, "{byte:02x}")
-            .map_err(|_| ControlError::Invalid("could not format a secure token".into()))?;
-    }
+    let bearer = new_bearer(token_id)?;
     let now = transaction.now;
     let mut parameters: Vec<Parameter> = vec![
         Parameter::Id(token_id),

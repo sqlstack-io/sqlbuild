@@ -12,7 +12,7 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::{bearer, require_location};
+use crate::api::_helpers::authentication::bearer::{bearer, require_location};
 use crate::api::errors::ApiError;
 use crate::api::models::{ChangeFeed, ChangeNotice, ChangeStream};
 use crate::credentials::main::authenticate_token::authenticate_token;

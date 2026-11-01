@@ -1,4 +1,4 @@
-//! Authenticate before body buffering; scope checks remain in each owning endpoint.
+//! Authenticate machine bearers before buffering; scope checks stay in each owning endpoint.
 
 use std::net::SocketAddr;
 

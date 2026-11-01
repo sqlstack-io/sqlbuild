@@ -4,7 +4,7 @@ use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::{require_location, require_resource};
+use crate::api::_helpers::authentication::bearer::{require_location, require_resource};
 use crate::api::errors::ApiError;
 use crate::api::models::{ReadQuery, ReadResource};
 use crate::credentials::models::TokenIdentity;

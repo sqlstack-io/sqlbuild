@@ -1,5 +1,69 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["logoutSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["loginPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["currentSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/health": {
         parameters: {
             query?: never;
@@ -327,6 +391,11 @@ export interface components {
         ApiErrorBody: {
             error: string;
         };
+        AuthenticationDenial: {
+            /** Format: uuid */
+            decision_id: string;
+            error: string;
+        };
         CatchUp: "latest" | {
             /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
             all: {
@@ -548,6 +617,18 @@ export interface components {
         OutputStream: "stdout" | "stderr";
         /** @enum {string} */
         Overlap: "coalesce" | "queue" | "allow";
+        PasswordChangeRequest: {
+            current_password: string;
+            new_password: string;
+        };
+        PasswordLoginRequest: {
+            password: string;
+            username: string;
+        };
+        PasswordSessionResponse: {
+            csrf_token: string;
+            identity: components["schemas"]["SessionIdentity"];
+        };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
@@ -802,6 +883,14 @@ export interface components {
         };
         /** @enum {string} */
         SensorStatus: "running" | "stopped";
+        SessionIdentity: {
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: uuid */
+            principal_id: string;
+            /** Format: uuid */
+            session_id: string;
+        };
         /** @description Node-level changes do not duplicate unchanged definitions or source text. */
         SnapshotChange: {
             after_hash?: string | null;
@@ -988,6 +1077,132 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    logoutSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    loginPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordLoginRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordSessionResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    currentSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionIdentity"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
     read_location_health: {
         parameters: {
             query?: never;

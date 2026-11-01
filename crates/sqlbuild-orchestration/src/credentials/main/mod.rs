@@ -1,7 +1,14 @@
 pub(crate) mod append_audit;
+pub mod authenticate_session;
 pub mod authenticate_token;
 pub mod create_location;
 pub mod create_principal;
 pub mod development_location;
 pub mod issue_token;
+pub mod login_password;
+pub mod record_authentication_denial;
+pub mod reserve_password_attempt;
+pub mod revoke_session;
 pub mod revoke_token;
+pub mod set_password;
+pub mod verify_password;

@@ -6,5 +6,9 @@ pub(crate) mod helpers;
 pub(crate) mod location_helpers;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "passwords/test_contract.rs"]
+mod test_passwords;
+#[path = "sessions/test_contract.rs"]
+mod test_sessions;
 #[path = "test_types.rs"]
 mod test_types;

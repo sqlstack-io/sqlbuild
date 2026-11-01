@@ -74,3 +74,9 @@ pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_observations: usize,
 }
+
+pub(crate) struct PasswordApiTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_lifetime: i64,
+}

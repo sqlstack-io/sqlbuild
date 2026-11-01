@@ -46,16 +46,20 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             let store = &fixture.store;
             migrate_store(store).await.expect("fresh migration");
             // Exercise both deployed predecessors, including checksums and repeated startup.
-            execute(store, "DROP TABLE sqb_development_locations").await;
-            execute(store, "DROP TABLE sqb_warehouse_fingerprints").await;
-            execute(store, "DROP TABLE sqb_warehouse_freshness").await;
-            execute(store, "DROP INDEX sqb_node_decisive_history; DROP INDEX sqb_node_finished_cursor; DROP INDEX sqb_node_started_identity; DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; DROP TABLE sqb_sensor_evaluation_events; DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DELETE FROM sqb_schema_migrations WHERE version>=3").await;
-            migrate_store(store).await.expect("schema 2 upgrade");
-            execute(store, "DROP TABLE sqb_development_locations").await;
-            execute(store, "DROP TABLE sqb_warehouse_fingerprints").await;
-            execute(store, "DROP TABLE sqb_warehouse_freshness").await;
-            execute(store, "DROP INDEX sqb_node_decisive_history; DROP INDEX sqb_node_finished_cursor; DROP INDEX sqb_node_started_identity; DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; DROP TABLE sqb_sensor_evaluation_events; DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2").await;
-            migrate_store(store).await.expect("schema 1 upgrade");
+            for (version, location_cleanup) in [(3, ""), (2, "DROP TABLE sqb_location_instances;")]
+            {
+                execute(store, &format!(
+                    "DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
+                     DROP TABLE sqb_password_credentials; DROP TABLE sqb_development_locations; \
+                     DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
+                     DROP INDEX sqb_node_decisive_history; DROP INDEX sqb_node_finished_cursor; \
+                     DROP INDEX sqb_node_started_identity; DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; \
+                     DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; DROP TABLE sqb_sensor_evaluation_events; \
+                     DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; \
+                     {location_cleanup} DELETE FROM sqb_schema_migrations WHERE version>={version}"
+                )).await;
+                migrate_store(store).await.expect("predecessor upgrade");
+            }
             migrate_store(store).await.expect("repeat migration");
             let location_id = create_location(store, "orders", "test-admin")
                 .await

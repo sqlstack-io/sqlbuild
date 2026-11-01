@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::require_location;
+use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::errors::ApiError;
 use crate::api::models::DevelopmentScope;
 use crate::credentials::models::TokenIdentity;

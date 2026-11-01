@@ -422,9 +422,18 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             )
             .await;
             // Recreate the exact pre-change index/migration state with populated run history.
-            let transaction = begin(store, TransactionMode::Write)
+            let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("upgrade fixture");
+            for table in ["sqb_password_sessions", "sqb_password_login_attempts"] {
+                (transaction, _) = query(transaction, &format!("DROP TABLE {table}"), vec![])
+                    .await
+                    .expect("remove subsequent session migration");
+            }
+            let (transaction, _) =
+                query(transaction, "DROP TABLE sqb_password_credentials", vec![])
+                    .await
+                    .expect("remove subsequent password migration");
             let (transaction, _) =
                 query(transaction, "DROP INDEX sqb_node_decisive_history", vec![])
                     .await

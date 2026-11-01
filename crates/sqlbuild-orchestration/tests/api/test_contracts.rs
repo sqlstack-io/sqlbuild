@@ -18,6 +18,8 @@ mod test_development;
 mod test_location_health;
 #[path = "test_location_work.rs"]
 mod test_location_work;
+#[path = "test_passwords.rs"]
+mod test_passwords;
 #[path = "test_reads.rs"]
 mod test_reads;
 #[path = "test_types.rs"]
