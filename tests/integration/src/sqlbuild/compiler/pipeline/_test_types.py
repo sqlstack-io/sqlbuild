@@ -153,6 +153,14 @@ class SemanticBindingIntegrationTestCase:
 
 
 @dataclass(frozen=True)
+class NumberWideningContractTestCase:
+    description: str
+    declared_type: str
+    expected_exit_code: int
+    expected_type_mismatch: bool
+
+
+@dataclass(frozen=True)
 class SourceContractDefaultIntegrationTestCase:
     description: str
     source_contract_yaml: str

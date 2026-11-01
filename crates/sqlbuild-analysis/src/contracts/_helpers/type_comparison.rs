@@ -1,4 +1,5 @@
-//! Python's `types_equal` over the native type system.
+//! Declared-versus-inferred type comparison over the native type system: Python's `types_equal`,
+//! plus lossless NUMBER widening (D31).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -6,9 +7,9 @@ use std::collections::HashMap;
 use crate::contracts::constants::UPPER_FOLDING_DIALECT;
 use crate::type_system::errors::TypeNormalizationError;
 use crate::type_system::main::normalize_type::normalize_type;
-use crate::type_system::models::{NormalizedType, TypeNormalization};
+use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily, TypeNormalization};
 
-/// Whether two type strings normalize to the same comparison shape.
+/// Whether a declared type accepts an inferred one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TypeComparison {
     Equal,
@@ -34,19 +35,22 @@ impl<'a> TypeComparer<'a> {
         }
     }
 
-    /// Compare two types as Python's `types_equal`, or Python's normalization error.
-    pub(crate) fn types_equal(
+    /// Whether a declared type accepts an inferred one: equal types, or a lossless NUMBER
+    /// widening, `NUMBER(q,s)` into `NUMBER(p,s)` with `q <= p` and the same scale.
+    pub(crate) fn declared_accepts(
         &self,
-        left: &str,
-        right: &str,
+        declared: &str,
+        inferred: &str,
     ) -> Result<TypeComparison, TypeNormalizationError> {
-        let left: NormalizedType = self.normalized(left)?;
-        let right: NormalizedType = self.normalized(right)?;
-        Ok(if left == right {
-            TypeComparison::Equal
-        } else {
-            TypeComparison::Different
-        })
+        let declared: NormalizedType = self.normalized(declared)?;
+        let inferred: NormalizedType = self.normalized(inferred)?;
+        Ok(
+            if declared == inferred || widens_losslessly(&inferred, &declared) {
+                TypeComparison::Equal
+            } else {
+                TypeComparison::Different
+            },
+        )
     }
 
     fn normalized(&self, type_sql: &str) -> Result<NormalizedType, TypeNormalizationError> {
@@ -61,4 +65,21 @@ impl<'a> TypeComparer<'a> {
             .insert(type_sql.to_owned(), normalized.clone());
         normalized
     }
+}
+
+/// Whether every `narrow` value fits `wide` exactly: decimals of one scale, `narrow` no more precise.
+fn widens_losslessly(narrow: &NormalizedType, wide: &NormalizedType) -> bool {
+    let digits = |value: &Option<PythonInteger>| -> Option<u64> {
+        value
+            .as_ref()
+            .and_then(|value| value.as_str().parse::<u64>().ok())
+    };
+    narrow.family == TypeFamily::Decimal
+        && wide.family == TypeFamily::Decimal
+        && narrow.scale.is_some()
+        && narrow.scale == wide.scale
+        && matches!(
+            (digits(&narrow.precision), digits(&wide.precision)),
+            (Some(narrow), Some(wide)) if narrow <= wide
+        )
 }

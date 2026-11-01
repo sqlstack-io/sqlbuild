@@ -10,6 +10,7 @@ from _pytest.capture import CaptureResult
 
 from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
+    NumberWideningContractTestCase,
     SemanticBindingClauseIntegrationTestCase,
     SemanticBindingIntegrationTestCase,
     SourceContractDefaultIntegrationTestCase,
@@ -746,3 +747,59 @@ def test_given_typed_union_ctes_when_compiling_enforced_contract_then_types_are_
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NumberWideningContractTestCase(
+            description="a windowed COUNT(DISTINCT) fits a declared NUMBER(38,0)",
+            declared_type="NUMBER(38,0)",
+            expected_exit_code=0,
+            expected_type_mismatch=False,
+        ),
+        NumberWideningContractTestCase(
+            description="a declared NUMBER(10,0) is narrower than the COUNT",
+            declared_type="NUMBER(10,0)",
+            expected_exit_code=1,
+            expected_type_mismatch=True,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_count_when_compiling_enforced_contract_then_lossless_widening_is_accepted(
+    test_case: NumberWideningContractTestCase,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _ = (tmp_path / "sqlbuild_project.toml").write_text(
+        'name = "orders"\nadapter = "snowflake"\n', encoding="utf-8"
+    )
+    models: Path = tmp_path / "models"
+    models.mkdir()
+    _ = (models / "orders.sql").write_text(
+        "MODEL (description 'Test model.', database warehouse, schema analytics,\n"
+        "  materialized table\n"
+        "  contract enforced\n"
+        "  columns (customer_id (type VARCHAR), status (type VARCHAR))\n"
+        ");\n"
+        "SELECT CAST('c' AS VARCHAR) AS customer_id, CAST('open' AS VARCHAR) AS status\n",
+        encoding="utf-8",
+    )
+    _ = (models / "order_counts.sql").write_text(
+        "MODEL (description 'Test model.', database warehouse, schema analytics,\n"
+        "  materialized table\n"
+        "  contract enforced\n"
+        f"  columns (customer_id (type VARCHAR), statuses (type {test_case.declared_type}))\n"
+        ");\n"
+        "SELECT customer_id,\n"
+        "  COUNT(DISTINCT status) OVER (PARTITION BY customer_id) AS statuses\n"
+        'FROM __ref("orders")\n',
+        encoding="utf-8",
+    )
+
+    exit_code: int = main(["--no-color", "--project-dir", str(tmp_path), "compile", "--no-cache"])
+
+    output: str = capsys.readouterr().out
+    assert exit_code == test_case.expected_exit_code, output
+    assert ("error[K002]" in output) == test_case.expected_type_mismatch, output

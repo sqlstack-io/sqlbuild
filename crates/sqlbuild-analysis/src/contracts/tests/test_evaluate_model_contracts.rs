@@ -4,7 +4,7 @@ use crate::contracts::tests::helpers::{
     declared, dynamic_model, inferred, model, outcome_lines, proof, schema, with_inferred,
 };
 use crate::contracts::tests::test_types::{
-    ContractTestCase, SharedTypesTestCase, UnknownDialectTestCase,
+    ContractTestCase, NumberWideningTestCase, SharedTypesTestCase, UnknownDialectTestCase,
 };
 
 #[test]
@@ -307,5 +307,90 @@ fn given_a_dialect_polyglot_does_not_know_when_comparing_types_then_python_error
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_a_declared_number_when_the_inferred_number_is_narrower_then_the_contract_accepts_it() {
+    let test_cases = [
+        NumberWideningTestCase {
+            description: "a COUNT's NUMBER(18,0) fits a declared NUMBER(38,0)",
+            dialect: "snowflake",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            expected_lines: &[],
+        },
+        NumberWideningTestCase {
+            description: "INTEGER is NUMBER(38,0) on Snowflake, so it accepts NUMBER(18,0)",
+            dialect: "snowflake",
+            declared_type: "INTEGER",
+            inferred_type: "NUMBER(18,0)",
+            expected_lines: &[],
+        },
+        NumberWideningTestCase {
+            description: "the same scale widens: NUMBER(10,2) into NUMBER(18,2)",
+            dialect: "snowflake",
+            declared_type: "NUMBER(18,2)",
+            inferred_type: "NUMBER(10,2)",
+            expected_lines: &[],
+        },
+        NumberWideningTestCase {
+            description: "narrowing stays an error",
+            dialect: "snowflake",
+            declared_type: "NUMBER(18,0)",
+            inferred_type: "NUMBER(38,0)",
+            expected_lines: &[
+                "K002 error declared:0 column 'amount' inferred as NUMBER(38,0) but declared type is NUMBER(18,0) [amount: inferred NUMBER(38,0)]",
+            ],
+        },
+        NumberWideningTestCase {
+            description: "a scale change stays an error",
+            dialect: "snowflake",
+            declared_type: "NUMBER(38,2)",
+            inferred_type: "NUMBER(18,0)",
+            expected_lines: &[
+                "K002 error declared:0 column 'amount' inferred as NUMBER(18,0) but declared type is NUMBER(38,2) [amount: inferred NUMBER(18,0)]",
+            ],
+        },
+        NumberWideningTestCase {
+            description: "a float is not a decimal widening",
+            dialect: "snowflake",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "FLOAT",
+            expected_lines: &[
+                "K002 error declared:0 column 'amount' inferred as FLOAT but declared type is NUMBER(38,0) [amount: inferred FLOAT]",
+            ],
+        },
+        NumberWideningTestCase {
+            description: "DuckDB decimals widen the same way; integers are not decimals",
+            dialect: "duckdb",
+            declared_type: "DECIMAL(38,0)",
+            inferred_type: "BIGINT",
+            expected_lines: &[
+                "K002 error declared:0 column 'amount' inferred as BIGINT but declared type is DECIMAL(38,0) [amount: inferred BIGINT]",
+            ],
+        },
+    ];
+    for test_case in test_cases {
+        let request = ContractRequest {
+            dialect: test_case.dialect.to_owned(),
+            implicit_column_contracts: true,
+            models: vec![with_inferred(
+                model(
+                    Some("enforced"),
+                    Some(schema(
+                        vec![declared("amount", Some(test_case.declared_type), false)],
+                        false,
+                    )),
+                ),
+                vec![inferred("amount", Some(test_case.inferred_type), false)],
+            )],
+        };
+        let lines: Vec<String> = evaluate_model_contracts(&request)
+            .expect("the types normalize")
+            .iter()
+            .flat_map(|diagnostics| outcome_lines(diagnostics))
+            .collect();
+        assert_eq!(lines, test_case.expected_lines, "{}", test_case.description);
     }
 }

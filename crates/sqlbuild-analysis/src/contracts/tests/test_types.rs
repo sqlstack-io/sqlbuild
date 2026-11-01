@@ -50,3 +50,11 @@ pub(crate) struct EnumLiteralDialectTestCase {
     pub(crate) dialect: &'static str,
     pub(crate) expected_count: usize,
 }
+
+pub(crate) struct NumberWideningTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) declared_type: &'static str,
+    pub(crate) inferred_type: &'static str,
+    pub(crate) expected_lines: &'static [&'static str],
+}

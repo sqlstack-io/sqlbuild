@@ -49,7 +49,7 @@ pub(crate) fn dynamic_column_diagnostics(
             ));
             continue;
         };
-        if types.types_equal(declared, inferred)? == TypeComparison::Different {
+        if types.declared_accepts(declared, inferred)? == TypeComparison::Different {
             diagnostics.push(family_diagnostic(
                 TYPE_MISMATCH_CODE,
                 ContractSeverity::Error,
