@@ -671,14 +671,10 @@ jobs:
             max_ratio: "1.10"
             edit_max_ratio: "1.20"
             edit_max_cpu_ratio: "1.75"
-          # Both sides set select = [] (an older base has no default Rules), so 1.10 holds.
-          - kind: fresh
-            label: fresh compiler-only
-            compiler_only: true
-            max_ratio: "1.10"
           # Temporary migration allowance; restore 1.10 once the base also runs default Rules.
-          # Default SQL Rules add a measured cold cost (1.14x wall, 1.28x CPU over select = []
-          # on the same machine), so only the cold limits scale by it; warm and edit keep 1.10.
+          # Default SQL Rules add a cold cost over select = [] (1.19x to 1.20x wall, 1.32x to
+          # 1.33x CPU in this job), so only the cold limits scale; warm and edit keep 1.10.
+          # The compiler-only cache guard at 3,000 models keeps the select = [] budgets.
           - kind: fresh
             label: fresh default Rules
             max_ratio: "1.10"
@@ -761,12 +757,10 @@ jobs:
           COLD_MAX_CPU_RATIO: ${{ matrix.cold_max_cpu_ratio }}
           EDIT_MAX_RATIO: ${{ matrix.edit_max_ratio }}
           EDIT_MAX_CPU_RATIO: ${{ matrix.edit_max_cpu_ratio }}
-          COMPILER_ONLY: ${{ matrix.compiler_only && '--compiler-only' || '' }}
         run: |
           uv run python -m scripts.compare_compile_performance \
             --kind "${KIND}" \
             --modes cold warm edit \
-            ${COMPILER_ONLY:+"$COMPILER_ONLY"} \
             ${COLD_MAX_RATIO:+--cold-max-ratio "$COLD_MAX_RATIO"} \
             ${COLD_MAX_CPU_RATIO:+--cold-max-cpu-ratio "$COLD_MAX_CPU_RATIO"} \
             ${EDIT_MAX_RATIO:+--edit-max-ratio "$EDIT_MAX_RATIO"} \

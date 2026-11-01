@@ -21,7 +21,6 @@ def comparison_markdown(
     mode_cpu_max_ratios: Mapping[str, float] | None = None,
     gate_phases: tuple[str, ...] = (),
     compile_args: tuple[str, ...] = (),
-    compiler_only: bool = False,
 ) -> str:
     """Summarize medians, ratios and per-phase timings of every mode as Markdown tables."""
 
@@ -35,13 +34,6 @@ def comparison_markdown(
         lines.extend((f"Gated phases: {', '.join(gate_phases)}.", ""))
     if compile_args:
         lines.extend((f"Compile arguments: `{' '.join(compile_args)}`.", ""))
-    if compiler_only:
-        lines.extend(
-            (
-                "Projects set `select = []` where supported: compiler only, no default SQL Rules.",
-                "",
-            )
-        )
     for comparison in comparisons:
         lines.extend(
             (

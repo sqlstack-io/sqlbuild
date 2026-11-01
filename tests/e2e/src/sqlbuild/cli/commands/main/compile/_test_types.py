@@ -172,8 +172,6 @@ class FreshProcessCompilePerformanceGuardTestCase:
     expected_max_wall_seconds: float
     expected_max_rss_bytes: int
     expected_semantic_fingerprint: str
-    # `select = []`: the compiler alone, without the default SQL Rules.
-    compiler_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -189,6 +187,7 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     expected_cold_max_wall_seconds: float
     expected_warm_max_wall_seconds: float
     expected_edit_max_wall_seconds: float
+    expected_project_config_edit_max_wall_seconds: float
     expected_max_warm_to_cold_ratio: float
     expected_max_edit_to_cold_ratio: float
     expected_max_cache_write_cpu_overhead_ratio: float

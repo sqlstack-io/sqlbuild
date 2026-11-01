@@ -36,12 +36,10 @@ EXCLUDED_ENVIRONMENT_KEYS: frozenset[str] = frozenset({"VIRTUAL_ENV"})
 EXCLUDED_ENVIRONMENT_PREFIX: str = "DBT_"
 COMPILE_ENTRY: str = "import sys; from sqlbuild.cli.entry.main.entry import main; sys.exit(main())"
 BASE_GENERATOR_ENTRY: str = (
-    "import inspect, sys; from pathlib import Path; "
+    "import sys; from pathlib import Path; "
     "from scripts.compile_performance_ratio._helpers.measure import write_benchmark_project; "
-    "options = {'compiler_only': sys.argv[4] == '1'} "
-    "if 'compiler_only' in inspect.signature(write_benchmark_project).parameters else {}; "
     "write_benchmark_project("
-    "kind=sys.argv[1], project_dir=Path(sys.argv[2]), models=int(sys.argv[3]), **options)"
+    "kind=sys.argv[1], project_dir=Path(sys.argv[2]), models=int(sys.argv[3]))"
 )
 PYTHONPATH_KEY: str = "PYTHONPATH"
 PHASE_NOISE_FLOOR_MS: float = 50.0

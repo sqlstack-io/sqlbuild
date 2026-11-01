@@ -20,7 +20,6 @@ from scripts.compile_performance_ratio.constants import (
     COMPILE_MODES,
     DEFAULT_MAX_RATIO,
     DEFAULT_RUNS,
-    DENSE_KIND,
     EDIT_MODE,
     NOISE_FLOOR_SECONDS,
     PHASE_NOISE_FLOOR_MS,
@@ -43,12 +42,7 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
             Path(root) / "base" / project_name if per_side_projects else head_project_dir
         )
         print(f"Generating {args.kind} project with {args.models} models", file=sys.stderr)
-        write_benchmark_project(
-            kind=args.kind,
-            project_dir=head_project_dir,
-            models=args.models,
-            compiler_only=args.compiler_only,
-        )
+        write_benchmark_project(kind=args.kind, project_dir=head_project_dir, models=args.models)
         if args.base_root is not None:
             print(f"Generating the base project with {args.base_root}'s generator", file=sys.stderr)
             write_base_benchmark_project(
@@ -57,7 +51,6 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
                 kind=args.kind,
                 project_dir=base_project_dir,
                 models=args.models,
-                compiler_only=args.compiler_only,
             )
         modes: tuple[str, ...] = tuple(dict.fromkeys(args.modes))
         comparisons: tuple[CompileComparison, ...] = compare_builds(
@@ -113,7 +106,6 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
         mode_cpu_max_ratios=mode_cpu_max_ratios,
         gate_phases=gate_phases,
         compile_args=tuple(args.compile_args),
-        compiler_only=args.compiler_only,
     )
     print(markdown)
     _ = append_summary(path=Path(summary_value) if summary_value else None, markdown=markdown)
@@ -185,12 +177,6 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Extra `sqb compile` argument for both builds, e.g. `--compile-arg=--select=*`.",
     )
     parser.add_argument(
-        "--compiler-only",
-        action="store_true",
-        help="Write both projects with `select = []`, so both builds run the compiler without "
-        "default SQL Rules (fresh projects only).",
-    )
-    parser.add_argument(
         "--gate-phase",
         dest="gate_phases",
         action="append",
@@ -204,7 +190,4 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=PHASE_NOISE_FLOOR_MS,
         help="Milliseconds of slack added to a gated phase's ratio allowance.",
     )
-    args: argparse.Namespace = parser.parse_args(argv)
-    if args.compiler_only and args.kind == DENSE_KIND:
-        parser.error("--compiler-only supports --kind fresh only")
-    return args
+    return parser.parse_args(argv)

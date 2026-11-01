@@ -522,7 +522,6 @@ def run_fresh_process_semantic_compile_benchmark(
     test_count: int,
     audit_count: int,
     expected_max_wall_seconds: float,
-    compiler_only: bool = False,
 ) -> FreshProcessCompileBenchmarkResult:
     """Compile one clean semantic fixture in a fresh process without compiler caches."""
 
@@ -535,7 +534,6 @@ def run_fresh_process_semantic_compile_benchmark(
         macro_count=macro_count,
         test_count=test_count,
         audit_count=audit_count,
-        compiler_only=compiler_only,
     )
     target_dir: Path = project_dir / "target"
     assert not target_dir.exists()
@@ -562,6 +560,7 @@ def run_fresh_process_compile_cache_benchmark(
     expected_cold_max_wall_seconds: float,
     expected_warm_max_wall_seconds: float,
     expected_edit_max_wall_seconds: float,
+    expected_project_config_edit_max_wall_seconds: float,
     macro_call_interval: int,
     scoped_macros: bool,
     compiler_only: bool = False,
@@ -642,7 +641,7 @@ def run_fresh_process_compile_cache_benchmark(
     project_config_edit: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=project_dir,
         label=f"cache-project-config-edit-{model_count}",
-        expected_max_wall_seconds=expected_cold_max_wall_seconds,
+        expected_max_wall_seconds=expected_project_config_edit_max_wall_seconds,
         compile_args=(),
     )
     after_project_config_edit: FreshProcessCompileBenchmarkResult = (
