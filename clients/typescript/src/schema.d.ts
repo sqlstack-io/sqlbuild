@@ -1,0 +1,2013 @@
+// Generated from sqb server --openapi. Run npm run generate; do not edit.
+export interface paths {
+    "/api/locations/{location_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["read_location_health"];
+        put?: never;
+        post: operations["report_location_health"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["subscribe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/fingerprints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_fingerprints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/source-freshness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_source_freshness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_runs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/runs/{run_id}/invocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["invocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/runs/{run_id}/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["nodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/runs/{run_id}/recall/{view}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["read_run_recall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["current"];
+        put?: never;
+        post: operations["publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/snapshots/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_triggers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ticks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/work/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["poll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/work/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["result"];
+        put?: never;
+        post: operations["complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_run_event"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["execution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["heartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["output"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/recall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
+export type webhooks = Record<string, never>;
+export interface components {
+    schemas: {
+        ApiErrorBody: {
+            error: string;
+        };
+        CatchUp: "latest" | {
+            /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
+            all: {
+                max_runs: number;
+            };
+        };
+        /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
+        ChangeNotice: {
+            topic: string;
+        };
+        /** @description A row whose key was already stored with different content; the first row is kept. */
+        ConflictEvidence: {
+            existing_sha256: string;
+            record_key: string;
+            rejected_sha256: string;
+            table: components["schemas"]["Table"];
+        };
+        /** @description The current successful snapshot, read with a consistent generation and change set. */
+        CurrentSnapshot: {
+            changes: components["schemas"]["SnapshotChange"][];
+            documents: {
+                [key: string]: unknown;
+            };
+            nodes: {
+                [key: string]: components["schemas"]["SnapshotNode"];
+            };
+            record: components["schemas"]["SnapshotRecord"];
+        };
+        /** @description Location-owned Python returns data; only the fenced scheduler may apply it. */
+        CustomSensorOutcome: {
+            cursor?: string | null;
+            run_keys: string[];
+            /** @enum {string} */
+            status: "completed";
+        } | {
+            cursor?: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "skipped";
+        } | {
+            /** @enum {string} */
+            status: "failed";
+        } | {
+            /** @enum {string} */
+            status: "timed_out";
+        };
+        /** @description Fingerprint observations from one registered reader, independent of automatic polling. */
+        FingerprintBatch: {
+            /** Format: int64 */
+            generation: number;
+            records: components["schemas"]["WarehouseFingerprintRecord"][];
+            /** Format: uuid */
+            session_id: string;
+        };
+        HeartbeatResponse: {
+            cancel_requested: boolean;
+        };
+        /** @description What one insert batch did, per table. */
+        InsertOutcome: {
+            conflicts: components["schemas"]["ConflictEvidence"][];
+            /** @description Rows written or already present with equal content, by table. */
+            delivered: [
+                "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts",
+                number
+            ][];
+            /** @description Tables whose insert failed, so their rows were not written, and the first failure. */
+            failed: components["schemas"]["Table"][];
+            failure?: string | null;
+        };
+        /** @description Locations report bounded facts, never connection strings or user exception text. */
+        LocationHealth: {
+            /** @enum {string} */
+            kind: "heartbeat";
+        } | {
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "compile_failed";
+        } | {
+            /** Format: int64 */
+            generation: number;
+            healthy: boolean;
+            /** @enum {string} */
+            kind: "connection";
+        };
+        /** @description Receipt time belongs to the server; consumers derive freshness rather than storing availability. */
+        LocationHealthObservation: {
+            /** Format: date-time */
+            received_at: string;
+            report: components["schemas"]["LocationHealthReport"];
+        };
+        LocationHealthReport: {
+            /** Format: uuid */
+            event_id: string;
+            health: components["schemas"]["LocationHealth"];
+            /** Format: uuid */
+            session_id: string;
+            target: string;
+        };
+        /** @description Only named location operations cross this boundary, never arbitrary SQL or Python. */
+        LocationWork: {
+            /** @enum {string} */
+            kind: "check_connection";
+        } | {
+            evaluation: Record<string, never>;
+            /** @enum {string} */
+            kind: "evaluate_sensor";
+        };
+        LocationWorkClaim: {
+            /** Format: uuid */
+            claim_id: string;
+            /** Format: int64 */
+            generation: number;
+            /** Format: date-time */
+            lease_expires_at: string;
+            request: components["schemas"]["LocationWorkRequest"];
+            /** Format: uuid */
+            session_id: string;
+        };
+        LocationWorkOutcome: {
+            healthy: boolean;
+            /** @enum {string} */
+            kind: "connection";
+        } | {
+            /** @enum {string} */
+            kind: "sensor_evaluation";
+            outcome: components["schemas"]["CustomSensorOutcome"];
+        } | {
+            /** @enum {string} */
+            kind: "superseded";
+        };
+        LocationWorkPoll: {
+            /** Format: uuid */
+            session_id: string;
+            target: string;
+        };
+        /** @description Expiry is derived from the deadline; only requests, leases and completed results are stored. */
+        LocationWorkRecord: {
+            /** Format: date-time */
+            completed_at?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: int64 */
+            generation: number;
+            request_json: components["schemas"]["LocationWorkRequest"];
+            /** Format: date-time */
+            requested_at: string;
+            requested_by: string;
+            result_json?: null | components["schemas"]["LocationWorkResult"];
+        };
+        LocationWorkRequest: {
+            /** Format: uuid */
+            location_id: string;
+            reason: string;
+            /** Format: uuid */
+            request_id: string;
+            target: string;
+            work: components["schemas"]["LocationWork"];
+        };
+        LocationWorkResult: {
+            /** Format: uuid */
+            claim_id: string;
+            outcome: components["schemas"]["LocationWorkOutcome"];
+            /** Format: uuid */
+            session_id: string;
+        };
+        MutationResponse: {
+            applied: boolean;
+        };
+        /** @enum {string} */
+        NodeEventKind: "success";
+        /** @enum {string} */
+        NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        /** @description Output of one stream that was not recorded because it exceeded `max_output_bytes`. */
+        OmittedOutput: {
+            /** Format: int64 */
+            bytes: number;
+            /**
+             * Format: int64
+             * @description Sequences this gap accounts for, its own included.
+             */
+            sequences: number;
+        };
+        /** @description One exact-byte output chunk. */
+        OutputChunk: {
+            /**
+             * Format: int64
+             * @description Bytes of the same stream before this chunk.
+             */
+            byte_offset: number;
+            data: number[];
+            /**
+             * Format: int64
+             * @description Output records the queue dropped just before this one.
+             */
+            dropped_before: number;
+            occurred_at: string;
+            omitted?: null | components["schemas"]["OmittedOutput"];
+            /**
+             * Format: int64
+             * @description Per invocation, from 0, shared by both streams.
+             */
+            sequence: number;
+            stream: components["schemas"]["OutputStream"];
+        };
+        /** @description Differing retries retain conflict evidence while preserving the first output bytes. */
+        OutputPublication: {
+            /** Format: int32 */
+            conflicts: number;
+            /** Format: int32 */
+            duplicates: number;
+            /** Format: int32 */
+            inserted: number;
+        };
+        /**
+         * @description A process output stream.
+         * @enum {string}
+         */
+        OutputStream: "stdout" | "stderr";
+        /** @enum {string} */
+        Overlap: "coalesce" | "queue" | "allow";
+        /** @enum {string} */
+        PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        /** @description One invocation's records; the server owns its claim namespace, start time and version. */
+        RecallBatch: {
+            invocation_id: string;
+            records: components["schemas"]["RecallRecord"][];
+        };
+        RecallRecord: {
+            table: components["schemas"]["Table"];
+            values: {
+                [key: string]: components["schemas"]["RecallValue"];
+            };
+        };
+        /** @description One stored value. */
+        RecallValue: {
+            /** @enum {string} */
+            kind: "null";
+        } | {
+            /** @enum {string} */
+            kind: "integer";
+            /** Format: int64 */
+            value: number;
+        } | {
+            /** @enum {string} */
+            kind: "real";
+            /** Format: double */
+            value: number;
+        } | {
+            /** @enum {string} */
+            kind: "text";
+            value: string;
+        } | {
+            /** @enum {string} */
+            kind: "blob";
+            value: number[];
+        };
+        /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
+        RunChange: {
+            container_id?: string | null;
+            /** @enum {string} */
+            kind: "launched";
+        } | {
+            code: string;
+            /** @enum {string} */
+            kind: "launch_failed";
+        } | {
+            /** @enum {string} */
+            kind: "started";
+        } | {
+            /** @enum {string} */
+            kind: "node_started";
+            node_key: string;
+        } | {
+            error_code?: string | null;
+            /** @enum {string} */
+            kind: "node_finished";
+            node_key: string;
+            outcome: components["schemas"]["NodeOutcome"];
+            /** Format: int64 */
+            rows_affected?: number | null;
+            skipped_because_of?: string | null;
+        } | {
+            /** @enum {string} */
+            kind: "unresponsive";
+        } | {
+            /** @enum {string} */
+            kind: "recovered";
+        } | {
+            actor: string;
+            /** @enum {string} */
+            kind: "cancel_requested";
+            reason?: string;
+        } | {
+            /** Format: int64 */
+            exit_code?: number | null;
+            /** @enum {string} */
+            kind: "finished";
+            outcome: components["schemas"]["RunOutcome"];
+            reason: string;
+        };
+        RunChangeRequest: {
+            change: components["schemas"]["RunChange"];
+            /** Format: uuid */
+            claim_id?: string | null;
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            run_id: string;
+        };
+        /** @description The database owns the claim before a launcher sees the pinned request. */
+        RunClaim: {
+            /** Format: uuid */
+            claim_id: string;
+            request: components["schemas"]["RunRequest"];
+        };
+        /** @enum {string} */
+        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
+        RunExecution: {
+            claim: components["schemas"]["RunClaim"];
+            environment_hash: string;
+            node_hashes: {
+                [key: string]: string;
+            };
+            /** @description Derived from completed sibling facts and pinned lineage, never a mutable request rewrite. */
+            skipped_nodes?: {
+                [key: string]: string;
+            };
+            sqb_version: string;
+        };
+        /** @enum {string} */
+        RunKind: "job" | "group" | "adhoc";
+        RunNodeRecord: {
+            /** Format: int64 */
+            attempt: number;
+            /** Format: date-time */
+            ended_at?: string | null;
+            error_code?: string | null;
+            node_key: string;
+            /** Format: int64 */
+            rows_affected?: number | null;
+            skipped_because_of?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: string;
+        };
+        /** @enum {string} */
+        RunOrigin: "manual" | "schedule" | "sensor" | "rerun" | "backfill";
+        /**
+         * @description Terminal outcomes cannot be confused with a request to change an active status.
+         * @enum {string}
+         */
+        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        RunRecord: {
+            /** Format: date-time */
+            ended_at?: string | null;
+            job_key?: string | null;
+            /** Format: int64 */
+            last_event_storage_id: number;
+            /** Format: date-time */
+            launched_at?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            node_counts_json: {
+                [key: string]: number;
+            };
+            /** Format: date-time */
+            queued_at: string;
+            /** Format: uuid */
+            run_id: string;
+            selection_json: string[];
+            /** Format: uuid */
+            snapshot_id: string;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: components["schemas"]["RunStatus"];
+            target: string;
+        };
+        /** @description The authorized selection and pinned execution inputs are immutable once requested. */
+        RunRequest: {
+            concurrency_groups: string[];
+            image_id?: string | null;
+            job_key?: string | null;
+            kind: components["schemas"]["RunKind"];
+            /** Format: uuid */
+            location_id: string;
+            origin: components["schemas"]["RunOrigin"];
+            overlap: components["schemas"]["Overlap"];
+            /** Format: uuid */
+            parent_run_id?: string | null;
+            /** Format: int64 */
+            priority: number;
+            requested_by: string;
+            /** Format: uuid */
+            rerun_of_run_id?: string | null;
+            /** Format: uuid */
+            root_run_id: string;
+            /** Format: uuid */
+            run_id: string;
+            selection: string[];
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            snapshot_id: string;
+            target: string;
+            /** Format: uuid */
+            tick_id?: string | null;
+            /** Format: uuid */
+            trigger_id?: string | null;
+            window?: null | components["schemas"]["RunWindow"];
+            write_set: string[];
+        };
+        /** @enum {string} */
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
+        RunWindow: {
+            /** Format: date-time */
+            end: string;
+            /** @enum {string} */
+            kind: "timestamp";
+            /** Format: date-time */
+            start: string;
+        } | {
+            /** Format: int64 */
+            end: number;
+            /** @enum {string} */
+            kind: "integer";
+            /** Format: int64 */
+            start: number;
+        };
+        Schedule: {
+            expression: string;
+            /** @enum {string} */
+            kind: "cron";
+            timezone: string;
+        } | {
+            /** @enum {string} */
+            kind: "calendar";
+            /** Format: date-time */
+            refresh_at: string;
+            times: string[];
+        };
+        SensorCondition: {
+            /** @enum {string} */
+            kind: "platform_event";
+            kinds: components["schemas"]["PlatformEventKind"][];
+        } | {
+            executed_successfully?: string[] | null;
+            job_key: string;
+            /** @enum {string} */
+            kind: "run_event";
+            kinds: components["schemas"]["RunEventKind"][];
+        } | {
+            /** @enum {string} */
+            kind: "node_event";
+            kinds: components["schemas"]["NodeEventKind"][];
+            selection: string[];
+        } | {
+            code_hash: string;
+            function: string;
+            /** @enum {string} */
+            kind: "custom";
+        };
+        SensorDefinition: {
+            default_status?: components["schemas"]["SensorStatus"];
+            description: string;
+            job_key: string;
+            /** Format: int32 */
+            minimum_interval_seconds: number;
+            when: components["schemas"]["SensorCondition"];
+        };
+        /** @enum {string} */
+        SensorStatus: "running" | "stopped";
+        /** @description Node-level changes do not duplicate unchanged definitions or source text. */
+        SnapshotChange: {
+            after_hash?: string | null;
+            before_hash?: string | null;
+            change_kind: string;
+            subject_key: string;
+        };
+        /** @description A location's successful compile for one target. */
+        SnapshotInput: {
+            documents: {
+                [key: string]: unknown;
+            };
+            environment_hash: string;
+            /** Format: int64 */
+            generation: number;
+            git_author?: string | null;
+            git_dirty: boolean;
+            git_revision?: string | null;
+            image_id?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            nodes: {
+                [key: string]: components["schemas"]["SnapshotNode"];
+            };
+            sqb_version: string;
+            target: string;
+        };
+        /** @description A compiled node and its display-only source. SQL and Python are never run by the server. */
+        SnapshotNode: {
+            compiled_sql?: string | null;
+            definition: unknown;
+            kind: string;
+            python_source?: string | null;
+            raw_sql?: string | null;
+        };
+        /** @description Immutable publication metadata. Generations increase independently per location and target. */
+        SnapshotRecord: {
+            /** Format: int64 */
+            generation: number;
+            /** Format: uuid */
+            location_id: string;
+            manifest_digest: string;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            target: string;
+        };
+        /** @description A bounded page from one registered reader of a published location/target generation. */
+        SourceFreshnessBatch: {
+            /** Format: int64 */
+            generation: number;
+            records: components["schemas"]["WarehouseFreshnessRecord"][];
+            /** Format: uuid */
+            session_id: string;
+        };
+        /**
+         * @description The tables Recall writes.
+         * @enum {string}
+         */
+        Table: "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts";
+        /** @enum {string} */
+        TickOutcome: "requested" | "skipped" | "covered" | "failed" | "deferred";
+        TickRecord: {
+            /** Format: uuid */
+            covered_by_run_id?: string | null;
+            /** Format: int64 */
+            epoch: number;
+            /** Format: date-time */
+            evaluated_at: string;
+            outcome: components["schemas"]["TickOutcome"];
+            reason?: string | null;
+            /** Format: uuid */
+            run_id?: string | null;
+            /** Format: date-time */
+            scheduled_for: string;
+            /** Format: uuid */
+            tick_id: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
+        /** @description Operator changes are immutable facts; clearing an override restores the published code default. */
+        TriggerChange: {
+            /** @enum {string} */
+            kind: "enable";
+        } | {
+            /** @enum {string} */
+            kind: "pause";
+        } | {
+            /** @enum {string} */
+            kind: "reset_default";
+        } | {
+            /** @enum {string} */
+            kind: "set_cursor";
+            /** Format: date-time */
+            time: string;
+        } | {
+            /** @enum {string} */
+            kind: "reset_cursor";
+        };
+        TriggerChangeRecord: {
+            /** Format: date-time */
+            occurred_at: string;
+            request_json: components["schemas"]["TriggerChangeRequest"];
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        TriggerChangeRequest: {
+            actor: string;
+            change: components["schemas"]["TriggerChange"];
+            /** Format: uuid */
+            event_id: string;
+            reason: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
+        /** @description Legacy schedule documents retain their stored shape; sensors add a distinct condition shape. */
+        TriggerDeclaration: components["schemas"]["TriggerDefinition"] | components["schemas"]["SensorDefinition"];
+        TriggerDefinition: {
+            catch_up?: components["schemas"]["CatchUp"];
+            default_status?: components["schemas"]["TriggerStatus"];
+            description: string;
+            job_key: string;
+            schedule: components["schemas"]["Schedule"];
+            /** Format: date-time */
+            starts_at?: string | null;
+        };
+        TriggerRecord: {
+            definition_json: components["schemas"]["TriggerDeclaration"];
+            job_key: string;
+            /** Format: date-time */
+            last_tick_for?: string | null;
+            name: string;
+            /** Format: date-time */
+            next_due_at?: string | null;
+            status: components["schemas"]["TriggerStatus"];
+            /** Format: uuid */
+            trigger_id: string;
+        };
+        /** @enum {string} */
+        TriggerStatus: "running" | "paused";
+        /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
+        WarehouseFingerprintRecord: {
+            definition: string;
+            definition_hash: string;
+            event_id?: string | null;
+            metadata_json: string;
+            node_name: string;
+            node_type: string;
+            run_id: string;
+            schema_fingerprint: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_database?: string | null;
+            target_name?: string | null;
+            target_schema?: string | null;
+            /** Format: date-time */
+            ts: string;
+            version_hash: string;
+        };
+        /** @description Preserve observations, not an inferred latest version, age status or run outcome. */
+        WarehouseFreshnessRecord: {
+            data_version?: string | null;
+            data_version_hash: string;
+            event_id?: string | null;
+            /** Format: date-time */
+            observed_at: string;
+            run_id: string;
+            source_name: string;
+            state_database?: string | null;
+            state_schema: string;
+            strategy: string;
+            target_database?: string | null;
+            target_name?: string | null;
+            target_schema?: string | null;
+            value_kind: string;
+        };
+    };
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+    read_location_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHealthObservation"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_location_health: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationHealthReport"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    subscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description changed events: all, runs, run:<id>, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["ChangeNotice"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_fingerprints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FingerprintBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_source_freshness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceFreshnessBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_runs: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent runs; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunRecord"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    invocations: {
+        parameters: {
+            query?: {
+                /** @description Maximum invocation namespaces; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown[];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    nodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunNodeRecord"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_run_recall: {
+        parameters: {
+            query: {
+                /** @description Exact scheduler or worker invocation ID */
+                invocation: string;
+                /** @description Maximum rows; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+                view: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown[];
+                };
+            };
+            /** @description Unknown Recall view */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run or invocation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    current: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentSnapshot"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No successful snapshot */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnapshotInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotRecord"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale generation */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    metadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotRecord"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No successful snapshot */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_triggers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerRecord"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    events: {
+        parameters: {
+            query?: {
+                /** @description Maximum events; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerChangeRecord"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ticks: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent ticks; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TickRecord"][];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    poll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationWorkPoll"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["LocationWorkClaim"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    result: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationWorkResult"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Work claim expired or was replaced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_run_event: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunChangeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    execution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunExecution"];
+                };
+            };
+            /** @description Inactive claim or invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    heartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeartbeatResponse"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    output: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputChunk"][];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputPublication"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecallBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsertOutcome"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Run not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}
