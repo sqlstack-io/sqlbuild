@@ -10,7 +10,7 @@ use sqlbuild_host::entries::models::AdapterHost;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::{
-    ExpansionSources, present, sql_expansion_inputs,
+    ExpansionSources, ExpansionVars, present, sql_expansion_inputs,
 };
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
@@ -46,6 +46,7 @@ pub(crate) fn build_lint_expansion_context<'py>(
     )?;
     let renderer: Bound<'py, PyAny> = arguments.value("value_renderer")?;
     lint_expansion_inputs(LintExpansionSources {
+        vars: ExpansionVars::ProjectDefault(None),
         project_dir: arguments.value("project_dir")?,
         value_renderer: renderer.is_truthy()?.then_some(renderer),
         discovered_inputs: present(arguments.value("discovered_inputs")?),
@@ -59,6 +60,8 @@ pub(crate) fn build_lint_expansion_context<'py>(
 pub(crate) struct LintExpansionSources<'py> {
     pub(crate) project_dir: Bound<'py, PyAny>,
     pub(crate) value_renderer: Option<Bound<'py, PyAny>>,
+    /// The target and vars lint expands with.
+    pub(crate) vars: ExpansionVars<'py>,
     pub(crate) discovered_inputs: Option<Bound<'py, PyAny>>,
     pub(crate) declaration_scope: Option<Bound<'py, PyAny>>,
     pub(crate) static_declaration_scope: Option<Bound<'py, PyAny>>,
@@ -111,7 +114,7 @@ fn expansion_inputs(sources: LintExpansionSources<'_>) -> PyResult<SqlExpansionI
     sql_expansion_inputs(ExpansionSources {
         project_dir,
         value_renderer: renderer,
-        cli_vars: None,
+        vars: sources.vars,
         discovered_inputs: Some(discovered),
         declaration_scope: sources.declaration_scope,
         static_declaration_scope: sources.static_declaration_scope,

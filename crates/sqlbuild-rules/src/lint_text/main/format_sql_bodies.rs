@@ -7,8 +7,8 @@ use crate::lint_text::_helpers::format_bodies::{
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::models::{FormatFault, FormatFile, FormattedBodies, PreparedBody};
-use crate::sql_lint::main::format_requests::format_requests;
-use crate::sql_lint::models::FormatResponse;
+use sqlclean::sql_lint::main::format_requests::format_requests;
+use sqlclean::sql_lint::models::FormatResponse;
 
 /// Format SQL bodies, reporting every declined body as a fault and leaving it unchanged.
 pub fn format_sql_bodies(

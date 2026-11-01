@@ -46,7 +46,7 @@ _UNEXPANDABLE_FILES: dict[str, str] = {
                 "tests/unit/test_orders.sql": _ORDERS_TEST,
                 "audits/generic/not_null.sql": _NOT_NULL_AUDIT,
             },
-            expected_codes=("SQBRSQL001",),
+            expected_codes=("SQLCLEAN001",),
         )
     ],
     ids=lambda case: case.description,
@@ -91,7 +91,7 @@ def test_given_unexpandable_files_when_linting_then_first_in_file_order_is_raise
         UnexpandableSkipTestCase(
             description="skipped unexpandable files are reported and the rest is linted",
             expected_unexpandable=("models/aa_broken.sql", "models/zz_broken.sql"),
-            expected_codes=("SQBRSQL001",),
+            expected_codes=("SQLCLEAN001",),
         )
     ],
     ids=lambda case: case.description,

@@ -27,6 +27,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     orders_model,
     output,
     run_project,
+    with_ignored_rules,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run_sqb
 
@@ -419,6 +420,7 @@ def test_given_any_spelling_of_list_calls_when_building_then_the_model_holds_the
                     'WITH o AS (SELECT order_id FROM __ref("stg_orders"))\n'
                     'SELECT o.order_id, @sql.audit_columns(o) FROM __ref("stg_orders") AS o\n'
                 ),
+                **with_ignored_rules("SQLCLEAN005", reason="The shadowed CTE is never read."),
             },
             command=("compile",),
             expected_returncode=0,
@@ -581,9 +583,7 @@ def test_given_an_edited_sql_macro_when_rebuilding_then_its_callers_use_the_new_
                 'MACRO (description "Net", arguments (gross BIGINT, refund BIGINT), '
                 "returns DOUBLE);\n\n"
             ),
-            expected_ending=(
-                "ROUND(\n  CAST((\n    @gross - COALESCE(@refund, 0)\n  ) AS double)\n  / 100,\n  2\n)\n"
-            ),
+            expected_ending="ROUND(CAST((@gross - COALESCE(@refund, 0)) AS double) / 100, 2)\n",
         ),
         SqlMacroFormatTestCase(
             description="column_list_macro_body_and_multi_line_header",

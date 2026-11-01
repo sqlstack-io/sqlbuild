@@ -180,7 +180,13 @@ fn config_object<'py>(py: Python<'py>, config: &RulesConfig) -> PyResult<Bound<'
     models.build(
         RecordId::RulesConfig,
         &[
-            ("select", strings(py, &config.select)?),
+            (
+                "select",
+                match &config.select {
+                    Some(select) => strings(py, select)?,
+                    None => py.None().into_bound(py),
+                },
+            ),
             ("ignore", strings(py, &config.ignore)?),
             ("thresholds", integers(py, &config.thresholds)?),
             ("threshold_overrides", threshold_overrides),

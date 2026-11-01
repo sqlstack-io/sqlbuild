@@ -22,6 +22,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     picked_orders,
     run_project,
     text_macro,
+    with_ignored_rules,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb
 
@@ -63,7 +64,13 @@ _CTE_LIST_TEST: str = (
         ),
         SqlMacroBuildTestCase(
             description="a_caller_reads_a_prefixed_intermediate_cte",
-            files={**CLEAN_ORDERS, **orders_model(_INTERMEDIATE)},
+            files={
+                **CLEAN_ORDERS,
+                **orders_model(_INTERMEDIATE),
+                **with_ignored_rules(
+                    "SQLCLEAN005", reason="The caller reads one intermediate CTE of the macro."
+                ),
+            },
             query="SELECT live_rows FROM orders",
             expected_rows=[(3,)],
         ),
@@ -85,17 +92,25 @@ _CTE_LIST_TEST: str = (
         ),
         SqlMacroBuildTestCase(
             description="a_nested_with_shadowing_a_cte",
-            files=picked_orders(
-                "WITH live AS (SELECT * FROM @src),\nlatest AS (WITH live AS (SELECT 42 AS order_id) SELECT order_id FROM live)"
-            ),
+            files={
+                **picked_orders(
+                    "WITH live AS (SELECT * FROM @src),\nlatest AS (WITH live AS (SELECT 42 AS order_id) SELECT order_id FROM live)"
+                ),
+                **with_ignored_rules("SQLCLEAN005", reason="The shadowed outer CTE is never read."),
+            },
             query="SELECT order_id FROM orders",
             expected_rows=[(42,)],
         ),
         SqlMacroBuildTestCase(
             description="a_cte_read_in_a_derived_table",
-            files=picked_orders(
-                "WITH live AS (SELECT * FROM @src WHERE order_id = 2),\nlatest AS (SELECT s.order_id FROM (SELECT live.order_id FROM live) AS s)"
-            ),
+            files={
+                **picked_orders(
+                    "WITH live AS (SELECT * FROM @src WHERE order_id = 2),\nlatest AS (SELECT s.order_id FROM (SELECT live.order_id FROM live) AS s)"
+                ),
+                **with_ignored_rules(
+                    "SQLCLEAN039", reason="The case reads a CTE in a derived table."
+                ),
+            },
             query="SELECT order_id FROM orders",
             expected_rows=[(2,)],
         ),

@@ -37,7 +37,7 @@ OUTPUT_MODEL_HEADER: str = (
 )
 OUTPUT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL021"]\n'
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN021"]\n'
     ),
     **{
         f"models/orders_{name}.sql": OUTPUT_MODEL_HEADER.format(name=name)

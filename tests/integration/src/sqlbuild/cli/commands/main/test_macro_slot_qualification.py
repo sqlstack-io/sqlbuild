@@ -1,4 +1,4 @@
-"""Real CLI coverage for how SQBRSQL028 judges the qualification of SQL macro slot reads."""
+"""Real CLI coverage for how SQLCLEAN028 judges the qualification of SQL macro slot reads."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _PROJECT: str = (
     'connection = "local"\n'
     'schema = "dev"\n\n'
     "[rules]\n"
-    'select = ["SQBRSQL028"]\n'
+    'select = ["SQLCLEAN028"]\n'
 )
 
 
@@ -40,7 +40,7 @@ _PROJECT: str = (
             ),
             expected_exit_code=0,
             expected_fragments=("Project compiled",),
-            absent_fragments=("SQBRSQL028",),
+            absent_fragments=("SQLCLEAN028",),
         ),
         MacroSlotQualificationTestCase(
             description="aliased slot reads beside a plain group read fail once, at the macro",
@@ -79,7 +79,7 @@ _PROJECT: str = (
             },
             expected_exit_code=0,
             expected_fragments=("Project compiled",),
-            absent_fragments=("SQBRSQL028",),
+            absent_fragments=("SQLCLEAN028",),
         ),
         MacroSlotQualificationTestCase(
             description="an expression macro's plain reads pass beside hand-qualified columns",
@@ -102,7 +102,7 @@ _PROJECT: str = (
             },
             expected_exit_code=0,
             expected_fragments=("Project compiled",),
-            absent_fragments=("SQBRSQL028",),
+            absent_fragments=("SQLCLEAN028",),
         ),
         MacroSlotQualificationTestCase(
             description="an expression macro's bare column beside a hand-qualified column fails",
@@ -120,7 +120,7 @@ _PROJECT: str = (
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQBRSQL028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
             absent_fragments=(),
         ),
         MacroSlotQualificationTestCase(
@@ -139,7 +139,7 @@ _PROJECT: str = (
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQBRSQL028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
             absent_fragments=(),
         ),
         MacroSlotQualificationTestCase(
@@ -155,7 +155,7 @@ _PROJECT: str = (
                 ),
             },
             expected_exit_code=1,
-            expected_fragments=("error[SQBRSQL028]", "--> models/open_orders.sql"),
+            expected_fragments=("error[SQLCLEAN028]", "--> models/open_orders.sql"),
             absent_fragments=(),
         ),
     ],

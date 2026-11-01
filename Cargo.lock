@@ -1228,6 +1228,7 @@ dependencies = [
  "sqlbuild-render",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
+ "sqlclean",
 ]
 
 [[package]]
@@ -1395,6 +1396,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlbuild-state",
+ "sqlclean",
  "stacker",
 ]
 
@@ -1458,6 +1460,7 @@ dependencies = [
  "sqlbuild-core",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
+ "sqlclean",
  "stacker",
  "tempfile",
  "toml",
@@ -1493,6 +1496,20 @@ dependencies = [
  "sha2",
  "sqlbuild-core",
  "sqlbuild-cursor",
+]
+
+[[package]]
+name = "sqlclean"
+version = "0.4.2"
+source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=571e40a746b3d8d20d6118620f05428eca45243c#571e40a746b3d8d20d6118620f05428eca45243c"
+dependencies = [
+ "polyglot-sql",
+ "polyglot-sql-function-catalogs",
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

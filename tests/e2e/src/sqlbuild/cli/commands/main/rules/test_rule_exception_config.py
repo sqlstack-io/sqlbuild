@@ -15,13 +15,15 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
     write_model_files,
 )
 
-_PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL038"]\n'
+_PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN038"]\n'
 _MODEL_PATH: str = "models/order_checks.sql"
 _CUSTOMERS: str = (
     "CROSS JOIN with `customers` in CTE `order_checks` creates an explicit cartesian product"
 )
 _REGIONS: str = "CROSS JOIN with `regions` in CTE `final` creates an explicit cartesian product"
-_EXCEPTION_HEAD: str = f'\n[[rules.rule_exceptions]]\nrule = "SQBRSQL038"\npath = "{_MODEL_PATH}"\n'
+_EXCEPTION_HEAD: str = (
+    f'\n[[rules.rule_exceptions]]\nrule = "SQLCLEAN038"\npath = "{_MODEL_PATH}"\n'
+)
 _REASON: str = 'reason = "Every order is checked for every customer and region."\n'
 _CUSTOMERS_EXCEPTION: str = f'{_EXCEPTION_HEAD}relation = "customers"\n{_REASON}'
 _REGIONS_EXCEPTION: str = f'{_EXCEPTION_HEAD}relation = "regions"\n{_REASON}'
@@ -45,15 +47,15 @@ _MODEL_SQL: str = (
 )
 _PLAIN_SQL: str = _MODEL_SQL.format(directive="")
 _DIRECTIVE_SQL: str = _MODEL_SQL.format(
-    directive="  -- sqb: ignore SQBRSQL038 because every order meets every customer\n"
+    directive="  -- sqb: ignore SQLCLEAN038 because every order meets every customer\n"
 )
 _LITERAL_SQL: str = _PLAIN_SQL.replace(
     "SELECT f.order_id, f.customer_id, f.region_id FROM final AS f",
-    "SELECT f.order_id, f.customer_id, f.region_id, 'sqb: ignore SQBRSQL038' AS note FROM final AS f",
+    "SELECT f.order_id, f.customer_id, f.region_id, 'sqb: ignore SQLCLEAN038' AS note FROM final AS f",
 )
 _TRAILING_SQL: str = _PLAIN_SQL.replace(
     '  CROSS JOIN __ref("customers") AS c\n',
-    '  CROSS JOIN __ref("customers") AS c -- sqb: ignore SQBRSQL038 because deliberate\n',
+    '  CROSS JOIN __ref("customers") AS c -- sqb: ignore SQLCLEAN038 because deliberate\n',
 )
 _UNNAMED_SQL: str = (
     "MODEL (description 'Order checks.');\n"
@@ -98,7 +100,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
             model_sql=_PLAIN_SQL,
             expected_exit=1,
             expected_fragments=(
-                "stale rule exception suppresses no finding: SQBRSQL038 at "
+                "stale rule exception suppresses no finding: SQLCLEAN038 at "
                 "models/order_checks.sql (relation shipments)",
             ),
         ),
@@ -110,7 +112,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
             expected_messages=(_CUSTOMERS, _REGIONS),
             expected_fragments=(
                 "Inline Rule suppressions are not supported",
-                '[[rules.rule_exceptions]]\n            rule = "SQBRSQL038"\n'
+                '[[rules.rule_exceptions]]\n            rule = "SQLCLEAN038"\n'
                 '            path = "models/order_checks.sql"\n'
                 '            relation = "customers"\n'
                 '            reason = "every order meets every customer"',
@@ -142,7 +144,7 @@ _UPSTREAM_FILES: tuple[tuple[str, str], ...] = (
                 "only a file-wide exception (rule and path) can cover it",
             ),
             expected_fragments=(
-                '[[rules.rule_exceptions]]\n            rule = "SQBRSQL038"\n'
+                '[[rules.rule_exceptions]]\n            rule = "SQLCLEAN038"\n'
                 '            path = "models/order_checks.sql"\n',
             ),
         ),
@@ -173,7 +175,7 @@ def test_given_rule_exception_config_when_compiling_then_only_named_findings_are
 
     text: str = diagnostic_text(result)
     assert result.returncode == test_case.expected_exit, text
-    assert diagnostic_messages(result, "SQBRSQL038") == test_case.expected_messages, text
+    assert diagnostic_messages(result, "SQLCLEAN038") == test_case.expected_messages, text
     for fragment in test_case.expected_fragments:
         assert fragment in text
 

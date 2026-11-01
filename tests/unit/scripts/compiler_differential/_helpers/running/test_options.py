@@ -27,8 +27,8 @@ from tests.unit.scripts.compiler_differential._helpers.running._test_types impor
         ),
         ExpectedOutcomeTestCase(
             description="rule_code",
-            value="failure:SQBRSQL005",
-            expected_outcome=ExpectedOutcome(error_code="SQBRSQL005"),
+            value="failure:SQLCLEAN005",
+            expected_outcome=ExpectedOutcome(error_code="SQLCLEAN005"),
         ),
     ],
     ids=lambda case: case.description,

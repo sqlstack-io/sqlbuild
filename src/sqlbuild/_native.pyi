@@ -3352,6 +3352,7 @@ def format_compile_text(
     use_color: bool,
     selected_keys: frozenset[CompiledObjectKey] | None = None,
     sql_validation_enabled: bool = True,
+    default_rules_notice: str | None = None,
 ) -> str: ...
 def format_compile_json(
     *,
@@ -5813,7 +5814,10 @@ class EarlySqlLint:
     def enabled(self) -> bool: ...
     def __enter__(self) -> EarlySqlLint: ...
     def __exit__(self, *exception: object) -> None: ...
-    def start(self, *, inputs: CompileInputsView, dialect: str) -> None: ...
+    def start(
+        self, *, inputs: CompileInputsView, dialect: str, value_renderer: TypedSqlValueRenderer
+    ) -> None: ...
+    def __call__(self, *, inputs: CompileInputsView) -> None: ...
     def stop(self) -> int: ...
 
 def scan_headers(*, contents: str, first_only: bool = False) -> tuple[HeaderSpan, ...]: ...
@@ -15879,7 +15883,7 @@ class LayoutConfig(NativeRecord):
     ) -> None: ...
 
 class RulesConfig(NativeRecord):
-    select: tuple[str, ...]
+    select: tuple[str, ...] | None
     ignore: tuple[str, ...]
     thresholds: dict[str, int]
     threshold_overrides: tuple[ThresholdOverride, ...]
@@ -15896,7 +15900,7 @@ class RulesConfig(NativeRecord):
     cache: RulesCacheConfig
     def __init__(
         self,
-        select: tuple[str, ...] = ...,
+        select: tuple[str, ...] | None = ...,
         ignore: tuple[str, ...] = ...,
         thresholds: dict[str, int] = ...,
         threshold_overrides: tuple[ThresholdOverride, ...] = ...,

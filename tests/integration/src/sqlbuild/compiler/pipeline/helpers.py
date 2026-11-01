@@ -50,7 +50,7 @@ _HOLD_SECONDS: float = 0.3
 _REACQUIRE_DELAY_SECONDS: float = 0.05
 _INTERRUPT_TIMEOUT_SECONDS: float = 30.0
 _INTERRUPT_DELAY_SECONDS: float = 0.15
-_SEMANTIC_BINDING_PROJECT_TOML: str = 'name = "semantic_binding"\nadapter = "duckdb"\n'
+SEMANTIC_BINDING_PROJECT_TOML: str = 'name = "semantic_binding"\nadapter = "duckdb"\n'
 _AUDIT_FACTORY_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
     value_renderer=DuckDbAdapter(),
     collection_rendering=CollectionRendering.VALUE_LIST,
@@ -97,6 +97,7 @@ def run_compile_pipeline_for_project(
     exclude: tuple[str, ...] = (),
     on_progress: Callable[[str], None] | None = None,
     resolve_python_run_selectors: bool = False,
+    no_sql_validation: bool = True,
 ) -> CompilePipelineResult:
     """Discover a project and run the real compile pipeline."""
 
@@ -105,7 +106,7 @@ def run_compile_pipeline_for_project(
         discovered_inputs=discovered_inputs,
         adapter=adapter,
         options=CompilePipelineOptions(
-            no_sql_validation=True,
+            no_sql_validation=no_sql_validation,
             defer_to=defer_to,
             select=select,
             exclude=exclude,
@@ -147,11 +148,13 @@ def validate_manifest_against_dbt_schema(manifest: dict[str, object]) -> None:
 
 
 def write_semantic_binding_project(
-    *, project_dir: Path, upstream_sql: str, downstream_sql: str
+    *,
+    project_dir: Path,
+    upstream_sql: str,
+    downstream_sql: str,
+    project_toml: str = SEMANTIC_BINDING_PROJECT_TOML,
 ) -> None:
-    _ = (project_dir / "sqlbuild_project.toml").write_text(
-        _SEMANTIC_BINDING_PROJECT_TOML, encoding="utf-8"
-    )
+    _ = (project_dir / "sqlbuild_project.toml").write_text(project_toml, encoding="utf-8")
     models_dir: Path = project_dir / "models"
     models_dir.mkdir()
     _ = (models_dir / "upstream.sql").write_text(upstream_sql, encoding="utf-8")

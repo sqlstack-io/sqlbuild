@@ -1077,7 +1077,7 @@ def test_given_leading_cte_comment_when_formatting_then_comment_rule_still_passe
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL033"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN033"]\n',
         encoding="utf-8",
     )
     models: Path = tmp_path / "models"
@@ -1098,7 +1098,7 @@ def test_given_leading_cte_comment_when_formatting_then_comment_rule_still_passe
     assert (format_exit, second_format_exit, compile_exit) == (0, 0, 0), output.out + output.err
     assert test_case.expected_fragment in formatted_sql
     assert model_path.read_text(encoding="utf-8") == formatted_sql
-    assert "SQBRSQL033" not in output.out + output.err
+    assert "SQLCLEAN033" not in output.out + output.err
 
 
 @pytest.mark.parametrize(
@@ -1289,8 +1289,8 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
                 "-- paid orders only\n"
                 "paid as (select o.order_id, cast(coalesce(o.amount, o.fallback_amount, 0) "
                 "+ o.tax as decimal(18, 2)) as total from orders o where o.amount > 0),\n"
-                "labels as (select * from (values (1, 'paid and shipped to the customer'), "
-                "(2, 'cancelled by the customer')) as l(order_id, label))\n"
+                "labels(order_id, label) as (values (1, 'paid and shipped to the customer'), "
+                "(2, 'cancelled by the customer'))\n"
                 "select p.order_id, p.total from paid p join labels l on p.order_id = l.order_id\n"
             ),
             expected_sql=(
@@ -1313,13 +1313,10 @@ def test_given_select_all_and_implicit_aliases_when_formatting_then_only_layout_
                 "  WHERE o.amount > 0\n"
                 "),\n"
                 "\n"
-                "labels AS (\n"
-                "  SELECT *\n"
-                "  FROM (\n"
-                "    VALUES\n"
-                "      (1, 'paid and shipped to the customer'),\n"
-                "      (2, 'cancelled by the customer')\n"
-                "  ) AS l(order_id, label)\n"
+                "labels(order_id, label) AS (\n"
+                "  VALUES\n"
+                "    (1, 'paid and shipped to the customer'),\n"
+                "    (2, 'cancelled by the customer')\n"
                 ")\n"
                 "\n"
                 "SELECT\n"

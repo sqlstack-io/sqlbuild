@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::constants::{
     API_VERSION, BUILT_IN_RULE_NAMESPACE, CUSTOM_RULE_NAMESPACE, RULE_CODE_NUMBER_LENGTH,
-    SCOPE_METADATA_SCHEMA_VERSION,
+    SCOPE_METADATA_SCHEMA_VERSION, SQL_RULE_PREFIX,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -24,7 +24,12 @@ impl fensu_policy::policy::types::RuleCodeGrammar for RulesCodeGrammar {
         let (family, number) = remainder.split_at(remainder.len() - RULE_CODE_NUMBER_LENGTH);
         let family_valid = family.bytes().all(|value| value.is_ascii_uppercase());
         let number_valid = number.bytes().all(|value| value.is_ascii_digit());
-        number_valid && family_valid && (namespace == CUSTOM_RULE_NAMESPACE || !family.is_empty())
+        let family_shape = match namespace {
+            CUSTOM_RULE_NAMESPACE => true,
+            SQL_RULE_PREFIX => family.is_empty(),
+            _ => !family.is_empty(),
+        };
+        number_valid && family_valid && family_shape
     }
 
     fn rule_selector_is_valid(&self, value: &str) -> bool {
@@ -39,12 +44,16 @@ impl fensu_policy::policy::types::RuleCodeGrammar for RulesCodeGrammar {
 
 impl RulesCodeGrammar {
     fn namespace_and_remainder(value: &str) -> Option<(&'static str, &str)> {
-        if let Some(remainder) = value.strip_prefix(CUSTOM_RULE_NAMESPACE) {
-            return Some((CUSTOM_RULE_NAMESPACE, remainder));
+        for namespace in [
+            CUSTOM_RULE_NAMESPACE,
+            SQL_RULE_PREFIX,
+            BUILT_IN_RULE_NAMESPACE,
+        ] {
+            if let Some(remainder) = value.strip_prefix(namespace) {
+                return Some((namespace, remainder));
+            }
         }
-        value
-            .strip_prefix(BUILT_IN_RULE_NAMESPACE)
-            .map(|remainder| (BUILT_IN_RULE_NAMESPACE, remainder))
+        None
     }
 }
 
@@ -146,7 +155,8 @@ impl Default for LayoutConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RulesConfig {
-    pub select: Vec<String>,
+    /// Exact codes or family prefixes; `None` runs SQLClean's default SQL Rules and nothing else.
+    pub select: Option<Vec<String>>,
     pub ignore: Vec<String>,
     pub thresholds: BTreeMap<String, u32>,
     pub threshold_overrides: Vec<ThresholdOverride>,
@@ -166,7 +176,7 @@ pub struct RulesConfig {
 impl Default for RulesConfig {
     fn default() -> Self {
         Self {
-            select: vec![],
+            select: None,
             ignore: vec![],
             thresholds: BTreeMap::new(),
             threshold_overrides: vec![],

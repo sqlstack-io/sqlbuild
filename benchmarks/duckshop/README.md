@@ -48,7 +48,7 @@ The core project, without the [edge-case area](#edge-cases):
 - 5 seeds, 2 SQL functions (a scalar UDF and a table function) and a Python UDF.
 - SQL and Python macros, folder-scoped constants and enums, generic and singular audits, model
   schemas, hooks, incremental models with cursor windows, and snapshots with both strategies.
-- Rules select `SQBRSQL`, `SQBRGRAPH`, `SQBRCONTRACT`, `SQBRTEST` and the project's own
+- Rules select `SQLCLEAN`, `SQBRGRAPH`, `SQBRCONTRACT`, `SQBRTEST` and the project's own
   `XSQBRDUCK` rules, with reviewed exceptions in `sqlbuild_project.toml`. Every model must have at least one unit test (`SQBRTEST202`).
 
 ## Tests and scenarios
@@ -225,7 +225,7 @@ noted here:
   static types of the columns it reads from a CTE through a table alias (`FROM listings AS l`), so
   `rpt_edge_partner_listing_export` declares only the name and audits of `"listingId"`, without
   types.
-- `SQBRSQL018` can only take proof from single-column keys. Append-only feeds redeliver rows, so
+- `SQLCLEAN018` can only take proof from single-column keys. Append-only feeds redeliver rows, so
   their id is unique only together with `_loaded_at` (the `unique_per_delivery` audit), and the
   staging models that keep the latest delivery carry reviewed exceptions.
 

@@ -262,7 +262,7 @@ const R_RULES_CONFIG: RecordSpec = RecordSpec {
     name: "RulesConfig",
     doc: "",
     fields: &[
-        FieldSpec::new("select", FieldDefault::EmptyTuple),
+        FieldSpec::new("select", FieldDefault::None),
         FieldSpec::new("ignore", FieldDefault::EmptyTuple),
         FieldSpec::new("thresholds", FieldDefault::EmptyDict),
         FieldSpec::new("threshold_overrides", FieldDefault::EmptyTuple),

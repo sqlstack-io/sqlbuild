@@ -321,7 +321,7 @@ FROM final
 
 MACRO_EXCEPTIONS: tuple[tuple[str, str, str], ...] = (
     (
-        "SQBRSQL018",
+        "SQLCLEAN018",
         "cdc_latest",
         """
 The macro cannot see its callers' keys on its own. Every call site is still checked, against the
@@ -329,7 +329,7 @@ unique, non-null _seq that each change-log source declares.
 """,
     ),
     (
-        "SQBRSQL018",
+        "SQLCLEAN018",
         "cdc_history",
         """
 The macro cannot see its callers' keys on its own. _seq is unique and non-null in every change-log
@@ -337,7 +337,7 @@ source, so ordering by it within a key and load is deterministic.
 """,
     ),
     (
-        "SQBRSQL034",
+        "SQLCLEAN034",
         "load_metadata",
         """
 A column-list macro body is a select list by construction. Its columns are inserted into the

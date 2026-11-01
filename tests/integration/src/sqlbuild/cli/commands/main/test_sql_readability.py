@@ -11,6 +11,8 @@ from _pytest.capture import CaptureResult
 from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import SqlReadabilityTestCase
 
+PROJECT_CONFIG: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nignore = ["SQLCLEAN"]\n'
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -60,7 +62,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import SqlRead
 def test_given_join_predicate_when_compiling_and_running_rules_then_expression_policy_applies(
     test_case: SqlReadabilityTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_CONFIG)
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
@@ -71,11 +73,11 @@ def test_given_join_predicate_when_compiling_and_running_rules_then_expression_p
     )
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == 0
     capsys.readouterr()
-    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL040"])
+    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN040"])
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
     assert result == int(test_case.expected_fault)
     assert bool(payload["findings"]) == test_case.expected_fault
-    assert ("SQBRSQL040" in json.dumps(payload["findings"])) == test_case.expected_fault
+    assert ("SQLCLEAN040" in json.dumps(payload["findings"])) == test_case.expected_fault
 
 
 @pytest.mark.parametrize(
@@ -114,37 +116,37 @@ def test_given_join_predicate_when_compiling_and_running_rules_then_expression_p
             "wrapped plain terminal",
             "((WITH final AS (SELECT 1 AS order_id) SELECT * FROM final))",
             False,
-            "SQBRSQL035",
+            "SQLCLEAN035",
         ),
         SqlReadabilityTestCase(
             "wrapped computed terminal",
             "((WITH final AS (SELECT 1 AS order_id) SELECT order_id + 1 AS order_id FROM final))",
             True,
-            "SQBRSQL035",
+            "SQLCLEAN035",
         ),
         SqlReadabilityTestCase(
             "wrapped terminal union shape",
             "(WITH final AS (SELECT 1 AS order_id) SELECT * FROM final UNION ALL SELECT * FROM final)",
             True,
-            "SQBRSQL035",
+            "SQLCLEAN035",
         ),
         SqlReadabilityTestCase(
             "wrapped CTE union terminal shape",
             "((WITH final AS (SELECT 1 AS order_id UNION ALL SELECT 2 AS order_id) SELECT * FROM final))",
             False,
-            "SQBRSQL035",
+            "SQLCLEAN035",
         ),
         SqlReadabilityTestCase(
             "wrapped root is not nested",
             "((WITH final AS (SELECT 1 AS order_id) SELECT * FROM final))",
             False,
-            "SQBRSQL036",
+            "SQLCLEAN036",
         ),
         SqlReadabilityTestCase(
             "scalar CTE is nested",
             "SELECT (WITH orders AS (SELECT 1 AS order_id) SELECT order_id FROM orders) AS order_id",
             True,
-            "SQBRSQL036",
+            "SQLCLEAN036",
         ),
         SqlReadabilityTestCase(
             "final", "WITH final AS (SELECT 1 AS order_id) SELECT * FROM final", False
@@ -181,7 +183,7 @@ def test_given_join_predicate_when_compiling_and_running_rules_then_expression_p
 def test_given_cte_names_when_compiling_and_running_rules_then_final_name_policy_applies(
     test_case: SqlReadabilityTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(PROJECT_CONFIG)
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(f'MODEL (description "Orders");\n{test_case.sql}\n')
@@ -198,7 +200,7 @@ def test_given_cte_names_when_compiling_and_running_rules_then_final_name_policy
 
 @pytest.mark.parametrize(
     "test_case",
-    [SqlReadabilityTestCase("family enables both rules", "SQBRSQL", True)],
+    [SqlReadabilityTestCase("family enables both rules", "SQLCLEAN", True)],
     ids=lambda case: case.description,
 )
 def test_given_family_selection_when_compiling_then_new_rules_are_enforced(
@@ -219,14 +221,14 @@ def test_given_family_selection_when_compiling_then_new_rules_are_enforced(
         test_case.expected_fault
     )
     output: CaptureResult[str] = capsys.readouterr()
-    assert "SQBRSQL040" in output.out + output.err
-    assert "SQBRSQL041" in output.out + output.err
+    assert "SQLCLEAN040" in output.out + output.err
+    assert "SQLCLEAN041" in output.out + output.err
     assert main(["--project-dir", str(tmp_path), "rules", "--json", "run", test_case.sql]) == int(
         test_case.expected_fault
     )
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
-    assert "SQBRSQL040" in json.dumps(payload["findings"])
-    assert "SQBRSQL041" in json.dumps(payload["findings"])
+    assert "SQLCLEAN040" in json.dumps(payload["findings"])
+    assert "SQLCLEAN041" in json.dumps(payload["findings"])
 
 
 @pytest.mark.parametrize(
@@ -251,10 +253,10 @@ def test_given_lateral_join_when_running_expression_rule_then_literals_pass_and_
         "SELECT o.order_id FROM raw_orders AS o LEFT JOIN LATERAL FLATTEN(input => o.items) AS f "
         f"ON {test_case.sql}\n"
     )
-    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL040"])
+    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN040"])
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
     assert result == int(test_case.expected_fault)
-    assert ("SQBRSQL040" in json.dumps(payload["findings"])) == test_case.expected_fault
+    assert ("SQLCLEAN040" in json.dumps(payload["findings"])) == test_case.expected_fault
 
 
 if __name__ == "__main__":

@@ -197,14 +197,14 @@ INTERRUPT_TIMEOUT_SECONDS: float = 30.0
         ),
         PythonFreeTestCase(
             description="rules show cross join",
-            args=("rules", "show", "SQBRSQL038"),
+            args=("rules", "show", "SQLCLEAN038"),
             prepare=prepare_project,
             expected_exit_code=0,
             expected_captures=1,
         ),
         PythonFreeTestCase(
             description="rules show inline directive rule",
-            args=("rules", "show", "SQBRSQL000"),
+            args=("rules", "show", "SQBRSUPPRESSION000"),
             prepare=prepare_project,
             expected_exit_code=2,
             expected_captures=1,

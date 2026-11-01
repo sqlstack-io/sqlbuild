@@ -50,12 +50,12 @@ fn given_relation_level_exceptions_matching_nothing_when_finalizing_then_they_ar
         StaleRelationExceptionTestCase {
             description: "a relation exception that matches nothing is stale",
             exceptions: json!([{"rule": CROSS_JOIN_CODE, "path": CROSS_JOIN_MODEL_PATH, "relation": "shipments", "reason": "Gone."}]),
-            expected_error: "stale rule exception suppresses no finding: SQBRSQL038 at models/orders.sql (relation shipments)",
+            expected_error: "stale rule exception suppresses no finding: SQLCLEAN038 at models/orders.sql (relation shipments)",
         },
         StaleRelationExceptionTestCase {
             description: "a CTE-scoped exception for another CTE is stale",
             exceptions: json!([{"rule": CROSS_JOIN_CODE, "path": CROSS_JOIN_MODEL_PATH, "relation": "customers", "cte": "other", "reason": "Gone."}]),
-            expected_error: "stale rule exception suppresses no finding: SQBRSQL038 at models/orders.sql (relation customers in CTE other)",
+            expected_error: "stale rule exception suppresses no finding: SQLCLEAN038 at models/orders.sql (relation customers in CTE other)",
         },
     ];
 

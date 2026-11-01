@@ -562,7 +562,8 @@ def test_given_multi_schema_functions_when_cloning_then_destination_graph_is_que
                 """
                 MODEL (description "Test model orders.", materialized table, schema model_origin);
 
-                SELECT * FROM (VALUES (1, 10), (2, 20)) AS orders(order_id, amount)
+                WITH amounts(order_id, amount) AS (VALUES (1, 10), (2, 20))
+                SELECT * FROM amounts
                 """
             ).strip()
             + "\n",

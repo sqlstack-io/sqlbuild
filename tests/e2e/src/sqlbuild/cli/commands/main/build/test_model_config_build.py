@@ -36,8 +36,8 @@ _PROJECT_FILES: dict[str, str] = {
     ),
     "models/staging/stg_orders.sql": (
         'MODEL (description "Staged orders.");\n\n'
-        "SELECT * FROM (VALUES (1, 10, 'placed'), (2, 20, 'shipped'))"
-        " AS t(order_id, amount, status)\n"
+        "WITH t(order_id, amount, status) AS (VALUES (1, 10, 'placed'), (2, 20, 'shipped'))\n"
+        "SELECT * FROM t\n"
     ),
     "models/marts/order_totals.sql": (
         'MODEL (\n  description "Order totals for ${CTX:run.target}.",\n'

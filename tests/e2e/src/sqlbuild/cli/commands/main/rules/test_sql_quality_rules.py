@@ -30,7 +30,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
 
 _PROJECT_TOML: str = (
     'name = "orders"\nadapter = "duckdb"\n\n[rules]\n'
-    'select = ["SQBRSQL018", "SQBRSQL042", "SQBRSQL043", "SQBRSQL044"]\n\n'
+    'select = ["SQLCLEAN018", "SQLCLEAN042", "SQLCLEAN043", "SQLCLEAN044"]\n\n'
     "[rules.thresholds]\nmax_literal_length = 30\nmax_ranking_order_by = 2\n"
 )
 _UPSTREAM_SQL: str = (
@@ -135,12 +135,12 @@ _KEYED_SOURCE_YML: str = (
                 "SELECT f.order_id, f.label, f.amount_rank, f.stable_rank FROM final AS f\n"
             ),
             expected_findings=(
-                ("SQBRSQL042", 3),
-                ("SQBRSQL044", 9),
-                ("SQBRSQL018", 10),
-                ("SQBRSQL043", 11),
+                ("SQLCLEAN042", 3),
+                ("SQLCLEAN044", 9),
+                ("SQLCLEAN018", 10),
+                ("SQLCLEAN043", 11),
             ),
-            expected_after_fix=(("SQBRSQL044", 16), ("SQBRSQL018", 19), ("SQBRSQL043", 20)),
+            expected_after_fix=(("SQLCLEAN044", 16), ("SQLCLEAN018", 19), ("SQLCLEAN043", 20)),
         ),
         SqlQualityRuleCase(
             description="a ranking order without a declared key cannot be proven",
@@ -157,8 +157,8 @@ _KEYED_SOURCE_YML: str = (
                 ")\n"
                 "SELECT f.order_id, f.rn FROM final AS f\n"
             ),
-            expected_findings=(("SQBRSQL018", 7),),
-            expected_after_fix=(("SQBRSQL018", 12),),
+            expected_findings=(("SQLCLEAN018", 7),),
+            expected_after_fix=(("SQLCLEAN018", 12),),
         ),
     ),
     ids=lambda case: case.description,
@@ -226,7 +226,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             ),
             upstream_sql=_CURSOR_INCREMENTAL_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
-            expected_codes=("SQBRSQL018",),
+            expected_codes=("SQLCLEAN018",),
             extra_files=(("sources/landing_events.yml", _CURSOR_SOURCE_YML),),
         ),
         RankingKeyProofCase(
@@ -234,14 +234,14 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             upstream_header=_SNAPSHOT_HEADER,
             upstream_sql=_INCREMENTAL_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
-            expected_codes=("SQBRSQL018",),
+            expected_codes=("SQLCLEAN018",),
         ),
         RankingKeyProofCase(
             description="a unique audit on a nullable column is not a key",
             upstream_header='MODEL (description "Raw orders", columns (order_id (audits [unique])));\n',
             upstream_sql=_UPSTREAM_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
-            expected_codes=("SQBRSQL018",),
+            expected_codes=("SQLCLEAN018",),
         ),
         RankingKeyProofCase(
             description="a unique audit on a nullable false column is a key",
@@ -272,7 +272,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
                 'FROM __ref("raw_orders") AS r\n'
                 "QUALIFY ROW_NUMBER() OVER (PARTITION BY r.customer_id ORDER BY r.amount DESC) = 1\n"
             ),
-            expected_codes=("SQBRSQL018",),
+            expected_codes=("SQLCLEAN018",),
         ),
         RankingKeyProofCase(
             description="an upstream hashed row key with a unique audit is a tie-breaker",
@@ -299,7 +299,7 @@ def test_given_quality_rule_violations_when_compiling_and_fixing_then_findings_a
             upstream_header='MODEL (description "Raw orders");\n',
             upstream_sql=_UPSTREAM_SQL,
             query_sql=_RENAMED_CHAIN_SQL,
-            expected_codes=("SQBRSQL018",),
+            expected_codes=("SQLCLEAN018",),
         ),
     ),
     ids=lambda case: case.description,
@@ -335,7 +335,7 @@ def test_given_declared_upstream_keys_when_compiling_then_ranking_proof_follows_
         RankingSortDefaultCase(
             description="six sort keys exceed the default",
             order_by="o.amount, o.status, o.note, o.customer_id, o.amount + 1, o.order_id",
-            expected_codes=("SQBRSQL043",),
+            expected_codes=("SQLCLEAN043",),
         ),
     ),
     ids=lambda case: case.description,
@@ -345,7 +345,7 @@ def test_given_default_ranking_limit_when_compiling_then_five_sort_keys_are_allo
 ) -> None:
     write_quality_project(
         project_dir=tmp_path,
-        toml='name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL043"]\n',
+        toml='name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN043"]\n',
         upstream=_RAW_HEADER + _UPSTREAM_SQL,
         summary=(
             _SUMMARY_HEADER + "SELECT o.order_id,"
@@ -379,20 +379,20 @@ def test_given_default_ranking_limit_when_compiling_then_five_sort_keys_are_allo
                 "SELECT f.order_id, f.label, f.rn FROM final AS f\n"
             ),
             expected_fixability=(
-                ("SQBRSQL042", True),
-                ("SQBRSQL043", False),
-                ("SQBRSQL044", False),
+                ("SQLCLEAN042", True),
+                ("SQLCLEAN043", False),
+                ("SQLCLEAN044", False),
             ),
             expected_notes=(
-                ("SQBRSQL042", (_FIX_NOTE,)),
-                ("SQBRSQL043", ()),
-                ("SQBRSQL044", ()),
+                ("SQLCLEAN042", (_FIX_NOTE,)),
+                ("SQLCLEAN043", ()),
+                ("SQLCLEAN044", ()),
             ),
             expected_help_fragments=(
-                ("SQBRSQL043", "(the current value is 2)"),
-                ("SQBRSQL043", "[rules.thresholds]\n            max_ranking_order_by = 3"),
-                ("SQBRSQL044", '@const("_status_pattern")'),
-                ("SQBRSQL044", "[rules.thresholds]\n            max_literal_length = 39"),
+                ("SQLCLEAN043", "(the current value is 2)"),
+                ("SQLCLEAN043", "[rules.thresholds]\n            max_ranking_order_by = 3"),
+                ("SQLCLEAN044", '@const("_status_pattern")'),
+                ("SQLCLEAN044", "[rules.thresholds]\n            max_literal_length = 39"),
             ),
         ),
     ),
@@ -409,10 +409,10 @@ def test_given_fixable_and_manual_findings_when_reporting_then_only_fixable_ones
     )
 
     rules_json: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
-        tmp_path, "rules", "--json", "run", "SQBRSQL"
+        tmp_path, "rules", "--json", "run", "SQLCLEAN"
     )
     rules_text: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
-        tmp_path, "rules", "run", "SQBRSQL"
+        tmp_path, "rules", "run", "SQLCLEAN"
     )
     compiled: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
         tmp_path, "compile", "--json", "--no-cache"
@@ -453,7 +453,7 @@ def test_given_fixable_and_manual_findings_when_reporting_then_only_fixable_ones
                 ' FROM __ref("raw_orders") AS o\n'
             ),
             expected_exit=1,
-            expected_codes=("SQBRSQL044",),
+            expected_codes=("SQLCLEAN044",),
         ),
     ),
     ids=lambda case: case.description,
@@ -548,7 +548,7 @@ def test_given_repeated_long_literal_when_running_rules_then_help_names_the_shar
         model.write_text(f"{_SUMMARY_HEADER}SELECT {literal} AS label\n", encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
-        tmp_path, "rules", "--json", "run", "SQBRSQL044"
+        tmp_path, "rules", "--json", "run", "SQLCLEAN044"
     )
 
     hints: dict[str, str] = long_literal_hints(result)

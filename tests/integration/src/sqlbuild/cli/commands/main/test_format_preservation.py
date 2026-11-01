@@ -8,6 +8,11 @@ import pytest
 from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.cli.commands.main._test_types import FormatterSyntaxTestCase
 
+# The window syntax cases order by a non-unique column, which SQLCLEAN018 reports.
+_WINDOW_SYNTAX_PROJECT_TOML: str = (
+    'name = "orders"\nadapter = "snowflake"\n\n[rules]\nignore = ["SQLCLEAN018"]\n'
+)
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -76,7 +81,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import Formatt
 def test_given_authored_syntax_when_formatting_then_spelling_and_idempotence_are_preserved(
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "snowflake"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(_WINDOW_SYNTAX_PROJECT_TOML)
     macros: Path = tmp_path / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
     (macros / "orders.py").write_text(test_case.macro_source)
@@ -213,7 +218,7 @@ def test_given_cte_macros_and_comments_when_formatting_then_layout_and_rules_sta
     test_case: FormatterSyntaxTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQBRSQL033"]\n'
+        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN033"]\n'
     )
     macros: Path = tmp_path / "models" / "_macros" / "python"
     macros.mkdir(parents=True)
@@ -235,7 +240,7 @@ def test_given_cte_macros_and_comments_when_formatting_then_layout_and_rules_sta
     assert model.read_text() == formatted
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == 0
     capsys.readouterr()
-    assert main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL033"]) == 0
+    assert main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN033"]) == 0
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
     assert payload["findings"] == []
 

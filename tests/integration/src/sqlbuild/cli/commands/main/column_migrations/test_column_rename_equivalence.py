@@ -32,6 +32,7 @@ from tests.integration.src.sqlbuild.cli.commands.main.column_migrations.helpers 
     state_table_names,
     write_model,
 )
+from tests.integration.src.sqlbuild.cli.commands.main.model_migrations.helpers import PROJECT_TOML
 
 _ORDERS: str = 'FROM __source("raw_orders")'
 _REBOUND_BODY: str = (
@@ -45,6 +46,8 @@ _QUALIFY_AFTER: str = (
     f"SELECT order_id, order_date, amount AS tax {_ORDERS} "
     "QUALIFY row_number() OVER (ORDER BY tax) = 1"
 )
+# The QUALIFY window ranks by a non-unique column on purpose, which SQLCLEAN018 reports.
+_QUALIFY_PROJECT_TOML: str = PROJECT_TOML + '\n[rules]\nignore = ["SQLCLEAN018"]\n'
 _FILTERED_BODY: str = f"SELECT order_id, order_date, amount AS revenue {_ORDERS} WHERE amount > 0"
 _REPLAY_BOUNDED: str = "  replay_on_change bounded-2d,\n"
 _HISTORY: tuple[tuple[int, Any], ...] = ((1, 101), (2, 102), (3, 103), (4, 104), (5, 105))
@@ -243,11 +246,11 @@ def test_given_rename_with_other_query_changes_when_building_then_replay_matches
 def test_given_renamed_alias_colliding_with_an_input_column_when_building_then_it_replays(
     test_case: CollidingAliasRenameTestCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    write_model(project_dir=tmp_path, sql=test_case.initial_sql)
+    write_model(project_dir=tmp_path, sql=test_case.initial_sql, project_toml=_QUALIFY_PROJECT_TOML)
     load_descending_amounts(project_dir=tmp_path, last_day=3)
     _ = build_ok(project_dir=tmp_path, capsys=capsys)
     load_descending_amounts(project_dir=tmp_path, last_day=5)
-    write_model(project_dir=tmp_path, sql=test_case.renamed_sql)
+    write_model(project_dir=tmp_path, sql=test_case.renamed_sql, project_toml=_QUALIFY_PROJECT_TOML)
 
     plan: dict[str, Any] = plan_json(project_dir=tmp_path, capsys=capsys)
     _ = build_ok(project_dir=tmp_path, capsys=capsys)

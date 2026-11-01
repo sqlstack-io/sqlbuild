@@ -35,6 +35,7 @@ from scripts.compiler_differential.constants import (
     GENERATOR_REGION_ENV_VAR,
     GENERATOR_ROLES,
     GENERATOR_SOURCE_COLUMNS,
+    GENERATOR_SQL_RULE_IGNORES,
     GENERATOR_STATUS_VALUES,
     GENERATOR_SUFFIXES,
     GENERATOR_VARIABLE_SHARE,
@@ -213,6 +214,7 @@ class ProjectBuilder:
                 )
         self._features.add("path_defaults_wildcard")
         lines.extend(extra_lines)
+        lines.extend(GENERATOR_SQL_RULE_IGNORES)
         self._files["sqlbuild_project.toml"] = "\n".join(lines) + "\n"
 
     def _write_sources(self) -> None:

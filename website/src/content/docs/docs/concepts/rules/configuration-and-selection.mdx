@@ -9,28 +9,35 @@ Configure built-in and custom Rules together:
 
 ```toml
 [rules]
-select = ["SQBRSQL", "SQBRGRAPH", "XSQBRARCH"]
-ignore = ["SQBRSQL004"]
+select = ["SQLCLEAN", "SQBRGRAPH", "XSQBRARCH"]
+ignore = ["SQLCLEAN004"]
 ```
 
-An empty `select` disables configurable Rules. It does not disable mandatory compiler correctness.
+Without `select`, SQLBuild runs the SQL Rules that are enabled by default and no other
+configurable Rules. `select = []` runs no configurable Rules. Mandatory compiler correctness
+always applies.
+
+SQL Rules read the SQL that SQLBuild analyses, so they skip a model with `sql_analysis false`, an
+audit or SQL test file whose headers all set `sql_analysis false`, and every model in a run with
+`--no-sql-analysis`.
 
 ## Codes and families
 
-Built-in codes use `SQBR<FAMILY><three digits>`, such as `SQBRSQL004`, `SQBRMODEL101`, and
-`SQBRGRAPH101`. Custom codes use `XSQBR<optional uppercase family><three digits>`, such as
-`XSQBRARCH001`.
+SQL Rule codes use `SQLCLEAN<three digits>`, such as `SQLCLEAN004`. Other built-in codes use
+`SQBR<FAMILY><three digits>`, such as `SQBRMODEL101` and `SQBRGRAPH101`. Custom codes use
+`XSQBR<optional uppercase family><three digits>`, such as `XSQBRARCH001`.
 
 A family is always the code with its final three digits removed:
 
 ```text
-SQBRSQL004    → SQBRSQL
+SQLCLEAN004   → SQLCLEAN
+SQBRGRAPH101  → SQBRGRAPH
 XSQBRARCH001  → XSQBRARCH
 XSQBR001      → XSQBR
 ```
 
-Exact codes select one Rule. Prefixes select every matching Rule. `ignore` uses the same matching
-semantics and takes precedence over `select`.
+Exact codes select one Rule. Families select every matching Rule, whether or not it is enabled by
+default. `ignore` uses the same matching semantics and takes precedence over `select`.
 
 A selector that matches no Rule fails with `C000`. `SQBRTEST105` (scenario description) was retired
 when descriptions became the compile error `P010`
@@ -41,7 +48,7 @@ Use the catalogue to inspect available codes and metadata:
 
 ```bash
 sqb rules list
-sqb rules show SQBRSQL004
+sqb rules show SQLCLEAN004
 ```
 
 ## Rule options
@@ -73,8 +80,8 @@ Unknown Rule codes, option names, and invalid option values fail configuration.
 Run one exact Rule or family while developing or adopting it:
 
 ```bash
-sqb rules run SQBRSQL004
-sqb rules run SQBRSQL
+sqb rules run SQLCLEAN004
+sqb rules run SQLCLEAN
 sqb rules run XSQBRARCH --select customer_orders
 ```
 
@@ -87,7 +94,7 @@ the complete configured enforcement performed by `sqb compile`.
 
 ## Join keys and final CTE names
 
-`SQBRSQL040` checks every `JOIN ... ON` in the SQL covered by SQL Rules, including joins inside CTEs
+`SQLCLEAN040` checks every `JOIN ... ON` in the SQL covered by SQL Rules, including joins inside CTEs
 and subqueries. `USING (...)` is accepted. Allowed predicates are:
 
 - Plain column comparisons, including equality, inequality, range and null-safe comparisons.
@@ -106,16 +113,16 @@ projects `LOWER(category) AS category_key`, then join `ON o.category_key = c.cat
 variant path access such as `ON a.data:key = b.id` is also computed: project the value as a named
 column before joining.
 
-`SQBRSQL041` checks CTE naming: the last top-level CTE must be named `final` (compared
+`SQLCLEAN041` checks CTE naming: the last top-level CTE must be named `final` (compared
 case-insensitively, including quoted identifiers), and no other CTE, including a nested one, may use
-that name. Queries without CTEs are unaffected, and SQL-test fixture CTEs are exempt. `SQBRSQL035`
+that name. Queries without CTEs are unaffected, and SQL-test fixture CTEs are exempt. `SQLCLEAN035`
 owns the terminal `SELECT`'s plain projection from that last CTE, so select both, normally through
-the `SQBRSQL` family, for the complete convention. Parentheses around the entire query do not create
+the `SQLCLEAN` family, for the complete convention. Parentheses around the entire query do not create
 a nested CTE scope.
 
 ## Repeated JSON parsing
 
-`SQBRSQL045` reports a JSON parse function applied to the same column more than once in one
+`SQLCLEAN045` reports a JSON parse function applied to the same column more than once in one
 `SELECT`. Parse the payload once in the CTE that reads it, then read every field from that column:
 
 ```sql
@@ -173,9 +180,9 @@ max_literal_length = 100   # default
 max_ranking_order_by = 5   # default
 ```
 
-- `SQBRSQL042`: every output column of a non-final CTE must be read later in the same model,
+- `SQLCLEAN042`: every output column of a non-final CTE must be read later in the same model,
   in any clause of a later CTE or the final query, including through a later `SELECT *`
-  pass-through. The last CTE (the model output), unreachable CTEs (reported by `SQBRSQL005`),
+  pass-through. The last CTE (the model output), unreachable CTEs (reported by `SQLCLEAN005`),
   CTEs with a column list, recursive queries and SQL-test fixtures are exempt. A later step that
   uses an `@` interpolation in an expression may read any column, so it keeps every column, and
   interpolated outputs are never reported. A later step that reads the CTE as a whole row (the
@@ -190,14 +197,14 @@ max_ranking_order_by = 5   # default
   `SELECT DISTINCT`, `DISTINCT ON`, `GROUP BY ALL`, `ORDER BY ALL`, an aggregate without
   `GROUP BY`, or positional `GROUP BY`/`ORDER BY`. Other findings are reported without a fix and
   name the reason. The fix repeats until nothing changes.
-- `SQBRSQL043`: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `FIRST_VALUE` and `LAST_VALUE` windows may
+- `SQLCLEAN043`: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `FIRST_VALUE` and `LAST_VALUE` windows may
   sort by at most `max_ranking_order_by` expressions. Order by the one or two columns that decide
   which row wins, then a unique row key as the final tie-breaker. If the rows have no unique
   column, build one in the upstream model from the columns that identify a row (for example
   `HASH(source_partition, source_offset, line_index) AS row_key`) and declare it with a `unique`
-  audit, so `SQBRSQL018` can prove the order. Raise the project limit only when the order
+  audit, so `SQLCLEAN018` can prove the order. Raise the project limit only when the order
   genuinely needs more keys.
-- `SQBRSQL044`: a string literal longer than `max_literal_length` characters is an error. Define
+- `SQLCLEAN044`: a string literal longer than `max_literal_length` characters is an error. Define
   the value once as a [constant](/docs/concepts/constants) in the narrowest
   [scope](/docs/concepts/declaration-scopes) that covers every use, and reference it with
   `@const`: a model-private `constants (_status_pattern '...')` entry in the `MODEL` header when
@@ -207,7 +214,7 @@ max_ranking_order_by = 5   # default
   Otherwise shorten the literal. When the identical literal is reported in other files, the help
   lists them (up to five) and names the nearest common folder and its constants directory.
   Literals produced by `@const` or a macro are not reported, and there is no automatic fix.
-- `SQBRSQL018` requires every `ROW_NUMBER`, `FIRST_VALUE` and `LAST_VALUE` window to be proven
+- `SQLCLEAN018` requires every `ROW_NUMBER`, `FIRST_VALUE` and `LAST_VALUE` window to be proven
   deterministic: `PARTITION BY` and `ORDER BY` together must cover a unique key of the ranked rows.
   Keys come from `unique` column audits and model-level `unique` audits naming a column, when the
   column is also non-null (a `not_null` audit or `nullable false`), and from the `unique_key` of
@@ -226,7 +233,6 @@ max_ranking_order_by = 5   # default
 A finding that `sqb format --fix` can fix says so in text output and carries `"fixable": true` in
 `sqb rules --json run` output; `sqb compile` adds the same note to the diagnostic.
 
-Family selectors such as `select = ["SQBRSQL", "SQBRMODEL", "SQBRGRAPH"]` pick up new built-in Rules
-on upgrade, so a release that adds `SQBRSQL040` to `SQBRSQL045` can expose computed join keys,
-differently named final CTEs, unused CTE columns, long literals, ranking sorts or repeated JSON
-parses that were accepted before.
+Family selectors such as `select = ["SQLCLEAN", "SQBRMODEL", "SQBRGRAPH"]` pick up new built-in Rules
+on upgrade, and an unset `select` picks up new default SQL Rules. A new Rule can report SQL that
+compiled under an earlier release.

@@ -224,6 +224,8 @@ pub struct CompileTextReport {
     /// Every selected model, in project order.
     pub models: Vec<ModelLine>,
     pub semantic_notice: Option<String>,
+    /// How to turn off configurable Rules, when unselected default Rules reported a finding.
+    pub default_rules_notice: Option<String>,
     /// The diagnostics shown, with repeated equal warnings already folded.
     pub diagnostics: Vec<DiagnosticText>,
     pub seed_count: usize,

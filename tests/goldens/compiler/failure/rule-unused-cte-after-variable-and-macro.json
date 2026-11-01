@@ -7,7 +7,7 @@
     {
      "phase": "rule",
      "severity": "error",
-     "code": "SQBRSQL005",
+     "code": "SQLCLEAN005",
      "message": "CTE is unreachable from the final query",
      "path": "models/marts/customer_totals.sql",
      "line": 5,
@@ -29,7 +29,7 @@
  "compiled_failed": {
   "models/marts/customer_totals.sql": [
    "-- sqb: compile failed for this model; not buildable",
-   "-- SQBRSQL005 at models/marts/customer_totals.sql:5:117: CTE is unreachable from the final query",
+   "-- SQLCLEAN005 at models/marts/customer_totals.sql:5:117: CTE is unreachable from the final query",
    "WITH totals AS (SELECT customer_id, (amount * 100) AS cents, 2 AS floor_cents FROM __ref(\"stg_orders\")), spare AS (SELECT 1 AS one)",
    "SELECT customer_id, SUM(cents) AS total_amount",
    "FROM totals WHERE cents > floor_cents",

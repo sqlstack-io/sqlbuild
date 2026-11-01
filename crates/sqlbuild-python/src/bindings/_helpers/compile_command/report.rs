@@ -51,6 +51,7 @@ const REPORT_OPTIONS: (&[&str], &[&str]) = (
         "sql_validation_enabled",
         "use_color",
         "timings_ms",
+        "default_rules_notice",
     ],
 );
 const HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];
@@ -404,6 +405,7 @@ pub(crate) fn format_compile_text<'py>(
         },
         models,
         semantic_notice: inputs.semantic_notice(&reader)?,
+        default_rules_notice: arguments.value("default_rules_notice")?.extract()?,
         diagnostics: shown_diagnostics(&inputs, &reader)?,
         seed_count: inputs.selected_count(&[SEED_TYPE])?,
         function_count: inputs.selected_count(&FUNCTION_TYPES)?,

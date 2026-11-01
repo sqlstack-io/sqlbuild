@@ -76,61 +76,61 @@ def test_given_unicode_before_intrinsics_when_preparing_then_lint_preserves_sema
         NeutralizeInterpolationTestCase(
             description="bare audit parameter becomes a sentinel",
             body="SELECT * FROM t WHERE NOT (@expression)",
-            expected_neutralized="SELECT * FROM t WHERE NOT (__sqb_lint_0__)",
+            expected_neutralized="SELECT * FROM t WHERE NOT (__sqlclean_interpolation_0__)",
             expected_original_texts=("@expression",),
         ),
         NeutralizeInterpolationTestCase(
             description="macro call including arguments becomes one sentinel",
             body="SELECT @py.cents_to_dollars(amount_cents) AS amount",
-            expected_neutralized="SELECT __sqb_lint_0__ AS amount",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS amount",
             expected_original_texts=("@py.cents_to_dollars(amount_cents)",),
         ),
         NeutralizeInterpolationTestCase(
             description="macro call with python valued arguments becomes one sentinel",
             body="SELECT @py.pick(columns=['a', 'b']) AS chosen",
-            expected_neutralized="SELECT __sqb_lint_0__ AS chosen",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS chosen",
             expected_original_texts=("@py.pick(columns=['a', 'b'])",),
         ),
         NeutralizeInterpolationTestCase(
             description="nested macro parentheses are matched",
             body="SELECT @py.outer(@py.inner(x), y) AS v",
-            expected_neutralized="SELECT __sqb_lint_0__ AS v",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS v",
             expected_original_texts=("@py.outer(@py.inner(x), y)",),
         ),
         NeutralizeInterpolationTestCase(
             description="quoted audit parameter becomes a sentinel",
             body="SELECT @'column_name' AS c",
-            expected_neutralized="SELECT __sqb_lint_0__ AS c",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS c",
             expected_original_texts=("@'column_name'",),
         ),
         NeutralizeInterpolationTestCase(
             description="project variable interpolation becomes a sentinel",
             body="SELECT * FROM @@source_table",
-            expected_neutralized="SELECT * FROM __sqb_lint_0__",
+            expected_neutralized="SELECT * FROM __sqlclean_interpolation_0__",
             expected_original_texts=("@@source_table",),
         ),
         NeutralizeInterpolationTestCase(
             description="environment interpolation becomes a sentinel",
             body="SELECT * FROM @@ENV:TARGET_TABLE",
-            expected_neutralized="SELECT * FROM __sqb_lint_0__",
+            expected_neutralized="SELECT * FROM __sqlclean_interpolation_0__",
             expected_original_texts=("@@ENV:TARGET_TABLE",),
         ),
         NeutralizeInterpolationTestCase(
             description="context interpolation becomes a sentinel",
             body="SELECT @@CTX:run_id AS run",
-            expected_neutralized="SELECT __sqb_lint_0__ AS run",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS run",
             expected_original_texts=("@@CTX:run_id",),
         ),
         NeutralizeInterpolationTestCase(
             description="template expression becomes a sentinel",
             body="SELECT ${if(eq(a, b), x, y)} AS v",
-            expected_neutralized="SELECT __sqb_lint_0__ AS v",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS v",
             expected_original_texts=("${if(eq(a, b), x, y)}",),
         ),
         NeutralizeInterpolationTestCase(
             description="each site receives a distinct sentinel",
             body="SELECT @a, @a FROM t",
-            expected_neutralized="SELECT __sqb_lint_0__, __sqb_lint_1__ FROM t",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__, __sqlclean_interpolation_1__ FROM t",
             expected_original_texts=("@a", "@a"),
         ),
         NeutralizeInterpolationTestCase(
@@ -142,7 +142,7 @@ def test_given_unicode_before_intrinsics_when_preparing_then_lint_preserves_sema
         NeutralizeInterpolationTestCase(
             description="SQLBuild reference call becomes one sentinel",
             body='SELECT * FROM __ref("@model")',
-            expected_neutralized="SELECT * FROM __sqb_lint_0__",
+            expected_neutralized="SELECT * FROM __sqlclean_interpolation_0__",
             expected_original_texts=('__ref("@model")',),
         ),
         NeutralizeInterpolationTestCase(
@@ -151,14 +151,14 @@ def test_given_unicode_before_intrinsics_when_preparing_then_lint_preserves_sema
                 'SELECT * FROM __table_fn("events")((SELECT ARRAY_AGG(event_id) FROM event_ids))'
             ),
             expected_neutralized=(
-                "SELECT * FROM __sqb_lint_0__((SELECT ARRAY_AGG(event_id) FROM event_ids))"
+                "SELECT * FROM __sqlclean_interpolation_0__((SELECT ARRAY_AGG(event_id) FROM event_ids))"
             ),
             expected_original_texts=('__table_fn("events")',),
         ),
         NeutralizeInterpolationTestCase(
             description="escaped SQL quote does not hide a later table function",
             body="SELECT 'can''t'; SELECT * FROM __table_fn(\"events\")((SELECT 1))",
-            expected_neutralized="SELECT 'can''t'; SELECT * FROM __sqb_lint_0__((SELECT 1))",
+            expected_neutralized="SELECT 'can''t'; SELECT * FROM __sqlclean_interpolation_0__((SELECT 1))",
             expected_original_texts=('__table_fn("events")',),
         ),
         NeutralizeInterpolationTestCase(
@@ -167,7 +167,7 @@ def test_given_unicode_before_intrinsics_when_preparing_then_lint_preserves_sema
                 '/* Snowflake\'s table function */\nSELECT * FROM __table_fn("events")((SELECT 1))'
             ),
             expected_neutralized=(
-                "/* Snowflake's table function */\nSELECT * FROM __sqb_lint_0__((SELECT 1))"
+                "/* Snowflake's table function */\nSELECT * FROM __sqlclean_interpolation_0__((SELECT 1))"
             ),
             expected_original_texts=('__table_fn("events")',),
         ),
@@ -234,28 +234,28 @@ def test_given_body_when_neutralizing_then_sentinels_replace_interpolation(
             description="databricks backtick keeps a close paren inside a macro call",
             dialect="databricks",
             body="SELECT @py.m(`a)b` x) AS y",
-            expected_neutralized="SELECT __sqb_lint_0__ AS y",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__ AS y",
             expected_original_texts=("@py.m(`a)b` x)",),
         ),
         DialectNeutralizeInterpolationTestCase(
             description="bigquery backtick apostrophe does not hide a later macro",
             dialect="bigquery",
             body='SELECT `customer\'s id` AS customer_id, @py.label("order_id") AS order_id',
-            expected_neutralized="SELECT `customer's id` AS customer_id, __sqb_lint_0__ AS order_id",
+            expected_neutralized="SELECT `customer's id` AS customer_id, __sqlclean_interpolation_0__ AS order_id",
             expected_original_texts=('@py.label("order_id")',),
         ),
         DialectNeutralizeInterpolationTestCase(
             description="postgres backtick remains ordinary code",
             dialect="postgres",
             body="SELECT @py.m(`a)b` x) AS y",
-            expected_neutralized="SELECT __sqb_lint_0__b` x) AS y",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__b` x) AS y",
             expected_original_texts=("@py.m(`a)",),
         ),
         DialectNeutralizeInterpolationTestCase(
             description="sqlserver backtick remains ordinary code",
             dialect="tsql",
             body="SELECT @py.m(`a)b` x) AS y",
-            expected_neutralized="SELECT __sqb_lint_0__b` x) AS y",
+            expected_neutralized="SELECT __sqlclean_interpolation_0__b` x) AS y",
             expected_original_texts=("@py.m(`a)",),
         ),
     ],
@@ -291,7 +291,7 @@ def test_given_dialect_quoting_when_neutralizing_then_python_and_native_sites_ag
             description="sentinels are unique across sites",
             body="SELECT @a, @b, @@c, ${d} FROM t",
             expected_neutralized=(
-                "SELECT __sqb_lint_0__, __sqb_lint_1__, __sqb_lint_2__, __sqb_lint_3__ FROM t"
+                "SELECT __sqlclean_interpolation_0__, __sqlclean_interpolation_1__, __sqlclean_interpolation_2__, __sqlclean_interpolation_3__ FROM t"
             ),
             expected_original_texts=("@a", "@b", "@@c", "${d}"),
         ),
@@ -315,13 +315,13 @@ def test_given_many_sites_when_neutralizing_then_every_sentinel_is_distinct(
         RestoreInterpolationTestCase(
             description="unchanged neutralized text round-trips to the original body",
             body="SELECT @py.cents_to_dollars(amount) AS a FROM t",
-            fixed_neutralized="SELECT __sqb_lint_0__ AS a FROM t",
+            fixed_neutralized="SELECT __sqlclean_interpolation_0__ AS a FROM t",
             expected_restored="SELECT @py.cents_to_dollars(amount) AS a FROM t",
         ),
         RestoreInterpolationTestCase(
             description="reformatted layout keeps interpolation intact",
             body="select @a as x,\n  @b from t",
-            fixed_neutralized="SELECT\n    __sqb_lint_0__ AS x,\n    __sqb_lint_1__\nFROM t",
+            fixed_neutralized="SELECT\n    __sqlclean_interpolation_0__ AS x,\n    __sqlclean_interpolation_1__\nFROM t",
             expected_restored="SELECT\n    @a AS x,\n    @b\nFROM t",
         ),
         RestoreInterpolationTestCase(
@@ -333,13 +333,13 @@ def test_given_many_sites_when_neutralizing_then_every_sentinel_is_distinct(
         RestoreInterpolationTestCase(
             description="repeated identical interpolation restores both sites",
             body="SELECT @a, @a FROM t",
-            fixed_neutralized="SELECT __sqb_lint_0__, __sqb_lint_1__ FROM t",
+            fixed_neutralized="SELECT __sqlclean_interpolation_0__, __sqlclean_interpolation_1__ FROM t",
             expected_restored="SELECT @a, @a FROM t",
         ),
         RestoreInterpolationTestCase(
             description="real identifier matching the interpolation name is untouched",
             body="SELECT expression, @expression FROM t",
-            fixed_neutralized="SELECT expression, __sqb_lint_0__ FROM t",
+            fixed_neutralized="SELECT expression, __sqlclean_interpolation_0__ FROM t",
             expected_restored="SELECT expression, @expression FROM t",
         ),
         RestoreInterpolationTestCase(
@@ -350,7 +350,7 @@ def test_given_many_sites_when_neutralizing_then_every_sentinel_is_distinct(
             ),
             fixed_neutralized=(
                 "SELECT expanded.order_id FROM orders CROSS JOIN "
-                "__SQB_LINT_0__(orders.order_id) AS expanded"
+                "__SQLCLEAN_INTERPOLATION_0__(orders.order_id) AS expanded"
             ),
             expected_restored=(
                 "SELECT expanded.order_id FROM orders CROSS JOIN "
@@ -382,7 +382,7 @@ def test_given_fixed_text_when_restoring_then_original_interpolation_returns(
         RestoreFailureTestCase(
             description="duplicated sentinel fails instead of duplicating interpolation",
             body="SELECT @a FROM t",
-            fixed_neutralized="SELECT __sqb_lint_0__, __sqb_lint_0__ FROM t",
+            fixed_neutralized="SELECT __sqlclean_interpolation_0__, __sqlclean_interpolation_0__ FROM t",
             expected_message_fragment="contains 2 occurrences",
         ),
     ],

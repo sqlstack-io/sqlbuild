@@ -35,11 +35,11 @@ pub(crate) const GRAPH_EDGE_RULE_CODE: &str = "SQBRGRAPH101";
 pub(crate) const REPLACEABLE_SKILL_STATES: [&str; 3] = ["fresh", "missing", "stale"];
 pub(crate) const RULE_EXAMPLES: [(&str, &str); 28] = [
     (
-        "SQBRSQL040",
+        "SQLCLEAN040",
         "Compute category_key in an input CTE, then JOIN categories AS c ON o.category_key = c.category_key.",
     ),
     (
-        "SQBRSQL041",
+        "SQLCLEAN041",
         "WITH orders AS (...), final AS (SELECT order_id FROM orders) SELECT order_id FROM final.",
     ),
     (
@@ -75,7 +75,7 @@ pub(crate) const RULE_EXAMPLES: [(&str, &str); 28] = [
         "sales publishes sales__mart__orders and sales__mart__customers; the finance variant lives in finance or sales intermediate.",
     ),
     (
-        "SQBRSQL038",
+        "SQLCLEAN038",
         "JOIN customers AS c ON o.customer_id = c.customer_id, or CROSS JOIN a provably one-row relation such as a one-row seed or an aggregate without GROUP BY.",
     ),
     (
