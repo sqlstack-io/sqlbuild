@@ -46,6 +46,8 @@ pub struct WarehouseStateLocation {
 pub struct SourceFreshnessRead {
     pub location: WarehouseStateLocation,
     pub after: Option<[Option<String>; 11]>,
+    /// Inclusive time bound, held fixed across pages; independent of the row-key cursor.
+    pub observed_since: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

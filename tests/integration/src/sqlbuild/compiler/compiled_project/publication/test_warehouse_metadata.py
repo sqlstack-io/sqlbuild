@@ -82,7 +82,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
         with closing(sqlite3.connect(project / "warehouse.db")) as predecessor:
             assert predecessor.execute("PRAGMA journal_mode=DELETE").fetchone() == (journal_mode,)
 
-    def page(after: list[str | None] | None = None) -> Any:
+    def page(after: list[str | None] | None = None, observed_since: str | None = None) -> Any:
         result: subprocess.CompletedProcess[str] = subprocess.run(
             [
                 str(Path(sys.executable).with_name("sqb")),
@@ -102,6 +102,7 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
                     "source_freshness": {
                         "location": {"database": None, "schema": "main"},
                         "after": after,
+                        "observed_since": observed_since,
                     }
                 }
             )
@@ -116,6 +117,11 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
 
     old: dict[str, Any] = page()
     assert len(old["records"]) == 1 and old["records"][0]["event_id"] is None
+    assert page(observed_since="2026-01-01T09:00:00Z") == old
+    assert page(observed_since="2026-01-01T10:00:00.000001Z") == {
+        "records": [],
+        "next_after": None,
+    }
     for journal_mode in test_case.journal_modes:
         with closing(sqlite3.connect(project / "warehouse.db")) as predecessor:
             assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
@@ -287,6 +293,36 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
         f"external-{index}" for index in range(104)
     }
     assert {row["target_database"] for row in imported} == {None, ""}
+    # The time bound is inclusive and independent of source-name/keyset ordering.
+    # SQL may read a superset within the boundary day, so a short decoded page
+    # must retain its continuation if the raw query filled the page.
+    observed_since: str = "2026-02-01T01:00:00.000050+01:00"
+    recent: list[dict[str, Any]] = [page(observed_since=observed_since)]
+    while recent[-1]["next_after"] is not None:
+        recent.append(page(recent[-1]["next_after"], observed_since))
+        assert len(recent) < 4
+    recent_records: list[dict[str, Any]] = []
+    for item in recent:
+        recent_records.extend(item["records"])
+    assert len(recent_records) == 54
+    assert {row["run_id"] for row in recent_records} == {
+        f"external-{index}" for index in range(50, 104)
+    }
+    zero: dict[str, Any] = page(observed_since="2026-02-01T00:00:00Z")
+    assert (
+        len(zero["records"]) + len(page(zero["next_after"], "2026-02-01T00:00:00Z")["records"])
+        == 105
+    )
+    assert sum(row["run_id"] == "external-0" for row in zero["records"]) == 2
+    # An empty decoded page can still have another bounded SQL page to inspect.
+    empty_since: str = "2026-02-01T00:00:00.000104Z"
+    empty: dict[str, Any] = page(observed_since=empty_since)
+    assert empty["records"] == [] and empty["next_after"] is not None
+    assert page(empty["next_after"], empty_since) == {"records": [], "next_after": None}
+    assert page(observed_since="2030-01-01T00:00:00Z") == {
+        "records": [],
+        "next_after": None,
+    }
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
     assert page() is None

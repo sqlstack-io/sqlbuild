@@ -128,9 +128,14 @@ The location history reader is read-only, including local database connections: 
 databases nor evolves tables. Source-freshness ingestion preserves warehouse IDs, scoped by location,
 target and physical state table. Only missing or NULL IDs use the fixed legacy observation tuple,
 never a hash of the evolving full row. Bounded pages commit atomically under the current location
-session and snapshot generation, and repeated pages are idempotent. These are read/ingestion
-primitives; automatic polling, watermark/overlap management and deletion reconciliation are separate
-location-sync responsibilities, not implemented by the page reader.
+session and snapshot generation, and repeated pages are idempotent. A history read can hold an
+inclusive observation-time lower bound fixed across pages, independently of the row-key cursor.
+SQLite's SQL prefilter includes the boundary day so legacy space-separated timestamps and variable
+fractional precision remain readable; decoded UTC timestamps enforce the exact bound. Other adapters
+prefilter at whole-second precision. Continuation follows the raw row count: even an empty decoded
+page can have more rows to inspect. These are read/ingestion primitives; automatic polling,
+watermark/overlap management and deletion reconciliation are separate location-sync responsibilities,
+not implemented by the page reader.
 
 ## Working on the crates
 
