@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -271,6 +272,10 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
     assert result.cache_bytes < test_case.expected_max_cache_bytes
 
     assert result.cache_disabled.semantic_fingerprint == test_case.expected_cold_fingerprint
+    cold_timings: dict[str, int] = cast(
+        dict[str, int], result.cache_disabled.payload["compile_timings"]
+    )
+    assert (cold_timings["rule_cache_misses"] > 0) is not test_case.compiler_only
     assert result.cold.semantic_fingerprint == test_case.expected_cold_fingerprint
     assert result.warm.semantic_fingerprint == test_case.expected_cold_fingerprint
     assert result.leaf_edit.semantic_fingerprint == test_case.expected_leaf_edit_fingerprint

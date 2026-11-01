@@ -36,7 +36,12 @@ def comparison_markdown(
     if compile_args:
         lines.extend((f"Compile arguments: `{' '.join(compile_args)}`.", ""))
     if compiler_only:
-        lines.extend(("Head project sets `select = []`: compiler only, no default SQL Rules.", ""))
+        lines.extend(
+            (
+                "Projects set `select = []` where supported: compiler only, no default SQL Rules.",
+                "",
+            )
+        )
     for comparison in comparisons:
         lines.extend(
             (

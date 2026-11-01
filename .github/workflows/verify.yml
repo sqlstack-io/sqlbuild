@@ -671,11 +671,12 @@ jobs:
             max_ratio: "1.10"
             edit_max_ratio: "1.20"
             edit_max_cpu_ratio: "1.75"
-          # Base predates default SQL Rules, so the compiler-only head keeps the 1.10 limit.
+          # Both sides set select = [] (an older base has no default Rules), so 1.10 holds.
           - kind: fresh
             label: fresh compiler-only
             compiler_only: true
             max_ratio: "1.10"
+          # Temporary migration allowance; restore 1.10 once the base also runs default Rules.
           # Default SQL Rules add a measured cold cost (1.14x wall, 1.28x CPU over select = []
           # on the same machine), so only the cold limits scale by it; warm and edit keep 1.10.
           - kind: fresh

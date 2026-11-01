@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -155,5 +156,7 @@ def test_given_scaled_semantic_project_when_compiling_fresh_then_preserves_resou
         "warnings": 0,
     }
     assert result.semantic_fingerprint == test_case.expected_semantic_fingerprint
+    timings: dict[str, int] = cast(dict[str, int], result.payload["compile_timings"])
+    assert (timings["rule_cache_misses"] > 0) is not test_case.compiler_only
     assert result.elapsed_seconds < test_case.expected_max_wall_seconds
     assert result.peak_rss_bytes < test_case.expected_max_rss_bytes

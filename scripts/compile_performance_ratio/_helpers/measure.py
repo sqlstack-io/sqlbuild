@@ -100,7 +100,13 @@ def run_checkout_generator(
 
 
 def write_base_benchmark_project(
-    *, base_root: Path, python: Path, kind: str, project_dir: Path, models: int
+    *,
+    base_root: Path,
+    python: Path,
+    kind: str,
+    project_dir: Path,
+    models: int,
+    compiler_only: bool = False,
 ) -> None:
     """Write the base project with the base checkout's own generator, run by `python`."""
 
@@ -108,7 +114,7 @@ def write_base_benchmark_project(
         checkout=base_root,
         python=python,
         entry=BASE_GENERATOR_ENTRY,
-        arguments=(kind, str(project_dir), str(models)),
+        arguments=(kind, str(project_dir), str(models), str(int(compiler_only))),
         environment=_compile_environment(),
         library_paths=(),
     )
