@@ -10,3 +10,4 @@ class PlatformEventKind(StrEnum):
     SCHEDULER_NO_LEADER = "scheduler_no_leader"
     TICK_OVERDUE = "tick_overdue"
     CALENDAR_HORIZON_LOW = "calendar_horizon_low"
+    LOCATION_BROKEN = "location_broken"

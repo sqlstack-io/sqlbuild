@@ -29,7 +29,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
         json!({
             "health_orders": {
                 "description": "Refresh reporting on overdue ticks", "job_key": "orders",
-                "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+                "when": {"kind": "platform_event", "kinds": ["tick_overdue", "location_broken"]},
                 "minimum_interval_seconds": 1
             }
         }),
@@ -53,9 +53,17 @@ pub(crate) async fn append_events(
         PlatformEvent::Heartbeat {
             replica_id: Uuid::from_u128(8),
         },
+        PlatformEvent::LocationBroken {
+            location_id: Uuid::from_u128(9),
+            target: "development".into(),
+            last_seen_at: occurred_at,
+        },
+        PlatformEvent::Heartbeat {
+            replica_id: Uuid::from_u128(10),
+        },
     ];
     for index in indices {
-        let platform = &payloads[(index % 2) as usize];
+        let platform = &payloads[(index % 4) as usize];
         let (next, appended) = append_control_event(
             transaction,
             ControlEvent {

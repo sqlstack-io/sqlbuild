@@ -1,10 +1,11 @@
-//! Health scanning releases the writer lock between bounded trigger pages.
+//! Health scanning releases the writer lock between location and trigger pages.
 
 use chrono::TimeDelta;
 use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::declarations::models::Schedule;
+use crate::platform::_helpers::liveness::scan_location_page;
 use crate::platform::_helpers::observations::observe;
 use crate::platform::models::{InstallationHealth, PlatformEvent, WatchdogTrigger};
 use crate::store::errors::ControlError;
@@ -40,6 +41,14 @@ pub(crate) async fn scan_health(
         .await?;
     }
     commit(transaction).await?;
+    let mut location_after = None;
+    while !*shutdown.borrow() {
+        location_after = scan_location_page(store, health.installation_id, location_after).await?;
+        if location_after.is_none() {
+            break;
+        }
+        tokio::task::yield_now().await;
+    }
     let mut after = None;
     while !*shutdown.borrow() {
         after = scan_trigger_page(store, health.installation_id, after).await?;
