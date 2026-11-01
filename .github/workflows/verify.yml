@@ -279,6 +279,16 @@ jobs:
         run: uv python install 3.12
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: clients/typescript/package-lock.json
+      - name: Check generated control client against the built native API
+        run: |
+          npm --prefix clients/typescript ci
+          uv run --no-sync npm --prefix clients/typescript run check
+          uv run --no-sync npm --prefix clients/typescript test
       - name: Run static checks
         run: make check-ci
       - name: Run native checks
