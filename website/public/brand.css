@@ -1,0 +1,67 @@
+/* Shared attribution for the static homepage and Starlight documentation. */
+.brand-group {
+	display: grid;
+	flex-shrink: 0;
+}
+
+.brand-byline {
+	display: flex;
+	align-items: center;
+	min-height: 24px;
+	/* The wordmark starts at x=447 in the unchanged 1626px-wide lockup. */
+	margin-inline-start: 27.5%;
+	color: var(--sqb-muted, var(--muted-foreground));
+	font-size: 11px;
+	line-height: 14px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.sqlstack-family {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-top: 20px;
+	padding-top: 20px;
+	border-top: 1px solid var(--sqb-line, var(--inner-line));
+	font-size: 13px;
+}
+
+.sqlstack-parent {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.sqlstack-parent img {
+	width: 28px;
+	height: auto;
+}
+
+.sqlstack-for-dark,
+:root[data-theme='dark'] .sqlstack-for-light {
+	display: none;
+}
+
+:root[data-theme='dark'] .sqlstack-for-dark {
+	display: block;
+}
+
+.sqlstack-products {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 20px;
+}
+
+.sqlstack-family a {
+	color: var(--sqb-muted, var(--muted-foreground));
+	text-decoration: none;
+}
+
+.brand-byline:hover,
+.sqlstack-family a:hover {
+	color: var(--sqb-fg, var(--foreground));
+	text-decoration: underline;
+}
