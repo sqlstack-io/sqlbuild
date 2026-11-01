@@ -68,7 +68,10 @@ _DECLARED_ORDERS: str = (
         StrictCompileTestCase(
             description="report-only with every check proven prints no report",
             settings='\n[settings]\nstrict = "report"\n',
-            files={"functions/sql/margin.sql": _MARGIN_FUNCTION, "models/orders.sql": _DECLARED_ORDERS},
+            files={
+                "functions/sql/margin.sql": _MARGIN_FUNCTION,
+                "models/orders.sql": _DECLARED_ORDERS,
+            },
             expected_exit_code=0,
             expected_strict="report",
             expected_fragments=("0 errors",),
@@ -95,7 +98,10 @@ _DECLARED_ORDERS: str = (
         StrictCompileTestCase(
             description="strict = true passes when every check is proven",
             settings="\n[settings]\nstrict = true\n",
-            files={"functions/sql/margin.sql": _MARGIN_FUNCTION, "models/orders.sql": _DECLARED_ORDERS},
+            files={
+                "functions/sql/margin.sql": _MARGIN_FUNCTION,
+                "models/orders.sql": _DECLARED_ORDERS,
+            },
             expected_exit_code=0,
             expected_strict="on",
             expected_fragments=("0 errors",),
@@ -177,7 +183,8 @@ def test_given_the_strict_flag_when_compiling_then_it_overrides_the_setting(
 
     payload: dict[str, object] = json.loads(report.stdout)
     codes: list[object] = [
-        item["code"] for item in payload["diagnostics"]  # type: ignore[index, union-attr]
+        item["code"]
+        for item in payload["diagnostics"]  # type: ignore[index, union-attr]
     ]
     assert text.returncode == 1, text.stdout + text.stderr
     assert "error[SQBSTRICT001]: model 'refunds'" in text.stdout + text.stderr

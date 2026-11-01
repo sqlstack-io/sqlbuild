@@ -150,7 +150,10 @@ def test_given_builtin_spelling_when_compiling_then_dialect_support_is_enforced(
         UnknownFunctionCoverageTestCase(
             description="duckdb unknown function in WHERE is a partial-check note, not an error",
             project_toml=_DUCKDB_PROJECT,
-            query_sql=_SELECT + "    product_name" + _FROM + "WHERE shop_margin(product_name) > 0\n",
+            query_sql=_SELECT
+            + "    product_name"
+            + _FROM
+            + "WHERE shop_margin(product_name) > 0\n",
             expected_exit_code=0,
             expected_codes=(),
             expected_reasons=("unknown function: shop_margin",),

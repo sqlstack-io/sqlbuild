@@ -31,9 +31,9 @@ use crate::assembly::analysis_session::_helpers::mappings::{
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::_helpers::resolution_rows::with_resolution_rows;
 use crate::assembly::analysis_session::constants::{
-    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, TRANSFORM_AGGREGATION,
-    TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR,
-    UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, SQLQUACK_NAMES_ONLY_DIALECTS,
+    TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT,
+    TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -86,6 +86,7 @@ impl AnalysisSession {
             outcomes: vec![None; request.models.len()],
             pending_cleaned: vec![false; request.models.len()],
             routed: vec![false; request.models.len()],
+            name_findings: HashMap::new(),
             waves: if dependency_ordered || request.models.is_empty() {
                 waves
             } else {
@@ -542,6 +543,7 @@ impl AnalysisSession {
                 analysis.binding_validated = true;
             }
         }
+        self.merge_name_findings(&models)?;
         self.sqlquack_lineage(&models)?;
         if self.dependency_ordered {
             if self.request.case_sensitive_shapes {
@@ -562,7 +564,7 @@ impl AnalysisSession {
             .copied()
             .filter(|model| !self.cached(*model) && !self.routed[*model])
             .collect();
-        if analysed.is_empty() || !self.sqlquack_reads() {
+        if analysed.is_empty() || !self.sqlquack_reads() || self.names_only() {
             return Ok(());
         }
         let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
@@ -1048,6 +1050,15 @@ impl AnalysisSession {
         if read.is_empty() {
             return Ok(misses);
         }
+        if self.names_only() {
+            for model in read {
+                let index: usize = models[model.position];
+                let resolved: Vec<(u8, DiagnosticRow)> =
+                    self.resolved_findings(&model, &schemas[model.position])?;
+                self.name_findings.insert(index, resolved);
+            }
+            return Ok(misses);
+        }
         let requests: Vec<(&str, &Shapes)> = read
             .iter()
             .map(|model| (model.cleaned_sql.as_str(), &schemas[model.position]))
@@ -1060,28 +1071,10 @@ impl AnalysisSession {
         let answered: Vec<usize> = read.iter().map(|model| model.position).collect();
         for (model, diagnostics) in read.into_iter().zip(diagnostics) {
             let index: usize = models[model.position];
-            let findings: Vec<FindingInput> = model
-                .lineage
-                .findings
-                .iter()
-                .map(|finding| {
-                    (
-                        finding.code.clone(),
-                        finding.message.clone(),
-                        finding.location,
-                        finding.written.clone(),
-                        finding.phase,
-                    )
-                })
-                .collect();
-            let exact_columns: bool = schemas[model.position]
-                .iter()
-                .any(|(_, columns)| columns.iter().any(|(name, _)| name.starts_with(QUOTE)));
             let resolved: Vec<(u8, DiagnosticRow)> =
-                self.catalog
-                    .native
-                    .finding_rows(&model.cleaned_sql, exact_columns, &findings)?;
-            let diagnostics: Vec<DiagnosticRow> = with_resolution_rows(diagnostics, resolved);
+                self.resolved_findings(&model, &schemas[model.position])?;
+            let diagnostics: Vec<DiagnosticRow> =
+                with_resolution_rows(diagnostics, resolved, false);
             let inputs_known: bool = self.request.models[index]
                 .required_names
                 .iter()
@@ -1100,6 +1093,53 @@ impl AnalysisSession {
             .into_iter()
             .filter(|position| !answered.contains(position))
             .collect())
+    }
+
+    /// SQLQuack's findings for one model it read, as diagnostic rows with their phases.
+    fn resolved_findings(
+        &self,
+        model: &ReadModel,
+        schema: &Shapes,
+    ) -> Result<Vec<(u8, DiagnosticRow)>, String> {
+        let findings: Vec<FindingInput> = model
+            .lineage
+            .findings
+            .iter()
+            .map(|finding| {
+                (
+                    finding.code.clone(),
+                    finding.message.clone(),
+                    finding.location,
+                    finding.written.clone(),
+                    finding.phase,
+                )
+            })
+            .collect();
+        let exact_columns: bool = schema
+            .iter()
+            .any(|(_, columns)| columns.iter().any(|(name, _)| name.starts_with(QUOTE)));
+        self.catalog
+            .native
+            .finding_rows(&model.cleaned_sql, exact_columns, &findings)
+    }
+
+    /// SQLQuack's name findings in place of polyglot's for the wave's models it read, in a
+    /// names-only dialect, once polyglot's diagnostics for them are final.
+    fn merge_name_findings(&mut self, models: &[usize]) -> Result<(), String> {
+        for model in models {
+            let Some(resolved) = self.name_findings.remove(model) else {
+                continue;
+            };
+            let analysis: &mut ModelAnalysis = &mut self.outcome_mut(*model)?.analysis;
+            let diagnostics: Vec<DiagnosticRow> = std::mem::take(&mut analysis.binding_diagnostics);
+            analysis.binding_diagnostics = with_resolution_rows(diagnostics, resolved, true);
+        }
+        Ok(())
+    }
+
+    /// Whether SQLQuack reports only names for this dialect, polyglot analysing the rest.
+    fn names_only(&self) -> bool {
+        SQLQUACK_NAMES_ONLY_DIALECTS.contains(&self.request.dialect.as_str())
     }
 
     /// The misses whose SQL cleans and SQLQuack reads into named columns, with their lineage.

@@ -360,6 +360,9 @@ pub struct AnalysisSession {
     pub(crate) legacy_models: Vec<String>,
     /// Models SQLQuack analysed, which need no completion or later lineage pass.
     pub(crate) routed: Vec<bool>,
+    /// For a names-only dialect, SQLQuack's name findings for each model it read, merged into
+    /// polyglot's diagnostics once the wave's analysis is final.
+    pub(crate) name_findings: HashMap<usize, Vec<(u8, DiagnosticRow)>>,
 }
 
 /// Which of Python's column analyses one query outside the session takes.

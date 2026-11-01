@@ -251,6 +251,10 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
 ];
 /// Diagnostic codes SQLQuack reports for routed models: names, columns counts and functions.
 pub(crate) const SQLQUACK_CODES: [&str; 6] = ["B002", "B003", "B004", "B005", "B101", "B102"];
+/// The name codes SQLQuack reports for a dialect whose types it does not check yet.
+pub(crate) const SQLQUACK_NAME_CODES: [&str; 4] = ["B002", "B003", "B004", "B005"];
+/// Analysis dialects whose types SQLQuack does not check yet: polyglot keeps their type rows.
+pub(crate) const SQLQUACK_NAMES_ONLY_DIALECTS: [&str; 2] = ["postgres", "postgresql"];
 /// Code number ranges SQLQuack reports for routed models: type checks and scope rules.
 pub(crate) const SQLQUACK_CODE_RANGES: [std::ops::RangeInclusive<u16>; 2] = [210..=219, 230..=234];
 /// The words of SQLBuild's own B101 rows, a built-in spelled as the dialect does not accept.

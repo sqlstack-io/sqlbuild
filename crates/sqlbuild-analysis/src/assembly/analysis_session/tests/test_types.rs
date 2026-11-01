@@ -239,5 +239,7 @@ pub(crate) struct ResolutionRowsTestCase {
     pub(crate) polyglot: &'static [(&'static str, usize, &'static str)],
     /// SQLQuack's rows, each with its phase: 0 scope rules, 1 names, 2 types.
     pub(crate) sqlquack: &'static [(u8, RowShape)],
+    /// Only name codes are SQLQuack's, as for a dialect whose types it does not check yet.
+    pub(crate) names_only: bool,
     pub(crate) expected_rows: &'static [(&'static str, usize, &'static str)],
 }
