@@ -29,7 +29,7 @@ pub(crate) async fn run_control(
     let address = control_address(namespace, standalone)?;
     let authentication = control_authentication(namespace)?;
     let store = open_control_store(namespace).await?;
-    let workers = open_control_workers(namespace)?;
+    let (workers, images) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
     let (_changes, changes) = watch::channel(());
     let mut tasks = tokio::task::JoinSet::new();
@@ -43,7 +43,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            authentication,
+            (authentication, images),
             (
                 move || {
                     drop(write_output(&[(

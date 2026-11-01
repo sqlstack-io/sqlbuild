@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope};
+use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_platform_webhook;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -57,6 +57,7 @@ use crate::native_commands::models::{
     LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
 use crate::native_commands::types::LocationPublication;
+use crate::workers::main::docker_image_sources::docker_image_sources;
 use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::main::terminate_child::terminate_child;
@@ -86,10 +87,10 @@ pub(crate) async fn run_development_roles(
     tasks.spawn(serve_api(
         store.clone(),
         listener,
-        ApiAuthentication {
+        (ApiAuthentication {
             development_scope: Some(scope),
             ..ApiAuthentication::default()
-        },
+        }, Vec::new()),
         (move || {
             drop(write_output(&[(Stream::Stderr, &format!(
                 "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
@@ -495,13 +496,17 @@ pub(crate) async fn open_control_store(
 }
 
 /// Decode privileged CLI configuration before handing process ownership to the workers domain.
-pub(crate) fn open_control_workers(namespace: &Namespace) -> Result<Workers, ControlError> {
-    open_workers(
+pub(crate) fn open_control_workers(
+    namespace: &Namespace,
+) -> Result<(Workers, Vec<DockerImageSource>), ControlError> {
+    let workers = open_workers(
         text(namespace, "control_launchers").as_deref(),
         text(namespace, "control_database_env")
             .unwrap_or_else(|| "SQLBUILD_CONTROL_DATABASE_URL".into()),
         !flag(namespace, "control_no_scheduler"),
-    )
+    )?;
+    let images = docker_image_sources(&workers);
+    Ok((workers, images))
 }
 
 pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {

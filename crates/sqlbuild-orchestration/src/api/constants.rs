@@ -9,5 +9,7 @@ pub(crate) const PASSWORD_CSRF_HEADER: &str = "x-sqb-csrf";
 pub(crate) const PROXY_USER_HEADER: &str = "x-sqb-user";
 pub(crate) const OIDC_FLOW_COOKIE: &str = "__Host-sqb-oidc";
 pub(crate) const OIDC_RESPONSE_BYTES: usize = 1024 * 1024;
+#[cfg(unix)]
+pub(crate) const DOCKER_IMAGE_HEX_LENGTH: usize = 64;
 pub(crate) const HTTPS_SCHEME: &str = "https";
 pub(crate) const ROOT_PATH: &str = "/";

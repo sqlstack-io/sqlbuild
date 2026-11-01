@@ -109,6 +109,15 @@ pub struct ApiAuthentication {
     pub oidc: Option<OidcAuthentication>,
 }
 
+/// Only the server's installation configuration selects the daemon and container to inspect.
+#[derive(Clone, Debug)]
+pub struct DockerImageSource {
+    pub location_id: uuid::Uuid,
+    pub target: String,
+    pub socket: std::path::PathBuf,
+    pub container: String,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct BrowserOrigin(pub(crate) String);
 

@@ -6,8 +6,9 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::bearer::require_location;
+use crate::api::_helpers::resources::docker_image;
 use crate::api::errors::ApiError;
-use crate::api::models::DevelopmentScope;
+use crate::api::models::{DevelopmentScope, DockerImageSource};
 use crate::credentials::models::TokenIdentity;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::current_snapshot_record::current_snapshot_record;
@@ -24,7 +25,10 @@ use crate::store::models::ControlStore;
         (status = 409, description = "Stale generation")), security(("bearer" = [])))]
 pub(crate) async fn publish(
     State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
+    (Extension(identity), Extension(images)): (
+        Extension<TokenIdentity>,
+        Extension<std::sync::Arc<Vec<DockerImageSource>>>,
+    ),
     (Path((location_id, target)), development): (
         Path<(Uuid, String)>,
         Option<Extension<DevelopmentScope>>,
@@ -49,6 +53,7 @@ pub(crate) async fn publish(
     } else {
         false
     };
+    let input = docker_image::pin(&images, input).await?;
     Ok(Json(if pause_new {
         publish_development_snapshot(&store, &input).await?
     } else {

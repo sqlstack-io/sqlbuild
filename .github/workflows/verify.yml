@@ -142,7 +142,7 @@ jobs:
               *) docs_only=false ;;
             esac
             case "${path}" in
-              crates/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml)
+              crates/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
                 ;;
             esac
@@ -982,6 +982,33 @@ jobs:
     uses: ./.github/workflows/build-distributions.yml
     with:
       sdist: false
+      upload: true
+      retention-days: 3
+
+  compose:
+    name: Packaged Compose lifecycle
+    needs: [changes, lockfile, wheels]
+    if: needs.changes.outputs.wheels == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.3"
+          enable-cache: true
+      - name: Install Python test dependencies without rebuilding the packages
+        run: |
+          uv python install 3.12
+          uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-wheel-linux-x86_64
+          path: dist
+      - name: Install the same wheels used by the images
+        run: uv pip install --no-deps dist/*.whl
+      - name: Verify packaged Compose deployment and operational recovery
+        run: make test-compose-packaged
 
   verify:
     # The required Verify of a Release Please pull request is the commit status that the trusted
@@ -1015,6 +1042,7 @@ jobs:
         postgres,
         clickhouse,
         wheels,
+        compose,
       ]
     runs-on: ubuntu-24.04
     steps:
@@ -1038,6 +1066,7 @@ jobs:
           POSTGRES_RESULT: ${{ needs.postgres.result }}
           CLICKHOUSE_RESULT: ${{ needs.clickhouse.result }}
           WHEELS_RESULT: ${{ needs.wheels.result }}
+          COMPOSE_RESULT: ${{ needs.compose.result }}
         run: |
           if [[ "${CHANGES_RESULT}" != "success" || "${LOCKFILE_RESULT}" != "success" ]]; then
             echo "Required classification or lockfile checks did not pass" >&2
@@ -1046,6 +1075,10 @@ jobs:
           if [[ "${CHECKS_RESULT}" != "success" ]] && \
              ! [[ "${CHECKS_SELECTED}" == "false" && "${CHECKS_RESULT}" == "skipped" ]]; then
             echo "Required static checks did not pass: ${CHECKS_RESULT}" >&2
+            exit 1
+          fi
+          if [[ "${WHEELS_RESULT}" == "success" && "${COMPOSE_RESULT}" != "success" ]]; then
+            echo "Required packaged Compose verification did not pass: ${COMPOSE_RESULT}" >&2
             exit 1
           fi
           for result in \
@@ -1062,7 +1095,8 @@ jobs:
             "${RULES_PERFORMANCE_RESULT}" \
             "${POSTGRES_RESULT}" \
             "${CLICKHOUSE_RESULT}" \
-            "${WHEELS_RESULT}"; do
+            "${WHEELS_RESULT}" \
+            "${COMPOSE_RESULT}"; do
             if [[ "${result}" != "success" && "${result}" != "skipped" ]]; then
               echo "A selected verification suite did not pass: ${result}" >&2
               exit 1

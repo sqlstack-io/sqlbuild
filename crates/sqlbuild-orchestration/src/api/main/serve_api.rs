@@ -6,7 +6,7 @@ use axum::{Extension, Json, Router, middleware};
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
-use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope};
+use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource};
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
@@ -15,7 +15,7 @@ use crate::store::models::ControlStore;
 pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
-    authentication: ApiAuthentication,
+    (authentication, images): (ApiAuthentication, Vec<DockerImageSource>),
     (ready, shutdown): (
         impl FnOnce() + Send + 'static,
         impl Future<Output = ()> + Send + 'static,
@@ -33,6 +33,7 @@ pub async fn serve_api(
     };
     let application = router(&store, feed)
         .merge(authentication_routes)
+        .layer(Extension(std::sync::Arc::new(images)))
         .route(
             "/api/openapi.json",
             get(|| async { Json(openapi_document()) }),

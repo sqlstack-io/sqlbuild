@@ -1,0 +1,5 @@
+{
+  "first": "SELECT 37 AS order_id, sum(sin(value)) AS total FROM range(2000000000) t(value)",
+  "second": "SELECT 41 AS order_id, 0.0 AS total",
+  "broken": "SELECT FROM"
+}

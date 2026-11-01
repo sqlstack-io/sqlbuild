@@ -1,0 +1,147 @@
+# Run the reference Docker Compose stack
+
+This Linux reference runs PostgreSQL, the native SQLBuild server/scheduler, and one outbound
+Python code location. Workers use Docker only. The server image contains no Python or project.
+The location image includes the example orders project and its Python dependencies.
+
+Use Docker Engine with a Unix socket and Docker Compose 2.23.1 or newer, Python 3.12, `uv`,
+a Rust toolchain, and `jq`. Build and test from a trusted checkout. Docker socket access is
+host-administrator authority: only the server gets that socket and control-store credentials.
+Locations and workers get warehouse access, but no control-store credentials or inbound ports.
+The default server port binds to loopback, not the public network.
+
+## Build the images
+
+Build matching wheels from this checkout before building the images:
+
+```sh
+uv sync --locked --all-extras
+uv run --no-sync maturin build --release --compatibility linux --out dist
+uv run --no-sync maturin build --manifest-path crates/sqlbuild-cli/Cargo.toml --release --compatibility linux --out dist
+cp deploy/compose.env.example .env
+```
+
+Set the ignored `.env` values. Use a unique PostgreSQL password and put its URL-encoded value
+in `SQLBUILD_CONTROL_DATABASE_URL`, for example
+`postgresql://sqlbuild:<encoded-password>@postgres:5432/sqlbuild`.
+Set `DOCKER_GID` to `stat -c %g /var/run/docker.sock` and `SQLBUILD_GIT_REVISION` to
+`git rev-parse HEAD`. Keep only the matching SQLBuild and CLI wheels in `dist/`; their Python
+version and architecture must match the image's `PYTHON_VERSION` build argument and Docker host.
+The default image uses Python 3.12. Do not put credentials in build arguments or project files.
+The Docker build context includes only wheels and the example project.
+
+```sh
+docker compose build
+docker compose up -d --wait postgres
+```
+
+## Register and start the code location
+
+Run these commands on the trusted control-store owner's host. They use the server image's
+direct-store administration path, not an HTTP or person-role grant:
+
+```sh
+docker compose run --rm --no-deps server admin create-location orders
+```
+
+Replace `.env`'s placeholder `SQLBUILD_LOCATION_ID` with the returned `location_id`. Issue a
+bounded credential, using a future RFC 3339 expiry you choose:
+
+```sh
+docker compose run --rm --no-deps server admin issue-location-token "$SQLBUILD_LOCATION_ID" --expires-at "$EXPIRY"
+```
+
+Shell variables above must be set explicitly; Compose's `.env` file is not sourced by the shell.
+Store the one-time `bearer` in `.env` as `SQLBUILD_LOCATION_TOKEN`, restrict the file to its owner
+(`chmod 600 .env`), and start the stack:
+
+```sh
+docker compose up -d --wait server location
+docker compose logs -f server location
+```
+
+The location watches and compiles its baked project, publishes a successful snapshot, and checks
+its warehouse connection. The example schedule runs every minute. The server resolves the
+running container's actual Docker image ID at publication; no `--image-id` or Docker socket is
+needed in the location. Workers recompile in that pinned image and verify environment and node
+hashes before writing. The warehouse persists in its named volume.
+
+For your project, build the `runtime` target as a base, then extend it with `COPY --chown=10001:10001`
+of your project to `/project`, install its locked dependencies, and set `SQLBUILD_GIT_REVISION`.
+Set `SQLBUILD_LOCATION_IMAGE` to that project image. Give location UID 10001 access to its
+warehouse volumes. Never mount control credentials, location-token files, or Docker sockets
+into the location: workers inherit its mounts and filtered warehouse environment.
+
+## Redeploy without interrupting a run
+
+Build the new project into a new revision-tagged image. Set `SQLBUILD_LOCATION_IMAGE` to that
+image and update only the location:
+
+```sh
+docker compose up -d --no-deps location
+```
+
+Active workers keep their existing image, process, mounts, and independent network endpoint.
+New publications affect only new runs. A failed compile does not replace the last good snapshot;
+its scheduled jobs still launch from the last good image even while the new location is broken.
+Keep the warehouse mounts, network, working directory, and warehouse environment compatible with
+that image. Changing those deployment settings requires a coordinated maintenance window.
+
+Retain every image referenced by a published snapshot or run. Do not run indiscriminate image
+pruning or delete those images. Inspect `sqb_snapshots.image_id` and `sqb_runs.image_id` through
+the trusted control-store owner before implementing retention. Removing a required image makes
+a queued or historical run unlaunchable.
+
+For bind-mounted source development, explicitly add the development overlay:
+
+```sh
+docker compose -f compose.yml -f deploy/compose.dev.yml up -d
+```
+
+The location watcher republishes changed source. Workers reject source drift against a pinned
+snapshot; the bind mount is not an immutable deployment and does not provide old-source fallback.
+
+## Credentials, identity, and platform events
+
+Rotate a location credential with `docker compose run --rm --no-deps server admin rotate-token
+TOKEN_UUID`, store its one-time replacement bearer, and recreate the location. The scope and
+expiry stay unchanged, and the old credential is revoked atomically. Service-account principal
+tokens are separate from location/run tokens. Person identities do not become machine bearers.
+
+For opt-in OIDC identity verification, mount a server-owned JSON file with `origin`, `issuer`,
+`client_id`, and explicit `identities` subject-to-existing-person UUID bindings; append
+`--oidc-config /etc/sqlbuild/oidc.json` to the server command. Both origin and issuer require
+HTTPS. Terminate HTTPS at a trusted proxy, preserve the external Host, restrict backend access,
+and register `/api/auth/oidc/callback` at the issuer. This verifies an explicitly bound enabled
+person; it does not provision people, issue a browser session, or grant roles. The reference
+does not assign an initial administrator or authorize non-admin operations.
+
+Set `SQLBUILD_PLATFORM_WEBHOOK_URL` in `.env` before creating the server to receive the native
+platform stream. Leave it unset to disable delivery. Receivers must deduplicate by `event_id`
+or the matching `Idempotency-Key` header: delivery is at least once and retries after failure.
+The native watchdog runs independently of location Python and scheduler leadership. It observes
+heartbeats, overdue ticks, missing leadership, and locations silent for over 90 seconds; its
+30-second scan and delivery polling add detection latency. Monitor platform heartbeats from
+outside this stack too: a stopped server cannot report its own outage.
+
+## Back up and upgrade
+
+Back up PostgreSQL with `pg_dump` using your normal protected database backup tooling. Also
+back up warehouse data, the restricted `.env`/identity configuration, and referenced project
+images. Keep backup credentials and output outside the repository. Test restoration before an
+upgrade. Ordinary `docker compose down` preserves named volumes; `down --volumes` destroys them.
+
+Upgrade matching server/location wheels and images together, retaining referenced old project
+images. The native server applies additive control-store migrations before its API reports
+ready. Do not start an older server against a newer schema without a documented compatible
+rollback or restored backup. Scheduler leadership resumes from durable ticks after restart;
+catch-up follows each declaration's `latest` or bounded `all` policy, not a fresh schedule.
+The Docker launcher adopts an existing claim-labeled worker rather than starting a duplicate.
+
+## Verify the packaged lifecycle locally
+
+`make test-compose` builds matching wheels and images, then tests scheduled Docker execution,
+redeploy during an active run, failed-deploy fallback, scheduler catch-up, credential/mount
+isolation, and the stopped-location platform webhook against PostgreSQL. It creates disposable
+containers and volumes and removes them on exit. It needs Docker, Compose, and network access
+for image and Python dependency downloads; it never deploys to an external installation.

@@ -1,0 +1,11 @@
+**
+!dist/
+!dist/*.whl
+!deploy/
+!deploy/Dockerfile
+!deploy/project/
+!deploy/project/sqlbuild_project.toml
+!deploy/project/models/
+!deploy/project/models/*.sql
+!deploy/project/orchestration/
+!deploy/project/orchestration/*.py

@@ -22,7 +22,7 @@ pub(crate) async fn start_api_with_authentication(
     let task = tokio::spawn(serve_api(
         store,
         listener,
-        authentication,
+        (authentication, Vec::new()),
         (|| {}, async {
             let _ = signal.await;
         }),
