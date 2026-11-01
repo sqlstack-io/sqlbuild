@@ -260,6 +260,7 @@ pub(crate) fn loader_defaults<'py>(
         &discovered.clone(),
         Some(selected_target.clone()).filter(|value| !value.is_none()),
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
+        false,
     )?
     .downcast_into()?;
     let adapter_name: Bound<'py, PyAny> = resolve_effective_adapter_name(

@@ -147,6 +147,7 @@ const R_TARGET_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::TargetWarehousesConfig),
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
+        FieldSpec::new("catalog_connection", FieldDefault::None),
     ],
 };
 const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
@@ -186,6 +187,7 @@ const R_LOCAL_TARGET_CONFIG: RecordSpec = RecordSpec {
             FieldDefault::NativeCall(RecordId::TargetWarehousesConfig),
         ),
         FieldSpec::new("concurrency", FieldDefault::None),
+        FieldSpec::new("catalog_connection", FieldDefault::None),
     ],
 };
 const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {

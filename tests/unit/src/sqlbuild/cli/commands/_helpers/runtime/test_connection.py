@@ -11,6 +11,7 @@ from sqlbuild._native import (
     ProjectConfig,
     ProjectConfigError,
     TargetConfig,
+    build_effective_connection_config,
     resolve_connection_config,
     resolve_project_connection_config,
     resolve_target_connection_config,
@@ -172,6 +173,61 @@ def test_given_named_connection_layers_when_resolving_then_uses_locked_precedenc
     )
 
     assert connection == test_case.expected_connection
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        NamedConnectionBehaviorTestCase(
+            description="catalog credentials never inherit writer fields",
+            expected_connection={
+                "account": "catalog-account",
+                "user": "catalog-reader",
+                "warehouse": "catalog-warehouse",
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_catalog_connection_when_resolving_then_only_its_own_named_layers_and_secrets_apply(
+    test_case: NamedConnectionBehaviorTestCase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SQLBUILD_MISSING_WRITER_PASSWORD", raising=False)
+    monkeypatch.setenv("SQLBUILD_CATALOG_USER", "catalog-reader")
+    discovered: DiscoveredProjectInputs = DiscoveredProjectInputs(
+        project_config=ProjectConfig(
+            name="orders",
+            adapter="snowflake",
+            default_target="development",
+            connection={"password": "${ENV:SQLBUILD_MISSING_WRITER_PASSWORD}"},
+            connections={
+                "writer": {"account": "writer-account", "private_key_file": "writer.pem"},
+                "catalog": {"account": "catalog-account", "user": "${ENV:SQLBUILD_CATALOG_USER}"},
+            },
+            targets={
+                "development": TargetConfig(
+                    connection_name="writer",
+                    catalog_connection="catalog",
+                    connection={"role": "writer-role"},
+                )
+            },
+        ),
+        local_config=LocalConfig(
+            connection={"token": "writer-token"},
+            connections={"catalog": {"warehouse": "catalog-warehouse"}},
+            targets={"development": LocalTargetConfig(connection={"user": "writer-user"})},
+        ),
+    )
+    assert (
+        build_effective_connection_config(discovered_inputs=discovered, catalog=True)
+        == test_case.expected_connection
+    )
+    with pytest.raises(CompileInputError, match="SQLBUILD_MISSING_WRITER_PASSWORD"):
+        build_effective_connection_config(discovered_inputs=discovered)
+    discovered.local_config.targets["development"] = LocalTargetConfig(catalog_connection="missing")
+    with pytest.raises(CompileInputError, match="catalog_connection: Unknown connection 'missing'"):
+        build_effective_connection_config(discovered_inputs=discovered, catalog=True)
 
 
 @pytest.mark.parametrize(

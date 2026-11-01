@@ -167,7 +167,13 @@ and future storage columns do not alter these identities.
 
 The location history reader pages fingerprint and source-freshness observations without selecting
 only the latest row. It is read-only, including local database connections: it neither creates
-databases nor evolves tables. Fingerprint definitions and metadata use the existing storage decoder;
+databases nor evolves tables. A target can select `catalog_connection = "catalog"` from named
+connections; project and local settings for that name resolve independently, with normal secret
+expansion and adapter defaults. Project, local and target writer credentials are never overlaid or
+used to fill missing catalog credentials. Without the override, reads use the target's normal
+connection. Local target overrides select the catalog name through the normal target precedence;
+unknown names and blank or non-string selections are configuration errors.
+Fingerprint definitions and metadata use the existing storage decoder;
 raw storage values remain the keyset cursor, separate from decoded UTC timestamps and text.
 Fingerprint and source-freshness ingestion preserve warehouse IDs, scoped by location, target and
 physical state table. Only missing or NULL IDs use fixed legacy fields, never a hash of an evolving

@@ -59,6 +59,7 @@ pub(crate) fn read_history(
         &discovered,
         (&project_dir, &arguments.value("selected_target")?),
         (&py.None().into_bound(py), true),
+        true,
     )?;
     let adapter_name: String = adapter.getattr("adapter_name")?.extract()?;
     if let Some((_, path_key)) = LOCAL_DATABASE_PATH_KEYS

@@ -42,7 +42,7 @@ pub(crate) fn connection_config<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = environment.py();
     let discovered = native_field(environment, "discovered_inputs")?;
-    let raw = build_effective_connection_config(&discovered.clone(), None, None)?;
+    let raw = build_effective_connection_config(&discovered.clone(), None, None, false)?;
     let raw: Bound<'_, PyDict> = raw.cast_into()?;
     let project_dir = native_field(environment, "project_dir")?;
     let adapter_name = native_field(environment, "adapter_name")?;
