@@ -58,9 +58,9 @@
 			section: 'Admin',
 			requires: ADMIN_CAPABILITIES,
 			items: [
-				{ label: 'Users', href: '/admin/users', icon: UsersIcon, requires: ['user.manage'] },
+				{ label: 'People', href: '/admin/people', icon: UsersIcon, requires: ['user.manage', 'role.assign'] },
 				{ label: 'Service accounts', href: '/admin/service-accounts', icon: BotIcon, requires: ['user.manage', 'token.manage'] },
-				{ label: 'Roles & approvals', href: '/admin/roles', icon: ShieldIcon, requires: ['role.assign'], badge: { value: (c) => c.pendingApprovals, tone: 'warning' } },
+				{ label: 'Roles', href: '/admin/roles', icon: ShieldIcon, requires: ['role.assign'], badge: { value: (c) => c.pendingApprovals, tone: 'warning' } },
 				{ label: 'Audit log', href: '/admin/audit', icon: ScrollTextIcon, requires: ['audit.view'] }
 			]
 		}
