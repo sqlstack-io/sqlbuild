@@ -98,11 +98,10 @@ fn create_sql(
     ))
 }
 
-/// Create the table/indexes, then add the nullable identity column to a pre-existing table.
+/// Create the table/indexes without an extra catalog read for a current or new table.
 fn setup<'py>(
     location: &Location<'_, 'py>,
     writer: &Writer<'_, 'py>,
-    request: &Request<'_, 'py>,
     describe: &dyn Fn(&PyErr) -> PyResult<RetryWarning<'py>>,
 ) -> PyResult<()> {
     let py: Python<'_> = writer.execute.py();
@@ -124,28 +123,13 @@ fn setup<'py>(
             sqls.push(sql?.extract()?);
         }
     }
-    let database = location.database.into_pyobject(py)?.into_any();
-    let schema = location.schema.into_pyobject(py)?.into_any();
     retry_write(
         py,
         || {
             for sql in &sqls {
                 execute_sql(writer, sql)?;
             }
-            ensure_event_id_column(
-                (writer.connection, writer.execute),
-                (&database, &schema),
-                (FINGERPRINT_TABLE_NAME, &qualified_table_name(location)?),
-                (
-                    &request
-                        .optional("read_columns")?
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                    &request
-                        .optional("render_add_columns")?
-                        .unwrap_or_else(|| py.None().into_bound(py)),
-                    writer.render_framework_type,
-                ),
-            )
+            Ok(())
         },
         describe,
     )
@@ -156,6 +140,37 @@ fn execute_sql<'py>(writer: &Writer<'_, 'py>, sql: &str) -> PyResult<Bound<'py, 
     keywords.set_item("connection", writer.connection)?;
     keywords.set_item("sql", sql)?;
     writer.execute.call((), Some(&keywords))
+}
+
+/// A failed insert triggers catalog-confirmed additive evolution inside the write retry budget.
+fn execute_insert<'py>(
+    location: &Location<'_, 'py>,
+    writer: &Writer<'_, 'py>,
+    request: &Request<'_, 'py>,
+    sql: &str,
+) -> PyResult<()> {
+    let error = match execute_sql(writer, sql) {
+        Ok(_) => return Ok(()),
+        Err(error) => error,
+    };
+    let py = writer.execute.py();
+    if !error.is_instance_of::<PyException>(py) || present(request, "read_columns")?.is_none() {
+        return Err(error);
+    }
+    ensure_event_id_column(
+        (writer.connection, writer.execute),
+        (
+            &location.database.into_pyobject(py)?.into_any(),
+            &location.schema.into_pyobject(py)?.into_any(),
+        ),
+        (FINGERPRINT_TABLE_NAME, &qualified_table_name(location)?),
+        (
+            &request.get("read_columns")?,
+            &request.get("render_add_columns")?,
+            writer.render_framework_type,
+        ),
+    )?;
+    execute_sql(writer, sql).map(|_| ())
 }
 
 /// Log one failed attempt with `details` after the attempt counts, then back off.
@@ -406,8 +421,12 @@ fn write_fingerprint<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<bool
         details.extend(error_details(py, error)?);
         Ok((SINGLE_RETRY_MESSAGE, details))
     };
-    setup(&location, &writer, &request, &describe)?;
-    retry_write(py, || execute_sql(&writer, &insert).map(|_| ()), &describe)?;
+    setup(&location, &writer, &describe)?;
+    retry_write(
+        py,
+        || execute_insert(&location, &writer, &request, &insert),
+        &describe,
+    )?;
     Ok(true)
 }
 
@@ -442,7 +461,7 @@ fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()>
     let on_progress: Option<Bound<'py, PyAny>> = present(&request, "on_progress")?;
     let parts: WriteParts<'py> = WriteParts::read(&request)?;
     let (location, writer) = (parts.location(), parts.writer());
-    setup(&location, &writer, &request, &|error| {
+    setup(&location, &writer, &|error| {
         batch_warning(&fingerprints, error)
     })?;
     let batches = fingerprint_insert_batches(
@@ -457,7 +476,7 @@ fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()>
         let members: Vec<Bound<'py, PyAny>> = batch.iter().collect();
         retry_write(
             py,
-            || execute_sql(&writer, &insert_sql).map(|_| ()),
+            || execute_insert(&location, &writer, &request, &insert_sql),
             &|error| batch_warning(&members, error),
         )?;
         completed += members.len();
