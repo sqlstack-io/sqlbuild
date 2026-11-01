@@ -12,7 +12,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager, nullcontext, suppress
+from contextlib import AbstractContextManager, closing, contextmanager, nullcontext, suppress
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
@@ -25,6 +25,7 @@ from uuid import uuid4
 import duckdb
 import pytest
 
+from sqlbuild._native import Fingerprint, write_fingerprint
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -590,3 +591,56 @@ def sensor_calls(path: Path, fields: dict[str, Any]) -> list[dict[str, Any]]:
     """Select recorded callback invocations without inferring execution from declarations."""
     records: list[dict[str, Any]] = [json.loads(line) for line in path.read_text().splitlines()]
     return list(filter(lambda record: fields.items() <= record.items(), records))
+
+
+def append_retried_fingerprints(
+    *,
+    adapter: Any,
+    connection: Any,
+    database_path: Path,
+    fingerprint: Fingerprint,
+    read_columns: Callable[..., Any] | None = None,
+) -> None:
+    """Retry the same observation without substituting its identity or live catalog."""
+    del database_path
+    for _attempt in range(2):
+        _ = write_fingerprint(
+            connection=connection,
+            execute=adapter.execute,
+            database=None,
+            schema="main",
+            fingerprint=fingerprint,
+            ensure_table=False,
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+            read_columns=read_columns or adapter.get_columns,
+            render_add_columns=adapter.render_add_columns,
+            render_create_table_sql=adapter.render_create_fingerprint_table_sql,
+        )
+
+
+def append_contended_fingerprints(
+    *, adapter: Any, connection: Any, database_path: Path, fingerprint: Fingerprint
+) -> None:
+    """Release a real SQLite write lock only after the first ALTER has failed."""
+    with closing(sqlite3.connect(database_path)) as blocker:
+        _ = adapter.execute(connection=connection, sql="PRAGMA busy_timeout=1")
+        catalog_actions: Iterator[Callable[[], Any]] = iter(
+            (lambda: blocker.execute("BEGIN IMMEDIATE"), blocker.commit)
+        )
+
+        def read_columns(**scope: Any) -> Any:
+            columns: Any = adapter.get_columns(**scope)
+            next(catalog_actions, lambda: None)()
+            return columns
+
+        try:
+            append_retried_fingerprints(
+                adapter=adapter,
+                connection=connection,
+                database_path=database_path,
+                fingerprint=fingerprint,
+                read_columns=read_columns,
+            )
+        finally:
+            blocker.rollback()

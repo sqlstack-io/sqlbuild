@@ -6,7 +6,7 @@ use axum::{Json, Router, middleware};
 
 use crate::api::_helpers::authentication::authenticate;
 use crate::api::_helpers::{
-    location_health, location_work, run_reads, runs, snapshots, trigger_reads,
+    location_health, location_work, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
 };
 use crate::api::constants::BODY_BYTES;
 use crate::api::main::openapi_document::openapi_document;
@@ -32,6 +32,10 @@ pub async fn serve_api(
         .route(
             "/api/locations/{location_id}/health",
             get(location_health::recent).post(location_health::report),
+        )
+        .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/source-freshness",
+            post(warehouse_metadata::report),
         )
         .route(
             "/api/locations/{location_id}/targets/{target}/snapshots",

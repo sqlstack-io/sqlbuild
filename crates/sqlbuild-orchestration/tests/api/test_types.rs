@@ -44,3 +44,9 @@ pub(crate) struct LocationWorkTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_generation: i64,
 }
+
+pub(crate) struct WarehouseMetadataTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_observations: usize,
+}

@@ -340,6 +340,7 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         from sqlbuild._native import (
             COLUMN_DEFINITION_B64,
             COLUMN_DEFINITION_HASH,
+            COLUMN_EVENT_ID,
             COLUMN_METADATA_JSON_B64,
             COLUMN_NODE_NAME,
             COLUMN_NODE_TYPE,
@@ -373,7 +374,8 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             f"{COLUMN_SCHEMA_FINGERPRINT} NVARCHAR(450) NOT NULL, "
             f"{COLUMN_DEFINITION_B64} NVARCHAR(MAX) NOT NULL, "
             f"{COLUMN_METADATA_JSON_B64} NVARCHAR(MAX) NOT NULL, "
-            f"{COLUMN_TIMESTAMP} DATETIME2 NOT NULL"
+            f"{COLUMN_TIMESTAMP} DATETIME2 NOT NULL, "
+            f"{COLUMN_EVENT_ID} NVARCHAR(MAX)"
             f")"
         )
         return self._create_table_if_missing_sql(

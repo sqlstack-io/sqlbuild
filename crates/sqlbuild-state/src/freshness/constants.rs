@@ -41,7 +41,7 @@ pub const REQUIRED_STATE_COLUMNS: [&str; 6] = [
 pub const STRING_STATE_VALUE_TYPE: &str = "string";
 /// State value type of a timestamp stored as ISO text.
 pub const TEXT_TIMESTAMP_STATE_VALUE_TYPE: &str = "text_timestamp";
-/// Source freshness state table columns in table order, with the state value type each declares.
+/// Legacy latest-reader columns; the nullable event ID is intentionally not required by reads.
 pub const SOURCE_FRESHNESS_COLUMN_TYPES: [(&str, &str); 10] = [
     ("source_name", STRING_STATE_VALUE_TYPE),
     ("target_database", STRING_STATE_VALUE_TYPE),
@@ -54,5 +54,8 @@ pub const SOURCE_FRESHNESS_COLUMN_TYPES: [(&str, &str); 10] = [
     ("data_version_hash", STRING_STATE_VALUE_TYPE),
     ("observed_at", TEXT_TIMESTAMP_STATE_VALUE_TYPE),
 ];
+pub const SOURCE_FRESHNESS_EVENT_ID: &str = "event_id";
+pub const OBSERVED_AT_COLUMN: &str = "observed_at";
+pub(crate) const SQLSERVER_ADAPTER: &str = "sqlserver";
 pub(crate) const PHYSICAL_TABLE_SOURCE_FRAGMENT: &str = "requires a physical table source";
 pub(crate) const INCOMPLETE_CONFIGURATION_FRAGMENT: &str = "incomplete";

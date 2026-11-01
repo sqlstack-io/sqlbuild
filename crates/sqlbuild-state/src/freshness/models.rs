@@ -2,6 +2,21 @@
 
 use sqlbuild_cursor::algebra::models::LocalDateTime;
 
+/// Stable identity fields shared by warehouse writers and legacy history ingestion.
+#[derive(Debug)]
+pub struct FreshnessEventIdentity<'a> {
+    pub source_name: &'a str,
+    pub target_database: Option<&'a str>,
+    pub target_schema: Option<&'a str>,
+    pub target_name: Option<&'a str>,
+    pub run_id: &'a str,
+    pub strategy: &'a str,
+    pub value_kind: &'a str,
+    pub data_version_hash: &'a str,
+    /// UTC ISO text with six fractional digits and a `+00:00` offset.
+    pub observed_at: &'a str,
+}
+
 /// An observed data version of one value kind.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DataVersion {

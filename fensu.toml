@@ -2657,6 +2657,7 @@ module_layers = [
     "native_host/model_lookup=project",
     "native_host/orchestration_sensors=commands",
     "native_host/orchestration_triggers=project",
+    "native_host/warehouse_metadata=commands",
     "native_threads=infra",
     "output_capture=output",
     "plan_command=commands",

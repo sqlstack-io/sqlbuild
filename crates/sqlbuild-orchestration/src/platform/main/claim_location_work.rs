@@ -3,8 +3,8 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::platform::_helpers::location_work::require_instance;
 use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::main::require_instance::require_instance;
 use crate::platform::models::{LocationWorkClaim, LocationWorkPoll};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;

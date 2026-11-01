@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::{
-    location_health, location_work, run_reads, runs, snapshots, trigger_reads,
+    location_health, location_work, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -27,7 +27,8 @@ use crate::api::_helpers::{
     run_reads::recall,
     trigger_reads::current,
     trigger_reads::events,
-    trigger_reads::ticks
+    trigger_reads::ticks,
+    warehouse_metadata::report
 ))]
 pub(crate) struct ControlApi;
 
