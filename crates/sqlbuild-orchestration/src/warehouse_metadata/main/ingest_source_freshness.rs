@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter};
+use crate::store::models::{Change, ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::ingestion::{begin_ingestion, scoped_event_id};
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::SourceFreshnessBatch;
@@ -88,6 +88,11 @@ pub async fn ingest_source_freshness(
             vec![Parameter::Id(event_id), Parameter::Id(location_id), Parameter::Text(target.into()),
                 Parameter::Text(source_event_id), Parameter::Time(record.observed_at), Parameter::Json(json!(record)), Parameter::Time(received_at)]).await?;
         applied |= !inserted.is_empty();
+    }
+    if applied {
+        transaction
+            .changes
+            .insert(Change::NodeStatus(location_id, target.into()));
     }
     commit(transaction).await?;
     Ok(applied)

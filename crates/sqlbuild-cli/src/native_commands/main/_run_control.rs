@@ -45,6 +45,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
+            None,
             stopped(shutdown.clone()),
         ));
         start_platform_roles(&mut tasks, (&store, &shutdown))?;

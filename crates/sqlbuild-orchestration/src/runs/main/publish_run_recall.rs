@@ -10,7 +10,7 @@ use crate::runs::models::RecallBatch;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::{Change, ControlStore, TransactionMode};
 
 pub async fn publish_run_recall(
     store: &ControlStore,
@@ -33,7 +33,10 @@ pub async fn publish_run_recall(
         .iter()
         .map(|record| claim_record(&envelope, record))
         .collect::<Result<Vec<_>, _>>()?;
-    let (transaction, result) = append_records(transaction, &envelope, &rows).await?;
+    let (mut transaction, result) = append_records(transaction, &envelope, &rows).await?;
+    if !rows.is_empty() {
+        transaction.changes.insert(Change::Run(identity.0));
+    }
     commit(transaction).await?;
     Ok(result)
 }

@@ -9,7 +9,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
 
 /// Repeating a revocation does not create a second audit entry or rewrite its actor.
 pub async fn revoke_token(
@@ -30,19 +30,18 @@ pub async fn revoke_token(
         .get("scope_json")
         .cloned()
         .ok_or_else(|| ControlError::Invalid("stored token scope is missing".into()))?;
-    commit(
-        append_audit(
-            transaction,
-            context,
-            (Uuid::new_v5(&token_id, b"revoked"), "token.revoked"),
-            (
-                scope,
-                json!({"token_id": token_id, "revoked": false}),
-                json!({"token_id": token_id, "revoked": true}),
-            ),
-        )
-        .await?,
+    let mut transaction = append_audit(
+        transaction,
+        context,
+        (Uuid::new_v5(&token_id, b"revoked"), "token.revoked"),
+        (
+            scope,
+            json!({"token_id": token_id, "revoked": false}),
+            json!({"token_id": token_id, "revoked": true}),
+        ),
     )
     .await?;
+    transaction.changes.insert(Change::Credentials);
+    commit(transaction).await?;
     Ok(true)
 }

@@ -67,6 +67,14 @@ def location_process(
                 _ = process.wait(timeout=5)
 
 
+def stop_location(process: subprocess.Popen[bytes], interpreter_pid: int, log: Path) -> None:
+    """Exercise graceful supervisor shutdown and prove its interpreter was reaped."""
+    process.send_signal(signal.SIGTERM)
+    assert process.wait(timeout=15) == 0, log.read_text()
+    with pytest.raises(ProcessLookupError):
+        os.kill(interpreter_pid, 0)
+
+
 def open_legacy_warehouse(project: Path, adapter_name: str, connection_key: str) -> tuple[Any, Any]:
     """The caller owns the returned real connection; declarations must never run during reads."""
     write_files(
@@ -526,10 +534,11 @@ def wait_for_run(
     pending: frozenset[str] = frozenset({"queued", "launched", "running", "unresponsive"}),
     job_key: str | None = None,
     run_id: str | None = None,
+    target: str = "development",
 ) -> dict[str, Any]:
     """A terminal API projection must follow the scheduler's actual isolated warehouse execution."""
     request: Request = Request(
-        f"{api.url}/api/locations/{api.location_id}/targets/development/runs",
+        f"{api.url}/api/locations/{api.location_id}/targets/{quote(target, safe='')}/runs",
         headers={"Authorization": f"Bearer {api.bearer}"},
     )
     deadline: float = time.monotonic() + 30

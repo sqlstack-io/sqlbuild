@@ -1,3 +1,4 @@
+pub(crate) mod changes;
 pub(crate) mod database;
 pub(crate) mod migration;
 pub(crate) mod open_sqlite;

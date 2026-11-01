@@ -3,11 +3,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::{
-    location_health, location_work, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
+    changes, location_health, location_work, run_reads, runs, snapshots, trigger_reads,
+    warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
+    changes::subscribe,
     location_health::report,
     location_health::recent,
     location_work::poll,
@@ -73,6 +75,40 @@ pub struct HeartbeatResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ApiErrorBody {
     pub error: String,
+}
+
+/// SSE invalidation topics; `all` means refetch the authorized REST resources.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ChangeNotice {
+    pub topic: String,
+}
+
+/// Explicit local development scope; never enabled by ordinary server startup.
+#[derive(Clone, Debug)]
+pub struct DevelopmentScope {
+    pub location_id: uuid::Uuid,
+    pub target: String,
+    pub triggers: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ChangeFeed {
+    pub(crate) sender: tokio::sync::broadcast::Sender<crate::store::models::ChangeMessage>,
+    pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
+}
+
+/// Sensitive headers redact the bearer from Debug output and all wire notifications.
+#[derive(Debug)]
+pub(crate) struct ChangeStream {
+    pub(crate) store: crate::store::models::ControlStore,
+    pub(crate) authorization: Option<axum::http::HeaderValue>,
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) target_hash: String,
+    pub(crate) receiver: tokio::sync::broadcast::Receiver<crate::store::models::ChangeMessage>,
+    pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
+    pub(crate) keepalive: tokio::time::Interval,
+    pub(crate) initial: bool,
 }
 
 #[derive(Clone, Debug)]

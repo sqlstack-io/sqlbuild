@@ -166,3 +166,13 @@ class FingerprintHistoryTestCase:
     journal_modes: tuple[str, ...]
     fixture_paths: tuple[Path, ...]
     expected_legacy_runs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DevelopmentTestCase:
+    description: str
+    target: str
+    arguments: tuple[str, ...]
+    control_path: str
+    expected_rows: list[tuple[int, int]]
+    local_config: str = ""

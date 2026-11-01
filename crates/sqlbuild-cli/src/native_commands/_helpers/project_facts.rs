@@ -2,9 +2,14 @@
 
 use std::path::Path;
 
+use sqlbuild_config::effective::main::effective_target_name::effective_target_name;
+use sqlbuild_config::effective::models::TargetChoice;
+use sqlbuild_config::models::ConfigValue;
+use sqlbuild_config::project::main::load_local_config::load_local_config;
 use sqlbuild_config::project::main::load_project_config::load_project_config;
 use sqlbuild_config::project::models::{Built, ConfigPaths};
 use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
+use sqlbuild_orchestration::store::errors::ControlError;
 
 use crate::native_commands::constants::{
     CUSTOM_RULES_DIRECTORY, EVENT_EXPORTERS_DIRECTORY, LEGACY_LOCAL_CONFIG_FILENAME,
@@ -63,4 +68,42 @@ pub(crate) fn has_no_runtime_extensions(project_dir: &Path) -> bool {
 /// Whether the project defines custom rules, which Python imports.
 pub(crate) fn has_custom_rules(project_dir: &Path) -> bool {
     project_dir.join(CUSTOM_RULES_DIRECTORY).is_dir()
+}
+
+/// Resolve development's target through the same selected/local/default precedence as compilation.
+pub(crate) fn development_target(
+    project_dir: &Path,
+    selected: Option<String>,
+) -> Result<String, ControlError> {
+    let paths = config_paths(project_dir);
+    let invalid =
+        || ControlError::Invalid("project configuration is invalid; run sqb debug".into());
+    let project = load_project_config(&paths).map_err(|_| invalid())?;
+    let local = load_local_config(&paths).map_err(|_| invalid())?;
+    let text = |config: &Built, name: &str| match object_field(config, name) {
+        Some(Built::Value(ConfigValue::String(value))) => Some(value.clone()),
+        _ => None,
+    };
+    let defined: Vec<String> = [&project, &local]
+        .into_iter()
+        .filter_map(|config| object_field(config, "targets"))
+        .filter_map(|targets| match targets {
+            Built::Dict(targets) => Some(targets),
+            _ => None,
+        })
+        .flatten()
+        .map(|(name, _)| name.clone())
+        .collect();
+    effective_target_name(TargetChoice {
+        selected,
+        local: text(&local, "target"),
+        default: text(&project, "default_target"),
+        defined,
+    })
+    .map_err(|_| {
+        ControlError::Invalid("unknown development target; run sqb debug --target <name>".into())
+    })?
+    .ok_or_else(|| {
+        ControlError::Invalid("sqb dev requires --target or a configured default target".into())
+    })
 }

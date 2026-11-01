@@ -13,6 +13,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 croner.workspace = true
 flate2.workspace = true
+futures-util.workspace = true
 getrandom.workspace = true
 reqwest.workspace = true
 rusqlite.workspace = true

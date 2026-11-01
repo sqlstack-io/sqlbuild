@@ -1,17 +1,25 @@
 use std::time::Duration;
 
 use crate::api::main::serve_api::serve_api;
+use crate::api::models::DevelopmentScope;
 use crate::api::tests::test_types::TestApi;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
+    start_api_with_scope(store, None).await
+}
+
+pub(crate) async fn start_api_with_scope(
+    store: &ControlStore,
+    scope: Option<DevelopmentScope>,
+) -> TestApi {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("isolated API socket");
     let url = format!("http://{}", listener.local_addr().expect("API address"));
     let (shutdown, signal) = tokio::sync::oneshot::channel();
     let store = store.clone();
-    let task = tokio::spawn(serve_api(store, listener, async {
+    let task = tokio::spawn(serve_api(store, listener, scope, async {
         let _ = signal.await;
     }));
     let client = reqwest::Client::builder()

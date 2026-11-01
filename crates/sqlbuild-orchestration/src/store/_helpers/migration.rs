@@ -16,6 +16,7 @@ pub(crate) const EXECUTED_NODES: &str = include_str!("../executed_nodes.sql");
 pub(crate) const NODE_SENSORS: &str = include_str!("../node_sensors.sql");
 pub(crate) const WAREHOUSE_FRESHNESS: &str = include_str!("../warehouse_freshness.sql");
 pub(crate) const WAREHOUSE_FINGERPRINTS: &str = include_str!("../warehouse_fingerprints.sql");
+pub(crate) const DEVELOPMENT_LOCATIONS: &str = include_str!("../development_locations.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

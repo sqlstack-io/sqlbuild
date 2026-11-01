@@ -23,14 +23,17 @@ pub(crate) async fn fingerprint_history(
     // Upgrade the immediate predecessor while published snapshots and freshness facts exist.
     let (transaction, _) = query(
         begin(store, TransactionMode::Write).await.expect("upgrade"),
-        "DROP TABLE sqb_warehouse_fingerprints",
+        "DROP TABLE sqb_development_locations",
         vec![],
     )
     .await
-    .expect("predecessor table set");
+    .expect("remove subsequent development migration");
+    let (transaction, _) = query(transaction, "DROP TABLE sqb_warehouse_fingerprints", vec![])
+        .await
+        .expect("predecessor table set");
     let (transaction, _) = query(
         transaction,
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_fingerprints'",
+        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations')",
         vec![],
     )
     .await

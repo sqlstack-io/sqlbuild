@@ -5,6 +5,7 @@ use reqwest::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::api::tests::changes_helpers::{connect, expect_topics};
 use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::test_types::WarehouseMetadataTestCase;
 use crate::credentials::main::issue_token::issue_token;
@@ -118,15 +119,22 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             let outbound = connect_location_work((&api.url, &token.bearer), location)
                 .expect("pooled native location client");
             let typed: SourceFreshnessBatch = serde_json::from_value(batch.clone()).expect("page");
-            for expected_applied in [true, false] {
-                assert_eq!(
-                    outbound
-                        .sync_source_freshness("development", &typed)
-                        .await
-                        .expect("native client sync"),
-                    expected_applied
-                );
-            }
+            let mut changes =
+                connect(&client, &api, (location, "development", &token.bearer)).await;
+            assert!(
+                outbound
+                    .sync_source_freshness("development", &typed)
+                    .await
+                    .expect("native client sync")
+            );
+            expect_topics(&mut changes, &["node_status:development".into()]).await;
+            assert!(
+                !outbound
+                    .sync_source_freshness("development", &typed)
+                    .await
+                    .expect("native client replay")
+            );
+            drop(changes);
             let mut equivalent = batch.clone();
             equivalent["records"] = json!([record]);
             equivalent["records"][0]["observed_at"] = json!("2026-01-01T11:00:00+01:00");

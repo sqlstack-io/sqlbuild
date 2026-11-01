@@ -13,7 +13,7 @@ use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::models::{FingerprintBatch, SourceFreshnessBatch};
 
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/source-freshness",
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/source-freshness", operation_id = "report_source_freshness",
     params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = SourceFreshnessBatch,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),

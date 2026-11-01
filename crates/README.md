@@ -107,6 +107,47 @@ the goldens in `tests/goldens/compiler`, with stage captures and full discovery,
 analysis coverage required. CI also runs it on Python 3.13 and 3.14, and compiles and builds a
 playground project on Windows.
 
+## Control-plane live updates
+
+`GET /api/locations/{location_id}/targets/{target}/changes` streams authenticated SSE
+`changed` events containing only a `topic`. Location credentials retain their existing scope;
+subscribers never receive another location's or target's invalidations. Topics are `runs`,
+`run:<id>`, `ticks`, `snapshot:<location>` and `node_status:<target>`. Clients refetch the
+corresponding REST resource rather than deriving application state from a notification.
+
+Invalidations are deduplicated within the writing transaction. PostgreSQL publishes with
+transactional `NOTIFY`, with each API replica holding a schema-isolated `LISTEN`; SQLite publishes
+through an in-process broadcast immediately after successful COMMIT, even if the awaiting async
+caller was cancelled. Rejected transactions publish nothing. Snapshot, run, trigger, sensor and
+warehouse-ingestion owners mark their own changes without adding a second durable event log.
+
+The first event, subscriber lag and restored PostgreSQL subscriptions emit `all`, requiring a
+complete authorized REST refetch. There is no durable SSE cursor or replay guarantee. Recoverable
+listener failures retry without stopping HTTP serving; fatal configuration/protocol failures remain
+errors. Every event and 15-second keepalive revalidates the credential against the store. Revocation
+invalidates active streams across replicas; expired or inactive credentials disclose no subsequent
+changes. Server shutdown closes live streams instead of waiting indefinitely for their bodies.
+
+## Local development supervisor
+
+`sqb dev` runs the native API, scheduler and reloadable code location together. Its default
+store is `.sqlbuild/control.sqlite3` in the canonical project directory. `--control-store-url`
+selects another control store, `--target` overrides the configured target, `--port 0` chooses a
+free port, and `--no-scheduler` leaves publication and reads active without launching runs.
+This backend-only command does not serve a UI.
+
+Authentication is disabled only for the explicit development listener on loopback. Host and Origin
+checks reject browser cross-origin and DNS-rebinding requests; ordinary `sqb server` authentication
+is unchanged. Development retains an opaque location identity per canonical project and target.
+The spawned code location receives no control-store credentials and uses the ordinary HTTP
+publication, reload and health paths; workers retain their ordinary run-scoped credentials.
+
+Triggers start paused before scheduling can begin. Publication pauses newly introduced or revived
+triggers in the same transaction as the snapshot, using ordinary audited operator facts rather
+than rewriting code definitions. Reload preserves explicit operator changes to retained triggers.
+`--triggers` skips these automatic pauses; it does not undo an operator's persisted pause.
+SIGINT or SIGTERM shuts down the scheduler, API streams and location interpreter together.
+
 ## Warehouse event identity
 
 Fingerprint and source-freshness writers persist deterministic `event_id` values in nullable text

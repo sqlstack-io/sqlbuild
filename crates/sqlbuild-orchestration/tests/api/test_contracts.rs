@@ -1,13 +1,19 @@
 //! HTTP contracts compiled within the API owner.
 
+#[path = "changes/helpers.rs"]
+mod changes_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "output/helpers.rs"]
 mod output_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "test_changes.rs"]
+mod test_changes;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "test_development.rs"]
+mod test_development;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]

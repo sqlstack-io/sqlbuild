@@ -1,10 +1,13 @@
 //! Native database handles and bound values shared by control-plane operations.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use sqlbuild_recall::schema::models::ColumnType;
 use sqlbuild_recall::store::models::ConflictEvidence;
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
 /// An installation's control store. Workers and locations never receive this handle.
@@ -45,12 +48,51 @@ pub(crate) enum TransactionMode {
 pub(crate) struct ControlTransaction {
     pub(crate) connection: Option<Connection>,
     pub(crate) now: DateTime<Utc>,
+    pub(crate) changes: BTreeSet<Change>,
+    pub(crate) notifications: Option<broadcast::Sender<ChangeMessage>>,
 }
 
 #[derive(Debug)]
 pub(crate) enum Connection {
     Sqlite(rusqlite::Connection),
     Postgres(sqlx_core::transaction::Transaction<'static, sqlx_postgres::Postgres>),
+}
+
+/// Transaction-local invalidations, not another durable lifecycle or event log.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Change {
+    Run(Uuid),
+    Trigger(Uuid),
+    Snapshot(Uuid, String),
+    NodeStatus(Uuid, String),
+    Credentials,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ChangeTopic {
+    Runs,
+    Run(Uuid),
+    Ticks,
+    Snapshot,
+    NodeStatus,
+}
+
+/// Fixed-size routing payloads fit PostgreSQL NOTIFY even with long target labels.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ChangeMessage {
+    Changed {
+        location_id: Uuid,
+        target_hash: String,
+        topic: ChangeTopic,
+    },
+    CredentialsChanged,
+    Resync,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChangedScope {
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
 }
 
 /// Parameters keep their PostgreSQL types; SQLite uses their corresponding storage classes.

@@ -13,3 +13,8 @@ pub(crate) struct RecallViewTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_complete: i64,
 }
+
+pub(crate) struct CommitCancellationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_body: &'static [u8],
+}

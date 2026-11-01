@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
-use crate::store::models::{ControlEvent, ControlTransaction};
+use crate::store::models::{Change, ControlEvent, ControlTransaction};
 
 pub(crate) async fn append_run_event(
     transaction: ControlTransaction,
@@ -22,7 +22,7 @@ pub(crate) async fn append_run_event(
         run_id: Some(run_id),
         payload,
     };
-    let (transaction, outcome) = append_control_event(transaction, event).await?;
+    let (mut transaction, outcome) = append_control_event(transaction, event).await?;
     if outcome.conflict.is_some() {
         return Err(ControlError::Invalid(
             "run event conflicts with a durable fact".into(),
@@ -31,5 +31,8 @@ pub(crate) async fn append_run_event(
     let cursor = outcome
         .storage_id
         .ok_or_else(|| ControlError::Invalid("run event has no storage cursor".into()))?;
+    if outcome.inserted {
+        transaction.changes.insert(Change::Run(run_id));
+    }
     Ok((transaction, cursor))
 }

@@ -15,7 +15,7 @@ use crate::scheduler::main::list_ticks::list_ticks;
 use crate::scheduler::models::TickRecord;
 use crate::store::models::ControlStore;
 
-#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/triggers",
+#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/triggers", operation_id = "list_triggers",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
     responses((status = 200, body = Vec<TriggerRecord>), (status = 401, description = "Invalid credential"),
         (status = 403, description = "Location not authorized")), security(("bearer" = [])))]

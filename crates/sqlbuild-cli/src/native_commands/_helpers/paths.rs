@@ -19,10 +19,15 @@ use crate::replay::main::output_file_identities::output_file_identities;
 /// Observe the same project inputs as compiler reuse, excluding redirected command output.
 pub(crate) fn location_watch(root: &Path) -> LocationWatch {
     let rules = location_rules();
+    let files: Vec<String> = std::env::var_os("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+        .into_iter()
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect();
+    let local_files = location_database_files(root, files);
     LocationWatch {
-        observed: location_inputs(root, &rules, &[]),
+        observed: location_inputs(root, &rules, &local_files),
         rules,
-        local_files: Vec::new(),
+        local_files,
         attempted: None,
         changed_at: tokio::time::Instant::now(),
         retry_at: None,

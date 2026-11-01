@@ -19,7 +19,7 @@ use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
 use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
@@ -389,21 +389,4 @@ pub(in crate::workers) fn exit_code(exit: ExitStatus) -> i64 {
     }
     #[cfg(not(unix))]
     i64::from(exit.code().unwrap_or(1))
-}
-
-pub(in crate::workers) fn terminate(child: &mut Child) -> Result<(), ControlError> {
-    #[cfg(unix)]
-    if let Some(id) = child.id() {
-        let raw = i32::try_from(id)
-            .map_err(|error| ControlError::Invalid(format!("invalid child process ID: {error}")))?;
-        let pid = rustix::process::Pid::from_raw(raw)
-            .ok_or_else(|| ControlError::Invalid("invalid child process ID".into()))?;
-        match rustix::process::kill_process(pid, rustix::process::Signal::TERM) {
-            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
-            Err(error) => return Err(std::io::Error::from(error).into()),
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = child;
-    Ok(())
 }
