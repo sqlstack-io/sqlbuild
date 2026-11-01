@@ -641,6 +641,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kind": "run_event",
                         "job_key": "edge_snapshot_group",
                         "kinds": ["completed"],
+                        "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "stopped",
@@ -662,6 +663,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                             jobs=[job("source_orders", description="Orders.", select="orders")],
                         ),
                         kinds=[RunEventKind.COMPLETED],
+                        executed_successfully=("orders", "orders*"),
                     ),
                     run=job("inventory", description="Inventory.", select="stg_orders"),
                 ),
@@ -676,6 +678,30 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kind": "run_event",
                         "job_key": "source_group",
                         "kinds": ["completed"],
+                        "executed_successfully": ["model:orders"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
+            description="source-job execution selectors compile to frozen canonical keys",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                ).read_text()
+            },
+            expected_jobs=("inventory", "source_orders"),
+            expected_sensors={
+                "on_orders": {
+                    "description": "Build inventory only after orders actually succeeds.",
+                    "job_key": "inventory",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "source_orders",
+                        "kinds": ["completed"],
+                        "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
@@ -857,6 +883,78 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="explicit empty execution selectors cannot broaden matching",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', "()")
+            },
+            expected_error=ValueError,
+            expected_message="executed_successfully needs nonempty selectors",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="blank execution selectors cannot broaden matching",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', '(" ",)')
+            },
+            expected_error=ValueError,
+            expected_message="executed_successfully needs nonempty selectors",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="unresolved execution selectors fail closed",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', '("unknown_orders",)')
+            },
+            expected_error=ValueError,
+            expected_message="unknown selector name 'unknown_orders'",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="unmatched execution patterns cannot become an omitted filter",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', '("unknown_*",)')
+            },
+            expected_error=ValueError,
+            expected_message="unknown selector pattern",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="invalid execution selector syntax fails closed",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', '("tag:",)')
+            },
+            expected_error=ValueError,
+            expected_message="has empty value after ':'",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="execution selectors outside the source job fail closed",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/run_orders.py"
+                )
+                .read_text()
+                .replace('("orders",)', '("stg_orders",)')
+            },
+            expected_error=ValueError,
+            expected_message="executed_successfully must select nonempty source job/group nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="sensor code defaults use running or stopped",

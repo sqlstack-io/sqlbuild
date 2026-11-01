@@ -505,7 +505,7 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
                     "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                     "annual_orders = job('annual_orders', select='orders', description='Refresh orders.', settings={'reload': True})\n"
                     "on_group = sensor('on_group', description='Refresh after group completion.', "
-                    "when=run_event(job=source_group, kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS]), "
+                    "when=run_event(job=source_group, kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
                     "run=annual_orders, minimum_interval_seconds=1)\n"
                 )
             },

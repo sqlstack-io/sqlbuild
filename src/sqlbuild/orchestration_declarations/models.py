@@ -92,10 +92,11 @@ class PlatformEventCondition:
 
 @dataclass(frozen=True, kw_only=True)
 class RunEventCondition:
-    """Match a job/group's terminal outcomes in the sensor's location and target."""
+    """Match scoped terminal outcomes, optionally requiring genuinely executed successful nodes."""
 
     job: Job | JobGroup
     kinds: Sequence[RunEventKind]
+    executed_successfully: Sequence[str] | None = None
     kind: Literal["run_event"] = field(default="run_event", init=False)
 
 

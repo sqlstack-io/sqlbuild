@@ -38,6 +38,8 @@ pub enum SensorCondition {
     RunEvent {
         job_key: String,
         kinds: BTreeSet<RunEventKind>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        executed_successfully: Option<BTreeSet<String>>,
     },
 }
 

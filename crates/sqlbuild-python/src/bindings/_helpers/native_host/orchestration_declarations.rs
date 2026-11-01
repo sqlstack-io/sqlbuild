@@ -53,6 +53,8 @@ pub(crate) struct AuthoredSensorCondition {
     pub(crate) kinds: Vec<String>,
     #[pyo3(default)]
     pub(crate) job: Option<AuthoredJobReference>,
+    #[pyo3(default)]
+    pub(crate) executed_successfully: Option<Vec<String>>,
 }
 
 #[derive(FromPyObject)]
