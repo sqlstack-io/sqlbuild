@@ -2,9 +2,8 @@
 
 use uuid::Uuid;
 
-use crate::declarations::_helpers::trigger_state::trigger_timing;
-use crate::declarations::models::{Definitions, PreviousTriggerState, Schedule};
-use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
+use crate::declarations::_helpers::trigger_state::{retain_calendar_ticks, trigger_timing};
+use crate::declarations::models::{Definitions, PreviousTriggerState};
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -16,40 +15,7 @@ pub(crate) async fn publish_definitions(
     snapshot: &SnapshotRecord,
     definitions: Definitions,
 ) -> Result<ControlTransaction, ControlError> {
-    for table in ["sqb_job_nodes", "sqb_jobs"] {
-        (transaction, _) = query(
-            transaction,
-            &format!("DELETE FROM {table} WHERE location_id=$1 AND target=$2"),
-            vec![
-                Parameter::Id(snapshot.location_id),
-                Parameter::Text(snapshot.target.clone()),
-            ],
-        )
-        .await?;
-    }
-    let jobs = definitions
-        .jobs
-        .into_iter()
-        .map(|(name, job)| (name, "job", job))
-        .chain(
-            definitions
-                .groups
-                .into_iter()
-                .map(|(name, group)| (name, "group", group.job)),
-        );
-    for (name, kind, job) in jobs {
-        let definition =
-            serde_json::to_value(&job).map_err(|error| ControlError::Invalid(error.to_string()))?;
-        (transaction, _) = query(transaction,
-            "INSERT INTO sqb_jobs (location_id, target, job_key, snapshot_id, kind, definition_json, overlap_policy) VALUES ($1,$2,$3,$4,$7,$5,$6)",
-            vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()),
-                Parameter::Id(snapshot.snapshot_id), Parameter::Json(definition), Parameter::Text(job.overlap.as_str().into()), Parameter::Text(kind.into())]).await?;
-        for node in job.selection {
-            (transaction, _) = query(transaction,
-                "INSERT INTO sqb_job_nodes (location_id, target, job_key, node_key) VALUES ($1,$2,$3,$4)",
-                vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()), Parameter::Text(node)]).await?;
-        }
-    }
+    transaction = publish_jobs(transaction, snapshot, &definitions).await?;
     (transaction, _) = query(transaction,
         "UPDATE sqb_triggers SET removed_in_snapshot_id=$1 WHERE location_id=$2 AND target=$3 AND removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(snapshot.snapshot_id), Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone())]).await?;
@@ -68,29 +34,7 @@ pub(crate) async fn publish_definitions(
             .next()
             .map(decode_row::<PreviousTriggerState>)
             .transpose()?;
-        if let Some(state) = &state
-            && let Schedule::Calendar {
-                times: previous_times,
-                ..
-            } = &state.definition_json.schedule
-            && let Schedule::Calendar { times, .. } = &mut trigger.schedule
-        {
-            times.extend(
-                previous_times
-                    .iter()
-                    .filter(|time| {
-                        **time >= state.started_at
-                            && **time <= snapshot.published_at
-                            && state.last_tick_for.is_none_or(|last| **time > last)
-                    })
-                    .copied(),
-            );
-            if times.len() > MAX_TICKS_PER_BATCH {
-                return Err(ControlError::Invalid(format!(
-                    "calendar {name} pending and upcoming times exceed {MAX_TICKS_PER_BATCH}; let the scheduler drain pending ticks before refreshing"
-                )));
-            }
-        }
+        retain_calendar_ticks(&name, &mut trigger, state.as_ref(), snapshot)?;
         let definition = serde_json::to_value(&trigger)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         (transaction, _) = query(transaction,
@@ -112,6 +56,48 @@ pub(crate) async fn publish_definitions(
             "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at, updated_at) VALUES ($1,$2,$3,$4,$5) \
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at, updated_at=excluded.updated_at",
             vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next), Parameter::Time(snapshot.published_at)]).await?;
+    }
+    Ok(transaction)
+}
+
+async fn publish_jobs(
+    mut transaction: ControlTransaction,
+    snapshot: &SnapshotRecord,
+    definitions: &Definitions,
+) -> Result<ControlTransaction, ControlError> {
+    for table in ["sqb_job_nodes", "sqb_jobs"] {
+        (transaction, _) = query(
+            transaction,
+            &format!("DELETE FROM {table} WHERE location_id=$1 AND target=$2"),
+            vec![
+                Parameter::Id(snapshot.location_id),
+                Parameter::Text(snapshot.target.clone()),
+            ],
+        )
+        .await?;
+    }
+    let jobs = definitions
+        .jobs
+        .iter()
+        .map(|(name, job)| (name, "job", job))
+        .chain(
+            definitions
+                .groups
+                .iter()
+                .map(|(name, group)| (name, "group", &group.job)),
+        );
+    for (name, kind, job) in jobs {
+        let definition =
+            serde_json::to_value(job).map_err(|error| ControlError::Invalid(error.to_string()))?;
+        (transaction, _) = query(transaction,
+            "INSERT INTO sqb_jobs (location_id, target, job_key, snapshot_id, kind, definition_json, overlap_policy) VALUES ($1,$2,$3,$4,$7,$5,$6)",
+            vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()),
+                Parameter::Id(snapshot.snapshot_id), Parameter::Json(definition), Parameter::Text(job.overlap.as_str().into()), Parameter::Text(kind.into())]).await?;
+        for node in &job.selection {
+            (transaction, _) = query(transaction,
+                "INSERT INTO sqb_job_nodes (location_id, target, job_key, node_key) VALUES ($1,$2,$3,$4)",
+                vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()), Parameter::Text(node.clone())]).await?;
+        }
     }
     Ok(transaction)
 }

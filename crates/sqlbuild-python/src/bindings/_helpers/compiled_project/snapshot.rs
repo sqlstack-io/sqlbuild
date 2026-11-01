@@ -131,8 +131,7 @@ pub(crate) fn build_orchestration_snapshot(
         input = compile_declarations(
             py,
             input,
-            &project_dir,
-            graph.bind(py).get().graph(),
+            (&project_dir, graph.bind(py).get().graph()),
             authored,
         )?;
     }

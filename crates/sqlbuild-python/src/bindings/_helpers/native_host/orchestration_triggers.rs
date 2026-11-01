@@ -18,6 +18,7 @@ use sqlbuild_orchestration::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
+use crate::bindings::_helpers::native_host::constants::CALENDAR_WINDOW_PARAMETER;
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::authored_setting;
 
@@ -94,9 +95,10 @@ fn horizon(value: &str) -> PyResult<TimeDelta> {
     ]
     .into_iter()
     .try_fold(0_i64, |total, (digits, factor)| {
-        total.checked_add(digits.parse::<i64>().ok()?.checked_mul(factor)?)
-    })
-    .ok_or_else(invalid)?;
+        let digits = digits.parse::<i64>().map_err(|_| invalid())?;
+        let seconds = digits.checked_mul(factor).ok_or_else(invalid)?;
+        total.checked_add(seconds).ok_or_else(invalid)
+    })?;
     TimeDelta::try_seconds(seconds).ok_or_else(invalid)
 }
 
@@ -132,10 +134,10 @@ fn calendar_times(
         .call((), Some(&window))?;
     let function = authored.getattr("function")?;
     let arguments = PyDict::new(py);
-    arguments.set_item("window", window)?;
+    arguments.set_item(CALENDAR_WINDOW_PARAMETER, window)?;
     for usage in provider_usages(&function, providers)?.try_iter()? {
         let usage = usage?;
-        if usage.getattr("parameter_name")?.extract::<String>()? == "window" {
+        if usage.getattr("parameter_name")?.extract::<String>()? == CALENDAR_WINDOW_PARAMETER {
             continue;
         }
         arguments.set_item(
@@ -143,7 +145,7 @@ fn calendar_times(
             session.call_method1("get", (usage.getattr("provider_name")?,))?,
         )?;
     }
-    let mut times = BTreeSet::new();
+    let mut times: BTreeSet<DateTime<Utc>> = BTreeSet::new();
     for (index, time) in function
         .call((), Some(&arguments))?
         .try_iter()?
@@ -186,7 +188,7 @@ pub(crate) fn compile_calendars(
     authored: Vec<Py<PyAny>>,
     mut definitions: Definitions,
 ) -> PyResult<Definitions> {
-    let mut calendars = Vec::new();
+    let mut calendars: Vec<Py<PyAny>> = Vec::new();
     for calendar in authored {
         let targets = calendar
             .bind(py)

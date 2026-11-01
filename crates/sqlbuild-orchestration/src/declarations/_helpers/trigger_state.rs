@@ -2,9 +2,46 @@
 
 use chrono::{DateTime, TimeDelta, Utc};
 
-use crate::declarations::models::{TriggerDefinition, TriggerStatus};
+use crate::declarations::models::{
+    PreviousTriggerState, Schedule, TriggerDefinition, TriggerStatus,
+};
+use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::scheduler::main::next_schedule_time::next_schedule_time;
+use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
+
+/// Replacing a future horizon must retain due ticks not yet consumed by the scheduler.
+pub(crate) fn retain_calendar_ticks(
+    name: &str,
+    trigger: &mut TriggerDefinition,
+    state: Option<&PreviousTriggerState>,
+    snapshot: &SnapshotRecord,
+) -> Result<(), ControlError> {
+    if let Some(state) = state
+        && let Schedule::Calendar {
+            times: previous_times,
+            ..
+        } = &state.definition_json.schedule
+        && let Schedule::Calendar { times, .. } = &mut trigger.schedule
+    {
+        times.extend(
+            previous_times
+                .iter()
+                .filter(|time| {
+                    **time >= state.started_at
+                        && **time <= snapshot.published_at
+                        && state.last_tick_for.is_none_or(|last| **time > last)
+                })
+                .copied(),
+        );
+        if times.len() > MAX_TICKS_PER_BATCH {
+            return Err(ControlError::Invalid(format!(
+                "calendar {name} pending and upcoming times exceed {MAX_TICKS_PER_BATCH}; let the scheduler drain pending ticks before refreshing"
+            )));
+        }
+    }
+    Ok(())
+}
 
 pub(crate) fn trigger_timing(
     definition: &TriggerDefinition,

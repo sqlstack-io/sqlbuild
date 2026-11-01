@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAny, PyResult, Python};
+use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
 use serde_json::Value;
 use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
 use sqlbuild_analysis::graph::models::ProjectGraph;
@@ -60,8 +60,7 @@ pub(crate) fn discover_declarations<'py>(
 pub(crate) fn compile_declarations(
     py: Python<'_>,
     mut input: SnapshotInput,
-    project_dir: &Path,
-    graph: &ProjectGraph,
+    (project_dir, graph): (&Path, &ProjectGraph),
     declarations: Vec<AuthoredDeclaration>,
 ) -> PyResult<SnapshotInput> {
     if declarations.is_empty() {
@@ -78,7 +77,7 @@ pub(crate) fn compile_declarations(
     let mut jobs: BTreeMap<String, JobDefinition> = BTreeMap::new();
     let mut authored_groups: Vec<AuthoredGroup> = Vec::new();
     let mut authored_jobs: Vec<AuthoredJob> = Vec::new();
-    let mut authored_calendars = Vec::new();
+    let mut authored_calendars: Vec<Py<PyAny>> = Vec::new();
     for declaration in declarations {
         match declaration {
             AuthoredDeclaration::Job(job) => authored_jobs.push(job),

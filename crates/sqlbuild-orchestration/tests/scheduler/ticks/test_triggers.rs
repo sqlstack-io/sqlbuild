@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::scheduler::tests::contracts::ticks::helpers::{snapshot, trigger_audits};
 use crate::scheduler::tests::contracts::ticks::test_types::{
-    TransactionFault, TriggerControlsTestCase,
+    TickTransactionTestCase, TransactionFault, TriggerControlsTestCase,
 };
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -253,10 +253,9 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
  {
     use crate::runs::main::list_runs::list_runs;
     use crate::scheduler::main::list_ticks::list_ticks;
-    use crate::scheduler::tests::contracts::ticks::test_types::TickTransactionTestCase;
     use serde_json::json;
 
-    for test_case in [
+    let test_cases = [
         TickTransactionTestCase {
             description: "SQLite retains due calendar ticks",
             backend: Backend::Sqlite,
@@ -269,7 +268,8 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
             expected_ticks: 3,
             expected_runs: 1,
         },
-    ] {
+    ];
+    for test_case in test_cases {
         run(async {
             let Some(fixture) = open_test_store(test_case.backend).await else {
                 return;
