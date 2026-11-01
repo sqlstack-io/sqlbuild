@@ -26,10 +26,82 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_json_numbers AS (
   SELECT
-    NULL AS check_id,
-    NULL AS parsed_kind,
-    NULL AS parsed_text,
-    NULL AS amount_kind,
-    NULL AS amount_text,
-    NULL AS is_valid_json
+    'AC-01' AS check_id,
+    'OBJECT' AS parsed_kind,
+    '{"amount":2,"qty":1}' AS parsed_text,
+    'INTEGER' AS amount_kind,
+    '2' AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    CAST(NULL AS VARCHAR) AS parsed_kind,
+    CAST(NULL AS VARCHAR) AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    FALSE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS VARCHAR) AS parsed_kind,
+    CAST(NULL AS VARCHAR) AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    FALSE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS parsed_kind,
+    CAST(NULL AS VARCHAR) AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    FALSE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-05' AS check_id,
+    'INTEGER' AS parsed_kind,
+    '12345678901234567890123456789012345678' AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-06' AS check_id,
+    'INTEGER' AS parsed_kind,
+    '1' AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-07' AS check_id,
+    'OBJECT' AS parsed_kind,
+    '{"amount":0}' AS parsed_text,
+    'INTEGER' AS amount_kind,
+    '0' AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-08' AS check_id,
+    'OBJECT' AS parsed_kind,
+    '{"amount":2.000000000000000e+05}' AS parsed_text,
+    'DOUBLE' AS amount_kind,
+    '200000' AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-09' AS check_id,
+    'OBJECT' AS parsed_kind,
+    '{"amount":100}' AS parsed_text,
+    'INTEGER' AS amount_kind,
+    '100' AS amount_text,
+    TRUE AS is_valid_json
+  UNION ALL
+  SELECT
+    'AC-10' AS check_id,
+    'INTEGER' AS parsed_kind,
+    '123456789012345678901234567890123456789' AS parsed_text,
+    CAST(NULL AS VARCHAR) AS amount_kind,
+    CAST(NULL AS VARCHAR) AS amount_text,
+    TRUE AS is_valid_json
 )

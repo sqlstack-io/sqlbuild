@@ -16,8 +16,20 @@ WITH __source__edge__basket_lines AS (
 
 __expected__stg_edge_basket_lines AS (
   SELECT
-    NULL AS line_id,
-    NULL AS basket_id,
-    NULL AS line_no,
-    NULL AS tag
+    'BL-01' AS line_id,
+    'B-1' AS basket_id,
+    1 AS line_no,
+    'bath' AS tag
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    'B-1' AS basket_id,
+    2 AS line_no,
+    'gift' AS tag
+  UNION ALL
+  SELECT
+    'BL-03' AS line_id,
+    'B-2' AS basket_id,
+    1 AS line_no,
+    CAST(NULL AS VARCHAR) AS tag
 )

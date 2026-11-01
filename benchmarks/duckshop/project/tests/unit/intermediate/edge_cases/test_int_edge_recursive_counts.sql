@@ -16,8 +16,32 @@ WITH __ref__stg_edge_category_links AS (
 
 __expected__int_edge_recursive_counts AS (
   SELECT
-    NULL AS category_id,
-    NULL AS tree_depth,
-    NULL AS parent_name,
-    NULL AS grandparent_name
+    'CAT-1' AS category_id,
+    1 AS tree_depth,
+    CAST(NULL AS VARCHAR) AS parent_name,
+    CAST(NULL AS VARCHAR) AS grandparent_name
+  UNION ALL
+  SELECT
+    'CAT-2' AS category_id,
+    2 AS tree_depth,
+    'Ducks' AS parent_name,
+    CAST(NULL AS VARCHAR) AS grandparent_name
+  UNION ALL
+  SELECT
+    'CAT-3' AS category_id,
+    3 AS tree_depth,
+    'Rubber ducks' AS parent_name,
+    'Ducks' AS grandparent_name
+  UNION ALL
+  SELECT
+    'CAT-4' AS category_id,
+    2 AS tree_depth,
+    'Ducks' AS parent_name,
+    CAST(NULL AS VARCHAR) AS grandparent_name
+  UNION ALL
+  SELECT
+    'CAT-5' AS category_id,
+    1 AS tree_depth,
+    CAST(NULL AS VARCHAR) AS parent_name,
+    CAST(NULL AS VARCHAR) AS grandparent_name
 )

@@ -19,9 +19,16 @@ WITH __source__edge__amount_checks AS (
 
 __expected__stg_edge_amount_checks AS (
   SELECT
-    NULL AS check_id,
-    NULL AS narrow_key,
-    NULL AS wide_key,
-    NULL AS amount,
-    NULL AS fine_amount
+    'AC-01' AS check_id,
+    7 AS narrow_key,
+    12345678901234567890123 AS wide_key,
+    10.00::NUMBER(18, 2) AS amount,
+    0.123456789012345::NUMBER(20, 15) AS fine_amount
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    CAST(NULL AS NUMBER(18, 0)) AS narrow_key,
+    CAST(NULL AS NUMBER(38, 0)) AS wide_key,
+    CAST(NULL AS NUMBER(18, 2)) AS amount,
+    CAST(NULL AS NUMBER(20, 15)) AS fine_amount
 )

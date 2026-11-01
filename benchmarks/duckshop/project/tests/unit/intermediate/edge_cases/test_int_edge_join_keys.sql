@@ -22,9 +22,93 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_join_keys AS (
   SELECT
-    NULL AS row_key,
-    NULL AS join_shape,
-    NULL AS group_code,
-    NULL AS group_name,
-    NULL AS threshold_name
+    'asof:AC-01:G-1:-' AS row_key,
+    'asof:AC-01' AS join_shape,
+    'G-1' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'asof:AC-02:G-1:ten or more' AS row_key,
+    'asof:AC-02' AS join_shape,
+    'G-1' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    'ten or more' AS threshold_name
+  UNION ALL
+  SELECT
+    'asof:AC-03:G-1:-' AS row_key,
+    'asof:AC-03' AS join_shape,
+    'G-1' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'asof:AC-04:G-2:a hundred or more' AS row_key,
+    'asof:AC-04' AS join_shape,
+    'G-2' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    'a hundred or more' AS threshold_name
+  UNION ALL
+  SELECT
+    'asof:AC-05:G-2:ten or more' AS row_key,
+    'asof:AC-05' AS join_shape,
+    'G-2' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    'ten or more' AS threshold_name
+  UNION ALL
+  SELECT
+    'asof:AC-06:G-3:-' AS row_key,
+    'asof:AC-06' AS join_shape,
+    'G-3' AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'natural:G-1:-' AS row_key,
+    'natural' AS join_shape,
+    'G-1' AS group_code,
+    'Mallard desk' AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'natural:G-2:-' AS row_key,
+    'natural' AS join_shape,
+    'G-2' AS group_code,
+    'Teal desk' AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'right_using:G-1:-' AS row_key,
+    'right_using' AS join_shape,
+    'G-1' AS group_code,
+    'Mallard desk' AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'right_using:G-2:-' AS row_key,
+    'right_using' AS join_shape,
+    'G-2' AS group_code,
+    'Teal desk' AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'right_using:G-9:-' AS row_key,
+    'right_using' AS join_shape,
+    'G-9' AS group_code,
+    'Eider desk' AS group_name,
+    CAST(NULL AS VARCHAR) AS threshold_name
+  UNION ALL
+  SELECT
+    'using_then_right:-:G-7' AS row_key,
+    'using_then_right' AS join_shape,
+    CAST(NULL AS VARCHAR) AS group_code,
+    CAST(NULL AS VARCHAR) AS group_name,
+    'G-7' AS threshold_name
+  UNION ALL
+  SELECT
+    'using_then_right:G-1:G-1' AS row_key,
+    'using_then_right' AS join_shape,
+    'G-1' AS group_code,
+    'Mallard desk' AS group_name,
+    'G-1' AS threshold_name
 )

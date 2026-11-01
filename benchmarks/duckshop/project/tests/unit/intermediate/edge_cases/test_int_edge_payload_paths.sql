@@ -20,10 +20,130 @@ WITH __ref__stg_edge_variant_values AS (
 
 __expected__int_edge_payload_paths AS (
   SELECT
-    NULL AS element_id,
-    NULL AS value_id,
-    NULL AS element_path,
-    NULL AS element_key,
-    NULL AS element_index,
-    NULL AS element_kind
+    'VV-01:[''a$b'']' AS element_id,
+    'VV-01' AS value_id,
+    '[''a$b'']' AS element_path,
+    'a$b' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a-b'']' AS element_id,
+    'VV-01' AS value_id,
+    '[''a-b'']' AS element_path,
+    'a-b' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'OBJECT' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a-b''][''@x'']' AS element_id,
+    'VV-01' AS value_id,
+    '[''a-b''][''@x'']' AS element_path,
+    '@x' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a[b'']' AS element_id,
+    'VV-01' AS value_id,
+    '[''a[b'']' AS element_path,
+    'a[b' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'ARRAY' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a[b''][0]' AS element_id,
+    'VV-01' AS value_id,
+    '[''a[b''][0]' AS element_path,
+    CAST(NULL AS VARCHAR) AS element_key,
+    0 AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a[b''][1]' AS element_id,
+    'VV-01' AS value_id,
+    '[''a[b''][1]' AS element_path,
+    CAST(NULL AS VARCHAR) AS element_key,
+    1 AS element_index,
+    'OBJECT' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-01:[''a[b''][1].k' AS element_id,
+    'VV-01' AS value_id,
+    '[''a[b''][1].k' AS element_path,
+    'k' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-02:[0]' AS element_id,
+    'VV-02' AS value_id,
+    '[0]' AS element_path,
+    CAST(NULL AS VARCHAR) AS element_key,
+    0 AS element_index,
+    'OBJECT' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-02:[0][''x y'']' AS element_id,
+    'VV-02' AS value_id,
+    '[0][''x y'']' AS element_path,
+    'x y' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-02:[1]' AS element_id,
+    'VV-02' AS value_id,
+    '[1]' AS element_path,
+    CAST(NULL AS VARCHAR) AS element_key,
+    1 AS element_index,
+    'ARRAY' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-02:[1][0]' AS element_id,
+    'VV-02' AS value_id,
+    '[1][0]' AS element_path,
+    CAST(NULL AS VARCHAR) AS element_key,
+    0 AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-04:['''']' AS element_id,
+    'VV-04' AS value_id,
+    '['''']' AS element_path,
+    '' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-04:[''9z'']' AS element_id,
+    'VV-04' AS value_id,
+    '[''9z'']' AS element_path,
+    '9z' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-04:[''a.b'']' AS element_id,
+    'VV-04' AS value_id,
+    '[''a.b'']' AS element_path,
+    'a.b' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-04:[''plain key'']' AS element_id,
+    'VV-04' AS value_id,
+    '[''plain key'']' AS element_path,
+    'plain key' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
+  UNION ALL
+  SELECT
+    'VV-04:é' AS element_id,
+    'VV-04' AS value_id,
+    'é' AS element_path,
+    'é' AS element_key,
+    CAST(NULL AS NUMBER(38, 0)) AS element_index,
+    'INTEGER' AS element_kind
 )

@@ -16,6 +16,14 @@ WITH __source__edge__variant_values AS (
 
 __expected__stg_edge_variant_values AS (
   SELECT
-    NULL AS value_id,
-    NULL AS attribute_value
+    'VV-01' AS value_id,
+    PARSE_JSON('{"a":1,"b":2}') AS attribute_value
+  UNION ALL
+  SELECT
+    'VV-02' AS value_id,
+    PARSE_JSON('null') AS attribute_value
+  UNION ALL
+  SELECT
+    'VV-03' AS value_id,
+    PARSE_JSON('null') AS attribute_value
 )

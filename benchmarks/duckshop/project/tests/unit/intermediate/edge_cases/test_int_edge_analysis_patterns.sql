@@ -35,12 +35,42 @@ __ref__stg_edge_date_texts AS (
 
 __expected__int_edge_analysis_patterns AS (
   SELECT
-    NULL AS basket_id,
-    NULL AS month_end,
-    NULL AS line_no,
-    NULL AS positional_sku,
-    NULL AS next_line_no,
-    NULL AS line_no_text,
-    NULL AS sku_prefix,
-    NULL AS line_count
+    'B-1' AS basket_id,
+    '2026-02-28'::DATE AS month_end,
+    3 AS line_no,
+    'EIDER-03' AS positional_sku,
+    4 AS next_line_no,
+    '1' AS line_no_text,
+    'EIDER' AS sku_prefix,
+    3 AS line_count
+  UNION ALL
+  SELECT
+    'B-2' AS basket_id,
+    '2026-02-28'::DATE AS month_end,
+    2 AS line_no,
+    'MALLARD-01' AS positional_sku,
+    3 AS next_line_no,
+    '1' AS line_no_text,
+    'MALLA' AS sku_prefix,
+    2 AS line_count
+  UNION ALL
+  SELECT
+    'B-3' AS basket_id,
+    '2026-02-28'::DATE AS month_end,
+    1 AS line_no,
+    'MERGANSER-05' AS positional_sku,
+    2 AS next_line_no,
+    '1' AS line_no_text,
+    'MERGA' AS sku_prefix,
+    1 AS line_count
+  UNION ALL
+  SELECT
+    'B-4' AS basket_id,
+    '2026-02-28'::DATE AS month_end,
+    2 AS line_no,
+    'EIDER-03' AS positional_sku,
+    3 AS next_line_no,
+    '1' AS line_no_text,
+    'EIDER' AS sku_prefix,
+    2 AS line_count
 )

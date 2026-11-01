@@ -22,12 +22,172 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_key_widths AS (
   SELECT
-    NULL AS pair_id,
-    NULL AS join_kind,
-    NULL AS check_key_text,
-    NULL AS narrow_check_id,
-    NULL AS wide_check_id,
-    NULL AS merged_key_type,
-    NULL AS narrow_side_type,
-    NULL AS wide_side_type
+    'full:-:AC-02' AS pair_id,
+    'full' AS join_kind,
+    '12345678901234567890123' AS check_key_text,
+    CAST(NULL AS VARCHAR) AS narrow_check_id,
+    'AC-02' AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'full:AC-01:AC-01' AS pair_id,
+    'full' AS join_kind,
+    '7' AS check_key_text,
+    'AC-01' AS narrow_check_id,
+    'AC-01' AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'full:AC-02:AC-03' AS pair_id,
+    'full' AS join_kind,
+    '12' AS check_key_text,
+    'AC-02' AS narrow_check_id,
+    'AC-03' AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'full:AC-04:AC-04' AS pair_id,
+    'full' AS join_kind,
+    '123456789012345678' AS check_key_text,
+    'AC-04' AS narrow_check_id,
+    'AC-04' AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'full:AC-05:-' AS pair_id,
+    'full' AS join_kind,
+    '99' AS check_key_text,
+    'AC-05' AS narrow_check_id,
+    CAST(NULL AS VARCHAR) AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'full:AC-06:AC-06' AS pair_id,
+    'full' AS join_kind,
+    '5' AS check_key_text,
+    'AC-06' AS narrow_check_id,
+    'AC-06' AS wide_check_id,
+    'NUMBER(38,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'inner:AC-01:AC-01' AS pair_id,
+    'inner' AS join_kind,
+    '7' AS check_key_text,
+    'AC-01' AS narrow_check_id,
+    'AC-01' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(18,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'inner:AC-02:AC-03' AS pair_id,
+    'inner' AS join_kind,
+    '12' AS check_key_text,
+    'AC-02' AS narrow_check_id,
+    'AC-03' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(18,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'inner:AC-04:AC-04' AS pair_id,
+    'inner' AS join_kind,
+    '123456789012345678' AS check_key_text,
+    'AC-04' AS narrow_check_id,
+    'AC-04' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(18,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'inner:AC-06:AC-06' AS pair_id,
+    'inner' AS join_kind,
+    '5' AS check_key_text,
+    'AC-06' AS narrow_check_id,
+    'AC-06' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(18,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'left:AC-01:AC-01' AS pair_id,
+    'left' AS join_kind,
+    '7' AS check_key_text,
+    'AC-01' AS narrow_check_id,
+    'AC-01' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'left:AC-02:AC-03' AS pair_id,
+    'left' AS join_kind,
+    '12' AS check_key_text,
+    'AC-02' AS narrow_check_id,
+    'AC-03' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'left:AC-04:AC-04' AS pair_id,
+    'left' AS join_kind,
+    '123456789012345678' AS check_key_text,
+    'AC-04' AS narrow_check_id,
+    'AC-04' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'left:AC-05:-' AS pair_id,
+    'left' AS join_kind,
+    '99' AS check_key_text,
+    'AC-05' AS narrow_check_id,
+    CAST(NULL AS VARCHAR) AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'left:AC-06:AC-06' AS pair_id,
+    'left' AS join_kind,
+    '5' AS check_key_text,
+    'AC-06' AS narrow_check_id,
+    'AC-06' AS wide_check_id,
+    'NUMBER(18,0)' AS merged_key_type,
+    'NUMBER(18,0)' AS narrow_side_type,
+    'NUMBER(38,0)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'text:AC-03:AC-03' AS pair_id,
+    'text' AS join_kind,
+    '12' AS check_key_text,
+    'AC-03' AS narrow_check_id,
+    'AC-03' AS wide_check_id,
+    'VARCHAR(3)' AS merged_key_type,
+    'VARCHAR(3)' AS narrow_side_type,
+    'VARCHAR(3)' AS wide_side_type
+  UNION ALL
+  SELECT
+    'text:AC-04:AC-01' AS pair_id,
+    'text' AS join_kind,
+    ' 7' AS check_key_text,
+    'AC-04' AS narrow_check_id,
+    'AC-01' AS wide_check_id,
+    'VARCHAR(3)' AS merged_key_type,
+    'VARCHAR(3)' AS narrow_side_type,
+    'VARCHAR(3)' AS wide_side_type
 )

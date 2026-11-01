@@ -20,12 +20,42 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_tag_sets AS (
   SELECT
-    NULL AS basket_id,
-    NULL AS tag_count,
-    NULL AS has_gift,
-    NULL AS overlaps_pond_or_garden,
-    NULL AS distinct_tag_count,
-    NULL AS distinct_tags,
-    NULL AS flattened_count,
-    NULL AS flattened_tags
+    'B-1' AS basket_id,
+    3 AS tag_count,
+    TRUE AS has_gift,
+    FALSE AS overlaps_pond_or_garden,
+    2 AS distinct_tag_count,
+    PARSE_JSON('["bath","gift"]')::ARRAY AS distinct_tags,
+    3 AS flattened_count,
+    'bath,gift' AS flattened_tags
+  UNION ALL
+  SELECT
+    'B-2' AS basket_id,
+    2 AS tag_count,
+    FALSE AS has_gift,
+    TRUE AS overlaps_pond_or_garden,
+    3 AS distinct_tag_count,
+    PARSE_JSON('["bath","garden","gift"]')::ARRAY AS distinct_tags,
+    2 AS flattened_count,
+    'bath,garden' AS flattened_tags
+  UNION ALL
+  SELECT
+    'B-3' AS basket_id,
+    1 AS tag_count,
+    FALSE AS has_gift,
+    TRUE AS overlaps_pond_or_garden,
+    2 AS distinct_tag_count,
+    PARSE_JSON('["gift","pond"]')::ARRAY AS distinct_tags,
+    1 AS flattened_count,
+    'pond' AS flattened_tags
+  UNION ALL
+  SELECT
+    'B-4' AS basket_id,
+    1 AS tag_count,
+    TRUE AS has_gift,
+    FALSE AS overlaps_pond_or_garden,
+    1 AS distinct_tag_count,
+    PARSE_JSON('["gift"]')::ARRAY AS distinct_tags,
+    1 AS flattened_count,
+    'gift' AS flattened_tags
 )

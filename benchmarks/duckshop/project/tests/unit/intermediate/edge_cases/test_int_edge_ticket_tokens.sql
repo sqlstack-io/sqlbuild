@@ -20,10 +20,52 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_ticket_tokens AS (
   SELECT
-    NULL AS line_id,
-    NULL AS edge_next_ticket_source,
-    NULL AS look_alike_text,
-    NULL AS tag_label
+    'BL-01' AS line_id,
+    'BL-01' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Bath' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    'BL-02' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Gift' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-03' AS line_id,
+    'BL-03' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Bath' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-04' AS line_id,
+    'BL-04' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Garden' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-05' AS line_id,
+    'BL-05' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Bath' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-06' AS line_id,
+    'BL-06' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Pond' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-07' AS line_id,
+    'BL-07' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Untagged' AS tag_label
+  UNION ALL
+  SELECT
+    'BL-08' AS line_id,
+    'BL-08' AS edge_next_ticket_source,
+    'edge_next_ticket edge_next_ticket' AS look_alike_text,
+    'Gift' AS tag_label
 ),
 
 __assert__every_call_gives_a_new_value AS (

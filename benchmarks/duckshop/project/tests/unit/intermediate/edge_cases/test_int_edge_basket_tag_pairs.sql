@@ -20,7 +20,37 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_tag_pairs AS (
   SELECT
-    NULL AS tag_pair_text,
-    NULL AS tag_pair,
-    NULL AS pair_size
+    'bath|bath' AS tag_pair_text,
+    PARSE_JSON('["bath","bath"]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'bath|garden' AS tag_pair_text,
+    PARSE_JSON('["bath","garden"]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'bath|gift' AS tag_pair_text,
+    PARSE_JSON('["bath","gift"]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'garden|bath' AS tag_pair_text,
+    PARSE_JSON('["garden","bath"]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'gift|' AS tag_pair_text,
+    PARSE_JSON('["gift",undefined]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'gift|bath' AS tag_pair_text,
+    PARSE_JSON('["gift","bath"]')::ARRAY AS tag_pair,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    '|gift' AS tag_pair_text,
+    PARSE_JSON('[undefined,"gift"]')::ARRAY AS tag_pair,
+    2 AS pair_size
 )

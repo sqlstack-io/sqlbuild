@@ -22,10 +22,74 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_python_values AS (
   SELECT
-    NULL AS kind,
-    NULL AS payload_is_sql_null,
-    NULL AS payload_is_json_null,
-    NULL AS payload_kind,
-    NULL AS payload_text,
-    NULL AS amount_as_float
+    'exponent_decimal' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"1E+3"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'naive_time' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"2026-03-01 09:30:00"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'naive_time_fraction' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"2026-03-01 09:30:00.250000"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'nested' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'OBJECT' AS payload_kind,
+    '{"a":true,"b":[1,null]}' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'nothing' AS kind,
+    FALSE AS payload_is_sql_null,
+    TRUE AS payload_is_json_null,
+    'NULL_VALUE' AS payload_kind,
+    'null' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'plain_decimal' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"1.50"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'some other kind' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"some other kind"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'wide_integer' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'INTEGER' AS payload_kind,
+    '1152921504606846977' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
+  UNION ALL
+  SELECT
+    'zoned_time' AS kind,
+    FALSE AS payload_is_sql_null,
+    FALSE AS payload_is_json_null,
+    'VARCHAR' AS payload_kind,
+    '"2026-03-01 09:30:00+00:00"' AS payload_text,
+    '9007199254740992.0'::FLOAT AS amount_as_float
 )

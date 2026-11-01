@@ -20,7 +20,27 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_top_tags AS (
   SELECT
-    NULL AS pick_kind,
-    NULL AS picked_id,
-    NULL AS picked_size
+    'by_name' AS pick_kind,
+    'B-3' AS picked_id,
+    CAST(NULL AS NUMBER(38, 0)) AS picked_size
+  UNION ALL
+  SELECT
+    'by_position' AS pick_kind,
+    'B-3' AS picked_id,
+    1 AS picked_size
+  UNION ALL
+  SELECT
+    'constructed' AS pick_kind,
+    'BL-03' AS picked_id,
+    1 AS picked_size
+  UNION ALL
+  SELECT
+    'over_union' AS pick_kind,
+    'B-3' AS picked_id,
+    1 AS picked_size
+  UNION ALL
+  SELECT
+    'through_iff' AS pick_kind,
+    'B-3' AS picked_id,
+    1 AS picked_size
 )

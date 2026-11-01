@@ -37,12 +37,232 @@ WITH __ref__stg_edge_date_texts AS (
 
 __expected__int_edge_text_dates AS (
   SELECT
-    NULL AS text_id,
-    NULL AS day_month_dots,
-    NULL AS iso_date,
-    NULL AS day_month_short_year,
-    NULL AS month_day_slashes,
-    NULL AS day_month_name,
-    NULL AS month_name_first,
-    NULL AS auto_date
+    'DT-01' AS text_id,
+    '2026-03-05'::DATE AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-02' AS text_id,
+    '0026-03-05'::DATE AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-03' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    '2026-03-05'::DATE AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    '2026-03-05'::DATE AS auto_date
+  UNION ALL
+  SELECT
+    'DT-04' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    '2026-03-05'::DATE AS day_month_short_year,
+    '0026-05-03'::DATE AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    '0026-05-03'::DATE AS auto_date
+  UNION ALL
+  SELECT
+    'DT-05' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    '2026-03-05'::DATE AS day_month_short_year,
+    '0026-05-03'::DATE AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    '0026-05-03'::DATE AS auto_date
+  UNION ALL
+  SELECT
+    'DT-06' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    '2026-03-05'::DATE AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    '2026-03-05'::DATE AS auto_date
+  UNION ALL
+  SELECT
+    'DT-07' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    '2026-10-05'::DATE AS auto_date
+  UNION ALL
+  SELECT
+    'DT-08' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-09' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-10' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-11' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-12' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-13' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    '2024-08-05'::DATE AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-14' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-15' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    '2024-03-05'::DATE AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-16' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    '2024-03-05'::DATE AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-17' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    '2024-03-05'::DATE AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-18' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    '2024-03-05'::DATE AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-19' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-20' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-21' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-22' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
+  UNION ALL
+  SELECT
+    'DT-23' AS text_id,
+    CAST(NULL AS DATE) AS day_month_dots,
+    CAST(NULL AS DATE) AS iso_date,
+    CAST(NULL AS DATE) AS day_month_short_year,
+    CAST(NULL AS DATE) AS month_day_slashes,
+    CAST(NULL AS DATE) AS day_month_name,
+    CAST(NULL AS DATE) AS month_name_first,
+    CAST(NULL AS DATE) AS auto_date
 )

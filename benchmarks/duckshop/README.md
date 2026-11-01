@@ -137,11 +137,8 @@ scenarios, in eight groups:
 
 Unit-test expectations in the edge-case area are captured on Snowflake under the `edge` target's
 pinned session, rather than derived by hand; scenario expectations, and the assertions in tests
-about ties and volatile values, are written by hand from those captured values. The 28 model tests
-added with the ordering-through-arrays, `VARIANT` comparison, lineage and Python function cases,
-and with the newer rows of the other groups, still hold placeholder expectations: run
-`capture_edge_expectations.py --write` on them (RUNBOOK.md, step 7) before relying on them.
-`fct_edge_delivery_events` is disabled: it is the acceptance case for cursor `delete_insert` models
+about ties, volatile values and values Snowflake does not compute exactly, are written by hand
+from those captured values. `fct_edge_delivery_events` is disabled: it is the acceptance case for cursor `delete_insert` models
 that emit rows outside the window they replace. See [RUNBOOK.md](RUNBOOK.md), step 7.
 
 Benchmarks and core measurements leave the area out:
@@ -254,6 +251,20 @@ noted here:
   (model SQL has no intrinsic for its own schema, and unit tests replace references with CTEs),
   `METADATA$` columns of a stream or `CHANGES` clause, and sequence `NEXTVAL`. SQLBuild's `@udf`
   has no option for `STRICT` (`RETURNS NULL ON NULL INPUT`), so no function declares it.
+- Snowflake rejects some shapes, so the edge-case area leaves them out: a window frame without
+  `ORDER BY` (such as a running `COUNT_IF`), `CONVERT_TIMEZONE` with a lower-case `'utc'`, and a
+  scalar subquery inside a `CONNECT BY` query (an internal error). `MAX` over `SYSTEM$TYPEOF`
+  values that are then joined on also fails with an internal error, so `int_edge_null_arithmetic`
+  reads one row's type instead.
+- Snowflake answers some shapes in ways worth knowing, and the captured expectations record them:
+  `SYSTEM$TYPEOF(COUNT(x))` does not make a query aggregate; in a `CONNECT BY` query that joins
+  another relation, a column named `level` reads as the walk depth even when qualified, and
+  `CONNECT_BY_ROOT` returns the row's own value; `COUNT` of a `VARIANT` skips JSON null; `MODE` of
+  a number over no rows can return 0; `MEDIAN` above scale 12 is not exact and differs between
+  plans; `JOIN ... USING` types the qualified keys of an inner join as the narrower side's type.
+- SQLBuild 0.186.2 reads the type of a Snowflake source column declared with a precision, such as
+  `TIME(3)` or `TIMESTAMP_NTZ(3)`, without it, and stops the build with a contract mismatch. The
+  `edge__date_texts` columns are declared without a precision and cast in `stg_edge_date_texts`.
 
 ## Compile
 

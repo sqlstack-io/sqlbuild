@@ -14,8 +14,14 @@ WITH __source__edge__category_links AS (
 
 __expected__stg_edge_category_links AS (
   SELECT
-    NULL AS category_id,
-    NULL AS parent_id,
-    NULL AS category_name,
-    NULL AS shelf_depth
+    'CAT-1' AS category_id,
+    CAST(NULL AS VARCHAR) AS parent_id,
+    'Ducks' AS category_name,
+    1 AS shelf_depth
+  UNION ALL
+  SELECT
+    'CAT-2' AS category_id,
+    'CAT-1' AS parent_id,
+    'Rubber ducks' AS category_name,
+    2 AS shelf_depth
 )
