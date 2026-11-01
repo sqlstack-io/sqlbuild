@@ -253,6 +253,8 @@ class SnapshotDiscoveryTestCase:
     expected_jobs: tuple[str, ...]
     declarations: tuple[()] | None = None
     expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    expected_sensors: dict[str, dict[str, object]] = field(default_factory=dict)
+    expected_schedules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

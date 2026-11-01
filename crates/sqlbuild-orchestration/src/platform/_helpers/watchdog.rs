@@ -78,7 +78,7 @@ async fn scan_trigger_page(
             "SELECT t.trigger_id, t.definition_json, s.next_due_at \
          FROM sqb_triggers t JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id \
          JOIN sqb_locations l ON l.location_id=t.location_id \
-         WHERE s.status='running' AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
+         WHERE t.kind='schedule' AND s.status='running' AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
          {cursor} ORDER BY t.trigger_id LIMIT 100"
         ),
         after.into_iter().map(Parameter::Id).collect(),

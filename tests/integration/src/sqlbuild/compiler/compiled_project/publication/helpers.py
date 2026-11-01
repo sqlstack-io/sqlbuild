@@ -376,6 +376,9 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
     assert nodes[0]["ended_at"] is not None
     with sqlite3.connect(control_store) as control:
         assert control.execute(
+            "SELECT origin FROM sqb_runs WHERE run_id=?", (run["run_id"],)
+        ).fetchone() == (test_case.expected_origin,)
+        assert control.execute(
             "SELECT count(*) FROM recall_events "
             "WHERE invocation_id=? AND event_type='run_launched'",
             (f"scheduler/{run['run_id']}",),

@@ -603,6 +603,34 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 "edge_inventory_group": {"edge_snapshot_inventory": []},
                 "edge_products_group": {"edge_snapshot_products": []},
             },
+            expected_sensors={
+                "edge_platform_orders": {
+                    "description": "Catch up retained platform observations with a stopped group sensor.",
+                    "job_key": "edge_snapshot_group",
+                    "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+                    "minimum_interval_seconds": 7,
+                    "default_status": "stopped",
+                }
+            },
+            expected_schedules=("edge_snapshot_orders",),
+        ),
+        SnapshotDiscoveryTestCase(
+            description="sensor-only roots preserve referenced jobs and filter targets",
+            files={
+                "orchestration/health.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                ).read_text()
+            },
+            expected_jobs=("health_orders",),
+            expected_sensors={
+                "overdue_orders": {
+                    "description": "Catch up overdue order reporting.",
+                    "job_key": "health_orders",
+                    "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+                    "minimum_interval_seconds": 7,
+                    "default_status": "stopped",
+                }
+            },
         ),
         SnapshotDiscoveryTestCase(
             description="a project without declarations has no job document",
@@ -634,6 +662,12 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
         name: definition["jobs"]
         for name, definition in publication["documents"].get("groups", {}).items()
     } == test_case.expected_groups
+    assert {
+        name: publication["documents"]["triggers"][name] for name in test_case.expected_sensors
+    } == test_case.expected_sensors
+    assert tuple(publication["documents"].get("triggers", {})) == tuple(
+        sorted((*test_case.expected_schedules, *test_case.expected_sensors))
+    )
     for definition in publication["documents"].get("jobs", {}).values():
         assert set(definition["selection"]) <= publication["nodes"].keys()
 
@@ -719,6 +753,54 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message="mutually exclusive",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a zero sensor interval cannot publish",
+            files={
+                "orchestration/health.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                )
+                .read_text()
+                .replace("minimum_interval_seconds=7", "minimum_interval_seconds=0")
+            },
+            expected_error=ValueError,
+            expected_message="nonzero u32",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="empty platform conditions cannot publish",
+            files={
+                "orchestration/health.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                )
+                .read_text()
+                .replace("kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=[]")
+            },
+            expected_error=ValueError,
+            expected_message="nonempty event kinds",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="platform kinds are a closed vocabulary",
+            files={
+                "orchestration/health.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                )
+                .read_text()
+                .replace("kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=['unknown_event']")
+            },
+            expected_error=ValueError,
+            expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="sensor code defaults use running or stopped",
+            files={
+                "orchestration/health.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
+                )
+                .read_text()
+                .replace('default_status="stopped"', 'default_status="paused"')
+            },
+            expected_error=ValueError,
+            expected_message="unknown variant",
         ),
     ],
     ids=lambda case: case.description,

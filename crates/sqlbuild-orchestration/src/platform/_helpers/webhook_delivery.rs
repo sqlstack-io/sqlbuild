@@ -1,11 +1,10 @@
 //! Ordered, at-least-once delivery; a response is acknowledged only after HTTP success.
 
-use crate::platform::constants::SINK_PAGE_SIZE;
-use crate::platform::models::{PlatformEventEnvelope, PlatformWebhook};
+use crate::platform::main::read_platform_events::read_platform_events;
+use crate::platform::models::PlatformWebhook;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
@@ -17,18 +16,13 @@ pub(crate) async fn deliver_platform_events(
     let transaction = begin(store, TransactionMode::Read).await?;
     let (transaction, rows) = query(
         transaction,
-        "SELECT storage_id, event_id, occurred_at, payload FROM recall_events \
-         WHERE producer='platform' AND invocation_id LIKE 'platform/%' AND storage_id > \
-         (SELECT COALESCE(MAX(storage_id), 0) FROM sqb_platform_sink_deliveries WHERE sink_id=$1) \
-         ORDER BY storage_id LIMIT $2",
-        vec![
-            Parameter::Text(sink.sink_id.clone()),
-            Parameter::Integer(SINK_PAGE_SIZE),
-        ],
+        "SELECT COALESCE(MAX(storage_id), 0) AS cursor FROM sqb_platform_sink_deliveries WHERE sink_id=$1",
+        vec![Parameter::Text(sink.sink_id.clone())],
     )
     .await?;
-    let events: Vec<PlatformEventEnvelope> =
-        rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
+    let cursor = serde_json::from_value(rows[0]["cursor"].clone())
+        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    let (transaction, events) = read_platform_events(transaction, cursor).await?;
     commit(transaction).await?;
     let count = events.len();
     for event in events {

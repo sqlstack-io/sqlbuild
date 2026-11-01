@@ -24,9 +24,25 @@ fn document<T: DeserializeOwned>(
 pub(crate) fn decode_definitions(
     documents: &BTreeMap<String, Value>,
 ) -> Result<Definitions, ControlError> {
-    Ok(Definitions {
+    let mut definitions = Definitions {
         jobs: document(documents, "jobs")?,
         groups: document(documents, "groups")?,
-        triggers: document(documents, "triggers")?,
-    })
+        ..Definitions::default()
+    };
+    for (name, value) in document::<Value>(documents, "triggers")? {
+        if value.get("when").is_some() {
+            definitions.sensors.insert(
+                name,
+                serde_json::from_value(value)
+                    .map_err(|error| ControlError::Invalid(format!("triggers: {error}")))?,
+            );
+        } else {
+            definitions.triggers.insert(
+                name,
+                serde_json::from_value(value)
+                    .map_err(|error| ControlError::Invalid(format!("triggers: {error}")))?,
+            );
+        }
+    }
+    Ok(definitions)
 }

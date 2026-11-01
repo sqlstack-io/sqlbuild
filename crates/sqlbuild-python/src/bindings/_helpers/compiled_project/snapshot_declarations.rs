@@ -16,16 +16,16 @@ use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    Definitions, GroupDefinition, JobDefinition, OnFailure, TriggerDefinition,
+    Definitions, GroupDefinition, JobDefinition, OnFailure, TriggerDeclaration, TriggerDefinition,
 };
 use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredDeclaration, AuthoredGroup, AuthoredJob, module_jobs,
+    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, module_jobs,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
-    compile_calendars, compile_cron,
+    compile_calendars, compile_cron, compile_sensors,
 };
 
 /// Dedicated declaration modules are imported only in the code-location interpreter.
@@ -78,11 +78,13 @@ pub(crate) fn compile_declarations(
     let mut authored_groups: Vec<AuthoredGroup> = Vec::new();
     let mut authored_jobs: Vec<AuthoredJob> = Vec::new();
     let mut authored_calendars: Vec<Py<PyAny>> = Vec::new();
+    let mut authored_sensors: Vec<AuthoredSensor> = Vec::new();
     for declaration in declarations {
         match declaration {
             AuthoredDeclaration::Job(job) => authored_jobs.push(job),
             AuthoredDeclaration::Group(group) => authored_groups.push(group),
             AuthoredDeclaration::Calendar(calendar) => authored_calendars.push(calendar),
+            AuthoredDeclaration::Sensor(sensor) => authored_sensors.push(sensor),
         }
     }
     let mut triggers: BTreeMap<String, TriggerDefinition> = BTreeMap::new();
@@ -198,16 +200,31 @@ pub(crate) fn compile_declarations(
         jobs,
         groups,
         triggers,
-    } = compile_calendars(
-        py,
-        (project_dir, &input.target),
-        authored_calendars,
-        Definitions {
-            jobs,
-            groups,
-            triggers,
-        },
+        sensors,
+    } = compile_sensors(
+        &input.target,
+        authored_sensors,
+        compile_calendars(
+            py,
+            (project_dir, &input.target),
+            authored_calendars,
+            Definitions {
+                jobs,
+                groups,
+                triggers,
+                ..Definitions::default()
+            },
+        )?,
     )?;
+    let triggers: BTreeMap<_, _> = triggers
+        .into_iter()
+        .map(|(name, trigger)| (name, TriggerDeclaration::Schedule(trigger)))
+        .chain(
+            sensors
+                .into_iter()
+                .map(|(name, sensor)| (name, TriggerDeclaration::Sensor(sensor))),
+        )
+        .collect();
     for (key, document) in [
         ("jobs", serde_json::to_value(jobs)),
         ("groups", serde_json::to_value(groups)),

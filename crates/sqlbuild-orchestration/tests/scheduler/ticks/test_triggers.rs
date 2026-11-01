@@ -308,7 +308,7 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
                 .expect("refreshed trigger")
                 .remove(0);
             assert_eq!(
-                serde_json::to_value(&trigger.definition_json.schedule).expect("calendar")["times"],
+                serde_json::to_value(&trigger.definition_json).expect("calendar")["schedule"]["times"],
                 json!([
                     "2020-01-01T00:00:00Z",
                     "2020-01-02T00:00:00Z",
@@ -356,7 +356,7 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
                 .expect("drained trigger")
                 .remove(0);
             assert_eq!(
-                serde_json::to_value(&trigger.definition_json.schedule).expect("calendar")["times"],
+                serde_json::to_value(&trigger.definition_json).expect("calendar")["schedule"]["times"],
                 json!(["2032-01-01T00:00:00Z"])
             );
             assert_eq!(

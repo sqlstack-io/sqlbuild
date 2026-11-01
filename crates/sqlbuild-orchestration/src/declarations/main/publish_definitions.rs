@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::declarations::_helpers::trigger_state::{retain_calendar_ticks, trigger_timing};
 use crate::declarations::models::{Definitions, PreviousTriggerState};
+use crate::sensors::main::publish_sensors::publish_sensors;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -19,6 +20,7 @@ pub(crate) async fn publish_definitions(
     (transaction, _) = query(transaction,
         "UPDATE sqb_triggers SET removed_in_snapshot_id=$1 WHERE location_id=$2 AND target=$3 AND removed_in_snapshot_id IS NULL",
         vec![Parameter::Id(snapshot.snapshot_id), Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone())]).await?;
+    transaction = publish_sensors(transaction, snapshot, &definitions).await?;
     for (name, mut trigger) in definitions.triggers {
         let id = Uuid::new_v5(
             &snapshot.location_id,

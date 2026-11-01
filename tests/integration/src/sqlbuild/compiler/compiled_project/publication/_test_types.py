@@ -99,6 +99,7 @@ class WorkerExecutionTestCase:
     expected_status: str
     expected_rows: list[tuple[int]]
     expected_node_count: int = 1
+    expected_origin: Literal["schedule", "sensor"] = "schedule"
     files: dict[str, str] = field(default_factory=dict)
     files_after_publication: dict[str, str] = field(default_factory=dict)
     store_setup: str = ""

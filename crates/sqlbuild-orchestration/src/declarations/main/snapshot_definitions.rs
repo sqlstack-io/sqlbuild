@@ -8,6 +8,7 @@ use crate::declarations::models::{Definitions, Schedule};
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::scheduler::main::parse_cron::parse_cron;
 use crate::scheduler::models::CatchUp;
+use crate::sensors::main::validate_sensors::validate_sensors;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
@@ -80,5 +81,6 @@ pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, Contro
             Schedule::Calendar { .. } => {}
         }
     }
+    validate_sensors(&definitions)?;
     Ok(definitions)
 }

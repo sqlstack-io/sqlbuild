@@ -65,6 +65,27 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             expected_totals=("success", None),
         ),
         GroupExecutionTestCase(
+            "a platform sensor starts group parents and children",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM totals",
+            "success",
+            [(17,)],
+            expected_origin="sensor",
+            expected_child_statuses={"staging": ("success",), "marts": ("success",)},
+            expected_totals=("success", None),
+            files={
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import PlatformEventKind, job, job_group, platform_event, sensor\n"
+                    "staging = job('staging', description='Stage orders.', select='stg_orders broken_orders')\n"
+                    "marts = job('marts', description='Build independent marts.', select='orders totals')\n"
+                    "annual_orders = job_group('annual_orders', description='Stage then build marts.', jobs=[marts, staging])\n"
+                    "health_orders = sensor('health_orders', description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run=annual_orders, "
+                    "minimum_interval_seconds=60)\n"
+                )
+            },
+        ),
+        GroupExecutionTestCase(
             "whole downstream job is blocked without building an empty selection",
             "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
@@ -161,6 +182,9 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             runs["marts"]["started_at"] or runs["staging"]["ended_at"]
         )
         with sqlite3.connect(worker.control_store) as control:
+            assert control.execute(
+                "SELECT origin FROM sqb_runs WHERE run_id=?", (parent["run_id"],)
+            ).fetchone() == (test_case.expected_origin,)
             assert (
                 control.execute(
                     "SELECT parent_run_id, root_run_id FROM sqb_runs WHERE kind='job' ORDER BY job_key"
@@ -378,6 +402,23 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
             "SELECT amount FROM orders",
             "success",
             [(23,)],
+        ),
+        WorkerExecutionTestCase(
+            "a platform sensor catches up retained events through a real worker",
+            "SELECT 47 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(47,)],
+            expected_origin="sensor",
+            files={
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import PlatformEventKind, job, platform_event, sensor\n"
+                    "annual_orders = job('annual_orders', select='orders', description='Build orders.')\n"
+                    "health_orders = sensor('health_orders', description='Refresh on platform heartbeat.', "
+                    "when=platform_event(kinds=[PlatformEventKind.HEARTBEAT]), run=annual_orders, "
+                    "minimum_interval_seconds=60)\n"
+                )
+            },
         ),
         WorkerExecutionTestCase(
             "authored variables and reload use ordinary build argument conversion",

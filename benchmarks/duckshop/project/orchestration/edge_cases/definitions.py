@@ -1,6 +1,13 @@
 """Exercise alias deduplication and cyclic factory containers during native discovery."""
 
-from sqlbuild.orchestration import job, job_group, schedule
+from sqlbuild.orchestration import (
+    PlatformEventKind,
+    job,
+    job_group,
+    platform_event,
+    schedule,
+    sensor,
+)
 
 edge_orders = job(
     "edge_snapshot_orders",
@@ -51,3 +58,12 @@ edge_products_group = job_group(
     jobs=[edge_products],
     concurrency_groups=("edge_products_limit",),
 )
+edge_health = sensor(
+    "edge_platform_orders",
+    description="Catch up retained platform observations with a stopped group sensor.",
+    when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]),
+    run=edge_group,
+    minimum_interval_seconds=7,
+    default_status="stopped",
+)
+edge_factory_results.append(edge_health)

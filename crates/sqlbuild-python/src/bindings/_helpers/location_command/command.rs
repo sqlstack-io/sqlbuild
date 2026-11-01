@@ -10,7 +10,9 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::git_revisions::main::head_commit::head_commit;
-use sqlbuild_orchestration::declarations::models::{Schedule, TriggerDefinition};
+use sqlbuild_orchestration::declarations::models::{
+    Schedule, TriggerDeclaration, TriggerDefinition,
+};
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
@@ -189,7 +191,7 @@ pub(super) fn publish_location(
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
     let (snapshot, _) = compile_location(py, arguments, &input)?;
-    let triggers: BTreeMap<String, TriggerDefinition> = serde_json::from_value(
+    let triggers: BTreeMap<String, TriggerDeclaration> = serde_json::from_value(
         snapshot
             .input
             .documents
@@ -200,9 +202,12 @@ pub(super) fn publish_location(
     .map_err(|error| PyValueError::new_err(error.to_string()))?;
     let refresh_at = triggers
         .values()
-        .filter_map(|trigger| match &trigger.schedule {
-            Schedule::Calendar { refresh_at, .. } => Some(*refresh_at),
-            Schedule::Cron { .. } => None,
+        .filter_map(|trigger| match trigger {
+            TriggerDeclaration::Schedule(TriggerDefinition {
+                schedule: Schedule::Calendar { refresh_at, .. },
+                ..
+            }) => Some(*refresh_at),
+            TriggerDeclaration::Schedule(_) | TriggerDeclaration::Sensor(_) => None,
         })
         .min();
     status(py, "Publishing location snapshot...")?;

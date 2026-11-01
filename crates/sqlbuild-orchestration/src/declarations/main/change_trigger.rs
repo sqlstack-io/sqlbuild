@@ -4,10 +4,8 @@ use serde_json::json;
 
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
-use crate::declarations::_helpers::trigger_state::trigger_timing;
-use crate::declarations::models::{
-    EditableTriggerState, TriggerChange, TriggerChangeRequest, TriggerStatus,
-};
+use crate::declarations::_helpers::operator_state::apply_operator_change;
+use crate::declarations::models::{EditableTriggerState, TriggerChangeRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -52,48 +50,24 @@ pub async fn change_trigger(
         vec![Parameter::Id(request.trigger_id)],
     )
     .await?;
-    let mut state: EditableTriggerState =
-        decode_row(rows.into_iter().next().ok_or_else(|| {
-            ControlError::Invalid("trigger does not exist in the current snapshot".into())
-        })?)?;
-    let before = json!({
-        "status_override": state.status_override,
-        "last_tick_for": state.last_tick_for,
-    });
-    match request.change {
-        TriggerChange::Enable => state.status_override = Some(TriggerStatus::Running),
-        TriggerChange::Pause => state.status_override = Some(TriggerStatus::Paused),
-        TriggerChange::ResetDefault => state.status_override = None,
-        TriggerChange::SetCursor { time } => state.last_tick_for = Some(time),
-        TriggerChange::ResetCursor => state.last_tick_for = None,
-    }
-    let (status, next) = trigger_timing(
-        &state.definition_json,
-        state.started_at,
-        state.last_tick_for,
-        state.status_override,
-    )?;
+    let state: EditableTriggerState = decode_row(rows.into_iter().next().ok_or_else(|| {
+        ControlError::Invalid("trigger does not exist in the current snapshot".into())
+    })?)?;
+    let snapshot_id = state.snapshot_id;
     let now = transaction.now;
     let (transaction, _) = query(transaction,
         "INSERT INTO sqb_trigger_state_events (event_id, trigger_id, occurred_at, snapshot_id, request_json) VALUES ($1,$2,$3,$4,$5)",
         vec![Parameter::Id(request.event_id), Parameter::Id(request.trigger_id), Parameter::Time(now), Parameter::Id(state.snapshot_id), Parameter::Json(body)]).await?;
-    let (transaction, _) = query(transaction,
-        "UPDATE sqb_trigger_state SET status=$1, status_override=$2, last_tick_for=$3, next_due_at=$4, updated_at=$5 WHERE trigger_id=$6",
-        vec![Parameter::Text(status.as_str().into()), Parameter::OptionalText(state.status_override.map(|value| value.as_str().into())), Parameter::OptionalTime(state.last_tick_for),
-            Parameter::OptionalTime(next), Parameter::Time(now), Parameter::Id(request.trigger_id)]).await?;
+    let (transaction, (before, after)) = apply_operator_change(transaction, state, request).await?;
     commit(
         append_audit(
             transaction,
             context,
             (request.event_id, "trigger.changed"),
             (
-                json!({"trigger_id": request.trigger_id, "snapshot_id": state.snapshot_id}),
+                json!({"trigger_id": request.trigger_id, "snapshot_id": snapshot_id}),
                 before,
-                json!({
-                    "status_override": state.status_override,
-                    "last_tick_for": state.last_tick_for,
-                    "reason": request.reason,
-                }),
+                after,
             ),
         )
         .await?,

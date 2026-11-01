@@ -2,6 +2,7 @@
 
 use uuid::Uuid;
 
+use crate::scheduler::_helpers::drain_sensors::drain_sensors;
 use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::{SchedulerCycle, SchedulerLease};
@@ -21,7 +22,7 @@ pub(crate) async fn drain_due_triggers(
     let (transaction, rows) = query(transaction,
         "SELECT s.trigger_id FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id \
          JOIN sqb_locations l ON l.location_id=t.location_id \
-         WHERE s.status='running' AND s.next_due_at<=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
+         WHERE t.kind='schedule' AND s.status='running' AND s.next_due_at<=$1 AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL \
          ORDER BY s.next_due_at, s.trigger_id LIMIT 100", vec![Parameter::Time(now)]).await?;
     commit(transaction).await?;
     for row in rows {
@@ -33,5 +34,7 @@ pub(crate) async fn drain_due_triggers(
         }
         lease = renew_lease(store, &lease).await?;
     }
+    let (lease, sensor_evaluations) = drain_sensors(store, lease).await?;
+    cycle.evaluated += sensor_evaluations;
     Ok((lease, cycle))
 }

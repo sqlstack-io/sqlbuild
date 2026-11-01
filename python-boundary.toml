@@ -23,6 +23,11 @@ rule = 3
 note = "Public job and schedule authoring records only; selection resolution, validation and scheduling stay native."
 
 [[stays]]
+path = "orchestration_declarations/types.py"
+rule = 3
+note = "Public PlatformEventKind enum only, placed in types.py to satisfy enum ownership; no Python event processing or implementation allowance."
+
+[[stays]]
 path = "orchestration_declarations/main/compile_snapshot.py"
 rule = 3
 note = "Public declaration compiler: one-line delegation to build_orchestration_snapshot; no Python discovery, validation or snapshot logic."
