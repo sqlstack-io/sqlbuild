@@ -93,3 +93,11 @@ pub(crate) struct MappedContextTestCase {
     pub(crate) expected_message: &'static str,
     pub(crate) expected_location: (Option<usize>, Option<usize>),
 }
+
+pub(crate) struct UnknownFunctionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) declared: &'static [&'static str],
+    pub(crate) expected_names: &'static [&'static str],
+}

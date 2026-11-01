@@ -233,11 +233,57 @@ pub(crate) fn unsupported_calls(
     dialect: DialectType,
     probes: &FunctionProbes,
 ) -> Vec<UnsupportedCall> {
+    let mut calls: Vec<UnsupportedCall> = Vec::new();
+    unaccepted_calls(sql, dialect, |site| {
+        if let Some(suggestion) = probes.suggestion(dialect, site.upper, site.arity) {
+            calls.push(UnsupportedCall {
+                name: site.name.to_owned(),
+                start: site.start,
+                end: site.end,
+                suggestion,
+            });
+        }
+    });
+    calls
+}
+
+/// The distinct names, as written, of calls in `sql` that are neither built-ins of `dialect`,
+/// nor one of its spellings SQLBuild suggests a fix for, nor `declared` by the project.
+pub(crate) fn unknown_calls(
+    sql: &str,
+    dialect: DialectType,
+    (probes, declared): (&FunctionProbes, &[String]),
+) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    unaccepted_calls(sql, dialect, |site| {
+        let known: bool = declared
+            .iter()
+            .any(|declared| declared.eq_ignore_ascii_case(site.name))
+            || names
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(site.name));
+        if !known && probes.suggestion(dialect, site.upper, site.arity).is_none() {
+            names.push(site.name.to_owned());
+        }
+    });
+    names
+}
+
+/// One call site whose name the dialect's built-ins do not list.
+struct CallSite<'s> {
+    name: &'s str,
+    upper: &'s str,
+    start: usize,
+    end: usize,
+    arity: usize,
+}
+
+/// Each unqualified call in `sql` whose name `dialect` does not list as a built-in.
+fn unaccepted_calls(sql: &str, dialect: DialectType, mut visit: impl FnMut(CallSite<'_>)) {
     let Some(names) = accepted(dialect) else {
-        return Vec::new();
+        return;
     };
     let bytes: &[u8] = sql.as_bytes();
-    let mut calls: Vec<UnsupportedCall> = Vec::new();
     let mut scan: Scan = Scan::new();
     let mut index: usize = 0;
     while index < bytes.len() {
@@ -282,18 +328,17 @@ pub(crate) fn unsupported_calls(
             && !KEYWORDS.contains(upper.as_str())
             && let Some((arity, close)) = arguments(bytes, open)
             && !opens_cte_body(bytes, close + 1)
-            && let Some(suggestion) = probes.suggestion(dialect, &upper, arity)
         {
-            calls.push(UnsupportedCall {
-                name: name.to_owned(),
+            visit(CallSite {
+                name,
+                upper: &upper,
                 start,
                 end: index,
-                suggestion,
+                arity,
             });
         }
         scan.word(upper);
     }
-    calls
 }
 
 impl Scan {

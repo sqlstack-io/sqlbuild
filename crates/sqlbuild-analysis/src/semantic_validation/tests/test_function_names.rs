@@ -2,7 +2,7 @@ use crate::semantic_validation::_helpers::diagnostics::map_diagnostics;
 use crate::semantic_validation::_helpers::function_names::unsupported_calls;
 use crate::semantic_validation::models::FunctionProbes;
 use crate::semantic_validation::tests::test_types::{
-    LocatedFunctionDiagnosticTestCase, UnsupportedFunctionTestCase,
+    LocatedFunctionDiagnosticTestCase, UnknownFunctionTestCase, UnsupportedFunctionTestCase,
 };
 use polyglot_sql::{DialectType, ValidationResult};
 
@@ -252,4 +252,59 @@ fn given_unsupported_spelling_when_mapping_diagnostics_then_returns_located_b101
         );
     }
     Ok(())
+}
+
+#[test]
+fn given_calls_when_listing_unknown_functions_then_only_undeclared_non_builtins_are_named() {
+    let test_cases = [
+        UnknownFunctionTestCase {
+            description: "a call no catalog lists is named once, as written",
+            dialect: "duckdb",
+            sql: "SELECT order_score(quantity), Order_Score(price), UPPER(status) FROM orders",
+            declared: &[],
+            expected_names: &["order_score"],
+        },
+        UnknownFunctionTestCase {
+            description: "a declared function is known",
+            dialect: "snowflake",
+            sql: "SELECT order_score(quantity), IFF(quantity > 0, 1, 0) FROM orders",
+            declared: &["ORDER_SCORE"],
+            expected_names: &[],
+        },
+        UnknownFunctionTestCase {
+            description: "a built-in spelled as the other dialect spells it is a spelling finding",
+            dialect: "snowflake",
+            sql: "SELECT STARTS_WITH(product_name, 'a') FROM products",
+            declared: &[],
+            expected_names: &[],
+        },
+        UnknownFunctionTestCase {
+            description: "strings, comments and qualified calls are not scanned",
+            dialect: "duckdb",
+            sql: "SELECT 'mystery(1)', shop.order_score(1) -- other_call(2)\nFROM orders",
+            declared: &[],
+            expected_names: &[],
+        },
+    ];
+    for test_case in test_cases {
+        let declared: Vec<String> = test_case
+            .declared
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        assert_eq!(
+            crate::semantic_validation::main::unknown_functions::unknown_functions(
+                test_case.sql,
+                test_case.dialect,
+                &declared,
+            ),
+            Ok(test_case
+                .expected_names
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect::<Vec<String>>()),
+            "{}",
+            test_case.description
+        );
+    }
 }
