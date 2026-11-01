@@ -3,7 +3,6 @@ pub mod configuration_error;
 pub mod data_version_hash;
 pub mod event_id;
 pub mod normalized_data_version;
-pub mod read_history_sql;
 pub mod read_latest_sql;
 pub mod records_equivalent;
 pub mod relevant_sources_sql;

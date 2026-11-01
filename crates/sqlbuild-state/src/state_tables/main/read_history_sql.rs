@@ -1,35 +1,34 @@
 //! Keyset pages preserve distinct observations without rereading or ranking all preceding rows.
 
-use crate::freshness::constants::{
-    OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SOURCE_FRESHNESS_EVENT_ID, SQLSERVER_ADAPTER,
-};
+use crate::state_tables::constants::SQLSERVER_ADAPTER;
+use crate::state_tables::models::HistoryRead;
 
 /// Cursor values are already rendered by the adapter; `None` sorts before every SQL value.
 pub fn read_history_sql(
     qualified_name: &str,
-    after: Option<&[Option<String>; 11]>,
-    observed_since: Option<&str>,
-    (limit, adapter, has_event_id): (usize, &str, bool),
+    after: Option<&[Option<String>]>,
+    read: HistoryRead<'_>,
 ) -> Result<String, String> {
-    let mut columns: Vec<&str> = SOURCE_FRESHNESS_COLUMN_TYPES
-        .iter()
-        .map(|(name, _)| *name)
-        .collect();
+    let HistoryRead {
+        columns,
+        timestamp_column,
+        observed_since,
+        adapter,
+        has_event_id,
+        limit,
+    } = read;
+    let mut columns = columns.to_vec();
     let mut projection = columns.join(", ");
     projection.push_str(if has_event_id {
         ", event_id"
     } else {
         ", NULL AS event_id"
     });
-    columns.push(if has_event_id {
-        SOURCE_FRESHNESS_EVENT_ID
-    } else {
-        "NULL"
-    });
+    columns.push(if has_event_id { "event_id" } else { "NULL" });
     let ordered = columns
         .iter()
         .map(|column| {
-            if *column == OBSERVED_AT_COLUMN {
+            if *column == timestamp_column {
                 Ok((*column).to_owned())
             } else {
                 binary(column, adapter)
@@ -43,7 +42,7 @@ pub fn read_history_sql(
             let literal = value
                 .as_ref()
                 .map(|value| {
-                    if *column == OBSERVED_AT_COLUMN {
+                    if *column == timestamp_column {
                         Ok(value.clone())
                     } else {
                         binary(value, adapter)
@@ -71,7 +70,7 @@ pub fn read_history_sql(
         filters.push(format!("({})", greater.join(" OR ")));
     }
     if let Some(since) = observed_since {
-        filters.push(format!("{OBSERVED_AT_COLUMN} >= {since}"));
+        filters.push(format!("{timestamp_column} >= {since}"));
     }
     let filter = if filters.is_empty() {
         String::new()
@@ -113,7 +112,7 @@ fn binary(value: &str, adapter: &str) -> Result<String, String> {
         "clickhouse" => value.to_owned(),
         _ => {
             return Err(format!(
-                "source freshness history does not support adapter '{adapter}'"
+                "warehouse history does not support adapter '{adapter}'"
             ));
         }
     })

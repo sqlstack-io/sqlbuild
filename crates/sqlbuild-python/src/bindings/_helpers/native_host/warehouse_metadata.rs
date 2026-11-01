@@ -16,7 +16,8 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 use sqlbuild_state::freshness::constants::{
     OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
 };
-use sqlbuild_state::freshness::main::read_history_sql::read_history_sql;
+use sqlbuild_state::state_tables::main::read_history_sql::read_history_sql;
+use sqlbuild_state::state_tables::models::HistoryRead;
 
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
@@ -170,9 +171,15 @@ fn read_page(
         .transpose()?;
     let sql = read_history_sql(
         &qualified,
-        request.after.as_ref().map(|_| &literals),
-        observed_since.as_deref(),
-        (MAX_FRESHNESS_RECORDS, &adapter_name, has_event_id),
+        request.after.as_ref().map(|_| literals.as_slice()),
+        HistoryRead {
+            columns: &SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name),
+            timestamp_column: OBSERVED_AT_COLUMN,
+            observed_since: observed_since.as_deref(),
+            adapter: &adapter_name,
+            has_event_id,
+            limit: MAX_FRESHNESS_RECORDS,
+        },
     )
     .map_err(PyValueError::new_err)?;
     let result = call_with(
