@@ -47,6 +47,7 @@ export const eventKindLabel: Record<PlatformEventKind, string> = {
 	location_broken: 'Deploy failed',
 	launch_failed: 'Couldn’t start runs',
 	connection_test_failed: 'Connection test failed',
+	warehouse_sync_failed: 'Warehouse sync failing',
 	heartbeat: 'Server heartbeat'
 };
 

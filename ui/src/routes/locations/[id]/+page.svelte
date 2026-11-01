@@ -145,7 +145,7 @@
 
 		<div class="min-h-0 flex-1 overflow-auto p-6">
 			<div id="problems">
-				<Panel title="Problems">
+				<Panel title="Problems" note="Overdue schedules, failed deploys, runs that couldn’t start, connection tests and warehouse syncs that failed">
 					{#snippet actions()}
 						<SegmentedFilter
 							bind:value={problemView}

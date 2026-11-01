@@ -125,6 +125,7 @@ export type PlatformEventKind =
 	| 'location_broken'
 	| 'launch_failed'
 	| 'connection_test_failed'
+	| 'warehouse_sync_failed'
 	| 'heartbeat';
 export type PlatformEventSeverity = 'info' | 'warning' | 'critical';
 export type PlatformEvent = {

@@ -39,7 +39,7 @@ import { MockBuild } from './build';
 
 export type MockOptions = {
 	role?: BuiltInRole;
-	/** `default` shows two warnings; `none` is all clear; `all` adds critical events. */
+	/** `default` shows three warnings; `none` is all clear; `all` adds critical events. */
 	events?: 'default' | 'none' | 'all';
 	/** Simulated request latency in milliseconds. */
 	latencyMs?: number;

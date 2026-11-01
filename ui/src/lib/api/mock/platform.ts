@@ -527,7 +527,13 @@ function eventDetails(now: number): Record<string, Pick<PlatformEventRecord, 're
 		'pe-2': { resolvedAt: null, links: [{ kind: 'trigger', id: triggerId('segments_hourly'), name: 'segments_hourly', ...shop }], reactions: [reaction('consumed', 77, 2, ago(11.5))], payload: { trigger: 'segments_hourly', scheduled_for: ago(12), overdue_by: '12m' } },
 		'pe-3': { resolvedAt: ago(1), links: [], reactions: [], payload: { interval: '60s' } },
 		'pe-4': { resolvedAt: null, links: [], reactions: [reaction('pending', null, 0, null)], payload: { last_holder: 'sqb-server-1', lease_expired_at: ago(2) } },
-		'pe-5': { resolvedAt: null, links: [{ kind: 'job', key: 'revenue_refresh', ...shop }, { kind: 'run', id: 'run-a7c1', ...shop }], reactions: [reaction('pending', null, 0, null)], payload: { job: 'revenue_refresh', attempts: '3', error: 'image pull error' } }
+		'pe-5': { resolvedAt: null, links: [{ kind: 'job', key: 'revenue_refresh', ...shop }, { kind: 'run', id: 'run-a7c1', ...shop }], reactions: [reaction('pending', null, 0, null)], payload: { job: 'revenue_refresh', attempts: '3', error: 'image pull error' } },
+		'pe-6': {
+			resolvedAt: null,
+			links: [{ kind: 'location', id: LOCATION_SHOP_STAGING }],
+			reactions: [],
+			payload: { table: '_sqlbuild_janitor_events', error: 'Insufficient privileges to read schema ARCHIVE: the catalog connection role lacks USAGE', last_synced: ago(95) }
+		}
 	};
 }
 
