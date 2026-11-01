@@ -30,9 +30,9 @@ use crate::assembly::analysis_session::_helpers::mappings::{
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::constants::{
-    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, TRANSFORM_AGGREGATION, TRANSFORM_CAST,
-    TRANSFORM_CONSTANT, TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR,
-    UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, RESOLUTION_CODES,
+    TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT,
+    TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -42,6 +42,7 @@ use crate::assembly::analysis_session::models::{
 };
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::lineage::models::{LineageConfidence, LineageTransformKind};
+use crate::semantic_validation::_helpers::catalog::FindingInput;
 use crate::semantic_validation::models::DiagnosticRow;
 use crate::semantic_validation::models::ProjectCatalog;
 use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_arguments;
@@ -1052,6 +1053,27 @@ impl AnalysisSession {
         let answered: Vec<usize> = read.iter().map(|model| model.position).collect();
         for (model, diagnostics) in read.into_iter().zip(diagnostics) {
             let index: usize = models[model.position];
+            let findings: Vec<FindingInput> = model
+                .lineage
+                .findings
+                .iter()
+                .map(|finding| {
+                    (
+                        finding.code.clone(),
+                        finding.message.clone(),
+                        finding.location,
+                        finding.written.clone(),
+                    )
+                })
+                .collect();
+            let exact_columns: bool = schemas[model.position]
+                .iter()
+                .any(|(_, columns)| columns.iter().any(|(name, _)| name.starts_with(QUOTE)));
+            let resolved: Vec<DiagnosticRow> =
+                self.catalog
+                    .native
+                    .finding_rows(&model.cleaned_sql, exact_columns, &findings)?;
+            let diagnostics: Vec<DiagnosticRow> = with_resolution_rows(diagnostics, resolved);
             let inputs_known: bool = self.request.models[index]
                 .required_names
                 .iter()
@@ -1160,8 +1182,27 @@ impl AnalysisSession {
         CompileFunctions {
             return_types: &self.request.function_return_types,
             nullability_rules: self.request.nullability_rules.as_deref().unwrap_or(&[]),
+            quoted_ignore_case: self.catalog.native.quoted_ignore_case,
         }
     }
+}
+
+/// `diagnostics` with its name-resolution rows replaced by SQLQuack's `resolved`, which take the
+/// place of the first one, else follow the rest.
+fn with_resolution_rows(
+    diagnostics: Vec<DiagnosticRow>,
+    resolved: Vec<DiagnosticRow>,
+) -> Vec<DiagnosticRow> {
+    let first: Option<usize> = diagnostics
+        .iter()
+        .position(|row| RESOLUTION_CODES.contains(&row.code.as_str()));
+    let mut rows: Vec<DiagnosticRow> = diagnostics
+        .into_iter()
+        .filter(|row| !RESOLUTION_CODES.contains(&row.code.as_str()))
+        .collect();
+    let at: usize = first.unwrap_or(rows.len()).min(rows.len());
+    rows.splice(at..at, resolved);
+    rows
 }
 
 /// SQLQuack's analysis with polyglot's diagnostics; a star is unresolved only over unknown inputs.

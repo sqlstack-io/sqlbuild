@@ -249,3 +249,7 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
     ("seed", "seed"),
     ("table_fn", "table_fn"),
 ];
+/// The diagnostic codes of name resolution, which SQLQuack's findings report for routed models.
+pub(crate) const RESOLUTION_CODES: [&str; 3] = ["B002", "B003", "B004"];
+/// The quote a catalog column name keeps when it was declared quoted.
+pub(crate) const QUOTE: char = '"';

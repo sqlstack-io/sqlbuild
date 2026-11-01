@@ -145,6 +145,26 @@ impl DiagnosticContext<'_> {
     }
 }
 
+/// `errors` in SQLBuild's codes and words, as `map_diagnostics` maps a validation's own.
+pub(crate) fn map_findings(
+    sql: &str,
+    dialect: DialectType,
+    errors: Vec<ValidationError>,
+) -> Result<Vec<ValidationError>, String> {
+    let mut context = DiagnosticContext {
+        sql,
+        dialect,
+        statements: None,
+    };
+    let mut mapped: Vec<ValidationError> = Vec::with_capacity(errors.len());
+    for error in errors {
+        if let Some(error) = context.map(error)? {
+            mapped.push(error);
+        }
+    }
+    Ok(mapped)
+}
+
 pub(crate) fn map_diagnostics(
     sql: &str,
     dialect: DialectType,

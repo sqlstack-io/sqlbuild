@@ -15,7 +15,7 @@ pub fn compile_lineage(
     functions: CompileFunctions<'_>,
     pool: &ThreadPool,
 ) -> Result<Option<Vec<Option<CompiledLineage>>>, String> {
-    let Some(dialect) = sqlquack_dialect(dialect) else {
+    let Some(dialect) = sqlquack_dialect(dialect, functions.quoted_ignore_case) else {
         return Ok(None);
     };
     pool.install(|| {

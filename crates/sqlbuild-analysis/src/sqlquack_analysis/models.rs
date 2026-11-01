@@ -28,6 +28,19 @@ pub struct CompiledLineage {
     pub projects_star: bool,
     /// Whether a star over a relation of unknown columns left outputs out.
     pub open_star: bool,
+    /// Column references SQLQuack resolved to nothing, in source order.
+    pub findings: Vec<CompileFinding>,
+}
+
+/// A column reference no relation resolves: polyglot's code and message, and where it is written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileFinding {
+    pub code: String,
+    pub message: String,
+    /// `(start, end, line, column)`, offsets in characters, when SQLQuack located it.
+    pub location: Option<(usize, usize, usize, usize)>,
+    /// The name as written; the message spells it in lower case.
+    pub written: String,
 }
 
 /// One output column's compile lineage.
@@ -52,11 +65,14 @@ pub(crate) struct LearningPass {
     pub(crate) readers: Vec<usize>,
 }
 
-/// What the adapter knows of functions, read for output types and nullability.
+/// What the adapter knows of functions, read for output types and nullability, and its session's
+/// quoting rule.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct CompileFunctions<'a> {
     /// `(function, return type)`.
     pub return_types: &'a [(String, String)],
     /// `(function, rule id)`.
     pub nullability_rules: &'a [(String, String)],
+    /// Whether the session sets QUOTED_IDENTIFIERS_IGNORE_CASE, so quoted names fold too.
+    pub quoted_ignore_case: bool,
 }

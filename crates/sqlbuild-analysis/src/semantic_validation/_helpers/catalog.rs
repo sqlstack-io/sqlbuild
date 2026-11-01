@@ -297,6 +297,46 @@ impl ProjectCatalog {
         })
     }
 
+    /// The diagnostic rows of SQLQuack's name findings in `sql`, mapped as validation errors are.
+    ///
+    /// Each finding is `(code, message, location, written name)`; the message names it in lower
+    /// case, restored to its written spelling where validation keeps exact names.
+    pub fn finding_rows(
+        &self,
+        sql: &str,
+        exact_columns: bool,
+        findings: &[FindingInput],
+    ) -> Result<Vec<DiagnosticRow>, String> {
+        let restore: bool = match self.quoted_ignore_case {
+            true => sql.contains('"'),
+            false => exact_columns,
+        };
+        let errors: Vec<ValidationError> = findings
+            .iter()
+            .map(|(code, message, location, written)| {
+                let message: String = match restore {
+                    true => message.replacen(
+                        &format!("'{}'", written.to_lowercase()),
+                        &format!("'{written}'"),
+                        1,
+                    ),
+                    false => message.clone(),
+                };
+                let error = ValidationError::error(message, code);
+                match location {
+                    Some((start, end, line, column)) => error
+                        .with_location(*line, *column)
+                        .with_span(Some(*start), Some(*end)),
+                    None => error,
+                }
+            })
+            .collect();
+        Ok(diagnostics::map_findings(sql, self.dialect, errors)?
+            .into_iter()
+            .map(diagnostic_row)
+            .collect())
+    }
+
     /// Normalize a preparation batch on the idle analysis pool, else in turn.
     pub fn normalize_analysis_sqls(
         &self,
@@ -313,6 +353,9 @@ impl ProjectCatalog {
         ))
     }
 }
+
+/// A SQLQuack name finding: code, message, `(start, end, line, column)` and the written name.
+pub type FindingInput = (String, String, Option<(usize, usize, usize, usize)>, String);
 
 /// Count one analysis batch as running on the catalog's pool until dropped.
 struct RunningAnalysis<'a>(&'a AtomicUsize);

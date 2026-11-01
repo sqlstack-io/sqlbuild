@@ -3,10 +3,11 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_semantics::lineage::models::NameFinding;
 use sqlquack_semantics::lineage::models::{
     LineageContext, Nullability, OutputLineage, SchemaColumn,
 };
-use sqlquack_semantics::query_lineage;
+use sqlquack_semantics::{query_lineage_and_findings, query_name_findings};
 use sqlquack_syntax::Dialect;
 
 use crate::constants::UNKNOWN_SQL_TYPE;
@@ -18,7 +19,7 @@ use crate::sqlquack_analysis::constants::{
     NON_NULL, NULLABLE, QUOTE, TEXT_TYPE, UNKNOWN_NULLABILITY, VARCHAR_TYPE,
 };
 use crate::sqlquack_analysis::models::{
-    CompileFunctions, CompileLineageColumn, CompiledLineage, CompiledModelSql,
+    CompileFinding, CompileFunctions, CompileLineageColumn, CompiledLineage, CompiledModelSql,
 };
 
 /// The model's lineage columns, `None` when SQLQuack cannot read its SQL.
@@ -28,30 +29,7 @@ pub(crate) fn model_lineage(
     (dialect, profile): (Dialect, &'static dyn DialectProfile),
 ) -> Option<CompiledLineage> {
     let quoted: HashSet<&str> = quoted_identifiers(model.sql);
-    let relations =
-        |shapes: &[(String, Vec<(String, String)>)]| -> HashMap<String, Vec<SchemaColumn>> {
-            shapes
-                .iter()
-                .filter(|(_, columns)| !columns.is_empty())
-                .map(|(relation, columns)| {
-                    let nullability: &[(String, String)] = relation_nullability(model, relation);
-                    (
-                        relation_key(relation, profile),
-                        typed_columns(columns, nullability, (&quoted, profile)),
-                    )
-                })
-                .collect()
-        };
-    let closed: HashMap<String, Vec<SchemaColumn>> = relations(model.schema);
-    let open: HashMap<String, Vec<SchemaColumn>> = relations(model.types)
-        .into_iter()
-        .filter(|(relation, _)| !closed.contains_key(relation))
-        .collect();
-    let schema = TypedRelations {
-        closed,
-        open,
-        functions,
-    };
+    let schema = typed_relations(model, functions, (&quoted, profile), true);
     let references: HashMap<String, (&str, &str)> = model
         .references
         .iter()
@@ -67,8 +45,19 @@ pub(crate) fn model_lineage(
         schema: &schema,
         sql: None,
     };
-    match query_lineage(model.sql, dialect, &lineage_parse_options(), context) {
-        Ok(lineage) => Some(CompiledLineage {
+    match query_lineage_and_findings(model.sql, dialect, &lineage_parse_options(), context) {
+        Ok((lineage, findings)) => Some(CompiledLineage {
+            findings: catalog_findings(model, functions, (&quoted, dialect, profile), findings)
+                .into_iter()
+                .map(|finding| CompileFinding {
+                    code: finding.code.to_owned(),
+                    message: finding.message,
+                    location: finding
+                        .span
+                        .map(|span| (span.start, span.end, span.line, span.column)),
+                    written: finding.written,
+                })
+                .collect(),
             columns: lineage
                 .outputs
                 .iter()
@@ -80,6 +69,68 @@ pub(crate) fn model_lineage(
         }),
         Err(_unreadable) => None,
     }
+}
+
+/// The model's relations as SQLQuack reads them; `quoting` reads a lower-case catalog name the
+/// SQL quotes as that quoted name, as lineage does.
+fn typed_relations<'a>(
+    model: &CompiledModelSql<'_>,
+    functions: CompileFunctions<'a>,
+    (quoted, profile): (&HashSet<&str>, &'static dyn DialectProfile),
+    quoting: bool,
+) -> TypedRelations<'a> {
+    let relations =
+        |shapes: &[(String, Vec<(String, String)>)]| -> HashMap<String, Vec<SchemaColumn>> {
+            shapes
+                .iter()
+                .filter(|(_, columns)| !columns.is_empty())
+                .map(|(relation, columns)| {
+                    let nullability: &[(String, String)] = relation_nullability(model, relation);
+                    (
+                        relation_key(relation, profile),
+                        typed_columns(columns, nullability, (quoted, profile), quoting),
+                    )
+                })
+                .collect()
+        };
+    let closed: HashMap<String, Vec<SchemaColumn>> = relations(model.schema);
+    let open: HashMap<String, Vec<SchemaColumn>> = relations(model.types)
+        .into_iter()
+        .filter(|(relation, _)| !closed.contains_key(relation))
+        .collect();
+    TypedRelations {
+        closed,
+        open,
+        functions,
+    }
+}
+
+/// The findings validation reports: a lower-case catalog name stays unquoted, as polyglot reads
+/// it, so findings are made again over that schema when lineage quoted one.
+fn catalog_findings(
+    model: &CompiledModelSql<'_>,
+    functions: CompileFunctions<'_>,
+    (quoted, dialect, profile): (&HashSet<&str>, Dialect, &'static dyn DialectProfile),
+    findings: Vec<NameFinding>,
+) -> Vec<NameFinding> {
+    let quotes_catalog_name: bool = model
+        .schema
+        .iter()
+        .chain(model.types)
+        .flat_map(|(_, columns)| columns.iter())
+        .any(|(name, _)| {
+            quoted.contains(name.as_str()) && profile.resolved_identifier(name, false) != *name
+        });
+    if !quotes_catalog_name {
+        return findings;
+    }
+    let catalog_schema = typed_relations(model, functions, (quoted, profile), false);
+    let context = LineageContext {
+        profile,
+        schema: &catalog_schema,
+        sql: None,
+    };
+    query_name_findings(model.sql, dialect, &lineage_parse_options(), context).unwrap_or(findings)
 }
 
 /// The catalog's `(column, nullability)` pairs for `relation`.
@@ -99,11 +150,13 @@ fn typed_columns(
     columns: &[(String, String)],
     nullability: &[(String, String)],
     (quoted, profile): (&HashSet<&str>, &dyn DialectProfile),
+    quoting: bool,
 ) -> Vec<SchemaColumn> {
     let mut typed: Vec<SchemaColumn> =
         schema_columns(columns.iter().map(|(name, _)| name.as_str()));
     for column in &mut typed {
-        if !column.quoted
+        if quoting
+            && !column.quoted
             && quoted.contains(column.name.as_str())
             && profile.resolved_identifier(&column.name, false) != column.name
         {

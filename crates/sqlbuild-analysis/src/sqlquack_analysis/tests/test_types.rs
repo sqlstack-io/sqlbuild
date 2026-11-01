@@ -11,3 +11,10 @@ pub(crate) struct CompileTypesTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_lines: &'static [&'static str],
 }
+
+pub(crate) struct CompileFindingsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_findings: &'static [&'static str],
+}

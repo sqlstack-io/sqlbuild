@@ -1,5 +1,7 @@
-use crate::sqlquack_analysis::tests::helpers::{compile_lines, compile_types};
-use crate::sqlquack_analysis::tests::test_types::{CompileLineageTestCase, CompileTypesTestCase};
+use crate::sqlquack_analysis::tests::helpers::{compile_findings, compile_lines, compile_types};
+use crate::sqlquack_analysis::tests::test_types::{
+    CompileFindingsTestCase, CompileLineageTestCase, CompileTypesTestCase,
+};
 
 #[test]
 fn given_a_compiled_model_when_tracing_compile_lineage_then_columns_name_their_resources() {
@@ -83,6 +85,40 @@ fn given_a_compiled_model_when_typing_outputs_then_the_catalog_and_its_functions
         assert_eq!(
             compile_types(test_case.sql),
             test_case.expected_lines,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_compiled_model_when_resolving_its_names_then_unresolved_references_are_found() {
+    let test_cases = [
+        CompileFindingsTestCase {
+            description: "a typo in a model column is an unknown column of its relation",
+            dialect: "snowflake",
+            sql: "SELECT o.amonut FROM ORDERS_REL o",
+            expected_findings: &["E201 Unknown column 'amonut' in table 'orders_rel' @9"],
+        },
+        CompileFindingsTestCase {
+            description: "a quoted catalog column read with its quotes resolves",
+            dialect: "snowflake",
+            sql: "SELECT \"listingId\" FROM EXPORTS_REL",
+            expected_findings: &[],
+        },
+        CompileFindingsTestCase {
+            description: "an unqualified column both relations offer is ambiguous on DuckDB",
+            dialect: "duckdb",
+            sql: "SELECT id FROM ORDERS_REL a JOIN ORDERS_REL b ON TRUE",
+            expected_findings: &[
+                "E221 Ambiguous unqualified column 'id' found in 2 referenced tables @7",
+            ],
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            compile_findings(test_case.dialect, test_case.sql),
+            test_case.expected_findings,
             "{}",
             test_case.description
         );

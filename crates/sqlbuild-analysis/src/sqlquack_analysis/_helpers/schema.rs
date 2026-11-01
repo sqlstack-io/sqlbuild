@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use sqlquack_semantics::dialects::constants::{DUCKDB, SNOWFLAKE};
+use sqlquack_semantics::dialects::constants::{DUCKDB, SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule, SchemaColumn};
 use sqlquack_semantics::lineage::types::LineageSchema;
@@ -64,8 +64,14 @@ fn named<'a>(pairs: &'a [(String, String)], name: &str) -> Option<&'a str> {
 }
 
 /// SQLQuack's dialect and profile for an analysis dialect it covers.
-pub(crate) fn sqlquack_dialect(dialect: &str) -> Option<(Dialect, &'static dyn DialectProfile)> {
+pub(crate) fn sqlquack_dialect(
+    dialect: &str,
+    quoted_ignore_case: bool,
+) -> Option<(Dialect, &'static dyn DialectProfile)> {
     match dialect {
+        SNOWFLAKE_DIALECT if quoted_ignore_case => {
+            Some((Dialect::Snowflake, &SNOWFLAKE_QUOTED_IGNORING_CASE))
+        }
         SNOWFLAKE_DIALECT => Some((Dialect::Snowflake, &SNOWFLAKE)),
         DUCKDB_DIALECT => Some((Dialect::DuckDB, &DUCKDB)),
         _ => None,

@@ -18,7 +18,7 @@ pub fn build_sqlquack_lineage(
     request: &RichLineageRequest,
     names: &[String],
 ) -> Result<Vec<RichLineageOutcome>, String> {
-    let Some((dialect, profile)) = sqlquack_dialect(&request.dialect) else {
+    let Some((dialect, profile)) = sqlquack_dialect(&request.dialect, false) else {
         return Err(format!(
             "SQLQuack does not analyse the {} dialect",
             request.dialect
