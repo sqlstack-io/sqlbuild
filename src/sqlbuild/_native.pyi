@@ -11831,6 +11831,7 @@ class SettingsConfig(NativeRecord):
 
     sql_analysis: bool
     require_sql_analysis: bool
+    strict: str
     query_change_tracking: bool
     column_contract_mode: ColumnContractMode
     concurrency: int
@@ -11850,6 +11851,7 @@ class SettingsConfig(NativeRecord):
         self,
         sql_analysis: bool = ...,
         require_sql_analysis: bool = ...,
+        strict: str = ...,
         query_change_tracking: bool = ...,
         column_contract_mode: ColumnContractMode = ...,
         concurrency: int = ...,

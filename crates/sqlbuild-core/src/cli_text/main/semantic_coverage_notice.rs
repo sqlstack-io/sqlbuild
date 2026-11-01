@@ -2,41 +2,10 @@
 
 use std::collections::BTreeMap;
 
+use crate::cli_text::_helpers::coverage_actions::{action, reason_detail};
 use crate::cli_text::_helpers::summary_text::count_noun;
 
-use crate::cli_text::constants::{
-    DEFAULT_ACTION, INVALID_UPSTREAM, NOTICE_DISPLAY_LIMIT, OPEN_INPUT, OPEN_SOURCE,
-};
-
-/// The action that clears one partial-check reason.
-fn action(reason: &str) -> String {
-    if let Some(source) = reason.strip_prefix(OPEN_SOURCE) {
-        return format!(
-            "run `sqb contract generate --from <target> --select source:{source} --write` and \
-             enforce the complete source contract"
-        );
-    }
-    if reason.starts_with(INVALID_UPSTREAM) {
-        return "fix the upstream error, then run `sqb compile --no-cache`".to_owned();
-    }
-    match reason {
-        "some output types are unknown" => {
-            "declare output types, then run `sqb compile --no-cache`"
-        }
-        "output shape could not be inferred" => {
-            "declare the output schema; run `sqb compile --no-cache`"
-        }
-        "unresolved star over open inputs" => {
-            "declare complete input contracts, then run `sqb compile --no-cache`"
-        }
-        "SQL analysis disabled" => "enable sql_analysis, then run `sqb compile --no-cache`",
-        "type checking awaits dialect coercion support" => {
-            "use a supported dialect for type checks; run `sqb compile --json` to inspect coverage"
-        }
-        _ => DEFAULT_ACTION,
-    }
-    .to_owned()
-}
+use crate::cli_text::constants::NOTICE_DISPLAY_LIMIT;
 
 /// The notice for each model's partial-check reasons, or `None` when every check was complete.
 #[must_use]
@@ -66,9 +35,7 @@ pub fn semantic_coverage_notice(reasons: &[(String, Vec<String>)]) -> Option<Str
         } else {
             String::new()
         };
-        let detail: String = reason
-            .replace(OPEN_SOURCE, "reads open source ")
-            .replace(OPEN_INPUT, "reads open input ");
+        let detail: String = reason_detail(reason);
         let shown: Vec<&str> = models.iter().take(NOTICE_DISPLAY_LIMIT).copied().collect();
         lines.push(format!(
             "  {}{suffix}: {detail}; {}.",

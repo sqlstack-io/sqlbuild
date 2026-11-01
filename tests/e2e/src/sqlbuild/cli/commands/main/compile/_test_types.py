@@ -450,6 +450,28 @@ class FunctionNameCompileTestCase:
 
 
 @dataclass(frozen=True)
+class UnknownFunctionCoverageTestCase:
+    description: str
+    project_toml: str
+    query_sql: str
+    expected_exit_code: int
+    expected_codes: tuple[str, ...]
+    expected_reasons: tuple[str, ...]
+    expected_notice: str
+
+
+@dataclass(frozen=True)
+class StrictCompileTestCase:
+    description: str
+    settings: str
+    files: dict[str, str]
+    expected_exit_code: int
+    expected_strict: str
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class TruthValueTestBuildTestCase:
     description: str
     repo_files: dict[str, str]

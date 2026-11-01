@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::semantic_validation::models::{
     CatalogInput, Columns, CompactAnalysisJob, DiagnosticRow, FunctionProbes, ProjectCatalog,
+    UnknownFunctions,
 };
 use crate::semantic_validation::types::{
     BindingRequest, NormalizationRequest, PreparedCompactAnalysis, Relations,
@@ -276,6 +277,7 @@ impl ProjectCatalog {
     pub fn binding_results(
         &self,
         requests: Vec<BindingRequest>,
+        unknown: UnknownFunctions,
     ) -> Result<Vec<Vec<DiagnosticRow>>, String> {
         let pool = self.analysis_pool()?;
         let _running = RunningAnalysis::start(&self.running_analyses);
@@ -289,7 +291,7 @@ impl ProjectCatalog {
                         &sql,
                         self.dialect,
                         result,
-                        &self.function_probes,
+                        (&self.function_probes, unknown),
                     )?;
                     Ok(result.errors.into_iter().map(diagnostic_row).collect())
                 })

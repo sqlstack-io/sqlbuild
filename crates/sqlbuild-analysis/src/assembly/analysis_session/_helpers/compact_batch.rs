@@ -769,7 +769,10 @@ impl SessionCatalog {
             return Ok(results);
         }
         let prepared: Vec<_> = self.prepare(&requests);
-        let rows: Vec<Vec<DiagnosticRow>> = self.native.binding_results(prepared)?;
+        let rows: Vec<Vec<DiagnosticRow>> = self.native.binding_results(
+            prepared,
+            crate::semantic_validation::models::UnknownFunctions::Notes,
+        )?;
         if rows.len() != indexes.len() {
             return Err(
                 "native SQL schema validation returned an invalid batch response".to_owned(),

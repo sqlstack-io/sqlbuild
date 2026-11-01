@@ -7,6 +7,7 @@ use crate::semantic_validation::_helpers::truth_tests;
 use crate::semantic_validation::_helpers::type_locations::locate_type_findings;
 use crate::semantic_validation::models::DiagnosticRow;
 use crate::semantic_validation::models::FunctionProbes;
+use crate::semantic_validation::models::UnknownFunctions;
 use polyglot_sql::expressions::Select;
 use polyglot_sql::{
     Dialect, DialectType, Expression, ExpressionWalk, ValidationError, ValidationResult,
@@ -26,6 +27,8 @@ const DUCKDB_KEYWORD_FUNCTIONS: [&str; 4] = [
     "LOCALTIMESTAMP",
 ];
 const ORDER_BY: &str = "ORDER BY";
+/// The prefix of SQLBuild's reserved calls, such as `__ref`, which are never user functions.
+const RESERVED_PREFIX: &str = "__";
 const ERROR: &str = "error";
 static COLUMN: LazyLock<Result<Regex, String>> = LazyLock::new(|| {
     Regex::new(r"(?:Unknown column|Ambiguous column reference|JOIN USING column) '([^']+)'")
@@ -233,7 +236,7 @@ pub(crate) fn map_diagnostics(
     sql: &str,
     dialect: DialectType,
     result: ValidationResult,
-    probes: &FunctionProbes,
+    (probes, unknown): (&FunctionProbes, UnknownFunctions),
 ) -> Result<ValidationResult, String> {
     let mut context = DiagnosticContext {
         sql,
@@ -243,7 +246,13 @@ pub(crate) fn map_diagnostics(
         words: None,
         contexts: None,
     };
-    let mut native = result.errors;
+    let mut native: Vec<ValidationError> = result
+        .errors
+        .into_iter()
+        .filter(|error| {
+            unknown == UnknownFunctions::Errors || definite_function_finding(dialect, error)
+        })
+        .collect();
     locate_type_findings(sql, dialect, &mut native)?;
     let mut errors: Vec<ValidationError> = Vec::with_capacity(native.len());
     for error in native {
@@ -262,6 +271,27 @@ pub(crate) fn map_diagnostics(
         .iter()
         .any(|error| error.severity == ValidationSeverity::Error);
     Ok(ValidationResult { valid, errors })
+}
+
+/// Whether `error` is not an unknown-function finding, names a SQLBuild call left unrendered
+/// (`__ref(1)`), or a DuckDB keyword-only built-in called with parentheses; any other unknown
+/// function is a partial-semantics note (D42).
+fn definite_function_finding(dialect: DialectType, error: &ValidationError) -> bool {
+    if error.code != UNKNOWN_FUNCTION {
+        return true;
+    }
+    let Some(captures) = FUNCTION
+        .as_ref()
+        .ok()
+        .and_then(|pattern| pattern.captures(&error.message))
+    else {
+        return false;
+    };
+    captures[1].starts_with(RESERVED_PREFIX)
+        || dialect == DialectType::DuckDB
+            && DUCKDB_KEYWORD_FUNCTIONS
+                .iter()
+                .any(|keyword| keyword.eq_ignore_ascii_case(&captures[1]))
 }
 
 fn sqlbuild_code(code: &str) -> Option<String> {
@@ -545,7 +575,7 @@ pub(crate) fn binding_diagnostics(
             valid: false,
             errors,
         },
-        &FunctionProbes::default(),
+        (&FunctionProbes::default(), UnknownFunctions::Notes),
     )?;
     Ok(result.errors.into_iter().map(diagnostic_row).collect())
 }

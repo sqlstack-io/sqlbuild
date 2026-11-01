@@ -35,6 +35,15 @@ const CLAUSE_KEYWORD_LIST: &str = "CONNECT EXCEPT FETCH GROUP HAVING INTERSECT L
 const FROM_KEYWORD: &str = "FROM";
 const NOT_KEYWORD: &str = "NOT";
 const MATERIALIZED_KEYWORD: &str = "MATERIALIZED";
+/// Syntax written like a call that no function catalogue lists: casts, EXTRACT and a CTE's
+/// `[NOT] MATERIALIZED (` body.
+const SYNTAX_CALLS: [&str; 5] = [
+    "CAST",
+    "TRY_CAST",
+    "SAFE_CAST",
+    "EXTRACT",
+    MATERIALIZED_KEYWORD,
+];
 const DISTINCT_KEYWORD: &str = "DISTINCT";
 
 type SpellingIndex = FxHashMap<Signature, Vec<String>>;
@@ -256,9 +265,10 @@ pub(crate) fn unknown_calls(
 ) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
     unaccepted_calls(sql, dialect, |site| {
-        let known: bool = declared
-            .iter()
-            .any(|declared| declared.eq_ignore_ascii_case(site.name))
+        let known: bool = SYNTAX_CALLS.contains(&site.upper)
+            || declared
+                .iter()
+                .any(|declared| declared.eq_ignore_ascii_case(site.name))
             || names
                 .iter()
                 .any(|name| name.eq_ignore_ascii_case(site.name));

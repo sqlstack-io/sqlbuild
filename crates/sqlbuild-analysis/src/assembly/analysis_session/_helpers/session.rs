@@ -532,7 +532,10 @@ impl AnalysisSession {
                 .map(|(_, sql, schema)| (sql.as_str(), schema))
                 .collect();
             let prepared: Vec<_> = self.catalog.prepare(&requests);
-            let rows: Vec<Vec<DiagnosticRow>> = self.catalog.native.binding_results(prepared)?;
+            let rows: Vec<Vec<DiagnosticRow>> = self.catalog.native.binding_results(
+                prepared,
+                crate::semantic_validation::models::UnknownFunctions::Notes,
+            )?;
             for ((model, _, _), diagnostics) in validations.iter().zip(rows) {
                 let analysis: &mut ModelAnalysis = &mut self.outcome_mut(*model)?.analysis;
                 analysis.binding_diagnostics = diagnostics;
@@ -1050,7 +1053,10 @@ impl AnalysisSession {
             .map(|model| (model.cleaned_sql.as_str(), &schemas[model.position]))
             .collect();
         let prepared: Vec<_> = self.catalog.prepare(&requests);
-        let diagnostics: Vec<Vec<DiagnosticRow>> = self.catalog.native.binding_results(prepared)?;
+        let diagnostics: Vec<Vec<DiagnosticRow>> = self.catalog.native.binding_results(
+            prepared,
+            crate::semantic_validation::models::UnknownFunctions::Notes,
+        )?;
         let answered: Vec<usize> = read.iter().map(|model| model.position).collect();
         for (model, diagnostics) in read.into_iter().zip(diagnostics) {
             let index: usize = models[model.position];

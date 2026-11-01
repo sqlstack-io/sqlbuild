@@ -101,3 +101,10 @@ pub(crate) struct UnknownFunctionTestCase {
     pub(crate) declared: &'static [&'static str],
     pub(crate) expected_names: &'static [&'static str],
 }
+
+pub(crate) struct PolyglotUnknownFunctionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) message: &'static str,
+    pub(crate) expected_codes: &'static [&'static str],
+}

@@ -94,7 +94,10 @@ impl ProjectCatalog {
         #[pyo3(from_py_with = conversions::binding_requests)] requests: Vec<BindingRequest>,
     ) -> PyResult<Vec<Vec<Positional<DiagnosticRow>>>> {
         let rows: Vec<Vec<DiagnosticRow>> = py
-            .compiler_detach(|| self.inner.binding_results(requests))
+            .compiler_detach(|| {
+                self.inner
+                    .binding_results(requests, validation::UnknownFunctions::Notes)
+            })
             .map_err(compiler_error)?;
         Ok(rows.into_iter().map(Positional::wrap_all).collect())
     }

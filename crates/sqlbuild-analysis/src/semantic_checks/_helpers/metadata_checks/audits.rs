@@ -186,7 +186,10 @@ fn expression_findings(
     );
     let rows = context
         .catalog
-        .binding_results(vec![request])
+        .binding_results(
+            vec![request],
+            crate::semantic_validation::models::UnknownFunctions::Errors,
+        )
         .map_err(internal)?
         .into_iter()
         .next()

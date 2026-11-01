@@ -366,7 +366,9 @@ pub(crate) fn schema_validations<'py>(
         let inner: &validation::ProjectCatalog = &native.inner;
         let dialect: &str = &catalog.dialect;
         let rows: Vec<Vec<DiagnosticRow>> = if any_explicit {
-            py.compiler_detach(|| inner.binding_results(prepared))
+            py.compiler_detach(|| {
+                inner.binding_results(prepared, validation::UnknownFunctions::Notes)
+            })
         } else {
             py.compiler_detach(|| inner.schema_validation_rows(dialect, prepared))
         }

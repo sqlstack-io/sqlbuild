@@ -7,15 +7,19 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::compile_context::delta::ModelCoverage;
-use crate::bindings::_helpers::compiled_views::model_reads::{inferred_rows, star_flags};
+use crate::bindings::_helpers::compiled_views::model_reads::{
+    inferred_rows, query_sql, star_flags,
+};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::semantic_shapes::delta_shapes::semantic_reasons;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
+use sqlbuild_analysis::semantic_validation::main::unknown_functions::unknown_functions;
 use sqlbuild_project::types::InferredRow;
 
 const TYPE_CHECKED_DIALECTS: [&str; 4] = ["duckdb", "snowflake", "postgresql", "bigquery"];
 const SOURCE_KIND: &str = "source";
 const OPEN_KINDS: [&str; 3] = [SOURCE_KIND, "ref", "dbt_ref"];
+const UNKNOWN_FUNCTION: &str = "unknown function: ";
 
 /// Partial-check reasons by model name; empty when SQL analysis is off.
 #[pyfunction]
@@ -32,6 +36,10 @@ pub(crate) fn semantic_coverage<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bo
     } else {
         "generic".to_owned()
     };
+    let mut declared: Vec<String> = Vec::new();
+    for function in native_field(project, "functions")?.try_iter()? {
+        declared.push(native_field(&function?, "name")?.extract()?);
+    }
     let mut order: Vec<(String, Vec<String>)> = Vec::new();
     let mut facts: Vec<ModelCoverage> = Vec::new();
     for model in native_field(project, "models")?.try_iter()? {
@@ -58,7 +66,7 @@ pub(crate) fn semantic_coverage<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bo
         let partial: BTreeSet<String> = if disabled {
             BTreeSet::new()
         } else {
-            own_reasons((&model, &name), &rows, (&shapes, &dialect))?
+            own_reasons((&model, &name), &rows, (&shapes, &dialect, &declared))?
         };
         facts.push(ModelCoverage {
             name: name.clone(),
@@ -81,7 +89,7 @@ pub(crate) fn semantic_coverage<'py>(project: &Bound<'py, PyAny>) -> PyResult<Bo
 fn own_reasons<'py>(
     (model, name): (&Bound<'py, PyAny>, &str),
     rows: &[(String, String)],
-    (shapes, dialect): (&Bound<'py, PyDict>, &str),
+    (shapes, dialect, declared): (&Bound<'py, PyDict>, &str, &[String]),
 ) -> PyResult<BTreeSet<String>> {
     let mut partial: BTreeSet<String> = BTreeSet::new();
     for (kind, upstream) in rows {
@@ -104,6 +112,17 @@ fn own_reasons<'py>(
         .any(|(_, column_type, _)| column_type.is_none())
     {
         partial.insert("some output types are unknown".to_owned());
+    }
+    let sql: Bound<'py, PyAny> = query_sql(model)?;
+    if sql.is_truthy()? {
+        let sql: String = sql.extract()?;
+        if let Ok(names) = unknown_functions(&sql, dialect, declared) {
+            partial.extend(
+                names
+                    .into_iter()
+                    .map(|name| format!("{UNKNOWN_FUNCTION}{name}")),
+            );
+        }
     }
     if !TYPE_CHECKED_DIALECTS.contains(&dialect) {
         partial.insert("type checking awaits dialect coercion support".to_owned());

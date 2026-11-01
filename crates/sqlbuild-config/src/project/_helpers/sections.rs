@@ -18,8 +18,9 @@ use crate::project::constants::{
     OLD_NAME_VIEWS_KEY, QUERY_CHANGE_TRACKING_KEY, REQUIRE_SQL_ANALYSIS_KEY,
     REVIEW_DOWNSTREAM_POLICIES, REVIEW_KEYS, RUN_NAMESPACE_KEY, RUN_NAMESPACE_MAX_LENGTH,
     SCENARIO_KEYS, SETTINGS_KEYS, SNAPSHOT_FULL_REFRESH_POLICIES, SNAPSHOT_KEYS,
-    SNAPSHOT_LIMIT_KEYS, SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY,
-    UNACCOUNTED_PARTITION_POLICIES, USD_PER_CREDIT_KEY, ZERO_FIXED_DURATION, ZERO_FLOAT,
+    SNAPSHOT_LIMIT_KEYS, SNAPSHOT_SCHEMA_CHANGE_POLICIES, SQL_ANALYSIS_KEY, STRICT_KEY, STRICT_OFF,
+    STRICT_ON, STRICT_REPORT, UNACCOUNTED_PARTITION_POLICIES, USD_PER_CREDIT_KEY,
+    ZERO_FIXED_DURATION, ZERO_FLOAT,
 };
 use crate::project::constants::{
     DEFAULT_TEST_TIMEOUT, DEFAULT_UNIT_TEST_MAX_REAL_MODELS, DELTA_COMPILE_KEY, DISABLED_VALUE,
@@ -137,6 +138,18 @@ fn column_contract_mode(mapping: &Entries) -> Loaded<Built> {
     }
 }
 
+/// `settings.strict`: `false` (off), `"report"` (report only) or `true` (enforced).
+fn strict(mapping: &Entries) -> Loaded<String> {
+    match get(mapping, STRICT_KEY) {
+        None | Some(ConfigValue::Bool(false)) => Ok(STRICT_OFF.to_owned()),
+        Some(ConfigValue::Bool(true)) => Ok(STRICT_ON.to_owned()),
+        Some(ConfigValue::String(text)) if text == STRICT_REPORT => Ok(STRICT_REPORT.to_owned()),
+        Some(_) => Err(ConfigFailure::plain(
+            "settings.strict must be true, false or \"report\"",
+        )),
+    }
+}
+
 fn unaccounted_partition_policy(mapping: &Entries) -> Loaded<String> {
     let policy = optional_str(mapping, "microbatch_unaccounted_partition_policy")?
         .unwrap_or_else(|| "synthesize".to_owned());
@@ -209,6 +222,10 @@ pub(crate) fn load_settings(payload: Option<&ConfigValue>, file: ConfigFile) -> 
             )?)),
         ),
         ("column_contract_mode", column_contract_mode(mapping)?),
+        (
+            STRICT_KEY,
+            Built::Value(ConfigValue::String(strict(mapping)?)),
+        ),
         (
             "auto_load_sources",
             Built::Value(ConfigValue::Bool(optional_bool(

@@ -11,6 +11,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     FunctionNameCompileTestCase,
+    UnknownFunctionCoverageTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
@@ -141,3 +142,79 @@ def test_given_builtin_spelling_when_compiling_then_dialect_support_is_enforced(
         tuple((item["code"], item["message"], item["line"], item["column"]) for item in diagnostics)
         == test_case.expected_diagnostics
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        UnknownFunctionCoverageTestCase(
+            description="duckdb unknown function in WHERE is a partial-check note, not an error",
+            project_toml=_DUCKDB_PROJECT,
+            query_sql=_SELECT + "    product_name" + _FROM + "WHERE shop_margin(product_name) > 0\n",
+            expected_exit_code=0,
+            expected_codes=(),
+            expected_reasons=("unknown function: shop_margin",),
+            expected_notice="products: calls unknown function shop_margin; declare it as a project "
+            "function so its calls are checked, or correct its spelling.",
+        ),
+        UnknownFunctionCoverageTestCase(
+            description="snowflake unknown function is a partial-check note, not an error",
+            project_toml=_SNOWFLAKE_PROJECT,
+            query_sql=_SELECT + "    shop_margin(product_name) AS margin" + _FROM,
+            expected_exit_code=0,
+            expected_codes=(),
+            expected_reasons=("some output types are unknown", "unknown function: shop_margin"),
+            expected_notice="products: calls unknown function shop_margin",
+        ),
+        UnknownFunctionCoverageTestCase(
+            description="a declared project function is known",
+            project_toml=_DUCKDB_PROJECT,
+            query_sql=_SELECT + "    __udf(\"starts_with\")(product_name, 'a') AS flagged" + _FROM,
+            expected_exit_code=0,
+            expected_codes=(),
+            expected_reasons=(),
+            expected_notice="0 errors",
+        ),
+        UnknownFunctionCoverageTestCase(
+            description="a duckdb keyword-only built-in called with parentheses stays an error",
+            project_toml=_DUCKDB_PROJECT,
+            query_sql=_SELECT + "    CURRENT_TIMESTAMP() AS seen_at" + _FROM,
+            expected_exit_code=1,
+            expected_codes=("B101",),
+            expected_reasons=(),
+            expected_notice="error[B101]: Unknown function 'CURRENT_TIMESTAMP' for dialect DuckDB",
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_unknown_function_when_compiling_then_checks_are_reported_partial(
+    test_case: UnknownFunctionCoverageTestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="products",
+        repo_files={
+            "sqlbuild_project.toml": test_case.project_toml,
+            "functions/sql/starts_with.sql": _STARTS_WITH_FUNCTION,
+            "models/products.sql": (
+                f"MODEL (description 'Test model products.', database warehouse, schema analytics);\n\n{test_case.query_sql}"
+            ),
+        },
+    )
+
+    report: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json", "--no-cache")
+    )
+    text: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("--no-color", "compile", "--no-cache")
+    )
+
+    payload: dict[str, object] = json.loads(report.stdout)
+    diagnostics: list[dict[str, object]] = cast(list[dict[str, object]], payload["diagnostics"])
+    partial: dict[str, list[str]] = cast(
+        dict[str, list[str]], payload.get("semantic_checks_partial", {})
+    )
+    assert report.returncode == test_case.expected_exit_code, report.stdout + report.stderr
+    assert tuple(item["code"] for item in diagnostics) == test_case.expected_codes
+    assert tuple(partial.get("products", ())) == test_case.expected_reasons
+    assert test_case.expected_notice in text.stdout + text.stderr

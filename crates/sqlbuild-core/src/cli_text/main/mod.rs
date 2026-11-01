@@ -18,3 +18,4 @@ pub mod format_tree_connector;
 pub mod resolve_name_column_width;
 pub mod semantic_coverage_notice;
 pub mod split_count_header;
+pub mod strict_report;

@@ -1,5 +1,6 @@
 pub(crate) mod bounded_sections;
 pub(crate) mod coded_error;
+pub(crate) mod coverage_actions;
 pub(crate) mod dbt_plan;
 pub(crate) mod dbt_plan_json;
 pub(crate) mod diagnostics;

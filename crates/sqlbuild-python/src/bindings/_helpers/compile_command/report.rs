@@ -8,12 +8,14 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_cache::project_reuse::constants::FAILED_COMPILED_DIRECTORY_NAME;
 use sqlbuild_core::cli_text::main::format_compile_text::format_compile_text as compile_text;
 use sqlbuild_core::cli_text::main::semantic_coverage_notice::semantic_coverage_notice as notice_text;
+use sqlbuild_core::cli_text::main::strict_report::strict_report;
 use sqlbuild_core::cli_text::models::{
     CliStyle, CompileTextReport, DiagnosticText, LineageNote, LocationText, ModelLine, RelatedText,
 };
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
+use crate::bindings::_helpers::compile_command::constants::STRICT_REPORT;
 use crate::bindings::_helpers::compile_command::surrogates::SurrogateText;
 use crate::bindings::_helpers::compile_outputs::json_report::{
     emit_json_report, emit_orjson_report,
@@ -183,7 +185,28 @@ impl<'py> ReportInputs<'py> {
     }
 
     fn semantic_notice(&self, reader: &SurrogateText) -> PyResult<Option<String>> {
-        coverage_notice(&self.semantic_coverage()?, reader)
+        self.coverage_text(&self.semantic_coverage()?, reader)
+    }
+
+    /// The notice of these coverage reasons, or the strict report when `strict = "report"`.
+    fn coverage_text(
+        &self,
+        coverage: &Bound<'py, PyDict>,
+        reader: &SurrogateText,
+    ) -> PyResult<Option<String>> {
+        let reasons: Vec<(String, Vec<String>)> = coverage_reasons(coverage, reader)?;
+        Ok(if self.strict_mode()? == STRICT_REPORT {
+            strict_report(&reasons)
+        } else {
+            notice_text(&reasons)
+        })
+    }
+
+    /// `settings.strict`: `off`, `report` or `on`.
+    fn strict_mode(&self) -> PyResult<String> {
+        native_field(&self.project, "settings")?
+            .getattr("strict")?
+            .extract()
     }
 
     /// `written.target_dir / "compiled"`, or `"compiled-failed"` when Rules failed, relative to its `target` directory, POSIX style.
@@ -417,11 +440,11 @@ pub(crate) fn format_compile_text<'py>(
     reader.python(py, &compile_text(&report))
 }
 
-/// The partial semantic-check notice of these coverage reasons, or `None` when complete.
-fn coverage_notice(
+/// Each model's coverage reasons as text.
+fn coverage_reasons(
     coverage: &Bound<'_, PyDict>,
     reader: &SurrogateText,
-) -> PyResult<Option<String>> {
+) -> PyResult<Vec<(String, Vec<String>)>> {
     let mut reasons: Vec<(String, Vec<String>)> = Vec::new();
     for (name, values) in coverage.iter() {
         let values: Vec<String> = values
@@ -430,7 +453,7 @@ fn coverage_notice(
             .collect::<PyResult<_>>()?;
         reasons.push((reader.text(&name)?, values));
     }
-    Ok(notice_text(&reasons))
+    Ok(reasons)
 }
 
 fn dict<'py>(
@@ -972,7 +995,7 @@ fn compile_json<'py>(
         Some(notice) => {
             let coverage: Bound<'py, PyDict> = inputs.semantic_coverage()?;
             let reader: SurrogateText = SurrogateText::default();
-            if let Some(text) = coverage_notice(&coverage, &reader)? {
+            if let Some(text) = inputs.coverage_text(&coverage, &reader)? {
                 notice(reader.python(py, &text)?)?;
             }
             Some(coverage)
@@ -1078,6 +1101,7 @@ fn compile_json<'py>(
                 }
                 .into_any(),
             ),
+            ("strict", any(py, inputs.strict_mode()?)?),
             ("compile_timings", arguments.value("timings_ms")?),
             ("lineage_mode", any(py, inputs.lineage_mode.as_str())?),
             ("resources", resource_lists.into_any()),

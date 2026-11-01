@@ -5,6 +5,7 @@ use crate::cli_text::main::format_dbt_interop_plan::format_dbt_interop_plan;
 use crate::cli_text::main::format_plan_completion::format_plan_completion;
 use crate::cli_text::main::format_plan_text::format_plan_text;
 use crate::cli_text::main::semantic_coverage_notice::semantic_coverage_notice;
+use crate::cli_text::main::strict_report::strict_report;
 use crate::cli_text::models::{
     CliStyle, CompileTextReport, DbtInteropPlanText, DbtLsNodeText, DiagnosticText, DisplayLimit,
     LineageNote, ModelLine, ModelPlanText, PlanTextReport, PlanWarningText, RelatedText,
@@ -79,6 +80,16 @@ fn given_partial_reasons_when_building_notice_then_groups_by_reason() {
             ),
         },
         NoticeTestCase {
+            description: "an unknown function names the call and how to check it",
+            reasons: vec![(
+                "alpha".to_owned(),
+                vec!["unknown function: shop_margin".to_owned()],
+            )],
+            expected_notice: Some(
+                "Semantic checks were partial for 1 model:\n  alpha: calls unknown function shop_margin; declare it as a project function so its calls are checked, or correct its spelling.",
+            ),
+        },
+        NoticeTestCase {
             description: "one partial model is counted in the singular",
             reasons: vec![("alpha".to_owned(), vec!["SQL analysis disabled".to_owned()])],
             expected_notice: Some(
@@ -95,6 +106,45 @@ fn given_partial_reasons_when_building_notice_then_groups_by_reason() {
     for test_case in test_cases {
         assert_eq!(
             semantic_coverage_notice(&test_case.reasons).as_deref(),
+            test_case.expected_notice,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_partial_reasons_when_building_strict_report_then_ranks_reasons_by_models() {
+    let test_cases = [
+        NoticeTestCase {
+            description: "the reason that leaves most models partial comes first",
+            reasons: vec![
+                (
+                    "orders".to_owned(),
+                    vec![
+                        "open source: raw_orders".to_owned(),
+                        "unknown function: shop_margin".to_owned(),
+                    ],
+                ),
+                (
+                    "customers".to_owned(),
+                    vec!["open source: raw_orders".to_owned()],
+                ),
+            ],
+            expected_notice: Some(
+                "Strict report: 2 checks unproven across 2 models:\n  1. reads open source raw_orders (2 models): customers, orders; run `sqb contract generate --from <target> --select source:raw_orders --write` and enforce the complete source contract.\n  2. calls unknown function shop_margin (1 model): orders; declare it as a project function so its calls are checked, or correct its spelling.\n  Report only (settings.strict = \"report\"): the exit code is unchanged; set strict = true or pass --strict to fail on these.",
+            ),
+        },
+        NoticeTestCase {
+            description: "complete checks print no report",
+            reasons: Vec::new(),
+            expected_notice: None,
+        },
+    ];
+
+    for test_case in test_cases {
+        assert_eq!(
+            strict_report(&test_case.reasons).as_deref(),
             test_case.expected_notice,
             "{}",
             test_case.description

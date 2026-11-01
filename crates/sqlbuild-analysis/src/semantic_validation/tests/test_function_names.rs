@@ -1,10 +1,11 @@
 use crate::semantic_validation::_helpers::diagnostics::map_diagnostics;
 use crate::semantic_validation::_helpers::function_names::unsupported_calls;
-use crate::semantic_validation::models::FunctionProbes;
+use crate::semantic_validation::models::{FunctionProbes, UnknownFunctions};
 use crate::semantic_validation::tests::test_types::{
-    LocatedFunctionDiagnosticTestCase, UnknownFunctionTestCase, UnsupportedFunctionTestCase,
+    LocatedFunctionDiagnosticTestCase, PolyglotUnknownFunctionTestCase, UnknownFunctionTestCase,
+    UnsupportedFunctionTestCase,
 };
-use polyglot_sql::{DialectType, ValidationResult};
+use polyglot_sql::{DialectType, ValidationError, ValidationResult};
 
 #[test]
 fn given_unsupported_builtin_spelling_when_scanning_then_reports_dialect_spelling() {
@@ -225,7 +226,7 @@ fn given_unsupported_spelling_when_mapping_diagnostics_then_returns_located_b101
                 valid: true,
                 errors: Vec::new(),
             },
-            &FunctionProbes::default(),
+            (&FunctionProbes::default(), UnknownFunctions::Notes),
         )?;
         let [error] = result.errors.as_slice() else {
             return Err(format!("{}: {:?}", test_case.description, result.errors));
@@ -279,6 +280,23 @@ fn given_calls_when_listing_unknown_functions_then_only_undeclared_non_builtins_
             expected_names: &[],
         },
         UnknownFunctionTestCase {
+            description: "casts, EXTRACT and CTE materialization are syntax, not calls",
+            dialect: "duckdb",
+            sql: "WITH a AS NOT MATERIALIZED (SELECT 1 AS x) \
+                  SELECT CAST(x AS DECIMAL(10, 2)), TRY_CAST(x AS INTEGER), \
+                  EXTRACT(YEAR FROM DATE '2026-01-01') FROM a",
+            declared: &[],
+            expected_names: &[],
+        },
+        UnknownFunctionTestCase {
+            description: "a sized type after AS or :: is not a call",
+            dialect: "snowflake",
+            sql: "SELECT CAST(CASE WHEN x > 0 THEN x END AS NUMBER(38, 12)) AS a, \
+                  x::NUMBER(18, 0) AS b, TIMESTAMP_NTZ_FROM_PARTS(2026, 1, 1, 0, 0, 0) AS c FROM t",
+            declared: &[],
+            expected_names: &[],
+        },
+        UnknownFunctionTestCase {
             description: "strings, comments and qualified calls are not scanned",
             dialect: "duckdb",
             sql: "SELECT 'mystery(1)', shop.order_score(1) -- other_call(2)\nFROM orders",
@@ -307,4 +325,69 @@ fn given_calls_when_listing_unknown_functions_then_only_undeclared_non_builtins_
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_polyglot_unknown_functions_when_mapping_diagnostics_then_only_keyword_calls_stay()
+-> Result<(), String> {
+    let test_cases = [
+        PolyglotUnknownFunctionTestCase {
+            description: "an unknown function is a partial-semantics note, not B101",
+            sql: "SELECT shop_margin(price) AS margin FROM products",
+            message: "Unknown function 'shop_margin' for dialect DuckDB",
+            expected_codes: &[],
+        },
+        PolyglotUnknownFunctionTestCase {
+            description: "a SQLBuild call left unrendered stays B101",
+            sql: "SELECT * FROM __ref(1)",
+            message: "Unknown function '__ref' for dialect DuckDB",
+            expected_codes: &["B101"],
+        },
+        PolyglotUnknownFunctionTestCase {
+            description: "a DuckDB keyword-only built-in called with parentheses stays B101",
+            sql: "SELECT CURRENT_TIMESTAMP() AS seen FROM products",
+            message: "Unknown function 'CURRENT_TIMESTAMP' for dialect DuckDB",
+            expected_codes: &["B101"],
+        },
+    ];
+    for test_case in &test_cases {
+        let result = map_diagnostics(
+            test_case.sql,
+            DialectType::DuckDB,
+            ValidationResult {
+                valid: false,
+                errors: vec![ValidationError::error(test_case.message, "E202")],
+            },
+            (&FunctionProbes::default(), UnknownFunctions::Notes),
+        )?;
+        let codes: Vec<&str> = result
+            .errors
+            .iter()
+            .map(|error| error.code.as_str())
+            .collect();
+
+        assert_eq!(codes, test_case.expected_codes, "{}", test_case.description);
+    }
+    let resource = map_diagnostics(
+        "SELECT shop_margin(price) FROM products",
+        DialectType::DuckDB,
+        ValidationResult {
+            valid: false,
+            errors: vec![ValidationError::error(
+                "Unknown function 'shop_margin' for dialect DuckDB",
+                "E202",
+            )],
+        },
+        (&FunctionProbes::default(), UnknownFunctions::Errors),
+    )?;
+    assert_eq!(
+        resource
+            .errors
+            .iter()
+            .map(|error| error.code.as_str())
+            .collect::<Vec<&str>>(),
+        ["B101"],
+        "resource SQL keeps an unknown function as B101"
+    );
+    Ok(())
 }

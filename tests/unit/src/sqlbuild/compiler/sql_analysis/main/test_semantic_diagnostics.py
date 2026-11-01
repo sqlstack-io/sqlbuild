@@ -22,7 +22,6 @@ DIALECTS: tuple[str, ...] = ("duckdb", "snowflake", "postgresql", "bigquery")
         SemanticDiagnosticMappingCase(
             description="semantic, prepared type, and implicit-conversion diagnostics",
             expected_codes=(
-                "B101",
                 "B102",
                 "B004",
                 "B005",
@@ -51,7 +50,7 @@ DIALECTS: tuple[str, ...] = ("duckdb", "snowflake", "postgresql", "bigquery")
 def test_given_native_semantic_errors_when_validating_then_codes_and_locations_survive(
     test_case: SemanticDiagnosticMappingCase,
 ) -> None:
-    codes: dict[str, str] = {"E202": "B101", "E203": "B102", "E222": "B004", "E223": "B005"}
+    codes: dict[str, str] = {"E203": "B102", "E222": "B004", "E223": "B005"}
     codes.update(
         {f"E{number}": f"B{number}" for number in (*range(210, 220), 230, 231, 232, 233, 234)}
     )

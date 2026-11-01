@@ -91,3 +91,5 @@ pub(crate) const COMPILE_CACHE_DISABLE_ENV_VAR: &str = "SQLBUILD_DISABLE_COMPILE
 pub(crate) const COMPILE_CACHE_DISABLE_VALUE: &str = "1";
 /// The fact and reference cache directories older releases kept under each retired cache root.
 pub(crate) const RETIRED_CACHE_DIRECTORY_NAMES: [&str; 2] = ["facts-v1", "references-v3"];
+/// `settings.strict` when only reporting what it would fail on.
+pub(crate) const STRICT_REPORT: &str = "report";

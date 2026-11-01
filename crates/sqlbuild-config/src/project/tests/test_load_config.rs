@@ -1,5 +1,6 @@
 use crate::project::main::load_git_base_ref::load_git_base_ref;
 use crate::project::main::load_review_config::load_review_config;
+use crate::project::errors::ConfigFailure;
 use crate::project::models::ConfigFile;
 use crate::project::models::ReviewConfig;
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};
@@ -18,6 +19,20 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
                       [targets.dev]\nschema = 'analytics'\n[sinks.lifecycle]\nshutdown_timeout = '10m'\n",
             local: "target = 'dev'\n[settings]\nmax_concurrency = 2\n",
             expected_failure: None,
+        },
+        ProjectFailureTestCase {
+            description: "strict takes report-only mode",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[settings]\nstrict = 'report'\n",
+            local: "",
+            expected_failure: None,
+        },
+        ProjectFailureTestCase {
+            description: "strict takes only true, false or report",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[settings]\nstrict = 'always'\n",
+            local: "",
+            expected_failure: Some(ConfigFailure::plain(
+                "settings.strict must be true, false or \"report\"",
+            )),
         },
         ProjectFailureTestCase {
             description: "an unknown key suggests the nearest supported key",

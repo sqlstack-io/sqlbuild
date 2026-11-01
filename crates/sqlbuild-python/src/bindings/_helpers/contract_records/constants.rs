@@ -194,6 +194,7 @@ const R_SETTINGS_CONFIG: RecordSpec = RecordSpec {
     fields: &[
         FieldSpec::new("sql_analysis", FieldDefault::True),
         FieldSpec::new("require_sql_analysis", FieldDefault::False),
+        FieldSpec::new("strict", FieldDefault::Text("off")),
         FieldSpec::new("query_change_tracking", FieldDefault::True),
         FieldSpec::new(
             "column_contract_mode",

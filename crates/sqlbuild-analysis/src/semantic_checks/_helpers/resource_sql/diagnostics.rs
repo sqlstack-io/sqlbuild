@@ -310,7 +310,10 @@ pub(crate) fn resource_sql_findings(
             });
     }
     let results = catalog
-        .binding_results(requests)
+        .binding_results(
+            requests,
+            crate::semantic_validation::models::UnknownFunctions::Errors,
+        )
         .map_err(ResourceSqlFailure::Internal)?;
     let mut keys: HashSet<Key> = HashSet::new();
     let mut opt_out_keys: HashSet<(String, i64, i64)> = HashSet::new();

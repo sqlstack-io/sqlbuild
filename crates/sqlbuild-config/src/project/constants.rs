@@ -44,8 +44,15 @@ pub(crate) const TEST_TIMEOUT_KEY: &str = "test_timeout";
 pub(crate) const DELTA_COMPILE_KEY: &str = "delta_compile";
 pub(crate) const SCENARIO_TIMEOUT_KEY: &str = "scenario_timeout";
 pub(crate) const DEFAULT_TEST_TIMEOUT: &str = "30s";
-pub(crate) const SETTINGS_KEYS: [&str; 15] = [
+/// `[settings] strict`: `false`, `"report"` or `true`.
+pub(crate) const STRICT_KEY: &str = "strict";
+/// The stored strict modes: off, report-only and enforced.
+pub(crate) const STRICT_OFF: &str = "off";
+pub(crate) const STRICT_REPORT: &str = "report";
+pub(crate) const STRICT_ON: &str = "on";
+pub(crate) const SETTINGS_KEYS: [&str; 16] = [
     "sql_analysis",
+    "strict",
     "require_sql_analysis",
     "query_change_tracking",
     "column_contract_mode",

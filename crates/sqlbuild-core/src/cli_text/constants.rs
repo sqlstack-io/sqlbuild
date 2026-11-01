@@ -32,6 +32,10 @@ pub(crate) const NOTICE_DISPLAY_LIMIT: usize = 10;
 pub(crate) const ELLIPSIS: &str = "...";
 pub(crate) const OPEN_SOURCE: &str = "open source: ";
 pub(crate) const OPEN_INPUT: &str = "open input: ";
+pub(crate) const UNKNOWN_FUNCTION: &str = "unknown function: ";
+/// The last line of a report-only strict report.
+pub(crate) const STRICT_REPORT_FOOTER: &str = "  Report only (settings.strict = \"report\"): the exit \
+    code is unchanged; set strict = true or pass --strict to fail on these.";
 pub(crate) const INVALID_UPSTREAM: &str = "depends on invalid model ";
 pub(crate) const DEFAULT_ACTION: &str =
     "declare the input shape, then run `sqb compile --no-cache`";

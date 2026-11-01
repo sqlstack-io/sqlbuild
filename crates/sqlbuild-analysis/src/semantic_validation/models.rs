@@ -66,6 +66,14 @@ pub struct PositionInput {
 }
 
 /// Memoized call-site function-name probes, owned by the catalog that validates a compile.
+/// How polyglot's unknown-function findings are reported: a model's are partial-semantics notes
+/// (D42); resource SQL (SQL tests, hooks, audits) keeps them as B101 errors.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnknownFunctions {
+    Notes,
+    Errors,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct FunctionProbes {
     pub(crate) suggestions: Mutex<HashMap<ProbeKey, Option<String>>>,
