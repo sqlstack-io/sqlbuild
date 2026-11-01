@@ -102,11 +102,28 @@ _GIB: int = 1024 * _MIB
             macro_count=123,
             test_count=9_816,
             audit_count=16_855,
+            # Default SQL Rules: 25.5 s scaled by the measured 1.09x cold cost over select = [].
+            expected_max_wall_seconds=28.0,
+            expected_max_rss_bytes=int(2.5 * _GIB),
+            expected_semantic_fingerprint=(
+                "5ccdabeaabfdfba1ecbae80259dd3c6eb801d683df140b7fb7a249b9555308c6"
+            ),
+        ),
+        FreshProcessCompilePerformanceGuardTestCase(
+            description="models_10000_fresh_process_compiler_only_compile_stays_within_budget",
+            model_count=10_000,
+            source_count=2_377,
+            seed_count=471,
+            function_count=236,
+            macro_count=123,
+            test_count=9_816,
+            audit_count=16_855,
             expected_max_wall_seconds=25.5,
             expected_max_rss_bytes=int(2.5 * _GIB),
             expected_semantic_fingerprint=(
                 "5ccdabeaabfdfba1ecbae80259dd3c6eb801d683df140b7fb7a249b9555308c6"
             ),
+            compiler_only=True,
         ),
     ],
     ids=lambda case: case.description,

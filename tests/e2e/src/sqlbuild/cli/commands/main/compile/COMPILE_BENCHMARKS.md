@@ -104,10 +104,12 @@ measured cold cost of the default Rules over `select = []` on the same machine (
 CPU, five paired runs). Its warm and edit modes keep 1.10x. The cold allowance is temporary: once
 the base also runs default Rules, it returns to 1.10x.
 
-The fresh-process 3,000- and 5,000-model compile guards and the 3,000-model cache guard follow the
-same split (approved 2026-11-01): `compiler_only` cases keep the previous wall budgets, and the
-default Rules cases scale them by the measured cold cost (1.14x and 1.16x fresh, 1.19x for the cache
-guard's cold and project-config runs). Larger cases already fit their budgets and are unchanged.
+Every fresh-process compile and cache guard follows the same split (approved 2026-11-01):
+`compiler_only` cases keep the previous wall budgets, and the default Rules cases scale the cold
+budget by the cold cost measured over `select = []` on the same machine: 1.14x, 1.16x and 1.09x for
+the 3,000-, 5,000- and 10,000-model compiles, and 1.19x, 1.20x and 1.25x for the cache guards, whose
+cold budget also bounds the cache-disabled and project-config runs. Warm, edit and memory budgets
+are unchanged; warm and edit runs measured within 5% of `select = []`.
 
 The warm and edit modes reuse the cold project. A warm run that misses the analysis cache, or an
 edit run that does not, stops the comparison because it would measure the wrong path.

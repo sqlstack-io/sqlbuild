@@ -122,7 +122,8 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_count=834,
             test_count=4_908,
             audit_count=8_427,
-            expected_cold_max_wall_seconds=14.5,
+            # Default SQL Rules: 14.5 s scaled by the measured 1.20x cold cost over select = [].
+            expected_cold_max_wall_seconds=17.4,
             expected_warm_max_wall_seconds=7.0,
             expected_edit_max_wall_seconds=7.0,
             expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
@@ -148,7 +149,78 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_macro_edit_misses=1,
         ),
         FreshProcessCompileCachePerformanceGuardTestCase(
+            description="models_5000_fresh_process_compiler_only_compile_cache_stays_incremental",
+            model_count=5_000,
+            source_count=1_189,
+            seed_count=236,
+            function_count=118,
+            macro_count=834,
+            test_count=4_908,
+            audit_count=8_427,
+            expected_cold_max_wall_seconds=14.5,
+            expected_warm_max_wall_seconds=7.0,
+            expected_edit_max_wall_seconds=7.0,
+            expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
+            expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
+            expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
+            expected_max_cache_write_wall_overhead_ratio=_MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO,
+            expected_max_rss_bytes=1664 * _MIB,
+            expected_max_cache_bytes=160 * _MIB,
+            expected_cold_fingerprint=(
+                "2f1e5dfd29025c25e0dffc6e74f4c2be020a5ef133ecd081f44e0c55c24858b4"
+            ),
+            expected_leaf_edit_fingerprint=(
+                "708f04a565a71b3981c9beba420aff691c8467eb30c5cdedd45c2518d45b31ba"
+            ),
+            expected_macro_edit_fingerprint=(
+                "7dd4d45c2b21f61cbc32d33b0e0cf98721975b9f8948277cc15dc947355cfc25"
+            ),
+            expected_project_config_fingerprint=(
+                "69f4fe914afc955d690e9c5b9074ca69dc58b8b7a0886a421b888385e6b066cb"
+            ),
+            macro_call_interval=6,
+            scoped_macros=True,
+            expected_macro_edit_misses=1,
+            compiler_only=True,
+        ),
+        FreshProcessCompileCachePerformanceGuardTestCase(
             description="models_10000_fresh_process_compile_cache_stays_incremental",
+            model_count=10_000,
+            source_count=2_377,
+            seed_count=471,
+            function_count=236,
+            macro_count=1_667,
+            test_count=9_816,
+            audit_count=16_855,
+            # Default SQL Rules: 28.0 s scaled by the measured 1.25x cold cost over select = [].
+            expected_cold_max_wall_seconds=35.0,
+            expected_warm_max_wall_seconds=14.0,
+            expected_edit_max_wall_seconds=13.5,
+            expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
+            expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
+            expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
+            expected_max_cache_write_wall_overhead_ratio=_MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO,
+            # Temporary memory exception (2026-10-10); remove after conversion optimisation.
+            expected_max_rss_bytes=3008 * _MIB,
+            expected_max_cache_bytes=320 * _MIB,
+            expected_cold_fingerprint=(
+                "ecdd7f2cf961fab739aa806b6d90283916cffad2007e1e2f3ba90a466db6cb75"
+            ),
+            expected_leaf_edit_fingerprint=(
+                "f67b73b56d7ad7677cbfa649e7933e8f294f9dd7c99f3660d7c42e1d01b804ff"
+            ),
+            expected_macro_edit_fingerprint=(
+                "5554615dbc5fe9dbfd7555771167f3380222cb3da468b4313076adecef0ff9c3"
+            ),
+            expected_project_config_fingerprint=(
+                "ebc15f5381746d060005ecc61f477b1b0338640198197f6788f9beab5da88db5"
+            ),
+            macro_call_interval=6,
+            scoped_macros=True,
+            expected_macro_edit_misses=1,
+        ),
+        FreshProcessCompileCachePerformanceGuardTestCase(
+            description="models_10000_fresh_process_compiler_only_compile_cache_stays_incremental",
             model_count=10_000,
             source_count=2_377,
             seed_count=471,
@@ -181,6 +253,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_call_interval=6,
             scoped_macros=True,
             expected_macro_edit_misses=1,
+            compiler_only=True,
         ),
     ],
     ids=lambda case: case.description,
