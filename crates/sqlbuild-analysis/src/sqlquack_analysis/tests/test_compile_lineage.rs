@@ -26,10 +26,10 @@ fn given_a_compiled_model_when_tracing_compile_lineage_then_columns_name_their_r
             expected_lines: &["id expression high [model:orders.ID]"],
         },
         CompileLineageTestCase {
-            description: "a column of no relation is unknown",
+            description: "a column its one relation lacks is read from it, untraced",
             dialect: "duckdb",
             sql: "SELECT missing FROM ORDERS_REL",
-            expected_lines: &["missing constant unknown []"],
+            expected_lines: &["missing direct medium [model:orders.missing]"],
         },
         CompileLineageTestCase {
             description: "SQL SQLQuack cannot parse has no lineage",

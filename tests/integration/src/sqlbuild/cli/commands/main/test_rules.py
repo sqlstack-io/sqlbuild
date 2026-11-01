@@ -3187,7 +3187,7 @@ def test_given_custom_rule_cache_when_inputs_change_then_only_unchanged_runs_hit
                 "not_null,accepted_values,accepted_values|1|3|order_status|minimum_amount|1|1|"
                 "order_totals",
                 "order_totals|models/marts/order_totals.sql|table|137|79|stg_orders|||"
-                "order_id:INT:non_null;doubled_amount:DOUBLE:unknown|order_id,doubled_amount|"
+                "order_id:INTEGER:non_null;doubled_amount:DOUBLE:unknown|order_id,doubled_amount|"
                 "False||test_order_totals|",
                 "stg_orders|models/staging/stg_orders.sql|None|417|109||order_totals|"
                 "order_id:INTEGER:False:Order key:not_null:[]:None/accepted_values:"
@@ -3195,7 +3195,7 @@ def test_given_custom_rule_cache_when_inputs_change_then_only_unchanged_runs_hit
                 "amount:DOUBLE:None:None::models/staging/stg_orders.sql:4;"
                 "status:VARCHAR:None:None:accepted_values:[('values', ('PAID', 'OPEN'))]:None:"
                 "models/staging/stg_orders.sql:5|"
-                "order_id:INT:unknown;amount:DOUBLE:unknown;status:TEXT:non_null|"
+                "order_id:INTEGER:unknown;amount:DOUBLE:unknown;status:TEXT:non_null|"
                 "order_id,amount,status|True|||not_null,accepted_values,accepted_values",
             ),
             expected_hits_and_misses=((0, 4), (4, 0), (3, 1)),

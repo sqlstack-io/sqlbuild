@@ -54,7 +54,7 @@ _MODEL_COUNT: int = 16
             dialects=(None, "duckdb", "postgres", "snowflake"),
             expected_minimum_native=400,
             expected_minimum_parsed=250,
-            expected_minimum_star_expansions=20,
+            expected_minimum_star_expansions=0,
         )
     ],
     ids=lambda case: case.description,

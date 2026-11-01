@@ -2,23 +2,23 @@
 [
 "completion",
 {
-"databricks": "25140233ccf8e7760c91ffd6",
-"mysql": "25140233ccf8e7760c91ffd6",
-"oracle": "25140233ccf8e7760c91ffd6",
-"sqlite": "25140233ccf8e7760c91ffd6",
-"trino": "25140233ccf8e7760c91ffd6",
-"tsql": "25140233ccf8e7760c91ffd6"
+"mysql": "44b52ce77f7b07ba440e3b69",
+"tsql": "44b52ce77f7b07ba440e3b69",
+"databricks": "44b52ce77f7b07ba440e3b69",
+"sqlite": "44b52ce77f7b07ba440e3b69",
+"oracle": "44b52ce77f7b07ba440e3b69",
+"trino": "44b52ce77f7b07ba440e3b69"
 }
 ],
 [
 "completion",
 {
-"databricks": "edd3b1ec05f9481067078045",
-"mysql": "edd3b1ec05f9481067078045",
-"oracle": "edd3b1ec05f9481067078045",
-"sqlite": "edd3b1ec05f9481067078045",
-"trino": "edd3b1ec05f9481067078045",
-"tsql": "edd3b1ec05f9481067078045"
+"mysql": "af4024cbb0b1022278fb0039",
+"tsql": "af4024cbb0b1022278fb0039",
+"databricks": "af4024cbb0b1022278fb0039",
+"sqlite": "af4024cbb0b1022278fb0039",
+"oracle": "af4024cbb0b1022278fb0039",
+"trino": "af4024cbb0b1022278fb0039"
 }
 ]
 ]

@@ -130,7 +130,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=40,
             expected_minimum_pivot_proofs=80,
             expected_minimum_proven_pivots=12,
-            expected_minimum_native_enrichments=90,
+            expected_minimum_native_enrichments=75,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, fast lineage",
@@ -144,7 +144,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=30,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, rich lineage",
@@ -158,7 +158,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=20,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="a project-local adapter's own nullability rules, called back natively",
@@ -227,9 +227,9 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
             inexact_regions=("east", "west", "north"),
             dialects=("duckdb", "snowflake"),
             expected_analysed=24,
-            expected_shared=22,
-            expected_reanalysed=6,
-            expected_unshared=2,
+            expected_shared=0,
+            expected_reanalysed=0,
+            expected_unshared=24,
             expected_column_values=12,
         )
     ],

@@ -105,7 +105,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             ],
             expected_steps: &[&[
                 "publish events event_id:UNKNOWN",
-                "publish events_mart event_id:UNKNOWN one:INT",
+                "publish events_mart event_id:UNKNOWN one:INTEGER",
             ]],
             expected_outcomes: &[
                 &[
@@ -114,7 +114,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
                 ],
                 &[
                     "event_id - unknown",
-                    "one INT non_null",
+                    "one INTEGER non_null",
                     "succeeded=true star=false/true diagnostics=[]",
                 ],
             ],
@@ -194,8 +194,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:INT amount:INT",
-                "publish orders_flagged order_id:INT amount:INT flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
         StarExpansionTestCase {
@@ -212,8 +212,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:INT amount:INT",
-                "publish orders_flagged order_id:INT amount:INT flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
         StarExpansionTestCase {
@@ -229,8 +229,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:INT amount:INT",
-                "publish orders_flagged order_id:INT amount:INT flag:INT",
+                "publish stg_orders order_id:INTEGER amount:INTEGER",
+                "publish orders_flagged order_id:INTEGER amount:INTEGER flag:INTEGER",
             ]],
         },
     ];
@@ -263,7 +263,7 @@ fn given_finished_sessions_when_reading_model_facts_then_keeps_only_native_succe
                 "Some([\"order_id INTEGER non_null\", \"doubled DOUBLE unknown\"]) \
                  order_id<-[(\"raw_orders\", \"order_id\")] \
                  doubled<-[(\"raw_orders\", \"amount\")]",
-                "Some([\"missing_column - unknown\"]) missing_column<-[]",
+                "Some([\"missing_column - unknown\"]) missing_column<-[(\"raw_orders\", \"missing_column\")]",
             ],
         },
         SessionFactsTestCase {
@@ -284,7 +284,7 @@ fn given_finished_sessions_when_reading_model_facts_then_keeps_only_native_succe
             ],
             expected_facts: &[
                 "Some([\"event_id - unknown\"]) event_id<-[(\"raw_events\", \"event_id\")]",
-                "Some([\"event_id - unknown\", \"one INT non_null\"]) event_id<-[(\"events\", \"event_id\")] one<-[]",
+                "Some([\"event_id - unknown\", \"one INTEGER non_null\"]) event_id<-[(\"events\", \"event_id\")] one<-[]",
             ],
         },
         SessionFactsTestCase {
@@ -720,7 +720,7 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
             "raw_orders",
             true,
         ),
-        expected_columns: [&["customer_id INTEGER non_null"], &["1 INT non_null"]],
+        expected_columns: [&["customer_id INTEGER non_null"], &["1 INTEGER non_null"]],
     }];
     for test_case in test_cases {
         let kept = kept_model_analyses(test_case.dialect, test_case.sql, test_case.family);

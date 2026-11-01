@@ -557,7 +557,7 @@ impl AnalysisSession {
             .copied()
             .filter(|model| !self.cached(*model) && !self.routed[*model])
             .collect();
-        if analysed.is_empty() {
+        if analysed.is_empty() || !self.sqlquack_reads() {
             return Ok(());
         }
         let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
@@ -1036,7 +1036,7 @@ impl AnalysisSession {
         misses: Vec<usize>,
         schemas: &[Shapes],
     ) -> Result<Vec<usize>, String> {
-        if misses.is_empty() || !reads_dialect(&self.request.dialect) {
+        if misses.is_empty() || !self.sqlquack_reads() {
             return Ok(misses);
         }
         let read: Vec<ReadModel> = self.read_models(models, &misses, schemas)?;
@@ -1072,7 +1072,7 @@ impl AnalysisSession {
             .collect())
     }
 
-    /// The misses whose SQL cleans and SQLQuack reads, with their lineage.
+    /// The misses whose SQL cleans and SQLQuack reads into named columns, with their lineage.
     fn read_models(
         &mut self,
         models: &[usize],
@@ -1143,10 +1143,16 @@ impl AnalysisSession {
                 Some(ReadModel {
                     position,
                     cleaned_sql,
-                    lineage: lineage?,
+                    lineage: lineage.filter(|lineage| !lineage.columns.is_empty())?,
                 })
             })
             .collect())
+    }
+
+    /// Whether SQLQuack analyses this session's models: its dialect, without a project-local
+    /// adapter's Python nullability rules, which only polyglot's analysis calls.
+    fn sqlquack_reads(&self) -> bool {
+        reads_dialect(&self.request.dialect) && self.request.nullability_callback.is_none()
     }
 
     /// The adapter's function facts, as SQLQuack reads them.
