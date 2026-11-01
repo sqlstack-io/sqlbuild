@@ -4,7 +4,8 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::store::_helpers::migration::{
-    LOCATION_INSTANCES, LOCATION_WORK, PLATFORM_SINK, SCHEMA, SENSORS, render, verify_migrations,
+    LOCATION_INSTANCES, LOCATION_WORK, PLATFORM_SINK, RUN_SENSORS, SCHEMA, SENSORS, render,
+    verify_migrations,
 };
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
@@ -32,6 +33,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         ("location_work", LOCATION_WORK),
         ("platform_sink", PLATFORM_SINK),
         ("sensors", SENSORS),
+        ("run_sensors", RUN_SENSORS),
     ];
     let mut digests = vec![digest.clone()];
     digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));

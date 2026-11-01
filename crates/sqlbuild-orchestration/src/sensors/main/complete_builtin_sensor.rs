@@ -8,8 +8,9 @@ use crate::scheduler::models::SchedulerLease;
 use crate::sensors::_helpers::attempts::{defer_sensor, last_attempt, read_sensor};
 use crate::sensors::_helpers::facts::{append_evaluation, commit_cursor};
 use crate::sensors::_helpers::platform::consume_platform_events;
+use crate::sensors::_helpers::runs::consume_run_events;
 use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
-use crate::sensors::models::{SensorEvaluationOutcome, SensorEvaluationRequest};
+use crate::sensors::models::{SensorCondition, SensorEvaluationOutcome, SensorEvaluationRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -46,7 +47,14 @@ pub async fn complete_builtin_sensor(
         commit(transaction).await?;
         return Ok(0);
     }
-    let (transaction, (cursor, run_ids)) = consume_platform_events(transaction, evaluation).await?;
+    let (transaction, (cursor, run_ids)) = match &evaluation.definition.when {
+        SensorCondition::PlatformEvent { kinds } => {
+            consume_platform_events(transaction, evaluation, kinds).await?
+        }
+        SensorCondition::RunEvent { job_key, kinds } => {
+            consume_run_events(transaction, evaluation, job_key, kinds).await?
+        }
+    };
     let count = run_ids.len();
     let (transaction, (event_id, storage_id)) = append_evaluation(
         transaction,

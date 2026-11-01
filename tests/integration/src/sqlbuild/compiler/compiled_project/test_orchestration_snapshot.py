@@ -18,7 +18,16 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
-from sqlbuild.orchestration import Job, compile_snapshot, job, schedule
+from sqlbuild.orchestration import (
+    Job,
+    RunEventKind,
+    compile_snapshot,
+    job,
+    job_group,
+    run_event,
+    schedule,
+    sensor,
+)
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
     SnapshotDeclarationRejectionTestCase,
@@ -613,9 +622,65 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 7,
                     "default_status": "stopped",
-                }
+                },
+                "edge_job_outcomes": {
+                    "description": "Keep warning and partial outcomes distinct from success.",
+                    "job_key": "edge_snapshot_inventory",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "edge_snapshot_orders",
+                        "kinds": ["warn", "partial"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "stopped",
+                },
+                "edge_group_outcomes": {
+                    "description": "Observe group completion including cancellation and presumed failure.",
+                    "job_key": "edge_snapshot_inventory",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "edge_snapshot_group",
+                        "kinds": ["completed"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "stopped",
+                },
             },
             expected_schedules=("edge_snapshot_orders",),
+        ),
+        SnapshotDiscoveryTestCase(
+            description="sensor-only roots collect source groups and destination jobs natively",
+            files={},
+            declarations=(
+                sensor(
+                    "on_orders",
+                    description="Build inventory after group completion.",
+                    when=run_event(
+                        job=job_group(
+                            "source_group",
+                            description="Source orders.",
+                            jobs=[job("source_orders", description="Orders.", select="orders")],
+                        ),
+                        kinds=[RunEventKind.COMPLETED],
+                    ),
+                    run=job("inventory", description="Inventory.", select="stg_orders"),
+                ),
+            ),
+            expected_jobs=("inventory", "source_orders"),
+            expected_groups={"source_group": {"source_orders": []}},
+            expected_sensors={
+                "on_orders": {
+                    "description": "Build inventory after group completion.",
+                    "job_key": "inventory",
+                    "when": {
+                        "kind": "run_event",
+                        "job_key": "source_group",
+                        "kinds": ["completed"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                }
+            },
         ),
         SnapshotDiscoveryTestCase(
             description="sensor-only roots preserve referenced jobs and filter targets",

@@ -6,6 +6,14 @@ use crate::credentials::models::AuditContext;
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::platform::models::PlatformEvent;
+use crate::runs::main::{
+    advance_groups::advance_groups, change_run::change_run, claim_next_run::claim_next_run,
+    request_job_run::request_job_run,
+};
+use crate::runs::models::{
+    JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
+};
+use crate::scheduler::models::SchedulerLease;
 use crate::sensors::models::SensorEvaluationFact;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::main::append_control_event::append_control_event;
@@ -127,4 +135,105 @@ pub(crate) async fn change(store: &ControlStore, trigger_id: Uuid, change: Trigg
             .await
             .expect("retry operator fact")
     );
+}
+
+/// Real request, claim, node facts and finish, including the virtual group parent.
+pub(crate) async fn finish_run(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    scope: (Uuid, &str),
+    job_key: &str,
+    outcome: RunOutcome,
+    nodes: [NodeOutcome; 2],
+) -> Uuid {
+    let run_id = Uuid::now_v7();
+    let context = AuditContext {
+        actor: "test-admin".into(),
+        granting_role: "control-store-owner".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    };
+    request_job_run(
+        store,
+        &context,
+        &JobRunRequest {
+            run_id,
+            location_id: scope.0,
+            target: scope.1.into(),
+            job_key: job_key.into(),
+            reason: "Exercise terminal sensor scope".into(),
+            priority: 10,
+            window: None,
+        },
+    )
+    .await
+    .expect("request source run");
+    let limits = std::collections::BTreeMap::new();
+    advance_groups(store, lease, (&limits, scope))
+        .await
+        .expect("advance parent");
+    let claim = claim_next_run(store, lease, &limits, Some(scope))
+        .await
+        .expect("claim source")
+        .expect("source ready");
+    assert!(claim.request.run_id == run_id || claim.request.parent_run_id == Some(run_id));
+    let worker = RunAuthority::Worker {
+        run_id: claim.request.run_id,
+        claim_id: claim.claim_id,
+    };
+    let changes = [
+        RunChange::Started,
+        RunChange::NodeFinished {
+            node_key: "customers".into(),
+            outcome: nodes[0],
+            rows_affected: None,
+            error_code: None,
+            skipped_because_of: None,
+        },
+        RunChange::NodeFinished {
+            node_key: "orders".into(),
+            outcome: nodes[1],
+            rows_affected: None,
+            error_code: None,
+            skipped_because_of: None,
+        },
+    ];
+    for change in changes {
+        change_run(
+            store,
+            worker,
+            &RunChangeRequest {
+                event_id: Uuid::now_v7(),
+                run_id: claim.request.run_id,
+                claim_id: Some(claim.claim_id),
+                change,
+            },
+        )
+        .await
+        .expect("publish worker evidence");
+    }
+    let terminal = RunChangeRequest {
+        event_id: Uuid::now_v7(),
+        run_id: claim.request.run_id,
+        claim_id: Some(claim.claim_id),
+        change: RunChange::Finished {
+            outcome,
+            reason: "Terminal outcome fixture".into(),
+            exit_code: None,
+        },
+    };
+    assert!(
+        change_run(store, RunAuthority::Scheduler(lease), &terminal)
+            .await
+            .expect("finish")
+    );
+    assert!(
+        !change_run(store, RunAuthority::Scheduler(lease), &terminal)
+            .await
+            .expect("retry finish")
+    );
+    advance_groups(store, lease, (&limits, scope))
+        .await
+        .expect("complete parent");
+    run_id
 }

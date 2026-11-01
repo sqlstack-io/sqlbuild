@@ -491,6 +491,60 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     "test_case",
     [
         WorkerExecutionTestCase(
+            "group completion starts a real sensor worker",
+            "SELECT 59 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(59,)],
+            expected_origin="sensor",
+            files={
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import RunEventKind, job, job_group, run_event, schedule, sensor\n"
+                    "source = job('source_orders', select='orders', description='Source orders.')\n"
+                    "source_group = job_group('source_group', description='Source group.', jobs=[source], "
+                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "annual_orders = job('annual_orders', select='orders', description='Refresh orders.', settings={'reload': True})\n"
+                    "on_group = sensor('on_group', description='Refresh after group completion.', "
+                    "when=run_event(job=source_group, kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS]), "
+                    "run=annual_orders, minimum_interval_seconds=1)\n"
+                )
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destination_worker_executes(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        destination: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert destination["status"] == test_case.expected_status, worker.log.read_text()
+        result: dict[str, Any] = worker_result(worker, test_case)
+        assert result["run_id"] == destination["run_id"]
+        with sqlite3.connect(worker.control_store) as control:
+            assert control.execute("SELECT run_key,run_id FROM sqb_run_requests").fetchall() == [
+                (
+                    control.execute(
+                        "SELECT run_id FROM sqb_runs WHERE job_key='source_group'"
+                    ).fetchone()[0],
+                    destination["run_id"],
+                )
+            ]
+            assert control.execute(
+                "SELECT job_key,status FROM sqb_runs ORDER BY job_key"
+            ).fetchall() == [
+                ("annual_orders", "success"),
+                ("source_group", "success"),
+                ("source_orders", "success"),
+            ]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             "cancellation stops an active warehouse statement",
             "SELECT sum(sin(value)) AS amount FROM range(10000000000) t(value)",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",

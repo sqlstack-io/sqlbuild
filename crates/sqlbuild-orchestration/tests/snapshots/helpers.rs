@@ -243,7 +243,8 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let connection = rusqlite::Connection::open(&path).expect("open fault injection connection");
     connection
         .execute_batch(
-            "DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; \
+            "DROP INDEX sqb_runs_terminal_cursor; \
+             DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; \
              DROP TABLE sqb_sensor_evaluation_events; DROP TABLE sqb_platform_sink_deliveries; \
              DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; \
              DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2",

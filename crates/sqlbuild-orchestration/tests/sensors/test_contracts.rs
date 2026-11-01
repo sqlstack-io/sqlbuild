@@ -6,5 +6,7 @@ mod helpers;
 mod test_delivery;
 #[path = "test_recovery.rs"]
 mod test_recovery;
+#[path = "test_runs.rs"]
+mod test_runs;
 #[path = "test_types.rs"]
 mod test_types;

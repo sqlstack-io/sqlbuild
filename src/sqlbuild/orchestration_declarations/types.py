@@ -12,3 +12,15 @@ class PlatformEventKind(StrEnum):
     CALENDAR_HORIZON_LOW = "calendar_horizon_low"
     LOCATION_BROKEN = "location_broken"
     LAUNCH_FAILED = "launch_failed"
+
+
+class RunEventKind(StrEnum):
+    """COMPLETED selects every terminal outcome; it is not a run status."""
+
+    COMPLETED = "completed"
+    SUCCESS = "success"
+    WARN = "warn"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    PRESUMED_FAILED = "presumed_failed"

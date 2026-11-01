@@ -7,6 +7,7 @@ from sqlbuild.orchestration_declarations.models import (
     Job,
     JobGroup,
     PlatformEventCondition,
+    RunEventCondition,
     Schedule,
     Sensor,
 )
@@ -14,9 +15,10 @@ from sqlbuild.orchestration_declarations.models import CalendarSchedule as calen
 from sqlbuild.orchestration_declarations.models import Job as job
 from sqlbuild.orchestration_declarations.models import JobGroup as job_group
 from sqlbuild.orchestration_declarations.models import PlatformEventCondition as platform_event
+from sqlbuild.orchestration_declarations.models import RunEventCondition as run_event
 from sqlbuild.orchestration_declarations.models import Schedule as schedule
 from sqlbuild.orchestration_declarations.models import Sensor as sensor
-from sqlbuild.orchestration_declarations.types import PlatformEventKind
+from sqlbuild.orchestration_declarations.types import PlatformEventKind, RunEventKind
 
 __all__ = (
     "CalendarSchedule",
@@ -25,6 +27,8 @@ __all__ = (
     "JobGroup",
     "PlatformEventCondition",
     "PlatformEventKind",
+    "RunEventCondition",
+    "RunEventKind",
     "Schedule",
     "Sensor",
     "calendar_schedule",
@@ -32,6 +36,7 @@ __all__ = (
     "job",
     "job_group",
     "platform_event",
+    "run_event",
     "schedule",
     "sensor",
 )
