@@ -386,6 +386,23 @@
 	border-width: 0 2px 2px 0;
 	transform: rotate(45deg);
 }
+.sb-check:indeterminate {
+	background: var(--primary);
+	border-color: var(--primary);
+}
+.sb-check:indeterminate::after {
+	content: '';
+	position: absolute;
+	left: 2px;
+	top: 4.5px;
+	width: 7px;
+	height: 2px;
+	background: #fff;
+}
+.sb-check:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
 /* paused/disabled row: dim the row content (toggle keeps its own colour) */
 .sb-row-off td {
 	opacity: 0.6;

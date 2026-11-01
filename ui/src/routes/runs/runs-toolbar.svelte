@@ -115,7 +115,7 @@
 			<input class="date" type="date" value={p.to} onchange={(e) => list.update({ to: e.currentTarget.value })} aria-label="To date" />
 		{/if}
 		<label class="toggle" title="Group runs start one run per job; show those as their own rows">
-			<input type="checkbox" checked={p.children} onchange={(e) => list.update({ children: e.currentTarget.checked })} />
+			<input type="checkbox" class="sb-check" checked={p.children} onchange={(e) => list.update({ children: e.currentTarget.checked })} />
 			Show child runs
 		</label>
 	</div>

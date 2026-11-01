@@ -73,7 +73,7 @@
 		<thead>
 			<tr>
 				<th class="sel">
-					<input type="checkbox" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
+					<input type="checkbox" class="sb-check" checked={list.allVisibleSelected} indeterminate={list.selected.size > 0 && !list.allVisibleSelected} onchange={() => list.toggleAll()} aria-label="Select all loaded runs" />
 				</th>
 				<th>Run</th>
 				<th>What</th>
@@ -91,7 +91,7 @@
 				<tr class:child={d.child} class:checked={list.selected.has(r.id)} style:height="{ROW_H}px" onclick={(e) => open(e, r.id)} onauxclick={(e) => e.button === 1 && open(e, r.id)}>
 					<td class="sel">
 						<i class="stripe" style:background={runStatusTone[r.status]}></i>
-						<input type="checkbox" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />
+						<input type="checkbox" class="sb-check" checked={list.selected.has(r.id)} onchange={() => list.toggleSelected(r.id)} aria-label="Select run {shortRunId(r.id)}" />
 					</td>
 					<td>
 						<div class="run-id">

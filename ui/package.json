@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"gen:command-table": "node scripts/extract-command-table.mjs",
-		"check:command-table": "node scripts/extract-command-table.mjs --check"
+		"check:command-table": "node scripts/extract-command-table.mjs --check",
+		"check:checkboxes": "node scripts/check-checkboxes.mjs"
 	},
 	"devDependencies": {
 		"@fontsource-variable/inter": "^5.2.8",
