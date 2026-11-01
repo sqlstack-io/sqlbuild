@@ -15,6 +15,12 @@ pub(crate) struct WatchdogTestCase {
     pub(crate) expected_low_horizons: usize,
 }
 
+pub(crate) struct LocationWatchdogTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_broken: usize,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct Observation {
     pub(crate) storage_id: i64,

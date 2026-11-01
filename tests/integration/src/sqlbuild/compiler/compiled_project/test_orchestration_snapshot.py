@@ -607,7 +607,10 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 "edge_platform_orders": {
                     "description": "Catch up retained platform observations with a stopped group sensor.",
                     "job_key": "edge_snapshot_group",
-                    "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
+                    "when": {
+                        "kind": "platform_event",
+                        "kinds": ["tick_overdue", "location_broken"],
+                    },
                     "minimum_interval_seconds": 7,
                     "default_status": "stopped",
                 }

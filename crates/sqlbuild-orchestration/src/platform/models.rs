@@ -119,6 +119,7 @@ pub enum PlatformEventKind {
     SchedulerNoLeader,
     TickOverdue,
     CalendarHorizonLow,
+    LocationBroken,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +138,12 @@ pub enum PlatformEvent {
         refresh_at: DateTime<Utc>,
         horizon_end: Option<DateTime<Utc>>,
     },
+    /// All observed instances of this location/target have missed three heartbeats.
+    LocationBroken {
+        location_id: Uuid,
+        target: String,
+        last_seen_at: DateTime<Utc>,
+    },
 }
 
 impl PlatformEvent {
@@ -147,6 +154,7 @@ impl PlatformEvent {
             Self::SchedulerNoLeader => PlatformEventKind::SchedulerNoLeader,
             Self::TickOverdue { .. } => PlatformEventKind::TickOverdue,
             Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
+            Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
         }
     }
 
@@ -157,6 +165,7 @@ impl PlatformEvent {
             Self::SchedulerNoLeader => "platform_scheduler_no_leader",
             Self::TickOverdue { .. } => "platform_tick_overdue",
             Self::CalendarHorizonLow { .. } => "platform_calendar_horizon_low",
+            Self::LocationBroken { .. } => "platform_location_broken",
         }
     }
 }
@@ -172,6 +181,13 @@ pub(crate) struct WatchdogTrigger {
     pub(crate) trigger_id: Uuid,
     pub(crate) definition_json: TriggerDefinition,
     pub(crate) next_due_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct WatchdogLocation {
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
+    pub(crate) last_seen_at: DateTime<Utc>,
 }
 
 /// The endpoint may contain credentials; neither errors nor Debug reveal it.
