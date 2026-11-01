@@ -1,4 +1,4 @@
-//! Existing source-freshness state rows, with their physical state-table provenance.
+//! Existing warehouse state rows, with their physical state-table provenance.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -50,9 +50,53 @@ pub struct SourceFreshnessRead {
     pub observed_since: Option<DateTime<Utc>>,
 }
 
+/// Fingerprints remain history here; latest-row selection belongs to the existing planner reader.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseFingerprintRecord {
+    pub event_id: Option<String>,
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub node_type: String,
+    pub node_name: String,
+    pub target_database: Option<String>,
+    pub target_schema: Option<String>,
+    pub target_name: Option<String>,
+    pub run_id: String,
+    pub definition_hash: String,
+    pub version_hash: String,
+    pub schema_fingerprint: String,
+    pub definition: String,
+    pub metadata_json: String,
+    pub ts: DateTime<Utc>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct SourceFreshnessPage {
-    pub records: Vec<WarehouseFreshnessRecord>,
-    pub next_after: Option<[Option<String>; 11]>,
+pub struct FingerprintRead {
+    pub location: WarehouseStateLocation,
+    pub after: Option<[Option<String>; 13]>,
+    pub observed_since: Option<DateTime<Utc>>,
+}
+
+/// The private interpreter accepts only these two known state tables, never arbitrary SQL.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WarehouseHistoryRead {
+    SourceFreshness(SourceFreshnessRead),
+    Fingerprints(FingerprintRead),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WarehouseHistoryRecord {
+    SourceFreshness(WarehouseFreshnessRecord),
+    Fingerprint(WarehouseFingerprintRecord),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseHistoryPage {
+    pub records: Vec<WarehouseHistoryRecord>,
+    pub next_after: Option<Vec<Option<String>>>,
 }

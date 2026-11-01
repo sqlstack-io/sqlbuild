@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from subprocess import Popen
 from typing import Any, Literal, NamedTuple
@@ -154,3 +155,14 @@ class WarehouseHistoryTestCase:
     connection_key: str
     journal_modes: tuple[str, ...]
     append_fingerprints: Callable[..., None]
+
+
+@dataclass(frozen=True)
+class FingerprintHistoryTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    observed_at: datetime
+    journal_modes: tuple[str, ...]
+    fixture_paths: tuple[Path, ...]
+    expected_legacy_runs: tuple[str, ...]

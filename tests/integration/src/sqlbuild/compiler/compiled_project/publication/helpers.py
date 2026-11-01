@@ -26,6 +26,7 @@ import duckdb
 import pytest
 
 from sqlbuild._native import Fingerprint, write_fingerprint
+from sqlbuild.adapter.discovery.main.resolve_adapter import resolve_adapter
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -64,6 +65,69 @@ def location_process(
             except subprocess.TimeoutExpired:
                 process.kill()
                 _ = process.wait(timeout=5)
+
+
+def open_legacy_warehouse(project: Path, adapter_name: str, connection_key: str) -> tuple[Any, Any]:
+    """The caller owns the returned real connection; declarations must never run during reads."""
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                f'name = "orders"\nadapter = "{adapter_name}"\n'
+                f'[connections.local]\n{connection_key} = "warehouse.db"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "orchestration/orders.py": 'raise AssertionError("unexpected declaration import")\n',
+        },
+    )
+    adapter: Any = resolve_adapter(adapter_name=adapter_name)
+    connection: Any = adapter.connect({connection_key: str(project / "warehouse.db")})
+    legacy_sql: str = Path(
+        "benchmarks/duckshop/edge_cases/orchestration/legacy_warehouse_state.sql"
+    ).read_text()
+    for statement in legacy_sql.rstrip().removesuffix(";").split(";"):
+        _ = adapter.execute(connection=connection, sql=statement)
+    return adapter, connection
+
+
+def warehouse_history_page(
+    project: Path,
+    table: str,
+    after: list[str | None] | None = None,
+    observed_since: str | None = None,
+) -> Any:
+    """Exercise the real isolated reader without a server, state database or declaration import."""
+    result: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "--project-dir",
+            str(project),
+            "location",
+            "runtime",
+            "--server",
+            "http://127.0.0.1:1",
+            "--location-id",
+            "00000000-0000-0000-0000-000000000001",
+            "--target",
+            "development",
+        ],
+        input=json.dumps(
+            {
+                table: {
+                    "location": {"database": None, "schema": "main"},
+                    "after": after,
+                    "observed_since": observed_since,
+                }
+            }
+        )
+        + "\n",
+        text=True,
+        capture_output=True,
+        timeout=20,
+        env=os.environ | {"SQLBUILD_CONTROL_DATABASE_URL": "unsupported://must-not-open"},
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
 
 
 def wait_for_generation(
