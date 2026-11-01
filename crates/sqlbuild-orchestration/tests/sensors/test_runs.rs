@@ -425,6 +425,10 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("upgrade fixture");
+            let (transaction, _) =
+                query(transaction, "DROP TABLE sqb_warehouse_fingerprints", vec![])
+                    .await
+                    .expect("remove subsequent fingerprint mirror migration");
             let (transaction, _) = query(transaction, "DROP TABLE sqb_warehouse_freshness", vec![])
                 .await
                 .expect("remove subsequent warehouse mirror migration");

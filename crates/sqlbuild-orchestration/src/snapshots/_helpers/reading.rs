@@ -6,9 +6,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::snapshots::_helpers::content::decompress;
 use crate::snapshots::models::{SnapshotNode, SnapshotRecord};
 use crate::store::errors::ControlError;
+use crate::store::main::decompress::decompress;
 use crate::store::main::{decode_row::decode_row, query::query};
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;

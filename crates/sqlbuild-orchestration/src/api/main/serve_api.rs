@@ -38,6 +38,10 @@ pub async fn serve_api(
             post(warehouse_metadata::report),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/fingerprints",
+            post(warehouse_metadata::report_fingerprints),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/snapshots",
             get(snapshots::current).post(snapshots::publish),
         )

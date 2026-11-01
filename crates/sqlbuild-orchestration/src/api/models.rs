@@ -28,7 +28,8 @@ use crate::api::_helpers::{
     trigger_reads::current,
     trigger_reads::events,
     trigger_reads::ticks,
-    warehouse_metadata::report
+    warehouse_metadata::report,
+    warehouse_metadata::report_fingerprints
 ))]
 pub(crate) struct ControlApi;
 

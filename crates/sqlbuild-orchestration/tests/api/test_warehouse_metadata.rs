@@ -299,6 +299,13 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 serde_json::to_value(rows).expect("rows"),
                 json!([{"target": "development", "n": 6}, {"target": "preview", "n": 4}])
             );
+            crate::api::tests::warehouse_metadata_helpers::fingerprint_history(
+                store,
+                &outbound,
+                (session_id, preview_session),
+                (&client, &url, &token.bearer),
+            )
+            .await;
             stop_api(api).await;
             close_test_store(fixture).await;
         });

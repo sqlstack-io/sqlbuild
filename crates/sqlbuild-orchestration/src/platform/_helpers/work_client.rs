@@ -8,9 +8,28 @@ use crate::api::models::MutationResponse;
 use crate::platform::models::{
     LocationWorkClaim, LocationWorkClient, LocationWorkPoll, LocationWorkResult,
 };
-use crate::warehouse_metadata::models::SourceFreshnessBatch;
+use crate::warehouse_metadata::models::{FingerprintBatch, SourceFreshnessBatch};
 
 impl LocationWorkClient {
+    pub async fn sync_fingerprints(
+        &self,
+        target: &str,
+        batch: &FingerprintBatch,
+    ) -> Result<bool, ClientError> {
+        let endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &self.location_id.to_string(),
+            "targets",
+            target,
+            "metadata",
+            "fingerprints",
+        ])?;
+        let response: MutationResponse =
+            client_response(self.connection.client.post(endpoint).json(batch)).await?;
+        Ok(response.applied)
+    }
+
     /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
     pub async fn sync_source_freshness(
         &self,

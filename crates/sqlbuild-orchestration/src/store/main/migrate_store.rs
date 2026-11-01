@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::store::_helpers::migration::{
     EXECUTED_NODES, LOCATION_INSTANCES, LOCATION_WORK, NODE_SENSORS, PLATFORM_SINK, RUN_SENSORS,
-    SCHEMA, SENSORS, WAREHOUSE_FRESHNESS, render, verify_migrations,
+    SCHEMA, SENSORS, WAREHOUSE_FINGERPRINTS, WAREHOUSE_FRESHNESS, render, verify_migrations,
 };
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
@@ -37,6 +37,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         ("executed_nodes", EXECUTED_NODES),
         ("node_sensors", NODE_SENSORS),
         ("warehouse_freshness", WAREHOUSE_FRESHNESS),
+        ("warehouse_fingerprints", WAREHOUSE_FINGERPRINTS),
     ];
     let mut digests = vec![digest.clone()];
     digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));
