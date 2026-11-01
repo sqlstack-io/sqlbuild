@@ -8,6 +8,8 @@ mod test_admin;
 mod test_control;
 #[path = "native_commands/admin/test_passwords.rs"]
 mod test_passwords;
+#[path = "native_commands/test_proxy.rs"]
+mod test_proxy;
 #[path = "native_commands/test_types.rs"]
 mod test_types;
 #[path = "native_commands/worker/test_worker.rs"]

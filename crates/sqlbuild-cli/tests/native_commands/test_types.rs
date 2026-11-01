@@ -41,6 +41,19 @@ pub(crate) struct PasswordOriginTestCase {
     pub(crate) expected_error: &'static str,
 }
 
+pub(crate) struct ProxyCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) subject: &'static str,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct ProxyConfigurationTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) configuration: &'static str,
+    pub(crate) arguments: &'static [&'static str],
+    pub(crate) expected_error: &'static str,
+}
+
 pub(crate) struct TestControl {
     pub(crate) child: Child,
     pub(crate) directory: tempfile::TempDir,

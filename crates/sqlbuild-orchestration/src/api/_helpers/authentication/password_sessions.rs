@@ -6,14 +6,13 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router, middleware};
 
-use crate::api::_helpers::authentication::password_transport::{authenticate, deny, guard};
-use crate::api::constants::{
-    HTTPS_SCHEME, PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, ROOT_PATH,
+use crate::api::_helpers::authentication::password_transport::{
+    authenticate, deny, guard, parse_origin,
 };
+use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE};
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    AuthenticationDenial, PasswordChangeRequest, PasswordLoginRequest, PasswordOrigin,
-    PasswordSessionResponse,
+    AuthenticationDenial, PasswordChangeRequest, PasswordLoginRequest, PasswordSessionResponse,
 };
 use crate::credentials::constants::{LOGIN_WINDOW_SECONDS, PASSWORD_SESSION_SECONDS};
 use crate::credentials::main::{
@@ -33,19 +32,7 @@ pub(crate) fn router(
     let Some(origin) = origin else {
         return Ok(Router::new());
     };
-    let url = reqwest::Url::parse(&origin).map_err(|_| {
-        ControlError::Invalid("password authentication requires an HTTPS origin".into())
-    })?;
-    if url.scheme() != HTTPS_SCHEME
-        || url.host().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.path() != ROOT_PATH
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        return Err(ControlError::Invalid("password authentication requires an HTTPS origin without credentials, path, query or fragment".into()));
-    }
+    let origin = parse_origin(&origin, "password")?;
     let protected = Router::new()
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
@@ -55,9 +42,7 @@ pub(crate) fn router(
         .route("/api/auth/password/login", post(login))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
-        .layer(Extension(PasswordOrigin(
-            url.origin().ascii_serialization(),
-        ))))
+        .layer(Extension(origin)))
 }
 
 #[utoipa::path(post, path = "/api/auth/password/login", operation_id = "loginPassword",

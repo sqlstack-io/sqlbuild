@@ -48,6 +48,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Requires a configured socket peer and an upstream-replaced X-SQB-User subject. Does not issue sessions or grant permissions. */
+        get: operations["proxyIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/session": {
         parameters: {
             query?: never;
@@ -631,6 +648,10 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        ProxyIdentityResponse: {
+            /** Format: uuid */
+            principal_id: string;
+        };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
             invocation_id: string;
@@ -1167,6 +1188,33 @@ export interface operations {
                 };
             };
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    proxyIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyIdentityResponse"];
+                };
+            };
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

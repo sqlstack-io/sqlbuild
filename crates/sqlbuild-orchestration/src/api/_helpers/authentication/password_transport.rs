@@ -10,17 +10,42 @@ use axum::{Extension, Json};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::api::constants::{PASSWORD_COOKIE, PASSWORD_CSRF_HEADER};
+use crate::api::constants::{HTTPS_SCHEME, PASSWORD_COOKIE, PASSWORD_CSRF_HEADER, ROOT_PATH};
 use crate::api::errors::ApiError;
-use crate::api::models::{AuthenticationDenial, PasswordOrigin};
+use crate::api::models::{AuthenticationDenial, BrowserOrigin};
 use crate::credentials::main::authenticate_session::authenticate_session;
 use crate::credentials::main::record_authentication_denial::record_authentication_denial;
 use crate::credentials::models::{AuditContext, SessionAccess};
+use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
+
+pub(crate) fn parse_origin(value: &str, mechanism: &str) -> Result<BrowserOrigin, ControlError> {
+    let error = || {
+        ControlError::Invalid(format!(
+            "{mechanism} authentication requires an HTTPS origin without credentials, path, query or fragment"
+        ))
+    };
+    let url = reqwest::Url::parse(value).map_err(|_| {
+        ControlError::Invalid(format!(
+            "{mechanism} authentication requires an HTTPS origin"
+        ))
+    })?;
+    if url.scheme() != HTTPS_SCHEME
+        || url.host().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.path() != ROOT_PATH
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(error());
+    }
+    Ok(BrowserOrigin(url.origin().ascii_serialization()))
+}
 
 pub(crate) async fn guard(
     State(store): State<ControlStore>,
-    Extension(origin): Extension<PasswordOrigin>,
+    Extension(origin): Extension<BrowserOrigin>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {

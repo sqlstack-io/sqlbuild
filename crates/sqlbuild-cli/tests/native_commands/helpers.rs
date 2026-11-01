@@ -15,6 +15,10 @@ pub(crate) fn isolated_binary(directory: &Path) -> std::path::PathBuf {
 
 pub(crate) fn start_control(arguments: &[&str]) -> TestControl {
     let directory = tempfile::tempdir().expect("isolated native control project");
+    start_control_in(directory, arguments)
+}
+
+pub(crate) fn start_control_in(directory: tempfile::TempDir, arguments: &[&str]) -> TestControl {
     let binary = isolated_binary(directory.path());
     let stderr = directory.path().join("control.log");
     let child = Command::new(binary)
