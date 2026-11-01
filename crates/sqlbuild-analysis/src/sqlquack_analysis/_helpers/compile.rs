@@ -1,32 +1,55 @@
 //! One compiled model's lineage from SQLQuack, in SQLBuild's compile lineage terms.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, SchemaColumn};
+use sqlquack_semantics::lineage::models::{
+    LineageContext, Nullability, OutputLineage, SchemaColumn,
+};
 use sqlquack_semantics::query_lineage;
 use sqlquack_syntax::Dialect;
 
+use crate::constants::UNKNOWN_SQL_TYPE;
 use crate::sqlquack_analysis::_helpers::outputs::{
     confidence, lineage_parse_options, transform_kind,
 };
-use crate::sqlquack_analysis::_helpers::schema::{RelationColumns, relation_key, schema_columns};
-use crate::sqlquack_analysis::models::{CompileLineageColumn, CompiledModelSql};
+use crate::sqlquack_analysis::_helpers::schema::{TypedRelations, relation_key, schema_columns};
+use crate::sqlquack_analysis::constants::{
+    NON_NULL, NULLABLE, QUOTE, TEXT_TYPE, UNKNOWN_NULLABILITY, VARCHAR_TYPE,
+};
+use crate::sqlquack_analysis::models::{CompileFunctions, CompileLineageColumn, CompiledModelSql};
 
 /// The model's lineage columns, `None` when SQLQuack cannot read its SQL.
 pub(crate) fn model_lineage(
     model: &CompiledModelSql<'_>,
-    dialect: Dialect,
-    profile: &'static dyn DialectProfile,
+    functions: CompileFunctions<'_>,
+    (dialect, profile): (Dialect, &'static dyn DialectProfile),
 ) -> Option<Vec<CompileLineageColumn>> {
-    let schema = RelationColumns(
-        model
-            .schema
-            .iter()
-            .filter(|(_, columns)| !columns.is_empty())
-            .map(|(relation, columns)| (relation_key(relation, profile), column_names(columns)))
-            .collect(),
-    );
+    let quoted: HashSet<&str> = quoted_identifiers(model.sql);
+    let relations =
+        |shapes: &[(String, Vec<(String, String)>)]| -> HashMap<String, Vec<SchemaColumn>> {
+            shapes
+                .iter()
+                .filter(|(_, columns)| !columns.is_empty())
+                .map(|(relation, columns)| {
+                    let nullability: &[(String, String)] = relation_nullability(model, relation);
+                    (
+                        relation_key(relation, profile),
+                        typed_columns(columns, nullability, (&quoted, profile)),
+                    )
+                })
+                .collect()
+        };
+    let closed: HashMap<String, Vec<SchemaColumn>> = relations(model.schema);
+    let open: HashMap<String, Vec<SchemaColumn>> = relations(model.types)
+        .into_iter()
+        .filter(|(relation, _)| !closed.contains_key(relation))
+        .collect();
+    let schema = TypedRelations {
+        closed,
+        open,
+        functions,
+    };
     let references: HashMap<String, (&str, &str)> = model
         .references
         .iter()
@@ -55,9 +78,46 @@ pub(crate) fn model_lineage(
     }
 }
 
-/// A relation's schema columns from its `(column, type)` pairs.
-fn column_names(columns: &[(String, String)]) -> Vec<SchemaColumn> {
-    schema_columns(columns.iter().map(|(name, _)| name.as_str()))
+/// The catalog's `(column, nullability)` pairs for `relation`.
+fn relation_nullability<'a>(
+    model: &CompiledModelSql<'a>,
+    relation: &str,
+) -> &'a [(String, String)] {
+    model
+        .nullability
+        .iter()
+        .find(|(name, _)| name == relation)
+        .map_or(&[], |(_, pairs)| pairs.as_slice())
+}
+
+/// A relation's typed schema columns; a lower-case name the SQL reads quoted is that quoted name.
+fn typed_columns(
+    columns: &[(String, String)],
+    nullability: &[(String, String)],
+    (quoted, profile): (&HashSet<&str>, &dyn DialectProfile),
+) -> Vec<SchemaColumn> {
+    let mut typed: Vec<SchemaColumn> =
+        schema_columns(columns.iter().map(|(name, _)| name.as_str()));
+    for column in &mut typed {
+        if !column.quoted
+            && quoted.contains(column.name.as_str())
+            && profile.resolved_identifier(&column.name, false) != column.name
+        {
+            column.quoted = true;
+        }
+        let written = |name: &String| name.trim_matches(QUOTE) == column.name;
+        column.data_type = columns
+            .iter()
+            .find(|(name, _)| written(name))
+            .map(|(_, data_type)| data_type.clone())
+            .filter(|data_type| !data_type.is_empty() && data_type != UNKNOWN_SQL_TYPE);
+        column.nullability = match nullability.iter().find(|(name, _)| written(name)) {
+            Some((_, value)) if value == NON_NULL => Nullability::NonNull,
+            Some((_, value)) if value == NULLABLE => Nullability::Nullable,
+            _ => Nullability::Unknown,
+        };
+    }
+    typed
 }
 
 fn lineage_column(
@@ -81,5 +141,74 @@ fn lineage_column(
         transform: transform_kind(output.kind),
         confidence: confidence(output.resolved, !sources.is_empty()),
         sources: sources.into_iter().collect(),
+        data_type: output.data_type.as_deref().map(project_type),
+        nullability: match output.nullability {
+            Nullability::NonNull => NON_NULL,
+            Nullability::Nullable => NULLABLE,
+            Nullability::Unknown => UNKNOWN_NULLABILITY,
+        },
     }
+}
+
+/// An output type in SQLBuild's spelling: unsized text is `TEXT`, sized text `VARCHAR(n)`.
+fn project_type(data_type: &str) -> String {
+    let upper: String = data_type.to_uppercase();
+    if upper == VARCHAR_TYPE {
+        return TEXT_TYPE.to_owned();
+    }
+    match upper
+        .strip_prefix("TEXT(")
+        .and_then(|suffix| suffix.strip_suffix(')'))
+    {
+        Some(length) => format!("{VARCHAR_TYPE}({length})"),
+        None => data_type.to_owned(),
+    }
+}
+
+/// The double-quoted identifiers of `sql`, outside string literals and comments.
+fn quoted_identifiers(sql: &str) -> HashSet<&str> {
+    let mut found: HashSet<&str> = HashSet::new();
+    let bytes: &[u8] = sql.as_bytes();
+    let mut index: usize = 0;
+    while index < bytes.len() {
+        match (bytes[index], bytes.get(index + 1)) {
+            (b'\'', _) => index = string_end(bytes, index + 1),
+            (b'-', Some(b'-')) => {
+                index = bytes[index..]
+                    .iter()
+                    .position(|byte| *byte == b'\n')
+                    .map_or(bytes.len(), |end| index + end);
+            }
+            (b'/', Some(b'*')) => {
+                index = sql[index + 2..]
+                    .find("*/")
+                    .map_or(bytes.len(), |end| index + 2 + end + 2);
+            }
+            (b'"', _) => {
+                let start: usize = index + 1;
+                match bytes[start..].iter().position(|byte| *byte == b'"') {
+                    Some(length) => {
+                        found.insert(&sql[start..start + length]);
+                        index = start + length + 1;
+                    }
+                    None => index = bytes.len(),
+                }
+            }
+            _ => index += 1,
+        }
+    }
+    found
+}
+
+/// The position after the single-quoted literal whose body starts at `index`.
+fn string_end(bytes: &[u8], mut index: usize) -> usize {
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => index += 2,
+            b'\'' if bytes.get(index + 1) == Some(&b'\'') => index += 2,
+            b'\'' => return index + 1,
+            _ => index += 1,
+        }
+    }
+    index
 }

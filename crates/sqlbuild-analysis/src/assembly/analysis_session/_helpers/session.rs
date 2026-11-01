@@ -48,7 +48,7 @@ use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_argument
 use crate::sql_macros::models::SqlMacroFinding;
 use crate::sql_macros::types::ArgumentCheckInput;
 use crate::sqlquack_analysis::main::compile_lineage::compile_lineage;
-use crate::sqlquack_analysis::models::{CompileLineageColumn, CompiledModelSql};
+use crate::sqlquack_analysis::models::{CompileFunctions, CompileLineageColumn, CompiledModelSql};
 
 /// What an internal native failure of the session names.
 const SESSION_CONTEXT: &str = "native model analysis";
@@ -532,6 +532,7 @@ impl AnalysisSession {
                 analysis.binding_validated = true;
             }
         }
+        self.sqlquack_lineage(&models)?;
         if self.dependency_ordered {
             if self.request.case_sensitive_shapes {
                 self.ensure_cleaned(&models)?;
@@ -540,7 +541,6 @@ impl AnalysisSession {
                 self.publish(*model)?;
             }
         }
-        self.sqlquack_lineage(&models)?;
         self.store_cached(&models);
         Ok(())
     }
@@ -556,8 +556,16 @@ impl AnalysisSession {
             return Ok(());
         }
         let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
+        let nullability: Vec<Shapes> = analysed
+            .iter()
+            .map(|model| self.input_nullability(*model))
+            .collect();
+        let types: Vec<Shapes> = analysed
+            .iter()
+            .map(|model| self.input_types(*model))
+            .collect();
         let mut inputs: Vec<CompiledModelSql<'_>> = Vec::with_capacity(analysed.len());
-        for model in &analysed {
+        for ((model, nullability), types) in analysed.iter().zip(&nullability).zip(&types) {
             let outcome: &ModelOutcome = self.outcomes[*model]
                 .as_ref()
                 .ok_or("a wave model was not analysed")?;
@@ -565,9 +573,20 @@ impl AnalysisSession {
                 sql: &outcome.cleaned_sql,
                 references: &self.request.models[*model].lineage_references,
                 schema: &outcome.validated_schema,
+                types,
+                nullability,
             });
         }
-        let Some(lineages) = compile_lineage(&self.request.dialect, &inputs, &pool)? else {
+        let Some(lineages) = compile_lineage(
+            &self.request.dialect,
+            &inputs,
+            CompileFunctions {
+                return_types: &self.request.function_return_types,
+                nullability_rules: self.request.nullability_rules.as_deref().unwrap_or(&[]),
+            },
+            &pool,
+        )?
+        else {
             return Ok(());
         };
         for (model, lineage) in analysed.into_iter().zip(lineages) {
@@ -575,6 +594,7 @@ impl AnalysisSession {
             let (Some(lineage), true) = (lineage, outcome.analysis.analysis_succeeded) else {
                 continue;
             };
+            outcome.analysis.columns = Some(lineage.iter().map(column_fact).collect());
             let rows: Vec<LineageRow> = lineage.into_iter().map(lineage_row).collect();
             outcome.analysis.lineage = match &outcome.analysis.lineage {
                 LineageFacts::Native(_) => LineageFacts::Native(rows),
@@ -582,6 +602,30 @@ impl AnalysisSession {
             };
         }
         Ok(())
+    }
+
+    /// The catalog nullability of each relation `model` reads.
+    fn input_nullability(&self, model: usize) -> Shapes {
+        self.request.models[model]
+            .required_names
+            .iter()
+            .filter_map(|name| {
+                let pairs: &Pairs = self.available_nullability.get(name)?;
+                Some((name.clone(), pairs.clone()))
+            })
+            .collect()
+    }
+
+    /// The catalog types of each relation `model` reads, its column list complete or not.
+    fn input_types(&self, model: usize) -> Shapes {
+        self.request.models[model]
+            .required_names
+            .iter()
+            .filter_map(|name| {
+                let pairs: &Pairs = self.available_types.get(name)?;
+                Some((name.clone(), pairs.clone()))
+            })
+            .collect()
     }
 
     /// Answer `models` from the cache where it can; returns the positions it cannot answer.
@@ -963,5 +1007,14 @@ fn lineage_row(column: CompileLineageColumn) -> LineageRow {
             LineageConfidence::Unknown => CONFIDENCE_UNKNOWN,
         },
         sources: column.sources,
+    }
+}
+
+/// SQLQuack's type and nullability of one output column.
+fn column_fact(column: &CompileLineageColumn) -> ColumnFact {
+    ColumnFact {
+        name: column.output_column.clone(),
+        data_type: column.data_type.clone(),
+        nullability: column.nullability.to_owned(),
     }
 }

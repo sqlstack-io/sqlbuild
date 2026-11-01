@@ -1,5 +1,5 @@
-use crate::sqlquack_analysis::tests::helpers::compile_lines;
-use crate::sqlquack_analysis::tests::test_types::CompileLineageTestCase;
+use crate::sqlquack_analysis::tests::helpers::{compile_lines, compile_types};
+use crate::sqlquack_analysis::tests::test_types::{CompileLineageTestCase, CompileTypesTestCase};
 
 #[test]
 fn given_a_compiled_model_when_tracing_compile_lineage_then_columns_name_their_resources() {
@@ -47,6 +47,41 @@ fn given_a_compiled_model_when_tracing_compile_lineage_then_columns_name_their_r
     for test_case in test_cases {
         assert_eq!(
             compile_lines(test_case.dialect, test_case.sql),
+            test_case.expected_lines,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_compiled_model_when_typing_outputs_then_the_catalog_and_its_functions_decide() {
+    let test_cases = [
+        CompileTypesTestCase {
+            description: "stored columns keep their catalog type and nullability; unsized text is TEXT",
+            sql: "SELECT o.id, o.amount FROM ORDERS_REL o",
+            expected_lines: &["id NUMBER(38,0) non_null", "amount TEXT nullable"],
+        },
+        CompileTypesTestCase {
+            description: "a relation known only in part types the columns it lists",
+            sql: "SELECT e.kind, e.other FROM EVENTS_REL e",
+            expected_lines: &["kind TEXT unknown", "other - unknown"],
+        },
+        CompileTypesTestCase {
+            description: "a lower-case catalog name the SQL quotes is that quoted name",
+            sql: "SELECT e.\"user\" AS username FROM EVENTS_REL e",
+            expected_lines: &["username VARCHAR(16777216) unknown"],
+        },
+        CompileTypesTestCase {
+            description: "the adapter's function return types and nullability rules apply",
+            sql: "SELECT UPPER(o.amount) AS shouted, LISTAGG(o.amount, ',') AS listed \
+                  FROM ORDERS_REL o",
+            expected_lines: &["shouted TEXT nullable", "listed TEXT unknown"],
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            compile_types(test_case.sql),
             test_case.expected_lines,
             "{}",
             test_case.description

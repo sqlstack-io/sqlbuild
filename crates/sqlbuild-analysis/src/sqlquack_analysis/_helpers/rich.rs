@@ -6,7 +6,9 @@ use rayon::ThreadPool;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_semantics::lineage::models::{LineageContext, OutputLineage, SchemaColumn};
+use sqlquack_semantics::lineage::models::{
+    LineageContext, Nullability, OutputLineage, SchemaColumn,
+};
 use sqlquack_semantics::query_lineage;
 use sqlquack_syntax::Dialect;
 
@@ -66,6 +68,8 @@ pub(crate) fn model_lineage(
         .map(|output| SchemaColumn {
             name: output.name.clone(),
             quoted: context.profile.resolved_identifier(&output.name, false) != output.key,
+            data_type: None,
+            nullability: Nullability::Unknown,
         })
         .collect();
     (
