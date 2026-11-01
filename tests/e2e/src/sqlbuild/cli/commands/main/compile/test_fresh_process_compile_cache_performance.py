@@ -51,6 +51,41 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_count=500,
             test_count=2_945,
             audit_count=5_056,
+            # Default SQL Rules: 9.0 s scaled by the measured 1.19x cold cost over select = [].
+            expected_cold_max_wall_seconds=10.75,
+            expected_warm_max_wall_seconds=4.5,
+            expected_edit_max_wall_seconds=4.5,
+            expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
+            expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
+            expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
+            expected_max_cache_write_wall_overhead_ratio=_MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO,
+            expected_max_rss_bytes=1152 * _MIB,
+            expected_max_cache_bytes=96 * _MIB,
+            expected_cold_fingerprint=(
+                "1914b788abcb452422eaf6c3a2c240ff390bab9530217285a5ca93334db7b6c3"
+            ),
+            expected_leaf_edit_fingerprint=(
+                "3a9480f952f11e16177274185e8bfda7eb0e65953a8ed1c8b21ad3cdb7d0b07d"
+            ),
+            expected_macro_edit_fingerprint=(
+                "552931889359ce882b18d4fb11fdc87341e60a8a4d2b26ad0f1635138c8b9ad8"
+            ),
+            expected_project_config_fingerprint=(
+                "6bf4f742469eee2be7eb5bbf2411564c924011fea0bd43becd80db4027022dac"
+            ),
+            macro_call_interval=6,
+            scoped_macros=True,
+            expected_macro_edit_misses=1,
+        ),
+        FreshProcessCompileCachePerformanceGuardTestCase(
+            description="models_3000_fresh_process_compiler_only_compile_cache_stays_incremental",
+            model_count=3_000,
+            source_count=713,
+            seed_count=141,
+            function_count=71,
+            macro_count=500,
+            test_count=2_945,
+            audit_count=5_056,
             expected_cold_max_wall_seconds=9.0,
             expected_warm_max_wall_seconds=4.5,
             expected_edit_max_wall_seconds=4.5,
@@ -75,6 +110,7 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_call_interval=6,
             scoped_macros=True,
             expected_macro_edit_misses=1,
+            compiler_only=True,
         ),
         FreshProcessCompileCachePerformanceGuardTestCase(
             description="models_5000_fresh_process_compile_cache_stays_incremental",
@@ -167,6 +203,7 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         expected_edit_max_wall_seconds=test_case.expected_edit_max_wall_seconds,
         macro_call_interval=test_case.macro_call_interval,
         scoped_macros=test_case.scoped_macros,
+        compiler_only=test_case.compiler_only,
     )
     measurements: dict[str, FreshProcessCompileBenchmarkResult] = {
         "cache_disabled": result.cache_disabled,

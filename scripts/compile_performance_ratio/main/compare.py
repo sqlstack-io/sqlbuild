@@ -16,6 +16,7 @@ from scripts.compile_performance_ratio._helpers.measure import (
 from scripts.compile_performance_ratio._helpers.report import append_summary, comparison_markdown
 from scripts.compile_performance_ratio._helpers.verdict import phase_failures, ratio_failures
 from scripts.compile_performance_ratio.constants import (
+    COLD_MODE,
     COMPILE_MODES,
     DEFAULT_MAX_RATIO,
     DEFAULT_RUNS,
@@ -41,7 +42,12 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
             Path(root) / "base" / project_name if per_side_projects else head_project_dir
         )
         print(f"Generating {args.kind} project with {args.models} models", file=sys.stderr)
-        write_benchmark_project(kind=args.kind, project_dir=head_project_dir, models=args.models)
+        write_benchmark_project(
+            kind=args.kind,
+            project_dir=head_project_dir,
+            models=args.models,
+            compiler_only=args.compiler_only,
+        )
         if args.base_root is not None:
             print(f"Generating the base project with {args.base_root}'s generator", file=sys.stderr)
             write_base_benchmark_project(
@@ -63,13 +69,20 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
             modes=modes,
             compile_args=tuple(args.compile_args),
         )
-    mode_max_ratios: dict[str, float] = (
-        {} if args.edit_max_ratio is None else {EDIT_MODE: args.edit_max_ratio}
-    )
+    mode_max_ratios: dict[str, float] = {
+        mode: limit
+        for mode, limit in ((COLD_MODE, args.cold_max_ratio), (EDIT_MODE, args.edit_max_ratio))
+        if limit is not None
+    }
     gate_phases: tuple[str, ...] = tuple(dict.fromkeys(args.gate_phases))
-    mode_cpu_max_ratios: dict[str, float] = (
-        {} if args.edit_max_cpu_ratio is None else {EDIT_MODE: args.edit_max_cpu_ratio}
-    )
+    mode_cpu_max_ratios: dict[str, float] = {
+        mode: limit
+        for mode, limit in (
+            (COLD_MODE, args.cold_max_cpu_ratio),
+            (EDIT_MODE, args.edit_max_cpu_ratio),
+        )
+        if limit is not None
+    }
     failures: tuple[str, ...] = (
         phase_failures(
             comparisons=comparisons,
@@ -98,6 +111,7 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
         mode_cpu_max_ratios=mode_cpu_max_ratios,
         gate_phases=gate_phases,
         compile_args=tuple(args.compile_args),
+        compiler_only=args.compiler_only,
     )
     print(markdown)
     _ = append_summary(path=Path(summary_value) if summary_value else None, markdown=markdown)
@@ -132,6 +146,18 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--max-ratio", type=float, default=DEFAULT_MAX_RATIO)
     parser.add_argument(
+        "--cold-max-ratio",
+        type=float,
+        default=None,
+        help="Ratio limit of the cold mode only; defaults to --max-ratio.",
+    )
+    parser.add_argument(
+        "--cold-max-cpu-ratio",
+        type=float,
+        default=None,
+        help="CPU ratio limit for cold mode only; defaults to the mode's ratio limit.",
+    )
+    parser.add_argument(
         "--edit-max-cpu-ratio",
         type=float,
         default=None,
@@ -155,6 +181,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="append",
         default=[],
         help="Extra `sqb compile` argument for both builds, e.g. `--compile-arg=--select=*`.",
+    )
+    parser.add_argument(
+        "--compiler-only",
+        action="store_true",
+        help="Write the head project with `select = []`, so both builds run the compiler without "
+        "default SQL Rules; the base predates default Rules.",
     )
     parser.add_argument(
         "--gate-phase",

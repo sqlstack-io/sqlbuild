@@ -52,10 +52,14 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
 )
 
 
-def write_benchmark_project(*, kind: str, project_dir: Path, models: int) -> None:
-    """Write the dense or fresh benchmark project used by both builds."""
+def write_benchmark_project(
+    *, kind: str, project_dir: Path, models: int, compiler_only: bool = False
+) -> None:
+    """Write the benchmark project; a fresh `compiler_only` project sets `select = []`."""
 
     if kind == DENSE_KIND:
+        if compiler_only:
+            raise CompileComparisonError("compiler-only comparisons support the fresh project only")
         write_dense_compile_project(project_dir=project_dir, model_count=models)
         return
     write_semantic_compile_project(
@@ -67,6 +71,7 @@ def write_benchmark_project(*, kind: str, project_dir: Path, models: int) -> Non
         macro_count=max(1, round(models * FRESH_MACRO_SHARE)),
         test_count=max(1, round(models * FRESH_TEST_SHARE)),
         audit_count=max(1, round(models * FRESH_AUDIT_SHARE)),
+        compiler_only=compiler_only,
     )
 
 

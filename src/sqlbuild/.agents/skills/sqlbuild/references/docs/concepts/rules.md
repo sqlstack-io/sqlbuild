@@ -228,6 +228,11 @@ rather than every invocation. Project Rules run once over the complete project v
 explicit choice for genuinely project-wide requirements, with broader invalidation. SQLBuild tracks
 the inputs each Rule depends on so cached findings are reused only while those inputs remain valid.
 
+The default SQL Rules lint every compiled model, so a cold compile without a cache costs more than
+the compiler alone: about 14% more wall time and 28% more CPU on a generated 3,000-model project.
+Warm and one-model edit compiles reuse cached findings and cost the same. Set `select = []` to
+measure or run the compiler without them.
+
 Required CI exercises custom Rule packs over generated projects, checking compilation time,
 memory, and cache invalidation. Separate 20- and 100-Rule profiles measure the cost of custom
 validation at 5,000-model scale.

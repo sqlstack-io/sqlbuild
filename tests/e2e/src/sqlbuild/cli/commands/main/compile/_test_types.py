@@ -172,6 +172,8 @@ class FreshProcessCompilePerformanceGuardTestCase:
     expected_max_wall_seconds: float
     expected_max_rss_bytes: int
     expected_semantic_fingerprint: str
+    # `select = []`: the compiler alone, without the default SQL Rules.
+    compiler_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -200,6 +202,8 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     macro_call_interval: int
     scoped_macros: bool
     expected_macro_edit_misses: int
+    # `select = []`: the compiler alone, without the default SQL Rules.
+    compiler_only: bool = False
 
 
 @dataclass(frozen=True)

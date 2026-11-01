@@ -140,7 +140,7 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules, the formatter and the canonical token stream.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "65eb3f32683a6a6fc84ca3b8637d2cabda750425" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "aed227a01101d434a2e43098468400989b60537f" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 tempfile = "3"

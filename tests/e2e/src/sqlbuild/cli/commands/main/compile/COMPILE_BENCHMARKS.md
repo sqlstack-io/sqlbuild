@@ -98,6 +98,17 @@ same runner, three alternating runs per mode, and the medians of wall and CPU ti
 - warm: an unchanged `sqb compile --json` after one untimed run that writes the cache;
 - edit: `sqb compile --json` after the same one-model edit as the release comparison below.
 
+The base branch predates the default SQL Rules, so the fresh comparison runs twice. The
+compiler-only job writes the head project with `select = []` and keeps the 1.10x limit for every
+mode. The default Rules job allows 1.25x cold wall and 1.41x cold CPU: the 1.10x limit times the
+measured cold cost of the default Rules over `select = []` on the same machine (1.14x wall, 1.28x
+CPU, five paired runs). Its warm and edit modes keep 1.10x.
+
+The fresh-process 3,000- and 5,000-model compile guards and the 3,000-model cache guard follow the
+same split (approved 2026-11-01): `compiler_only` cases keep the previous wall budgets, and the
+default Rules cases scale them by the measured cold cost (1.14x and 1.16x fresh, 1.19x for the cache
+guard's cold and project-config runs). Larger cases already fit their budgets and are unchanged.
+
 The warm and edit modes reuse the cold project. A warm run that misses the analysis cache, or an
 edit run that does not, stops the comparison because it would measure the wrong path.
 

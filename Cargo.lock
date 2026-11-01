@@ -1501,7 +1501,7 @@ dependencies = [
 [[package]]
 name = "sqlclean"
 version = "0.4.1"
-source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=65eb3f32683a6a6fc84ca3b8637d2cabda750425#65eb3f32683a6a6fc84ca3b8637d2cabda750425"
+source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=aed227a01101d434a2e43098468400989b60537f#aed227a01101d434a2e43098468400989b60537f"
 dependencies = [
  "polyglot-sql",
  "polyglot-sql-function-catalogs",

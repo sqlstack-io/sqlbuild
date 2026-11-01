@@ -522,6 +522,7 @@ def run_fresh_process_semantic_compile_benchmark(
     test_count: int,
     audit_count: int,
     expected_max_wall_seconds: float,
+    compiler_only: bool = False,
 ) -> FreshProcessCompileBenchmarkResult:
     """Compile one clean semantic fixture in a fresh process without compiler caches."""
 
@@ -534,6 +535,7 @@ def run_fresh_process_semantic_compile_benchmark(
         macro_count=macro_count,
         test_count=test_count,
         audit_count=audit_count,
+        compiler_only=compiler_only,
     )
     target_dir: Path = project_dir / "target"
     assert not target_dir.exists()
@@ -562,6 +564,7 @@ def run_fresh_process_compile_cache_benchmark(
     expected_edit_max_wall_seconds: float,
     macro_call_interval: int,
     scoped_macros: bool,
+    compiler_only: bool = False,
 ) -> FreshProcessCompileCacheBenchmarkResult:
     """Measure exact and incremental cache reuse across independent CLI processes."""
 
@@ -576,6 +579,7 @@ def run_fresh_process_compile_cache_benchmark(
         audit_count=audit_count,
         macro_call_interval=macro_call_interval,
         scoped_macros=scoped_macros,
+        compiler_only=compiler_only,
     )
     target_dir: Path = project_dir / "target"
     assert not target_dir.exists()
@@ -1583,14 +1587,16 @@ def write_semantic_compile_project(
     scoped_macros: bool = False,
     shared_diamond_layers: int = 0,
     shared_diamond_width: int = 0,
+    compiler_only: bool = False,
 ) -> None:
     """Write a neutral project with broad resources and dense SQL semantics.
 
     A positive `shared_diamond_layers` adds the shared-dependency lattice from
     `write_shared_diamond_models`; the default leaves the compile guard fixtures unchanged.
+    `compiler_only` sets `select = []` so a guard measures the compiler without default Rules.
     """
 
-    _layered_write_project_config(project_dir=project_dir)
+    _layered_write_project_config(project_dir=project_dir, compiler_only=compiler_only)
     _layered_write_sources(project_dir=project_dir, source_count=source_count)
     _layered_write_seeds(project_dir=project_dir, seed_count=seed_count)
     _layered_write_functions(project_dir=project_dir, function_count=function_count)
@@ -1627,10 +1633,11 @@ def write_semantic_compile_project(
     )
 
 
-def _layered_write_project_config(*, project_dir: Path) -> None:
+def _layered_write_project_config(*, project_dir: Path, compiler_only: bool = False) -> None:
     project_dir.mkdir(parents=True)
+    rules_selection: str = {True: "[rules]\nselect = []\n\n", False: ""}[compiler_only]
     (project_dir / "sqlbuild_project.toml").write_text(
-        """name = "layered_production_performance_guard"
+        f"""name = "layered_production_performance_guard"
 adapter = "duckdb"
 default_target = "dev"
 
@@ -1655,7 +1662,7 @@ materialized = "table"
 [path_defaults."mart"]
 materialized = "table"
 
-[[rules.rule_ignores]]
+{rules_selection}[[rules.rule_ignores]]
 rules = ["SQLCLEAN039"]
 paths = ["models/**"]
 reason = "The workload mixes nested query shapes on purpose to cover their compile path."
