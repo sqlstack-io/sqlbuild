@@ -7,13 +7,17 @@
 	import SegmentedFilter from '$lib/components/list/segmented-filter.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import NoAccess from '$lib/components/platform/no-access.svelte';
-	import { CAPABILITIES, type AuditOutcome } from '$lib/api';
+	import { page } from '$app/state';
+	import CopyButton from '$lib/components/copy-button.svelte';
+	import type { AuditOutcome } from '$lib/api';
+	import { checkHref, personHref } from '$lib/platform/access';
+	import { AUDIT_ACTIONS, auditActionLabel } from '$lib/platform/permission-catalog';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { formatAssignmentScope } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
-	let actor = $state('');
+	let actor = $state(page.url.searchParams.get('actor') ?? '');
 	let action = $state('');
 	let outcome = $state<AuditOutcome | 'any'>('any');
 	let evidenceOnly = $state(false);
@@ -26,7 +30,6 @@
 	const everyone = createResource((client) => (app.can('audit.view') ? client.listAuditEntries({ limit: 500 }) : Promise.resolve([])));
 
 	const actors = $derived([...new Set((everyone.data ?? []).map((e) => e.actor.name))].sort());
-	const actions = [...CAPABILITIES, 'role.approve', 'role.reject', 'session.login'];
 	const rows = $derived(entries.data ?? []);
 	const locations = $derived(app.bootstrap?.locations ?? []);
 </script>
@@ -51,8 +54,8 @@
 			{#each actors as a (a)}<option value={a}>{a}</option>{/each}
 		</select>
 		<select class="field" bind:value={action} aria-label="Action">
-			<option value="">Any permission</option>
-			{#each actions as a (a)}<option value={a}>{a}</option>{/each}
+			<option value="">Any action</option>
+			{#each AUDIT_ACTIONS as a (a)}<option value={a}>{auditActionLabel(a)} ({a})</option>{/each}
 		</select>
 		<SegmentedFilter
 			bind:value={outcome}
@@ -75,7 +78,7 @@
 				<tr>
 					<th>When</th>
 					<th>Who</th>
-					<th title="The permission the request needed">Permission</th>
+					<th title="The action the request needed">Action</th>
 					<th>Where</th>
 					<th>Result</th>
 					<th>Allowed by role</th>
@@ -87,18 +90,27 @@
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
 						<td>
-							{e.actor.name}
+							{#if e.actor.kind === 'user' || e.actor.kind === 'service_account'}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
 							<div class="cell-desc">{e.ip}</div>
 						</td>
 						<td>
-							<code>{e.action}</code>
+							<span title={e.action}>{auditActionLabel(e.action)}</span>
 							{#if e.evidenceRead}<span class="evidence" title="They looked at stored sample or failing rows (evidence)"><EyeIcon size={12} /> read sample rows</span>{/if}
 						</td>
 						<td class="muted">
 							{formatAssignmentScope(e.scope, locations)}
 							{#if e.scope.subject}<div class="cell-desc"><code>{e.scope.subject}</code></div>{/if}
 						</td>
-						<td><StatusLabel tone={e.outcome === 'denied' ? 'var(--sb-error)' : 'var(--sb-success)'} label={e.outcome === 'denied' ? 'Denied' : 'Allowed'} /></td>
+						<td>
+							<StatusLabel tone={e.outcome === 'denied' ? 'var(--sb-error)' : 'var(--sb-success)'} label={e.outcome === 'denied' ? 'Denied' : 'Allowed'} />
+							{#if e.decisionId}
+								<div class="decision">
+									<code title="Decision ID, as shown in the error message">{e.decisionId}</code>
+									<CopyButton value={e.decisionId} label="Copy decision ID" />
+									<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>
+								</div>
+							{/if}
+						</td>
 						<td class="muted">{e.grantingRole ?? '—'}</td>
 						<td class="detail">
 							{e.summary}
@@ -161,5 +173,13 @@
 	}
 	.detail {
 		max-width: 420px;
+	}
+	.decision {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 2px;
+		font-size: 12px;
+		white-space: nowrap;
 	}
 </style>
