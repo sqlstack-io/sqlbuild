@@ -49,7 +49,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
     [
         GroupExecutionTestCase(
             "group execution preserves independent downstream work",
-            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT amount FROM orders",
             "partial",
             [(11,)],
@@ -87,7 +87,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
         ),
         GroupExecutionTestCase(
             "whole downstream job is blocked without building an empty selection",
-            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
             "partial",
             [(0,)],
@@ -96,7 +96,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
         ),
         GroupExecutionTestCase(
             "job failure stops the group",
-            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
             "failed",
             [(0,)],
@@ -107,7 +107,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
         ),
         GroupExecutionTestCase(
             "critical node stops the group under the default policy",
-            "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
             "failed",
             [(0,)],
@@ -117,7 +117,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             files={
                 "models/broken_orders.sql": (
                     "MODEL (description 'Critical orders.', materialized table, critical true);\n"
-                    "SELECT CAST(value AS INTEGER) AS amount FROM (VALUES ('invalid')) AS source(value)\n"
+                    "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source\n"
                 ),
             },
         ),
@@ -398,7 +398,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
     [
         WorkerExecutionTestCase(
             "successful model writes actual rows",
-            "SELECT CAST(value AS BIGINT) AS amount FROM (VALUES ('23')) t(value)",
+            "WITH source(value) AS (VALUES ('23')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT amount FROM orders",
             "success",
             [(23,)],
@@ -443,7 +443,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
         ),
         WorkerExecutionTestCase(
             "warehouse error retains failed node evidence",
-            "SELECT CAST(value AS BIGINT) AS amount FROM (VALUES ('invalid')) t(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
             "failed",
             [(0,)],

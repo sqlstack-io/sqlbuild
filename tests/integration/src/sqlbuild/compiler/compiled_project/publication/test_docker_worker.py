@@ -43,7 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     [
         WorkerExecutionTestCase(
             "pinned container inherits project context but not privileged credentials",
-            "SELECT CAST(value AS BIGINT) AS amount FROM (VALUES ('37')) t(value)",
+            "WITH source(value) AS (VALUES ('37')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT amount FROM orders",
             "success",
             [(37,)],
@@ -65,7 +65,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
         ),
         WorkerExecutionTestCase(
             "container warehouse error retains failed node evidence",
-            "SELECT CAST(value AS BIGINT) AS amount FROM (VALUES ('invalid')) t(value)",
+            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS BIGINT) AS amount FROM source",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",
             "failed",
             [(0,)],
