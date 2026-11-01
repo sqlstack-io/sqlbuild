@@ -105,7 +105,7 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				title: `${plural(item.count, 'role change')} waiting for approval`,
 				detail: item.roles.join(', '),
 				since: '',
-				href: '/admin/roles',
+				href: '/admin/roles?tab=approvals',
 				action: 'Review'
 			};
 	}

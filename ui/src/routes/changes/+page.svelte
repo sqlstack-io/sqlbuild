@@ -113,10 +113,10 @@
 						{#each c.roles as r (r.role)}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[r.op]}>{changeOpLabel[r.op]}</span>
-								<a class="key" href="/admin/roles">{r.role}</a>
+								<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
 								<span class="detail">
 									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
-									{#if r.approvalId}<a class="tag link" href="/admin/roles">needs approval</a>{/if}
+									{#if r.approvalId}<a class="tag link" href="/admin/roles?tab=approvals">needs approval</a>{/if}
 								</span>
 							</div>
 						{/each}
