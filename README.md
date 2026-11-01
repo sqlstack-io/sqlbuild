@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/.github/sqlbuild-logo-clean.png" alt="SQLBuild" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/website/public/assets/logo-dark.png">
+    <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/website/public/assets/logo-light.png" alt="SQLBuild" width="600">
+  </picture>
 </p>
 
 <p align="center">
