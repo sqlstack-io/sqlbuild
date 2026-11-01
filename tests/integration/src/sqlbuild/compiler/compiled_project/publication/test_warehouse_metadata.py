@@ -20,6 +20,7 @@ from sqlbuild._native import (
     write_source_freshness_records,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
     WarehouseHistoryTestCase,
 )
@@ -29,6 +30,47 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     open_legacy_warehouse,
     warehouse_history_page,
 )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CatalogConnectionTestCase("DuckDB independent reader", "duckdb", "database", "legacy-run"),
+        CatalogConnectionTestCase("SQLite independent reader", "sqlite", "path", "legacy-run"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_independent_catalog_connection_when_reading_history_then_writer_secrets_and_files_are_untouched(
+    test_case: CatalogConnectionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project: Path = tmp_path / "project"
+    connection_key: str = test_case.connection_key
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(project, test_case.adapter_name, connection_key)
+    adapter.close(connection)
+    config: Path = project / "sqlbuild_project.toml"
+    config.write_text(
+        Path("benchmarks/duckshop/edge_cases/orchestration/catalog_connection.toml")
+        .read_text()
+        .replace('adapter = "sqlite"', f'adapter = "{test_case.adapter_name}"')
+        .replace("\npath =", f"\n{connection_key} =")
+    )
+    monkeypatch.delenv("SQLBUILD_MISSING_WRITER_PASSWORD", raising=False)
+    monkeypatch.setenv("SQLBUILD_CATALOG_DATABASE", "warehouse.db")
+    first: Any = warehouse_history_page(project, "source_freshness")
+    assert first is not None and len(first["records"]) == 1
+    assert first["records"][0]["run_id"] == test_case.expected_run_id
+    # Local target selection replaces only the catalog name, not the writer connection.
+    (project / "warehouse.db").rename(project / "retained-warehouse.db")
+    (project / "sqlbuild_local.toml").write_text(
+        f'[connections.mirror]\n{connection_key} = "retained-warehouse.db"\n'
+        '[targets.development]\ncatalog_connection = "mirror"\n'
+    )
+    assert warehouse_history_page(project, "source_freshness") == first
+    assert not (project / "must-not-open.db").exists()
+    assert not (project / "must-not-open-writer.db").exists()
+    assert not (project / ".sqlbuild/control.sqlite3").exists()
 
 
 @pytest.mark.parametrize(

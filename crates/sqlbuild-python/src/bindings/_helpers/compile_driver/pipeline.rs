@@ -75,6 +75,7 @@ pub(crate) fn compiled_phase<'py>(
             discovered,
             Some(native_field(&options, "selected_target")?),
             Some(native_field(&options, "cli_vars")?),
+            false,
         )?
     } else {
         configured

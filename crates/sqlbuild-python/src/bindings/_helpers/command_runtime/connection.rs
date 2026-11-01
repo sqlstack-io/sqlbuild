@@ -366,6 +366,7 @@ pub(crate) fn project_connection_config<'py>(
     discovered_inputs: &Bound<'py, PyAny>,
     (project_dir, selected_target): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (cli_vars, require_connection): (&Bound<'py, PyAny>, bool),
+    catalog: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     if require_connection {
         require_configured_connection(discovered_inputs, project_dir, selected_target)?;
@@ -374,6 +375,7 @@ pub(crate) fn project_connection_config<'py>(
         &discovered_inputs.clone(),
         Some(selected_target.clone()).filter(|value| !value.is_none()),
         Some(cli_vars.clone()).filter(|value| !value.is_none()),
+        catalog,
     )?
     .cast_into()?;
     let adapter_name: Bound<'py, PyAny> = resolve_effective_adapter_name(
@@ -410,6 +412,7 @@ pub(crate) fn resolve_project_connection_config<'py>(
             &arguments.value("selected_target")?,
         ),
         (&arguments.value("cli_vars")?, require_connection),
+        false,
     )
 }
 
@@ -433,6 +436,7 @@ pub(crate) fn resolve_target_connection_config<'py>(
             &arguments.value("target_name")?,
         ),
         (&arguments.value("cli_vars")?, true),
+        false,
     )
 }
 

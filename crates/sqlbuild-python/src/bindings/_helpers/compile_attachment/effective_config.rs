@@ -7,9 +7,9 @@ use pyo3::types::{PyDict, PyString, PyTuple};
 use sqlbuild_model_config::templates::models::TemplateOptions;
 
 use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::contracts::effective_config::effective_config_connection;
 use crate::bindings::_helpers::contracts::effective_config::effective_config_settings;
 use crate::bindings::_helpers::contracts::effective_config::effective_config_vars;
+use crate::bindings::_helpers::contracts::effective_config::effective_connection_fields;
 use crate::bindings::_helpers::contracts::spec_resolution::{
     resolve_target_config, resolve_target_name,
 };
@@ -32,9 +32,24 @@ pub(crate) fn build_effective_connection<'py>(
     target_config: &Bound<'py, PyAny>,
     effective_vars: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    expanded_connection(
+        (project_config, local_config),
+        target_config,
+        effective_vars,
+        false,
+    )
+}
+
+/// Expand only the connection selected for the caller's writer or catalog role.
+fn expanded_connection<'py>(
+    (project_config, local_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    target_config: &Bound<'py, PyAny>,
+    effective_vars: &Bound<'py, PyAny>,
+    catalog: bool,
+) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = project_config.py();
     let (connection, error): (Bound<'py, PyAny>, Option<String>) =
-        effective_config_connection(py, project_config, local_config, target_config)
+        effective_connection_fields(py, (project_config, local_config), target_config, catalog)
             .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?
             .extract()?;
     if connection.is_none() {
@@ -156,20 +171,24 @@ pub(crate) fn build_effective_target_config<'py>(
 
 /// Build the effective project connection config without compiling resources.
 #[pyfunction]
-#[pyo3(signature = (*, discovered_inputs, selected_target = None, cli_vars = None))]
+#[pyo3(signature = (*, discovered_inputs, selected_target = None, cli_vars = None, catalog = false))]
 pub(crate) fn build_effective_connection_config<'py>(
     discovered_inputs: &Bound<'py, PyAny>,
     selected_target: Option<Bound<'py, PyAny>>,
     cli_vars: Option<Bound<'py, PyAny>>,
+    catalog: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let (_, target_config) = target_selection(discovered_inputs, selected_target)?;
     let effective_vars: Bound<'py, PyAny> =
         discovered_vars(discovered_inputs, &target_config, cli_vars)?;
-    build_effective_connection(
-        &native_field(discovered_inputs, "project_config")?,
-        &native_field(discovered_inputs, "local_config")?,
+    expanded_connection(
+        (
+            &native_field(discovered_inputs, "project_config")?,
+            &native_field(discovered_inputs, "local_config")?,
+        ),
         &target_config,
         &effective_vars,
+        catalog,
     )
 }
 

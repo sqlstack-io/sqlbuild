@@ -293,6 +293,7 @@ fn build_report(
             &context.discovered_inputs,
             (&context.project_dir, &context.selected_target),
             (&py.None().into_bound(py), true),
+            false,
         )
     })?;
     let connection_config: Bound<'_, PyDict> =

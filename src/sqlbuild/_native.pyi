@@ -2352,6 +2352,13 @@ def resolve_target_connection_config(
     target_name: str,
     cli_vars: dict[str, object] | None = None,
 ) -> dict[str, object]: ...
+def build_effective_connection_config(
+    *,
+    discovered_inputs: DiscoveredProjectInputs,
+    selected_target: str | None = None,
+    cli_vars: dict[str, object] | None = None,
+    catalog: bool = False,
+) -> dict[str, object]: ...
 def normalize_dbt_profile_connection(
     *, resolved: ResolvedDbtProfileOutput
 ) -> NormalizedDbtProfileConnection: ...
@@ -11809,6 +11816,7 @@ class TargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    catalog_connection: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -11832,6 +11840,7 @@ class TargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        catalog_connection: str | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -11858,6 +11867,7 @@ class LocalTargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    catalog_connection: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -11882,6 +11892,7 @@ class LocalTargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        catalog_connection: str | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):

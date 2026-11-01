@@ -274,7 +274,7 @@ fn target_namespaces(
     let (_, effective_vars, _): (Bound<'_, PyAny>, Bound<'_, PyAny>, Bound<'_, PyAny>) =
         runtime.extract()?;
     let connection: Bound<'_, PyAny> = if resolved_connection.is_none() {
-        build_effective_connection_config(&discovered.clone(), Some(name), None)
+        build_effective_connection_config(&discovered.clone(), Some(name), None, false)
             .and_then(|value| value.into_bound_py_any(py))?
     } else {
         resolved_connection.clone()

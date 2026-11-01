@@ -158,6 +158,14 @@ class WarehouseHistoryTestCase:
 
 
 @dataclass(frozen=True)
+class CatalogConnectionTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    expected_run_id: str
+
+
+@dataclass(frozen=True)
 class FingerprintHistoryTestCase:
     description: str
     adapter_name: str
