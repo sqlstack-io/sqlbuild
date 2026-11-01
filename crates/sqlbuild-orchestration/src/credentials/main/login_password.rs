@@ -5,9 +5,9 @@ use uuid::Uuid;
 use crate::credentials::_helpers::password_sessions::issue_session;
 use crate::credentials::constants::{LOGIN_USERNAME_BYTES, MAX_PASSWORD_BYTES};
 use crate::credentials::main::record_authentication_denial::record_authentication_denial;
-use crate::credentials::main::reserve_password_attempt::reserve_password_attempt;
+use crate::credentials::main::reserve_authentication_attempt::reserve_authentication_attempt;
 use crate::credentials::main::verify_password::verify_password;
-use crate::credentials::models::{AuditContext, PasswordAttempt, PasswordLogin};
+use crate::credentials::models::{AuditContext, AuthenticationAttempt, PasswordLogin};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -20,7 +20,8 @@ pub async fn login_password(
     let bounded = username.len() <= LOGIN_USERNAME_BYTES && password.len() <= MAX_PASSWORD_BYTES;
     let username = if bounded { username } else { "" };
     let (attempt_id, allowed) =
-        reserve_password_attempt(store, context, PasswordAttempt::Login(username)).await?;
+        reserve_authentication_attempt(store, context, AuthenticationAttempt::Login(username))
+            .await?;
     if !allowed {
         return Ok(PasswordLogin::Denied {
             decision_id: attempt_id,

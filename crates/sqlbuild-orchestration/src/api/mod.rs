@@ -5,6 +5,7 @@ pub(crate) mod constants;
 pub mod errors;
 pub mod main;
 pub mod models;
+pub(crate) mod types;
 
 #[cfg(test)]
 #[path = "../../tests/api/test_contracts.rs"]

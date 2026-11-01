@@ -1,4 +1,4 @@
-//! Serialized reservations bound concurrent password work across API replicas.
+//! Serialized reservations bound authentication work across API replicas.
 
 use chrono::Duration;
 use serde_json::json;
@@ -6,25 +6,30 @@ use uuid::Uuid;
 
 use crate::credentials::constants::{LOGIN_PEER_LIMIT, LOGIN_USER_LIMIT, LOGIN_WINDOW_SECONDS};
 use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::models::{AuditContext, PasswordAttempt};
+use crate::credentials::models::{AuditContext, AuthenticationAttempt};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-pub async fn reserve_password_attempt(
+pub async fn reserve_authentication_attempt(
     store: &ControlStore,
     context: &AuditContext,
-    attempt: PasswordAttempt<'_>,
+    attempt: AuthenticationAttempt<'_>,
 ) -> Result<(Uuid, bool), ControlError> {
-    let identity_key = match attempt {
-        PasswordAttempt::Login(username) => format!("login:{username}"),
-        PasswordAttempt::Reauthenticate(id) => format!("reauthenticate:{id}"),
-    };
     let peer = context
         .ip_address
         .ok_or_else(|| ControlError::Invalid("login requires a trusted peer address".into()))?
         .to_canonical()
         .to_string();
+    let (identity_key, identity_limit) = match attempt {
+        AuthenticationAttempt::Login(username) => (format!("login:{username}"), LOGIN_USER_LIMIT),
+        AuthenticationAttempt::Reauthenticate(id) => {
+            (format!("reauthenticate:{id}"), LOGIN_USER_LIMIT)
+        }
+        AuthenticationAttempt::IdentityProvider => {
+            (format!("identity-provider:{peer}"), LOGIN_PEER_LIMIT)
+        }
+    };
     let transaction = begin(store, TransactionMode::Write).await?;
     let now = transaction.now;
     let (transaction, _) = query(transaction,
@@ -37,7 +42,7 @@ pub async fn reserve_password_attempt(
         vec![Parameter::Text(identity_key.clone()), Parameter::Text(peer.clone()), Parameter::Time(now - Duration::seconds(LOGIN_WINDOW_SECONDS))]).await?;
     let allowed = rows[0]["user_count"]
         .as_u64()
-        .is_some_and(|count| count < LOGIN_USER_LIMIT)
+        .is_some_and(|count| count < identity_limit)
         && rows[0]["peer_count"]
             .as_u64()
             .is_some_and(|count| count < LOGIN_PEER_LIMIT);

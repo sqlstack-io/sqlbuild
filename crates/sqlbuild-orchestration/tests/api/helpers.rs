@@ -19,9 +19,14 @@ pub(crate) async fn start_api_with_authentication(
     let url = format!("http://{}", listener.local_addr().expect("API address"));
     let (shutdown, signal) = tokio::sync::oneshot::channel();
     let store = store.clone();
-    let task = tokio::spawn(serve_api(store, listener, authentication, async {
-        let _ = signal.await;
-    }));
+    let task = tokio::spawn(serve_api(
+        store,
+        listener,
+        authentication,
+        (|| {}, async {
+            let _ = signal.await;
+        }),
+    ));
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(1))
         .build()

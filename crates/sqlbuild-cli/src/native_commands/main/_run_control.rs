@@ -39,15 +39,20 @@ pub(crate) async fn run_control(
             "Starting control API...\n",
         )]));
         let listener = tokio::net::TcpListener::bind(address).await?;
-        drop(write_output(&[(
-            Stream::Stderr,
-            &format!("Control API ready: {}\n", listener.local_addr()?),
-        )]));
+        let address = listener.local_addr()?;
         tasks.spawn(serve_api(
             store.clone(),
             listener,
             authentication,
-            stopped(shutdown.clone()),
+            (
+                move || {
+                    drop(write_output(&[(
+                        Stream::Stderr,
+                        &format!("Control API ready: {address}\n"),
+                    )]));
+                },
+                stopped(shutdown.clone()),
+            ),
         ));
         start_platform_roles(&mut tasks, (&store, &shutdown))?;
     }

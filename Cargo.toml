@@ -66,6 +66,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 argon2 = "0.5.3"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
+axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 fensu-policy = "=0.22.0"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
@@ -78,6 +79,7 @@ mimalloc = { version = "0.1", default-features = false, features = ["local_dynam
 proc-macro2 = { version = "1", features = ["span-locations"] }
 pyo3 = { version = "0.26", features = ["abi3-py312"] }
 rpassword = "7.5.4"
+rcgen = "0.14"
 polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
     "ast-tools",
     "builder",
@@ -96,6 +98,7 @@ bstr = "1"
 either = { version = "1", default-features = false, features = ["use_std"] }
 memchr = "2"
 once_cell = "1"
+openidconnect = { version = "4.1", default-features = false, features = ["reqwest", "rustls-tls"] }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-search"] }
 syn-v2-macro-features = { package = "syn", version = "2", default-features = false, features = ["extra-traits", "fold", "visit-mut"] }
 syn-v3-macro-features = { package = "syn", version = "3", default-features = false, features = ["extra-traits", "full"] }

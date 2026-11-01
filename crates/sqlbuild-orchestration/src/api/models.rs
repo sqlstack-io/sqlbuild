@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::api::_helpers::authentication::oidc;
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::resources::{
@@ -16,6 +17,8 @@ use crate::api::_helpers::resources::{
     password_sessions::logout,
     password_sessions::change_password,
     trusted_proxy::identity,
+    oidc::login,
+    oidc::callback,
     changes::subscribe,
     location_health::report,
     location_health::recent,
@@ -103,6 +106,7 @@ pub struct ApiAuthentication {
     pub development_scope: Option<DevelopmentScope>,
     pub password_origin: Option<String>,
     pub trusted_proxy: Option<TrustedProxyAuthentication>,
+    pub oidc: Option<OidcAuthentication>,
 }
 
 #[derive(Clone, Debug)]
@@ -117,8 +121,34 @@ pub struct TrustedProxyAuthentication {
     pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
 }
 
+/// Exact issuer/subject bindings authenticate existing people without provisioning or grants.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OidcAuthentication {
+    pub origin: String,
+    pub issuer: String,
+    pub client_id: String,
+    pub client_secret_env: Option<String>,
+    pub certificate_authority: Option<std::path::PathBuf>,
+    pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
+}
+
+#[derive(Debug)]
+pub(crate) struct OidcRuntime {
+    pub(crate) settings: OidcAuthentication,
+    pub(crate) client_secret: Option<openidconnect::ClientSecret>,
+    pub(crate) http: reqwest::Client,
+    pub(crate) configuration_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OidcCallback {
+    pub(crate) state: Option<openidconnect::CsrfToken>,
+    pub(crate) code: Option<openidconnect::AuthorizationCode>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ProxyIdentityResponse {
+pub struct ExternalIdentityResponse {
     pub principal_id: uuid::Uuid,
 }
 

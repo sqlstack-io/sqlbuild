@@ -23,6 +23,7 @@ pub(crate) async fn fingerprint_history(
     // Upgrade the immediate predecessor while published snapshots and freshness facts exist.
     let mut transaction = begin(store, TransactionMode::Write).await.expect("upgrade");
     for table in [
+        "sqb_oidc_login_flows",
         "sqb_authentication_revision",
         "sqb_password_sessions",
         "sqb_password_login_attempts",
@@ -45,7 +46,7 @@ pub(crate) async fn fingerprint_history(
         .expect("predecessor table set");
     let (transaction, _) = query(
         transaction,
-        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions','authentication_revision')",
+        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions','authentication_revision','oidc_login_flows')",
         vec![],
     )
     .await

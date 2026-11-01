@@ -107,7 +107,7 @@ pub(crate) async fn authenticate(
     };
     let identity = authenticate_session(
         &store,
-        session_cookie(request.headers()).unwrap_or_default(),
+        browser_cookie(request.headers(), PASSWORD_COOKIE).unwrap_or_default(),
         access,
     )
     .await?;
@@ -130,17 +130,17 @@ pub(crate) fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'
     values.next().is_none().then_some(value)
 }
 
-fn session_cookie(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn browser_cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     let mut session = None;
     for header in headers.get_all(header::COOKIE) {
         let Ok(value) = header.to_str() else {
             return None;
         };
         for cookie in value.split(';') {
-            let Some((name, value)) = cookie.trim().split_once('=') else {
+            let Some((cookie_name, value)) = cookie.trim().split_once('=') else {
                 continue;
             };
-            if name == PASSWORD_COOKIE {
+            if cookie_name == name {
                 if session.is_some() {
                     return None;
                 }
@@ -149,6 +149,22 @@ fn session_cookie(headers: &HeaderMap) -> Option<&str> {
         }
     }
     session
+}
+
+pub(crate) fn set_cookie(
+    response: &mut Response,
+    (name, value): (&str, &str),
+    max_age: i64,
+    (http_only, same_site): (bool, &str),
+) -> Result<(), ApiError> {
+    let attributes = if http_only { "; HttpOnly" } else { "" };
+    let mut cookie = HeaderValue::from_str(&format!(
+        "{name}={value}; Path=/; Secure; SameSite={same_site}; Max-Age={max_age}{attributes}"
+    ))
+    .map_err(|_| ControlError::Invalid("could not encode a session cookie".into()))?;
+    cookie.set_sensitive(true);
+    response.headers_mut().append(header::SET_COOKIE, cookie);
+    Ok(())
 }
 
 pub(crate) async fn deny(
