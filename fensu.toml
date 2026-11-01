@@ -1572,6 +1572,12 @@ reason = "IssuedToken implements Debug manually to redact its bearer credential;
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
+path = "crates/sqlbuild-orchestration/src/platform/models.rs"
+symbols = ["PlatformWebhook"]
+reason = "PlatformWebhook implements Debug manually to redact its endpoint, which may contain delivery credentials; other models derive Debug."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
 path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
 

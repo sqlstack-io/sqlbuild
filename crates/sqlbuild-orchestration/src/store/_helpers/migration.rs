@@ -9,6 +9,7 @@ use crate::store::types::Row;
 pub(crate) const SCHEMA: &str = include_str!("../schema.sql");
 pub(crate) const LOCATION_INSTANCES: &str = include_str!("../location_instances.sql");
 pub(crate) const LOCATION_WORK: &str = include_str!("../location_work.sql");
+pub(crate) const PLATFORM_SINK: &str = include_str!("../platform_sink.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

@@ -1,7 +1,6 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -11,7 +10,7 @@ use uuid::Uuid;
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{control_address, flag};
 use crate::native_commands::_helpers::execution::{
-    open_control_store, open_control_workers, supervise_control_roles,
+    open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
 use crate::native_commands::_helpers::terminal::write_output;
 
@@ -48,19 +47,7 @@ pub(crate) async fn run_control(
             listener,
             stopped(shutdown.clone()),
         ));
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Starting platform watchdog...\n",
-        )]));
-        let watchdog_store = store.clone();
-        let watchdog_shutdown = shutdown.clone();
-        tasks.spawn(async move {
-            run_watchdog(&watchdog_store, Uuid::now_v7(), watchdog_shutdown).await
-        });
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Platform watchdog started\n",
-        )]));
+        start_platform_roles(&mut tasks, (&store, &shutdown))?;
     }
     if standalone || !flag(namespace, "control_no_scheduler") {
         drop(write_output(&[(Stream::Stderr, "Starting scheduler...\n")]));

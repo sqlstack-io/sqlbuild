@@ -1,6 +1,7 @@
 //! Both launchers hand off the same scoped invocation and exclude privileged credentials.
 
 use sqlbuild_core::command_output::constants::INVOCATION_CONTEXT_ENV;
+use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::runs::models::RunClaim;
 
 use crate::workers::models::LauncherScope;
@@ -26,6 +27,7 @@ pub(in crate::workers) fn arguments(scope: &LauncherScope<'_>, claim: &RunClaim)
 
 pub(in crate::workers) fn excluded(name: &str, control_variable: &str) -> bool {
     name == control_variable
+        || name == PLATFORM_WEBHOOK_VARIABLE
         || matches!(
             name,
             "SQLBUILD_CONTROL_DATABASE_URL" | "SQLBUILD_LOCATION_TOKEN" | "SQLBUILD_RUN_TOKEN"
