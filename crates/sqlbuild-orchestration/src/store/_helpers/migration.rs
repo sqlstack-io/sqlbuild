@@ -20,6 +20,7 @@ pub(crate) const DEVELOPMENT_LOCATIONS: &str = include_str!("../development_loca
 pub(crate) const NODE_TRANSITIONS: &str = include_str!("../node_transitions.sql");
 pub(crate) const PASSWORD_CREDENTIALS: &str = include_str!("../password_credentials.sql");
 pub(crate) const PASSWORD_SESSIONS: &str = include_str!("../password_sessions.sql");
+pub(crate) const AUTHENTICATION_REVISION: &str = include_str!("../authentication_revision.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

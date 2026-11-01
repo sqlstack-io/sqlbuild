@@ -37,3 +37,24 @@ pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
         .await
         .expect("read durable token hashes")
 }
+
+pub(crate) async fn authentication_revision(
+    store: &ControlStore,
+) -> Result<u64, crate::store::errors::ControlError> {
+    use crate::store::main::{begin::begin, commit::commit, query::query};
+    use crate::store::models::TransactionMode;
+
+    let (transaction, rows) = query(
+        begin(store, TransactionMode::Read).await?,
+        "SELECT revision FROM sqb_authentication_revision WHERE singleton=1",
+        vec![],
+    )
+    .await?;
+    commit(transaction).await?;
+    rows.first()
+        .and_then(|row| row.get("revision"))
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| {
+            crate::store::errors::ControlError::Schema("authentication revision is invalid".into())
+        })
+}

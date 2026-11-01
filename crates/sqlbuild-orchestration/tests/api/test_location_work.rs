@@ -49,7 +49,8 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             for (version, location_cleanup) in [(3, ""), (2, "DROP TABLE sqb_location_instances;")]
             {
                 execute(store, &format!(
-                    "DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
+                    "DROP TABLE sqb_authentication_revision; \
+                     DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
                      DROP TABLE sqb_password_credentials; DROP TABLE sqb_development_locations; \
                      DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
                      DROP INDEX sqb_node_decisive_history; DROP INDEX sqb_node_finished_cursor; \

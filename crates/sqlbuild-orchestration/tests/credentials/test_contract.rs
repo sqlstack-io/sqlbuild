@@ -13,7 +13,7 @@ use crate::store::main::migrate_store::migrate_store;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
-use crate::credentials::tests::helpers::{location_state, stored_hashes};
+use crate::credentials::tests::helpers::{authentication_revision, location_state, stored_hashes};
 use crate::credentials::tests::test_types::{CredentialTestCase, TransactionFault};
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::terminal_helpers::finish;
@@ -47,6 +47,12 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
             let replica = second_store(store).await;
+            assert_eq!(
+                authentication_revision(&replica)
+                    .await
+                    .expect("initial revision"),
+                0
+            );
             let context = AuditContext {
                 actor: "test-admin".into(),
                 granting_role: "admin".into(),
@@ -100,6 +106,12 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT,'injected audit failure')",
                 postgres_body: "RAISE EXCEPTION 'injected audit failure'",
+            };
+            let revision_fault = TransactionFault {
+                description: "authentication revision failure",
+                table: "sqb_authentication_revision",
+                operation: "UPDATE",
+                ..fault
             };
             install_fault(store, &fault).await;
             assert!(
@@ -160,28 +172,51 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                             .is_none()
                     );
                 }
-                install_fault(store, &fault).await;
-                assert!(
-                    revoke_token(store, &context, issued.identity.token_id)
-                        .await
-                        .is_err()
-                );
-                remove_fault(store, &fault).await;
-                assert!(
-                    authenticate_token(&replica, &issued.bearer)
-                        .await
-                        .expect("failed revocation rolled back")
-                        .is_some()
-                );
+                let revision = authentication_revision(&replica)
+                    .await
+                    .expect("before revocation");
+                for failure in [&fault, &revision_fault] {
+                    install_fault(store, failure).await;
+                    assert!(
+                        revoke_token(store, &context, issued.identity.token_id)
+                            .await
+                            .is_err()
+                    );
+                    remove_fault(store, failure).await;
+                    assert!(
+                        authenticate_token(&replica, &issued.bearer)
+                            .await
+                            .expect("failed revocation rolled back")
+                            .is_some()
+                    );
+                    assert_eq!(
+                        authentication_revision(&replica)
+                            .await
+                            .expect("rollback revision"),
+                        revision
+                    );
+                }
                 assert!(
                     revoke_token(store, &context, issued.identity.token_id)
                         .await
                         .expect("revoke")
                 );
+                assert_eq!(
+                    authentication_revision(&replica)
+                        .await
+                        .expect("committed revision"),
+                    revision + 1
+                );
                 assert!(
                     !revoke_token(&replica, &context, issued.identity.token_id)
                         .await
                         .expect("retry revoke")
+                );
+                assert_eq!(
+                    authentication_revision(store)
+                        .await
+                        .expect("idempotent revision"),
+                    revision + 1
                 );
                 assert!(
                     authenticate_token(&replica, &issued.bearer)
