@@ -29,6 +29,13 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
             expected_stderr: "",
         },
         CommandTestCase {
+            description: "native password provisioning help",
+            arguments: &["admin", "set-password", "--help"],
+            expected_success: true,
+            expected_stdout_prefix: "usage: sqb admin set-password ",
+            expected_stderr: "",
+        },
+        CommandTestCase {
             description: "native trigger administration help",
             arguments: &["admin", "change-trigger", "--help"],
             expected_success: true,
@@ -175,6 +182,13 @@ fn given_a_standalone_binary_when_printing_help_or_rejecting_invalid_input_then_
         CommandTestCase {
             description: "invalid credential ID rejected before store initialization",
             arguments: &["admin", "revoke-token", "not-a-uuid"],
+            expected_success: false,
+            expected_stdout_prefix: "",
+            expected_stderr: "Control administration failed: invalid control-plane data: a valid subject UUID is required\n",
+        },
+        CommandTestCase {
+            description: "invalid password principal rejected before input or store initialization",
+            arguments: &["admin", "set-password", "not-a-uuid"],
             expected_success: false,
             expected_stdout_prefix: "",
             expected_stderr: "Control administration failed: invalid control-plane data: a valid subject UUID is required\n",
@@ -390,6 +404,12 @@ fn given_a_standalone_binary_when_serving_with_or_without_a_scheduler_then_migra
                 "{}",
                 test_case.description
             );
+            let password_session = client
+                .get(format!("{url}/api/auth/session"))
+                .send()
+                .await
+                .expect("password routes are opt-in");
+            assert_eq!(password_session.status(), reqwest::StatusCode::NOT_FOUND);
             let (leaders, heartbeats) = wait_for_health(&mut control, &test_case).await;
             assert_eq!(
                 leaders, test_case.expected_leaders,

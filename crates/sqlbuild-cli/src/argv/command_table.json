@@ -329,6 +329,18 @@
           }
          },
          {
+          "name": "set-password",
+          "parser": {
+           "prog": "sqb admin set-password",
+           "description": "Set or reset an active person's password through direct control-store ownership. Reads hidden, confirmed terminal input or one line from standard input; never grants roles.",
+           "groups": [{"title": "positional arguments"}, {"title": "options"}],
+           "actions": [
+            {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "active person UUID; password is read from the terminal or standard input, never an argument", "group": 0}
+           ]
+          }
+         },
+         {
           "name": "issue-location-token",
           "parser": {
            "prog": "sqb admin issue-location-token",
@@ -895,6 +907,11 @@
           "help": "create a person or service account without granting permissions"
          },
          {
+          "dest": "set-password",
+          "metavar": "set-password",
+          "help": "set an active person's password without granting permissions"
+         },
+         {
           "dest": "issue-location-token",
           "metavar": "issue-location-token",
           "help": "issue a bounded location credential, returned once as JSON"
@@ -1008,6 +1025,13 @@
         "default": 8000,
         "type": "int",
         "help": "TCP port, or 0 to choose a free port (default: 8000)",
+        "group": 1
+       },
+       {
+        "kind": "store",
+        "options": ["--password-origin"],
+        "dest": "control_password_origin",
+        "help": "enable password sessions for this exact external HTTPS origin; requires HTTPS termination in front of the HTTP listener",
         "group": 1
        },
        {

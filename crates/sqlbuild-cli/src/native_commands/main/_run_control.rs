@@ -9,7 +9,7 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, flag};
+use crate::native_commands::_helpers::decision::{control_address, flag, text};
 use crate::native_commands::_helpers::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
@@ -46,7 +46,10 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            ApiAuthentication::default(),
+            ApiAuthentication {
+                password_origin: text(namespace, "control_password_origin"),
+                ..ApiAuthentication::default()
+            },
             stopped(shutdown.clone()),
         ));
         start_platform_roles(&mut tasks, (&store, &shutdown))?;
