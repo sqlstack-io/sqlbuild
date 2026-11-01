@@ -2,6 +2,7 @@
 // data only: a fictional waffle shop and its analytics team.
 
 import { ApiError } from '../client';
+import { CAPABILITIES } from '../types';
 import type { PlatformApi } from '../platform-client';
 import type { LocalChangeBus } from '../signals';
 import type {
@@ -1038,7 +1039,8 @@ export class MockPlatformApi implements PlatformApi {
 		const entry = this.#data.auditEntries.find((e) => e.decisionId === id);
 		if (!entry) throw new ApiError(`No denied request has decision ID ${id}. Check it was copied in full, e.g. dec-4k7q2m.`, 404);
 		if (entry.actor.name !== this.#ctx.user.name && !this.#can('audit.view')) throw new ApiError('That decision belongs to someone else; looking it up requires audit.view', 403);
-		const action = entry.action as Capability;
+		// Approval refusals are checked as the permission behind them.
+		const action: Capability = (CAPABILITIES as readonly string[]).includes(entry.action) ? (entry.action as Capability) : 'role.assign';
 		return this.#ctx.reply({
 			decisionId: id,
 			at: entry.at,
