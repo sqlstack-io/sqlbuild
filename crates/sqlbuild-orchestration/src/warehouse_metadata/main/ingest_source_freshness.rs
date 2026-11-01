@@ -11,7 +11,7 @@ use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
-use crate::warehouse_metadata::constants::MAX_FRESHNESS_RECORDS;
+use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::SourceFreshnessBatch;
 
 pub async fn ingest_source_freshness(
@@ -40,12 +40,12 @@ pub async fn ingest_source_freshness(
             .is_some_and(|value| value.trim().is_empty())
     });
     if batch.generation < 1
-        || batch.records.len() > MAX_FRESHNESS_RECORDS
+        || batch.records.len() > MAX_HISTORY_RECORDS
         || invalid_identity
         || invalid_source_id
     {
         return Err(ControlError::Invalid(format!(
-            "source freshness sync needs a positive generation, at most {MAX_FRESHNESS_RECORDS} records and nonempty state identities",
+            "source freshness sync needs a positive generation, at most {MAX_HISTORY_RECORDS} records and nonempty state identities",
         )));
     }
     let transaction = require_instance(

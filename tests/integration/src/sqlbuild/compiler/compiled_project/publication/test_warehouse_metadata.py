@@ -2,10 +2,7 @@
 
 import hashlib
 import json
-import os
 import sqlite3
-import subprocess
-import sys
 from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -19,17 +16,19 @@ from sqlbuild._native import (
     SourceFreshnessRenderers,
     read_latest_fingerprints,
     read_latest_source_freshness,
+    write_fingerprints,
     write_source_freshness_records,
 )
-from sqlbuild.adapter.discovery.main.resolve_adapter import resolve_adapter
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    FingerprintHistoryTestCase,
     WarehouseHistoryTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_contended_fingerprints,
     append_retried_fingerprints,
+    open_legacy_warehouse,
+    warehouse_history_page,
 )
-from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 
 @pytest.mark.parametrize(
@@ -59,61 +58,18 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
 ) -> None:
     project: Path = tmp_path / "project"
     connection_key: str = test_case.connection_key
-    write_files(
-        project_dir=project,
-        files={
-            "sqlbuild_project.toml": (
-                f'name = "orders"\nadapter = "{test_case.adapter_name}"\n'
-                f'[connections.local]\n{connection_key} = "warehouse.db"\n'
-                '[targets.development]\nschema = "main"\n'
-            ),
-            "orchestration/orders.py": 'raise AssertionError("metadata must not compile user declarations")\n',
-        },
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
     )
-    adapter: Any = resolve_adapter(adapter_name=test_case.adapter_name)
-    connection: Any = adapter.connect({connection_key: str(project / "warehouse.db")})
-    legacy_sql: str = Path(
-        "benchmarks/duckshop/edge_cases/orchestration/legacy_warehouse_state.sql"
-    ).read_text()
-    for statement in legacy_sql.rstrip().removesuffix(";").split(";"):
-        _ = adapter.execute(connection=connection, sql=statement)
     adapter.close(connection)
     for journal_mode in test_case.journal_modes:
         with closing(sqlite3.connect(project / "warehouse.db")) as predecessor:
             assert predecessor.execute("PRAGMA journal_mode=DELETE").fetchone() == (journal_mode,)
 
     def page(after: list[str | None] | None = None, observed_since: str | None = None) -> Any:
-        result: subprocess.CompletedProcess[str] = subprocess.run(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "--project-dir",
-                str(project),
-                "location",
-                "runtime",
-                "--server",
-                "http://127.0.0.1:1",
-                "--location-id",
-                "00000000-0000-0000-0000-000000000001",
-                "--target",
-                "development",
-            ],
-            input=json.dumps(
-                {
-                    "source_freshness": {
-                        "location": {"database": None, "schema": "main"},
-                        "after": after,
-                        "observed_since": observed_since,
-                    }
-                }
-            )
-            + "\n",
-            text=True,
-            capture_output=True,
-            timeout=20,
-            env=os.environ | {"SQLBUILD_CONTROL_DATABASE_URL": "unsupported://must-not-open"},
-        )
-        assert result.returncode == 0, result.stderr
-        return json.loads(result.stdout)
+        return warehouse_history_page(project, "source_freshness", after, observed_since)
 
     old: dict[str, Any] = page()
     assert len(old["records"]) == 1 and old["records"][0]["event_id"] is None
@@ -323,6 +279,156 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
         "records": [],
         "next_after": None,
     }
+    assert not (project / ".sqlbuild/control.sqlite3").exists()
+    (project / "warehouse.db").rename(project / "retained-warehouse.db")
+    assert page() is None
+    assert not (project / "warehouse.db").exists()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        FingerprintHistoryTestCase(
+            "DuckDB typed fingerprint timestamps",
+            "duckdb",
+            "database",
+            datetime(2026, 2, 1, tzinfo=UTC),
+            (),
+            (),
+            ("legacy-run",),
+        ),
+        FingerprintHistoryTestCase(
+            "SQLite offset fingerprint timestamps",
+            "sqlite",
+            "path",
+            datetime(2026, 1, 31, 23, tzinfo=timezone(timedelta(hours=-1))),
+            ("delete",),
+            (
+                Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/legacy_warehouse_fingerprint_offsets.sql"
+                ),
+            ),
+            ("legacy-run", "offset-run"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_fingerprint_history_when_read_in_isolated_pages_then_legacy_retries_definitions_and_time_bounds_survive(
+    test_case: FingerprintHistoryTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    for fixture in test_case.fixture_paths:
+        _ = adapter.execute(connection=connection, sql=fixture.read_text())
+    adapter.close(connection)
+
+    def page(after: list[str | None] | None = None, observed_since: str | None = None) -> Any:
+        return warehouse_history_page(project, "fingerprints", after, observed_since)
+
+    legacy: dict[str, Any] = page()
+    assert legacy["next_after"] is None
+    assert {row["run_id"] for row in legacy["records"]} == set(test_case.expected_legacy_runs)
+    assert legacy["records"][0]["event_id"] is None
+    assert legacy["records"][0]["definition"] == "SELECT 1 AS order_id"
+    assert legacy["records"][0]["metadata_json"] == "{}"
+    assert page(observed_since="2026-01-01T09:00:00Z") == legacy
+    assert page(observed_since="2026-01-01T10:00:00.000001Z") == {
+        "records": [],
+        "next_after": None,
+    }
+    connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
+    assert "event_id" not in {
+        column.name
+        for column in adapter.get_columns(
+            connection=connection, database=None, schema="main", name="_sqlbuild_fingerprints"
+        )
+    }
+    fingerprints: tuple[Fingerprint, ...] = tuple(
+        Fingerprint(
+            node_type=("model", "seed")[index % 2],
+            node_name=("Orders", "orders", "orders ", "ordérs", "o'rders 🧾")[index % 5],
+            target_database=(None, "")[index % 2],
+            target_schema="main",
+            target_name="orders",
+            run_id=f"external-{index}",
+            definition_hash="definition",
+            version_hash=f"version-{index}",
+            schema_fingerprint="schema",
+            definition="SELECT 'o''rders 🧾' AS order_note",
+            metadata_json='{"note":"orders 🧾"}',
+            ts=test_case.observed_at + timedelta(microseconds=index),
+        )
+        for index in range(104)
+    )
+    for batch in (fingerprints, fingerprints[:1]):
+        write_fingerprints(
+            connection=connection,
+            execute=adapter.execute,
+            database=None,
+            schema="main",
+            fingerprints=batch,
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+            render_create_table_sql=adapter.render_create_fingerprint_table_sql,
+            read_columns=adapter.get_columns,
+            render_add_columns=adapter.render_add_columns,
+        )
+    adapter.close(connection)
+    for journal_mode in test_case.journal_modes:
+        with closing(sqlite3.connect(project / "warehouse.db")) as predecessor:
+            assert predecessor.execute("PRAGMA journal_mode=DELETE").fetchone() == (journal_mode,)
+    pages: list[dict[str, Any]] = [page()]
+    while pages[-1]["next_after"] is not None:
+        assert len(pages[-1]["next_after"]) == 13
+        pages.append(page(pages[-1]["next_after"]))
+        assert len(pages) < 4
+    assert tuple(len(item["records"]) for item in pages) == (
+        100,
+        5 + len(test_case.expected_legacy_runs),
+    )
+    imported: list[dict[str, Any]] = []
+    for item in pages:
+        imported.extend(item["records"])
+    assert {row["run_id"] for row in imported} == set(test_case.expected_legacy_runs) | {
+        f"external-{index}" for index in range(104)
+    }
+    assert len({row["event_id"] for row in imported} - {None}) == 104
+    assert sum(row["event_id"] is None for row in imported) == len(test_case.expected_legacy_runs)
+    assert {row["target_database"] for row in imported} == {None, ""}
+    first: list[dict[str, Any]] = list(filter(lambda row: row["run_id"] == "external-0", imported))
+    assert len(first) == 2 and first[0] == first[1]
+    assert first[0]["definition"] == "SELECT 'o''rders 🧾' AS order_note"
+    assert first[0]["metadata_json"] == '{"note":"orders 🧾"}'
+    assert (
+        first[0]["event_id"]
+        == hashlib.sha256(
+            b'["sqlbuild.fingerprint.event.v1","model","Orders",null,"main","orders","external-0","version-0"]'
+        ).hexdigest()
+    )
+    assert datetime.fromisoformat(first[0]["ts"]) == datetime(2026, 2, 1, tzinfo=UTC)
+    observed_since: str = "2026-02-01T01:00:00.000050+01:00"
+    recent: list[dict[str, Any]] = [page(observed_since=observed_since)]
+    while recent[-1]["next_after"] is not None:
+        recent.append(page(recent[-1]["next_after"], observed_since))
+        assert len(recent) < 4
+    recent_records: list[dict[str, Any]] = []
+    for item in recent:
+        recent_records.extend(item["records"])
+    assert len(recent_records) == 54
+    assert {row["run_id"] for row in recent_records} == {
+        f"external-{index}" for index in range(50, 104)
+    }
+    empty_since: str = "2026-02-01T00:00:00.000104Z"
+    empty: dict[str, Any] = page(observed_since=empty_since)
+    assert empty["records"] == [] and empty["next_after"] is not None
+    assert page(empty["next_after"], empty_since) == {"records": [], "next_after": None}
+    for journal_mode in test_case.journal_modes:
+        with closing(sqlite3.connect(project / "warehouse.db")) as predecessor:
+            assert predecessor.execute("PRAGMA journal_mode").fetchone() == (journal_mode,)
     assert not (project / ".sqlbuild/control.sqlite3").exists()
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
     assert page() is None

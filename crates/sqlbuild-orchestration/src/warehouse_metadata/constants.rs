@@ -1,3 +1,3 @@
 //! Limits bound each authenticated warehouse observation transaction.
 
-pub const MAX_FRESHNESS_RECORDS: usize = 100;
+pub const MAX_HISTORY_RECORDS: usize = 100;
