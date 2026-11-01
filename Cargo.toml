@@ -159,6 +159,8 @@ sqlbuild-recall = { path = "crates/sqlbuild-recall" }
 sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
+# SQL lint Rules, quality Rules, the formatter and the canonical token stream.
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "571e40a746b3d8d20d6118620f05428eca45243c" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"

@@ -604,7 +604,7 @@ def _write_project(*, project_dir: Path, model_count: int) -> None:
     config.write_text(
         config.read_text(encoding="utf-8")
         + (
-            '\n[rules]\nselect = ["SQBRSQL001", "XSQBR"]\n'
+            '\n[rules]\nselect = ["SQLCLEAN001", "XSQBR"]\n'
             "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
             "[rules.cache]\nenabled = true\n"
         ),

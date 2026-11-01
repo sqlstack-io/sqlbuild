@@ -27,8 +27,8 @@ from tests.integration.src.sqlbuild.cli.recall.helpers import (
 CUSTOMERS_MODEL: str = (
     'MODEL (\n  description "One row per customer",\n  materialized table,\n'
     "  columns (email (audits [not_null(severity warn)])),\n);\n\n"
-    "SELECT * FROM (VALUES (1, 'ada@example.com'), (2, NULL), (3, NULL)) "
-    "AS customers(customer_id, email)\n"
+    "WITH customers(customer_id, email) AS (VALUES (1, 'ada@example.com'), (2, NULL), (3, NULL))\n"
+    "SELECT customers.customer_id, customers.email FROM customers\n"
 )
 
 COSTED_ADAPTER: str = (

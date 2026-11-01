@@ -67,7 +67,8 @@ def test_given_measurement_outcomes_when_building_then_gates_and_persists_canoni
              )
           ]
         );
-        SELECT * FROM (VALUES (1), (2), (3)) AS orders(order_id)
+        WITH orders(order_id) AS (VALUES (1), (2), (3))
+        SELECT orders.order_id FROM orders
     """
     audit_sql = """
         AUDIT (

@@ -1,4 +1,4 @@
-//! Rules results rendered for the CLI, and SQBRSQL044 help naming files that repeat a literal.
+//! Rules results rendered for the CLI, and SQLCLEAN044 help naming files that repeat a literal.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
 use pyo3::{pyfunction, wrap_pyfunction};

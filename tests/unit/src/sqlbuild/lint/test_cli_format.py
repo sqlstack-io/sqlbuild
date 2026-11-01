@@ -58,7 +58,7 @@ def test_given_legacy_lint_configuration_when_formatting_then_it_is_rejected(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        f'{PROJECT_TOML}\n[lint]\nselect = ["SQBRSQL"]\n', encoding="utf-8"
+        f'{PROJECT_TOML}\n[lint]\nselect = ["SQLCLEAN"]\n', encoding="utf-8"
     )
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
@@ -72,7 +72,7 @@ def test_given_legacy_lint_configuration_when_formatting_then_it_is_rejected(
 
 @pytest.mark.parametrize(
     "test_case",
-    [FormatCliTestCase("format does not enforce unselected Rules", (), 0, "SQBRSQL004")],
+    [FormatCliTestCase("format does not enforce unselected Rules", (), 0, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_unselected_sql_rule_finding_when_formatting_then_rule_is_not_enforced(

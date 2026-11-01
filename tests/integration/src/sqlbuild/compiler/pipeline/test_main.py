@@ -120,7 +120,7 @@ def test_given_typed_cte_chain_when_compiling_contract_then_type_remains_proven(
     [
         RulesPipelineIntegrationTestCase(
             description="configured Rules block planning before a warehouse connection",
-            expected_error_pattern="SQBRSQL004",
+            expected_error_pattern="SQLCLEAN004",
             expected_connection_calls=0,
         )
     ],
@@ -132,12 +132,13 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        f'{_PROJECT_TOML}\n[rules]\nselect = ["SQBRSQL004"]\n', encoding="utf-8"
+        f'{_PROJECT_TOML}\n[rules]\nselect = ["SQLCLEAN004"]\n', encoding="utf-8"
     )
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
-        'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n',
+        'MODEL (description "Orders");\n'
+        "WITH orders(order_id) AS (VALUES (1), (2))\nSELECT order_id FROM orders LIMIT 1\n",
         encoding="utf-8",
     )
     adapter: DuckDbAdapter = DuckDbAdapter()
@@ -145,7 +146,9 @@ def test_given_rule_finding_when_running_shared_compile_pipeline_then_planning_i
     monkeypatch.setattr(adapter, "connect", connect)
 
     with pytest.raises(RulesError, match=test_case.expected_error_pattern):
-        _ = run_compile_pipeline_for_project(project_dir=tmp_path, adapter=adapter)
+        _ = run_compile_pipeline_for_project(
+            project_dir=tmp_path, adapter=adapter, no_sql_validation=False
+        )
 
     assert connect.call_count == test_case.expected_connection_calls
 

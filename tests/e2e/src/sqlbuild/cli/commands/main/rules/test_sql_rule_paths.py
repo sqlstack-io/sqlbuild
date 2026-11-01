@@ -20,7 +20,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
             description="macro, CRLF model and CRLF SQL test",
             files={
                 "sqlbuild_project.toml": (
-                    'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL"]\n'
+                    'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN"]\n'
                 ),
                 "models/staging/orders.sql": (
                     'MODEL (description "Orders");\n'
@@ -44,15 +44,15 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
                 ),
             },
             expected_findings=(
-                ("models/staging/customers.sql", 2, 6, "SQBRSQL005"),
-                ("models/staging/customers.sql", 2, 6, "SQBRSQL041"),
-                ("models/staging/customers.sql", 3, 1, "SQBRSQL035"),
-                ("models/staging/orders.sql", 2, 6, "SQBRSQL005"),
-                ("models/staging/orders.sql", 2, 47, "SQBRSQL041"),
-                ("models/staging/orders.sql", 3, 1, "SQBRSQL034"),
-                ("models/staging/orders.sql", 3, 1, "SQBRSQL035"),
-                ("tests/unit/test_orders.sql", 4, 1, "SQBRSQL005"),
-                ("tests/unit/test_orders.sql", 5, 59, "SQBRSQL004"),
+                ("models/staging/customers.sql", 2, 6, "SQLCLEAN005"),
+                ("models/staging/customers.sql", 2, 6, "SQLCLEAN041"),
+                ("models/staging/customers.sql", 3, 1, "SQLCLEAN035"),
+                ("models/staging/orders.sql", 2, 6, "SQLCLEAN005"),
+                ("models/staging/orders.sql", 2, 47, "SQLCLEAN041"),
+                ("models/staging/orders.sql", 3, 1, "SQLCLEAN034"),
+                ("models/staging/orders.sql", 3, 1, "SQLCLEAN035"),
+                ("tests/unit/test_orders.sql", 4, 1, "SQLCLEAN005"),
+                ("tests/unit/test_orders.sql", 5, 59, "SQLCLEAN004"),
             ),
         )
     ],
@@ -73,7 +73,7 @@ def test_given_sql_findings_when_compiling_or_running_rules_then_findings_are_id
         command=("--no-color", "compile", "--json", "--no-cache"), project_dir=compile_dir
     )
     ruled: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "rules", "--json", "run", "SQBRSQL"), project_dir=rules_dir
+        command=("--no-color", "rules", "--json", "run", "SQLCLEAN"), project_dir=rules_dir
     )
 
     compile_payload: dict[str, Any] = json.loads(compiled.stdout)

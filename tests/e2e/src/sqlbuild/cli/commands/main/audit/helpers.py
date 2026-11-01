@@ -210,8 +210,10 @@ def audit_meta_project_files(
             '    expression_is_true (name "known_region", expression "region IS NOT NULL"),\n'
             "  ],\n"
             ");\n\n"
-            "SELECT * FROM (VALUES (1, 'emea', 10), (2, 'emea', 20), (3, 'apac', 30))"
-            " AS orders(order_id, region, amount)\n"
+            "WITH orders(order_id, region, amount) AS (\n"
+            "  VALUES (1, 'emea', 10), (2, 'emea', 20), (3, 'apac', 30)\n"
+            ")\n"
+            "SELECT * FROM orders\n"
         ),
     }
 

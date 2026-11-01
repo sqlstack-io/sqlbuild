@@ -19,7 +19,9 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
 )
 
 _PROJECT_TOML: str = (
-    'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n'
+    'name = "orders"\nadapter = "duckdb"\n[connection]\ndatabase = "orders.duckdb"\n\n'
+    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["models/flagged_orders.sql"]\n'
+    'reason = "One case stars over a derived table on purpose."\n'
 )
 _BASE_ORDERS_SQL: str = (
     "MODEL (description 'Orders.', materialized table);\n\n"

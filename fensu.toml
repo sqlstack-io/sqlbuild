@@ -1582,11 +1582,6 @@ path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
 
 [[targets.rust.rule_exceptions]]
-rule = "FPRSL105"
-path = "crates/sqlbuild-analysis/src/sql_tokens/main/builtin_function_names.rs"
-reason = "This test-support entry exists only for the SQL lint tests in sqlbuild-rules, which the analyzer does not count as importers."
-
-[[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
 path = "crates/sqlbuild-python/src/bindings/_helpers/native_threads/exit_signal.rs"
 symbols = ["signal_interpreter_exit"]
@@ -1764,7 +1759,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/compile_context/compile_timings.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_context/diagnostic_collector.rs=9",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_context/input_reads.rs=0",
-    "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/analysis.rs=11",
+    "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/analysis.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/analysis_cache.rs=20",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/assembly.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/assembly_analysis.rs=12",
@@ -1781,7 +1776,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/phases.rs=14",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/pipeline.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/pipeline_entries.rs=1",
-    "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/plan_pipeline.rs=7",
+    "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/plan_pipeline.rs=6",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/plan_result.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/project.rs=8",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_driver/python_plan_entries.rs=5",
@@ -2314,7 +2309,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/invocation.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/warehouse_scope.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/command_runtime/warehouses.rs=5",
-    "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/sql_expansion_context.rs=6",
+    "crates/sqlbuild-python/src/bindings/_helpers/compile_attachment/sql_expansion_context.rs=5",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/models.rs=9",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/prepared_artifacts.rs=7",
     "crates/sqlbuild-python/src/bindings/_helpers/compile_command/report.rs=6",
@@ -2502,7 +2497,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/rules/custom_evaluation.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/rules/custom_host_observation.rs=2",
     "crates/sqlbuild-python/src/bindings/_helpers/rules/custom_hosts.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/rules/early_sql_lint.rs=4",
+    "crates/sqlbuild-python/src/bindings/_helpers/rules/early_sql_lint.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/rules/fact_encoder.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/rules/fact_replay.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/rules/findings.rs=2",

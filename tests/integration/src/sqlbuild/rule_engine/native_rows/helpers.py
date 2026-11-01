@@ -8,7 +8,7 @@ import pytest
 from sqlbuild._native import run_cli as main
 
 RULES_FIXTURE: Path = Path("tests/e2e/fixtures/waffle_shop")
-RULES_CONFIG: str = '\n[rules]\nselect = ["SQBR"]\n'
+RULES_CONFIG: str = '\n[rules]\nselect = ["SQBR", "SQLCLEAN"]\n'
 EDITED_MODEL: str = "models/staging/stg_orders.sql"
 
 type FindingKey = tuple[str, str, int | None, int | None, str]

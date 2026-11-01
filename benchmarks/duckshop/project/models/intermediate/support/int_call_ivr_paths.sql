@@ -77,8 +77,6 @@ final AS (
       THEN 'APAC'
       WHEN '965'
       THEN 'MENA'
-      WHEN NULL
-      THEN NULL
       ELSE 'EU'
     END::VARCHAR AS caller_region,
     CASE

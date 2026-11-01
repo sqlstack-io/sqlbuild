@@ -39,14 +39,14 @@ def test_given_unicode_playground_fixture_when_running_rules_and_format_then_emp
     )
     fixture.write_text(sql, encoding="utf-8")
     baseline: subprocess.CompletedProcess[str] = run_sqb(
-        command=("rules", "--json", "run", "SQBRSQL021"), project_dir=project
+        command=("rules", "--json", "run", "SQLCLEAN021"), project_dir=project
     )
     baseline_count: int = json.loads(baseline.stdout)["finding_count"]
     fixture.write_text(
         sql.replace("'completed' AS status", f"'{test_case.status}' AS status"), encoding="utf-8"
     )
     before: subprocess.CompletedProcess[str] = run_sqb(
-        command=("rules", "--json", "run", "SQBRSQL021"), project_dir=project
+        command=("rules", "--json", "run", "SQLCLEAN021"), project_dir=project
     )
     assert before.returncode == baseline.returncode, before.stdout + before.stderr
     assert (
@@ -62,7 +62,7 @@ def test_given_unicode_playground_fixture_when_running_rules_and_format_then_emp
     assert test_case.status in formatted
     assert "__EMPTY_FIXTURE()" in formatted
     after: subprocess.CompletedProcess[str] = run_sqb(
-        command=("rules", "--json", "run", "SQBRSQL021"), project_dir=project
+        command=("rules", "--json", "run", "SQLCLEAN021"), project_dir=project
     )
     assert after.returncode == baseline.returncode, after.stdout + after.stderr
     assert (

@@ -25,9 +25,9 @@ _DIFFERENTIAL_TOML: str = (
 )
 _DIFFERENTIAL_RAW_SQL: str = (
     'MODEL (description "Raw orders");\n'
-    "SELECT * FROM (VALUES (1, 7, 'open', 3, [1, 2]), (2, 7, 'done', 5, [3]),"
-    " (3, 8, 'done', 3, [4, 5, 6]), (4, 9, 'done', 2, [7])) AS v"
-    " (order_id, customer_id, status, amount, tags)\n"
+    "WITH v (order_id, customer_id, status, amount, tags) AS (VALUES (1, 7, 'open', 3, [1, 2]),"
+    " (2, 7, 'done', 5, [3]), (3, 8, 'done', 3, [4, 5, 6]), (4, 9, 'done', 2, [7]))\n"
+    "SELECT v.order_id, v.customer_id, v.status, v.amount, v.tags FROM v\n"
 )
 
 
@@ -48,7 +48,7 @@ def test_given_bare_union_when_fixing_then_preserves_output_and_is_idempotent(
     payload: dict[str, Any] = json.loads(capsys.readouterr().out)
     assert model.read_text() == original
     assert any(
-        fix["code"] == "SQBRSQL008" and fix["status"] == "applied" for fix in payload["rule_fixes"]
+        fix["code"] == "SQLCLEAN008" and fix["status"] == "applied" for fix in payload["rule_fixes"]
     )
     assert main(["--project-dir", str(tmp_path), "format", "--fix", "--json"]) == 0
     capsys.readouterr()
@@ -71,7 +71,7 @@ def test_given_null_comparison_when_fixing_then_refuses_semantics_change(
     main(["--project-dir", str(tmp_path), "format", "--fix", "--json"])
     payload: dict[str, Any] = json.loads(capsys.readouterr().out)
     assert any(
-        fix["code"] == "SQBRSQL001" and fix["status"] == "refused" for fix in payload["rule_fixes"]
+        fix["code"] == "SQLCLEAN001" and fix["status"] == "refused" for fix in payload["rule_fixes"]
     )
     assert test_case.expected_literal in model.read_text()
 
@@ -109,28 +109,28 @@ def test_given_unanalysed_model_when_fixing_then_verification_preserves_original
             "comma product",
             "SELECT a.order_id, b.customer_id FROM "
             "(SELECT 1 AS order_id) AS a, (SELECT 2 AS customer_id) AS b",
-            "SQBRSQL002",
+            "SQLCLEAN002",
         ),
         SemanticFixTestCase(
             "unused CTE",
             "WITH unused AS (SELECT 2 AS customer_id) SELECT 1 AS order_id",
-            "SQBRSQL005",
+            "SQLCLEAN005",
         ),
         SemanticFixTestCase(
             "constant row count",
             "SELECT COUNT(1) AS order_count FROM (SELECT 1 AS order_id UNION ALL SELECT 2) AS o",
-            "SQBRSQL017",
+            "SQLCLEAN017",
         ),
         SemanticFixTestCase(
             "implicit inner join",
             "SELECT a.order_id, b.customer_id FROM (SELECT 1 AS order_id) AS a "
             "JOIN (SELECT 1 AS order_id, 2 AS customer_id) AS b ON a.order_id = b.order_id",
-            "SQBRSQL025",
+            "SQLCLEAN025",
         ),
         SemanticFixTestCase(
             "redundant distinct",
             "SELECT DISTINCT order_id FROM (SELECT 1 AS order_id) AS orders GROUP BY order_id",
-            "SQBRSQL006",
+            "SQLCLEAN006",
         ),
     ],
     ids=lambda case: case.description,
@@ -163,32 +163,32 @@ def test_given_safe_native_fix_when_formatting_then_compiler_and_query_results_a
             "Snowflake cartesian JOIN",
             "SELECT a.order_id, b.customer_id FROM "
             "(SELECT 1 AS order_id) AS a JOIN (SELECT 2 AS customer_id) AS b",
-            "SQBRSQL003",
+            "SQLCLEAN003",
             dialect="snowflake",
         ),
         SemanticFixTestCase(
             "DuckDB invalid JOIN",
             "SELECT a.order_id, b.customer_id FROM "
             "(SELECT 1 AS order_id) AS a JOIN (SELECT 2 AS customer_id) AS b",
-            "SQBRSQL003",
+            "SQLCLEAN003",
             expected_status="refused",
         ),
         SemanticFixTestCase(
             "parentheses precedence",
             "SELECT DISTINCT (1 + 2) * 3 AS order_id",
-            "SQBRSQL013",
+            "SQLCLEAN013",
             expected_status="refused",
         ),
         SemanticFixTestCase(
             "unused table alias",
             "SELECT order_id FROM (SELECT 1 AS order_id) AS o",
-            "SQBRSQL023",
+            "SQLCLEAN023",
             expected_status="refused",
         ),
         SemanticFixTestCase(
             "boolean CASE",
             "SELECT CASE WHEN 1 = 2 THEN TRUE ELSE FALSE END AS active",
-            "SQBRSQL030",
+            "SQLCLEAN030",
             expected_status="refused",
         ),
     ],
@@ -244,8 +244,8 @@ def test_given_one_unverifiable_file_when_fixing_then_only_that_file_keeps_its_o
     assert {
         (Path(fix["file"]).name, fix["code"], fix["status"]) for fix in payload["rule_fixes"]
     } >= {
-        ("orders.sql", "SQBRSQL008", "applied"),
-        ("customers.sql", "SQBRSQL005", "refused"),
+        ("orders.sql", "SQLCLEAN008", "applied"),
+        ("customers.sql", "SQLCLEAN005", "refused"),
     }
     faults: set[tuple[str, str]] = {
         (Path(violation["file"]).name, violation["code"]) for violation in payload["violations"]
@@ -295,7 +295,7 @@ def test_given_existing_errors_and_unexpandable_file_when_fixing_then_other_file
     assert unexpandable.read_text() == unexpandable_sql
     assert {
         (Path(fix["file"]).name, fix["code"], fix["status"]) for fix in payload["rule_fixes"]
-    } >= {("orders.sql", "SQBRSQL008", "applied")}
+    } >= {("orders.sql", "SQLCLEAN008", "applied")}
     assert {
         (
             Path(violation["file"]).name,
@@ -336,7 +336,7 @@ def test_given_only_unverifiable_fixes_when_fixing_then_every_refusal_is_listed_
     assert exit_code == 1
     assert {
         (Path(fix["file"]).name, fix["code"], fix["status"]) for fix in payload["rule_fixes"]
-    } >= {("orders.sql", "SQBRSQL001", "refused"), ("customers.sql", "SQBRSQL005", "refused")}
+    } >= {("orders.sql", "SQLCLEAN001", "refused"), ("customers.sql", "SQLCLEAN005", "refused")}
     assert {
         (Path(violation["file"]).name, violation["message"]) for violation in payload["violations"]
     } >= {("customers.sql", test_case.expected_literal + ", so the fix cannot be verified")}
@@ -419,7 +419,7 @@ def test_given_unused_cte_output_when_fixing_then_model_rows_are_unchanged(
 
     assert after == before
     assert (
-        rule_fix_statuses(payload=payload, code="SQBRSQL042", file_name="summary.sql")
+        rule_fix_statuses(payload=payload, code="SQLCLEAN042", file_name="summary.sql")
         == test_case.expected_statuses
     )
 
@@ -456,7 +456,7 @@ def test_given_macro_and_crlf_source_when_fixing_then_previews_preserve_bytes_an
     assert main(["--project-dir", str(tmp_path), "format", "--fix", "--json"]) == 0
     payload: dict[str, Any] = json.loads(capsys.readouterr().out)
     assert any(
-        fix["code"] == "SQBRSQL008" and fix["status"] == "applied" for fix in payload["rule_fixes"]
+        fix["code"] == "SQLCLEAN008" and fix["status"] == "applied" for fix in payload["rule_fixes"]
     )
     written: bytes = model.read_bytes()
     assert b"@py.order_value()" in written

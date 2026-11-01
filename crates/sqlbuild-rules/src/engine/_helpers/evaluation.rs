@@ -12,7 +12,6 @@ use crate::rules::main::{
 use crate::rules::models::{
     ModelEvaluationRequest, ProjectEvaluationRequest, QueryShapes, ResolvedThresholdOverride,
 };
-use crate::sql_lint::main::cross_join_subject::cross_join_subject;
 use fensu_policy::apply_suppressions;
 use fensu_policy::lifecycle::errors::LifecycleError;
 use fensu_policy::lifecycle::models::{
@@ -21,6 +20,7 @@ use fensu_policy::lifecycle::models::{
 #[cfg(test)]
 use rayon::iter::IndexedParallelIterator;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use sqlclean::sql_lint::main::cross_join_subject::cross_join_subject;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -103,7 +103,7 @@ fn evaluate_native_models(
     if !context
         .selected
         .values()
-        .any(|rule| !rule.custom && !rule.code.starts_with("SQBRSQL"))
+        .any(|rule| !rule.custom && !rule.code.starts_with("SQLCLEAN"))
     {
         return Ok(NativeModelEvaluation::default());
     }
@@ -111,7 +111,7 @@ fn evaluate_native_models(
     models.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     let all_models_required = context.selected.values().any(|rule| {
         !rule.custom
-            && !rule.code.starts_with("SQBRSQL")
+            && !rule.code.starts_with("SQLCLEAN")
             && !matches!(
                 rule.code.as_str(),
                 "SQBRDECLARATION201" | "SQBRDECLARATION301" | "SQBRTEST301"
@@ -364,7 +364,11 @@ fn evaluated_request(
     }
     config::validate(&request.config)?;
     let all_rules = assemble_catalogue::assemble_catalogue(&request.custom_rules)?;
-    let selected = select::select(&all_rules, &request.config.select, &request.config.ignore)?;
+    let selected = select::select(
+        &all_rules,
+        request.config.select.as_deref(),
+        &request.config.ignore,
+    )?;
     let request = if selected
         .iter()
         .any(|rule| matches!(rule.code.as_str(), "SQBRTEST202" | "SQBRTEST203"))

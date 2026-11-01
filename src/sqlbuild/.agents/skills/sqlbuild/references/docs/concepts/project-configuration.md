@@ -710,20 +710,21 @@ the same checks:
 
 ```toml
 [rules]
-select = ["SQBRSQL", "SQBRGRAPH", "XSQBRARCH"]
+select = ["SQLCLEAN", "SQBRGRAPH", "XSQBRARCH"]
 ```
 
-Rules are opt-in. Exact codes activate individual checks and prefixes activate a family. Built-in
-codes begin with `SQBR`; repository-defined codes begin with `XSQBR`. See
+Without `select`, the SQL Rules enabled by default run; `select = []` runs no configurable Rules.
+Exact codes activate individual checks and prefixes activate a family. SQL Rule codes begin with
+`SQLCLEAN`, other built-in codes with `SQBR`, and repository-defined codes with `XSQBR`. See
 [Compiler-integrated Rules](rules.md) for configuration, authoring, and exceptions.
 
 | Key | Description |
 | --- | --- |
 | `ignore` | Rule codes or families turned off for the whole project. |
-| `[[rules.rule_exceptions]]` | One reviewed exception: `rule`, `path` and `reason`, plus `relation` and optional `cte` for relation-level Rules such as `SQBRSQL038`. Stale entries fail compilation. See [Findings and exceptions](rules/findings-and-exceptions.md). |
+| `[[rules.rule_exceptions]]` | One reviewed exception: `rule`, `path` and `reason`, plus `relation` and optional `cte` for relation-level Rules such as `SQLCLEAN038`. Stale entries fail compilation. See [Findings and exceptions](rules/findings-and-exceptions.md). |
 | `[[rules.rule_ignores]]` | Rules turned off for `paths` or `selectors`, with a `reason`. |
 
-Rule exceptions live only in this file. Inline `-- sqb: ignore` comments are `SQBRSQL000` errors
+Rule exceptions live only in this file. Inline `-- sqb: ignore` comments are `SQBRSUPPRESSION000` errors
 that print the entry to add.
 
 ## Scopes

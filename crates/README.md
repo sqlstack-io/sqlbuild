@@ -199,8 +199,6 @@ not implemented by the page reader.
 
 - Tests live next to the module they cover; run them for one crate with
   `cargo test -p <crate>` or for all crates with `cargo test --workspace`.
-- `sqlbuild-analysis` has a `test-support` feature that exposes test-only helpers to the tests of
-  dependent crates. Enable it only from `[dev-dependencies]`.
 - The build identity (`sqlbuild._native.BUILD_IDENTITY`) hashes the sources of every crate in
   this directory, so editing any crate invalidates the native caches keyed on it.
 - maturin builds `crates/sqlbuild-python`; the release version lives in

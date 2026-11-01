@@ -557,7 +557,8 @@ def prepare_attached_audit_gate_project(
         "audits/generic/code_check.sql": _GATE_AUDIT_TEMPLATE.format(read=read),
         "models/valid_codes.sql": (
             "MODEL (description 'Test model valid_codes.', "
-            "materialized table);\n\nSELECT code FROM (VALUES ('A'), ('B')) AS valid(code)\n"
+            "materialized table);\n\n"
+            "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
         ),
     }
     files.update(
@@ -607,7 +608,7 @@ def prepare_nested_source_gate_project(*, tmp_path: Path, raw_code: str) -> Path
             ),
             "models/valid_codes.sql": (
                 "MODEL (description 'Test model valid_codes.', materialized table);\n\n"
-                "SELECT code FROM (VALUES ('A'), ('B')) AS valid(code)\n"
+                "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
             ),
         },
     )

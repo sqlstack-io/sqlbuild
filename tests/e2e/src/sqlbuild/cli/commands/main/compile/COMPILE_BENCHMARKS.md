@@ -98,6 +98,36 @@ same runner, three alternating runs per mode, and the medians of wall and CPU ti
 - warm: an unchanged `sqb compile --json` after one untimed run that writes the cache;
 - edit: `sqb compile --json` after the same one-model edit as the release comparison below.
 
+The fresh comparison writes both projects with the default SQL Rules, and every mode keeps the
+1.10x limit. Before the base ran them, the default Rules cost 1.19x to 1.20x cold wall and 1.32x to
+1.33x cold CPU over `select = []` in this job.
+
+Every fresh-process compile and cache guard runs the default SQL Rules (approved 2026-11-01). One
+guard keeps `select = []` and the previous budgets: the 3,000-model cache guard, which runs in the
+same job as its default Rules twin and covers the cold, warm, edit and project-config edit compiles.
+Each default Rules wall budget is the previous budget times the larger of two medians of default
+Rules over `select = []`: same-job pairs in CI and alternating local pairs after one discarded
+warm-up pair. A pair is excluded when a phase the Rules do not run (discover, attachment, test input
+compile, write) takes more than twice its median over the other runs. The project-config edit has
+its own budget because it reruns every rule on less parallel work.
+
+| Guard and run | CI same-job pairs | Local alternating | Factor | Budget |
+| --- | --- | --- | --- | --- |
+| Fresh 3,000 | 1.220, 1.239, 1.278 | 1.163 (5 pairs) | 1.24 | 9.9 s |
+| Fresh 5,000 | 1.238, 1.205; 1.465 excluded (write 4.9 s) | 1.161 (4) | 1.23 | 15.4 s |
+| Fresh 10,000 | 1.125 | 1.120 (6) | 1.13 | 28.8 s |
+| Cache 3,000 cold | 1.221, 1.158, 1.166 | 1.114 (3) | 1.17 | 10.5 s |
+| Cache 3,000 project-config edit | 1.203, 1.276, 1.232 | 1.170 (3) | 1.24 | 11.2 s |
+| Cache 5,000 cold | 1.174 | 1.107 (3) | 1.18 | 17.1 s |
+| Cache 5,000 project-config edit | 1.497 isolated, see below | 1.165 (3) | 1.24 | 18.0 s |
+| Cache 10,000 cold | 1.198 | 1.118 (3, fixed order) | 1.20 | 33.6 s |
+| Cache 10,000 project-config edit | 1.316 | 1.249 (3, fixed order) | 1.32 | 37.0 s |
+
+The single 5,000-model project-config pair took 1.39x its own cold compile against 1.08x to 1.13x on
+three other CI runs, so it uses the local median times that size's CI over local cold ratio (1.06).
+Warm, edit, memory and ratio budgets are unchanged. The cold budget bounds the cold run and sets the
+cache-disabled timeout, and no longer the project-config edit.
+
 The warm and edit modes reuse the cold project. A warm run that misses the analysis cache, or an
 edit run that does not, stops the comparison because it would measure the wrong path.
 

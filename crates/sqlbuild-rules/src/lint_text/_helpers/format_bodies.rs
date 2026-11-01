@@ -25,7 +25,7 @@ use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 use crate::lint_text::main::restore_interpolation::restore_interpolation;
 use crate::lint_text::models::{FormatFault, FormatFile, InterpolationSite, PreparedBody};
-use crate::sql_lint::models::{FormatRequest, FormatResponse};
+use sqlclean::sql_lint::models::{FormatRequest, FormatResponse};
 
 static OMITTED_SELECT_SUFFIX: LazyLock<Result<Regex, regex::Error>> =
     LazyLock::new(|| Regex::new(OMITTED_SELECT_SUFFIX_PATTERN));
@@ -60,6 +60,7 @@ impl RequestTable {
             dialect: options.0.to_string(),
             max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
             line_width: Some(options.1),
+            indent: None,
             token_widths: widths.into_iter().collect(),
         });
         let _ = self.index.insert(key, self.requests.len() - 1);

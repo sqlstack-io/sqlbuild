@@ -56,7 +56,9 @@ pub(crate) fn native_rules_config(config: &Bound<'_, PyAny>) -> PyResult<RulesCo
 /// Whether any selector, option, exception or ignore of `config` names a custom rule.
 pub(crate) fn references_custom_rules(config: &Bound<'_, PyAny>) -> PyResult<bool> {
     let mut selectors: Vec<String> = Vec::new();
-    for field in ["select", "ignore", "rule_options"] {
+    let select: Option<Vec<String>> = record_field(config, "select")?.extract()?;
+    selectors.extend(select.unwrap_or_default());
+    for field in ["ignore", "rule_options"] {
         for selector in record_field(config, field)?.try_iter()? {
             selectors.push(selector?.extract()?);
         }

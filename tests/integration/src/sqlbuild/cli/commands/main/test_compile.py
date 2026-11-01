@@ -128,7 +128,7 @@ def test_given_model_macro_when_compiling_with_sql_rules_then_expands_once_and_p
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQBRSQL001"]\n'
+        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN001"]\n'
     )
     macro_dir: Path = tmp_path / "models" / "orders" / "_sqlbuild" / "_macros" / "python"
     macro_dir.mkdir(parents=True)
@@ -148,7 +148,7 @@ def test_given_model_macro_when_compiling_with_sql_rules_then_expands_once_and_p
     diagnostics: list[dict[str, object]] = cast(list[dict[str, object]], result["diagnostics"])
     assert exit_code == 1
     assert int((macro_dir / "missing_value.calls").read_text()) == test_case.expected_count
-    assert tuple(item["code"] for item in diagnostics) == ("SQBRSQL001",)
+    assert tuple(item["code"] for item in diagnostics) == ("SQLCLEAN001",)
     assert diagnostics[0]["line"] == 3
 
 

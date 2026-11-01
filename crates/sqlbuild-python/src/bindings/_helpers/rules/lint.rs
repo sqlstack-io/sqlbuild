@@ -3,7 +3,7 @@
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::{FromPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_rules::lint_text::models::InterpolationSite;
-use sqlbuild_rules::sql_lint::types::PreparedSql;
+use sqlbuild_rules::lint_text::types::PreparedSql;
 
 use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::compiled_views::relation_keys;
@@ -12,7 +12,7 @@ use crate::bindings::types::CompilerDetach;
 
 #[pyfunction]
 fn lint_sql_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
-    py.compiler_detach(|| sqlbuild_rules::sql_lint::main::engine::lint_json(request_json))
+    py.compiler_detach(|| sqlclean::sql_lint::main::engine::lint_json(request_json))
         .map_err(value_error)
 }
 
@@ -36,7 +36,7 @@ fn prepare_lint_sql(
 ) -> PyResult<Option<PreparedLintSql>> {
     let prepared: Option<PreparedSql> = py
         .compiler_detach(|| {
-            sqlbuild_rules::sql_lint::main::preparation::prepare(
+            sqlbuild_rules::lint_text::main::preparation::prepare(
                 &request.expanded,
                 &request.before_expansion,
                 &request.prior_sites,
@@ -55,7 +55,7 @@ fn prepare_lint_sql(
 
 #[pyfunction]
 fn format_sql_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
-    py.compiler_detach(|| sqlbuild_rules::sql_lint::main::formatter::format_json(request_json))
+    py.compiler_detach(|| sqlclean::sql_lint::main::formatter::format_json(request_json))
         .map_err(value_error)
 }
 

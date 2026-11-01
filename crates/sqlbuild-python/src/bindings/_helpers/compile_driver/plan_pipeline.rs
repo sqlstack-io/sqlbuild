@@ -4,6 +4,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::PyDict;
 use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
@@ -19,11 +20,13 @@ use crate::bindings::_helpers::compile_driver::selection_phases::{
 };
 use crate::bindings::_helpers::frontier::stage_capture::write_plan_capture;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
+use crate::bindings::_helpers::records::construct::{error_class, new_annotated_error};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
+use crate::bindings::_helpers::rules::early_sql_lint::EarlySqlLint;
 use crate::bindings::_helpers::rules::results::{format_rules_result, rules_progress};
 use crate::bindings::_helpers::rules::rule_dispatch::evaluate_rules;
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
@@ -54,12 +57,20 @@ pub(crate) fn run_compile_pipeline<'py>(
         hooks
     };
     let on_progress: Bound<'py, PyAny> = native_field(&hooks, "on_progress")?;
-    let compiled: Bound<'py, PyAny> =
-        compiled_phase((&discovered, &adapter), &options, &on_progress)?;
+    let expansion_reuse: Bound<'py, EarlySqlLint> =
+        Bound::new(py, EarlySqlLint::new(false, false))?;
+    let on_inputs_ready: Bound<'py, PyAny> =
+        EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, &adapter);
+    let compiled: Bound<'py, PyAny> = compiled_phase(
+        (&discovered, &adapter),
+        &options,
+        &on_progress,
+        Some(&on_inputs_ready),
+    )?;
     let project: Bound<'py, PyAny> = native_field(&compiled, "project")?;
     let graph: Bound<'py, PyAny> = project_graph(&project)?;
     run_rules_gate(
-        (&discovered, &adapter),
+        (&discovered, &adapter, expansion_reuse.as_any()),
         (&options, &on_progress),
         (&project, &graph),
     )?;
@@ -68,7 +79,11 @@ pub(crate) fn run_compile_pipeline<'py>(
 
 /// Run the configured rules and stop the command when any of them finds a fault.
 fn run_rules_gate<'py>(
-    (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (discovered, adapter, expansion_reuse): (
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+        &Bound<'py, PyAny>,
+    ),
     (options, on_progress): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     (project, graph): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<()> {
@@ -103,10 +118,11 @@ fn run_rules_gate<'py>(
             &[
                 ("graph", graph.clone()),
                 ("discovered_inputs", discovered.clone()),
-                ("config", config),
+                ("config", config.clone()),
                 ("project_dir", project_dir),
                 ("dialect", dialect),
                 ("selected_keys", selected_keys),
+                ("early_lint", expansion_reuse.clone()),
                 (
                     "no_sql_analysis",
                     native_field(options, "no_sql_validation")?,
@@ -141,9 +157,22 @@ fn run_rules_gate<'py>(
         ],
     )?;
     let rendered: String = format_rules_result(&summary, false)?;
-    Err(PyErr::from_value(rules_error.call1((format!(
-        "configured compiler rules failed:\n{rendered}"
-    ),))?))
+    let codes: Vec<String> = native_field(&summary, "findings")?
+        .try_iter()?
+        .map(|finding| native_field(&finding?, "code")?.extract())
+        .collect::<PyResult<_>>()?;
+    let select_omitted: bool = native_field(&config, "select")?.is_none();
+    let notice: Vec<(&str, String)> =
+        default_rules_notice(select_omitted, codes.iter().map(String::as_str))
+            .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
+            .into_iter()
+            .collect();
+    Err(new_annotated_error(
+        py,
+        ErrorId::Rules,
+        format!("configured compiler rules failed:\n{rendered}"),
+        &notice,
+    ))
 }
 
 /// Open the planning connection, plan, and record the compile and planning times.

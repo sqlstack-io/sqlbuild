@@ -14,7 +14,10 @@ from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
     SemanticBindingIntegrationTestCase,
     SourceContractDefaultIntegrationTestCase,
 )
-from tests.integration.src.sqlbuild.compiler.pipeline.helpers import write_semantic_binding_project
+from tests.integration.src.sqlbuild.compiler.pipeline.helpers import (
+    SEMANTIC_BINDING_PROJECT_TOML,
+    write_semantic_binding_project,
+)
 
 _AUTHORITATIVE_MODEL: str = """MODEL (description "Test model.",
   materialized table
@@ -26,6 +29,10 @@ _AUTHORITATIVE_MODEL: str = """MODEL (description "Test model.",
 );
 SELECT CAST(1 AS INTEGER) AS id, CAST('a' AS VARCHAR) AS category
 """
+
+
+# Some binding cases rank by a column with no proven key, which SQLCLEAN018 reports.
+_UNPROVEN_RANKING_RULES: str = '\n[rules]\nignore = ["SQLCLEAN018"]\n'
 
 
 @pytest.mark.parametrize(
@@ -497,6 +504,7 @@ def test_given_valid_using_and_qualify_alias_when_binding_then_compile_succeeds(
             'FROM __ref("upstream") l JOIN __ref("upstream") r USING (id) '
             "QUALIFY rn = 1\n"
         ),
+        project_toml=SEMANTIC_BINDING_PROJECT_TOML + _UNPROVEN_RANKING_RULES,
     )
 
     exit_code: int = main(["--no-color", "--project-dir", str(tmp_path), "compile", "--no-cache"])
@@ -600,7 +608,8 @@ def test_given_untyped_source_when_cast_flows_through_ctes_then_declared_type_ma
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "semantic_binding"\nadapter = "snowflake"\n', encoding="utf-8"
+        'name = "semantic_binding"\nadapter = "snowflake"\n' + _UNPROVEN_RANKING_RULES,
+        encoding="utf-8",
     )
     sources_dir: Path = tmp_path / "sources"
     models_dir: Path = tmp_path / "models"

@@ -66,7 +66,7 @@ fn given_built_in_catalogue_when_reading_rule_scopes_then_every_rule_matches_rev
     for test_case in &test_cases {
         let declared: BTreeMap<String, RuleScope> = catalogue()
             .into_iter()
-            .filter(|rule| !rule.code.starts_with("SQBRSQL"))
+            .filter(|rule| !rule.code.starts_with("SQLCLEAN"))
             .map(|rule| (rule.code, rule.scope))
             .collect();
         let declared: Vec<(&str, RuleScope)> = declared
@@ -75,7 +75,7 @@ fn given_built_in_catalogue_when_reading_rule_scopes_then_every_rule_matches_rev
             .collect();
         let sql_scopes_match = catalogue()
             .iter()
-            .filter(|rule| rule.code.starts_with("SQBRSQL"))
+            .filter(|rule| rule.code.starts_with("SQLCLEAN"))
             .all(|rule| rule.scope == test_case.expected_sql_scope);
 
         assert_eq!(

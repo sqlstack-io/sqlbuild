@@ -172,18 +172,18 @@ reason, and the run continues. A cycle or the 128-pass limit fails without writi
 
 | Rule | Decision | Reason |
 | --- | --- | --- |
-| SQBRSQL001 NULL comparison | Refused | Replacing `= NULL` with `IS NULL` changes three-valued logic. |
-| SQBRSQL002 implicit cartesian join | Applied | A comma-separated product becomes an explicit `CROSS JOIN`; mixed join precedence is excluded. |
-| SQBRSQL003 conditionless join | Applied in Snowflake | Snowflake defines an unqualified `JOIN` without `ON` or `USING` as a cartesian product. Other dialects are refused because the original syntax may be invalid. |
-| SQBRSQL005 unused CTE | Applied | Unreferenced `SELECT` CTEs contribute no rows. Mutation statements and commented CTEs are excluded. |
-| SQBRSQL006 redundant DISTINCT | Applied | The projected and grouping expressions are proved to coincide. |
-| SQBRSQL008 bare UNION | Applied | `UNION DISTINCT` states the existing duplicate elimination, in dialects that support it. |
-| SQBRSQL013 parenthesized DISTINCT | Refused | Removing parentheses can change operator precedence. |
-| SQBRSQL017 constant row count | Applied | `COUNT(1)` and `COUNT(*)` both count every row. |
-| SQBRSQL023 unused table alias | Refused | Not yet reviewed as meaning-preserving. |
-| SQBRSQL025 implicit inner join | Applied | A bare `JOIN ... ON` is an inner join. |
-| SQBRSQL030 boolean CASE simplification | Refused | The `COALESCE` rewrite is not proved portable to every supported dialect. |
-| SQBRSQL042 unused CTE output | Applied when row-neutral | Only a column reference or deterministic scalar expression is removed, from a CTE without `DISTINCT`, `DISTINCT ON`, `GROUP BY ALL`, `ORDER BY ALL`, an ungrouped aggregate, or positional `GROUP BY`/`ORDER BY`. Other removals could change the rows and are refused with the reason. |
+| SQLCLEAN001 NULL comparison | Refused | Replacing `= NULL` with `IS NULL` changes three-valued logic. |
+| SQLCLEAN002 implicit cartesian join | Applied | A comma-separated product becomes an explicit `CROSS JOIN`; mixed join precedence is excluded. |
+| SQLCLEAN003 conditionless join | Applied in Snowflake | Snowflake defines an unqualified `JOIN` without `ON` or `USING` as a cartesian product. Other dialects are refused because the original syntax may be invalid. |
+| SQLCLEAN005 unused CTE | Applied | Unreferenced `SELECT` CTEs contribute no rows. Mutation statements and commented CTEs are excluded. |
+| SQLCLEAN006 redundant DISTINCT | Applied | The projected and grouping expressions are proved to coincide. |
+| SQLCLEAN008 bare UNION | Applied | `UNION DISTINCT` states the existing duplicate elimination, in dialects that support it. |
+| SQLCLEAN013 parenthesized DISTINCT | Refused | Removing parentheses can change operator precedence. |
+| SQLCLEAN017 constant row count | Applied | `COUNT(1)` and `COUNT(*)` both count every row. |
+| SQLCLEAN023 unused table alias | Refused | Not yet reviewed as meaning-preserving. |
+| SQLCLEAN025 implicit inner join | Applied | A bare `JOIN ... ON` is an inner join. |
+| SQLCLEAN030 boolean CASE simplification | Refused | The `COALESCE` rewrite is not proved portable to every supported dialect. |
+| SQLCLEAN042 unused CTE output | Applied when row-neutral | Only a column reference or deterministic scalar expression is removed, from a CTE without `DISTINCT`, `DISTINCT ON`, `GROUP BY ALL`, `ORDER BY ALL`, an ungrouped aggregate, or positional `GROUP BY`/`ORDER BY`. Other removals could change the rows and are refused with the reason. |
 
 `--fix` also rewrites a header description that escapes double quotes as `\"` or doubles them as
 `""`, which descriptions do not support, as a `"""..."""` string holding real quotes, and reports

@@ -949,7 +949,11 @@ def build_complex_values_fixture_project_files(*, adapter_name: str) -> dict[str
             f'adapter = "{adapter_name}"\n\n'
             "[connection]\n"
             'database = "complex_values_fixture.duckdb"\n'
-            'schema = "main"\n'
+            'schema = "main"\n\n'
+            "[[rules.rule_ignores]]\n"
+            'rules = ["SQLCLEAN039"]\n'
+            'paths = ["tests/unit/test_orders.sql"]\n'
+            'reason = "The fixtures cover complex strings in a VALUES relation on every dialect."\n'
         ),
         "models/orders.sql": (
             'MODEL (description "Test model orders.", database "fixture_db", schema "main");\n\n'
@@ -1237,12 +1241,13 @@ def build_diamond_chain_test_project_files(*, sql_analysis_enabled: bool) -> dic
         ),
         "models/customer_order_mix.sql": (
             "MODEL (description 'Test model customer_order_mix.', materialized table);\n\n"
+            'WITH customers AS (SELECT DISTINCT customer_id FROM __ref("stg_orders"))\n'
             "SELECT customer_id,\n"
             '  (SELECT COUNT(*) FROM __ref("large_orders") AS l\n'
             "    WHERE l.customer_id = c.customer_id) AS large_count,\n"
             '  (SELECT COUNT(*) FROM __ref("small_orders") AS s\n'
             "    WHERE s.customer_id = c.customer_id) AS small_count\n"
-            'FROM (SELECT DISTINCT customer_id FROM __ref("stg_orders")) AS c\n'
+            "FROM customers AS c\n"
         ),
         "tests/unit/test_customer_order_mix.sql": (
             'TEST (name "customer_order_mix_matches");\n\n'
@@ -1961,7 +1966,11 @@ def build_helper_reference_project_files(
             "[connection]\n"
             'database = "helper_reference_demo.duckdb"\n\n'
             "[settings]\n"
-            f"sql_analysis = {str(sql_analysis).lower()}\n"
+            f"sql_analysis = {str(sql_analysis).lower()}\n\n"
+            "[[rules.rule_ignores]]\n"
+            'rules = ["SQLCLEAN005"]\n'
+            'paths = ["tests/unit/**"]\n'
+            'reason = "These SQL tests leave helpers unread to cover reference detection."\n'
         ),
         "sources/item_returns.yml": (
             "sources:\n"

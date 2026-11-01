@@ -18,6 +18,7 @@ export default defineConfig({
 			},
 			favicon: '/favicon.png',
 			head: [
+				{ tag: 'link', attrs: { rel: 'stylesheet', href: '/brand.css' } },
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://sqlbuild.com/assets/og-sqlbuild-docs.png' } },
 				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
 				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
@@ -35,6 +36,7 @@ export default defineConfig({
 				SiteTitle: './src/components/SiteTitle.astro',
 				Pagination: './src/components/Pagination.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',
+				Footer: './src/components/Footer.astro',
 			},
 			customCss: ['./src/styles/fonts.css', './src/styles/sqlbuild.css'],
 			expressiveCode: {

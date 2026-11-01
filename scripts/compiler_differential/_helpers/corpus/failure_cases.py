@@ -416,11 +416,11 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         ),
         failure_case(
             name="rule-unused-cte-after-variable-and-macro",
-            expected_code="SQBRSQL005",
+            expected_code="SQLCLEAN005",
             files={
                 FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
                 + '\n[vars]\nfloor = "2"\n'
-                + _RULES_CONFIG.format(codes="SQBRSQL005"),
+                + _RULES_CONFIG.format(codes="SQLCLEAN005"),
                 "models/marts/_macros/python/cents.py": _ENGINE_ERROR_CENTS,
                 **mart_body_files(
                     'WITH totals AS (SELECT customer_id, @py.cents("amount") AS cents, '
@@ -432,9 +432,9 @@ def _compile_failure_cases() -> tuple[FailureCase, ...]:
         ),
         failure_case(
             name="rule-unused-cte",
-            expected_code="SQBRSQL005",
+            expected_code="SQLCLEAN005",
             files={
-                **_rules("SQBRSQL005"),
+                **_rules("SQLCLEAN005"),
                 **mart_body_files(
                     "WITH spare AS (SELECT 1 AS one)\n"
                     "SELECT customer_id, SUM(amount) AS total_amount\n"

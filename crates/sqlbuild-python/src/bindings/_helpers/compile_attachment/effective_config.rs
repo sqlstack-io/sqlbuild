@@ -108,7 +108,7 @@ pub(crate) fn build_effective_vars<'py>(
 }
 
 /// The selected target name of a discovered project and its effective config, if any.
-fn target_selection<'py>(
+pub(crate) fn target_selection<'py>(
     discovered: &Bound<'py, PyAny>,
     selected: Option<Bound<'py, PyAny>>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {

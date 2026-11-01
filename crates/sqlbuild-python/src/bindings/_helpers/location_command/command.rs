@@ -127,7 +127,12 @@ fn compile_location<'py>(
         RecordId::CompilePipelineOptions,
         &[("selected_target", arguments.value("selected_target")?)],
     )?;
-    let compiled = compiled_phase((&discovered, &adapter), &options, &py.None().into_bound(py))?;
+    let compiled = compiled_phase(
+        (&discovered, &adapter),
+        &options,
+        &py.None().into_bound(py),
+        None,
+    )?;
     let project = field(&compiled, "project")?;
     let view = project.cast::<NativeProjectView>()?.borrow();
     let snapshot = build_orchestration_snapshot(

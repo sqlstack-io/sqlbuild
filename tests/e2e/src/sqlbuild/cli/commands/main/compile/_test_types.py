@@ -39,6 +39,7 @@ class SemanticCorpusCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     pending_native: bool
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,7 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     expected_cold_max_wall_seconds: float
     expected_warm_max_wall_seconds: float
     expected_edit_max_wall_seconds: float
+    expected_project_config_edit_max_wall_seconds: float
     expected_max_warm_to_cold_ratio: float
     expected_max_edit_to_cold_ratio: float
     expected_max_cache_write_cpu_overhead_ratio: float
@@ -199,6 +201,8 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     macro_call_interval: int
     scoped_macros: bool
     expected_macro_edit_misses: int
+    # `select = []`: the compiler alone, without the default SQL Rules.
+    compiler_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -1360,6 +1364,7 @@ class DialectSyntaxCompileE2ETestCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     expected_column_counts: dict[str, int]
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

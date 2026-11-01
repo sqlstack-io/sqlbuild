@@ -24,8 +24,8 @@ _STARTS_WITH_FUNCTION: str = (
     "LEFT(value, LENGTH(prefix)) = prefix\n"
 )
 
-_SELECT: str = "SELECT\n"
-_FROM: str = "\nFROM (SELECT 'anvil' AS product_name) AS catalog_items\n"
+_SELECT: str = "WITH catalog_items AS (SELECT 'anvil' AS product_name)\nSELECT\n"
+_FROM: str = "\nFROM catalog_items\n"
 _SNOWFLAKE_PROJECT: str = 'name = "products"\nadapter = "snowflake"\n'
 _DUCKDB_PROJECT: str = (
     'name = "products"\nadapter = "duckdb"\n\n[connection]\ndatabase = ":memory:"\n'
@@ -44,7 +44,7 @@ _DUCKDB_PROJECT: str = (
                 (
                     "B101",
                     "Unknown function 'STARTS_WITH' for dialect Snowflake; did you mean STARTSWITH?",
-                    4,
+                    5,
                     5,
                 ),
             ),
@@ -71,7 +71,9 @@ _DUCKDB_PROJECT: str = (
         ),
         FunctionNameCompileTestCase(
             description="snowflake derived-table alias named like an alias compiles",
-            project_toml=_SNOWFLAKE_PROJECT,
+            project_toml=_SNOWFLAKE_PROJECT
+            + '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\npaths = ["models/**"]\n'
+            + 'reason = "The case names a derived table like a date part."\n',
             query_sql="SELECT x FROM (VALUES (1)) day_of_week (x)\n",
             expected_exit_code=0,
             expected_diagnostics=(),
@@ -85,7 +87,7 @@ _DUCKDB_PROJECT: str = (
                 (
                     "B101",
                     "Unknown function 'STARTSWITH' for dialect DuckDB; did you mean STARTS_WITH?",
-                    4,
+                    5,
                     5,
                 ),
             ),
