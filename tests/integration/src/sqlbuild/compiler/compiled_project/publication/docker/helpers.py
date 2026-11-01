@@ -3,11 +3,16 @@
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from http.client import HTTPConnection, HTTPResponse
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from socketserver import UnixStreamServer
+from threading import Event, Thread
 from uuid import uuid4
 
 import pytest
@@ -126,3 +131,64 @@ def worker_container(location: DockerLocation, location_id: str, run_id: str) ->
         == location.image_id
     )
     return result
+
+
+@contextmanager
+def lost_start_response(directory: Path, upstream: Path, inspection: Event) -> Iterator[Path]:
+    """Fail the real start result and hold physical inspection until explicitly restored."""
+    proxy: Path = directory / "docker-proxy.sock"
+
+    class Handler(BaseHTTPRequestHandler):
+        def forward(self) -> None:
+            connection: HTTPConnection = HTTPConnection("localhost", timeout=5)
+            connection.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            connection.sock.settimeout(5)
+            connection.sock.connect(str(upstream))
+            try:
+                body: bytes = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+                connection.request(
+                    self.command, self.path, body, {"Content-Type": "application/json"}
+                )
+                response: HTTPResponse = connection.getresponse()
+                payload: bytes = response.read()
+                status: int = response.status
+                started: bool = self.command == "POST" and self.path.endswith("/start")
+                unavailable: bool = (
+                    self.command == "GET"
+                    and self.path.startswith("/containers/sqlbuild-")
+                    and not inspection.is_set()
+                )
+                assert not started or status == 204, (
+                    "The actual Docker start must succeed before faulting"
+                )
+                status, payload = {
+                    (False, False): (status, payload),
+                    (True, False): (503, b'{"message":"synthetic lost start response"}'),
+                    (False, True): (503, b'{"message":"synthetic inspection outage"}'),
+                }[(started, unavailable)]
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+            finally:
+                connection.close()
+
+        def do_GET(self) -> None:
+            self.forward()
+
+        def do_POST(self) -> None:
+            self.forward()
+
+        def log_message(self, format: str, *args: object) -> None:
+            """Never copy credential-bearing Docker requests to test output."""
+
+    with UnixStreamServer(str(proxy), Handler) as server:
+        thread: Thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield proxy
+        finally:
+            server.shutdown()
+            thread.join(timeout=6)
+            assert not thread.is_alive(), "Docker fault proxy did not stop"
+            proxy.unlink(missing_ok=True)

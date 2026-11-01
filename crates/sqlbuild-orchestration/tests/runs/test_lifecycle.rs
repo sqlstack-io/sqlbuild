@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::credentials::models::AuditContext;
+use crate::platform::models::PlatformEvent;
 use crate::runs::main::change_run::change_run;
 use crate::runs::main::claim_next_run::claim_next_run;
 use crate::runs::main::heartbeat_run::heartbeat_run;
@@ -11,6 +12,7 @@ use crate::runs::models::{
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::helpers::read_recall_events;
 use uuid::Uuid;
@@ -19,6 +21,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::test_types::{RunLifecycleTestCase, TransactionFault};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::lease_helpers::expire_lease;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -117,6 +120,96 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     .expect("started run")
                     .status,
                 RunStatus::Running
+            );
+            let launch_failed = RunChangeRequest {
+                event_id: Uuid::now_v7(),
+                change: RunChange::LaunchFailed {
+                    code: "docker_launch_failed".into(),
+                },
+                ..started.clone()
+            };
+            assert!(change_run(store, worker, &launch_failed).await.is_err());
+            assert!(
+                change_run(store, RunAuthority::Operator(&operator), &launch_failed)
+                    .await
+                    .is_err()
+            );
+            let wrong_claim = RunChangeRequest {
+                claim_id: Some(Uuid::now_v7()),
+                ..launch_failed.clone()
+            };
+            assert!(
+                change_run(store, RunAuthority::Scheduler(&lease), &wrong_claim)
+                    .await
+                    .is_err()
+            );
+            let before_launch_failure = read_recall_events(store, 0, 100)
+                .await
+                .expect("before launch failure");
+            let fault = TransactionFault {
+                description: "platform launch observation must commit with its run fact",
+                table: "recall_events",
+                operation: "INSERT",
+                condition: "WHEN NEW.event_type='platform_launch_failed'",
+                sqlite_body: "SELECT RAISE(ABORT,'injected launch observation failure')",
+                postgres_body: "RAISE EXCEPTION 'injected launch observation failure'",
+            };
+            install_fault(store, &fault).await;
+            assert!(
+                change_run(store, RunAuthority::Scheduler(&lease), &launch_failed)
+                    .await
+                    .is_err()
+            );
+            remove_fault(store, &fault).await;
+            assert_eq!(
+                read_recall_events(store, 0, 100)
+                    .await
+                    .expect("rolled back launch fact"),
+                before_launch_failure
+            );
+            assert!(
+                change_run(store, RunAuthority::Scheduler(&lease), &launch_failed)
+                    .await
+                    .expect("launch observation")
+            );
+            assert!(
+                !change_run(store, RunAuthority::Scheduler(&lease), &launch_failed)
+                    .await
+                    .expect("idempotent retry")
+            );
+            let observations: Vec<_> = read_recall_events(store, 0, 100)
+                .await
+                .expect("health facts")
+                .into_iter()
+                .filter(|row| row["event_type"] == "platform_launch_failed")
+                .collect();
+            assert_eq!(observations.len(), 1);
+            let platform: PlatformEvent =
+                serde_json::from_value(observations[0]["payload"]["platform"].clone())
+                    .expect("typed launch failure");
+            assert_eq!(
+                platform,
+                PlatformEvent::LaunchFailed {
+                    run_id: started.run_id,
+                    claim_id: claim.claim_id,
+                    code: "docker_launch_failed".into()
+                }
+            );
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("live run")
+                    .into_iter()
+                    .find(|run| run.run_id == started.run_id)
+                    .expect("original run")
+                    .status,
+                RunStatus::Running
+            );
+            assert!(
+                claim_next_run(store, &lease, &limits, None)
+                    .await
+                    .expect("physical ownership retained")
+                    .is_none()
             );
             let success = RunChangeRequest {
                 event_id: Uuid::now_v7(),
@@ -345,6 +438,123 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
             assert_eq!(nodes[0].status, "success");
             assert_eq!(nodes[0].rows_affected, Some(17));
             assert_eq!(nodes[1].error_code.as_deref(), Some("E100"));
+            let late_failure = RunChangeRequest {
+                event_id: Uuid::now_v7(),
+                ..launch_failed.clone()
+            };
+            let before_late = read_recall_events(store, 0, 100)
+                .await
+                .expect("terminal facts");
+            let expiry = TransactionFault {
+                description: "late launch observation loses leadership before commit",
+                sqlite_body: "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
+                postgres_body: "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
+                ..fault
+            };
+            for (point, fenced) in [(&fault, false), (&expiry, true)] {
+                install_fault(store, point).await;
+                let failed =
+                    change_run(store, RunAuthority::Scheduler(&lease), &late_failure).await;
+                let error = failed.expect_err(point.description);
+                assert_eq!(
+                    matches!(error, ControlError::Fenced),
+                    fenced,
+                    "{}",
+                    point.description
+                );
+                remove_fault(store, point).await;
+                assert_eq!(
+                    read_recall_events(store, 0, 100)
+                        .await
+                        .expect("terminal rollback"),
+                    before_late
+                );
+            }
+            assert!(
+                change_run(store, RunAuthority::Scheduler(&lease), &late_failure)
+                    .await
+                    .expect("late observation")
+            );
+            assert!(
+                !change_run(store, RunAuthority::Scheduler(&lease), &late_failure)
+                    .await
+                    .expect("late retry")
+            );
+            assert!(change_run(store, worker, &late_failure).await.is_err());
+            assert!(
+                change_run(store, RunAuthority::Operator(&operator), &late_failure)
+                    .await
+                    .is_err()
+            );
+            for invalid in [
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    claim_id: Some(Uuid::now_v7()),
+                    ..late_failure.clone()
+                },
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    claim_id: None,
+                    ..late_failure.clone()
+                },
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: Uuid::from_u128(2),
+                    ..late_failure.clone()
+                },
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: Uuid::from_u128(2),
+                    claim_id: Some(Uuid::new_v5(&Uuid::from_u128(2), b"run_claimed")),
+                    ..late_failure.clone()
+                },
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    ..started.clone()
+                },
+                RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    ..launched.clone()
+                },
+            ] {
+                assert!(
+                    change_run(store, RunAuthority::Scheduler(&lease), &invalid)
+                        .await
+                        .is_err(),
+                    "terminal authority remains narrow: {invalid:?}"
+                );
+            }
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("unchanged terminal projection")
+                    .into_iter()
+                    .find(|run| run.run_id == started.run_id)
+                    .expect("original run"),
+                projected
+            );
+            let recorded = read_recall_events(store, 0, 100)
+                .await
+                .expect("late fact pair");
+            assert_eq!(
+                recorded
+                    .iter()
+                    .filter(|row| row["event_type"] == "platform_launch_failed")
+                    .count(),
+                2
+            );
+            expire_lease(store).await;
+            assert!(
+                matches!(
+                    change_run(store, RunAuthority::Scheduler(&lease), &late_failure).await,
+                    Err(ControlError::Fenced)
+                ),
+                "even duplicate observations require a live leader"
+            );
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect successor")
+                .expect("successor");
             let following = claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim following run")

@@ -114,6 +114,24 @@ impl Workers {
                     }
                     renewed = Instant::now();
                 }
+                if self.active[index].launch_failure.is_some() {
+                    let reported = match lease {
+                        Some(lease) => {
+                            self.active[index]
+                                .publish_launch_failure(store, lease)
+                                .await
+                        }
+                        None => Err(ControlError::Fenced),
+                    };
+                    if let Err(error) = reported {
+                        if matches!(error, ControlError::Fenced) {
+                            failure = Some(error);
+                        } else {
+                            failure.get_or_insert(error);
+                        }
+                        continue;
+                    }
+                }
                 if let Some(WorkerChild::Docker(child)) = &self.active[index].child {
                     match child.try_wait().await {
                         Ok(None) => {

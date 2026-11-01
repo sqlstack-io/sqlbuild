@@ -250,6 +250,10 @@ pub enum RunChange {
     Launched {
         container_id: Option<String>,
     },
+    /// A failed launch response is not physical evidence that the worker has stopped.
+    LaunchFailed {
+        code: String,
+    },
     Started,
     NodeStarted {
         node_key: String,
@@ -279,6 +283,7 @@ impl RunChange {
     pub(crate) const fn event_type(&self) -> &'static str {
         match self {
             Self::Launched { .. } => "run_launched",
+            Self::LaunchFailed { .. } => "run_launch_failed",
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",
             Self::NodeFinished { .. } => "run_node_finished",

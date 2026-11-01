@@ -120,6 +120,7 @@ pub enum PlatformEventKind {
     TickOverdue,
     CalendarHorizonLow,
     LocationBroken,
+    LaunchFailed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,6 +145,12 @@ pub enum PlatformEvent {
         target: String,
         last_seen_at: DateTime<Utc>,
     },
+    /// A launch attempt or its response failed; the worker may still start or finish.
+    LaunchFailed {
+        run_id: Uuid,
+        claim_id: Uuid,
+        code: String,
+    },
 }
 
 impl PlatformEvent {
@@ -155,6 +162,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => PlatformEventKind::TickOverdue,
             Self::CalendarHorizonLow { .. } => PlatformEventKind::CalendarHorizonLow,
             Self::LocationBroken { .. } => PlatformEventKind::LocationBroken,
+            Self::LaunchFailed { .. } => PlatformEventKind::LaunchFailed,
         }
     }
 
@@ -166,6 +174,7 @@ impl PlatformEvent {
             Self::TickOverdue { .. } => "platform_tick_overdue",
             Self::CalendarHorizonLow { .. } => "platform_calendar_horizon_low",
             Self::LocationBroken { .. } => "platform_location_broken",
+            Self::LaunchFailed { .. } => "platform_launch_failed",
         }
     }
 }

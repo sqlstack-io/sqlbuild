@@ -61,7 +61,13 @@ edge_products_group = job_group(
 edge_health = sensor(
     "edge_platform_orders",
     description="Catch up retained platform observations with a stopped group sensor.",
-    when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE, PlatformEventKind.LOCATION_BROKEN]),
+    when=platform_event(
+        kinds=[
+            PlatformEventKind.TICK_OVERDUE,
+            PlatformEventKind.LOCATION_BROKEN,
+            PlatformEventKind.LAUNCH_FAILED,
+        ]
+    ),
     run=edge_group,
     minimum_interval_seconds=7,
     default_status="stopped",

@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::credentials::main::append_audit::append_audit;
 use crate::runs::_helpers::lifecycle::changes::{
-    validate_authority, validate_change, validate_retry,
+    check_launch_claim, validate_authority, validate_change, validate_retry,
 };
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{ChangingRun, RunAuthority, RunChange, RunChangeRequest};
@@ -39,7 +39,7 @@ pub async fn change_run(
         commit(transaction).await?;
         return Ok(false);
     }
-    let (transaction, rows) = query(
+    let (mut transaction, rows) = query(
         transaction,
         "SELECT r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
          LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.run_id=$1",
@@ -51,7 +51,11 @@ pub async fn change_run(
             .next()
             .ok_or_else(|| ControlError::Invalid("run does not exist".into()))?,
     )?;
-    validate_change(&state, request)?;
+    if matches!(request.change, RunChange::LaunchFailed { .. }) {
+        transaction = check_launch_claim(transaction, request).await?;
+    } else {
+        validate_change(&state, request)?;
+    }
     let mut transaction = publish_change(transaction, request, &state).await?;
     if let (RunAuthority::Operator(context), RunChange::CancelRequested { reason, .. }) =
         (authority, &request.change)

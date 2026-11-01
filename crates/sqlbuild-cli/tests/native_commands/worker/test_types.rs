@@ -16,6 +16,8 @@ pub(crate) struct WorkerHeartbeatTestCase {
 pub(crate) struct WorkerRecoveryTestCase {
     pub(crate) description: &'static str,
     pub(crate) image_id: Option<&'static str>,
+    pub(crate) failure_event: &'static str,
+    pub(crate) expected_pending_observations: i64,
     pub(crate) expected_status: &'static str,
 }
 

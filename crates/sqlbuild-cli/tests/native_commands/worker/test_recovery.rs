@@ -14,11 +14,29 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
         WorkerRecoveryTestCase {
             description: "snapshot without an image pin",
             image_id: None,
+            failure_event: "run_terminated",
+            expected_pending_observations: 1,
             expected_status: "failed",
         },
         WorkerRecoveryTestCase {
             description: "snapshot with a malformed image pin",
             image_id: Some("sha256:invalid"),
+            failure_event: "run_terminated",
+            expected_pending_observations: 1,
+            expected_status: "failed",
+        },
+        WorkerRecoveryTestCase {
+            description: "missing image pin retains a rolled-back launch observation",
+            image_id: None,
+            failure_event: "platform_launch_failed",
+            expected_pending_observations: 0,
+            expected_status: "failed",
+        },
+        WorkerRecoveryTestCase {
+            description: "invalid image pin retains a rolled-back launch observation",
+            image_id: Some("sha256:invalid"),
+            failure_event: "platform_launch_failed",
+            expected_pending_observations: 0,
             expected_status: "failed",
         },
     ];
@@ -37,11 +55,11 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
         connection
             .busy_timeout(Duration::from_secs(5))
             .expect("database contention timeout");
-        connection.execute_batch(
+        connection.execute_batch(&format!(
             "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00Z';
              CREATE TRIGGER reject_recovery_publication BEFORE INSERT ON recall_events
-             WHEN NEW.event_type='run_terminated' BEGIN SELECT RAISE(ABORT, 'synthetic unavailable publication'); END;",
-        ).expect("expire the departed leader and interrupt terminal publication");
+             WHEN NEW.event_type='{}' BEGIN SELECT RAISE(ABORT, 'synthetic unavailable publication'); END;", test_case.failure_event
+        )).expect("expire the departed leader and interrupt durable publication");
         let mut replacement = start_recovery_scheduler(&control, &url, baseline.location_id);
         wait_for_worker_log(&mut replacement, "Retrying worker shutdown publication").await;
         let held: (i64, i64) = connection.query_row(
@@ -49,6 +67,10 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
             [], |row| Ok((row.get(0)?, row.get(1)?)),
         ).expect("retained claim while publication is unavailable");
         assert_eq!(held, (1, 1), "{}", test_case.description);
+        for event_type in ["run_launch_failed", "platform_launch_failed"] {
+            let pending: i64 = connection.query_row("SELECT COUNT(*) FROM recall_events WHERE event_type=?1", [event_type], |row| row.get(0)).expect("pending source/platform pair");
+            assert_eq!(pending, test_case.expected_pending_observations, "{}: {event_type}", test_case.description);
+        }
         connection
             .execute_batch("DROP TRIGGER reject_recovery_publication")
             .expect("restore terminal publication");
@@ -69,6 +91,19 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
             "{}",
             test_case.description
         );
+        let (producer, payload, count): (String, String, i64) = connection.query_row(
+            "SELECT producer, payload, COUNT(*) OVER () FROM recall_events WHERE event_type='platform_launch_failed'",
+            [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).expect("durable launch observation from the real replacement scheduler");
+        assert_eq!(producer, "platform");
+        assert_eq!(count, 1, "{}", test_case.description);
+        let source_count: i64 = connection.query_row("SELECT COUNT(*) FROM recall_events WHERE event_type='run_launch_failed'", [], |row| row.get(0)).expect("retried source fact");
+        assert_eq!(source_count, 1, "{}", test_case.description);
+        let event: serde_json::Value = serde_json::from_str(&payload).expect("typed event payload");
+        assert_eq!(event["platform"]["kind"], "launch_failed");
+        assert_eq!(event["platform"]["run_id"], worker.identity.0.to_string());
+        assert_eq!(event["platform"]["claim_id"], worker.identity.1.to_string());
+        assert_eq!(event["platform"]["code"], "docker_configuration_rejected");
         assert!(
             std::fs::read_to_string(&replacement.stderr)
                 .expect("shutdown recovery log")
