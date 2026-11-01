@@ -29,13 +29,13 @@ export function roleSummary(role: Pick<RoleDefinition, 'source' | 'extends' | 'g
 
 export const roleSourceLabel: Record<RoleSource, string> = { built_in: 'Built-in', server_config: 'Server config', project: 'Policy file' };
 
-export const assignmentSourceLabel: Record<AssignmentSource, string> = { manual: 'Manual', sso: 'SSO group', policy: 'Policy file', built_in: 'Built-in' };
+export const assignmentSourceLabel: Record<AssignmentSource, string> = { manual: 'Manual', sso: 'SSO group', policy: 'Server config', built_in: 'Default for everyone' };
 
 /** Chip text, e.g. `SSO group "analytics-eng"`. */
 export function sourceChip(a: Pick<RoleAssignment, 'source' | 'ssoGroup' | 'definedIn'>): string {
 	if (a.source === 'sso') return `SSO group “${a.ssoGroup}”`;
-	if (a.source === 'policy') return 'Policy file';
-	if (a.source === 'built_in') return 'Built-in';
+	if (a.source === 'policy') return 'Server config';
+	if (a.source === 'built_in') return 'Default for everyone';
 	return 'Manual';
 }
 
