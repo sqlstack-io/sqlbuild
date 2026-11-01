@@ -10,5 +10,6 @@ pub mod record_authentication_denial;
 pub mod reserve_password_attempt;
 pub mod revoke_session;
 pub mod revoke_token;
+pub mod rotate_token;
 pub mod set_password;
 pub mod verify_password;

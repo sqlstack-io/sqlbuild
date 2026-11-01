@@ -19,6 +19,7 @@ pub(crate) enum ControlAdmin {
     CreatePrincipal(String, PrincipalKind),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
+    RotateToken(Uuid),
     SetPassword(Uuid),
     RequestJobRun(JobRunRequest),
     Rerun(RerunRequest),

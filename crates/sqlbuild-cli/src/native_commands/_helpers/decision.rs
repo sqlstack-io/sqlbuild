@@ -225,6 +225,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
             Ok(ControlAdmin::IssueToken(scope, expiry))
         }
         Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
+        Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
         Some("set-password") => Ok(ControlAdmin::SetPassword(id)),
         _ => Err(ControlError::Invalid(
             "an administration command is required".into(),
