@@ -21,7 +21,7 @@ use crate::bindings::_helpers::boundary::python_calls::{
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
 use crate::bindings::_helpers::compile_command::report::{
-    format_compile_json_with_notice, format_compile_text,
+    format_compile_json_with_notice, format_compile_text, strict_diagnostics,
 };
 use crate::bindings::_helpers::compile_command::reuse_recording::write_reusable_compile;
 use crate::bindings::_helpers::compile_command::reuse_recording::{
@@ -398,12 +398,21 @@ fn compiled_with_status<'py>(
     } else {
         PyTuple::empty(py).into_any()
     };
+    let strict: Vec<Bound<'py, PyAny>> = strict_diagnostics(
+        &native_field(&analysis, "graph")?,
+        (
+            &native_field(&analysis, "selected_keys")?,
+            !native_field(request, "no_sql_validation")?.is_truthy()?,
+        ),
+        native_field(request, "strict")?.is_truthy()?,
+    )?;
     let diagnostics: Bound<'py, PyTuple> = PyTuple::new(
         py,
         native_field(&analysis, "diagnostics")?
             .try_iter()?
             .chain(native_field(&written, "diagnostics")?.try_iter()?)
             .chain(withheld.try_iter()?)
+            .chain(strict.into_iter().map(Ok))
             .collect::<PyResult<Vec<_>>>()?,
     )?;
     crate::bindings::_helpers::compile_delta::report_hooks::record_compile_facts(
@@ -559,7 +568,8 @@ fn record_output<'py>(
     )
     .to_owned()
     .into_any();
-    let shared: [(&str, Bound<'py, PyAny>); 7] = [
+    let shared: [(&str, Bound<'py, PyAny>); 8] = [
+        ("strict", native_field(request, "strict")?),
         ("graph", graph.clone()),
         ("written", written.clone()),
         ("manifest", native_field(request, "manifest")?),

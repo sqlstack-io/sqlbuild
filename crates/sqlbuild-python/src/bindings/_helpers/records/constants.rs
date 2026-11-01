@@ -928,6 +928,7 @@ const COMPILE_COMMAND_REQUEST: RecordSpec = RecordSpec {
         ),
         FieldSpec::new("no_cache", FieldDefault::False),
         FieldSpec::new("debug", FieldDefault::False),
+        FieldSpec::new("strict", FieldDefault::False),
     ],
 };
 const SELECTOR_FILE_SUMMARY: RecordSpec = RecordSpec {

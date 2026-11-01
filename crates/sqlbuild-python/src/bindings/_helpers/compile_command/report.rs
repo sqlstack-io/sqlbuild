@@ -1,5 +1,7 @@
 //! The `sqb compile` report: human text, the JSON report, and the JSON report of a stopped compile.
 
+use std::collections::HashMap;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{
     PyDict, PyDictMethods, PyList, PySet, PySetMethods, PyString, PyTuple, PyTupleMethods,
@@ -8,14 +10,16 @@ use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_cache::project_reuse::constants::FAILED_COMPILED_DIRECTORY_NAME;
 use sqlbuild_core::cli_text::main::format_compile_text::format_compile_text as compile_text;
 use sqlbuild_core::cli_text::main::semantic_coverage_notice::semantic_coverage_notice as notice_text;
-use sqlbuild_core::cli_text::main::strict_report::strict_report;
+use sqlbuild_core::cli_text::main::strict_report::{reason_text, strict_report};
 use sqlbuild_core::cli_text::models::{
     CliStyle, CompileTextReport, DiagnosticText, LineageNote, LocationText, ModelLine, RelatedText,
 };
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
-use crate::bindings::_helpers::compile_command::constants::STRICT_REPORT;
+use crate::bindings::_helpers::compile_command::constants::{
+    STRICT_CODE, STRICT_HELP, STRICT_ON, STRICT_REPORT,
+};
 use crate::bindings::_helpers::compile_command::surrogates::SurrogateText;
 use crate::bindings::_helpers::compile_outputs::json_report::{
     emit_json_report, emit_orjson_report,
@@ -23,7 +27,7 @@ use crate::bindings::_helpers::compile_outputs::json_report::{
 use crate::bindings::_helpers::discovery::constants::SQL_HOOK_OUTPUT_FIELDS;
 use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
+use crate::bindings::_helpers::records::construct::{new_record, new_record_with, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_get_or;
@@ -53,6 +57,7 @@ const REPORT_OPTIONS: (&[&str], &[&str]) = (
         "sql_validation_enabled",
         "use_color",
         "timings_ms",
+        "strict",
     ],
 );
 const HOOK_KEYS: [&str; 2] = ["pre_hooks", "post_hooks"];
@@ -69,6 +74,8 @@ struct ReportInputs<'py> {
     lineage_mode: String,
     selected_keys: Bound<'py, PyAny>,
     sql_validation_enabled: bool,
+    /// `--strict` was passed, which enforces strict whatever `settings.strict` says.
+    strict_flag: bool,
 }
 
 impl<'py> ReportInputs<'py> {
@@ -95,6 +102,7 @@ impl<'py> ReportInputs<'py> {
             selected_keys: arguments.value("selected_keys")?,
             sql_validation_enabled: !arguments.passed("sql_validation_enabled")?
                 || arguments.flag("sql_validation_enabled")?,
+            strict_flag: arguments.flag("strict")?,
         })
     }
 
@@ -195,18 +203,18 @@ impl<'py> ReportInputs<'py> {
         reader: &SurrogateText,
     ) -> PyResult<Option<String>> {
         let reasons: Vec<(String, Vec<String>)> = coverage_reasons(coverage, reader)?;
-        Ok(if self.strict_mode()? == STRICT_REPORT {
-            strict_report(&reasons)
-        } else {
-            notice_text(&reasons)
+        let mode: String = self.strict_mode()?;
+        Ok(match mode.as_str() {
+            STRICT_REPORT => strict_report(&reasons, false),
+            STRICT_ON => strict_report(&reasons, true),
+            _ => notice_text(&reasons),
         })
     }
 
-    /// `settings.strict`: `off`, `report` or `on`.
+    /// The strict mode in force: `on` with `--strict`, else `settings.strict` (`off`, `report`
+    /// or `on`).
     fn strict_mode(&self) -> PyResult<String> {
-        native_field(&self.project, "settings")?
-            .getattr("strict")?
-            .extract()
+        strict_mode(&self.project, self.strict_flag)
     }
 
     /// `written.target_dir / "compiled"`, or `"compiled-failed"` when Rules failed, relative to its `target` directory, POSIX style.
@@ -438,6 +446,84 @@ pub(crate) fn format_compile_text<'py>(
         lineage,
     };
     reader.python(py, &compile_text(&report))
+}
+
+/// The strict mode in force for `project`: `on` with `--strict`, else `settings.strict`.
+fn strict_mode(project: &Bound<'_, PyAny>, flag: bool) -> PyResult<String> {
+    if flag {
+        return Ok(STRICT_ON.to_owned());
+    }
+    native_field(project, "settings")?
+        .getattr("strict")?
+        .extract()
+}
+
+/// One error per selected model whose checks were partial, when strict is enforced.
+pub(crate) fn strict_diagnostics<'py>(
+    graph: &Bound<'py, PyAny>,
+    (selected_keys, sql_validation_enabled): (&Bound<'py, PyAny>, bool),
+    flag: bool,
+) -> PyResult<Vec<Bound<'py, PyAny>>> {
+    let py: Python<'py> = graph.py();
+    let project: Bound<'py, PyAny> = native_field(graph, "project")?;
+    if strict_mode(&project, flag)? != STRICT_ON {
+        return Ok(Vec::new());
+    }
+    let inputs: ReportInputs<'py> = ReportInputs {
+        graph: graph.clone(),
+        project: project.clone(),
+        written: py.None().into_bound(py),
+        manifest: false,
+        lineage: py.None().into_bound(py),
+        diagnostics: Vec::new(),
+        lineage_mode: String::new(),
+        selected_keys: selected_keys.clone(),
+        sql_validation_enabled,
+        strict_flag: flag,
+    };
+    let reader: SurrogateText = SurrogateText::default();
+    let mut paths: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
+    for model in native_field(&project, "models")?.try_iter()? {
+        let model: Bound<'py, PyAny> = model?;
+        paths.insert(
+            native_field(&model, "name")?.extract()?,
+            native_field(&model, "relative_path")?,
+        );
+    }
+    let mut reasons: Vec<(String, Vec<String>)> =
+        coverage_reasons(&inputs.semantic_coverage()?, &reader)?;
+    reasons.sort();
+    let mut diagnostics: Vec<Bound<'py, PyAny>> = Vec::with_capacity(reasons.len());
+    for (model, values) in reasons {
+        let details: Vec<String> = values.iter().map(|reason| reason_text(reason)).collect();
+        let fields: Bound<'py, PyDict> = PyDict::new(py);
+        fields.set_item("phase", "compile")?;
+        fields.set_item("severity", ERROR_SEVERITY)?;
+        fields.set_item("code", STRICT_CODE)?;
+        fields.set_item(
+            "message",
+            format!(
+                "model '{model}' has unproven checks under strict: {}",
+                details.join("; ")
+            ),
+        )?;
+        fields.set_item("resource_type", MODEL_TYPE)?;
+        fields.set_item(
+            "path",
+            paths
+                .get(&model)
+                .map_or_else(|| py.None().into_bound(py), Clone::clone),
+        )?;
+        fields.set_item("resource_name", model)?;
+        fields.set_item("help", STRICT_HELP)?;
+        diagnostics.push(new_record(
+            py,
+            RecordId::CompilerDiagnostic,
+            (),
+            Some(&fields),
+        )?);
+    }
+    Ok(diagnostics)
 }
 
 /// Each model's coverage reasons as text.

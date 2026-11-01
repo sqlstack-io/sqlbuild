@@ -441,6 +441,7 @@ fn reuse_request<'py>(request: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>
         "defer_to",
         "no_cache",
         "no_sql_validation",
+        "strict",
     ] {
         fields.push((name, native_field(request, name)?));
     }

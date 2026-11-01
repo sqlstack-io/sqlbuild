@@ -93,3 +93,11 @@ pub(crate) const COMPILE_CACHE_DISABLE_VALUE: &str = "1";
 pub(crate) const RETIRED_CACHE_DIRECTORY_NAMES: [&str; 2] = ["facts-v1", "references-v3"];
 /// `settings.strict` when only reporting what it would fail on.
 pub(crate) const STRICT_REPORT: &str = "report";
+/// The strict mode that fails a compile on any partial check.
+pub(crate) const STRICT_ON: &str = "on";
+/// The error a model whose checks were partial gets under enforced strict.
+pub(crate) const STRICT_CODE: &str = "SQBSTRICT001";
+/// What clears a strict error.
+pub(crate) const STRICT_HELP: &str = "declare, override or catalog each unproven input (a \
+    function signature, an input contract or an output type), or set settings.strict = \"report\" \
+    to list them without failing";

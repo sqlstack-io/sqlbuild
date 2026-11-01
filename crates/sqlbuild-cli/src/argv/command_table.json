@@ -131,6 +131,18 @@
         "group": 1
        },
        {
+        "kind": "store_true",
+        "options": [
+         "--strict"
+        ],
+        "dest": "compile_strict",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "help": "fail the compile on any check that is partial or not understood, as settings.strict = true does",
+        "group": 1
+       },
+       {
         "kind": "store",
         "options": [
          "--defer-to"

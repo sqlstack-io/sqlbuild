@@ -15,8 +15,9 @@ use crate::bindings::_helpers::records::registry;
 /// The version of the runtime identity a stored compile records.
 const REUSE_FORMAT_VERSION: &str = "1";
 /// Each `CompileReuseRequest` field the invocation identity records unchanged.
-const REQUEST_CHOICES: [&str; 9] = [
+const REQUEST_CHOICES: [&str; 10] = [
     "no_sql_validation",
+    "strict",
     "defer_to",
     "selected_target",
     "json_output",

@@ -1,6 +1,6 @@
+use crate::project::errors::ConfigFailure;
 use crate::project::main::load_git_base_ref::load_git_base_ref;
 use crate::project::main::load_review_config::load_review_config;
-use crate::project::errors::ConfigFailure;
 use crate::project::models::ConfigFile;
 use crate::project::models::ReviewConfig;
 use crate::project::tests::helpers::{failure_at, first_failure, project_directory};

@@ -7192,6 +7192,7 @@ class CompileCommandRequest(NativeRecord):
     profile_flags: CompileProfileFlags
     no_cache: bool
     debug: bool
+    strict: bool
     def __init__(
         self,
         project_dir: Path | None = None,
@@ -7209,6 +7210,7 @@ class CompileCommandRequest(NativeRecord):
         profile_flags: CompileProfileFlags = ...,
         no_cache: bool = False,
         debug: bool = False,
+        strict: bool = False,
     ) -> None: ...
 
 class SelectorFileSummary(NativeRecord):

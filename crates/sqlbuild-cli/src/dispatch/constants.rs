@@ -597,10 +597,11 @@ const PROFILE_FIELDS: [Field; 4] = [
     attr("skip_contracts", "profile_skip_contracts"),
     attr("skip_write", "profile_skip_write"),
 ];
-const COMPILE_FIELDS: [Field; 15] = [
+const COMPILE_FIELDS: [Field; 16] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
+    attr("strict", "compile_strict"),
     same("defer_to"),
     SELECTED_TARGET,
     JSON_OUTPUT,

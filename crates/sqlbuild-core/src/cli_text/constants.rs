@@ -33,6 +33,9 @@ pub(crate) const ELLIPSIS: &str = "...";
 pub(crate) const OPEN_SOURCE: &str = "open source: ";
 pub(crate) const OPEN_INPUT: &str = "open input: ";
 pub(crate) const UNKNOWN_FUNCTION: &str = "unknown function: ";
+/// The last line of an enforced strict report.
+pub(crate) const STRICT_ENFORCED_FOOTER: &str = "  Strict (settings.strict = true or --strict): each \
+    unproven check fails the compile; declare, override or catalog what it needs.";
 /// The last line of a report-only strict report.
 pub(crate) const STRICT_REPORT_FOOTER: &str = "  Report only (settings.strict = \"report\"): the exit \
     code is unchanged; set strict = true or pass --strict to fail on these.";

@@ -4,12 +4,20 @@ use std::collections::BTreeMap;
 
 use crate::cli_text::_helpers::coverage_actions::{action, reason_detail};
 use crate::cli_text::_helpers::summary_text::count_noun;
-use crate::cli_text::constants::{NOTICE_DISPLAY_LIMIT, STRICT_REPORT_FOOTER};
+use crate::cli_text::constants::{
+    NOTICE_DISPLAY_LIMIT, STRICT_ENFORCED_FOOTER, STRICT_REPORT_FOOTER,
+};
 
-/// The report-only strict text for each model's partial-check reasons, most models first, or
-/// `None` when every check was complete.
+/// One partial-check reason as the reports word it.
 #[must_use]
-pub fn strict_report(reasons: &[(String, Vec<String>)]) -> Option<String> {
+pub fn reason_text(reason: &str) -> String {
+    reason_detail(reason)
+}
+
+/// The strict text for each model's partial-check reasons, most models first, or `None` when
+/// every check was complete; `enforced` when strict fails the compile on them.
+#[must_use]
+pub fn strict_report(reasons: &[(String, Vec<String>)], enforced: bool) -> Option<String> {
     let mut groups: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for (model, values) in reasons {
         for reason in values {
@@ -54,6 +62,13 @@ pub fn strict_report(reasons: &[(String, Vec<String>)]) -> Option<String> {
             action(reason)
         ));
     }
-    lines.push(STRICT_REPORT_FOOTER.to_owned());
+    lines.push(
+        if enforced {
+            STRICT_ENFORCED_FOOTER
+        } else {
+            STRICT_REPORT_FOOTER
+        }
+        .to_owned(),
+    );
     Some(lines.join("\n"))
 }

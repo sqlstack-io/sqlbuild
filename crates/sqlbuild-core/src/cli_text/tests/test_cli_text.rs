@@ -141,10 +141,24 @@ fn given_partial_reasons_when_building_strict_report_then_ranks_reasons_by_model
             expected_notice: None,
         },
     ];
+    let enforced: Option<String> = strict_report(
+        &[(
+            "orders".to_owned(),
+            vec!["some output types are unknown".to_owned()],
+        )],
+        true,
+    );
+    assert_eq!(
+        enforced.as_deref(),
+        Some(
+            "Strict report: 1 check unproven across 1 model:\n  1. some output types are unknown (1 model): orders; declare output types, then run `sqb compile --no-cache`.\n  Strict (settings.strict = true or --strict): each unproven check fails the compile; declare, override or catalog what it needs."
+        ),
+        "an enforced report says the checks fail the compile"
+    );
 
     for test_case in test_cases {
         assert_eq!(
-            strict_report(&test_case.reasons).as_deref(),
+            strict_report(&test_case.reasons, false).as_deref(),
             test_case.expected_notice,
             "{}",
             test_case.description

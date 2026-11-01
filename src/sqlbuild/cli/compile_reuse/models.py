@@ -19,6 +19,7 @@ class CompileReuseRequest:
     defer_to: str | None
     no_cache: bool
     no_sql_validation: bool
+    strict: bool
     lineage_mode: str
     select: tuple[str, ...]
     exclude: tuple[str, ...]

@@ -166,3 +166,51 @@ def test_given_real_sqlquack_when_testing_locally_then_converted_tests_run_on_du
     assert result.returncode == 1, result.stdout + result.stderr
     for fragment in test_case.expected_stdout_fragments:
         assert fragment in result.stdout, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalEngineE2ETestCase(
+            description="settings.strict = true refuses assumptions as --strict does",
+            arguments=("test", "--local", "--select", "order_zones"),
+            expected_exit_code=1,
+            expected_stdout_fragments=(
+                "PASS=0  FAIL=0  REFUSED=1  TOTAL=1",
+                "node:cast relies on assumption session_timezone_utc",
+            ),
+            unexpected_stdout_fragments=("Assumptions relied on",),
+            expected_conversion_count=1,
+            expected_converter_arguments=("--strict", "--policy"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_strict_setting_when_testing_locally_then_assumptions_are_refused(
+    test_case: LocalEngineE2ETestCase, tmp_path: Path
+) -> None:
+    files: dict[str, str] = build_local_engine_project_files()
+    files["sqlbuild_project.toml"] += "\n[settings]\nstrict = true\n"
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="duckshop_local", repo_files=files
+    )
+    converter_dir: Path = tmp_path / "converter"
+    _ = write_fake_sqlquack(directory=converter_dir, version=test_case.converter_version)
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.arguments),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(converter_dir / test_case.converter_name)},
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout, result.stdout + result.stderr
+    for fragment in test_case.unexpected_stdout_fragments:
+        assert fragment not in result.stdout, result.stdout
+    conversions: tuple[tuple[str, ...], ...] = read_fake_sqlquack_conversions(
+        directory=converter_dir
+    )
+    assert len(conversions) == test_case.expected_conversion_count, conversions
+    for argument in test_case.expected_converter_arguments:
+        assert all(argument in call for call in conversions), conversions

@@ -74,6 +74,33 @@ _DECLARED_ORDERS: str = (
             expected_fragments=("0 errors",),
             unexpected_fragments=("Strict report", "Semantic checks were partial"),
         ),
+        StrictCompileTestCase(
+            description="strict = true fails the compile on each partial model, with the report",
+            settings="\n[settings]\nstrict = true\n",
+            files={"models/orders.sql": _ORDERS, "models/refunds.sql": _REFUNDS},
+            expected_exit_code=1,
+            expected_strict="on",
+            expected_fragments=(
+                "Strict report: 2 checks unproven across 2 models:",
+                "  1. calls unknown function shop_margin (2 models): orders, refunds;",
+                "Strict (settings.strict = true or --strict): each unproven check fails the compile",
+                "error[SQBSTRICT001]: model 'orders' has unproven checks under strict: "
+                "some output types are unknown; calls unknown function shop_margin",
+                "error[SQBSTRICT001]: model 'refunds' has unproven checks under strict: "
+                "calls unknown function shop_margin",
+                "2 errors",
+            ),
+            unexpected_fragments=("Semantic checks were partial", "Report only"),
+        ),
+        StrictCompileTestCase(
+            description="strict = true passes when every check is proven",
+            settings="\n[settings]\nstrict = true\n",
+            files={"functions/sql/margin.sql": _MARGIN_FUNCTION, "models/orders.sql": _DECLARED_ORDERS},
+            expected_exit_code=0,
+            expected_strict="on",
+            expected_fragments=("0 errors",),
+            unexpected_fragments=("Strict report", "SQBSTRICT001"),
+        ),
     ),
     ids=lambda case: case.description,
 )
@@ -122,3 +149,39 @@ def test_given_an_invalid_strict_value_when_compiling_then_the_setting_is_reject
 
     assert result.returncode != 0
     assert 'settings.strict must be true, false or "report"' in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "settings",
+    ("", '\n[settings]\nstrict = "report"\n', "\n[settings]\nstrict = false\n"),
+    ids=("no setting", "report-only setting", "strict off"),
+)
+def test_given_the_strict_flag_when_compiling_then_it_overrides_the_setting(
+    settings: str, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={"sqlbuild_project.toml": _PROJECT + settings, "models/refunds.sql": _REFUNDS},
+    )
+
+    text: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("--no-color", "compile", "--strict")
+    )
+    report: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json", "--strict")
+    )
+    relaxed: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("--no-color", "compile")
+    )
+
+    payload: dict[str, object] = json.loads(report.stdout)
+    codes: list[object] = [
+        item["code"] for item in payload["diagnostics"]  # type: ignore[index, union-attr]
+    ]
+    assert text.returncode == 1, text.stdout + text.stderr
+    assert "error[SQBSTRICT001]: model 'refunds'" in text.stdout + text.stderr
+    assert report.returncode == 1
+    assert payload["strict"] == "on"
+    assert codes == ["SQBSTRICT001"]
+    assert relaxed.returncode == 0, relaxed.stdout + relaxed.stderr

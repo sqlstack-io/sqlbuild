@@ -69,6 +69,8 @@ const UNKNOWN_GROUP: &str = "(unknown)";
 const EXECUTION_COMMAND: &str = "sqb test";
 const UNKNOWN_CASE_CODE: &str = "S008";
 const STRICT_WITHOUT_LOCAL_CODE: &str = "T008";
+/// `settings.strict = true`, which local tests honour as `--strict` does.
+const STRICT_ON_SETTING: &str = "on";
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
@@ -750,9 +752,16 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         TimeoutKind::Test,
     )?;
     let local_options: Bound<'_, PyAny> = if local {
+        let enforced: bool = strict.is_truthy()?
+            || native_field(&native_field(&pipeline, "project")?, "settings")?
+                .getattr("strict")?
+                .eq(STRICT_ON_SETTING)?;
         call_with(
             &host::entry(py, ExecutorHost::LocalTestOptions)?,
-            &[("project_dir", project_dir.clone()), ("strict", strict)],
+            &[
+                ("project_dir", project_dir.clone()),
+                ("strict", PyBool::new(py, enforced).to_owned().into_any()),
+            ],
         )?
     } else {
         py.None().into_bound(py)
