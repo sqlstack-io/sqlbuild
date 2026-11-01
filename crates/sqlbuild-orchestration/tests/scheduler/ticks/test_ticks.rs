@@ -1,5 +1,5 @@
 #[path = "helpers.rs"]
-mod helpers;
+pub(crate) mod helpers;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_loop.rs"]

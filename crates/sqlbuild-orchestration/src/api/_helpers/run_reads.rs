@@ -20,7 +20,7 @@ use crate::store::main::read_recall_view::read_recall_view;
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::types::Row;
 
-#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/runs",
+#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/runs", operation_id = "list_runs",
     params(("location_id" = Uuid, Path), ("target" = String, Path),
         ("limit" = Option<u32>, Query, description = "Maximum recent runs; defaults to 100, capped at 1000")),
     responses((status = 200, body = Vec<RunRecord>), (status = 401, description = "Invalid credential"),
@@ -72,7 +72,7 @@ pub(crate) async fn invocations(
     ))
 }
 
-#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/runs/{run_id}/recall/{view}",
+#[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/runs/{run_id}/recall/{view}", operation_id = "read_run_recall",
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path),
         ("view" = String, Path), ("invocation" = String, Query, description = "Exact scheduler or worker invocation ID"),
         ("limit" = Option<u32>, Query, description = "Maximum rows; defaults to 100, capped at 1000")),

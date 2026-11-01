@@ -38,7 +38,7 @@ pub(crate) async fn execution(
     Ok(Json(execution))
 }
 
-#[utoipa::path(post, path = "/api/runs/{run_id}/events", params(("run_id" = Uuid, Path)),
+#[utoipa::path(post, path = "/api/runs/{run_id}/events", operation_id = "report_run_event", params(("run_id" = Uuid, Path)),
     request_body = RunChangeRequest,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Invalid credential"), (status = 403, description = "Run not authorized")),

@@ -8,12 +8,16 @@ use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::api::main::serve_api::serve_api;
+use sqlbuild_orchestration::api::models::DevelopmentScope;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_platform_webhook;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_platform_sink::run_platform_sink;
 use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
+use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
+use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
@@ -53,8 +57,139 @@ use crate::native_commands::models::{
     LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
 use crate::native_commands::types::LocationPublication;
+use crate::workers::main::open_development_workers::open_development_workers;
 use crate::workers::main::open_workers::open_workers;
+use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::Workers;
+
+/// Own the API, scheduler and outbound location as one development process tree.
+pub(crate) async fn run_development_roles(
+    (store, scope): (ControlStore, DevelopmentScope),
+    (project, executable): (PathBuf, PathBuf),
+    listener: tokio::net::TcpListener,
+    scheduler: bool,
+) -> Result<(), ControlError> {
+    let address = listener.local_addr()?;
+    let url = format!("http://{address}");
+    let location_id = scope.location_id;
+    let target = scope.target.clone();
+    let triggers = scope.triggers;
+    let workers = open_development_workers(
+        (location_id, target.clone()),
+        project.clone(),
+        executable.clone(),
+        url.clone(),
+    )?;
+    let (stop, shutdown) = watch::channel(false);
+    let (_changes, changes) = watch::channel(());
+    let mut tasks = JoinSet::new();
+    tasks.spawn(serve_api(
+        store.clone(),
+        listener,
+        Some(scope),
+        development_stopped(shutdown.clone()),
+    ));
+    start_platform_roles(&mut tasks, (&store, &shutdown))?;
+    tasks.spawn(development_location_role(
+        (&project, &executable),
+        (location_id, &target),
+        (&url, &store),
+        shutdown.clone(),
+    )?);
+    if scheduler {
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Starting development scheduler...\n",
+        )]));
+        let scheduler_store = store.clone();
+        tasks.spawn(async move {
+            run_scheduler(
+                &scheduler_store,
+                SchedulerState::new(Uuid::now_v7()),
+                (shutdown, changes),
+                workers,
+            )
+            .await
+        });
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Development scheduler started\n",
+        )]));
+    }
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!(
+            "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
+            if triggers {
+                "follow code defaults and operator overrides"
+            } else {
+                "start paused"
+            }
+        ),
+    )]));
+    supervise_control_roles(tasks, stop).await
+}
+
+async fn development_stopped(mut shutdown: watch::Receiver<bool>) {
+    while !*shutdown.borrow_and_update() {
+        if shutdown.changed().await.is_err() {
+            break;
+        }
+    }
+}
+
+/// Hand off only the local file exclusion, never control-store connection credentials.
+fn development_location_role(
+    (project, executable): (&Path, &Path),
+    (location_id, target): (Uuid, &str),
+    (url, store): (&str, &ControlStore),
+    shutdown: watch::Receiver<bool>,
+) -> Result<impl Future<Output = Result<(), ControlError>> + Send + 'static, ControlError> {
+    let mut command = Command::new(executable);
+    command
+        .args(["--project-dir"])
+        .arg(project)
+        .args([
+            "location",
+            "serve",
+            "--server",
+            url,
+            "--location-id",
+            &location_id.to_string(),
+            "--target",
+            target,
+        ])
+        .env("SQLBUILD_LOCATION_TOKEN", "local-development")
+        .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
+        .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
+        .env_remove("SQLBUILD_RUN_TOKEN")
+        .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
+        .stdin(Stdio::null())
+        .kill_on_drop(true);
+    if let ControlStore::Sqlite(path) = store {
+        command.env(
+            "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
+            std::env::current_dir()?.join(path),
+        );
+    }
+    let mut child = command.spawn()?;
+    Ok(async move {
+        tokio::select! {
+            result = child.wait() => {
+                result?;
+                Err(ControlError::Invalid("development code location stopped unexpectedly".into()))
+            },
+            () = development_stopped(shutdown) => {
+                terminate_child(&mut child)?;
+                match tokio::time::timeout(Duration::from_secs(10), child.wait()).await {
+                    Ok(result) => { result?; },
+                    Err(_) => child.kill().await?,
+                }
+                Ok(())
+            },
+        }
+    })
+}
 
 /// Request one publication without transferring interpreter ownership to a cancellable future.
 pub(crate) async fn compile_generation(

@@ -1,13 +1,15 @@
 //! Authenticate before body buffering; scope checks remain in each owning endpoint.
 
+use std::net::SocketAddr;
+
 use axum::extract::{Request, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::Response;
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::ReadResource;
+use crate::api::models::{DevelopmentScope, ReadResource};
 use crate::credentials::main::authenticate_token::authenticate_token;
 use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -18,20 +20,22 @@ pub(crate) async fn authenticate(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
-    let unauthorized = || ApiError {
-        status: StatusCode::UNAUTHORIZED,
-        message: "valid bearer credential required".into(),
+    let development = request.extensions().get::<DevelopmentScope>().cloned();
+    let identity = match bearer(request.headers()) {
+        Ok(token) => authenticate_token(&store, token).await?,
+        Err(_) if development.is_some() => None,
+        Err(error) => return Err(error),
     };
-    let bearer = request
-        .headers()
-        .get(header::AUTHORIZATION)
-        .ok_or_else(unauthorized)?
-        .to_str()
-        .map_err(|_| unauthorized())?
-        .strip_prefix("Bearer ")
-        .ok_or_else(unauthorized)?;
-    let identity = authenticate_token(&store, bearer)
-        .await?
+    let identity = identity
+        .or_else(|| {
+            development.map(|scope| TokenIdentity {
+                token_id: Uuid::nil(),
+                scope: CredentialScope::Location {
+                    location_id: scope.location_id,
+                },
+                expires_at: chrono::DateTime::<chrono::Utc>::MAX_UTC,
+            })
+        })
         .ok_or_else(unauthorized)?;
     request.extensions_mut().insert(identity);
     let mut response = next.run(request).await;
@@ -39,6 +43,51 @@ pub(crate) async fn authenticate(
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+pub(crate) fn bearer(headers: &HeaderMap) -> Result<&str, ApiError> {
+    headers
+        .get(header::AUTHORIZATION)
+        .ok_or_else(unauthorized)?
+        .to_str()
+        .map_err(|_| unauthorized())?
+        .strip_prefix("Bearer ")
+        .ok_or_else(unauthorized)
+}
+
+fn unauthorized() -> ApiError {
+    ApiError {
+        status: StatusCode::UNAUTHORIZED,
+        message: "valid bearer credential required".into(),
+    }
+}
+
+/// Reject browser cross-origin and DNS-rebinding requests on the disabled-auth listener.
+pub(crate) async fn local_request(
+    State(address): State<SocketAddr>,
+    request: Request,
+    next: Next,
+) -> Result<Response, ApiError> {
+    let authorities = [address.to_string(), format!("localhost:{}", address.port())];
+    let valid_host = request.headers().get(header::HOST).is_some_and(|value| {
+        value
+            .to_str()
+            .is_ok_and(|host| authorities.iter().any(|allowed| host == allowed))
+    });
+    let valid_origin = request.headers().get(header::ORIGIN).is_none_or(|value| {
+        value.to_str().is_ok_and(|origin| {
+            authorities
+                .iter()
+                .any(|host| origin == format!("http://{host}"))
+        })
+    });
+    if !valid_host || !valid_origin {
+        return Err(ApiError {
+            status: StatusCode::FORBIDDEN,
+            message: "development API requires a local authority and origin".into(),
+        });
+    }
+    Ok(next.run(request).await)
 }
 
 pub(crate) fn require_location(

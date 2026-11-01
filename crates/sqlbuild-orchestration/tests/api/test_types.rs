@@ -8,6 +8,12 @@ pub(crate) struct ApiContractTestCase {
     pub(crate) expected_status: RunStatus,
 }
 
+pub(crate) struct DevelopmentTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_status: crate::declarations::models::TriggerStatus,
+}
+
 pub(crate) struct WorkerRedirectTestCase {
     pub(crate) description: &'static str,
     pub(crate) expected_status: reqwest::StatusCode,
@@ -31,6 +37,24 @@ pub(crate) struct TestApi {
     pub(crate) url: String,
     pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,
     pub(crate) task: tokio::task::JoinHandle<Result<(), ControlError>>,
+}
+
+pub(crate) struct SseConnection {
+    pub(crate) response: reqwest::Response,
+    pub(crate) pending: Vec<u8>,
+}
+
+pub(crate) struct ResetProxy {
+    pub(crate) store: crate::store::models::ControlStore,
+    pub(crate) reset: tokio::sync::watch::Sender<u64>,
+    pub(crate) shutdown: tokio::sync::oneshot::Sender<()>,
+    pub(crate) task: tokio::task::JoinHandle<()>,
+}
+
+pub(crate) struct ChangesTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_generation: i64,
 }
 
 pub(crate) struct LocationHealthTestCase {

@@ -1,6 +1,8 @@
+pub(super) mod _publish_snapshot;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
 pub mod next_remote_generation;
+pub(crate) mod publish_development_snapshot;
 pub mod publish_remote_snapshot;
 pub mod publish_snapshot;
 pub(crate) mod read_snapshot_documents;

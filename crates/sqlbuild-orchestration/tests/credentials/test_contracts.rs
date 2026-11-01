@@ -1,7 +1,7 @@
 //! Credential contracts compiled within the credential owner.
 
 #[path = "helpers.rs"]
-mod helpers;
+pub(crate) mod helpers;
 #[path = "locations/helpers.rs"]
 pub(crate) mod location_helpers;
 #[path = "test_contract.rs"]

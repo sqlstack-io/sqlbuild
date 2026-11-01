@@ -13,7 +13,7 @@ use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealthObservation, LocationHealthReport};
 use crate::store::models::ControlStore;
 
-#[utoipa::path(post, path = "/api/locations/{location_id}/health",
+#[utoipa::path(post, path = "/api/locations/{location_id}/health", operation_id = "report_location_health",
     params(("location_id" = Uuid, Path)), request_body = LocationHealthReport,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
@@ -30,7 +30,7 @@ pub(crate) async fn report(
     }))
 }
 
-#[utoipa::path(get, path = "/api/locations/{location_id}/health",
+#[utoipa::path(get, path = "/api/locations/{location_id}/health", operation_id = "read_location_health",
     params(("location_id" = Uuid, Path)),
     responses((status = 200, body = Vec<LocationHealthObservation>),
         (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),

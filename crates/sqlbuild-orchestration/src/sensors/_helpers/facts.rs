@@ -9,7 +9,7 @@ use crate::sensors::models::{
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;
-use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
+use crate::store::models::{Change, ControlEvent, ControlTransaction, Parameter};
 
 pub(crate) async fn append_evaluation(
     transaction: ControlTransaction,
@@ -45,11 +45,14 @@ pub(crate) async fn append_evaluation(
     let storage_id = appended
         .storage_id
         .ok_or_else(|| ControlError::Invalid("sensor evaluation has no storage cursor".into()))?;
-    let (transaction, _) = query(transaction,
+    let (mut transaction, _) = query(transaction,
         "INSERT INTO sqb_sensor_evaluation_events (event_id,storage_id,evaluation_id,trigger_id,phase,occurred_at,fact_json) \
          VALUES ($1,$2,$3,$4,$5,$6,$7)",
         vec![Parameter::Id(event_id), Parameter::Integer(storage_id), Parameter::Id(request.evaluation_id),
             Parameter::Id(request.trigger_id), Parameter::Text(phase.into()), Parameter::Time(occurred_at), Parameter::Json(payload)]).await?;
+    transaction
+        .changes
+        .insert(Change::Trigger(request.trigger_id));
     Ok((transaction, (event_id, storage_id)))
 }
 

@@ -8,7 +8,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{
     commit::commit, compress::compress, query::query, store_source_text::store_source_text,
 };
-use crate::store::models::{ControlStore, Parameter};
+use crate::store::models::{Change, ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::fingerprints::{source_event_id, validate_batch};
 use crate::warehouse_metadata::_helpers::ingestion::{begin_ingestion, scoped_event_id};
 use crate::warehouse_metadata::models::FingerprintBatch;
@@ -69,6 +69,11 @@ pub async fn ingest_fingerprints(
                 Parameter::Text(source_event_id), Parameter::Time(record.ts), Parameter::Text(definition_text_hash),
                 Parameter::Json(record_json), Parameter::Time(received_at)]).await?;
         applied |= !inserted.is_empty();
+    }
+    if applied {
+        transaction
+            .changes
+            .insert(Change::NodeStatus(location_id, target.into()));
     }
     commit(transaction).await?;
     Ok(applied)

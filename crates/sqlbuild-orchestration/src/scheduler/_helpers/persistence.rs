@@ -8,7 +8,7 @@ use crate::runs::models::{RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
-use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
 pub(crate) async fn persist_ticks(
     transaction: ControlTransaction,
@@ -35,6 +35,11 @@ pub(crate) async fn persist_ticks(
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (trigger_id, scheduled_for) DO NOTHING RETURNING tick_id",
             vec![Parameter::Id(action.tick_id), Parameter::Id(trigger.trigger_id), Parameter::Time(action.scheduled_for), Parameter::Time(now), Parameter::Integer(lease.epoch),
                 Parameter::Text(outcome.into()), Parameter::OptionalId(run), Parameter::OptionalId(covered), Parameter::Json(json!({}))]).await?;
+        if !inserted.is_empty() {
+            transaction
+                .changes
+                .insert(Change::Trigger(trigger.trigger_id));
+        }
         if let Some(run_id) = run
             && !inserted.is_empty()
         {

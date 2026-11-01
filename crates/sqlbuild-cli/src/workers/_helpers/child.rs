@@ -2,7 +2,8 @@
 
 use sqlbuild_orchestration::store::errors::ControlError;
 
-use crate::workers::_helpers::supervisor::{exit_code, terminate};
+use crate::workers::_helpers::supervisor::exit_code;
+use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{WorkerChild, WorkerExit};
 
 impl WorkerExit {
@@ -42,7 +43,7 @@ impl WorkerChild {
 
     pub(in crate::workers) async fn terminate(&mut self) -> Result<(), ControlError> {
         match self {
-            Self::Local(child) => terminate(child),
+            Self::Local(child) => terminate_child(child),
             #[cfg(target_os = "linux")]
             Self::RecoveredLocal(child) => child.signal(rustix::process::Signal::TERM),
             Self::Docker(child) => child.signal("SIGTERM").await,

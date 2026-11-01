@@ -7,4 +7,4 @@ mod test_contract;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "ticks/test_ticks.rs"]
-mod ticks;
+pub(crate) mod ticks;

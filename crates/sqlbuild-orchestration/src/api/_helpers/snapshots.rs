@@ -7,9 +7,11 @@ use uuid::Uuid;
 
 use crate::api::_helpers::authentication::require_location;
 use crate::api::errors::ApiError;
+use crate::api::models::DevelopmentScope;
 use crate::credentials::models::TokenIdentity;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::current_snapshot_record::current_snapshot_record;
+use crate::snapshots::main::publish_development_snapshot::publish_development_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{CurrentSnapshot, SnapshotInput, SnapshotRecord};
 use crate::store::models::ControlStore;
@@ -23,7 +25,10 @@ use crate::store::models::ControlStore;
 pub(crate) async fn publish(
     State(store): State<ControlStore>,
     Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
+    (Path((location_id, target)), development): (
+        Path<(Uuid, String)>,
+        Option<Extension<DevelopmentScope>>,
+    ),
     Json(input): Json<SnapshotInput>,
 ) -> Result<Json<SnapshotRecord>, ApiError> {
     require_location(&identity, location_id)?;
@@ -33,7 +38,22 @@ pub(crate) async fn publish(
             message: "snapshot does not match the requested location and target".into(),
         });
     }
-    Ok(Json(publish_snapshot(&store, &input).await?))
+    let pause_new = if let Some(Extension(scope)) = development {
+        if scope.location_id != location_id || scope.target != target {
+            return Err(ApiError {
+                status: StatusCode::FORBIDDEN,
+                message: "snapshot is outside the development scope".into(),
+            });
+        }
+        !scope.triggers
+    } else {
+        false
+    };
+    Ok(Json(if pause_new {
+        publish_development_snapshot(&store, &input).await?
+    } else {
+        publish_snapshot(&store, &input).await?
+    }))
 }
 
 #[utoipa::path(get, path = "/api/locations/{location_id}/targets/{target}/snapshots",

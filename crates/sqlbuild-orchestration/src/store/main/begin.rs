@@ -5,6 +5,7 @@ use std::time::Duration;
 use chrono::Utc;
 use rusqlite::OpenFlags;
 
+use crate::store::_helpers::changes::sqlite_changes;
 use crate::store::errors::ControlError;
 use crate::store::main::refresh_clock::refresh_clock;
 use crate::store::models::{Connection, ControlStore, ControlTransaction, TransactionMode};
@@ -13,27 +14,31 @@ pub(crate) async fn begin(
     store: &ControlStore,
     mode: TransactionMode,
 ) -> Result<ControlTransaction, ControlError> {
-    let connection = match store {
+    let (connection, notifications) = match store {
         ControlStore::Sqlite(path) => {
             let path = path.clone();
-            Connection::Sqlite(
-                tokio::task::spawn_blocking(move || {
-                    let connection = rusqlite::Connection::open_with_flags(
-                        path,
-                        OpenFlags::SQLITE_OPEN_READ_WRITE
-                            | OpenFlags::SQLITE_OPEN_CREATE
-                            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-                    )?;
-                    connection.busy_timeout(Duration::from_secs(30))?;
-                    connection.execute_batch(if mode == TransactionMode::Write {
-                        "PRAGMA foreign_keys=ON; BEGIN IMMEDIATE"
-                    } else {
-                        "PRAGMA foreign_keys=ON; PRAGMA query_only=ON; BEGIN"
-                    })?;
-                    Ok::<_, ControlError>(connection)
-                })
-                .await??,
-            )
+            let (connection, notifications) = tokio::task::spawn_blocking(move || {
+                let connection = rusqlite::Connection::open_with_flags(
+                    &path,
+                    OpenFlags::SQLITE_OPEN_READ_WRITE
+                        | OpenFlags::SQLITE_OPEN_CREATE
+                        | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+                )?;
+                connection.busy_timeout(Duration::from_secs(30))?;
+                connection.execute_batch(if mode == TransactionMode::Write {
+                    "PRAGMA foreign_keys=ON; BEGIN IMMEDIATE"
+                } else {
+                    "PRAGMA foreign_keys=ON; PRAGMA query_only=ON; BEGIN"
+                })?;
+                let notifications = if mode == TransactionMode::Write {
+                    Some(sqlite_changes(&path)?)
+                } else {
+                    None
+                };
+                Ok::<_, ControlError>((connection, notifications))
+            })
+            .await??;
+            (Connection::Sqlite(connection), notifications)
         }
         ControlStore::Postgres(pool) => {
             let mut transaction = pool.begin().await?;
@@ -48,12 +53,14 @@ pub(crate) async fn begin(
                 .execute(&mut *transaction)
                 .await?;
             }
-            Connection::Postgres(transaction)
+            (Connection::Postgres(transaction), None)
         }
     };
     let transaction = ControlTransaction {
         connection: Some(connection),
         now: Utc::now(),
+        changes: Default::default(),
+        notifications,
     };
     refresh_clock(transaction).await
 }

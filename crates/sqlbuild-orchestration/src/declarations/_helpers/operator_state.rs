@@ -10,7 +10,7 @@ use crate::sensors::main::read_sensor_cursor::read_sensor_cursor;
 use crate::sensors::main::reset_sensor_cursor::reset_sensor_cursor;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
-use crate::store::models::{ControlTransaction, Parameter};
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
 pub(crate) async fn apply_operator_change(
     transaction: ControlTransaction,
@@ -73,9 +73,12 @@ pub(crate) async fn apply_operator_change(
         });
     }
     let now = transaction.now;
-    let (transaction, _) = query(transaction,
+    let (mut transaction, _) = query(transaction,
         "UPDATE sqb_trigger_state SET status=$1, status_override=$2, last_tick_for=$3, next_due_at=$4, updated_at=$5 WHERE trigger_id=$6",
         vec![Parameter::Text(status.as_str().into()), Parameter::OptionalText(state.status_override.map(|value| value.as_str().into())), Parameter::OptionalTime(state.last_tick_for),
             Parameter::OptionalTime(next), Parameter::Time(now), Parameter::Id(request.trigger_id)]).await?;
+    transaction
+        .changes
+        .insert(Change::Trigger(request.trigger_id));
     Ok((transaction, (before, after)))
 }

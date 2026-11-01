@@ -9,7 +9,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::append_recall::append_recall;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::{Change, ControlStore, TransactionMode};
 
 /// The active-claim check and the complete batch commit share a serialized write transaction.
 pub async fn publish_run_output(
@@ -30,6 +30,9 @@ pub async fn publish_run_output(
         } else {
             published.duplicates += 1;
         }
+    }
+    if published.inserted > 0 || published.conflicts > 0 {
+        transaction.changes.insert(Change::Run(run_id));
     }
     commit(transaction).await?;
     Ok(published)
