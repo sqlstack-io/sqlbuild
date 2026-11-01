@@ -11,7 +11,10 @@ from _pytest.capture import CaptureResult
 
 from sqlbuild._native import run_cli as main
 from tests.integration.src.sqlbuild.compiler.pipeline._test_types import SemanticCompileCase
-from tests.integration.src.sqlbuild.compiler.pipeline.helpers import write_semantic_binding_project
+from tests.integration.src.sqlbuild.compiler.pipeline.helpers import (
+    SEMANTIC_BINDING_PROJECT_TOML,
+    write_semantic_binding_project,
+)
 
 _UPSTREAM: str = "SELECT 1 AS id, 'placed' AS status"
 
@@ -119,6 +122,7 @@ def test_given_semantic_scope_when_compiling_then_closed_shapes_are_checked(
         project_dir=tmp_path,
         upstream_sql="MODEL (description 'Test model.', materialized view);\n" + test_case.upstream,
         downstream_sql=test_case.header + test_case.downstream,
+        project_toml=SEMANTIC_BINDING_PROJECT_TOML + '\n[rules]\nignore = ["SQLCLEAN039"]\n',
     )
     (tmp_path / "sources").mkdir(exist_ok=True)
     (tmp_path / "sources" / "orders.yml").write_text(

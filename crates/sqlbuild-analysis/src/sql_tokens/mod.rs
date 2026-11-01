@@ -1,9 +1,4 @@
-//! SQLBuild's canonical SQL token stream: authored tokens without layout or comments.
+//! SQLBuild's query and definition fingerprints over SQLClean's canonical SQL token stream.
 
-pub mod _helpers;
 pub mod constants;
 pub mod main;
-pub mod models;
-
-#[cfg(test)]
-mod tests;

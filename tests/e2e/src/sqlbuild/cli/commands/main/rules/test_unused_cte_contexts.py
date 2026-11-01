@@ -195,9 +195,9 @@ def test_given_framework_cte_context_when_running_rule_then_live_cte_is_not_repo
         target.write_text(contents, encoding="utf-8")
 
     result: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "rules", "run", "SQBRSQL005"),
+        command=("--no-color", "rules", "run", "SQLCLEAN005"),
         project_dir=project_dir,
     )
 
     assert result.returncode == test_case.expected_returncode, result.stdout + result.stderr
-    assert result.stdout.count("[SQBRSQL005]") == test_case.expected_finding_count
+    assert result.stdout.count("[SQLCLEAN005]") == test_case.expected_finding_count

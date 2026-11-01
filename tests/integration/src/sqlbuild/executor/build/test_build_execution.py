@@ -112,8 +112,9 @@ _FAILING_TEST_SQL: str = (
                 ),
                 "models/validated_orders.sql": (
                     "MODEL (description 'Test model validated_orders.', materialized table);\n\n"
-                    'SELECT value, __udf("is_positive_int")(value) AS is_positive '
-                    "FROM (VALUES ('123'), ('abc')) AS input(value)"
+                    "WITH input(value) AS (VALUES ('123'), ('abc'))\n"
+                    'SELECT input.value, __udf("is_positive_int")(input.value) AS is_positive '
+                    "FROM input"
                 ),
             },
             expected_status=BuildStatus.SUCCESS,
@@ -147,8 +148,9 @@ _FAILING_TEST_SQL: str = (
                 ),
                 "models/validated_orders.sql": (
                     "MODEL (description 'Test model validated_orders.', materialized table);\n\n"
-                    'SELECT value, __udf("is_positive_int")(value) AS is_positive '
-                    "FROM (VALUES ('123'), ('abc')) AS input(value)"
+                    "WITH input(value) AS (VALUES ('123'), ('abc'))\n"
+                    'SELECT input.value, __udf("is_positive_int")(input.value) AS is_positive '
+                    "FROM input"
                 ),
             },
             expected_status=BuildStatus.SUCCESS,
@@ -185,8 +187,9 @@ _FAILING_TEST_SQL: str = (
                 ),
                 "models/validated_orders.sql": (
                     "MODEL (description 'Test model validated_orders.', materialized table);\n\n"
-                    'SELECT value, __udf("is_positive_int")(value) AS is_positive '
-                    "FROM (VALUES ('123'), ('abc')) AS input(value)"
+                    "WITH input(value) AS (VALUES ('123'), ('abc'))\n"
+                    'SELECT input.value, __udf("is_positive_int")(input.value) AS is_positive '
+                    "FROM input"
                 ),
             },
             expected_status=BuildStatus.SUCCESS,
@@ -310,7 +313,7 @@ _FAILING_TEST_SQL: str = (
                 "sqlbuild_project.toml": _PROJECT_YML,
                 "models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table, columns (id (audits [unique])));\n\n"
-                    "SELECT * FROM (VALUES (1), (NULL), (NULL)) AS input(id)"
+                    "WITH input(id) AS (VALUES (1), (NULL), (NULL))\nSELECT input.id FROM input"
                 ),
             },
             expected_status=BuildStatus.SUCCESS,
@@ -327,7 +330,7 @@ _FAILING_TEST_SQL: str = (
                 "models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table, columns (status (audits [accepted_values "
                     '(values ["placed", "completed"])])));\n\n'
-                    "SELECT * FROM (VALUES ('placed'), ('completed'), (NULL)) AS input(status)"
+                    "WITH input(status) AS (VALUES ('placed'), ('completed'), (NULL))\nSELECT input.status FROM input"
                 ),
             },
             expected_status=BuildStatus.SUCCESS,
@@ -859,7 +862,7 @@ def test_given_view_with_run_audits_false_when_executing_then_succeeds(
                 "sqlbuild_project.toml": _PROJECT_YML,
                 "models/orders.sql": (
                     "MODEL (description 'Test model orders.', materialized table, columns (id (audits [unique])));\n\n"
-                    "SELECT * FROM (VALUES (1), (1), (NULL)) AS input(id)"
+                    "WITH input(id) AS (VALUES (1), (1), (NULL))\nSELECT input.id FROM input"
                 ),
             },
             expected_status=BuildStatus.FAILED,

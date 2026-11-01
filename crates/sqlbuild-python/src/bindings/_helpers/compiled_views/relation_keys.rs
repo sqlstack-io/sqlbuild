@@ -9,8 +9,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 use sqlbuild_discovery::project_validation::main::at_most_one_csv_data_row::at_most_one_csv_data_row;
 use sqlbuild_discovery::project_validation::models::CsvSettings;
-use sqlbuild_rules::sql_quality::main::declared_relation_keys::declared_relation_keys as derive_keys;
-use sqlbuild_rules::sql_quality::models::{DeclaredKeyColumn, DeclaredRelation};
+use sqlbuild_rules::relation_keys::main::declared_relation_keys::declared_relation_keys as derive_keys;
+use sqlbuild_rules::relation_keys::models::{DeclaredKeyColumn, DeclaredRelation};
 
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_facts;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;

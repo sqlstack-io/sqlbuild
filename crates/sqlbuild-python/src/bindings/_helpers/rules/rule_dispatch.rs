@@ -45,7 +45,9 @@ use crate::bindings::_helpers::rules::rows::{
     NativeRulesRequest, build_rules_request, evaluate_rules_request, evaluate_rules_request_with,
     rules_request_over, selectionless_rules_request,
 };
-use crate::bindings::_helpers::rules::rule_plan::{plan_rule_run, whole_project_codes};
+use crate::bindings::_helpers::rules::rule_plan::{
+    plan_rule_run, selects_row_rules, whole_project_codes,
+};
 use crate::bindings::_helpers::rules::rule_run::finish_rule_run;
 use crate::bindings::_helpers::rules::selection::{rule_selected, selected_rule_codes};
 use crate::bindings::_helpers::rules::sql_rules::run_planned_sql_rules;
@@ -294,7 +296,7 @@ pub(crate) fn evaluate_rules<'py>(
     ];
     let native_dialect: String = run.dialect.clone();
     let native_cancel: HostCancel = run.cancel.clone();
-    let selectionless: bool = custom.is_none() && field(&run.config, "select")?.len()? == 0;
+    let selectionless: bool = custom.is_none() && !selects_row_rules(&plan)?;
     let early: Option<EarlyBuiltinRules> = take_early_rules();
     let early_report: Option<Arc<EarlyRulesReport>> = early.as_ref().map(EarlyBuiltinRules::report);
     let native_thread: Option<PhaseThread> = if selectionless {
@@ -454,7 +456,7 @@ fn evaluate_native<'py>(
     rules_result(run, defer_suppressions, evaluated, custom)
 }
 
-/// The built-in rules result of a run that selects no rules, without building its models.
+/// The built-in rules result of a run that selects no rows-engine rules, without building its models.
 fn selectionless_result<'py>(
     run: &NativeRun<'py>,
     payloads: &Bound<'py, PyAny>,
@@ -465,11 +467,20 @@ fn selectionless_result<'py>(
         selectionless_rules_request(&run.config, &run.project_dir, &run.dialect, payloads)?,
     )?;
     let evaluated: PyResult<Bound<'py, PyAny>> = evaluate_rules_request(py, &request);
-    rules_result(
+    let result: Bound<'py, PyAny> = rules_result(
         run,
         true,
         evaluated,
         outcome(py, (Vec::new(), 0, 0), (0, 0), &[]),
+    )?;
+    let evaluated_models: usize = if field(&run.config, "select")?.len()? == 0 {
+        0
+    } else {
+        project_models(&run.project)?.len()
+    };
+    replaced(
+        &result,
+        &[("evaluated_models", evaluated_models.into_bound_py_any(py)?)],
     )
 }
 

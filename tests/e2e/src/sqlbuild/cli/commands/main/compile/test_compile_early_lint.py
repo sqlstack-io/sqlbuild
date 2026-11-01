@@ -24,7 +24,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project
 
-_PROJECT_TOML: str = 'name = "commerce"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL005"]\n'
+_PROJECT_TOML: str = 'name = "commerce"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN005"]\n'
 _ORDERS_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS amount\n'
 
 
@@ -59,9 +59,9 @@ _ORDERS_SQL: str = 'MODEL (description "Orders");\nSELECT 1 AS order_id, 2 AS am
             ),
             expected_exit_code=1,
             expected_diagnostics=(
-                ("SQBRSQL005", "models/order_totals.sql", 3, 3),
-                ("SQBRSQL005", "models/order_totals.sql", 6, 3),
-                ("SQBRSQL005", "models/order_totals.sql", 9, 3),
+                ("SQLCLEAN005", "models/order_totals.sql", 3, 3),
+                ("SQLCLEAN005", "models/order_totals.sql", 6, 3),
+                ("SQLCLEAN005", "models/order_totals.sql", 9, 3),
             ),
         ),
     ),

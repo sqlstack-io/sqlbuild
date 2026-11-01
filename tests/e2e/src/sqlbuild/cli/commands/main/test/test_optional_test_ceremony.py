@@ -81,7 +81,7 @@ def test_given_optional_test_ceremony_when_testing_then_short_and_explicit_forms
         command=("--no-color", "test"), project_dir=project_dir
     )
     linted: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "rules", "run", "SQBRSQL"), project_dir=project_dir
+        command=("--no-color", "rules", "run", "SQLCLEAN"), project_dir=project_dir
     )
     formatted: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "format"), project_dir=project_dir

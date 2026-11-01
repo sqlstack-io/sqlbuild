@@ -72,7 +72,7 @@ pub(crate) fn allows_output_star(query: &QueryFacts, root: &QueryFacts, model: &
 fn rules_need_no_query(model: &Model, selected: &BTreeMap<String, &RuleMetadata>) -> bool {
     selected.values().all(|rule| {
         rule.custom
-            || rule.code.starts_with("SQBRSQL")
+            || rule.code.starts_with("SQLCLEAN")
             || rule.code.starts_with("SQBRCONTRACT10")
             || (model.bare_dynamic_pivot && rule.code == SELECT_STAR_MODEL_RULE_CODE)
             || matches!(

@@ -156,8 +156,9 @@ pub(crate) fn analyze<'py>(
     let enabled: bool = !(native_field(selection, "select")?.is_truthy()?
         || native_field(selection, "exclude")?.is_truthy()?)
         && crate::bindings::_helpers::compile_context::delta::injection().is_none();
+    let sql_lint_enabled: bool = enabled && !options.no_sql_validation.is_truthy()?;
     let early_lint: Bound<'py, EarlySqlLint> =
-        Bound::new(py, EarlySqlLint::new(enabled, options.no_cache()?))?;
+        Bound::new(py, EarlySqlLint::new(sql_lint_enabled, options.no_cache()?))?;
     let early_rules: EarlyRulesScope = EarlyRulesScope::new();
     let analysis: PyResult<Bound<'py, PyAny>> =
         analyzed(py, &options, (&early_lint, enabled.then_some(&early_rules)));
@@ -381,10 +382,11 @@ impl<'py> Driver<'_, 'py> {
                 ),
             ],
         )?;
-        let on_inputs_ready: Bound<'py, PyAny> = imported(py, "functools", "partial")?.call(
-            (self.early_lint.getattr("start")?,),
-            Some(&keywords(py, &[("dialect", lint_dialect.clone())])?),
-        )?;
+        let on_inputs_ready: Bound<'py, PyAny> = EarlySqlLint::inputs_ready_hook(
+            self.early_lint,
+            &lint_dialect.extract::<String>()?,
+            adapter,
+        );
         let analysis_selection: Bound<'py, PyAny> = replaced(
             &options.analysis_selection.clone(),
             &[("on_inputs_ready", on_inputs_ready)],
@@ -497,7 +499,8 @@ impl<'py> Driver<'_, 'py> {
         if !options.prepared_artifacts.is_none() && !any_error(core_diagnostics.as_any())? {
             let target_dir: Bound<'py, PyAny> =
                 project_dir.call_method1("__truediv__", (TARGET_DIRECTORY,))?;
-            let stage_artifacts: bool = native_field(&rules_config, "select")?.is_truthy()?;
+            let select: Bound<'py, PyAny> = native_field(&rules_config, "select")?;
+            let stage_artifacts: bool = select.is_none() || select.is_truthy()?;
             call_with(
                 &native_field(&options.prepared_artifacts, "start")?,
                 &[

@@ -3,14 +3,14 @@
 pub(crate) const MODEL_TEST_MODE: &str = "model";
 /// The rule codes whose fixes `sqb format --fix` may apply after compiler verification.
 pub(crate) const SAFE_RULE_FIX_CODES: [&str; 8] = [
-    "SQBRSQL002",
-    "SQBRSQL003",
-    "SQBRSQL005",
-    "SQBRSQL006",
-    "SQBRSQL008",
-    "SQBRSQL017",
-    "SQBRSQL025",
-    "SQBRSQL042",
+    "SQLCLEAN002",
+    "SQLCLEAN003",
+    "SQLCLEAN005",
+    "SQLCLEAN006",
+    "SQLCLEAN008",
+    "SQLCLEAN017",
+    "SQLCLEAN025",
+    "SQLCLEAN042",
 ];
 /// The note attached to a rule finding that has an available fix.
 pub(crate) const RULE_FIX_AVAILABLE_NOTE: &str =
@@ -19,7 +19,7 @@ pub(crate) const RULES_NATIVE_API_VERSION: i64 = 1;
 /// File name of the custom-rule result cache under the project cache directory.
 pub(crate) const CUSTOM_RULES_CACHE_FILE: &str = "custom-rules.json";
 /// Code prefix of the SQL lint rules, which check each selected file on its own.
-pub(crate) const SQL_RULE_PREFIX: &str = "SQBRSQL";
+pub(crate) const SQL_RULE_PREFIX: &str = "SQLCLEAN";
 /// Suffix of a custom host scratch directory abandoned by a cancelled run.
 pub(crate) const CUSTOM_HOST_ABANDONED_SUFFIX: &str = ".abandoned";
 /// Marker file whose presence tells split custom hosts the run was cancelled.
@@ -31,3 +31,5 @@ pub(crate) const CUSTOM_HOST_RUNTIME_VERSION: &str = "sqlbuild-rules-custom-v3";
 
 /// Native rules evaluations answered from the response memo.
 pub(crate) const RULES_MEMO_REUSES: &str = "rules_memo_reuses";
+/// The `RulesError` attribute holding how to turn off default Rules, printed only with human error text.
+pub(crate) const DEFAULT_RULES_NOTICE_ATTR: &str = "default_rules_notice";

@@ -21,11 +21,11 @@ from tests.unit.src.sqlbuild.rule_engine._helpers.engine._test_types import (
 )
 
 _EXCEPTION_ENTRY: str = (
-    '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\npath = "models/orders.sql"\n'
+    '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/orders.sql"\n'
     'reason = "A reviewed sample"\n'
 )
 _IGNORE_ENTRY: str = (
-    '[[rules.rule_ignores]]\nrules = ["SQBRSQL"]\npaths = ["models/examples/**"]\n'
+    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models/examples/**"]\n'
     'reason = "Examples keep minimal SQL"\n'
 )
 
@@ -168,15 +168,15 @@ _IGNORE_ENTRY: str = (
         RulesConfigErrorTestCase(
             description="relation for a Rule that reports no relation",
             source=(
-                '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\npath = "models/orders.sql"\n'
+                '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/orders.sql"\n'
                 'relation = "customers"\nreason = "A reviewed sample"\n'
             ),
-            expected_error_pattern="sets relation, but only SQBRSQL038 report a joined relation",
+            expected_error_pattern="sets relation, but only SQLCLEAN038 report a joined relation",
         ),
         RulesConfigErrorTestCase(
             description="cte without relation",
             source=(
-                '[[rules.rule_exceptions]]\nrule = "SQBRSQL038"\npath = "models/orders.sql"\n'
+                '[[rules.rule_exceptions]]\nrule = "SQLCLEAN038"\npath = "models/orders.sql"\n'
                 'cte = "checks"\nreason = "Deliberate"\n'
             ),
             expected_error_pattern="sets cte without relation",
@@ -323,7 +323,7 @@ def test_given_removed_allow_exceptions_when_loading_then_raises_error_explainin
         RelationExceptionConfigTestCase(
             description="relation-level exception narrowed to a CTE",
             source=(
-                '[[rules.rule_exceptions]]\nrule = "SQBRSQL038"\npath = "models/orders.sql"\n'
+                '[[rules.rule_exceptions]]\nrule = "SQLCLEAN038"\npath = "models/orders.sql"\n'
                 'relation = "order_policy"\ncte = "order_checks"\n'
                 'reason = "Every order is checked against every policy"\n'
             ),
@@ -375,7 +375,7 @@ def test_given_pipeline_directory_when_loading_then_returns_typed_relative_confi
         RuleIgnoreConfigTestCase(
             description="graph selectors and paths can share one scoped ignore",
             source=(
-                '[[rules.rule_ignores]]\nrules = ["SQBRSQL021"]\n'
+                '[[rules.rule_ignores]]\nrules = ["SQLCLEAN021"]\n'
                 'paths = ["tests/**"]\nselectors = ["+orders", "tag:interface+"]\n'
                 'reason = "Reviewed interface resources"\n'
             ),

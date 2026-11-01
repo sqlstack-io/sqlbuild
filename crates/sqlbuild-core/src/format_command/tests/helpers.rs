@@ -12,7 +12,7 @@ pub(super) fn sample_report() -> LintReport {
         formatted_files: texts(&["/p/models/orders.sql"]),
         rule_fixes: vec![RuleFixLine {
             file: "/p/models/orders.sql".to_owned(),
-            code: "SQBRSQL002".to_owned(),
+            code: "SQLCLEAN002".to_owned(),
             line: 4,
             status: "applied".to_owned(),
             reason: "ok".to_owned(),
@@ -25,7 +25,7 @@ pub(super) fn sample_report() -> LintReport {
                 column: 8,
                 end_line: Some(2),
                 end_column: Some(15),
-                code: "SQBRSQL004".to_owned(),
+                code: "SQLCLEAN004".to_owned(),
                 message: "Avoid LIMIT".to_owned(),
                 fault: true,
                 engine: "native".to_owned(),

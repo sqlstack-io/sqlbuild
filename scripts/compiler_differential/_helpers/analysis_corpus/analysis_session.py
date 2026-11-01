@@ -1,7 +1,12 @@
 """Failure cases owned by the native model analysis session lane."""
 
 from scripts.compiler_differential._helpers.corpus.case_builder import failure_case
-from scripts.compiler_differential.constants import FAILURE_MART_PATH, FAILURE_STAGING_PATH
+from scripts.compiler_differential.constants import (
+    FAILURE_BASE_CONFIG,
+    FAILURE_CONFIG_PATH,
+    FAILURE_MART_PATH,
+    FAILURE_STAGING_PATH,
+)
 from scripts.compiler_differential.models import FailureCase
 
 _ORDERS: str = '__ref("stg_orders")'
@@ -70,6 +75,10 @@ def analysis_session_failure_cases() -> tuple[FailureCase, ...]:
             name="analysis-session-enriched-subquery-type-mismatch",
             expected_code="K002",
             files={
+                FAILURE_CONFIG_PATH: FAILURE_BASE_CONFIG
+                + '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN039"]\n'
+                f'paths = ["{FAILURE_MART_PATH}"]\n'
+                'reason = "The case checks type facts through a derived table."\n',
                 FAILURE_MART_PATH: 'MODEL (\n  description "Order totals per customer",\n'
                 "  contract enforced,\n"
                 "  columns (\n    customer_id (type INTEGER),\n    amount (type VARCHAR),\n  ),\n"

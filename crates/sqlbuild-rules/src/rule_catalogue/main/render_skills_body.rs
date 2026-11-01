@@ -15,7 +15,7 @@ pub fn render_skills_body(rules: &[RuleText], config: &RulesConfig) -> String {
         "# SQLBuild Rules",
         "",
         "Rules enforce SQL model architecture and never modifies SQL files.",
-        "Run `sqb rules run SQBR` before handing off model changes.",
+        "Run `sqb rules run SQBR` and `sqb rules run SQLCLEAN` before handing off model changes.",
         "Fix findings in SQL. A deliberate deviation is a reviewed [[rules.rule_exceptions]] entry with a reason in sqlbuild_project.toml; inline `-- sqb: ignore` comments are errors.",
         "",
         "## Active Rules",

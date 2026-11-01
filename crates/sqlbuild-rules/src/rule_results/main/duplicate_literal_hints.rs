@@ -1,4 +1,4 @@
-//! `duplicate_literal_hints`: SQBRSQL044 help naming the other files that repeat a literal.
+//! `duplicate_literal_hints`: SQLCLEAN044 help naming the other files that repeat a literal.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use polyglot_sql::{Dialect, DialectType};
 use sha2::{Digest, Sha256};
 
-use crate::sql_tokens::main::canonical_tokens::canonical_tokens;
+use sqlclean::sql_tokens::main::canonical_tokens::canonical_tokens;
 
 /// Return the SHA-256 hex digest of the canonical token stream of `sql` under `dialect_name`.
 pub fn query_fingerprint(sql: &str, dialect_name: &str) -> Result<String, String> {

@@ -48,6 +48,7 @@ sqlbuild-rules.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlbuild-state.workspace = true
+sqlclean.workspace = true
 stacker.workspace = true
 tokio.workspace = true
 uuid.workspace = true

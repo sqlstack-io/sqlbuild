@@ -49,6 +49,7 @@ use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::construct::{error_class, new_error};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;
 use sqlbuild_core::cli_text::main::format_coded_error::format_coded_error;
@@ -175,11 +176,27 @@ fn print_expected_error(
             use_color: invocation.use_color,
         },
     );
+    let notice: Option<String> = match error.getattr_opt(DEFAULT_RULES_NOTICE_ATTR)? {
+        Some(notice) if !machine_output(invocation)? => Some(notice.extract()?),
+        _ => None,
+    };
+    let text: String = match notice {
+        Some(notice) => format!("{text}\n\n{notice}"),
+        None => text,
+    };
     print_object(
         &PyString::new(py, &format!("{text}\n")).into_any(),
         Some("stderr"),
         None,
     )
+}
+
+/// Whether the command was asked for JSON output.
+fn machine_output(invocation: &Invocation<'_>) -> PyResult<bool> {
+    match invocation.args.getattr_opt("json")? {
+        Some(json) => json.is_truthy(),
+        None => Ok(false),
+    }
 }
 
 /// The compile JSON error document `sqb compile --json` prints for a failure.

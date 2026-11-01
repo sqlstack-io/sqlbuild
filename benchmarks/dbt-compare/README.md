@@ -34,7 +34,7 @@ average.
 | Python macros | Jinja macros producing the same SQL |
 | `audits [not_null]` | `data_tests: [not_null]` |
 | SQL tests with fixture CTEs | `unit_tests` with the same input and expected rows |
-| `[rules] select = ["SQBR", "XSQBR"]` (built-in Rules plus one custom Rule) | none |
+| `[rules] select = ["SQBR", "SQLCLEAN", "XSQBR"]` (built-in Rules, SQLClean Rules and one custom Rule) | none |
 
 `sqlbuild-norules/` is the same project with `[rules] select = []`. That turns off configurable Rules;
 column binding, type inference and contract checks still run.

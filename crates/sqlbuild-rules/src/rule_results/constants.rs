@@ -1,6 +1,6 @@
 //! Codes, placement folders and wording of rules results and literal hints.
 
-pub(crate) const LONG_LITERAL_CODE: &str = "SQBRSQL044";
+pub(crate) const LONG_LITERAL_CODE: &str = "SQLCLEAN044";
 pub(crate) const QUOTE: char = '\'';
 pub(crate) const LISTED_PATHS: usize = 5;
 pub(crate) const MIN_SHARED_FILES: usize = 2;

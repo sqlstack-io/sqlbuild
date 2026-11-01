@@ -23,6 +23,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     text_macro,
     typed_position_files,
     untyped_text_macro,
+    with_ignored_rules,
     with_rules,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import run_sqb
@@ -130,6 +131,11 @@ _AGREEING_POSITIONS: tuple[tuple[str, str, str, str], ...] = (
             files={
                 **_MACROS,
                 **typed_position_files(shape, sql.replace("{m}", _UNKNOWN_CALL), declared),
+                **with_ignored_rules(
+                    "SQLCLEAN004",
+                    "SQLCLEAN039",
+                    reason="The matrix covers calls in derived tables and scalar subqueries.",
+                ),
             },
             expected_returncode=0,
             expected_fragments=_CLEAN,

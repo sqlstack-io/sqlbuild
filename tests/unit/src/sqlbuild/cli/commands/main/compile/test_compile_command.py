@@ -287,7 +287,6 @@ def test_given_python_project_dag_flag_when_running_compile_then_writes_python_d
                 ");\n\n"
                 "SELECT\n"
                 "  CAST('1' AS VARCHAR) AS amount_cents\n"
-                "FROM (SELECT 1) AS source\n"
             ),
         ),
         CompileCommandTestCase(

@@ -76,7 +76,7 @@ def write_dense_compile_project(*, project_dir: Path, model_count: int) -> None:
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "dense_orders"\nadapter = "snowflake"\n'
         '[defaults]\ndatabase = "warehouse"\nschema = "analytics"\n'
-        f'[rules]\nselect = ["SQBR", "XSQBR"]\ndomains = [{domains}]\n',
+        f'[rules]\nselect = ["SQBR", "SQLCLEAN", "XSQBR"]\ndomains = [{domains}]\n',
         encoding="utf-8",
     )
     source_count: int = max(1, model_count * 24 // 100)

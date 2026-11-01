@@ -7,6 +7,7 @@ use pyo3::prelude::{
 use pyo3::types::PyDict;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_rules::rules::main::selected_codes::selected_codes_json;
+use sqlbuild_rules::rules::main::selected_sql_codes::selected_sql_codes;
 
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
 use crate::bindings::_helpers::records::construct::error_class;
@@ -80,20 +81,20 @@ fn selected_codes(py: Python<'_>, encoded: &str) -> PyResult<Vec<String>> {
     })
 }
 
-/// Whether `code` is selected and not ignored by the configuration's prefixes.
+/// Whether `code` is selected and not ignored by the configuration's prefixes; without `select`, only SQLClean's default Rules are.
 #[pyfunction]
 #[pyo3(signature = (*, config, code))]
 pub(crate) fn rule_selected(config: &Bound<'_, PyAny>, code: &str) -> PyResult<bool> {
-    let matches = |field: &str| -> PyResult<bool> {
-        for selector in record_field(config, field)?.try_iter()? {
-            let selector: String = selector?.extract()?;
-            if code.starts_with(&selector) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    };
-    Ok(matches("select")? && !matches("ignore")?)
+    let select: Option<Vec<String>> = record_field(config, "select")?.extract()?;
+    let ignore: Vec<String> = record_field(config, "ignore")?.extract()?;
+    let matches =
+        |selectors: &[String]| selectors.iter().any(|selector| code.starts_with(selector));
+    Ok(match select {
+        None => selected_sql_codes(None, &ignore)
+            .iter()
+            .any(|selected| selected == code),
+        Some(select) => matches(&select) && !matches(&ignore),
+    })
 }
 
 /// `RulesError(message)`, caused by `cause` when given.

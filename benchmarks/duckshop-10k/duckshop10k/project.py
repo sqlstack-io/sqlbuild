@@ -192,12 +192,12 @@ valuation_date = "2026-03-31"
 lookup_customer_id = "C000001"
 
 [rules]
-select = ["SQBRSQL", "SQBRGRAPH", "SQBRCONTRACT", "SQBRTEST", "XSQBRDUCK"]
-# SQBRSQL021: `SELECT * FROM final` and the change-log macro's pass-through CTEs are the house
+select = ["SQLCLEAN", "SQBRGRAPH", "SQBRCONTRACT", "SQBRTEST", "XSQBRDUCK"]
+# SQLCLEAN021: `SELECT * FROM final` and the change-log macro's pass-through CTEs are the house
 #   style; each model's columns block, not its terminal SELECT, owns the output shape.
 # SQBRCONTRACT101: exact contracts are reserved for published dim_ and fct_ models.
 # SQBRTEST202: a sample of models carries unit tests, as in a project of this size.
-ignore = ["SQBRSQL021", "SQBRCONTRACT101", "SQBRTEST202"]
+ignore = ["SQLCLEAN021", "SQBRCONTRACT101", "SQBRTEST202"]
 '''
 
 

@@ -14,17 +14,17 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
 )
 
 _EXCEPTION: str = (
-    '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\npath = "models/customers.sql"\n'
+    '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/customers.sql"\n'
     'reason = "The sample intentionally keeps one row."\n'
 )
 _IGNORE: str = (
-    '[[rules.rule_ignores]]\nrules = ["SQBRSQL004"]\npaths = ["models/**"]\n'
+    '[[rules.rule_ignores]]\nrules = ["SQLCLEAN004"]\npaths = ["models/**"]\n'
     'reason = "Samples intentionally keep one row."\n'
 )
-_DIRECTIVE: str = "-- sqb: ignore SQBRSQL004 because the sample intentionally keeps one row\n"
+_DIRECTIVE: str = "-- sqb: ignore SQLCLEAN004 because the sample intentionally keeps one row\n"
 _PRINTED_ENTRY: str = (
     "[[rules.rule_exceptions]]\n"
-    '            rule = "SQBRSQL004"\n'
+    '            rule = "SQLCLEAN004"\n'
     '            path = "models/customers.sql"\n'
     '            reason = "the sample intentionally keeps one row"'
 )
@@ -40,10 +40,10 @@ _REMOVED: str = "sets [rules] allow_exceptions, which SQLBuild no longer support
             directive=_DIRECTIVE,
             expected_exit_code=1,
             expected_fragments=(
-                "SQBRSQL000",
+                "SQBRSUPPRESSION000",
                 "Inline Rule suppressions are not supported",
                 _PRINTED_ENTRY,
-                "SQBRSQL004",
+                "SQLCLEAN004",
             ),
         ),
         RuleExceptionPolicyTestCase(
@@ -74,7 +74,7 @@ _REMOVED: str = "sets [rules] allow_exceptions, which SQLBuild no longer support
         ),
         RuleExceptionPolicyTestCase(
             description="project-wide ignore",
-            rules_toml='ignore = ["SQBRSQL004"]\n',
+            rules_toml='ignore = ["SQLCLEAN004"]\n',
             directive="",
             expected_exit_code=0,
         ),
@@ -87,7 +87,7 @@ def test_given_rule_exception_mechanism_when_compiling_then_only_configuration_a
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n'
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n'
         f"{test_case.rules_toml}",
         encoding="utf-8",
     )
@@ -134,7 +134,7 @@ def test_given_exception_policy_when_formatting_then_it_is_validated_like_compil
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n'
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n'
         f"{test_case.setting}\n",
         encoding="utf-8",
     )

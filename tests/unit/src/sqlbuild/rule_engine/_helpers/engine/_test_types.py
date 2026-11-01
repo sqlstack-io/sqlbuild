@@ -54,7 +54,7 @@ class RuleSignatureTestCase:
 @dataclass(frozen=True)
 class PolicySelectionTestCase:
     description: str
-    select: tuple[str, ...]
+    select: tuple[str, ...] | None
     ignore: tuple[str, ...]
     expected_codes: tuple[str, ...]
 

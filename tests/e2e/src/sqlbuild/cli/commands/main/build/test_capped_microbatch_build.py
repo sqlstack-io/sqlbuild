@@ -96,10 +96,11 @@ def test_given_monthly_producer_with_midmonth_max_when_building_capped_daily_con
                   batch_size 1d,
                   microbatch_limit (max_batches 7, action cap_from_end),
                 );
+                WITH meetings AS (SELECT COUNT(*) AS row_count FROM __ref("monthly_meetings"))
                 SELECT
                   CAST(__cursor_start() AS TIMESTAMP) AS batch_start,
                   CAST(__cursor_end() AS TIMESTAMP) AS batch_end
-                FROM (SELECT COUNT(*) AS row_count FROM __ref("monthly_meetings"))
+                FROM meetings
                 """
             ).strip()
             + "\n",

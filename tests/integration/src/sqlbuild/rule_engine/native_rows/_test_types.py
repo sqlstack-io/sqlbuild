@@ -36,3 +36,12 @@ class StructPassthroughTestCase:
     declared_type: str
     expected_exit_code: int
     expected_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class SqlRuleCompileVarsTestCase:
+    """A compile's effective vars and whether SQL Rules report the NULL comparison they expand."""
+
+    description: str
+    effective_vars: dict[str, object]
+    expected_codes: tuple[str, ...]

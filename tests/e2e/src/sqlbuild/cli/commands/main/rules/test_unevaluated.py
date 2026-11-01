@@ -183,7 +183,7 @@ def test_given_prefix_not_like_when_running_rules_then_evaluates_the_complete_mo
             "rules",
             "--json",
             "run",
-            "SQBRSQL035",
+            "SQLCLEAN035",
         )
         assert result.returncode == 0, result.stdout + result.stderr
         payload: dict[str, Any] = json.loads(result.stdout)
@@ -213,7 +213,7 @@ def test_given_prefix_not_like_when_running_rules_then_evaluates_the_complete_mo
         ),
         UnevaluatedRuleCase(
             "explicit scoped rule ignore",
-            configuration='\n[[rules.rule_ignores]]\nrules = ["SQBRSQL035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
+            configuration='\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
             expected_exit=0,
         ),
     ],
@@ -229,7 +229,7 @@ def test_given_explicit_escape_hatch_when_running_rules_then_honors_policy(
         configuration=test_case.configuration,
     )
     result: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
-        tmp_path, "rules", "--json", "run", "SQBRSQL035"
+        tmp_path, "rules", "--json", "run", "SQLCLEAN035"
     )
     assert result.returncode == test_case.expected_exit, result.stdout + result.stderr
     payload: dict[str, Any] = json.loads(result.stdout)
@@ -249,20 +249,20 @@ def test_given_explicit_escape_hatch_when_running_rules_then_honors_policy(
             "compile groups two Rules",
             ("compile", "--json", "--no-cache"),
             "diagnostics",
-            ("SQBRSQL034", "SQBRSQL035"),
+            ("SQLCLEAN034", "SQLCLEAN035"),
         ),
         GroupedRulesCase(
             "Rules CLI groups selected family",
-            ("rules", "--json", "run", "SQBRSQL"),
+            ("rules", "--json", "run", "SQLCLEAN"),
             "findings",
-            tuple(f"SQBRSQL{number:03}" for number in range(1, 46)),
+            tuple(f"SQLCLEAN{number:03}" for number in range(1, 54)),
         ),
         GroupedRulesCase(
             "suppression precedes grouping",
             ("compile", "--json", "--no-cache"),
             "diagnostics",
-            ("SQBRSQL034",),
-            '\n[[rules.rule_ignores]]\nrules = ["SQBRSQL035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
+            ("SQLCLEAN034",),
+            '\n[[rules.rule_ignores]]\nrules = ["SQLCLEAN035"]\npaths = ["models/staging/orders.sql"]\nreason = "External SQL syntax"\n',
         ),
     ],
     ids=lambda case: case.description,
@@ -273,7 +273,7 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
 ) -> None:
     write_unevaluated_rules_project(
         project_dir=tmp_path,
-        selected_rules=("SQBRSQL034", "SQBRSQL035"),
+        selected_rules=("SQLCLEAN034", "SQLCLEAN035"),
         configuration=test_case.configuration,
     )
     for _ in range(2):

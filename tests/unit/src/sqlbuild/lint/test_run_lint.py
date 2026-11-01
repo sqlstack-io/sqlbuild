@@ -289,7 +289,7 @@ def test_given_non_ascii_sql_when_native_linting_then_span_maps_to_authored_colu
         config=LintConfig(dialect="duckdb"),
     )
 
-    assert tuple(item.code for item in result.violations) == ("SQBRSQL001",)
+    assert tuple(item.code for item in result.violations) == ("SQLCLEAN001",)
     assert (result.violations[0].line, result.violations[0].column) == test_case.expected_value
     assert (result.violations[0].end_line, result.violations[0].end_column) == (2, 45)
     assert result.violations[0].remediation == ("Use IS NULL or IS NOT NULL when testing for NULL.")
@@ -414,12 +414,12 @@ def test_given_fixture_ceremony_variants_when_formatting_and_linting_then_forms_
         InlineDirectiveTestCase(
             description="matching directive keeps the finding and fails",
             query="SELECT value FROM items LIMIT 1\n",
-            expected_violations=(("SQBRSQL000", 2, "fault"), ("SQBRSQL004", 3, "warning")),
+            expected_violations=(("SQBRSUPPRESSION000", 2, "fault"), ("SQLCLEAN004", 3, "warning")),
         ),
         InlineDirectiveTestCase(
             description="directive without a finding still fails",
             query="SELECT value FROM items ORDER BY value LIMIT 1\n",
-            expected_violations=(("SQBRSQL000", 2, "fault"),),
+            expected_violations=(("SQBRSUPPRESSION000", 2, "fault"),),
         ),
     ],
     ids=lambda case: case.description,
@@ -433,7 +433,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
     target.parent.mkdir()
     _ = target.write_text(
         'MODEL (description "ok");\n'
-        "-- sqb: ignore SQBRSQL004 because this fixture intentionally samples one row\n"
+        "-- sqb: ignore SQLCLEAN004 because this fixture intentionally samples one row\n"
         f"{test_case.query}",
         encoding="utf-8",
     )
@@ -450,7 +450,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
     remediation: str = result.violations[0].remediation or ""
     assert (
         "[[rules.rule_exceptions]]\n"
-        '            rule = "SQBRSQL004"\n'
+        '            rule = "SQLCLEAN004"\n'
         '            path = "models/sample.sql"\n'
         '            reason = "this fixture intentionally samples one row"'
     ) in remediation
@@ -461,7 +461,7 @@ def test_given_inline_directive_when_linting_then_it_is_a_fault_printing_the_exc
     [
         LintBehaviorTestCase(
             description="mandatory fault directive",
-            expected_value={"SQBRSQL000", "description-present"},
+            expected_value={"SQBRSUPPRESSION000", "description-present"},
         )
     ],
     ids=lambda case: case.description,
