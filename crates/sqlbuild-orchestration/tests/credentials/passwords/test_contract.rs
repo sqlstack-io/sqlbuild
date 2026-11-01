@@ -8,6 +8,7 @@ use crate::credentials::main::{
     verify_password::verify_password,
 };
 use crate::credentials::models::{AuditContext, PasswordAuthority, PrincipalKind};
+use crate::credentials::tests::helpers::authentication_revision;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -171,6 +172,9 @@ fn given_person_passwords_when_changed_then_replicas_verify_exact_bytes_and_audi
                 sqlite_body: "SELECT RAISE(ABORT,'injected audit failure')",
                 postgres_body: "RAISE EXCEPTION 'injected audit failure'",
             };
+            let revision = authentication_revision(&replica)
+                .await
+                .expect("password revision");
             install_fault(store, &fault).await;
             assert!(
                 set_password(
@@ -183,6 +187,12 @@ fn given_person_passwords_when_changed_then_replicas_verify_exact_bytes_and_audi
                 .is_err()
             );
             remove_fault(store, &fault).await;
+            assert_eq!(
+                authentication_revision(&replica)
+                    .await
+                    .expect("audit rollback revision"),
+                revision
+            );
             assert_eq!(
                 verify_password(&replica, person, password)
                     .await
@@ -197,6 +207,14 @@ fn given_person_passwords_when_changed_then_replicas_verify_exact_bytes_and_audi
             )
             .await
             .expect("replace password");
+            assert_eq!(
+                authentication_revision(&replica)
+                    .await
+                    .expect("replacement revision"),
+                cases["security_revision_after_replacement"]
+                    .as_u64()
+                    .expect("expected revision")
+            );
             for invalid in [
                 password,
                 cases["wrong"].as_str().expect("wrong"),

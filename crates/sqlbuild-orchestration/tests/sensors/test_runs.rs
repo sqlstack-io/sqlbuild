@@ -425,7 +425,11 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("upgrade fixture");
-            for table in ["sqb_password_sessions", "sqb_password_login_attempts"] {
+            for table in [
+                "sqb_authentication_revision",
+                "sqb_password_sessions",
+                "sqb_password_login_attempts",
+            ] {
                 (transaction, _) = query(transaction, &format!("DROP TABLE {table}"), vec![])
                     .await
                     .expect("remove subsequent session migration");

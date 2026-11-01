@@ -139,10 +139,17 @@ fn given_a_standalone_control_server_when_bootstrapped_by_an_operator_then_scope
             let token_id = credential["identity"]["token_id"]
                 .as_str()
                 .expect("credential ID");
-            for expected in [true, false] {
+            let connection = rusqlite::Connection::open(control.directory.path().join(".sqlbuild/control.sqlite3"))
+                .expect("parent observes shared revision");
+            let read_revision = || connection.query_row(
+                "SELECT revision FROM sqb_authentication_revision WHERE singleton=1", [],
+                |row| row.get::<_, u64>(0)).expect("cross-process revision");
+            let revision = read_revision();
+            for (expected, delta) in [(true, 1), (false, 1)] {
                 let revoked = administer(&control, &["revoke-token", token_id]);
                 assert_eq!(revoked["revoked"], expected);
                 assert_eq!(revoked["token_id"], token_id);
+                assert_eq!(read_revision(), revision + delta);
             }
             assert!(matches!(
                 publish_remote_snapshot(&url, bearer, &snapshot).await,
