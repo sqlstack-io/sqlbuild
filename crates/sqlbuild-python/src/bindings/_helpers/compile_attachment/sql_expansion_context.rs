@@ -96,10 +96,13 @@ pub(crate) struct ExpansionSources<'py> {
 
 /// Where expansion takes its target and vars from.
 pub(crate) enum ExpansionVars<'py> {
-    /// The default target's effective vars, overridden by these CLI vars when given.
-    DefaultTarget(Option<Bound<'py, PyAny>>),
-    /// The target and vars of the compiling command's macro context.
-    Compile(Bound<'py, PyAny>),
+    /// For commands without `--target`: the project's default target, with these CLI vars.
+    ProjectDefault(Option<Bound<'py, PyAny>>),
+    /// The compile's effective target name and vars, exactly as the command resolved them.
+    Compile {
+        target_name: Bound<'py, PyAny>,
+        vars: Bound<'py, PyAny>,
+    },
 }
 
 /// Assemble SQL expansion inputs; a static scope lends only its index to private macros.
@@ -125,11 +128,8 @@ pub(crate) fn sql_expansion_inputs(sources: ExpansionSources<'_>) -> PyResult<Sq
     let project_config: Bound<'_, PyAny> = native_field(&discovered, "project_config")?;
     let local_config: Bound<'_, PyAny> = native_field(&discovered, "local_config")?;
     let (target_name, effective_vars): (Bound<'_, PyAny>, Bound<'_, PyAny>) = match sources.vars {
-        ExpansionVars::Compile(context) => (
-            native_field(&context, "target_name")?,
-            native_field(&context, "vars")?,
-        ),
-        ExpansionVars::DefaultTarget(cli_vars) => {
+        ExpansionVars::Compile { target_name, vars } => (target_name, vars),
+        ExpansionVars::ProjectDefault(cli_vars) => {
             let cli_vars: Bound<'_, PyAny> = cli_vars.unwrap_or_else(|| PyDict::new(py).into_any());
             let (target_name, target_config) = target_selection(&discovered, None)?;
             let vars: Bound<'_, PyAny> = build_effective_vars(
@@ -227,7 +227,7 @@ pub(crate) fn build_sql_expansion_context<'py>(
     sql_expansion_inputs(ExpansionSources {
         project_dir: arguments.value("project_dir")?,
         value_renderer: arguments.value("value_renderer")?,
-        vars: ExpansionVars::DefaultTarget(present(arguments.value("cli_vars")?)),
+        vars: ExpansionVars::ProjectDefault(present(arguments.value("cli_vars")?)),
         discovered_inputs: present(arguments.value("discovered_inputs")?),
         declaration_scope: present(arguments.value("declaration_scope")?),
         static_declaration_scope: present(arguments.value("static_declaration_scope")?),

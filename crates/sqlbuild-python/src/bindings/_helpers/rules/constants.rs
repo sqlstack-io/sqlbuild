@@ -1,8 +1,17 @@
 //! Authored SQL-test mode identifiers.
 
 pub(crate) const MODEL_TEST_MODE: &str = "model";
-/// The SQL Rules whose fixes may change a query's meaning, so `sqb format --fix` never applies them; as in SQLClean, every other SQL Rule fix is safe.
-pub(crate) const UNSAFE_RULE_FIX_CODES: [&str; 1] = ["SQLCLEAN001"];
+/// The rule codes whose fixes `sqb format --fix` may apply after compiler verification.
+pub(crate) const SAFE_RULE_FIX_CODES: [&str; 8] = [
+    "SQLCLEAN002",
+    "SQLCLEAN003",
+    "SQLCLEAN005",
+    "SQLCLEAN006",
+    "SQLCLEAN008",
+    "SQLCLEAN017",
+    "SQLCLEAN025",
+    "SQLCLEAN042",
+];
 /// The note attached to a rule finding that has an available fix.
 pub(crate) const RULE_FIX_AVAILABLE_NOTE: &str =
     "Fix available: `sqb format --fix` applies it after compiler verification";

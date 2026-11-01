@@ -17,7 +17,6 @@ class SemanticFixTestCase:
     expected_code: str
     dialect: str = "duckdb"
     expected_status: str = "applied"
-    expected_exit_code: int = 0
 
 
 @dataclass(frozen=True)

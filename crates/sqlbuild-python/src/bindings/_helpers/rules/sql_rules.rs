@@ -19,6 +19,7 @@ use sqlbuild_rules::rule_results::models::RuleFinding;
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     NativeCompiledModel, SqlRuleInputs, SqlRuleKey,
 };
@@ -30,8 +31,8 @@ use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
-use crate::bindings::_helpers::rules::constants::UNSAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::early_sql_lint::{
     EarlyLintResult, EarlySqlLint, ExpansionReuse, PreparedSqlLint, sql_lint_settings,
     sql_rule_cache_path,
@@ -642,7 +643,7 @@ fn path_rows(outcome: LintOutcome) -> Vec<(PathBuf, LintViolationRow)> {
         .collect()
 }
 
-/// Build lint expansion, reusing the compiler's scope only for the same discovery.
+/// Build lint expansion with the compiled target and vars, reusing the compiler's scope only for the same discovery.
 fn lint_expansion_context(
     run: &SqlRun<'_, '_>,
 ) -> PyResult<crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs> {
@@ -658,7 +659,10 @@ fn lint_expansion_context(
     lint_expansion_inputs(LintExpansionSources {
         project_dir: run.project_dir.clone().into_pyobject(py)?.into_any(),
         value_renderer: reuse.map(|reuse| reuse.value_renderer(py)),
-        compile: reuse,
+        vars: ExpansionVars::Compile {
+            target_name: native_field(&run.project, "effective_target_name")?,
+            vars: native_field(&run.project, "effective_vars")?,
+        },
         discovered_inputs: (!run.discovered_inputs.is_none())
             .then(|| run.discovered_inputs.clone()),
         declaration_scope: reuse.map(|reuse| reuse.declaration_scope(py)).transpose()?,
@@ -713,7 +717,7 @@ fn lint_finding(
     };
     let path: String = posix(path);
     let fixable: bool = violation.fix.is_some()
-        && !UNSAFE_RULE_FIX_CODES.contains(&violation.code.as_str())
+        && SAFE_RULE_FIX_CODES.contains(&violation.code.as_str())
         && fixable_paths.contains(&path);
     RuleFinding {
         code: violation.code.clone(),

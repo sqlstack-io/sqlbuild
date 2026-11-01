@@ -16,6 +16,7 @@ use sqlbuild_rules::fix_verification::main::with_edits::with_edits;
 use sqlbuild_rules::fix_verification::models::{FixEdit, FixEligibility};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeys, project_relation_keys,
@@ -28,8 +29,8 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::{field, replaced};
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
+use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
-use crate::bindings::_helpers::rules::constants::UNSAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::fix_facts::compile_facts;
 use crate::bindings::_helpers::rules::fix_verdict::fix_verdict;
 use crate::bindings::_helpers::rules::lint_expansion::{
@@ -172,7 +173,7 @@ impl<'py> FixSession<'py> {
         let sources: Vec<LintFile> = lint_sources(&project_dir, Some(&selected), given)?;
         let context: Option<SqlExpansionInputs> = if settings.native_enabled {
             Some(lint_expansion_inputs(LintExpansionSources {
-                compile: None,
+                vars: ExpansionVars::ProjectDefault(None),
                 project_dir: self.project_dir.clone(),
                 value_renderer: self.adapter.is_truthy()?.then(|| self.adapter.clone()),
                 discovered_inputs: Some(updated_inputs(&self.inputs, files)?),
@@ -273,7 +274,7 @@ impl<'py> FixSession<'py> {
         let facts = FixEligibility {
             model_body: model_paths.contains(&path)?,
             has_fix,
-            safe_code: !UNSAFE_RULE_FIX_CODES.contains(&code.extract::<String>()?.as_str()),
+            safe_code: SAFE_RULE_FIX_CODES.contains(&code.extract::<String>()?.as_str()),
             conditionless_join: code.eq("SQLCLEAN003")?,
             snowflake: field(&self.config, "dialect")?.eq("snowflake")?,
         };

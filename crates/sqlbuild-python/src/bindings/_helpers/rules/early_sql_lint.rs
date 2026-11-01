@@ -21,6 +21,7 @@ use sqlbuild_rules::rule_cache::main::rules_bulk_cache_path::rules_bulk_cache_pa
 use sqlbuild_rules::rules::main::selected_sql_codes::selected_sql_codes;
 
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::present;
 use crate::bindings::_helpers::compiled_views::relation_keys::model_key_row;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
@@ -259,7 +260,7 @@ fn early_lint(py: Python<'_>, work: &EarlyLintWork) -> PyResult<EarlyLintResult>
     let context: SqlExpansionInputs = lint_expansion_inputs(LintExpansionSources {
         project_dir: project_dir.into_pyobject(py)?.into_any(),
         value_renderer: Some(work.reuse.value_renderer(py)),
-        compile: Some(&work.reuse),
+        vars: work.reuse.expansion_vars(py)?,
         discovered_inputs: Some(work.reuse.discovered_inputs(py)?),
         declaration_scope: None,
         static_declaration_scope: present(work.reuse.declaration_scope(py)?),
@@ -305,9 +306,13 @@ impl ExpansionReuse {
         record_field(self.inputs.bind(py), "declaration_scope")
     }
 
-    /// The compile's macro context, carrying its target and vars.
-    pub(crate) fn macro_context<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        record_field(self.inputs.bind(py), "macro_context")
+    /// The compile's target and vars, read from its macro context.
+    pub(crate) fn expansion_vars<'py>(&self, py: Python<'py>) -> PyResult<ExpansionVars<'py>> {
+        let context: Bound<'py, PyAny> = record_field(self.inputs.bind(py), "macro_context")?;
+        Ok(ExpansionVars::Compile {
+            target_name: record_field(&context, "target_name")?,
+            vars: record_field(&context, "vars")?,
+        })
     }
 
     /// The adapter that renders declared values.

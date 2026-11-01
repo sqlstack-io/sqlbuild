@@ -55,6 +55,8 @@ def test_given_increasing_findings_when_publishing_cache_then_findings_are_store
         ]
         project: SimpleNamespace = SimpleNamespace(
             settings=SimpleNamespace(sql_analysis=True),
+            effective_target_name=None,
+            effective_vars={},
             models=models,
             seeds=(),
             sources=(),

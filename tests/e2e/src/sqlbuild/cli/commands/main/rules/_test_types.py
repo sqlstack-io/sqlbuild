@@ -367,3 +367,11 @@ class DefaultRuleSelectionCase:
     expected_exit: int
     expected_finding: bool
     expected_notices: int
+
+
+@dataclass(frozen=True)
+class SqlRuleTargetVarsCase:
+    description: str
+    commands: tuple[tuple[str, ...], ...]
+    expected_outcomes: tuple[tuple[int, bool, bool], ...]
+    extra_files: dict[str, str] = field(default_factory=dict)

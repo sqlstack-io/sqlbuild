@@ -19,7 +19,6 @@ use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::ErrorId;
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
-use crate::bindings::_helpers::rules::early_sql_lint::ExpansionReuse;
 
 const COMPILE_FIRST_MESSAGE: &str = "compiler-integrated Rules check the SQL your project \
     actually produces, so the project must compile first";
@@ -47,7 +46,7 @@ pub(crate) fn build_lint_expansion_context<'py>(
     )?;
     let renderer: Bound<'py, PyAny> = arguments.value("value_renderer")?;
     lint_expansion_inputs(LintExpansionSources {
-        compile: None,
+        vars: ExpansionVars::ProjectDefault(None),
         project_dir: arguments.value("project_dir")?,
         value_renderer: renderer.is_truthy()?.then_some(renderer),
         discovered_inputs: present(arguments.value("discovered_inputs")?),
@@ -58,11 +57,11 @@ pub(crate) fn build_lint_expansion_context<'py>(
 }
 
 /// Where lint's expansion inputs come from; a missing renderer is the project's adapter.
-pub(crate) struct LintExpansionSources<'a, 'py> {
+pub(crate) struct LintExpansionSources<'py> {
     pub(crate) project_dir: Bound<'py, PyAny>,
     pub(crate) value_renderer: Option<Bound<'py, PyAny>>,
-    /// The compile whose macro context lint expands with, for its target and vars.
-    pub(crate) compile: Option<&'a ExpansionReuse>,
+    /// The target and vars lint expands with.
+    pub(crate) vars: ExpansionVars<'py>,
     pub(crate) discovered_inputs: Option<Bound<'py, PyAny>>,
     pub(crate) declaration_scope: Option<Bound<'py, PyAny>>,
     pub(crate) static_declaration_scope: Option<Bound<'py, PyAny>>,
@@ -70,13 +69,13 @@ pub(crate) struct LintExpansionSources<'a, 'py> {
 
 /// Lint's expansion inputs, reporting compile failures as `ProjectCompileError`.
 pub(crate) fn lint_expansion_inputs(
-    sources: LintExpansionSources<'_, '_>,
+    sources: LintExpansionSources<'_>,
 ) -> PyResult<SqlExpansionInputs> {
     let py: Python<'_> = sources.project_dir.py();
     expansion_inputs(sources).or_else(|error| Err(compile_first_error(py, error)?))
 }
 
-fn expansion_inputs(sources: LintExpansionSources<'_, '_>) -> PyResult<SqlExpansionInputs> {
+fn expansion_inputs(sources: LintExpansionSources<'_>) -> PyResult<SqlExpansionInputs> {
     let py: Python<'_> = sources.project_dir.py();
     let project_dir: Bound<'_, PyAny> = sources.project_dir;
     let discovered: Bound<'_, PyAny> = match sources.discovered_inputs {
@@ -115,10 +114,7 @@ fn expansion_inputs(sources: LintExpansionSources<'_, '_>) -> PyResult<SqlExpans
     sql_expansion_inputs(ExpansionSources {
         project_dir,
         value_renderer: renderer,
-        vars: match sources.compile {
-            Some(compile) => ExpansionVars::Compile(compile.macro_context(py)?),
-            None => ExpansionVars::DefaultTarget(None),
-        },
+        vars: sources.vars,
         discovered_inputs: Some(discovered),
         declaration_scope: sources.declaration_scope,
         static_declaration_scope: sources.static_declaration_scope,

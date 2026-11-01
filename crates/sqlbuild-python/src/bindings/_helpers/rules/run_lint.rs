@@ -8,6 +8,7 @@ use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_attachment::sql_expansion_context::present;
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
 use crate::bindings::_helpers::rules::lint_expansion::{
@@ -125,7 +126,7 @@ fn run_lint<'py>(
     } else if settings.native_enabled {
         let renderer: Bound<'py, PyAny> = arguments.value("value_renderer")?;
         Some(lint_expansion_inputs(LintExpansionSources {
-            compile: None,
+            vars: ExpansionVars::ProjectDefault(None),
             project_dir: project_dir.clone(),
             value_renderer: renderer.is_truthy()?.then_some(renderer),
             discovered_inputs: present(arguments.value("discovered_inputs")?),
