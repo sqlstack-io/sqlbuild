@@ -270,18 +270,13 @@ pub(crate) fn compile_sensors(
         if let Some(job) = sensor.when.job {
             condition["job_key"] = json!(job.name);
         }
+        if let Some(select) = sensor.when.select {
+            let selectors: Vec<String> = select.split_whitespace().map(str::to_owned).collect();
+            condition["selection"] = sensor_nodes(graph, &selectors, "node_event")?;
+        }
         if let Some(selectors) = sensor.when.executed_successfully {
-            if selectors.is_empty() || selectors.iter().any(|value| value.trim().is_empty()) {
-                return Err(PyValueError::new_err(
-                    "executed_successfully needs nonempty selectors",
-                ));
-            }
-            let nodes: BTreeSet<String> = resolve_selectors(graph, &selectors, &[])
-                .map_err(|error| PyValueError::new_err(error.message))?
-                .into_iter()
-                .map(|(kind, name)| format!("{kind}:{name}"))
-                .collect();
-            condition["executed_successfully"] = json!(nodes);
+            condition["executed_successfully"] =
+                sensor_nodes(graph, &selectors, "executed_successfully")?;
         }
         let definition: SensorDefinition = serde_json::from_value(json!({
             "description": sensor.description,
@@ -294,4 +289,23 @@ pub(crate) fn compile_sensors(
         definitions.sensors.insert(sensor.name, definition);
     }
     Ok(definitions)
+}
+
+fn sensor_nodes(graph: &ProjectGraph, selectors: &[String], field: &str) -> PyResult<Value> {
+    if selectors.is_empty() || selectors.iter().any(|value| value.trim().is_empty()) {
+        return Err(PyValueError::new_err(format!(
+            "{field} needs nonempty selectors"
+        )));
+    }
+    let nodes: BTreeSet<String> = resolve_selectors(graph, selectors, &[])
+        .map_err(|error| PyValueError::new_err(error.message))?
+        .into_iter()
+        .map(|(kind, name)| format!("{kind}:{name}"))
+        .collect();
+    if nodes.is_empty() {
+        return Err(PyValueError::new_err(format!(
+            "{field} needs nonempty selectors"
+        )));
+    }
+    Ok(json!(nodes))
 }

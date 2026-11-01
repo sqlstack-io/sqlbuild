@@ -2,12 +2,21 @@
 
 use crate::declarations::models::Definitions;
 use crate::sensors::models::SensorCondition;
+use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
 
-pub(crate) fn validate_sensors(definitions: &Definitions) -> Result<(), ControlError> {
+pub(crate) fn validate_sensors(
+    definitions: &Definitions,
+    input: &SnapshotInput,
+) -> Result<(), ControlError> {
     for (name, sensor) in &definitions.sensors {
         let valid_condition = match &sensor.when {
             SensorCondition::PlatformEvent { kinds } => !kinds.is_empty(),
+            SensorCondition::NodeEvent { selection, kinds } => {
+                !kinds.is_empty()
+                    && !selection.is_empty()
+                    && selection.iter().all(|key| input.nodes.contains_key(key))
+            }
             SensorCondition::RunEvent {
                 job_key,
                 kinds,
@@ -32,7 +41,7 @@ pub(crate) fn validate_sensors(definitions: &Definitions) -> Result<(), ControlE
                 && !definitions.groups.contains_key(&sensor.job_key))
         {
             return Err(ControlError::Invalid(format!(
-                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes"
+                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes; node_event must select nonempty snapshot nodes"
             )));
         }
     }

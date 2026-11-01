@@ -686,6 +686,28 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="any-run node selectors freeze canonical keys without a source job reference",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
+                ).read_text()
+            },
+            expected_jobs=("inventory", "source_orders"),
+            expected_sensors={
+                "on_orders": {
+                    "description": "Build inventory for every genuine orders rebuild.",
+                    "job_key": "inventory",
+                    "when": {
+                        "kind": "node_event",
+                        "selection": ["model:orders"],
+                        "kinds": ["success"],
+                    },
+                    "minimum_interval_seconds": 30,
+                    "default_status": "running",
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="source-job execution selectors compile to frozen canonical keys",
             files={
                 "orchestration/orders.py": Path(
@@ -880,6 +902,30 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
                 )
                 .read_text()
                 .replace("kinds=[PlatformEventKind.TICK_OVERDUE]", "kinds=['unknown_event']")
+            },
+            expected_error=ValueError,
+            expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="empty node selectors cannot broaden matching to all nodes",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
+                )
+                .read_text()
+                .replace('select="orders orders*"', 'select=" "')
+            },
+            expected_error=ValueError,
+            expected_message="node_event needs nonempty selectors",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="node event kinds do not imply unapproved failure transitions",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/node_orders.py"
+                )
+                .read_text()
+                .replace("kinds=[NodeEventKind.SUCCESS]", "kinds=['failed']")
             },
             expected_error=ValueError,
             expected_message="unknown variant",

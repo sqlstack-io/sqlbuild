@@ -24,3 +24,9 @@ class RunEventKind(StrEnum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     PRESUMED_FAILED = "presumed_failed"
+
+
+class NodeEventKind(StrEnum):
+    """SUCCESS requires a genuine rebuild, not freshness-only completion."""
+
+    SUCCESS = "success"

@@ -25,7 +25,7 @@ note = "Public job and schedule authoring records only; selection resolution, va
 [[stays]]
 path = "orchestration_declarations/types.py"
 rule = 3
-note = "Public PlatformEventKind and RunEventKind enums only, placed in types.py to satisfy enum ownership while retaining a zero implementation budget; no Python event processing allowance."
+note = "Public PlatformEventKind, RunEventKind and NodeEventKind enums only, placed in types.py to satisfy enum ownership while retaining a zero implementation budget; no Python event processing allowance."
 
 [[stays]]
 path = "orchestration_declarations/main/compile_snapshot.py"

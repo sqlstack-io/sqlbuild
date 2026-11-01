@@ -6,6 +6,8 @@ mod helpers;
 mod test_delivery;
 #[path = "test_execution_bounds.rs"]
 mod test_execution_bounds;
+#[path = "test_nodes.rs"]
+mod test_nodes;
 #[path = "test_recovery.rs"]
 mod test_recovery;
 #[path = "test_runs.rs"]

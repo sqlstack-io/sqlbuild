@@ -41,6 +41,18 @@ pub enum SensorCondition {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         executed_successfully: Option<BTreeSet<String>>,
     },
+    NodeEvent {
+        selection: BTreeSet<String>,
+        kinds: BTreeSet<NodeEventKind>,
+    },
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum NodeEventKind {
+    Success,
 }
 
 #[derive(
@@ -78,6 +90,14 @@ pub(crate) struct TerminalSensorRun {
     pub(crate) run_id: Uuid,
     pub(crate) status: RunOutcome,
     pub(crate) last_event_storage_id: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct NodeSensorEvent {
+    pub(crate) event_id: Uuid,
+    pub(crate) run_id: Uuid,
+    pub(crate) storage_id: i64,
+    pub(crate) payload: serde_json::Value,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

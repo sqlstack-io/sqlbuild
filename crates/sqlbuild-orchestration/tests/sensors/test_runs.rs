@@ -425,6 +425,14 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("upgrade fixture");
+            let (transaction, _) =
+                query(transaction, "DROP INDEX sqb_node_finished_cursor", vec![])
+                    .await
+                    .expect("remove node finish cursor index");
+            let (transaction, _) =
+                query(transaction, "DROP INDEX sqb_node_started_identity", vec![])
+                    .await
+                    .expect("remove node start evidence index");
             let (transaction, _) = query(transaction, "DROP INDEX sqb_runs_parent", vec![])
                 .await
                 .expect("remove execution lookup index");
