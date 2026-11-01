@@ -13,7 +13,9 @@ use sqlbuild_orchestration::warehouse_metadata::constants::MAX_FRESHNESS_RECORDS
 use sqlbuild_orchestration::warehouse_metadata::models::{
     SourceFreshnessPage, SourceFreshnessRead, WarehouseFreshnessRecord,
 };
-use sqlbuild_state::freshness::constants::{OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES};
+use sqlbuild_state::freshness::constants::{
+    OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
+};
 use sqlbuild_state::freshness::main::read_history_sql::read_history_sql;
 
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
@@ -147,9 +149,29 @@ fn read_page(
         (&database, &schema),
     )?;
     let adapter_name = adapter.getattr("adapter_name")?.extract::<String>()?;
+    let observed_since = request
+        .observed_since
+        .map(|since| {
+            let text = since
+                .format(if adapter_name == SQLITE_ADAPTER {
+                    "%Y-%m-%d"
+                } else {
+                    "%Y-%m-%dT%H:%M:%S+00:00"
+                })
+                .to_string();
+            let classes = SqlValueClasses::load(py)?;
+            let value = sql_value(&SqlValue::String(text), &classes)?;
+            call_with(
+                &adapter.getattr("render_typed_scalar")?,
+                &[("value", value)],
+            )?
+            .extract::<String>()
+        })
+        .transpose()?;
     let sql = read_history_sql(
         &qualified,
         request.after.as_ref().map(|_| &literals),
+        observed_since.as_deref(),
         (MAX_FRESHNESS_RECORDS, &adapter_name, has_event_id),
     )
     .map_err(PyValueError::new_err)?;
@@ -166,7 +188,9 @@ fn read_page(
     )?;
     let mut records: Vec<WarehouseFreshnessRecord> = Vec::new();
     let mut next_after = None;
+    let mut read_count = 0;
     for row in field(&result, "rows")?.try_iter()? {
+        read_count += 1;
         let row = row?;
         let record = row_record(&row)?;
         let mut cursor: [Option<String>; 11] = Default::default();
@@ -189,13 +213,17 @@ fn read_page(
         }
         cursor[10] = row.get_item(10)?.extract::<Option<String>>()?;
         value["event_id"] = json!(cursor[10]);
-        records.push(
-            serde_json::from_value::<WarehouseFreshnessRecord>(value)
-                .map_err(|error| PyValueError::new_err(error.to_string()))?,
-        );
+        let record = serde_json::from_value::<WarehouseFreshnessRecord>(value)
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        if request
+            .observed_since
+            .is_none_or(|since| record.observed_at >= since)
+        {
+            records.push(record);
+        }
         next_after = Some(cursor);
     }
-    if records.len() < MAX_FRESHNESS_RECORDS {
+    if read_count < MAX_FRESHNESS_RECORDS {
         next_after = None;
     }
     Ok(SourceFreshnessPage {

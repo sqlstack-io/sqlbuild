@@ -8,6 +8,7 @@ use crate::freshness::constants::{
 pub fn read_history_sql(
     qualified_name: &str,
     after: Option<&[Option<String>; 11]>,
+    observed_since: Option<&str>,
     (limit, adapter, has_event_id): (usize, &str, bool),
 ) -> Result<String, String> {
     let mut columns: Vec<&str> = SOURCE_FRESHNESS_COLUMN_TYPES
@@ -65,10 +66,17 @@ pub fn read_history_sql(
             ));
         }
     }
-    let filter = if greater.is_empty() {
+    let mut filters: Vec<String> = Vec::new();
+    if !greater.is_empty() {
+        filters.push(format!("({})", greater.join(" OR ")));
+    }
+    if let Some(since) = observed_since {
+        filters.push(format!("{OBSERVED_AT_COLUMN} >= {since}"));
+    }
+    let filter = if filters.is_empty() {
         String::new()
     } else {
-        format!(" WHERE {}", greater.join(" OR "))
+        format!(" WHERE {}", filters.join(" AND "))
     };
     let order: Vec<String> = columns
         .iter()
