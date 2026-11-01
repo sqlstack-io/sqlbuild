@@ -22,7 +22,7 @@
 	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync']);
 	const problems = createResource((client) => client.listPlatformEventHistory({ locationId: id }), ['platform_events']);
 	const detail = $derived(location.data ?? null);
-	let problemView = $state<'open' | 'all'>('all');
+	let problemView = $state<'open' | 'all'>('open');
 	const problemRows = $derived((problems.data ?? []).filter((e) => problemView === 'all' || e.active));
 	const openProblems = $derived((problems.data ?? []).filter((e) => e.active).length);
 	const processes = $derived(summariseProcesses(detail?.instances ?? []));
@@ -159,9 +159,11 @@
 				</Panel>
 			</div>
 
-			<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
-				<LocationTokens locationId={detail.id} />
-			</Panel>
+			{#if app.can('location.manage')}
+				<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
+					<LocationTokens locationId={detail.id} />
+				</Panel>
+			{/if}
 		</div>
 	{/if}
 </div>
