@@ -57,6 +57,8 @@ pub enum SensorCondition {
 #[serde(rename_all = "snake_case")]
 pub enum NodeEventKind {
     Success,
+    Failed,
+    Recovered,
 }
 
 #[derive(

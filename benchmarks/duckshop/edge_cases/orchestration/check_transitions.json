@@ -1,0 +1,13 @@
+[
+  {"nodes": ["success", "failed"], "started": [true, true], "outcome": "partial"},
+  {"nodes": ["failed", "failed"], "started": [true, true], "outcome": "failed"},
+  {"nodes": ["success", "cancelled"], "started": [true, true], "outcome": "partial"},
+  {"nodes": ["success", "skipped"], "started": [true, false], "outcome": "partial"},
+  {"nodes": ["success", "warn"], "started": [true, true], "outcome": "warn"},
+  {"nodes": ["success", "failed"], "started": [true, true], "outcome": "partial"},
+  {"nodes": ["success", "success"], "started": [true, false], "outcome": "success"},
+  {"nodes": ["success", "failed"], "started": [true, true], "outcome": "partial"},
+  {"nodes": ["success", "success"], "started": [true, true], "outcome": "success"},
+  {"nodes": ["success", "success"], "started": [true, true], "outcome": "success"},
+  {"nodes": ["success", "failed"], "started": [true, true], "outcome": "partial"}
+]

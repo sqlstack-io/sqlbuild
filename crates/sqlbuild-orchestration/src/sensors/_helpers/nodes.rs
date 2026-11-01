@@ -1,4 +1,4 @@
-//! Successful rebuilds require earlier immutable start evidence from the same run claim.
+//! Node transitions require earlier immutable start evidence from the same run claim.
 
 use std::collections::BTreeSet;
 
@@ -6,7 +6,10 @@ use uuid::Uuid;
 
 use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
-use crate::sensors::models::{NodeSensorEvent, SensorCursor, SensorEvaluationRequest};
+use crate::sensors::_helpers::transitions::matches_transition;
+use crate::sensors::models::{
+    NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
@@ -16,6 +19,7 @@ pub(crate) async fn consume_node_events(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
     selection: &BTreeSet<String>,
+    kinds: &BTreeSet<NodeEventKind>,
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
@@ -37,20 +41,31 @@ pub(crate) async fn consume_node_events(
             return Err(ControlError::Invalid("node event identity mismatch".into()));
         }
         let RunChange::NodeFinished {
-            node_key,
-            outcome: NodeOutcome::Success,
-            ..
+            node_key, outcome, ..
         } = &request.change
         else {
             continue;
         };
-        if !selection.contains(node_key) {
+        if !selection.contains(node_key)
+            || !matches!(outcome, NodeOutcome::Success | NodeOutcome::Failed)
+        {
             continue;
         }
         let started;
         (transaction, started) =
             prior_start(transaction, evaluation, &request, event.storage_id).await?;
-        if started {
+        if !started {
+            continue;
+        }
+        let matches;
+        (transaction, matches) = matches_transition(
+            transaction,
+            evaluation,
+            (node_key, *outcome, event.storage_id),
+            kinds,
+        )
+        .await?;
+        if matches {
             let run_id;
             (transaction, run_id) =
                 queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;

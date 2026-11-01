@@ -27,6 +27,8 @@ class RunEventKind(StrEnum):
 
 
 class NodeEventKind(StrEnum):
-    """SUCCESS requires a genuine rebuild, not freshness-only completion."""
+    """Actual execution drives success and transitions into or out of failure."""
 
     SUCCESS = "success"
+    FAILED = "failed"
+    RECOVERED = "recovered"
