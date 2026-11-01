@@ -36,6 +36,18 @@ _ORDER_TOTALS_MODEL: str = """MODEL (
   contract enforced,
   columns (
     order_id (type BIGINT),
+    total (type DECIMAL(12, 3)),
+  ),
+);
+
+SELECT order_id, amount AS total FROM __ref("orders")
+"""
+_WIDENED_TOTALS_MODEL: str = """MODEL (
+  description "Order totals whose contract widens the amount's precision losslessly.",
+  materialized table,
+  contract enforced,
+  columns (
+    order_id (type INTEGER),
     total (type DECIMAL(12, 2)),
   ),
 );
@@ -140,7 +152,17 @@ GROUP BY customer_id
                 "models/order_totals.sql": _ORDER_TOTALS_MODEL,
             },
             expected_exit_code=1,
-            expected_report_text="inferred as numeric(10,2) but declared type is DECIMAL(12,2)",
+            expected_report_text="inferred as numeric(10,2) but declared type is DECIMAL(12,3)",
+        ),
+        NativeTypeSystemTestCase(
+            description="a lossless DECIMAL widening satisfies the contract",
+            project_files={
+                "sqlbuild_project.toml": _PROJECT_TOML,
+                "models/orders.sql": _ORDERS_MODEL,
+                "models/order_totals.sql": _WIDENED_TOTALS_MODEL,
+            },
+            expected_exit_code=0,
+            expected_report_text='"has_errors": false',
         ),
         NativeTypeSystemTestCase(
             description="a sized TEXT satisfies a VARCHAR contract of the same length",
