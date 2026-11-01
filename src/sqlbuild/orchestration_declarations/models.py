@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 
-from sqlbuild.orchestration_declarations.types import PlatformEventKind, RunEventKind
+from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEventKind, RunEventKind
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -100,13 +100,22 @@ class RunEventCondition:
     kind: Literal["run_event"] = field(default="run_event", init=False)
 
 
+@dataclass(frozen=True, kw_only=True)
+class NodeEventCondition:
+    """Match each successful rebuild in any run within the sensor's location and target."""
+
+    select: str
+    kinds: Sequence[NodeEventKind]
+    kind: Literal["node_event"] = field(default="node_event", init=False)
+
+
 @dataclass(frozen=True, eq=False)
 class Sensor:
     """Start a job for each matching event; event identity deduplicates replayed requests."""
 
     name: str
     description: str = field(kw_only=True)
-    when: PlatformEventCondition | RunEventCondition = field(kw_only=True)
+    when: PlatformEventCondition | RunEventCondition | NodeEventCondition = field(kw_only=True)
     run: Job | JobGroup = field(kw_only=True)
     minimum_interval_seconds: int = field(default=30, kw_only=True)
     default_status: Literal["running", "stopped"] = field(default="running", kw_only=True)

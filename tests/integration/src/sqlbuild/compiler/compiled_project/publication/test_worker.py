@@ -545,6 +545,65 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
     "test_case",
     [
         WorkerExecutionTestCase(
+            "group child node sensor",
+            "SELECT 67 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(67,)],
+            expected_origin="sensor",
+            files={
+                "models/stg_orders.sql": "MODEL (description 'Staging orders.');\nSELECT 71 AS amount\n",
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import NodeEventKind, job, job_group, node_event, schedule, sensor\n"
+                    "source = job('source_orders', select='orders', description='Source orders.')\n"
+                    "source_group = job_group('source_group', description='Source group.', jobs=[source], "
+                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "annual_orders = job('annual_orders', select='stg_orders', description='Refresh staging.', settings={'reload': True})\n"
+                    "on_node = sensor('on_node', description='React to actual orders rebuilds.', "
+                    "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), "
+                    "run=annual_orders, minimum_interval_seconds=1)\n"
+                ),
+            },
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_the_child_finish_queues_a_worker(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        destination: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert destination["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            assert control.execute(
+                "SELECT job_key,status FROM sqb_runs ORDER BY job_key"
+            ).fetchall() == [
+                ("annual_orders", "success"),
+                ("source_group", "success"),
+                ("source_orders", "success"),
+            ]
+            assert control.execute(
+                "SELECT q.run_key,q.run_id FROM sqb_run_requests q"
+            ).fetchall() == [
+                (
+                    control.execute(
+                        "SELECT e.event_id FROM recall_events e JOIN sqb_runs r ON r.run_id=e.run_id "
+                        "WHERE r.job_key='source_orders' AND e.event_type='run_node_finished'"
+                    ).fetchone()[0],
+                    destination["run_id"],
+                )
+            ]
+            assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             "cancellation stops an active warehouse statement",
             "SELECT sum(sin(value)) AS amount FROM range(10000000000) t(value)",
             "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'orders'",

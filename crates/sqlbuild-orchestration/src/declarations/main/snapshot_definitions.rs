@@ -81,6 +81,6 @@ pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, Contro
             Schedule::Calendar { .. } => {}
         }
     }
-    validate_sensors(&definitions)?;
+    validate_sensors(&definitions, input)?;
     Ok(definitions)
 }
