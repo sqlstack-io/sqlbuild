@@ -16,6 +16,7 @@ from sqlbuild._native import (
     SourceFreshnessRecord,
     build_source_freshness_create_table_sql,
 )
+from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.contract.types import FrameworkType
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.cost.models import CostResourceContext
@@ -52,6 +53,14 @@ class RecordingAdapter:
 
     def render_framework_type(self, framework_type: FrameworkType) -> str:
         return framework_type.value
+
+    def get_columns(self, **_scope: object) -> tuple[ColumnInfo, ...]:
+        return (ColumnInfo(name="event_id", type="VARCHAR"),)
+
+    def render_add_columns(
+        self, *, destination: str, columns: tuple[ColumnInfo, ...]
+    ) -> tuple[str, ...]:
+        return DuckDbAdapter().render_add_columns(destination=destination, columns=columns)
 
     def render_create_source_freshness_table_sql(self, *, database: str | None, schema: str) -> str:
         return build_source_freshness_create_table_sql(

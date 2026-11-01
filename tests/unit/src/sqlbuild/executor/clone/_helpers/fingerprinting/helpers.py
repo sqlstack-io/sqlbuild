@@ -20,9 +20,10 @@ from sqlbuild._native import (
     SeedPlanEntry,
 )
 from sqlbuild.adapter.contract.models import RelationInfo
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 
 
-class CloneFingerprintAdapter:
+class CloneFingerprintAdapter(DuckDbAdapter):
     adapter_name: str = "test"
 
     def execute(self, connection: object, sql: str) -> object:
@@ -59,8 +60,8 @@ class CloneFingerprintAdapter:
         del kwargs
         return "select * from fingerprints"
 
-    def render_framework_type(self, value: object) -> str:
-        return str(value)
+    def render_framework_type(self, type_name: object) -> str:
+        return str(type_name)
 
     def render_create_fingerprint_table_sql(self, **kwargs: object) -> str:
         del kwargs
