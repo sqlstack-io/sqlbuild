@@ -27,6 +27,20 @@ pub(crate) struct ServiceTestCase {
     pub(crate) expected_heartbeats: i64,
 }
 
+pub(crate) struct PasswordCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) password: &'static str,
+    pub(crate) replacement: &'static str,
+    pub(crate) expected_password_rows: i64,
+    pub(crate) expected_audits: i64,
+}
+
+pub(crate) struct PasswordOriginTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) origin: &'static str,
+    pub(crate) expected_error: &'static str,
+}
+
 pub(crate) struct TestControl {
     pub(crate) child: Child,
     pub(crate) directory: tempfile::TempDir,

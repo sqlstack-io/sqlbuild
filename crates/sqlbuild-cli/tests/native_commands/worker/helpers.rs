@@ -1,7 +1,7 @@
 //! Privileged test operators stay separate from the API-only worker session.
 
 use std::collections::BTreeMap;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
 
 use sqlbuild_orchestration::credentials::main::create_location::create_location;
@@ -349,19 +349,4 @@ pub(crate) async fn wait_for_worker_log(control: &mut TestControl, expected: &st
     })
     .await
     .expect("worker supervision phase completes");
-}
-
-pub(crate) async fn wait_for_worker_exit(control: &mut TestControl) -> ExitStatus {
-    tokio::time::timeout(Duration::from_secs(5), async {
-        for _ in 0..250 {
-            let Some(exit) = control.child.try_wait().expect("scheduler exit") else {
-                tokio::time::sleep(Duration::from_millis(20)).await;
-                continue;
-            };
-            return exit;
-        }
-        panic!("worker supervision exhausted shutdown attempts");
-    })
-    .await
-    .expect("shutdown publishes retained terminal evidence")
 }

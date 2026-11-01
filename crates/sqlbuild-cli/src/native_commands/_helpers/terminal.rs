@@ -1,12 +1,15 @@
 //! The process's terminal: its width, colour support and stream writes.
 
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, BufRead, IsTerminal, Read, Write};
+
+use sqlbuild_orchestration::store::errors::ControlError;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::argv_host::python_int;
 use crate::native_commands::constants::{
     BROKEN_PIPE_EXCEPTION, COLUMNS_VARIABLE, EXIT_FLUSH_FAILURE, EXIT_FLUSH_FAILURE_STATUS,
-    FALLBACK_COLUMNS, NO_COLOR_VARIABLE, PYTHON_STDOUT_BUFFER_SIZE, UNCAUGHT_EXCEPTION_STATUS,
+    FALLBACK_COLUMNS, NO_COLOR_VARIABLE, PASSWORD_INPUT_BYTES, PYTHON_STDOUT_BUFFER_SIZE,
+    UNCAUGHT_EXCEPTION_STATUS,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::models::LostStdout;
@@ -52,6 +55,37 @@ pub(crate) fn terminal_columns() -> Result<i64, PythonNeeded> {
 /// `stdout_supports_color`: stdout is a terminal and `NO_COLOR` is unset.
 pub(crate) fn stdout_supports_color() -> bool {
     std::env::var_os(NO_COLOR_VARIABLE).is_none() && io::stdout().is_terminal()
+}
+
+/// Passwords never enter parsed arguments, environment variables or command output.
+pub(crate) fn read_password() -> Result<String, ControlError> {
+    let password = if io::stdin().is_terminal() {
+        let password = rpassword::prompt_password("Password: ")?;
+        if password != rpassword::prompt_password("Confirm password: ")? {
+            return Err(ControlError::Invalid("passwords do not match".into()));
+        }
+        password
+    } else {
+        let mut password = String::new();
+        io::stdin()
+            .lock()
+            .take(PASSWORD_INPUT_BYTES)
+            .read_line(&mut password)?;
+        if password.len() as u64 == PASSWORD_INPUT_BYTES {
+            return Err(ControlError::Invalid("password input is too large".into()));
+        }
+        if password.ends_with('\n') {
+            password.pop();
+            if password.ends_with('\r') {
+                password.pop();
+            }
+        }
+        password
+    };
+    if password.is_empty() {
+        return Err(ControlError::Invalid("password input was empty".into()));
+    }
+    Ok(password)
 }
 
 /// `\n` as a Python text stream writes it on this platform.

@@ -5,7 +5,8 @@ use sqlbuild_orchestration::credentials::main::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::models::AuditContext;
+use sqlbuild_orchestration::credentials::main::set_password::set_password;
+use sqlbuild_orchestration::credentials::models::{AuditContext, PasswordAuthority};
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;
 use sqlbuild_orchestration::platform::main::location_work::location_work;
@@ -20,6 +21,7 @@ use uuid::Uuid;
 use crate::argv::models::Namespace;
 use crate::native_commands::_helpers::decision::control_admin;
 use crate::native_commands::_helpers::execution::open_control_store;
+use crate::native_commands::_helpers::terminal::read_password;
 use crate::native_commands::models::ControlAdmin;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
@@ -47,6 +49,17 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ControlAdmin::RevokeToken(token_id) => {
             let revoked = revoke_token(&store, &context, token_id).await?;
             Ok(json!({"token_id": token_id, "revoked": revoked}))
+        }
+        ControlAdmin::SetPassword(principal_id) => {
+            let password = read_password()?;
+            set_password(
+                &store,
+                &context,
+                PasswordAuthority::Operator(principal_id),
+                &password,
+            )
+            .await?;
+            Ok(json!({"principal_id": principal_id, "password_set": true}))
         }
         ControlAdmin::RequestJobRun(request) => {
             let applied = request_job_run(&store, &context, &request).await?;

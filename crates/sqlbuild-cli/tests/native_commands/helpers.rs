@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
 use crate::test_types::{ServiceTestCase, TestControl};
@@ -119,18 +119,7 @@ pub(crate) async fn terminate(control: &mut TestControl) {
         .status()
         .expect("send SIGTERM");
     assert!(status.success());
-    let status = tokio::time::timeout(Duration::from_secs(5), async {
-        for _ in 0..250 {
-            tokio::time::sleep(Duration::from_millis(20)).await;
-            let Some(status) = control.child.try_wait().expect("child exit") else {
-                continue;
-            };
-            return status;
-        }
-        panic!("control roles exhausted shutdown attempts");
-    })
-    .await
-    .expect("control roles stop promptly");
+    let status = wait_for_exit(control).await;
     assert!(
         status.success(),
         "shutdown failed: {}",
@@ -141,4 +130,19 @@ pub(crate) async fn terminate(control: &mut TestControl) {
             .expect("shutdown log")
             .ends_with("Control service stopped successfully\n")
     );
+}
+
+pub(crate) async fn wait_for_exit(control: &mut TestControl) -> ExitStatus {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        for _ in 0..250 {
+            let Some(exit) = control.child.try_wait().expect("control process exit") else {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                continue;
+            };
+            return exit;
+        }
+        panic!("control process exhausted shutdown attempts");
+    })
+    .await
+    .expect("control process exits promptly")
 }

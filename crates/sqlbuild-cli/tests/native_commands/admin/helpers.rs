@@ -1,6 +1,7 @@
 //! Run the isolated native executable; never include returned bearer bytes in assertion messages.
 
-use std::process::{Command, Output};
+use std::io::Write;
+use std::process::{Command, Output, Stdio};
 
 use serde_json::Value;
 use sqlbuild_orchestration::declarations::models::TriggerRecord;
@@ -23,19 +24,42 @@ pub(crate) fn administer(control: &TestControl, arguments: &[&str]) -> Value {
 }
 
 pub(crate) fn invoke_admin(control: &TestControl, arguments: &[&str]) -> Output {
-    Command::new(
+    admin_command(control, arguments)
+        .output()
+        .expect("native administration process")
+}
+
+fn admin_command(control: &TestControl, arguments: &[&str]) -> Command {
+    let mut command = Command::new(
         control
             .directory
             .path()
             .join(format!("sqb{}", std::env::consts::EXE_SUFFIX)),
-    )
-    .arg("admin")
-    .args(arguments)
-    .current_dir(control.directory.path())
-    .env("PATH", "")
-    .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
-    .output()
-    .expect("native administration process")
+    );
+    command
+        .arg("admin")
+        .args(arguments)
+        .current_dir(control.directory.path())
+        .env("PATH", "")
+        .env_remove("SQLBUILD_CONTROL_DATABASE_URL");
+    command
+}
+
+pub(crate) fn invoke_password(control: &TestControl, principal: &str, input: &[u8]) -> Output {
+    let mut child = admin_command(control, &["set-password", principal])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("native password provisioning");
+    let mut stdin = child.stdin.take().expect("password pipe");
+    stdin
+        .write_all(input)
+        .expect("deliver password through stdin");
+    drop(stdin);
+    child
+        .wait_with_output()
+        .expect("password command completed")
 }
 
 pub(crate) async fn read_triggers(
