@@ -1,9 +1,11 @@
 <script lang="ts">
 	import AppTopbar from '$lib/components/app-topbar.svelte';
-	import ExplainAccess from '$lib/components/platform/explain-access.svelte';
+	import AccessChecker from '$lib/components/admin/access-checker.svelte';
+	import PermissionName from '$lib/components/admin/permission-name.svelte';
 	import KeyValues from '$lib/components/platform/key-values.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
-	import { CAPABILITIES, type AuthMode } from '$lib/api';
+	import type { AuthMode } from '$lib/api';
+	import { PERMISSIONS_BY_RISK, RISK_LABEL } from '$lib/platform/permission-catalog';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
@@ -77,16 +79,24 @@
 							{ label: 'Role', value: app.user.role }
 						]}
 					/>
-					<div class="caps">
-						{#each CAPABILITIES as c (c)}
-							<span class="cap" class:on={app.can(c)} title={app.can(c) ? 'You can' : 'You can’t'}>{c}</span>
-						{/each}
-					</div>
+					<table class="caps">
+						<tbody>
+							{#each PERMISSIONS_BY_RISK as group (group.risk)}
+								{#each group.actions as c, i (c)}
+									<tr class:off={!app.can(c)}>
+										<td class="risk">{i === 0 ? RISK_LABEL[group.risk] : ''}</td>
+										<td class="mark" title={app.can(c) ? 'You can' : 'You can’t'}>{app.can(c) ? '✓' : '—'}</td>
+										<td><PermissionName action={c} /></td>
+									</tr>
+								{/each}
+							{/each}
+						</tbody>
+					</table>
 					<p class="cli">On the command line, sign in with <code>sqb login</code>: it opens this browser and keeps a short-lived session, so you don't need an API token.</p>
 				{/if}
 			</Panel>
-			<Panel title="Why can or can't I?">
-				<ExplainAccess />
+			<Panel title="Why can or can't I?" note="Paste a denial ID from an error, or pick an action">
+				<AccessChecker sampleDecision="dec-5r2w9j" />
 			</Panel>
 		</div>
 	</div>
@@ -123,22 +133,25 @@
 		cursor: default;
 	}
 	.caps {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
+		width: 100%;
 		margin-top: 12px;
+		border-collapse: collapse;
+		font-size: 12.5px;
 	}
-	.cap {
-		padding: 2px 7px;
-		border-radius: 2px;
-		background: var(--sb-hover);
+	.caps td {
+		padding: 3px 8px 3px 0;
+		vertical-align: baseline;
+	}
+	.caps .risk {
+		width: 100px;
 		color: var(--sb-text-faint);
-		font-family: var(--font-mono);
 		font-size: 11.5px;
-		text-decoration: line-through;
 	}
-	.cap.on {
-		color: var(--foreground);
-		text-decoration: none;
+	.caps .mark {
+		width: 18px;
+		color: var(--sb-success);
+	}
+	.caps tr.off td {
+		color: var(--sb-text-faint);
 	}
 </style>
