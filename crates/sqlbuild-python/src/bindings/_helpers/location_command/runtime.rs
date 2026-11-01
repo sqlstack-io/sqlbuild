@@ -6,11 +6,13 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
+use sqlbuild_orchestration::warehouse_metadata::models::SourceFreshnessRead;
 
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
 use crate::bindings::_helpers::native_host::host::{redirect_stdout_to_stderr, write_console};
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
+use crate::bindings::_helpers::native_host::warehouse_metadata::read_source_freshness;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
     options.set_item("action", "publish")?;
@@ -44,6 +46,24 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     }
                 };
                 serde_json::to_string(&record)
+            } else if request.get("source_freshness").is_some() {
+                let metadata: SourceFreshnessRead =
+                    serde_json::from_value(request["source_freshness"].clone()).map_err(|_| {
+                        PyValueError::new_err("runtime received an invalid metadata read")
+                    })?;
+                let arguments = location_arguments(py, Some(options.clone()))?;
+                let page = match read_source_freshness(py, &arguments, &metadata) {
+                    Ok(page) => Some(page),
+                    Err(_) => {
+                        write_console(
+                            py,
+                            "stderr",
+                            "Warehouse metadata read failed. No page delivered.\n",
+                        )?;
+                        None
+                    }
+                };
+                serde_json::to_string(&page)
             } else {
                 let evaluation: SensorEvaluationRequest =
                     serde_json::from_value(request).map_err(|_| {

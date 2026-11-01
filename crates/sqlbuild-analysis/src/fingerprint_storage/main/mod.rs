@@ -1,3 +1,4 @@
+mod _event_id;
 pub mod create_table_sql;
 pub mod decode_storage;
 pub mod insert_batch_lengths;

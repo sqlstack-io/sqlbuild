@@ -16,6 +16,8 @@ mod test_location_work;
 mod test_reads;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_warehouse_metadata.rs"]
+mod test_warehouse_metadata;
 #[path = "test_worker.rs"]
 mod test_worker;
 #[path = "work/helpers.rs"]

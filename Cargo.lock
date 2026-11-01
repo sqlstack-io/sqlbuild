@@ -2597,6 +2597,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlbuild-recall",
+ "sqlbuild-state",
  "sqlx-core",
  "sqlx-postgres",
  "subtle",

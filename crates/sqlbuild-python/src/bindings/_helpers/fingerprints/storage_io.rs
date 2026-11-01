@@ -24,6 +24,7 @@ use crate::bindings::_helpers::fingerprints::storage_sql::{
 use crate::bindings::_helpers::records::construct::new_record;
 
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::state_column_evolution::ensure_event_id_column;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
@@ -97,8 +98,13 @@ fn create_sql(
     ))
 }
 
-/// The table DDL, adapter-rendered when the adapter overrides it, then any index DDL.
-fn setup_sqls(location: &Location<'_, '_>, writer: &Writer<'_, '_>) -> PyResult<Vec<String>> {
+/// Create the table/indexes, then add the nullable identity column to a pre-existing table.
+fn setup<'py>(
+    location: &Location<'_, 'py>,
+    writer: &Writer<'_, 'py>,
+    request: &Request<'_, 'py>,
+    describe: &dyn Fn(&PyErr) -> PyResult<RetryWarning<'py>>,
+) -> PyResult<()> {
     let py: Python<'_> = writer.execute.py();
     let mut sqls: Vec<String> = vec![match writer.render_create_table_sql {
         Some(render) => render
@@ -118,7 +124,31 @@ fn setup_sqls(location: &Location<'_, '_>, writer: &Writer<'_, '_>) -> PyResult<
             sqls.push(sql?.extract()?);
         }
     }
-    Ok(sqls)
+    let database = location.database.into_pyobject(py)?.into_any();
+    let schema = location.schema.into_pyobject(py)?.into_any();
+    retry_write(
+        py,
+        || {
+            for sql in &sqls {
+                execute_sql(writer, sql)?;
+            }
+            ensure_event_id_column(
+                (writer.connection, writer.execute),
+                (&database, &schema),
+                (FINGERPRINT_TABLE_NAME, &qualified_table_name(location)?),
+                (
+                    &request
+                        .optional("read_columns")?
+                        .unwrap_or_else(|| py.None().into_bound(py)),
+                    &request
+                        .optional("render_add_columns")?
+                        .unwrap_or_else(|| py.None().into_bound(py)),
+                    writer.render_framework_type,
+                ),
+            )
+        },
+        describe,
+    )
 }
 
 fn execute_sql<'py>(writer: &Writer<'_, 'py>, sql: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -156,22 +186,14 @@ fn error_details<'py>(py: Python<'py>, error: &PyErr) -> PyResult<Vec<Bound<'py,
     Ok(vec![value.get_type().getattr("__name__")?, value])
 }
 
-/// Run `sqls` in order, retrying the whole group after an `Exception` up to the attempt budget.
-fn execute_with_retry<'py>(
-    writer: &Writer<'_, 'py>,
-    sqls: &[String],
+/// Retry a complete warehouse operation after transient exceptions within the write budget.
+fn retry_write<'py>(
+    py: Python<'py>,
+    write: impl Fn() -> PyResult<()>,
     describe: &dyn Fn(&PyErr) -> PyResult<RetryWarning<'py>>,
 ) -> PyResult<()> {
-    let py: Python<'py> = writer.execute.py();
     for attempt in 0..WRITE_ATTEMPTS {
-        let mut failure: Option<PyErr> = None;
-        for sql in sqls {
-            if let Err(error) = execute_sql(writer, sql) {
-                failure = Some(error);
-                break;
-            }
-        }
-        let Some(error) = failure else {
+        let Err(error) = write() else {
             return Ok(());
         };
         if attempt + 1 == WRITE_ATTEMPTS || !error.is_instance_of::<PyException>(py) {
@@ -376,16 +398,16 @@ fn write_fingerprint<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<bool
             Err(error) => return Err(error),
         }
     }
-    let mut sqls: Vec<String> = setup_sqls(&location, &writer)?;
-    sqls.push(insert);
-    execute_with_retry(&writer, &sqls, &|error| {
+    let describe = |error: &PyErr| {
         let mut details: Vec<Bound<'py, PyAny>> = vec![
             native_field(&fingerprint, "node_type")?,
             native_field(&fingerprint, "node_name")?,
         ];
         details.extend(error_details(py, error)?);
         Ok((SINGLE_RETRY_MESSAGE, details))
-    })?;
+    };
+    setup(&location, &writer, &request, &describe)?;
+    retry_write(py, || execute_sql(&writer, &insert).map(|_| ()), &describe)?;
     Ok(true)
 }
 
@@ -420,8 +442,7 @@ fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()>
     let on_progress: Option<Bound<'py, PyAny>> = present(&request, "on_progress")?;
     let parts: WriteParts<'py> = WriteParts::read(&request)?;
     let (location, writer) = (parts.location(), parts.writer());
-    let setup: Vec<String> = setup_sqls(&location, &writer)?;
-    execute_with_retry(&writer, &setup, &|error| {
+    setup(&location, &writer, &request, &|error| {
         batch_warning(&fingerprints, error)
     })?;
     let batches = fingerprint_insert_batches(
@@ -434,9 +455,11 @@ fn write_fingerprints<'py>(request: Option<&Bound<'py, PyDict>>) -> PyResult<()>
     let mut completed: usize = 0;
     for (batch, insert_sql) in batches {
         let members: Vec<Bound<'py, PyAny>> = batch.iter().collect();
-        execute_with_retry(&writer, &[insert_sql], &|error| {
-            batch_warning(&members, error)
-        })?;
+        retry_write(
+            py,
+            || execute_sql(&writer, &insert_sql).map(|_| ()),
+            &|error| batch_warning(&members, error),
+        )?;
         completed += members.len();
         if let Some(progress) = &on_progress {
             let keywords: Bound<'py, PyDict> = PyDict::new(py);

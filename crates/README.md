@@ -107,6 +107,31 @@ the goldens in `tests/goldens/compiler`, with stage captures and full discovery,
 analysis coverage required. CI also runs it on Python 3.13 and 3.14, and compiles and builds a
 playground project on Windows.
 
+## Warehouse event identity
+
+Fingerprint and source-freshness writers persist deterministic `event_id` values in nullable text
+columns. Existing tables evolve additively; no predecessor rows are rewritten. Latest-state readers
+retain their existing projections. IDs are lowercase SHA-256 hex over compact UTF-8 JSON arrays,
+whose fixed namespace is independent of the package version:
+
+| Table | Array fields, in order |
+|---|---|
+| `_sqlbuild_fingerprints` | `"sqlbuild.fingerprint.event.v1"`, node kind, node name, target database, target schema, target name, run ID, version hash |
+| `_sqlbuild_source_freshness` | `"sqlbuild.source-freshness.event.v1"`, source name, target database, target schema, target name, run ID, observation time, strategy, value kind, value hash |
+
+Nullable identity fields remain JSON null, distinct from empty strings. Freshness observation time
+is normalized to UTC ISO text with six fractional digits and a `+00:00` offset. Retrying the same
+observation retains its ID; another run or observation is distinct. Definitions, display values,
+and future storage columns do not alter these identities.
+
+The location history reader is read-only, including local database connections: it neither creates
+databases nor evolves tables. Source-freshness ingestion preserves warehouse IDs, scoped by location,
+target and physical state table. Only missing or NULL IDs use the fixed legacy observation tuple,
+never a hash of the evolving full row. Bounded pages commit atomically under the current location
+session and snapshot generation, and repeated pages are idempotent. These are read/ingestion
+primitives; automatic polling, watermark/overlap management and deletion reconciliation are separate
+location-sync responsibilities, not implemented by the page reader.
+
 ## Working on the crates
 
 - Tests live next to the module they cover; run them for one crate with

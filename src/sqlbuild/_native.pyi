@@ -199,6 +199,7 @@ COLUMN_SCHEMA_FINGERPRINT: str
 COLUMN_DEFINITION_B64: str
 COLUMN_METADATA_JSON_B64: str
 COLUMN_TIMESTAMP: str
+COLUMN_EVENT_ID: str
 NODE_TYPE_MODEL: str
 NODE_TYPE_SEED: str
 AUDIT_GATE_METADATA_KEY: str
@@ -4187,6 +4188,8 @@ def write_fingerprint(
     render_create_table_sql: Callable[..., str] | None = None,
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
     ensure_table: bool = True,
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+    render_add_columns: Callable[..., tuple[str, ...]] | None = None,
 ) -> bool: ...
 def write_fingerprints(
     *,
@@ -4200,6 +4203,8 @@ def write_fingerprints(
     render_create_table_sql: Callable[..., str] | None = None,
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
     on_progress: FingerprintWriteProgress | None = None,
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+    render_add_columns: Callable[..., tuple[str, ...]] | None = None,
 ) -> None: ...
 def select_latest_fingerprints(
     *,
@@ -7838,6 +7843,8 @@ class SourceFreshnessRenderers(NativeRecord):
     render_insert_records_sql: Callable[..., str]
     render_create_table_sql: Callable[..., str] | None
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None
+    render_add_columns: Callable[..., tuple[str, ...]] | None
     def __init__(
         self,
         render_qualified_name: Callable[..., str | None],
@@ -7845,6 +7852,8 @@ class SourceFreshnessRenderers(NativeRecord):
         render_insert_records_sql: Callable[..., str],
         render_create_table_sql: Callable[..., str] | None = None,
         render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
+        read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+        render_add_columns: Callable[..., tuple[str, ...]] | None = None,
     ) -> None: ...
 
 class SourceFreshnessObservation(NativeRecord):

@@ -177,6 +177,11 @@ fn renderers<'py>(adapter: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
                 "render_create_index_sqls",
                 native_field(adapter, "render_create_source_freshness_index_sqls")?,
             ),
+            ("read_columns", native_field(adapter, "get_columns")?),
+            (
+                "render_add_columns",
+                native_field(adapter, "render_add_columns")?,
+            ),
         ],
     )
 }

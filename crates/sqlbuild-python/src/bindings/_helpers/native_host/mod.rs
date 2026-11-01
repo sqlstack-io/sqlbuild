@@ -13,3 +13,5 @@ pub(crate) mod registration;
 pub(crate) mod results;
 pub(crate) mod sqlite_connection;
 pub(crate) mod sqlite_cursor;
+pub(crate) mod state_column_evolution;
+pub(crate) mod warehouse_metadata;

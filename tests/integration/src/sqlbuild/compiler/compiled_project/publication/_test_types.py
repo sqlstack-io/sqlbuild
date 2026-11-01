@@ -1,5 +1,6 @@
 """Publication cases and isolated server credentials."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import Popen
@@ -143,3 +144,13 @@ class CalendarRejectionTestCase:
 class CalendarRefreshTestCase:
     description: str
     expected_timezone: str
+
+
+@dataclass(frozen=True)
+class WarehouseHistoryTestCase:
+    description: str
+    adapter_name: str
+    expected_page_lengths: tuple[int, ...]
+    connection_key: str
+    journal_modes: tuple[str, ...]
+    append_fingerprints: Callable[..., None]

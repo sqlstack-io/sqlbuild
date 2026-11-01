@@ -1367,6 +1367,8 @@ const SOURCE_FRESHNESS_RENDERERS: RecordSpec = RecordSpec {
         FieldSpec::required("render_insert_records_sql"),
         FieldSpec::new("render_create_table_sql", FieldDefault::None),
         FieldSpec::new("render_create_index_sqls", FieldDefault::None),
+        FieldSpec::new("read_columns", FieldDefault::None),
+        FieldSpec::new("render_add_columns", FieldDefault::None),
     ],
 };
 const SOURCE_FRESHNESS_OBSERVATION: RecordSpec = RecordSpec {

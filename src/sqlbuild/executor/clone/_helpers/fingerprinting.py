@@ -205,6 +205,8 @@ def _write_collected_fingerprints(
             fingerprints=group,
             render_qualified_name=adapter.render_qualified_name,
             render_framework_type=adapter.render_framework_type,
+            read_columns=adapter.get_columns,
+            render_add_columns=adapter.render_add_columns,
             render_create_table_sql=adapter.render_create_fingerprint_table_sql,
             render_create_index_sqls=adapter.render_create_fingerprint_index_sqls,
             on_progress=_on_group_progress,

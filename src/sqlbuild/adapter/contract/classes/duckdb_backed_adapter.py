@@ -1080,7 +1080,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         import duckdb
 
         database: str = str(config.get("database", ":memory:"))
-        raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(database=database)
+        raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(
+            database=database, read_only=bool(config.get("read_only", False))
+        )
         return self._configured_connection(raw_connection=raw_connection, config=config)
 
     def connect_local_replay(self, database: Path) -> Any:

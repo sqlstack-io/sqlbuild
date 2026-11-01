@@ -1,4 +1,4 @@
-//! Request retries and completion share the same immutable result reader and instance scope.
+//! Named work and warehouse observations share the registered location/target boundary.
 
 use uuid::Uuid;
 
