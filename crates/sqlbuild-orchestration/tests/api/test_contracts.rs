@@ -20,5 +20,7 @@ mod test_types;
 mod test_warehouse_metadata;
 #[path = "test_worker.rs"]
 mod test_worker;
+#[path = "warehouse_metadata/helpers.rs"]
+mod warehouse_metadata_helpers;
 #[path = "work/helpers.rs"]
 mod work_helpers;

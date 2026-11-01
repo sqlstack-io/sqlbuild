@@ -1,14 +1,13 @@
 //! Canonical content addresses and compressed immutable bodies.
 
 use std::collections::BTreeMap;
-use std::io::{Read, Write};
 
-use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use serde_json::Value;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 use crate::snapshots::models::{NodeContent, PreparedNode, SnapshotNode};
 use crate::store::errors::ControlError;
+use crate::store::main::compress::compress;
 
 fn canonical(value: &Value) -> Value {
     match value {
@@ -26,20 +25,6 @@ fn canonical(value: &Value) -> Value {
 
 pub(crate) fn json_bytes(value: &Value) -> Result<Vec<u8>, ControlError> {
     serde_json::to_vec(&canonical(value)).map_err(|error| ControlError::Invalid(error.to_string()))
-}
-
-pub(crate) fn compress(bytes: &[u8]) -> Result<Vec<u8>, ControlError> {
-    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(bytes)?;
-    Ok(encoder.finish()?)
-}
-
-pub(crate) fn decompress(value: &Value) -> Result<Vec<u8>, ControlError> {
-    let bytes: Vec<u8> = serde_json::from_value(value.clone())
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let mut output: Vec<u8> = Vec::new();
-    GzDecoder::new(bytes.as_slice()).read_to_end(&mut output)?;
-    Ok(output)
 }
 
 pub(crate) fn node_content(node: &SnapshotNode) -> Result<NodeContent<'_>, ControlError> {

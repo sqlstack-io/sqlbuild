@@ -5,12 +5,11 @@ use sqlbuild_state::freshness::main::event_id::event_id as legacy_event_id;
 use sqlbuild_state::freshness::models::FreshnessEventIdentity;
 use uuid::Uuid;
 
-use crate::platform::main::require_instance::require_instance;
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
 use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::{ControlStore, Parameter};
+use crate::warehouse_metadata::_helpers::ingestion::{begin_ingestion, scoped_event_id};
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::SourceFreshnessBatch;
 
@@ -48,20 +47,12 @@ pub async fn ingest_source_freshness(
             "source freshness sync needs a positive generation, at most {MAX_HISTORY_RECORDS} records and nonempty state identities",
         )));
     }
-    let transaction = require_instance(
-        begin(store, TransactionMode::Write).await?,
-        (location_id, batch.session_id, target),
+    let mut transaction = begin_ingestion(
+        store,
+        (location_id, target),
+        (batch.session_id, batch.generation),
     )
     .await?;
-    let (mut transaction, rows) = query(
-        transaction,
-        "SELECT s.snapshot_id FROM sqb_current_snapshots c JOIN sqb_snapshots s ON s.snapshot_id=c.snapshot_id \
-         WHERE c.location_id=$1 AND c.target=$2 AND s.generation=$3",
-        vec![Parameter::Id(location_id), Parameter::Text(target.into()), Parameter::Integer(batch.generation)],
-    ).await?;
-    if rows.is_empty() {
-        return Err(ControlError::Fenced);
-    }
     let mut applied = false;
     for record in &batch.records {
         let source_event_id = record.event_id.clone().unwrap_or_else(|| {
@@ -80,15 +71,15 @@ pub async fn ingest_source_freshness(
                     .to_string(),
             })
         });
-        let identity = serde_json::to_vec(&(
-            target,
-            &record.state_database,
-            &record.state_schema,
-            "_sqlbuild_source_freshness",
+        let event_id = scoped_event_id(
+            (location_id, target),
+            (
+                record.state_database.as_deref(),
+                &record.state_schema,
+                "_sqlbuild_source_freshness",
+            ),
             &source_event_id,
-        ))
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        let event_id = Uuid::new_v5(&location_id, &identity);
+        )?;
         let received_at = transaction.now;
         let inserted;
         (transaction, inserted) = query(transaction,

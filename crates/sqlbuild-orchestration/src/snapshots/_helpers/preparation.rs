@@ -4,9 +4,10 @@ use std::collections::BTreeMap;
 
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
-use crate::snapshots::_helpers::content::{compress, json_bytes, prepare_node};
+use crate::snapshots::_helpers::content::{json_bytes, prepare_node};
 use crate::snapshots::models::{PreparedNode, PreparedSnapshot, SnapshotInput};
 use crate::store::errors::ControlError;
+use crate::store::main::compress::compress;
 
 pub(crate) fn prepare_snapshot(input: &SnapshotInput) -> Result<PreparedSnapshot, ControlError> {
     if input.target.trim().is_empty()

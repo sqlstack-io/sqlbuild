@@ -51,7 +51,7 @@ pub struct SourceFreshnessRead {
 }
 
 /// Fingerprints remain history here; latest-row selection belongs to the existing planner reader.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WarehouseFingerprintRecord {
     pub event_id: Option<String>,
@@ -69,6 +69,15 @@ pub struct WarehouseFingerprintRecord {
     pub definition: String,
     pub metadata_json: String,
     pub ts: DateTime<Utc>,
+}
+
+/// Fingerprint observations from one registered reader, independent of automatic polling.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FingerprintBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseFingerprintRecord>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -128,16 +128,29 @@ The location history reader pages fingerprint and source-freshness observations 
 only the latest row. It is read-only, including local database connections: it neither creates
 databases nor evolves tables. Fingerprint definitions and metadata use the existing storage decoder;
 raw storage values remain the keyset cursor, separate from decoded UTC timestamps and text.
-Source-freshness ingestion preserves warehouse IDs, scoped by location, target and physical state
-table. Only missing or NULL IDs use the fixed legacy observation tuple, never a hash of the evolving
-full row. Its bounded pages commit atomically under the current location session and snapshot
-generation, and repeated pages are idempotent. A history read can hold an
+Fingerprint and source-freshness ingestion preserve warehouse IDs, scoped by location, target and
+physical state table. Only missing or NULL IDs use fixed legacy fields, never a hash of an evolving
+full row. Bounded pages of at most 100 observations commit atomically under the current location
+session and snapshot generation, and repeated pages are idempotent. Fingerprint legacy IDs are
+SHA-256 over a compact JSON array: `"sqlbuild.fingerprint.legacy.v1"`, node kind/name, target
+database/schema/name, run ID, definition hash, version hash, schema fingerprint, exact definition,
+metadata JSON text and UTC observation time (six fractional digits, `+00:00`).
+
+Fingerprint events retain their warehouse `definition_hash` unchanged. This is a semantic token
+hash: SQL with different whitespace, comments or keyword case can share it. The separate
+`definition_text_hash` references the existing immutable `sqb_source_texts` store, keyed by SHA-256
+of the exact UTF-8 bytes and using its existing compressed encoding. Identical bytes share a body;
+semantic-hash-equivalent SQL variants remain lossless. Event JSON omits the definition body, and
+the event and its referenced body commit or roll back together. Rebuilding the mirror by replaying
+history preserves source identities and definitions; no warehouse mutation is involved.
+
+A history read can hold an
 inclusive observation-time lower bound fixed across pages, independently of the row-key cursor.
 SQLite's SQL prefilter includes the boundary day and its predecessor so legacy separators, variable
 fractional precision and writer offsets crossing a UTC date remain readable; decoded UTC timestamps
 enforce the exact bound. Other adapters prefilter at whole-second precision. Continuation follows
-the raw row count: even an empty decoded page can have more rows to inspect. Fingerprint ingestion
-and per-hash definition storage remain separate from this read-only transport. Automatic polling,
+the raw row count: even an empty decoded page can have more rows to inspect. Ingestion and per-hash
+definition storage are separate from this read-only transport. Automatic polling,
 watermark/overlap management and deletion reconciliation are separate location-sync responsibilities,
 not implemented by the page reader.
 
