@@ -99,5 +99,5 @@ pub(crate) const STRICT_ON: &str = "on";
 pub(crate) const STRICT_CODE: &str = "SQBSTRICT001";
 /// What clears a strict error.
 pub(crate) const STRICT_HELP: &str = "declare, override or catalog each unproven input (a \
-    function signature, an input contract or an output type), or set settings.strict = \"report\" \
-    to list them without failing";
+    function signature, an input contract or an output type); to list them without failing, set \
+    this in sqlbuild_project.toml:\n    [settings]\n    strict = \"report\"";
