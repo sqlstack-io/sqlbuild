@@ -17,6 +17,8 @@ use crate::credentials::tests::helpers::{location_state, stored_hashes};
 use crate::credentials::tests::test_types::{CredentialTestCase, TransactionFault};
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::terminal_helpers::finish;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::TransactionMode;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
@@ -51,6 +53,46 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 request_id: Uuid::now_v7(),
                 ip_address: Some("127.0.0.1".parse().expect("loopback")),
             };
+            let predecessor = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../benchmarks/duckshop/edge_cases/orchestration/legacy_person_token.sql");
+            let sql = std::fs::read_to_string(predecessor).expect("DuckShop predecessor token");
+            let mut transaction = begin(store, TransactionMode::Write)
+                .await
+                .expect("predecessor");
+            for statement in sql.split(';').map(str::trim).filter(|sql| !sql.is_empty()) {
+                (transaction, _) = query(transaction, statement, vec![])
+                    .await
+                    .expect("legacy person and hashed token");
+            }
+            commit(transaction).await.expect("predecessor committed");
+            let personal_scope = CredentialScope::Principal {
+                principal_id: Uuid::parse_str("00000000-0000-4000-8000-000000000001")
+                    .expect("synthetic person identity"),
+            };
+            assert!(
+                issue_token(
+                    store,
+                    &context,
+                    personal_scope,
+                    Utc::now() + Duration::hours(1)
+                )
+                .await
+                .is_err(),
+                "people cannot mint API tokens"
+            );
+            assert_eq!(
+                stored_hashes(&replica).await.len(),
+                1,
+                "rejected issuance writes nothing"
+            );
+            let legacy_bearer = format!("00000000-0000-4000-8000-000000000002.{}", "0".repeat(64));
+            assert!(
+                authenticate_token(&replica, &legacy_bearer)
+                    .await
+                    .expect("predecessor personal credential")
+                    .is_none(),
+                "pre-existing personal tokens are rejected on every replica"
+            );
             let fault = TransactionFault {
                 description: "security audit failure",
                 table: "sqb_security_audit",

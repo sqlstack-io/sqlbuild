@@ -16,9 +16,17 @@ pub enum PrincipalKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CredentialScope {
-    Principal { principal_id: Uuid },
-    Location { location_id: Uuid },
-    Run { run_id: Uuid, claim_id: Uuid },
+    /// API tokens belong to service accounts, never person sessions.
+    Principal {
+        principal_id: Uuid,
+    },
+    Location {
+        location_id: Uuid,
+    },
+    Run {
+        run_id: Uuid,
+        claim_id: Uuid,
+    },
 }
 
 /// Server-derived request metadata, never copied from an action's JSON body.

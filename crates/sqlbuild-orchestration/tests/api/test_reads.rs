@@ -140,10 +140,13 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             )
             .await
             .expect("location token");
-            let principal_id =
-                create_principal(store, &audit, ("orders operator", PrincipalKind::Person))
-                    .await
-                    .expect("unprivileged person");
+            let principal_id = create_principal(
+                store,
+                &audit,
+                ("orders automation", PrincipalKind::ServiceAccount),
+            )
+            .await
+            .expect("unprivileged service account");
             let principal = issue_token(
                 store,
                 &audit,
