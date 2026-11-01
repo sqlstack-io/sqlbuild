@@ -64,20 +64,18 @@
 	<ul class="tokens">
 		{#each tokens ?? [] as t (t.id)}
 			<li class:off={t.state !== 'active'}>
-				<div class="row">
-					<code>{t.prefix}…</code>
-					<StatusLabel tone={tokenTone[t.state]} label={tokenLabel[t.state]} muted={t.state !== 'active'} />
-					{#if t.state === 'active'}
-						<span class="actions">
-							<GatedButton requires="location.manage" size="xs" busy={busy === t.id} onclick={() => rotate(t)}>Rotate</GatedButton>
-							<GatedButton requires="location.manage" size="xs" variant="destructive" busy={busy === t.id} onclick={() => revoke(t)}>Revoke</GatedButton>
-						</span>
-					{/if}
-				</div>
-				<div class="meta" title="Created {formatStamp(t.createdAt)}">
-					Created {formatAgo(t.createdAt, app.now)} by {t.createdBy.name} ·
+				<code>{t.prefix}…</code>
+				<StatusLabel tone={tokenTone[t.state]} label={tokenLabel[t.state]} muted={t.state !== 'active'} />
+				<span class="meta" title="Created {formatStamp(t.createdAt)} by {t.createdBy.name}">
+					created {formatAgo(t.createdAt, app.now)} ·
 					{t.revokedAt ? `revoked ${formatAgo(t.revokedAt, app.now)}` : t.lastUsedAt ? `used ${formatAgo(t.lastUsedAt, app.now)}` : 'never used'}
-				</div>
+				</span>
+				{#if t.state === 'active'}
+					<span class="actions">
+						<GatedButton requires="location.manage" size="xs" busy={busy === t.id} onclick={() => rotate(t)}>Rotate</GatedButton>
+						<GatedButton requires="location.manage" size="xs" variant="destructive" busy={busy === t.id} onclick={() => revoke(t)}>Revoke</GatedButton>
+					</span>
+				{/if}
 			</li>
 		{:else}
 			<li class="muted">{tokens ? 'No tokens yet. Create one and give it to the location so it can connect.' : 'Loading…'}</li>
@@ -92,21 +90,19 @@
 	.tokens {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		border-top: 1px solid var(--border);
 		font-size: 12.5px;
 	}
-	.tokens li:not(.muted) {
-		padding: 8px 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
+	.tokens li {
+		display: flex;
+		min-height: 40px;
+		align-items: center;
+		gap: 12px;
+		padding: 6px 10px;
+		border-bottom: 1px solid var(--border);
 	}
 	.tokens li.off {
 		opacity: 0.65;
-	}
-	.row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
 	}
 	.actions {
 		display: flex;
@@ -114,9 +110,8 @@
 		margin-left: auto;
 	}
 	.meta {
-		margin-top: 3px;
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
+		color: var(--muted-foreground);
+		font-size: 12px;
 	}
 	code {
 		font-family: var(--font-mono);

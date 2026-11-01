@@ -19,10 +19,9 @@
 		currentLocationId?: string | null;
 	} = $props();
 
-	/** Scoped links switch the selected location and target before navigating. */
-	function follow(scope: { locationId: string; target: string }) {
+	/** Scoped links switch the selected location before navigating. */
+	function follow(scope: { locationId: string }) {
 		if (app.locationId !== scope.locationId) app.selectLocation(scope.locationId);
-		if (app.targetName !== scope.target) app.selectTarget(scope.target);
 	}
 
 	function followLink(link: PlatformEventLink) {

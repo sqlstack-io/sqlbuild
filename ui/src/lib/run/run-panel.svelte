@@ -178,8 +178,8 @@
 				{/each}
 			</div>
 			<span class="faint">{spec.description}</span>
-			<span class="target" title="Runs launch against the target selected in the target switcher">
-				<LockIcon size={12} /> target <b>{app.targetName}</b> · {app.location?.name}
+			<span class="target" title="Runs launch in the selected location, against its one target">
+				<LockIcon size={12} /> <b>{app.location?.name}</b> · target {app.target?.name}
 			</span>
 			<button class="close" onclick={() => (open = false)} aria-label="Close"><XIcon size={16} /></button>
 		</div>
@@ -274,7 +274,7 @@
 					spellcheck="false"
 					placeholder="sqb build --select +fact_orders"
 				/>
-				<span class="locked" title="Set by the target switcher"><LockIcon size={11} /> --target {app.targetName}</span>
+				<span class="locked" title="Set by the location you're in"><LockIcon size={11} /> --target {app.target?.name}</span>
 				<span title={canLaunch ? undefined : blockedReason}>
 					<GatedButton requires="run.adhoc" variant="default" disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
 				</span>

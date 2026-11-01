@@ -68,7 +68,7 @@
 			<span class="faint" title={triggerKindHelp[t.kind]}>· {triggerKindLabel[t.kind]} · {t.cadence}</span>
 		{/if}
 	</div>
-	{#if res.error}<div class="msg err">Couldn't load this: {res.error}</div>{:else if res.data === null}<div class="msg">There's no schedule or sensor <code>{id}</code> in the version deployed to {app.targetName}.</div>{/if}
+	{#if res.error}<div class="msg err">Couldn't load this: {res.error}</div>{:else if res.data === null}<div class="msg">There's no schedule or sensor <code>{id}</code> in the version deployed to {app.location?.name}.</div>{/if}
 	{#if error}<div class="msg err">{error}</div>{/if}
 
 	{#if t}

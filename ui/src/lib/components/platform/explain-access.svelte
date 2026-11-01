@@ -12,25 +12,19 @@
 	let principal = $state('');
 	let action = $state<Capability>('job.run');
 	let locationId = $state(app.locationId);
-	let target = $state(app.targetName);
 	let subject = $state('');
 	let running = $state(false);
 	let result = $state<AccessExplanation | null>(null);
 	let failure = $state<string | null>(null);
 
 	const locations = $derived(app.bootstrap?.locations ?? []);
-	const targets = $derived(locations.find((l) => l.id === locationId)?.targets ?? []);
 	const who = $derived(principal || app.user?.name || '');
-
-	$effect(() => {
-		if (!targets.some((t) => t.name === target) && targets[0]) target = targets[0].name;
-	});
 
 	async function explain() {
 		running = true;
 		failure = null;
 		try {
-			result = await app.client.explainAccess({ principal: who, action, locationId, target, subject: subject.trim() || null });
+			result = await app.client.explainAccess({ principal: who, action, locationId, subject: subject.trim() || null });
 		} catch (error) {
 			result = null;
 			failure = errorMessage(error);
@@ -64,13 +58,7 @@
 		<label>
 			<span>Location</span>
 			<select bind:value={locationId}>
-				{#each locations as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-			</select>
-		</label>
-		<label>
-			<span>Target</span>
-			<select bind:value={target}>
-				{#each targets as t (t.name)}<option value={t.name}>{t.name}</option>{/each}
+				{#each locations as l (l.id)}<option value={l.id}>{l.name} · {l.target.name}</option>{/each}
 			</select>
 		</label>
 		<label class="grow">

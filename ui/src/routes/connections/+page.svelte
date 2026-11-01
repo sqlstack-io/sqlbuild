@@ -25,7 +25,7 @@
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
 	<p class="lede">
-		How SQLBuild reaches the warehouse for target <b>{app.targetName}</b>. Set in the project config and read-only here; secrets show only where they come from, never their value.
+		How SQLBuild reaches the warehouse for <b>{app.location?.name}</b> (target <b>{app.target?.name}</b>). Set in the project config and read-only here; secrets show only where they come from, never their value.
 		APIs, storage and webhooks are under <a href="/providers">Providers</a>.
 	</p>
 
@@ -49,10 +49,10 @@
 						</div>
 					{/each}
 				</dl>
-				<ConnectionTest scope={{ locationId: app.locationId, target: app.targetName }} connection={c.name} last={c.lastTest} />
+				<ConnectionTest scope={{ locationId: app.locationId }} connection={c.name} last={c.lastTest} />
 			</div>
 		{:else}
-			<p class="muted">{connections.data ? 'This target has no warehouse connection. Add one to the target in the project config.' : connections.error ? '' : 'Loading…'}</p>
+			<p class="muted">{connections.data ? 'This location’s target has no warehouse connection. Add one to the target in the project config.' : connections.error ? '' : 'Loading…'}</p>
 		{/each}
 	</Panel>
 

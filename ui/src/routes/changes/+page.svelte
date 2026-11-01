@@ -166,7 +166,7 @@
 			</div>
 		</article>
 	{:else}
-		<div class="msg">{changes.loading ? 'Loading…' : all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this target yet.'}</div>
+		<div class="msg">{changes.loading ? 'Loading…' : all.length ? 'No deploys match the filter.' : 'Nothing has been deployed to this location yet.'}</div>
 	{/each}
 </div>
 

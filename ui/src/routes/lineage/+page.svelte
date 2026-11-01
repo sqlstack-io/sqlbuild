@@ -726,7 +726,7 @@
 							{#if run.message}<em>{run.message}</em>{/if}
 						</a>
 					{:else}
-						<span class="section-meta">No builds recorded in this target.</span>
+						<span class="section-meta">No builds recorded in this location.</span>
 					{/each}
 				</InspectorSection>
 			{/if}
@@ -757,7 +757,7 @@
 						<div><dt>Group</dt><dd>{d.group}</dd></div>
 						<div><dt>Owner</dt><dd>{d.owner.join(', ') || '—'}</dd></div>
 						<div><dt>Tags</dt><dd>{d.tags.join(', ') || '—'}</dd></div>
-						<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this target">{d.lastBuild?.fingerprint.slice(0, 12) ?? '—'}</dd></div>
+						<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this location">{d.lastBuild?.fingerprint.slice(0, 12) ?? '—'}</dd></div>
 					</dl>
 				</InspectorSection>
 			{/if}

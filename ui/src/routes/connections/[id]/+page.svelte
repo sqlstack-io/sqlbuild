@@ -31,14 +31,14 @@
 		<div class="text-[var(--sb-error)] px-6 py-4 text-[13px]">Couldn't load connections: {connections.error}</div>
 	{:else if connections.data && !warehouse}
 		<div class="text-muted-foreground px-6 py-4 text-[13px]">
-			Target {app.targetName} has no warehouse connection named <code>{name}</code>. Looking for an API or storage connection? See <a class="text-[var(--primary)]" href="/providers/{name}">Providers</a>.
+			{app.location?.name} has no warehouse connection named <code>{name}</code>. Looking for an API or storage connection? See <a class="text-[var(--primary)]" href="/providers/{name}">Providers</a>.
 		</div>
 	{:else if warehouse}
 		<div class="flex min-h-0 flex-1">
 			<div class="min-h-0 flex-1 overflow-auto">
 				<div class="flex max-w-[680px] flex-col p-6">
 					<div class="mb-5">
-						<ConnectionTest scope={{ locationId: app.locationId, target: app.targetName }} connection={warehouse.name} last={warehouse.lastTest} />
+						<ConnectionTest scope={{ locationId: app.locationId }} connection={warehouse.name} last={warehouse.lastTest} />
 					</div>
 					<div class="text-[var(--sb-text-faint)] mb-4 flex items-center gap-2 rounded-[2px] border border-[var(--border-subtle)] bg-[var(--sb-surface-low)] px-3 py-2 text-[11.5px]">
 						<LockIcon size={12} />

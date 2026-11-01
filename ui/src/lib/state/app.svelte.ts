@@ -21,7 +21,7 @@ function message(error: unknown): string {
 }
 
 /**
- * App-wide state: the bootstrap, the selected location and target, and the
+ * App-wide state: the bootstrap, the selected location, and the
  * shell's live data (navigation counts, platform events, warehouse sync).
  */
 class AppState {
@@ -29,7 +29,6 @@ class AppState {
 	bootstrap = $state<Bootstrap | null>(null);
 	bootError = $state<string | null>(null);
 	locationId = $state('');
-	targetName = $state('');
 	/** Wall clock, ticking every second, for ages and elapsed times. */
 	now = $state(Date.now());
 	connection = $state<ConnectionState>('connecting');
@@ -38,11 +37,10 @@ class AppState {
 	warehouseSync = $state<WarehouseSync | null>(null);
 	lastSyncRequest = $state<WarehouseSyncRequestOutcome | null>(null);
 
-	readonly scope = $derived<Scope | null>(
-		this.locationId && this.targetName ? { locationId: this.locationId, target: this.targetName } : null
-	);
+	readonly scope = $derived<Scope | null>(this.locationId ? { locationId: this.locationId } : null);
 	readonly location = $derived(this.bootstrap?.locations.find((l) => l.id === this.locationId) ?? null);
-	readonly target = $derived(this.location?.targets.find((t) => t.name === this.targetName) ?? null);
+	/** The selected location's one target. */
+	readonly target = $derived(this.location?.target ?? null);
 	readonly user = $derived(this.bootstrap?.user ?? null);
 	readonly capabilities = $derived(this.bootstrap?.capabilities ?? []);
 
@@ -81,13 +79,6 @@ class AppState {
 		const location = this.bootstrap?.locations.find((l) => l.id === locationId);
 		if (!location) return;
 		this.locationId = location.id;
-		this.targetName = (location.targets.find((t) => t.isDefault) ?? location.targets[0]).name;
-		this.#scopeChanged();
-	}
-
-	selectTarget(targetName: string): void {
-		if (!this.location?.targets.some((t) => t.name === targetName)) return;
-		this.targetName = targetName;
 		this.#scopeChanged();
 	}
 
@@ -124,13 +115,7 @@ class AppState {
 		const location =
 			locations.find((l) => l.id === wantedLocation || l.name === wantedLocation) ?? locations[0];
 		if (!location) return;
-		const wantedTarget = search.get('target') ?? saved.target;
-		const target =
-			location.targets.find((t) => t.name === wantedTarget) ??
-			location.targets.find((t) => t.isDefault) ??
-			location.targets[0];
 		this.locationId = location.id;
-		this.targetName = target.name;
 	}
 
 	#loadScoped() {

@@ -18,7 +18,11 @@ export const ROLE_CAPABILITIES: Record<BuiltInRole, Capability[]> = {
 };
 
 export const LOCATION_SHOP = '0d9c6a52-3f1e-4b7a-9c43-5b8e2f61a7d4';
+export const LOCATION_SHOP_STAGING = '5e8b1f37-a04c-4c2e-b6d9-2f7a91c3e508';
+export const LOCATION_SHOP_DEV = 'c2f47d90-1b6e-4a85-93fd-6e0a5b28c171';
 export const LOCATION_MARKETING = '7a41e0c8-62b5-4d19-8f3a-c1e95d0b2e66';
+/** The waffle-shop project's locations, one per target; they share the project's roles and providers. */
+export const SHOP_LOCATIONS: readonly string[] = [LOCATION_SHOP, LOCATION_SHOP_STAGING, LOCATION_SHOP_DEV];
 
 export function createFixtures(now: number) {
 	const ago = (minutes: number) => new Date(now - minutes * MIN).toISOString();
@@ -47,20 +51,36 @@ export function createFixtures(now: number) {
 			name: 'waffle-shop',
 			health: 'healthy',
 			lastSeenAt: ago(0.2),
-			targets: [
-				{ name: 'prod', adapter: 'snowflake', isDefault: true, snapshot: snapshot(42, '7d2e41a', 190, 'Alex Rivera'), warehouseSync: idleSync(4) },
-				{ name: 'staging', adapter: 'snowflake', isDefault: false, snapshot: snapshot(57, 'b81c09e', 35, 'Sam Okafor'), warehouseSync: idleSync(11) },
-				{ name: 'dev', adapter: 'duckdb', isDefault: false, snapshot: snapshot(311, 'b81c09e', 2, 'Demo User', true), warehouseSync: idleSync(1) }
-			]
+			target: { name: 'prod', adapter: 'snowflake', connectionSummary: 'WAFFLE_SHOP on example-account' },
+			snapshot: snapshot(42, '7d2e41a', 190, 'Alex Rivera'),
+			warehouseSync: idleSync(4)
+		},
+		{
+			id: LOCATION_SHOP_STAGING,
+			name: 'waffle-shop-staging',
+			health: 'healthy',
+			lastSeenAt: ago(0.1),
+			target: { name: 'staging', adapter: 'snowflake', connectionSummary: 'WAFFLE_SHOP_STAGING on example-account' },
+			snapshot: snapshot(57, 'b81c09e', 35, 'Sam Okafor'),
+			warehouseSync: idleSync(11)
+		},
+		{
+			id: LOCATION_SHOP_DEV,
+			name: 'waffle-shop-dev',
+			health: 'healthy',
+			lastSeenAt: ago(0.3),
+			target: { name: 'dev', adapter: 'duckdb', connectionSummary: 'warehouse.duckdb' },
+			snapshot: snapshot(311, 'b81c09e', 2, 'Demo User', true),
+			warehouseSync: idleSync(1)
 		},
 		{
 			id: LOCATION_MARKETING,
 			name: 'marketing-analytics',
 			health: 'falling_back',
 			lastSeenAt: ago(0.5),
-			targets: [
-				{ name: 'prod', adapter: 'postgres', isDefault: true, snapshot: snapshot(18, '3e5f7aa', 1440, 'Jordan Lee'), warehouseSync: idleSync(26) }
-			]
+			target: { name: 'prod', adapter: 'postgres', connectionSummary: 'analytics on db.example.com' },
+			snapshot: snapshot(18, '3e5f7aa', 1440, 'Jordan Lee'),
+			warehouseSync: idleSync(26)
 		}
 	];
 

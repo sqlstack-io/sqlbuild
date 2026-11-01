@@ -110,6 +110,8 @@ export type OperateContext = {
 	can: (capability: Capability) => boolean;
 	user: () => Principal;
 	adapter: (scope: Scope) => string;
+	/** Name of the location's one target. */
+	target: (scope: Scope) => string;
 	reply: <T>(value: T) => Promise<T>;
 };
 
@@ -315,7 +317,7 @@ export class MockOperate {
 			.flatMap((r) => execution(r, this.#nodesOf(r, now), now).statements)
 			.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
-		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, scope.target) : null });
+		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, this.#ctx.target(scope)) : null });
 	}
 
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
@@ -465,7 +467,7 @@ export class MockOperate {
 		this.#need('job.run');
 		const job = jobDef(key);
 		if (!job) throw new ApiError(`Unknown job ${key}`, 404);
-		if (job.targets && !job.targets.includes(scope.target)) throw new ApiError(`${key} is limited to targets ${job.targets.join(', ')}`, 422);
+		if (job.targets && !job.targets.includes(this.#ctx.target(scope))) throw new ApiError(`${key} is limited to targets ${job.targets.join(', ')}`, 422);
 		const flags: Record<string, string | true> = Object.fromEntries(Object.entries(job.settings).map(([k, v]) => [k, v === true ? true : String(v)]));
 		if (options.fullRefresh) flags['--full-refresh'] = true;
 		if (options.window) {
@@ -651,7 +653,7 @@ export class MockOperate {
 
 	#view(rec: RunRecord, scope: Scope): Run {
 		const nodes = this.#nodesOf(rec, Date.now());
-		const run = { ...rec.run, locationId: scope.locationId, target: scope.target };
+		const run = { ...rec.run, locationId: scope.locationId, target: this.#ctx.target(scope) };
 		run.nodeCounts = countNodes(nodes);
 		run.cost = null;
 		if (run.endedAt && run.startedAt && this.#ctx.adapter(scope) === 'snowflake') {
@@ -1033,7 +1035,8 @@ export class MockOperate {
 	// ---- internals: triggers ----
 
 	#runtime(scope: Scope, name: string): TriggerRuntime {
-		const key = `${scope.locationId}/${scope.target}`;
+		const key = scope.locationId;
+		const dev = this.#ctx.target(scope) === 'dev';
 		let map = this.#triggers.get(key);
 		if (!map) {
 			map = new Map();
@@ -1041,8 +1044,8 @@ export class MockOperate {
 				const cursor = this.#fx.cursors[t.name];
 				// `sqb dev` starts with every trigger paused.
 				map.set(t.name, {
-					state: scope.target === 'dev' ? 'paused' : t.state,
-					history: structuredClone(scope.target === 'dev' ? [] : (this.#fx.stateHistory[t.name] ?? [])),
+					state: dev ? 'paused' : t.state,
+					history: structuredClone(dev ? [] : (this.#fx.stateHistory[t.name] ?? [])),
 					cursor: cursor?.cursor ?? null,
 					cursorUpdatedAt: cursor?.updatedAt ?? null
 				});

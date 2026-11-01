@@ -126,7 +126,7 @@
 				<div><dt>Owner</dt><dd>{node.owner.join(', ') || '—'}</dd></div>
 				<div><dt>Path</dt><dd class="mono" title={node.path}>{node.path}</dd></div>
 				<div><dt>Relation</dt><dd class="mono" title={relationName(node.relation)}>{relationName(node.relation)}</dd></div>
-				{#if node.lastBuild}<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this target">{node.lastBuild.fingerprint.slice(0, 12)}</dd></div>{/if}
+				{#if node.lastBuild}<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this location">{node.lastBuild.fingerprint.slice(0, 12)}</dd></div>{/if}
 				{#if drift}<div><dt>Drift</dt><dd style:color="var(--sb-stale)">{driftLabel[drift]}</dd></div>{/if}
 			</dl>
 		</section>

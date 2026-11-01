@@ -11,12 +11,12 @@
 	import LocationTokens from '$lib/components/platform/location-tokens.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import ProblemList from '$lib/components/platform/problem-list.svelte';
-	import SegmentedFilterProblems from '$lib/components/list/segmented-filter.svelte';
 	import type { LocationInstance } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { healthLabel, healthTone, shortImage } from '$lib/platform/labels';
+	import { healthLabel, healthTone, shortImage, targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
+	import { firstLine, summariseProcesses } from './utils';
 
 	const id = $derived(page.params.id ?? '');
 	const location = createResource((client) => client.getLocation(id), ['snapshot', 'warehouse_sync']);
@@ -25,17 +25,15 @@
 	let problemView = $state<'open' | 'all'>('all');
 	const problemRows = $derived((problems.data ?? []).filter((e) => problemView === 'all' || e.active));
 	const openProblems = $derived((problems.data ?? []).filter((e) => e.active).length);
-
-	let syncTarget = $state('');
-	const syncTargetName = $derived(detail?.targets.some((t) => t.name === syncTarget) ? syncTarget : (detail?.targets.find((t) => t.isDefault) ?? detail?.targets[0])?.name ?? '');
-	const syncRows = $derived(detail?.targets.find((t) => t.name === syncTargetName)?.stateSync ?? []);
-	const current = $derived(detail?.targets.find((t) => t.isDefault) ?? detail?.targets[0] ?? null);
+	const processes = $derived(summariseProcesses(detail?.instances ?? []));
+	const running = $derived(processes.live[0] ?? null);
 
 	const instanceTone: Record<LocationInstance['state'], string> = {
 		live: 'var(--sb-success)',
 		stale: 'var(--sb-warning)',
 		gone: 'var(--sb-text-faint)'
 	};
+	const instanceLabel: Record<LocationInstance['state'], string> = { live: 'Running', stale: 'Not checking in', gone: 'Stopped' };
 </script>
 
 <AppTopbar title="Locations">
@@ -43,222 +41,235 @@
 </AppTopbar>
 
 <div class="flex min-h-0 flex-1 flex-col">
-	<div class="flex items-center gap-3 border-b border-border px-6 py-3.5">
-		<a href="/locations" class="text-muted-foreground hover:text-foreground text-[13px]">← Locations</a>
-		<span class="font-display text-[17px] font-semibold">{detail?.name ?? ''}</span>
-		{#if detail}
-			<StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} />
-			{#if openProblems}<a class="text-[12.5px] text-[var(--sb-warning)]" href="#problems">{openProblems} open problem{openProblems === 1 ? '' : 's'}</a>{/if}
-		{/if}
-	</div>
-
 	{#if location.error}
 		<div class="text-[var(--sb-error)] px-6 py-4 text-[13px]">Couldn't load this location: {location.error}</div>
 	{:else if location.data === null}
-		<div class="text-muted-foreground px-6 py-4 text-[13px]">No location with ID <code>{id}</code>.</div>
+		<div class="text-muted-foreground px-6 py-4 text-[13px]"><a href="/locations" class="back">← Locations</a> No location with ID <code>{id}</code>.</div>
 	{:else if !detail}
 		<div class="text-muted-foreground px-6 py-4 text-[13px]">Loading…</div>
 	{:else}
-		<div class="flex min-h-0 flex-1">
-			<div class="min-h-0 flex-1 overflow-auto p-6">
-				{#if detail.failedDeploy}
-					<div class="fallback">
-						<TriangleAlertIcon size={15} />
-						<div class="min-w-0 flex-1">
-							<div class="headline">
-								The deploy of commit <code>{detail.failedDeploy.gitRevision}</code> failed {formatAgo(detail.failedDeploy.attemptedAt, app.now)}.
-								{#if detail.brokenDeployPolicy === 'fallback'}
-									Still running the previous version{current?.snapshot ? ` (version ${current.snapshot.generation}, commit ${current.snapshot.gitRevision})` : ''}.
-								{:else}
-									Scheduled runs wait until a deploy works.
-								{/if}
-							</div>
-							<p>Fix the error below and deploy again. A deploy only takes over once it loads without errors.</p>
-							<pre>{detail.failedDeploy.error}</pre>
-							<details>
-								<summary>Details</summary>
-								<p>
-									Failed image <code>{shortImage(detail.failedDeploy.imageId)}</code>; running image <code>{shortImage(current?.imageId ?? null)}</code>. Broken-deploy policy
-									<code>{detail.brokenDeployPolicy}</code>: {detail.brokenDeployPolicy === 'fallback' ? 'scheduled runs keep starting from the last good version.' : 'scheduled runs wait, and the problem stays open.'}
-								</p>
-							</details>
-						</div>
-					</div>
-				{:else if detail.lastLoadError}
-					<div class="fallback">
-						<TriangleAlertIcon size={15} />
-						<div class="min-w-0 flex-1">
-							<div class="headline">The last load reported an error</div>
-							<pre>{detail.lastLoadError}</pre>
-						</div>
-					</div>
+		<header class="head">
+			<div class="line title-line">
+				<a href="/locations" class="back">← Locations</a>
+				<span class="font-display text-[17px] font-semibold">{detail.name}</span>
+				<span class="muted">· {targetWords(detail.target)}</span>
+				<span class="right">
+					<StatusLabel tone={healthTone[detail.health]} label={healthLabel[detail.health]} />
+					{#if openProblems}<a class="warn" href="#problems">· {openProblems} open problem{openProblems === 1 ? '' : 's'}</a>{/if}
+				</span>
+			</div>
+
+			<div class="line muted">
+				{#if detail.snapshot}
+					<span title="Snapshot {detail.snapshot.id}, generation {detail.snapshot.generation}, deployed {formatStamp(detail.snapshot.publishedAt)}">
+						<b class="fg">Version {detail.snapshot.generation}</b> · commit <code>{detail.snapshot.gitRevision}</code>{#if detail.snapshot.gitDirty}{' '}<span class="warn">with uncommitted changes</span>{/if}
+						· by {detail.snapshot.gitAuthor} · deployed {formatAgo(detail.snapshot.publishedAt, app.now)} · sqb {detail.snapshot.sqbVersion}
+					</span>
+				{:else}
+					Nothing deployed yet
 				{/if}
+			</div>
 
-				<div id="problems">
-					<Panel title="Problems" note="Overdue schedules, failed deploys, runs that couldn't start and failed connection tests, with the sensors that reacted">
-						{#snippet actions()}
-							<SegmentedFilterProblems
-								bind:value={problemView}
-								options={[
-									{ value: 'open', label: 'Open', count: openProblems },
-									{ value: 'all', label: 'History', count: problems.data?.length ?? 0 }
-								]}
-							/>
-						{/snippet}
-						<ProblemList events={problemRows} resource={problems} currentLocationId={id} empty={problemView === 'open' ? 'No open problems. Everything is running normally.' : 'No problems recorded for this location.'} />
-					</Panel>
+			<div class="line">
+				<span class="muted">
+					{#if processes.live.length === 1 && running}
+						<b class="fg">Running</b> ·
+						{#if detail.imageId}image <code title={running.imageId}>{shortImage(running.imageId)}</code>{:else}<span title="Runs start as local processes, not containers">local process</span>{/if}
+						· <span title={formatStamp(running.lastSeenAt)}>last check-in {formatAgo(running.lastSeenAt, app.now)}</span>
+					{:else if processes.live.length > 1}
+						<b class="fg">{processes.live.length} processes running</b> · usually a deploy in progress: the new one takes over once it loads
+					{:else}
+						<b class="err">Not running</b> · no process of this location is checking in, so no runs can start
+					{/if}
+				</span>
+				<span class="right">
+					<ConnectionTest compact scope={{ locationId: detail.id }} connection={detail.warehouseConnection} last={detail.connectionTest} />
+				</span>
+			</div>
+
+			{#if processes.listed.length}
+				<ul class="processes">
+					{#each processes.listed as i (i.id)}
+						<li class:off={i.state === 'gone'}>
+							<StatusLabel tone={instanceTone[i.state]} label={instanceLabel[i.state]} muted={i.state !== 'live'} />
+							<code class="muted" title={i.id}>{i.id}</code>
+							<span class="muted">image <code title={i.imageId}>{shortImage(i.imageId)}</code> · commit <code>{i.gitRevision}</code></span>
+							<span class="muted">started <RelativeTime value={formatAgo(i.startedAt, app.now)} exact={formatStamp(i.startedAt)} /> · last check-in <RelativeTime value={formatAgo(i.lastSeenAt, app.now)} exact={formatStamp(i.lastSeenAt)} /></span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if detail.failedDeploy}
+				<details class="alert">
+					<summary>
+						<TriangleAlertIcon size={14} />
+						<span class="summary-text">
+							<b>Deploy failed {formatAgo(detail.failedDeploy.attemptedAt, app.now)}</b>
+							— {detail.brokenDeployPolicy === 'fallback' ? `still running ${detail.snapshot ? `version ${detail.snapshot.generation}` : 'the previous version'}` : 'scheduled runs wait until a deploy works'}
+							· <code>{firstLine(detail.failedDeploy.error)}</code>
+						</span>
+						<span class="more">details</span>
+					</summary>
+					<div class="alert-body">
+						<p>Commit <code>{detail.failedDeploy.gitRevision}</code> (image <code>{shortImage(detail.failedDeploy.imageId)}</code>) didn't load. Fix the error and deploy again; a deploy only takes over once it loads without errors.</p>
+						<pre>{detail.failedDeploy.error}</pre>
+					</div>
+				</details>
+			{:else if detail.lastLoadError}
+				<details class="alert">
+					<summary>
+						<TriangleAlertIcon size={14} />
+						<span class="summary-text"><b>The last load reported an error</b> · <code>{firstLine(detail.lastLoadError)}</code></span>
+						<span class="more">details</span>
+					</summary>
+					<div class="alert-body"><pre>{detail.lastLoadError}</pre></div>
+				</details>
+			{/if}
+
+			<details class="facts">
+				<summary>Details</summary>
+				<div class="facts-body">
+					<KeyValues
+						rows={[
+							{ label: 'Location ID', value: detail.id, mono: true },
+							{ label: 'Created', value: formatAgo(detail.createdAt, app.now), title: formatStamp(detail.createdAt) },
+							{ label: 'Target', value: `${targetWords(detail.target)} · ${detail.target.connectionSummary}` },
+							{ label: 'Warehouse connection', value: detail.warehouseConnection, mono: true },
+							{ label: 'If a deploy fails', value: detail.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works' }
+						]}
+					/>
 				</div>
+			</details>
+		</header>
 
-				<Panel title="Targets" note="The deployed version per target, and the warehouse connection test run after each deploy">
-					<table class="sb-list static">
-						<thead>
-							<tr>
-								<th>Target</th>
-								<th>Deployed version</th>
-								<th>Image</th>
-								<th>Warehouse connection</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each detail.targets as t (t.name)}
-								<tr>
-									<td>
-										<strong>{t.name}</strong>{#if t.isDefault}<span class="muted"> · default</span>{/if}
-										<div class="cell-desc">{t.adapter}</div>
-									</td>
-									<td>
-										{#if t.snapshot}
-											<div title="Snapshot {t.snapshot.id}, generation {t.snapshot.generation}">Version {t.snapshot.generation} · commit <code>{t.snapshot.gitRevision}</code>{#if t.snapshot.gitDirty}<span class="warn"> (with uncommitted changes)</span>{/if}</div>
-											<div class="cell-desc" title={formatStamp(t.snapshot.publishedAt)}>
-												by {t.snapshot.gitAuthor} · deployed {formatAgo(t.snapshot.publishedAt, app.now)} · sqb {t.snapshot.sqbVersion}
-											</div>
-										{:else}
-											<span class="muted">Nothing deployed yet</span>
-										{/if}
-									</td>
-									<td>{#if t.imageId}<code title={t.imageId}>{shortImage(t.imageId)}</code>{:else}<span class="muted" title="Runs start as local processes, not containers">local</span>{/if}</td>
-									<td class="test-cell">
-										<ConnectionTest scope={{ locationId: detail.id, target: t.name }} connection={t.warehouseConnection} last={t.connectionTest} />
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</Panel>
-
-				<Panel title="Warehouse sync" note="SQLBuild's own tables in the warehouse, read back by the location so this UI shows what was built">
+		<div class="min-h-0 flex-1 overflow-auto p-6">
+			<div id="problems">
+				<Panel title="Problems">
 					{#snippet actions()}
-						{#if detail.targets.length > 1}
-							<SegmentedFilter bind:value={() => syncTargetName, (v) => (syncTarget = v)} options={detail.targets.map((t) => ({ value: t.name, label: t.name }))} />
-						{/if}
+						<SegmentedFilter
+							bind:value={problemView}
+							options={[
+								{ value: 'open', label: 'Open', count: openProblems },
+								{ value: 'all', label: 'History', count: problems.data?.length ?? 0 }
+							]}
+						/>
 					{/snippet}
-					<table class="sb-list static">
-						<thead>
-							<tr>
-								<th>Table</th>
-								<th class="num">Schemas</th>
-								<th>Last synced</th>
-								<th class="num" title="Rows read by the last sync">New rows</th>
-								<th class="num" title="Warehouse cost of the sync queries in the last 24 hours">Cost, 24h</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each syncRows as row (row.table)}
-								<tr>
-									<td>
-										<code>{row.table}</code>
-										{#if row.lastError}<div class="cell-desc err" title={row.lastError}>{row.lastError}</div>{/if}
-									</td>
-									<td class="num muted">{row.schemas}</td>
-									<td>
-										{#if row.lastError}
-											<StatusLabel tone="var(--sb-error)" label="Failing; last worked {formatAgo(row.lastSyncedAt, app.now)}" />
-										{:else}
-											<RelativeTime value={formatAgo(row.lastSyncedAt, app.now)} exact={formatStamp(row.lastSyncedAt)} />
-										{/if}
-									</td>
-									<td class="num muted">{row.rowsLastPass}</td>
-									<td class="num muted" title={row.cost24h ? undefined : 'This warehouse has no cost concept'}>
-										{row.cost24h ? `${row.cost24h.amount} ${row.cost24h.unit}` : '—'}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</Panel>
-
-				<Panel title="Location processes" note="Running copies of this location that load the code and start runs">
-					<table class="sb-list static">
-						<thead>
-							<tr>
-								<th>Process</th>
-								<th>Image</th>
-								<th>Commit</th>
-								<th>Started</th>
-								<th>Last seen</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each detail.instances as i (i.id)}
-								<tr class:sb-row-off={i.state === 'gone'}>
-									<td><StatusLabel tone={instanceTone[i.state]} label={i.id} /></td>
-									<td><code title={i.imageId}>{shortImage(i.imageId)}</code></td>
-									<td><code>{i.gitRevision}</code></td>
-									<td><RelativeTime value={formatAgo(i.startedAt, app.now)} exact={formatStamp(i.startedAt)} /></td>
-									<td><RelativeTime value={formatAgo(i.lastSeenAt, app.now)} exact={formatStamp(i.lastSeenAt)} /></td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
+					<ProblemList events={problemRows} resource={problems} currentLocationId={id} empty={problemView === 'open' ? 'No open problems. Everything is running normally.' : 'No problems recorded for this location.'} />
 				</Panel>
 			</div>
 
-			<aside class="w-[320px] shrink-0 overflow-auto border-l border-border p-5">
-				<div class="rail-title">Location</div>
-				<KeyValues
-					rows={[
-						{ label: 'ID', value: detail.id, mono: true },
-						{ label: 'Created', value: formatAgo(detail.createdAt, app.now), title: formatStamp(detail.createdAt) },
-						{ label: 'If a deploy fails', value: detail.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works' },
-						{ label: 'Targets', value: detail.targets.map((t) => t.name).join(', ') }
-					]}
-				/>
-				<div class="rail-title mt-6">Location tokens</div>
-				<p class="rail-note">A location token lets this location's processes connect to the server, deploy new versions and report problems. It can't do anything else.</p>
+			<Panel title="Access tokens" note="Lets this location's processes connect to the server. Can't do anything else.">
 				<LocationTokens locationId={detail.id} />
-			</aside>
+			</Panel>
 		</div>
 	{/if}
 </div>
 
 <style>
-	.fallback {
+	.head {
 		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 14px 24px 12px;
+		border-bottom: 1px solid var(--border);
+		font-size: 12.5px;
+	}
+	.line {
+		display: flex;
+		min-width: 0;
+		align-items: center;
+		gap: 8px;
+	}
+	.title-line {
 		gap: 10px;
-		margin-bottom: 24px;
-		padding: 12px 14px;
+	}
+	.right {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-left: auto;
+	}
+	.back {
+		color: var(--muted-foreground);
+		font-size: 13px;
+	}
+	.back:hover {
+		color: var(--foreground);
+	}
+	.fg {
+		color: var(--foreground);
+		font-weight: 500;
+	}
+	.processes {
+		display: flex;
+		flex-direction: column;
+		margin: 2px 0;
+		border-top: 1px solid var(--border);
+	}
+	.processes li {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding: 5px 2px;
+		border-bottom: 1px solid var(--border);
+	}
+	.processes li.off {
+		opacity: 0.7;
+	}
+	.alert {
 		border: 1px solid color-mix(in srgb, var(--sb-warning) 40%, var(--border));
 		border-radius: 2px;
 		background: color-mix(in srgb, var(--sb-warning) 8%, var(--background));
-		font-size: 12.5px;
 	}
-	.fallback > :global(svg) {
-		margin-top: 2px;
+	.alert summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 7px 10px;
+		cursor: pointer;
+		list-style: none;
+	}
+	.alert summary::-webkit-details-marker {
+		display: none;
+	}
+	.alert summary > :global(svg) {
+		flex: 0 0 auto;
 		color: var(--sb-warning);
 	}
-	.headline {
+	.summary-text {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.summary-text b {
 		font-weight: 600;
 	}
-	.fallback p {
-		margin: 4px 0 8px;
+	.more {
+		flex: 0 0 auto;
+		margin-left: auto;
+		color: var(--muted-foreground);
+		text-decoration: underline;
+	}
+	.alert[open] .more {
+		visibility: hidden;
+	}
+	.alert-body {
+		padding: 0 10px 10px 32px;
 		color: var(--muted-foreground);
 	}
-	.fallback details {
-		margin-top: 6px;
-		color: var(--muted-foreground);
+	.alert-body p {
+		margin-bottom: 8px;
 	}
-	.fallback summary {
+	.facts summary {
+		width: max-content;
+		color: var(--muted-foreground);
 		cursor: pointer;
+	}
+	.facts-body {
+		max-width: 640px;
+		padding: 8px 0 2px;
 	}
 	#problems {
 		scroll-margin-top: 12px;
@@ -277,16 +288,6 @@
 		font-family: var(--font-mono);
 		font-size: 12px;
 	}
-	.static {
-		border-top: 1px solid var(--border);
-	}
-	:global(.sb-list.static tbody tr) {
-		cursor: default;
-	}
-	.test-cell {
-		width: 42%;
-		max-width: 0;
-	}
 	.muted {
 		color: var(--muted-foreground);
 	}
@@ -294,17 +295,7 @@
 		color: var(--sb-warning);
 	}
 	.err {
-		color: var(--sb-error) !important;
-	}
-	.rail-title {
-		margin-bottom: 8px;
-		color: var(--sb-text-faint);
-		font-size: 12px;
+		color: var(--sb-error);
 		font-weight: 500;
-	}
-	.rail-note {
-		margin-bottom: 8px;
-		color: var(--muted-foreground);
-		font-size: 12px;
 	}
 </style>

@@ -60,7 +60,7 @@
 					{#if issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
 				</div>
 				<div class="health-copy">
-					<strong>{issues.length ? `${app.targetName} needs attention` : `${app.targetName} is healthy`}</strong>
+					<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
 					<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
 				</div>
 				{#if m}
@@ -136,7 +136,7 @@
 		<div class="lower-grid">
 			<section class="surface-panel">
 				<div class="panel-heading">
-					<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.targetName}</span></div>
+					<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
 					<a href="/catalog">Open catalog →</a>
 				</div>
 				<div class="groups">

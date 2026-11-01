@@ -6,8 +6,9 @@
 	import { app } from '$lib/state/app.svelte';
 	import GatedButton from './gated-button.svelte';
 
-	type Props = { scope: Scope; connection: string; last: ConnectionTest | null; ontested?: () => void };
-	let { scope, connection, last, ontested }: Props = $props();
+	/** `compact` shows one line, e.g. "Warehouse ● connected 54s ago", with the message in the tooltip. */
+	type Props = { scope: Scope; connection: string; last: ConnectionTest | null; compact?: boolean; ontested?: () => void };
+	let { scope, connection, last, compact = false, ontested }: Props = $props();
 
 	let testing = $state(false);
 	let result = $state<ConnectionTest | null>(null);
@@ -32,9 +33,21 @@
 	}
 </script>
 
-<div class="connection-test">
+<div class="connection-test" class:compact>
 	<div class="min-w-0 flex-1">
-		{#if testing}
+		{#if compact}
+			<span class="lead">Warehouse</span>
+			{#if testing}
+				<StatusLabel tone="var(--sb-running)" label="testing…" />
+			{:else if shown}
+				<span title={`${shown.message}\nTested ${origin(shown)} · ${formatStamp(shown.at)} · ${shown.durationMs} ms`}>
+					<StatusLabel tone={testTone[shown.outcome]} label="{shown.outcome === 'ok' ? 'connected' : 'couldn’t connect'} {formatAgo(shown.at, app.now)}" />
+				</span>
+			{:else}
+				<StatusLabel tone="var(--sb-text-faint)" label="not tested yet" muted />
+			{/if}
+			{#if failure}<span class="message err" title={failure}>{failure}</span>{/if}
+		{:else if testing}
 			<span title="Runs the same check as sqb debug"><StatusLabel tone="var(--sb-running)" label="Testing…" /></span>
 		{:else if shown}
 			<span title="{formatStamp(shown.at)} · {shown.durationMs} ms">
@@ -55,6 +68,18 @@
 		align-items: center;
 		gap: 12px;
 		min-width: 0;
+	}
+	.compact > div {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.lead {
+		color: var(--muted-foreground);
+		font-size: 12.5px;
+	}
+	.compact .message {
+		margin-top: 0;
 	}
 	.message {
 		margin-top: 2px;

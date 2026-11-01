@@ -6,6 +6,7 @@ import type {
 	LocationHealth,
 	Location,
 	LocationSummary,
+	LocationTarget,
 	PlatformEventKind,
 	PlatformEventLink,
 	PlatformEventReaction,
@@ -31,8 +32,8 @@ export const healthLabel: Record<LocationHealth, string> = {
 };
 
 /** A location's health in words, e.g. "Deploy failed — running previous version 17". */
-export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDeploy' | 'brokenDeployPolicy' | 'targets'>): string {
-	const version = location.targets.find((t) => t.snapshot)?.snapshot?.generation;
+export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDeploy' | 'brokenDeployPolicy' | 'snapshot'>): string {
+	const version = location.snapshot?.generation;
 	if (location.failedDeploy) {
 		if (location.brokenDeployPolicy === 'fallback') return `Deploy failed — running previous version${version != null ? ` ${version}` : ''}`;
 		return 'Deploy failed — scheduled runs wait until a deploy works';
@@ -72,9 +73,9 @@ export const reactionLabel: Record<PlatformEventReactionOutcome, string> = {
 	pending: 'not yet'
 };
 
-/** Deep link to the sensor that reacted, scoped to its location and target. */
+/** Deep link to the sensor that reacted, scoped to its location. */
 export function reactionHref(reaction: PlatformEventReaction): string {
-	return `/triggers/${encodeURIComponent(reaction.triggerId)}?location=${encodeURIComponent(reaction.locationId)}&target=${encodeURIComponent(reaction.target)}`;
+	return `/triggers/${encodeURIComponent(reaction.triggerId)}?location=${encodeURIComponent(reaction.locationId)}`;
 }
 
 export const testTone: Record<TestOutcome, string> = { ok: 'var(--sb-success)', failed: 'var(--sb-error)' };
@@ -111,17 +112,25 @@ export function locationName(locations: readonly Location[] | undefined, locatio
 	return locations?.find((l) => l.id === locationId)?.name ?? locationId;
 }
 
-/** e.g. `All locations`, `waffle-shop · all targets`, `waffle-shop / prod`. */
+/** e.g. `All locations` or `waffle-shop`. */
 export function formatAssignmentScope(scope: AssignmentScope, locations: readonly Location[] | undefined): string {
-	if (!scope.locationId) return scope.target ? `All locations / ${scope.target}` : 'Installation';
-	const name = locationName(locations, scope.locationId);
-	return scope.target ? `${name} / ${scope.target}` : `${name} · all targets`;
+	return locationName(locations, scope.locationId);
 }
 
-/** Deep link for an event link; scoped pages carry `?location=&target=`. */
+/** A location's one target in words, e.g. `prod · Snowflake`. */
+export function targetWords(target: Pick<LocationTarget, 'name' | 'adapter'>): string {
+	return `${target.name} · ${adapterLabel(target.adapter)}`;
+}
+
+const ADAPTER_LABELS: Record<string, string> = { snowflake: 'Snowflake', duckdb: 'DuckDB', postgres: 'Postgres', bigquery: 'BigQuery', databricks: 'Databricks' };
+export function adapterLabel(adapter: string): string {
+	return ADAPTER_LABELS[adapter] ?? adapter;
+}
+
+/** Deep link for an event link; scoped pages carry `?location=`. */
 export function eventLinkHref(link: PlatformEventLink): string {
 	if (link.kind === 'location') return `/locations/${link.id}`;
-	const scope = `location=${encodeURIComponent(link.locationId)}&target=${encodeURIComponent(link.target)}`;
+	const scope = `location=${encodeURIComponent(link.locationId)}`;
 	if (link.kind === 'trigger') return `/triggers/${encodeURIComponent(link.id)}?${scope}`;
 	if (link.kind === 'job') return `/jobs/${encodeURIComponent(link.key)}?${scope}`;
 	return `/runs/${encodeURIComponent(link.id)}?${scope}`;

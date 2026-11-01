@@ -31,7 +31,7 @@
 				<td><RelativeTime value={formatAgo(r.startedAt, app.now)} exact={formatStamp(r.startedAt)} /></td>
 			</tr>
 		{:else}
-			<tr><td colspan="6" class="empty">No builds recorded in this target.</td></tr>
+			<tr><td colspan="6" class="empty">No builds recorded in this location.</td></tr>
 		{/each}
 	</tbody>
 </table>

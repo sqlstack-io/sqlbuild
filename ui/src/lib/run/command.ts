@@ -33,7 +33,7 @@ export function parseCommand(text: string): ParsedCommand {
 		if (token.startsWith('-')) {
 			mode = null;
 			if (token === '--target') {
-				errors.push('The target is set by the target switcher; remove --target');
+				errors.push('The target is set by the location; remove --target');
 				i++;
 				continue;
 			}

@@ -21,7 +21,6 @@ import type {
 	Location,
 	LocationDetail,
 	LocationSummary,
-	LocationTarget,
 	LocationToken,
 	MaintenanceHistory,
 	MigrationEvent,
@@ -44,11 +43,9 @@ import type {
 	ServerSettings,
 	ServiceAccountRequest,
 	SettingField,
-	StateTableName,
-	StateTableSync,
 	WarehouseConnection
 } from '../types';
-import { LOCATION_MARKETING, LOCATION_SHOP, ROLE_CAPABILITIES } from './fixtures';
+import { LOCATION_MARKETING, LOCATION_SHOP, LOCATION_SHOP_DEV, LOCATION_SHOP_STAGING, ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { triggerId } from './operate';
 import { ALEX, CI_ACCOUNT, DEMO_USER, JORDAN, OPS_USER, REPORTING, RILEY, SAM, SYSTEM } from './principals';
 
@@ -56,16 +53,6 @@ const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
 
 const ADMIN_ONLY: readonly Capability[] = ['location.manage', 'user.manage', 'role.assign', 'token.manage', 'audit.view'];
-
-const STATE_TABLES: readonly StateTableName[] = [
-	'_sqlbuild_fingerprints',
-	'_sqlbuild_audit_results',
-	'_sqlbuild_source_freshness',
-	'_sqlbuild_microbatches',
-	'_sqlbuild_migrations',
-	'_sqlbuild_old_name_views',
-	'_sqlbuild_janitor_events'
-];
 
 /** Mock-only selector membership for node-scoped grants. */
 const SELECTOR_NODES: Record<string, string[]> = {
@@ -167,17 +154,17 @@ function createPlatformFixtures(now: number) {
 	];
 
 	const assignments: RoleAssignment[] = [
-		{ id: 'asg-1', principal: DEMO_USER, role: 'admin', scope: { locationId: null, target: null }, source: 'manual', ssoGroup: null, assignedBy: SYSTEM, assignedAt: ago(days(210)), stale: false },
-		{ id: 'asg-2', principal: ALEX, role: 'developer', scope: { locationId: LOCATION_SHOP, target: 'staging' }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(180)), stale: false },
-		{ id: 'asg-3', principal: ALEX, role: 'operator', scope: { locationId: LOCATION_SHOP, target: 'prod' }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(170)), stale: false },
-		{ id: 'asg-4', principal: SAM, role: 'developer', scope: { locationId: LOCATION_SHOP, target: 'staging' }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(95)), stale: false },
-		{ id: 'asg-5', principal: SAM, role: 'finance_operator', scope: { locationId: LOCATION_SHOP, target: 'prod' }, source: 'sso', ssoGroup: 'finance-analysts', assignedBy: null, assignedAt: ago(days(95)), stale: false },
-		{ id: 'asg-6', principal: JORDAN, role: 'viewer', scope: { locationId: null, target: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(40)), stale: false },
-		{ id: 'asg-7', principal: JORDAN, role: 'growth_analyst', scope: { locationId: LOCATION_SHOP, target: 'prod' }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(38)), stale: true },
-		{ id: 'asg-8', principal: CI_ACCOUNT, role: 'operator', scope: { locationId: LOCATION_SHOP, target: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(200)), stale: false },
-		{ id: 'asg-9', principal: REPORTING, role: 'viewer', scope: { locationId: LOCATION_MARKETING, target: 'prod' }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(120)), stale: false },
-		{ id: 'asg-11', principal: OPS_USER, role: 'operator', scope: { locationId: null, target: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(150)), stale: false },
-		{ id: 'asg-10', principal: RILEY, role: 'support_viewer', scope: { locationId: null, target: null }, source: 'sso', ssoGroup: 'support-ops', assignedBy: null, assignedAt: ago(days(300)), stale: false }
+		{ id: 'asg-1', principal: DEMO_USER, role: 'admin', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: SYSTEM, assignedAt: ago(days(210)), stale: false },
+		{ id: 'asg-2', principal: ALEX, role: 'developer', scope: { locationId: LOCATION_SHOP_STAGING }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(180)), stale: false },
+		{ id: 'asg-3', principal: ALEX, role: 'operator', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(170)), stale: false },
+		{ id: 'asg-4', principal: SAM, role: 'developer', scope: { locationId: LOCATION_SHOP_STAGING }, source: 'sso', ssoGroup: 'analytics-eng', assignedBy: null, assignedAt: ago(days(95)), stale: false },
+		{ id: 'asg-5', principal: SAM, role: 'finance_operator', scope: { locationId: LOCATION_SHOP }, source: 'sso', ssoGroup: 'finance-analysts', assignedBy: null, assignedAt: ago(days(95)), stale: false },
+		{ id: 'asg-6', principal: JORDAN, role: 'viewer', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(40)), stale: false },
+		{ id: 'asg-7', principal: JORDAN, role: 'growth_analyst', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(38)), stale: true },
+		{ id: 'asg-8', principal: CI_ACCOUNT, role: 'operator', scope: { locationId: LOCATION_SHOP }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(200)), stale: false },
+		{ id: 'asg-9', principal: REPORTING, role: 'viewer', scope: { locationId: LOCATION_MARKETING }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(120)), stale: false },
+		{ id: 'asg-11', principal: OPS_USER, role: 'operator', scope: { locationId: null }, source: 'manual', ssoGroup: null, assignedBy: DEMO_USER, assignedAt: ago(days(150)), stale: false },
+		{ id: 'asg-10', principal: RILEY, role: 'support_viewer', scope: { locationId: null }, source: 'sso', ssoGroup: 'support-ops', assignedBy: null, assignedAt: ago(days(300)), stale: false }
 	];
 
 	const approvals: RoleApproval[] = [
@@ -243,7 +230,7 @@ function createPlatformFixtures(now: number) {
 			...e
 		};
 	};
-	const shopProd = { locationId: LOCATION_SHOP, target: 'prod' };
+	const shopProd = { locationId: LOCATION_SHOP };
 	const auditEntries: AuditEntry[] = [
 		entry(2, { actor: DEMO_USER, action: 'warehouse.sync', outcome: 'allowed', scope: { ...shopProd, subject: null }, grantingRole: 'admin', evidenceRead: false, summary: 'Requested a warehouse sync (started)', before: null, after: null }),
 		entry(18, { actor: SAM, action: 'view.evidence', outcome: 'allowed', scope: { ...shopProd, subject: 'fact_orders' }, grantingRole: 'finance_operator', evidenceRead: true, summary: 'Read sample rows of fact_orders', before: null, after: null, ip: '10.0.7.33' }),
@@ -251,25 +238,16 @@ function createPlatformFixtures(now: number) {
 		entry(42, { actor: CI_ACCOUNT, action: 'job.run', outcome: 'allowed', scope: { ...shopProd, subject: 'checks_only' }, grantingRole: 'operator', evidenceRead: false, summary: 'Launched checks_only', before: null, after: 'run-c40e queued', ip: '10.0.2.8' }),
 		entry(55, { actor: ALEX, action: 'trigger.toggle', outcome: 'allowed', scope: { ...shopProd, subject: 'revenue_refresh' }, grantingRole: 'operator', evidenceRead: false, summary: 'Paused revenue_refresh', before: 'running', after: 'paused', ip: '10.0.7.21' }),
 		entry(70, { actor: ALEX, action: 'run.adhoc', outcome: 'denied', scope: { ...shopProd, subject: 'daily_revenue+' }, grantingRole: null, evidenceRead: false, summary: 'Denied: run.adhoc missing on 4 nodes (daily_revenue, revenue_dashboard, …)', before: null, after: null, ip: '10.0.7.21' }),
-		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, target: null, subject: 'finance_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed a widening of finance_operator; held for approval', before: null, after: 'pending appr-3', ip: '—' }),
-		entry(300, { actor: DEMO_USER, action: 'token.manage', outcome: 'allowed', scope: { locationId: null, target: null, subject: 'tok-2' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated token "Dashboard refresh"', before: 'sqbt_77d0', after: 'sqbt_9a07' }),
+		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed a widening of finance_operator; held for approval', before: null, after: 'pending appr-3', ip: '—' }),
+		entry(300, { actor: DEMO_USER, action: 'token.manage', outcome: 'allowed', scope: { locationId: null, subject: 'tok-2' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated token "Dashboard refresh"', before: 'sqbt_77d0', after: 'sqbt_9a07' }),
 		entry(720, { actor: JORDAN, action: 'connection.test', outcome: 'denied', scope: { ...shopProd, subject: 'prod' }, grantingRole: null, evidenceRead: false, summary: 'Denied: connection.test requires developer or above', before: null, after: null, ip: '10.0.9.4' }),
 		entry(days(1) + 60, { actor: SAM, action: 'view.evidence', outcome: 'denied', scope: { ...shopProd, subject: 'dim_customers' }, grantingRole: null, evidenceRead: false, summary: 'Denied: finance_operator grants view.evidence only on group:finance,tag:pii', before: null, after: null, ip: '10.0.7.33' }),
-		entry(days(2), { actor: DEMO_USER, action: 'location.manage', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, target: null, subject: 'ltok-1' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated the location token', before: 'sqbl_a210', after: 'sqbl_3f9a' }),
-		entry(days(8), { actor: DEMO_USER, action: 'role.reject', outcome: 'allowed', scope: { locationId: LOCATION_MARKETING, target: null, subject: 'support_triage' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rejected widening of support_triage', before: 'pending', after: 'rejected' }),
-		entry(days(20), { actor: DEMO_USER, action: 'role.approve', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, target: null, subject: 'finance_operator' }, grantingRole: 'admin', evidenceRead: false, summary: 'Approved widening of finance_operator (+run.cancel on group:finance)', before: 'pending', after: 'approved' })
+		entry(days(2), { actor: DEMO_USER, action: 'location.manage', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'ltok-1' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rotated the location token', before: 'sqbl_a210', after: 'sqbl_3f9a' }),
+		entry(days(8), { actor: DEMO_USER, action: 'role.reject', outcome: 'allowed', scope: { locationId: LOCATION_MARKETING, subject: 'support_triage' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rejected widening of support_triage', before: 'pending', after: 'rejected' }),
+		entry(days(20), { actor: DEMO_USER, action: 'role.approve', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: 'admin', evidenceRead: false, summary: 'Approved widening of finance_operator (+run.cancel on group:finance)', before: 'pending', after: 'approved' })
 	];
 
 	// ---- locations ----
-	const stateSync = (minutesAgo: number, costPer: number | null, unit: 'credits' | 'GB scanned', errorTable?: StateTableName, error?: string): StateTableSync[] =>
-		STATE_TABLES.map((table, i) => ({
-			table,
-			schemas: table === '_sqlbuild_janitor_events' ? 4 : 3,
-			lastSyncedAt: table === errorTable ? ago(minutesAgo + 95) : ago(minutesAgo),
-			rowsLastPass: [212, 64, 18, 40, 0, 0, 3][i],
-			lastError: table === errorTable ? (error ?? null) : null,
-			cost24h: costPer === null ? null : { amount: Math.round(costPer * (i < 4 ? 3 : 1) * 1000) / 1000, unit }
-		}));
 	const publishTest = (minutesAgo: number, durationMs: number, message: string): ConnectionTest => ({
 		outcome: 'ok',
 		at: ago(minutesAgo),
@@ -278,42 +256,58 @@ function createPlatformFixtures(now: number) {
 		by: null,
 		message
 	});
-	const targetExtras: Record<string, Record<string, Pick<LocationTarget, 'imageId' | 'warehouseConnection' | 'connectionTest' | 'stateSync'>>> = {
-		[LOCATION_SHOP]: {
-			prod: { imageId: 'sha256:4be1c07d9a52', warehouseConnection: 'prod', connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'), stateSync: stateSync(4, 0.004, 'credits') },
-			staging: {
-				imageId: 'sha256:9f02b6e4c1a8',
-				warehouseConnection: 'staging',
-				connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
-				stateSync: stateSync(11, 0.002, 'credits', '_sqlbuild_janitor_events', 'Insufficient privileges to read schema ARCHIVE: the catalog connection role lacks USAGE')
-			},
-			dev: { imageId: null, warehouseConnection: 'dev', connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'), stateSync: stateSync(1, null, 'credits') }
-		},
-		[LOCATION_MARKETING]: {
-			prod: { imageId: 'sha256:3e5f7aa20c19', warehouseConnection: 'prod', connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'), stateSync: stateSync(26, null, 'credits') }
-		}
-	};
 	const loadError =
 		"ImportError: cannot import name 'campaign_touches' from 'models.attribution' (orchestration/jobs.py, line 12)";
-	const locationExtras: Record<string, Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances'>> = {
+	type LocationExtras = Pick<LocationDetail, 'createdAt' | 'brokenDeployPolicy' | 'failedDeploy' | 'lastLoadError' | 'instances' | 'imageId' | 'warehouseConnection' | 'connectionTest'>;
+	const locationExtras: Record<string, LocationExtras> = {
 		[LOCATION_SHOP]: {
 			createdAt: ago(days(210)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: null,
 			lastLoadError: null,
+			imageId: 'sha256:4be1c07d9a52',
+			warehouseConnection: 'prod',
+			connectionTest: publishTest(190, 820, 'Connected as TRANSFORMER to WAFFLE_SHOP; warehouse TRANSFORMING_WH available'),
 			instances: [
 				{ id: 'location-waffle-shop-7c2d', imageId: 'sha256:4be1c07d9a52', gitRevision: '7d2e41a', startedAt: ago(192), lastSeenAt: ago(0.2), state: 'live' },
 				{ id: 'location-waffle-shop-1b90', imageId: 'sha256:ad37e9015b64', gitRevision: '5c1a9e2', startedAt: ago(days(3)), lastSeenAt: ago(193), state: 'gone' }
 			]
+		},
+		// A deploy in progress: the new process is loading while the old one keeps running.
+		[LOCATION_SHOP_STAGING]: {
+			createdAt: ago(days(180)),
+			brokenDeployPolicy: 'fallback',
+			failedDeploy: null,
+			lastLoadError: null,
+			imageId: 'sha256:9f02b6e4c1a8',
+			warehouseConnection: 'staging',
+			connectionTest: publishTest(35, 760, 'Connected as TRANSFORMER to WAFFLE_SHOP_STAGING'),
+			instances: [
+				{ id: 'location-waffle-shop-staging-c7e3', imageId: 'sha256:61d0a4f7b2e9', gitRevision: 'e09a6c3', startedAt: ago(1), lastSeenAt: ago(0.1), state: 'live' },
+				{ id: 'location-waffle-shop-staging-5a1f', imageId: 'sha256:9f02b6e4c1a8', gitRevision: 'b81c09e', startedAt: ago(36), lastSeenAt: ago(0.1), state: 'live' }
+			]
+		},
+		[LOCATION_SHOP_DEV]: {
+			createdAt: ago(days(14)),
+			brokenDeployPolicy: 'queue',
+			failedDeploy: null,
+			lastLoadError: null,
+			imageId: null,
+			warehouseConnection: 'dev',
+			connectionTest: publishTest(2, 12, 'Opened warehouse.duckdb'),
+			instances: [{ id: 'location-waffle-shop-dev-local', imageId: 'local', gitRevision: 'b81c09e', startedAt: ago(30), lastSeenAt: ago(0.3), state: 'live' }]
 		},
 		[LOCATION_MARKETING]: {
 			createdAt: ago(days(120)),
 			brokenDeployPolicy: 'fallback',
 			failedDeploy: { gitRevision: '9c4b2d1', imageId: 'sha256:9c4b2d18e07f', attemptedAt: ago(48), error: loadError },
 			lastLoadError: loadError,
+			imageId: 'sha256:3e5f7aa20c19',
+			warehouseConnection: 'prod',
+			connectionTest: publishTest(1440, 140, 'Connected to analytics as sqb_builder'),
 			instances: [
-				{ id: 'location-marketing-analytics-e41a', imageId: 'sha256:9c4b2d18e07f', gitRevision: '9c4b2d1', startedAt: ago(48), lastSeenAt: ago(0.5), state: 'live' },
-				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(49), state: 'gone' }
+				{ id: 'location-marketing-analytics-03f6', imageId: 'sha256:3e5f7aa20c19', gitRevision: '3e5f7aa', startedAt: ago(days(1) + 30), lastSeenAt: ago(0.5), state: 'live' },
+				{ id: 'location-marketing-analytics-e41a', imageId: 'sha256:9c4b2d18e07f', gitRevision: '9c4b2d1', startedAt: ago(48), lastSeenAt: ago(47), state: 'gone' }
 			]
 		}
 	};
@@ -332,9 +326,9 @@ function createPlatformFixtures(now: number) {
 		],
 		values: { account: 'example-account', database, warehouse: 'TRANSFORMING_WH' }
 	});
-	const warehouseByScope: Record<string, WarehouseConnection[]> = {
-		[`${LOCATION_SHOP}/prod`]: [
-			{ name: 'prod', target: 'prod', adapter: 'snowflake', purpose: 'target', sourceFile: 'sqlbuild.toml', ...snowflakeSettings('WAFFLE_SHOP'), lastTest: targetExtras[LOCATION_SHOP].prod.connectionTest },
+	const warehouseByLocation: Record<string, WarehouseConnection[]> = {
+		[LOCATION_SHOP]: [
+			{ name: 'prod', target: 'prod', adapter: 'snowflake', purpose: 'target', sourceFile: 'sqlbuild.toml', ...snowflakeSettings('WAFFLE_SHOP'), lastTest: locationExtras[LOCATION_SHOP].connectionTest },
 			{
 				name: 'prod_catalog',
 				target: 'prod',
@@ -346,10 +340,10 @@ function createPlatformFixtures(now: number) {
 				lastTest: null
 			}
 		],
-		[`${LOCATION_SHOP}/staging`]: [
-			{ name: 'staging', target: 'staging', adapter: 'snowflake', purpose: 'target', sourceFile: 'sqlbuild.toml', ...snowflakeSettings('WAFFLE_SHOP_STAGING'), lastTest: targetExtras[LOCATION_SHOP].staging.connectionTest }
+		[LOCATION_SHOP_STAGING]: [
+			{ name: 'staging', target: 'staging', adapter: 'snowflake', purpose: 'target', sourceFile: 'sqlbuild.toml', ...snowflakeSettings('WAFFLE_SHOP_STAGING'), lastTest: locationExtras[LOCATION_SHOP_STAGING].connectionTest }
 		],
-		[`${LOCATION_SHOP}/dev`]: [
+		[LOCATION_SHOP_DEV]: [
 			{
 				name: 'dev',
 				target: 'dev',
@@ -361,10 +355,10 @@ function createPlatformFixtures(now: number) {
 					{ key: 'threads', type: 'int', default: 4, min: 1, max: 32, description: 'Concurrent statements' }
 				],
 				values: { path: 'warehouse.duckdb' },
-				lastTest: targetExtras[LOCATION_SHOP].dev.connectionTest
+				lastTest: locationExtras[LOCATION_SHOP_DEV].connectionTest
 			}
 		],
-		[`${LOCATION_MARKETING}/prod`]: [
+		[LOCATION_MARKETING]: [
 			{
 				name: 'prod',
 				target: 'prod',
@@ -379,7 +373,7 @@ function createPlatformFixtures(now: number) {
 					{ key: 'password', type: 'secret', required: true, secretSource: 'env: PGPASSWORD', description: 'Login password' }
 				],
 				values: { host: 'db.example.com', dbname: 'analytics', user: 'sqb_builder' },
-				lastTest: targetExtras[LOCATION_MARKETING].prod.connectionTest
+				lastTest: locationExtras[LOCATION_MARKETING].connectionTest
 			}
 		]
 	};
@@ -508,7 +502,7 @@ function createPlatformFixtures(now: number) {
 		janitor('jan-3', 'archive', days(16), 'STAGING', 'view', 'WAFFLE_SHOP.STAGING.STG_COUPONS', 'WAFFLE_SHOP.STAGING._SQB_ARCHIVE__20261013T040000Z__STG_COUPONS', days(16), 'run-jan-6d0')
 	];
 
-	return { accounts, apiTokens, locationTokens, roles, assignments, approvals, auditEntries, targetExtras, locationExtras, warehouseByScope, providers, migrations, oldNameViews, janitorEvents };
+	return { accounts, apiTokens, locationTokens, roles, assignments, approvals, auditEntries, locationExtras, warehouseByLocation, providers, migrations, oldNameViews, janitorEvents };
 }
 
 /** How the platform-event sensor (see `platform_health_webhook` in operate.ts) handled an event. */
@@ -517,7 +511,6 @@ function reaction(outcome: PlatformEventReaction['outcome'], sequence: number | 
 		triggerId: triggerId('platform_health_webhook'),
 		triggerName: 'platform_health_webhook',
 		locationId: LOCATION_SHOP,
-		target: 'prod',
 		outcome,
 		evaluationId: sequence === null ? null : `eval-platform-health-webhook-${sequence}`,
 		attempts,
@@ -526,26 +519,26 @@ function reaction(outcome: PlatformEventReaction['outcome'], sequence: number | 
 }
 
 /** Enrichment of the shared platform event fixtures, by event ID. */
-function eventDetails(now: number): Record<string, Pick<PlatformEventRecord, 'resolvedAt' | 'target' | 'links' | 'reactions' | 'payload'>> {
+function eventDetails(now: number): Record<string, Pick<PlatformEventRecord, 'resolvedAt' | 'links' | 'reactions' | 'payload'>> {
 	const ago = (minutes: number) => new Date(now - minutes * MIN).toISOString();
-	const shop = { locationId: LOCATION_SHOP, target: 'prod' };
+	const shop = { locationId: LOCATION_SHOP };
 	return {
-		'pe-1': { resolvedAt: null, target: null, links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [reaction('consumed', 75, 1, ago(48))], payload: { failed_revision: '9c4b2d1', running_revision: '3e5f7aa', policy: 'fallback' } },
-		'pe-2': { resolvedAt: null, target: 'prod', links: [{ kind: 'trigger', id: triggerId('segments_hourly'), name: 'segments_hourly', ...shop }], reactions: [reaction('consumed', 77, 2, ago(11.5))], payload: { trigger: 'segments_hourly', scheduled_for: ago(12), overdue_by: '12m' } },
-		'pe-3': { resolvedAt: ago(1), target: null, links: [], reactions: [], payload: { interval: '60s' } },
-		'pe-4': { resolvedAt: null, target: null, links: [], reactions: [reaction('pending', null, 0, null)], payload: { last_holder: 'sqb-server-1', lease_expired_at: ago(2) } },
-		'pe-5': { resolvedAt: null, target: 'prod', links: [{ kind: 'job', key: 'revenue_refresh', ...shop }, { kind: 'run', id: 'run-a7c1', ...shop }], reactions: [reaction('pending', null, 0, null)], payload: { job: 'revenue_refresh', attempts: '3', error: 'image pull error' } }
+		'pe-1': { resolvedAt: null, links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [reaction('consumed', 75, 1, ago(48))], payload: { failed_revision: '9c4b2d1', running_revision: '3e5f7aa', policy: 'fallback' } },
+		'pe-2': { resolvedAt: null, links: [{ kind: 'trigger', id: triggerId('segments_hourly'), name: 'segments_hourly', ...shop }], reactions: [reaction('consumed', 77, 2, ago(11.5))], payload: { trigger: 'segments_hourly', scheduled_for: ago(12), overdue_by: '12m' } },
+		'pe-3': { resolvedAt: ago(1), links: [], reactions: [], payload: { interval: '60s' } },
+		'pe-4': { resolvedAt: null, links: [], reactions: [reaction('pending', null, 0, null)], payload: { last_holder: 'sqb-server-1', lease_expired_at: ago(2) } },
+		'pe-5': { resolvedAt: null, links: [{ kind: 'job', key: 'revenue_refresh', ...shop }, { kind: 'run', id: 'run-a7c1', ...shop }], reactions: [reaction('pending', null, 0, null)], payload: { job: 'revenue_refresh', attempts: '3', error: 'image pull error' } }
 	};
 }
 
 function historicalEvents(now: number): PlatformEventRecord[] {
 	const ago = (minutes: number) => new Date(now - minutes * MIN).toISOString();
-	const shop = { locationId: LOCATION_SHOP, target: 'prod' };
+	const shop = { locationId: LOCATION_SHOP };
 	return [
-		{ id: 'pe-h3', kind: 'launch_failed', severity: 'critical', occurredAt: ago(1500), active: false, locationId: LOCATION_SHOP, subject: 'activity_microbatch', message: 'A run of activity_microbatch stopped reporting in and was marked failed.', resolvedAt: ago(1490), target: 'prod', links: [{ kind: 'job', key: 'activity_microbatch', ...shop }, { kind: 'run', id: 'run-e3f8', ...shop }], reactions: [reaction('consumed', 52, 1, ago(1499))], payload: { job: 'activity_microbatch', attempts: '1', error: 'worker lost' } },
-		{ id: 'pe-h2', kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2 * 1440 + 30), active: false, locationId: null, subject: null, message: 'No server ran the scheduler for 41s while a server restarted.', resolvedAt: ago(2 * 1440 + 29), target: null, links: [], reactions: [reaction('consumed', 41, 1, ago(2 * 1440 + 29))], payload: { last_holder: 'sqb-server-2', lease_expired_at: ago(2 * 1440 + 30) } },
-		{ id: 'pe-h4', kind: 'connection_test_failed', severity: 'warning', occurredAt: ago(2 * 1440 + 400), active: false, locationId: LOCATION_MARKETING, subject: 'prod', message: 'The warehouse connection test after publishing failed: password authentication failed for user sqb_builder.', resolvedAt: ago(2 * 1440 + 380), target: 'prod', links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [], payload: { connection: 'prod', trigger: 'publish', error: 'password authentication failed' } },
-		{ id: 'pe-h1', kind: 'tick_overdue', severity: 'warning', occurredAt: ago(3 * 1440), active: false, locationId: LOCATION_SHOP, subject: 'core_build', message: 'The core_build schedule started 4 minutes late.', resolvedAt: ago(3 * 1440 - 4), target: 'prod', links: [{ kind: 'trigger', id: triggerId('core_build'), name: 'core_build', ...shop }], reactions: [reaction('consumed', 33, 1, ago(3 * 1440 - 1))], payload: { trigger: 'core_build', scheduled_for: ago(3 * 1440), overdue_by: '4m' } }
+		{ id: 'pe-h3', kind: 'launch_failed', severity: 'critical', occurredAt: ago(1500), active: false, locationId: LOCATION_SHOP, subject: 'activity_microbatch', message: 'A run of activity_microbatch stopped reporting in and was marked failed.', resolvedAt: ago(1490), links: [{ kind: 'job', key: 'activity_microbatch', ...shop }, { kind: 'run', id: 'run-e3f8', ...shop }], reactions: [reaction('consumed', 52, 1, ago(1499))], payload: { job: 'activity_microbatch', attempts: '1', error: 'worker lost' } },
+		{ id: 'pe-h2', kind: 'scheduler_no_leader', severity: 'critical', occurredAt: ago(2 * 1440 + 30), active: false, locationId: null, subject: null, message: 'No server ran the scheduler for 41s while a server restarted.', resolvedAt: ago(2 * 1440 + 29), links: [], reactions: [reaction('consumed', 41, 1, ago(2 * 1440 + 29))], payload: { last_holder: 'sqb-server-2', lease_expired_at: ago(2 * 1440 + 30) } },
+		{ id: 'pe-h4', kind: 'connection_test_failed', severity: 'warning', occurredAt: ago(2 * 1440 + 400), active: false, locationId: LOCATION_MARKETING, subject: 'prod', message: 'The warehouse connection test after publishing failed: password authentication failed for user sqb_builder.', resolvedAt: ago(2 * 1440 + 380), links: [{ kind: 'location', id: LOCATION_MARKETING }], reactions: [], payload: { connection: 'prod', trigger: 'publish', error: 'password authentication failed' } },
+		{ id: 'pe-h1', kind: 'tick_overdue', severity: 'warning', occurredAt: ago(3 * 1440), active: false, locationId: LOCATION_SHOP, subject: 'core_build', message: 'The core_build schedule started 4 minutes late.', resolvedAt: ago(3 * 1440 - 4), links: [{ kind: 'trigger', id: triggerId('core_build'), name: 'core_build', ...shop }], reactions: [reaction('consumed', 33, 1, ago(3 * 1440 - 1))], payload: { trigger: 'core_build', scheduled_for: ago(3 * 1440), overdue_by: '4m' } }
 	];
 }
 
@@ -607,7 +600,7 @@ export class MockPlatformApi implements PlatformApi {
 		const details = eventDetails(this.#ctx.now);
 		const current: PlatformEventRecord[] = this.#ctx.platformEvents().map((event) => ({
 			...event,
-			...(details[event.id] ?? { resolvedAt: null, target: null, links: [], reactions: [], payload: {} })
+			...(details[event.id] ?? { resolvedAt: null, links: [], reactions: [], payload: {} })
 		}));
 		let events = [...current, ...historicalEvents(this.#ctx.now)];
 		if (query.kinds?.length) events = events.filter((e) => query.kinds!.includes(e.kind));
@@ -633,7 +626,9 @@ export class MockPlatformApi implements PlatformApi {
 				activeProblems: this.#ctx.platformEvents().filter((e) => e.active && e.locationId === d.id && e.kind !== 'heartbeat').length,
 				liveInstances: d.instances.filter((i) => i.state === 'live').length,
 				lastSeenAt: d.instances.map((i) => i.lastSeenAt).sort().at(-1) ?? null,
-				targets: d.targets.map((t) => ({ name: t.name, snapshot: t.snapshot, connectionTest: t.connectionTest }))
+				target: d.target,
+				snapshot: d.snapshot,
+				connectionTest: d.connectionTest
 			}))
 		);
 	}
@@ -657,7 +652,7 @@ export class MockPlatformApi implements PlatformApi {
 			by: this.#ctx.user,
 			message: conn.adapter === 'duckdb' ? `Opened ${conn.values.path}` : `Connected to ${conn.values.database ?? conn.values.dbname} (sqb debug: all checks passed)`
 		};
-		this.#connectionTests.set(`${scope.locationId}/${scope.target}/${connection}`, result);
+		this.#connectionTests.set(`${scope.locationId}/${connection}`, result);
 		this.#audit('connection.test', { ...scope, subject: connection }, `Tested connection ${connection} (${result.outcome})`);
 		return this.#ctx.reply(result);
 	}
@@ -671,7 +666,7 @@ export class MockPlatformApi implements PlatformApi {
 		this.#require('location.manage');
 		if (!this.#ctx.locations.some((l) => l.id === locationId)) throw new ApiError('Unknown location', 404);
 		const issued = this.#issueLocationToken(locationId);
-		this.#audit('location.manage', { locationId, target: null, subject: issued.token.id }, 'Created a location token', null, issued.token.prefix);
+		this.#audit('location.manage', { locationId, subject: issued.token.id }, 'Created a location token', null, issued.token.prefix);
 		return this.#ctx.reply(issued);
 	}
 
@@ -682,7 +677,7 @@ export class MockPlatformApi implements PlatformApi {
 		old.state = 'revoked';
 		old.revokedAt = new Date().toISOString();
 		const issued = this.#issueLocationToken(old.locationId);
-		this.#audit('location.manage', { locationId: old.locationId, target: null, subject: issued.token.id }, 'Rotated the location token', old.prefix, issued.token.prefix);
+		this.#audit('location.manage', { locationId: old.locationId, subject: issued.token.id }, 'Rotated the location token', old.prefix, issued.token.prefix);
 		return this.#ctx.reply(issued);
 	}
 
@@ -692,7 +687,7 @@ export class MockPlatformApi implements PlatformApi {
 		if (!token) throw new ApiError('Token not found or not active', 404);
 		token.state = 'revoked';
 		token.revokedAt = new Date().toISOString();
-		this.#audit('location.manage', { locationId: token.locationId, target: null, subject: token.id }, 'Revoked a location token', token.prefix, null);
+		this.#audit('location.manage', { locationId: token.locationId, subject: token.id }, 'Revoked a location token', token.prefix, null);
 		return this.#ctx.reply(structuredClone(token));
 	}
 
@@ -701,23 +696,24 @@ export class MockPlatformApi implements PlatformApi {
 	async listWarehouseConnections(scope: Scope): Promise<WarehouseConnection[]> {
 		const warehouse = this.#warehouse(scope).map((c) => ({
 			...c,
-			lastTest: this.#connectionTests.get(`${scope.locationId}/${scope.target}/${c.name}`) ?? c.lastTest
+			lastTest: this.#connectionTests.get(`${scope.locationId}/${c.name}`) ?? c.lastTest
 		}));
 		return this.#ctx.reply(structuredClone(warehouse));
 	}
 
 	async listProviders(scope: Scope): Promise<ProviderConnection[]> {
-		return this.#ctx.reply(structuredClone(scope.locationId === LOCATION_SHOP ? this.#data.providers : []));
+		return this.#ctx.reply(structuredClone(SHOP_LOCATIONS.includes(scope.locationId) ? this.#data.providers : []));
 	}
 
 	// ---- maintenance ----
 
 	async maintenanceHistory(scope: Scope): Promise<MaintenanceHistory> {
-		if (scope.locationId !== LOCATION_SHOP || scope.target === 'dev') {
+		if (scope.locationId !== LOCATION_SHOP && scope.locationId !== LOCATION_SHOP_STAGING) {
 			return this.#ctx.reply({ migrations: [], oldNameViews: [], janitorEvents: [] });
 		}
 		const { migrations, oldNameViews, janitorEvents } = this.#data;
-		const retarget = <T extends { targetName: string }>(rows: T[]) => rows.map((r) => ({ ...r, targetName: scope.target }));
+		const target = this.#ctx.locations.find((l) => l.id === scope.locationId)?.target.name ?? '';
+		const retarget = <T extends { targetName: string }>(rows: T[]) => rows.map((r) => ({ ...r, targetName: target }));
 		return this.#ctx.reply(structuredClone({ migrations: retarget(migrations), oldNameViews, janitorEvents }));
 	}
 
@@ -738,7 +734,7 @@ export class MockPlatformApi implements PlatformApi {
 		account.disabled = true;
 		account.activeSessions = 0;
 		const revoked = sessions === 1 ? '1 session' : `${sessions} sessions`;
-		this.#audit('user.manage', { locationId: null, target: null, subject: name }, `Disabled ${name} and revoked ${revoked}`, 'active', 'disabled');
+		this.#audit('user.manage', { locationId: null, subject: name }, `Disabled ${name} and revoked ${revoked}`, 'active', 'disabled');
 		return this.#ctx.reply(structuredClone(account));
 	}
 
@@ -748,7 +744,7 @@ export class MockPlatformApi implements PlatformApi {
 		if (!account) throw new ApiError(`Unknown account ${name}`, 404);
 		if (!account.disabled) throw new ApiError(`${name} is already active`, 409);
 		account.disabled = false;
-		this.#audit('user.manage', { locationId: null, target: null, subject: name }, `Enabled ${name}`, 'disabled', 'active');
+		this.#audit('user.manage', { locationId: null, subject: name }, `Enabled ${name}`, 'disabled', 'active');
 		return this.#ctx.reply(structuredClone(account));
 	}
 
@@ -773,7 +769,7 @@ export class MockPlatformApi implements PlatformApi {
 			description: description || null
 		};
 		this.#data.accounts.push(account);
-		this.#audit('user.manage', { locationId: null, target: null, subject: name }, `Created service account ${name}`, null, name);
+		this.#audit('user.manage', { locationId: null, subject: name }, `Created service account ${name}`, null, name);
 		return this.#ctx.reply(structuredClone(account));
 	}
 
@@ -790,7 +786,7 @@ export class MockPlatformApi implements PlatformApi {
 		if (owner.disabled) throw new ApiError(`${account} is disabled; enable it first`, 409);
 		if (!request.label.trim()) throw new ApiError('A label is required', 422);
 		const issued = this.#issueApiToken(request.label.trim(), owner, request.expiresInDays);
-		this.#audit('token.manage', { locationId: null, target: null, subject: issued.token.id }, `Created token "${issued.token.label}" for ${owner.name}`, null, issued.token.prefix);
+		this.#audit('token.manage', { locationId: null, subject: issued.token.id }, `Created token "${issued.token.label}" for ${owner.name}`, null, issued.token.prefix);
 		return this.#ctx.reply(issued);
 	}
 
@@ -803,7 +799,7 @@ export class MockPlatformApi implements PlatformApi {
 		const remaining = old.expiresAt ? Math.max(1, Math.round((Date.parse(old.expiresAt) - Date.now()) / DAY)) : null;
 		const owner = this.#data.accounts.find((a) => a.name === old.owner.name) ?? old.owner;
 		const issued = this.#issueApiToken(old.label, owner, remaining);
-		this.#audit('token.manage', { locationId: null, target: null, subject: issued.token.id }, `Rotated token "${old.label}"`, old.prefix, issued.token.prefix);
+		this.#audit('token.manage', { locationId: null, subject: issued.token.id }, `Rotated token "${old.label}"`, old.prefix, issued.token.prefix);
 		return this.#ctx.reply(issued);
 	}
 
@@ -813,7 +809,7 @@ export class MockPlatformApi implements PlatformApi {
 		if (!token) throw new ApiError('Token not found or not active', 404);
 		token.state = 'revoked';
 		token.revokedAt = new Date().toISOString();
-		this.#audit('token.manage', { locationId: null, target: null, subject: token.id }, `Revoked token "${token.label}"`, token.prefix, null);
+		this.#audit('token.manage', { locationId: null, subject: token.id }, `Revoked token "${token.label}"`, token.prefix, null);
 		return this.#ctx.reply(structuredClone(token));
 	}
 
@@ -821,7 +817,7 @@ export class MockPlatformApi implements PlatformApi {
 
 	async listRoles(locationId: string): Promise<RoleDefinition[]> {
 		this.#require('role.assign');
-		const roles = this.#data.roles.filter((r) => r.source !== 'project' || locationId === LOCATION_SHOP);
+		const roles = this.#data.roles.filter((r) => r.source !== 'project' || SHOP_LOCATIONS.includes(locationId));
 		return this.#ctx.reply(structuredClone(roles));
 	}
 
@@ -836,7 +832,7 @@ export class MockPlatformApi implements PlatformApi {
 		if (!principal) throw new ApiError(`Unknown principal ${request.principal}`, 404);
 		if (!this.#data.roles.some((r) => r.name === request.role)) throw new ApiError(`Unknown role ${request.role}`, 404);
 		const duplicate = this.#data.assignments.some(
-			(a) => a.principal.name === principal.name && a.role === request.role && a.scope.locationId === request.scope.locationId && a.scope.target === request.scope.target
+			(a) => a.principal.name === principal.name && a.role === request.role && a.scope.locationId === request.scope.locationId
 		);
 		if (duplicate) throw new ApiError('That assignment already exists', 409);
 		const assignment: RoleAssignment = {
@@ -891,7 +887,7 @@ export class MockPlatformApi implements PlatformApi {
 			role.pendingApprovalId = null;
 			if (decision === 'approve') role.grants = applyDiff(role.grants, approval);
 		}
-		this.#audit(decision === 'approve' ? 'role.approve' : 'role.reject', { locationId: approval.locationId, target: null, subject: approval.role }, `${decision === 'approve' ? 'Approved' : 'Rejected'} widening of ${approval.role}`, 'pending', approval.state);
+		this.#audit(decision === 'approve' ? 'role.approve' : 'role.reject', { locationId: approval.locationId, subject: approval.role }, `${decision === 'approve' ? 'Approved' : 'Rejected'} widening of ${approval.role}`, 'pending', approval.state);
 		return this.#ctx.reply(structuredClone(approval));
 	}
 
@@ -918,13 +914,7 @@ export class MockPlatformApi implements PlatformApi {
 		const ignored: AccessExplanation['ignored'] = [];
 		const assignments = this.#effectiveAssignments(account.name);
 		for (const a of assignments) {
-			const inScope = (a.scope.locationId === null || a.scope.locationId === query.locationId) && (a.scope.target === null || a.scope.target === query.target);
-			if (!inScope) {
-				if (a.scope.locationId === null || a.scope.locationId === query.locationId) {
-					ignored.push({ assignmentId: a.id, role: a.role, reason: `Assigned on target ${a.scope.target} only` });
-				}
-				continue;
-			}
+			if (a.scope.locationId !== null && a.scope.locationId !== query.locationId) continue;
 			if (a.stale) {
 				ignored.push({ assignmentId: a.id, role: a.role, reason: 'Role removed from code; the assignment grants nothing' });
 				continue;
@@ -940,7 +930,7 @@ export class MockPlatformApi implements PlatformApi {
 			.map((r) => r.name);
 		const allowed = grantedBy.length > 0;
 		const on = query.subject ? `${query.subject} in ` : '';
-		const where = `${on}${this.#locationName(query.locationId)} / ${query.target}`;
+		const where = `${on}${this.#locationName(query.locationId)}`;
 		const summary = allowed
 			? `${account.name} can ${query.action} on ${where}, granted by ${[...assigned].join(', ')}.`
 			: `${account.name} can't ${query.action} on ${where}: no assigned role grants it${wouldBeGrantedBy.length ? `; ${wouldBeGrantedBy.join(', ')} would` : ''}.`;
@@ -978,16 +968,14 @@ export class MockPlatformApi implements PlatformApi {
 			name: location.name,
 			health: location.health,
 			...extras,
-			targets: location.targets.map((t) => {
-				const targetExtras = this.#data.targetExtras[location.id][t.name];
-				const test = this.#connectionTests.get(`${location.id}/${t.name}/${targetExtras.warehouseConnection}`);
-				return { name: t.name, adapter: t.adapter, isDefault: t.isDefault, snapshot: t.snapshot, ...targetExtras, connectionTest: test ?? targetExtras.connectionTest };
-			})
+			target: location.target,
+			snapshot: location.snapshot,
+			connectionTest: this.#connectionTests.get(`${location.id}/${extras.warehouseConnection}`) ?? extras.connectionTest
 		});
 	}
 
 	#warehouse(scope: Scope): WarehouseConnection[] {
-		return this.#data.warehouseByScope[`${scope.locationId}/${scope.target}`] ?? [];
+		return this.#data.warehouseByLocation[scope.locationId] ?? [];
 	}
 
 	#locationName(locationId: string): string {
@@ -1003,7 +991,7 @@ export class MockPlatformApi implements PlatformApi {
 		const role = this.#data.roles.find((r) => r.name === roleName);
 		if (!role) return null;
 		if (role.source !== 'built_in' && ADMIN_ONLY.includes(query.action)) return null;
-		if (role.source === 'project' && query.locationId !== LOCATION_SHOP) return null;
+		if (role.source === 'project' && !SHOP_LOCATIONS.includes(query.locationId)) return null;
 		return (
 			role.grants.find(
 				(g) => g.permissions.includes(query.action) && g.nodes.some((selector) => selector === '*' || (query.subject !== null && matchesSelector(selector, query.subject)))

@@ -55,7 +55,7 @@
 		{:else if view.detailRes.error}
 			<p class="err">Couldn't load this run: {view.detailRes.error}</p>
 		{:else if view.detailRes.data === null}
-			<p class="faint">There's no run {runId} in this target. It may belong to another location or target.</p>
+			<p class="faint">There's no run {runId} in this location. It may belong to another location.</p>
 		{/if}
 	</div>
 	{#if run}

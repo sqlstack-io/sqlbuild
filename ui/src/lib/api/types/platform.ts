@@ -7,6 +7,7 @@ import type {
 	Capability,
 	Iso,
 	LocationHealth,
+	LocationTarget,
 	PlatformEvent,
 	Principal,
 	Snapshot
@@ -66,9 +67,9 @@ export type PlatformHealth = {
 };
 
 export type PlatformEventLink =
-	| { kind: 'trigger'; id: string; name: string; locationId: string; target: string }
-	| { kind: 'job'; key: string; locationId: string; target: string }
-	| { kind: 'run'; id: string; locationId: string; target: string }
+	| { kind: 'trigger'; id: string; name: string; locationId: string }
+	| { kind: 'job'; key: string; locationId: string }
+	| { kind: 'run'; id: string; locationId: string }
 	| { kind: 'location'; id: string };
 
 /**
@@ -82,7 +83,6 @@ export type PlatformEventReaction = {
 	triggerId: string;
 	triggerName: string;
 	locationId: string;
-	target: string;
 	outcome: PlatformEventReactionOutcome;
 	/** The evaluation that consumed the event, or the latest one that tried. */
 	evaluationId: string | null;
@@ -93,7 +93,6 @@ export type PlatformEventReaction = {
 
 export type PlatformEventRecord = PlatformEvent & {
 	resolvedAt: Iso | null;
-	target: string | null;
 	links: PlatformEventLink[];
 	/** Sensors whose `platform_event` condition matches this event's kind. */
 	reactions: PlatformEventReaction[];
@@ -135,40 +134,6 @@ export type ConnectionTest = {
 	message: string;
 };
 
-export type StateTableName =
-	| '_sqlbuild_fingerprints'
-	| '_sqlbuild_audit_results'
-	| '_sqlbuild_source_freshness'
-	| '_sqlbuild_microbatches'
-	| '_sqlbuild_migrations'
-	| '_sqlbuild_old_name_views'
-	| '_sqlbuild_janitor_events';
-
-export type WarehouseCost = { amount: number; unit: 'credits' | 'GB scanned' };
-
-export type StateTableSync = {
-	table: StateTableName;
-	schemas: number;
-	lastSyncedAt: Iso | null;
-	/** Rows inserted by the last pass (idempotent on event ID). */
-	rowsLastPass: number;
-	lastError: string | null;
-	/** Warehouse cost of sync queries in the last 24 hours; null when the warehouse has no cost concept. */
-	cost24h: WarehouseCost | null;
-};
-
-export type LocationTarget = {
-	name: string;
-	adapter: string;
-	isDefault: boolean;
-	snapshot: Snapshot | null;
-	/** Image the current snapshot was published from; runs start from it. */
-	imageId: string | null;
-	warehouseConnection: string;
-	connectionTest: ConnectionTest | null;
-	stateSync: StateTableSync[];
-};
-
 export type LocationInstance = {
 	id: string;
 	imageId: string;
@@ -189,15 +154,19 @@ export type LocationDetail = {
 	failedDeploy: FailedDeploy | null;
 	lastLoadError: string | null;
 	instances: LocationInstance[];
-	targets: LocationTarget[];
+	target: LocationTarget;
+	snapshot: Snapshot | null;
+	/** Image the current snapshot was published from; runs start from it. Null for local processes. */
+	imageId: string | null;
+	warehouseConnection: string;
+	connectionTest: ConnectionTest | null;
 };
 
-export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'health' | 'brokenDeployPolicy' | 'failedDeploy'> & {
+export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'health' | 'brokenDeployPolicy' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
 	/** Unresolved platform events of this location. */
 	activeProblems: number;
 	liveInstances: number;
 	lastSeenAt: Iso | null;
-	targets: Pick<LocationTarget, 'name' | 'snapshot' | 'connectionTest'>[];
 };
 
 // ---- tokens ----
@@ -372,7 +341,8 @@ export type RoleDefinition = {
 	pendingApprovalId: string | null;
 };
 
-export type AssignmentScope = { locationId: string | null; target: string | null };
+/** `locationId: null` applies everywhere. */
+export type AssignmentScope = { locationId: string | null };
 
 export type RoleAssignment = {
 	id: string;
@@ -443,7 +413,6 @@ export type AccessQuery = {
 	principal: string;
 	action: Capability;
 	locationId: string;
-	target: string;
 	/** Optional job, group or node the action applies to. */
 	subject: string | null;
 };

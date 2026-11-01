@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
-	import { healthLabel, healthTone } from '$lib/platform/labels';
+	import { healthLabel, healthTone, targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 
 	const locations = $derived(app.bootstrap?.locations ?? []);
@@ -12,47 +12,24 @@
 		<DropdownMenu.Trigger class="switch" aria-label="Switch location">
 			<span class="badge">{app.location?.name.slice(0, 1).toUpperCase() ?? '·'}</span>
 			<span class="copy">
-				<small>Location</small>
 				<span class="value">{app.location?.name ?? '—'}</span>
+				<small>{app.location ? targetWords(app.location.target) : 'Location'}</small>
 			</span>
 			{#if app.location && app.location.health !== 'healthy'}
 				<i class="dot" style:background={healthTone[app.location.health]} title={healthLabel[app.location.health]}></i>
 			{/if}
 			<ChevronsUpDownIcon size={13} class="chev" />
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content class="w-60">
+		<DropdownMenu.Content class="w-64">
 			<DropdownMenu.Label>Locations</DropdownMenu.Label>
 			<DropdownMenu.RadioGroup value={app.locationId} onValueChange={(id) => app.selectLocation(id)}>
 				{#each locations as location (location.id)}
 					<DropdownMenu.RadioItem value={location.id}>
-						<i class="dot" style:background={healthTone[location.health]}></i>
+						<i class="dot" style:background={healthTone[location.health]} title={healthLabel[location.health]}></i>
 						<span class="flex min-w-0 flex-col">
 							<span class="truncate">{location.name}</span>
-							<small class="text-muted-foreground text-[11px]">{healthLabel[location.health]}</small>
-						</span>
-					</DropdownMenu.RadioItem>
-				{/each}
-			</DropdownMenu.RadioGroup>
-		</DropdownMenu.Content>
-	</DropdownMenu.Root>
-
-	<DropdownMenu.Root>
-		<DropdownMenu.Trigger class="switch" aria-label="Switch target">
-			<span class="copy">
-				<small>Target</small>
-				<span class="value">{app.target?.name ?? '—'}<em>{app.target?.adapter ?? ''}</em></span>
-			</span>
-			<ChevronsUpDownIcon size={13} class="chev" />
-		</DropdownMenu.Trigger>
-		<DropdownMenu.Content class="w-60">
-			<DropdownMenu.Label>Targets in {app.location?.name}</DropdownMenu.Label>
-			<DropdownMenu.RadioGroup value={app.targetName} onValueChange={(name) => app.selectTarget(name)}>
-				{#each app.location?.targets ?? [] as target (target.name)}
-					<DropdownMenu.RadioItem value={target.name}>
-						<span class="flex min-w-0 flex-col">
-							<span class="truncate">{target.name}{target.isDefault ? ' · default' : ''}</span>
 							<small class="text-muted-foreground text-[11px]">
-								{target.adapter}{target.snapshot ? ` · version ${target.snapshot.generation}` : ' · nothing deployed'}
+								{targetWords(location.target)}{location.snapshot ? ` · version ${location.snapshot.generation}` : ' · nothing deployed'}
 							</small>
 						</span>
 					</DropdownMenu.RadioItem>
@@ -79,9 +56,6 @@
 		padding: 7px 10px;
 		text-align: left;
 		font-size: 13px;
-	}
-	.switchers :global(.switch + .switch) {
-		border-top: 1px solid var(--sidebar-border);
 	}
 	.switchers :global(.switch:hover),
 	.switchers :global(.switch[data-state='open']) {
@@ -119,13 +93,6 @@
 		font-weight: 500;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-	}
-	.value em {
-		margin-left: 6px;
-		color: var(--muted-foreground);
-		font-size: 11px;
-		font-style: normal;
-		font-weight: 400;
 	}
 	.dot {
 		display: inline-block;

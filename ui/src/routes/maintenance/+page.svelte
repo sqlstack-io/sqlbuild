@@ -120,7 +120,7 @@
 						<td class="nowrap"><code class="muted" title="The run that did it: {m.runId}">{m.runId.replace(/^run-/, '')}</code></td>
 					</tr>
 				{:else}
-					<LoadRow colspan={6} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this target.'} />
+					<LoadRow colspan={6} resource={history} empty={migrations.length ? 'Nothing matches the search.' : 'No models have been renamed or moved in this location.'} />
 				{/each}
 			</tbody>
 		</table>
@@ -169,7 +169,7 @@
 						</td>
 					</tr>
 				{:else}
-					<LoadRow colspan={6} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names are being kept working in this target.'} />
+					<LoadRow colspan={6} resource={history} empty={views.length ? 'Nothing matches the search.' : 'No old names are being kept working in this location.'} />
 				{/each}
 			</tbody>
 		</table>
@@ -199,7 +199,7 @@
 						<td class="nowrap"><code class="muted" title={j.runId}>{j.runId.replace(/^run-/, '')}</code></td>
 					</tr>
 				{:else}
-					<LoadRow colspan={6} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this target.'} />
+					<LoadRow colspan={6} resource={history} empty={janitor.length ? 'Nothing matches the search.' : 'Nothing has been archived or deleted by clean-up in this location.'} />
 				{/each}
 			</tbody>
 		</table>

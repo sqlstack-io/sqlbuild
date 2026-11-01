@@ -63,7 +63,7 @@
 			<span class="faint">{c.severity} severity · {runScopePhaseLabel[c.runScopePhase].toLowerCase()} · {evaluationModeLabel[c.evaluationMode].toLowerCase()}</span>
 		{/if}
 	</div>
-	{#if res.error}<div class="msg err">Couldn't load this check: {res.error}</div>{:else if res.data === null}<div class="msg">There's no check <code>{id}</code> in the version deployed to {app.targetName}.</div>{/if}
+	{#if res.error}<div class="msg err">Couldn't load this check: {res.error}</div>{:else if res.data === null}<div class="msg">There's no check <code>{id}</code> in the version deployed to {app.location?.name}.</div>{/if}
 
 	{#if c}
 		<div class="flex min-h-0 flex-1">

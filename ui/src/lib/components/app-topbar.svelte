@@ -5,6 +5,7 @@
 	import type { ConnectionState } from '$lib/api';
 	import { theme, toggleTheme } from '$lib/theme.svelte';
 	import { formatAgo } from '$lib/format/time';
+	import { targetWords } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import PlatformEventBanner from './shell/platform-event-banner.svelte';
 	import WarehouseSyncStatus from './shell/warehouse-sync-status.svelte';
@@ -31,18 +32,18 @@
 		offline: 'Offline'
 	};
 
-	const snapshot = $derived(app.target?.snapshot ?? null);
+	const snapshot = $derived(app.location?.snapshot ?? null);
 </script>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
 	<h1 class="text-[15px] font-semibold">{title}</h1>
-	<span class="text-muted-foreground text-[12.5px]">{app.location?.name ?? '—'} / {app.targetName || '—'}</span>
+	<span class="text-muted-foreground text-[12.5px]">{app.location ? `${app.location.name} · ${targetWords(app.location.target)}` : '—'}</span>
 	<div class="ml-auto flex items-center gap-2.5">
 		<span
 			class="text-muted-foreground flex items-center gap-[7px] text-[12px]"
 			title={`${connectionTitle[app.connection]}\n${snapshot
 				? `Version ${snapshot.generation}: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''} by ${snapshot.gitAuthor} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
-				: 'Nothing deployed to this target yet'}`}
+				: 'Nothing deployed to this location yet'}`}
 		>
 			<span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>
 			{connectionLabel[app.connection]}

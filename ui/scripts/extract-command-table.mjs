@@ -28,7 +28,7 @@ const VERBS = {
 	freshness: 'Check source freshness'
 };
 
-/** Set by the server from the target switcher, the run token and the event stream. */
+/** Set by the server from the location's target, the run token and the event stream. */
 const SERVER_CONTROLLED = [
 	'--help',
 	'--target',

@@ -84,25 +84,28 @@ export type WarehouseSyncRequestResult = {
 	sync: WarehouseSync;
 };
 
-export type Target = {
+/** The one target a location is deployed against, e.g. `prod` on Snowflake. */
+export type LocationTarget = {
 	name: string;
 	adapter: string;
-	isDefault: boolean;
-	snapshot: Snapshot | null;
-	warehouseSync: WarehouseSync;
+	/** Where it builds, e.g. `WAFFLE_SHOP on example-account`; never secrets. */
+	connectionSummary: string;
 };
 
 export type LocationHealth = 'healthy' | 'degraded' | 'falling_back' | 'broken';
+/** A project deployed against exactly one target. Staging and dev are separate locations. */
 export type Location = {
 	/** Opaque server-generated UUID; the name is a mutable label. */
 	id: string;
 	name: string;
 	health: LocationHealth;
 	lastSeenAt: Iso | null;
-	targets: Target[];
+	target: LocationTarget;
+	snapshot: Snapshot | null;
+	warehouseSync: WarehouseSync;
 };
 
-export type Scope = { locationId: string; target: string };
+export type Scope = { locationId: string };
 
 // ---- bootstrap ----
 

@@ -47,7 +47,7 @@
 		incremental: 'var(--sb-layer-intermediate)',
 		task: 'var(--sb-stale)'
 	};
-	const targetBlocked = $derived(!!def?.targets && !def.targets.includes(app.targetName));
+	const targetBlocked = $derived(!!def?.targets && !def.targets.includes(app.target?.name ?? ''));
 </script>
 
 <AppTopbar title="Jobs">
@@ -75,7 +75,7 @@
 	{#if job.error}
 		<div class="msg err">Couldn't load this job: {job.error}</div>
 	{:else if job.data === null}
-		<div class="msg">There's no job or group named <code>{name}</code> in the version deployed to {app.targetName}.</div>
+		<div class="msg">There's no job or group named <code>{name}</code> in the version deployed to {app.location?.name}.</div>
 	{/if}
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 

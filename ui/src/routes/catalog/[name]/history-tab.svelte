@@ -18,7 +18,7 @@
 		<p class="formerly">Formerly known as {#each h.formerNames as f, i (f)}{i ? ', ' : ''}<code>{f}</code>{/each}</p>
 	{/if}
 
-	<Panel title="Renames and moves" note={h.migrations.length ? `${h.migrations.length} recorded in this target` : undefined}>
+	<Panel title="Renames and moves" note={h.migrations.length ? `${h.migrations.length} recorded in this location` : undefined}>
 		{#if h.migrations.length}
 			<table class="sb-list">
 				<thead><tr><th>When</th><th>Change</th><th>From</th><th>To</th><th>What happened</th><th>Run</th></tr></thead>
@@ -36,7 +36,7 @@
 				</tbody>
 			</table>
 		{:else}
-			<p class="muted">No renames or moves recorded for {node.key} in this target.</p>
+			<p class="muted">No renames or moves recorded for {node.key} in this location.</p>
 		{/if}
 	</Panel>
 

@@ -76,7 +76,8 @@ export class MockApiClient implements ApiClient {
 			role: () => this.#options.role,
 			can: (capability) => ROLE_CAPABILITIES[this.#options.role].includes(capability),
 			user: () => DEMO_USER,
-			adapter: (scope) => this.#location(scope).targets.find((t) => t.name === scope.target)?.adapter ?? '',
+			adapter: (scope) => this.#location(scope).target.adapter,
+			target: (scope) => this.#location(scope).target.name,
 			reply: (value) => this.#reply(value)
 		});
 		this.#platform = new MockPlatformApi({
@@ -93,7 +94,7 @@ export class MockApiClient implements ApiClient {
 		this.#build = new MockBuild({
 			now: this.#createdAt,
 			can: (capability) => ROLE_CAPABILITIES[this.#options.role].includes(capability),
-			adapter: (scope) => this.#location(scope).targets.find((t) => t.name === scope.target)?.adapter ?? '',
+			adapter: (scope) => this.#location(scope).target.adapter,
 			reply: (value) => this.#reply(value),
 			operate: this.#operate,
 			platform: this.#platform,
@@ -110,10 +111,7 @@ export class MockApiClient implements ApiClient {
 			capabilities: ROLE_CAPABILITIES[this.#options.role],
 			locations: this.#fixtures.locations.map((location) => ({
 				...location,
-				targets: location.targets.map((target) => ({
-					...target,
-					warehouseSync: this.#sync({ locationId: location.id, target: target.name })
-				}))
+				warehouseSync: this.#sync({ locationId: location.id })
 			}))
 		});
 	}
@@ -439,8 +437,7 @@ export class MockApiClient implements ApiClient {
 		const key = scopeKey(scope);
 		let sync = this.#syncs.get(key);
 		if (!sync) {
-			const target = this.#location(scope).targets.find((t) => t.name === scope.target)!;
-			sync = { ...target.warehouseSync };
+			sync = { ...this.#location(scope).warehouseSync };
 			this.#syncs.set(key, sync);
 		}
 		return sync;
@@ -455,9 +452,7 @@ export class MockApiClient implements ApiClient {
 
 	#location(scope: Scope) {
 		const location = this.#fixtures.locations.find((l) => l.id === scope.locationId);
-		if (!location || !location.targets.some((t) => t.name === scope.target)) {
-			throw new ApiError(`Unknown location or target: ${scope.locationId} / ${scope.target}`, 404);
-		}
+		if (!location) throw new ApiError(`Unknown location: ${scope.locationId}`, 404);
 		return location;
 	}
 
@@ -473,5 +468,5 @@ export class MockApiClient implements ApiClient {
 }
 
 function scopeKey(scope: Scope): string {
-	return `${scope.locationId}/${scope.target}`;
+	return scope.locationId;
 }

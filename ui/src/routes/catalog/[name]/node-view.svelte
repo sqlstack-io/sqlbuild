@@ -121,7 +121,7 @@
 		</div>
 	</header>
 
-	{#if res.error}<div class="msg err">Couldn't load {name}: {res.error}</div>{:else if res.data === null}<div class="msg">There's no node <code>{name}</code> in the version deployed to {app.targetName}.</div>{/if}
+	{#if res.error}<div class="msg err">Couldn't load {name}: {res.error}</div>{:else if res.data === null}<div class="msg">There's no node <code>{name}</code> in the version deployed to {app.location?.name}.</div>{/if}
 
 	{#if n}
 		<div class="asset-body" class:fill={tab === 'lineage' || tab === 'collineage' || (tab === 'sql' && !!n.sql) || tab === 'drift'}>

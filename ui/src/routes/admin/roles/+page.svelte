@@ -72,8 +72,6 @@
 	let newPrincipal = $state('');
 	let newRole = $state('');
 	let newLocation = $state('');
-	let newTarget = $state('');
-	const newTargets = $derived(locations.find((l) => l.id === newLocation)?.targets ?? []);
 
 	async function assign() {
 		busy = 'assign';
@@ -82,7 +80,7 @@
 			await app.client.createRoleAssignment({
 				principal: newPrincipal.trim(),
 				role: newRole,
-				scope: { locationId: newLocation || null, target: newLocation && newTarget ? newTarget : null }
+				scope: { locationId: newLocation || null }
 			});
 			newPrincipal = '';
 			assignments.refresh();
@@ -226,11 +224,7 @@
 				</select>
 				<select class="field" bind:value={newLocation} aria-label="Location">
 					<option value="">All locations</option>
-					{#each locations as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-				</select>
-				<select class="field" bind:value={newTarget} aria-label="Target" disabled={!newLocation}>
-					<option value="">All targets</option>
-					{#each newTargets as t (t.name)}<option value={t.name}>{t.name}</option>{/each}
+					{#each locations as l (l.id)}<option value={l.id}>{l.name} · {l.target.name}</option>{/each}
 				</select>
 				<GatedButton requires="role.assign" variant="default" busy={busy === 'assign'} disabled={!newPrincipal.trim() || !newRole} onclick={assign}>Assign role</GatedButton>
 				{#if staleCount}<span class="note warn">{staleCount} stale {staleCount === 1 ? 'assignment grants' : 'assignments grant'} nothing</span>{/if}
