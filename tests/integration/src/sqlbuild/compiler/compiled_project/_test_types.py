@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlbuild.orchestration import Schedule
+from sqlbuild.orchestration import CalendarSchedule, Job, JobGroup, Schedule, Sensor
 
 
 @dataclass(frozen=True)
@@ -251,7 +251,7 @@ class SnapshotDiscoveryTestCase:
     description: str
     files: dict[str, str]
     expected_jobs: tuple[str, ...]
-    declarations: tuple[()] | None = None
+    declarations: tuple[Job | JobGroup | CalendarSchedule | Sensor, ...] | None = None
     expected_groups: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     expected_sensors: dict[str, dict[str, object]] = field(default_factory=dict)
     expected_schedules: tuple[str, ...] = ()

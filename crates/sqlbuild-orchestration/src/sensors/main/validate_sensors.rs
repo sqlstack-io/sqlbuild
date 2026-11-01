@@ -6,10 +6,17 @@ use crate::store::errors::ControlError;
 
 pub(crate) fn validate_sensors(definitions: &Definitions) -> Result<(), ControlError> {
     for (name, sensor) in &definitions.sensors {
-        let SensorCondition::PlatformEvent { kinds } = &sensor.when;
+        let valid_condition = match &sensor.when {
+            SensorCondition::PlatformEvent { kinds } => !kinds.is_empty(),
+            SensorCondition::RunEvent { job_key, kinds } => {
+                !kinds.is_empty()
+                    && (definitions.jobs.contains_key(job_key)
+                        || definitions.groups.contains_key(job_key))
+            }
+        };
         if name.trim().is_empty()
             || sensor.description.trim().is_empty()
-            || kinds.is_empty()
+            || !valid_condition
             || (!definitions.jobs.contains_key(&sensor.job_key)
                 && !definitions.groups.contains_key(&sensor.job_key))
         {

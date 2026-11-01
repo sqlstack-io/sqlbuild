@@ -16,7 +16,7 @@ from contextlib import AbstractContextManager, contextmanager, nullcontext, supp
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -387,10 +387,16 @@ def worker_result(worker: ScheduledWorker, test_case: WorkerExecutionTestCase) -
             "SELECT external_context FROM recall_invocations WHERE command = 'location'"
         ).fetchall()
         assert contexts, log.read_text()
-        assert all(
-            context is not None and json.loads(context)["run_id"] == run["run_id"]
-            for (context,) in contexts
-        )
+        assert all(context is not None for (context,) in contexts)
+        expected_run_ids: set[str] = {
+            run_id
+            for (run_id,) in control.execute(
+                "SELECT run_id FROM sqb_runs WHERE kind<>'group' AND ended_at IS NOT NULL"
+            ).fetchall()
+        }
+        assert {
+            json.loads(cast(str, context))["run_id"] for (context,) in contexts
+        } == expected_run_ids
         assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
     with duckdb.connect(str(project / "warehouse.duckdb"), read_only=True) as warehouse:
         assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows

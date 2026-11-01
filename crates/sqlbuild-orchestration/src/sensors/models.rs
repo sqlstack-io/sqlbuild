@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
 use crate::platform::models::PlatformEventKind;
+use crate::runs::models::RunOutcome;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -31,7 +32,50 @@ impl SensorStatus {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SensorCondition {
-    PlatformEvent { kinds: BTreeSet<PlatformEventKind> },
+    PlatformEvent {
+        kinds: BTreeSet<PlatformEventKind>,
+    },
+    RunEvent {
+        job_key: String,
+        kinds: BTreeSet<RunEventKind>,
+    },
+}
+
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum RunEventKind {
+    Completed,
+    Success,
+    Warn,
+    Partial,
+    Failed,
+    Cancelled,
+    PresumedFailed,
+}
+
+impl RunEventKind {
+    #[must_use]
+    pub const fn matches(self, outcome: RunOutcome) -> bool {
+        matches!(
+            (self, outcome),
+            (Self::Completed, _)
+                | (Self::Success, RunOutcome::Success)
+                | (Self::Warn, RunOutcome::Warn)
+                | (Self::Partial, RunOutcome::Partial)
+                | (Self::Failed, RunOutcome::Failed)
+                | (Self::Cancelled, RunOutcome::Cancelled)
+                | (Self::PresumedFailed, RunOutcome::PresumedFailed)
+        )
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TerminalSensorRun {
+    pub(crate) run_id: Uuid,
+    pub(crate) status: RunOutcome,
+    pub(crate) last_event_storage_id: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

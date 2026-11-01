@@ -122,8 +122,13 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         with urlopen(request, timeout=5) as response:
             triggers: list[dict[str, Any]] = json.load(response)
         by_name: dict[str, dict[str, Any]] = {trigger["name"]: trigger for trigger in triggers}
-        assert len(triggers) == 2
-        assert set(by_name) == {"edge_snapshot_orders", "edge_platform_orders"}
+        assert len(triggers) == 4
+        assert set(by_name) == {
+            "edge_snapshot_orders",
+            "edge_platform_orders",
+            "edge_job_outcomes",
+            "edge_group_outcomes",
+        }
         scheduled: dict[str, Any] = by_name["edge_snapshot_orders"]
         assert scheduled["status"] == "paused"
         assert scheduled["definition_json"]["starts_at"] == "2026-07-02T19:47:23.456789Z"
@@ -135,6 +140,18 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             "kind": "platform_event",
             "kinds": ["tick_overdue", "location_broken", "launch_failed"],
         }
+        assert by_name["edge_job_outcomes"]["definition_json"]["when"] == {
+            "kind": "run_event",
+            "job_key": "edge_snapshot_orders",
+            "kinds": ["warn", "partial"],
+        }
+        assert by_name["edge_group_outcomes"]["definition_json"]["when"] == {
+            "kind": "run_event",
+            "job_key": "edge_snapshot_group",
+            "kinds": ["completed"],
+        }
+        assert by_name["edge_job_outcomes"]["status"] == "paused"
+        assert by_name["edge_group_outcomes"]["status"] == "paused"
 
 
 @pytest.mark.parametrize(

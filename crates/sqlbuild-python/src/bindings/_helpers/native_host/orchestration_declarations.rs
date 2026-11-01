@@ -10,6 +10,7 @@ use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use serde_json::Value;
 use sqlbuild_host::entries::models::UserCodeHost;
 
+use crate::bindings::_helpers::native_host::constants::RUN_EVENT_CONDITION;
 use crate::bindings::_helpers::native_host::host::entry;
 
 #[derive(FromPyObject)]
@@ -47,16 +48,18 @@ pub(crate) struct AuthoredGroup {
 }
 
 #[derive(FromPyObject)]
-pub(crate) struct AuthoredPlatformCondition {
+pub(crate) struct AuthoredSensorCondition {
     pub(crate) kind: String,
     pub(crate) kinds: Vec<String>,
+    #[pyo3(default)]
+    pub(crate) job: Option<AuthoredJobReference>,
 }
 
 #[derive(FromPyObject)]
 pub(crate) struct AuthoredSensor {
     pub(crate) name: String,
     pub(crate) description: String,
-    pub(crate) when: AuthoredPlatformCondition,
+    pub(crate) when: AuthoredSensorCondition,
     pub(crate) run: AuthoredJobReference,
     #[pyo3(from_py_with = authored_setting)]
     pub(crate) minimum_interval_seconds: Value,
@@ -155,6 +158,16 @@ pub(crate) fn collect_declarations<'py>(
                 ));
             }
             pending.push(target);
+            let condition = declaration.getattr("when")?;
+            if condition.getattr("kind")?.extract::<String>()? == RUN_EVENT_CONDITION {
+                let source = condition.getattr("job")?;
+                if !source.is_instance(&job)? && !source.is_instance(&group)? {
+                    return Err(PyTypeError::new_err(
+                        "run_event job must be a Job or JobGroup object",
+                    ));
+                }
+                pending.push(source);
+            }
             AuthoredDeclaration::Sensor(declaration.extract()?)
         } else if declaration.is_instance(&calendar)? {
             let target = declaration.getattr("job")?;

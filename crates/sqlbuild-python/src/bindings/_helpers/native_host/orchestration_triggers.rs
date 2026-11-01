@@ -263,10 +263,14 @@ pub(crate) fn compile_sensors(
         if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == target) {
             continue;
         }
+        let mut condition = json!({"kind": sensor.when.kind, "kinds": sensor.when.kinds});
+        if let Some(job) = sensor.when.job {
+            condition["job_key"] = json!(job.name);
+        }
         let definition: SensorDefinition = serde_json::from_value(json!({
             "description": sensor.description,
             "job_key": sensor.run.name,
-            "when": {"kind": sensor.when.kind, "kinds": sensor.when.kinds},
+            "when": condition,
             "minimum_interval_seconds": sensor.minimum_interval_seconds,
             "default_status": sensor.default_status,
         }))

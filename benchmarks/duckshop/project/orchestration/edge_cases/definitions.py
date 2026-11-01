@@ -2,9 +2,11 @@
 
 from sqlbuild.orchestration import (
     PlatformEventKind,
+    RunEventKind,
     job,
     job_group,
     platform_event,
+    run_event,
     schedule,
     sensor,
 )
@@ -73,3 +75,19 @@ edge_health = sensor(
     default_status="stopped",
 )
 edge_factory_results.append(edge_health)
+
+edge_job_outcomes = sensor(
+    "edge_job_outcomes",
+    description="Keep warning and partial outcomes distinct from success.",
+    when=run_event(job=edge_orders, kinds=[RunEventKind.WARN, RunEventKind.PARTIAL]),
+    run=edge_inventory,
+    default_status="stopped",
+)
+edge_group_outcomes = sensor(
+    "edge_group_outcomes",
+    description="Observe group completion including cancellation and presumed failure.",
+    when=run_event(job=edge_group, kinds=[RunEventKind.COMPLETED]),
+    run=edge_inventory,
+    default_status="stopped",
+)
+edge_factory_results.extend([edge_job_outcomes, edge_group_outcomes])
