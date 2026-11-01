@@ -3,7 +3,7 @@ MODEL (
     One row per support ticket note with order references and reasons found by regular expressions,
     written with escaped and dollar-quoted patterns, a SKU normalised by a macro after an escaped
     quote, campaign and discount codes matched by pattern lists and escapes, and SKUs split at edge
-    positions
+    positions; the note text and tags are passed on as written
   """,
   tags [edge_case],
   columns (
@@ -29,6 +29,8 @@ MODEL (
     sku_from_zero (type VARCHAR),
     sku_last_two (type VARCHAR),
     sku_before_start (type VARCHAR),
+    body (type VARCHAR),
+    tags_text (type VARCHAR),
   ),
 );
 
@@ -67,7 +69,9 @@ final AS (
     SPLIT_PART(s.sku, '', 1)::VARCHAR AS sku_part_no_delimiter,
     SUBSTR(s.sku, 0, 3)::VARCHAR AS sku_from_zero,
     SUBSTR(s.sku, -2)::VARCHAR AS sku_last_two,
-    SUBSTR(s.sku, -10, 3)::VARCHAR AS sku_before_start
+    SUBSTR(s.sku, -10, 3)::VARCHAR AS sku_before_start,
+    s.body,
+    s.tags_text
   FROM src AS s
 )
 
