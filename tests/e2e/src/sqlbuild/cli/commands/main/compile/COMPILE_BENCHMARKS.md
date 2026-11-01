@@ -121,14 +121,14 @@ its own budget because it reruns every rule on less parallel work.
 | Cache 3,000 cold | 1.221, 1.158, 1.166 | 1.114 (3) | 1.17 | 10.5 s |
 | Cache 3,000 project-config edit | 1.203, 1.276, 1.232 | 1.170 (3) | 1.24 | 11.2 s |
 | Cache 5,000 cold | 1.174 | 1.107 (3) | 1.18 | 17.1 s |
-| Cache 5,000 project-config edit | 1.497 isolated, see below | 1.165 (3) | 1.25 | 18.1 s |
+| Cache 5,000 project-config edit | 1.497 isolated, see below | 1.165 (3) | 1.24 | 18.0 s |
 | Cache 10,000 cold | 1.198 | 1.118 (3, fixed order) | 1.20 | 33.6 s |
 | Cache 10,000 project-config edit | 1.316 | 1.249 (3, fixed order) | 1.32 | 37.0 s |
 
 The single 5,000-model project-config pair took 1.39x its own cold compile against 1.08x to 1.13x on
 three other CI runs, so it uses the local median times that size's CI over local cold ratio (1.06).
-Warm, edit, memory and ratio budgets are unchanged, and the cold budget only sets the timeout of the
-cache-disabled run.
+Warm, edit, memory and ratio budgets are unchanged. The cold budget bounds the cold run and sets the
+cache-disabled timeout, and no longer the project-config edit.
 
 The warm and edit modes reuse the cold project. A warm run that misses the analysis cache, or an
 edit run that does not, stops the comparison because it would measure the wrong path.

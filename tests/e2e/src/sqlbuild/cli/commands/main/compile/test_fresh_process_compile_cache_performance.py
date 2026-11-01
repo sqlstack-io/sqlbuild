@@ -127,11 +127,11 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             test_count=4_908,
             audit_count=8_427,
             # Default SQL Rules scale 14.5 s by the CI cost over select = []: 1.18x cold and
-            # 1.25x for the project-config edit, which reruns every rule.
+            # 1.24x for the project-config edit, which reruns every rule.
             expected_cold_max_wall_seconds=17.1,
             expected_warm_max_wall_seconds=7.0,
             expected_edit_max_wall_seconds=7.0,
-            expected_project_config_edit_max_wall_seconds=18.1,
+            expected_project_config_edit_max_wall_seconds=18.0,
             expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
             expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
             expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
