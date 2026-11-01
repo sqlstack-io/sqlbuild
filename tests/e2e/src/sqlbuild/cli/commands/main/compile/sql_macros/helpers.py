@@ -558,7 +558,7 @@ def scoped_model(macros: dict[str, str], body: str) -> dict[str, str]:
 
 SQL_RULES: dict[str, str] = {
     "sqlbuild_project.toml": BASE_FILES["sqlbuild_project.toml"]
-    + '\n[rules]\nselect = ["SQBRSQL028", "SQBRSQL029"]\n'
+    + '\n[rules]\nselect = ["SQLCLEAN028", "SQLCLEAN029"]\n'
 }
 
 

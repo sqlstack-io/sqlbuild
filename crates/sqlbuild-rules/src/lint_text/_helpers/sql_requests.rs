@@ -5,17 +5,19 @@ use std::borrow::Cow;
 use serde_json::{Map, Value};
 use sqlbuild_attachments::ceremonial_select::main::omitted_select_offset::omitted_select_offset;
 use sqlbuild_attachments::ceremonial_select::models::OmittedSelect;
+use sqlbuild_core::constants::PROJECT_CONFIG_FILENAME;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::lint_text::_helpers::sql_diagnostics::{
     sql_macro_output_spans, without_generated_comments,
 };
 use crate::lint_text::constants::{
-    CROSS_KEYWORD, CTE_ARGUMENT, INVALID_BATCH, LINE_COMMENT_PREFIX, LINT_API_VERSION,
-    OMITTED_CEREMONIAL_SELECT_SQL,
+    CROSS_KEYWORD, CTE_ARGUMENT, EMPTY_FIXTURE_RELATION, FIXTURE_CTE_MARKERS,
+    FIXTURE_HARNESS_CTE_PREFIXES, INVALID_BATCH, LINE_COMMENT_PREFIX, LINT_API_VERSION,
+    LONG_LITERAL_GUIDANCE, OMITTED_CEREMONIAL_SELECT_SQL,
 };
 use crate::lint_text::models::{LintSqlBody, LintSqlOptions};
-use crate::sql_lint::main::batch_engine::lint_batch_json;
+use sqlclean::sql_lint::main::batch_engine::lint_batch_json;
 
 /// Where a fixture body omits its ceremonial `SELECT 1`, so the parser sees one statement.
 pub(crate) fn omitted_select(body: &LintSqlBody) -> Option<usize> {
@@ -96,6 +98,26 @@ fn top_level_arguments(arguments: &str) -> Vec<&str> {
     parts
 }
 
+/// The harness SQLBuild wraps a test or macro body in; its inputs may read the empty fixture.
+fn fixture_harness(body: &LintSqlBody) -> Value {
+    let mut harness: Map<String, Value> = Map::new();
+    let _ = harness.insert(
+        "cte_prefixes".to_string(),
+        Value::from(FIXTURE_HARNESS_CTE_PREFIXES.to_vec()),
+    );
+    if body.allows_empty_fixture_star {
+        let _ = harness.insert(
+            "input_cte_prefixes".to_string(),
+            Value::from(FIXTURE_CTE_MARKERS.to_vec()),
+        );
+        let _ = harness.insert(
+            "empty_relation".to_string(),
+            Value::from(EMPTY_FIXTURE_RELATION),
+        );
+    }
+    Value::Object(harness)
+}
+
 fn strings(values: &[String]) -> Value {
     Value::from(values.to_vec())
 }
@@ -131,6 +153,14 @@ pub(crate) fn lint_payload(
     let _ = payload.insert("version".to_string(), Value::from(LINT_API_VERSION));
     let _ = payload.insert("sql".to_string(), Value::from(sql));
     let _ = payload.insert("dialect".to_string(), Value::from(options.dialect.clone()));
+    let _ = payload.insert(
+        "config_file".to_string(),
+        Value::from(PROJECT_CONFIG_FILENAME),
+    );
+    let _ = payload.insert(
+        "long_literal_guidance".to_string(),
+        Value::from(LONG_LITERAL_GUIDANCE),
+    );
     if !outputs.is_empty() {
         let _ = payload.insert("sql_macro_outputs".to_string(), Value::from(outputs));
     }
@@ -151,18 +181,11 @@ pub(crate) fn lint_payload(
             let _ = payload.insert(key.to_string(), strings(values));
         }
     }
-    let flags: [(&str, bool); 3] = [
-        ("allows_ceremonial_select", body.allows_ceremonial_select),
-        (
-            "allows_dynamic_output_star",
-            body.allows_dynamic_output_star,
-        ),
-        ("allows_empty_fixture_star", body.allows_empty_fixture_star),
-    ];
-    for (key, enabled) in flags {
-        if enabled {
-            let _ = payload.insert(key.to_string(), Value::Bool(true));
-        }
+    if body.allows_dynamic_output_star {
+        let _ = payload.insert("allows_dynamic_output_star".to_string(), Value::Bool(true));
+    }
+    if body.allows_ceremonial_select {
+        let _ = payload.insert("fixture_harness".to_string(), fixture_harness(body));
     }
     let _ = payload.insert(
         "max_literal_length".to_string(),

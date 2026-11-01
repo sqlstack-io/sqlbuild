@@ -68,8 +68,12 @@ RULES_BUILT_IN_CODES: tuple[str, ...] = (
     "SQBRTEST203",
     "SQBRTEST301",
 )
-SQL_CODES: tuple[str, ...] = tuple(f"SQBRSQL{number:03d}" for number in range(1, 46))
-BUILT_IN_CODES: tuple[str, ...] = tuple(sorted((*RULES_BUILT_IN_CODES, *SQL_CODES)))
+SQL_CODES: tuple[str, ...] = tuple(f"SQLCLEAN{number:03d}" for number in range(1, 54))
+SQL_DEFAULT_CODES: tuple[str, ...] = tuple(
+    f"SQLCLEAN{number:03d}"
+    for number in (1, 2, 3, 4, 5, 6, 7, 9, 10, 18, 19, 20, 39, 46, 47, 48, 51, 52, 53)
+)
+BUILT_IN_CODES: tuple[str, ...] = tuple(sorted(RULES_BUILT_IN_CODES))
 STRUCTURE_CODES: tuple[str, ...] = (
     "SQBRMODEL101",
     "SQBRMODEL102",
@@ -119,7 +123,6 @@ NON_STRUCTURE_CODES: tuple[str, ...] = tuple(
             "SQBRPROJECT203",
             "SQBRPROJECT204",
             *SQL_TEST_CODES,
-            *SQL_CODES,
         )
     )
 )
@@ -129,7 +132,7 @@ NON_STRUCTURE_CODES: tuple[str, ...] = tuple(
     "test_case",
     (
         PolicySelectionTestCase(
-            description="built-in namespace activates every built-in",
+            description="SQBR namespace activates every SQLBuild-owned built-in",
             select=("SQBR",),
             ignore=(),
             expected_codes=BUILT_IN_CODES,
@@ -153,9 +156,33 @@ NON_STRUCTURE_CODES: tuple[str, ...] = tuple(
             expected_codes=SQL_TEST_CODES,
         ),
         PolicySelectionTestCase(
+            description="no selection activates SQLClean's default SQL Rules only",
+            select=None,
+            ignore=(),
+            expected_codes=SQL_DEFAULT_CODES,
+        ),
+        PolicySelectionTestCase(
             description="empty selection activates no rules",
             select=(),
             ignore=(),
+            expected_codes=(),
+        ),
+        PolicySelectionTestCase(
+            description="SQLCLEAN family activates every SQL Rule, opt-in ones too",
+            select=("SQLCLEAN",),
+            ignore=(),
+            expected_codes=SQL_CODES,
+        ),
+        PolicySelectionTestCase(
+            description="exact opt-in SQL code activates only that Rule",
+            select=("SQLCLEAN050",),
+            ignore=(),
+            expected_codes=("SQLCLEAN050",),
+        ),
+        PolicySelectionTestCase(
+            description="ignoring the SQLCLEAN family without a selection activates nothing",
+            select=None,
+            ignore=("SQLCLEAN",),
             expected_codes=(),
         ),
         PolicySelectionTestCase(

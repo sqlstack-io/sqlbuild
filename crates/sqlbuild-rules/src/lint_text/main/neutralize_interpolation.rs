@@ -7,8 +7,8 @@ use crate::lint_text::_helpers::sites::{
 };
 use crate::lint_text::constants::LINT_SENTINEL_PREFIX;
 use crate::lint_text::errors::LintTextError;
+use crate::lint_text::main::backtick_identifiers::backtick_identifiers;
 use crate::lint_text::models::Neutralized;
-use crate::sql_lint::main::backtick_identifiers::backtick_identifiers;
 
 /// Neutralize references for lint, or every intrinsic spelling in any case for formatting.
 pub fn neutralize_interpolation(

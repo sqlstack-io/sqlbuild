@@ -2893,7 +2893,7 @@ def write_set_operation_project(
     }[adapter == "duckdb"]
     files: dict[str, str] = {
         "sqlbuild_project.toml": (
-            f'name = "orders"\nadapter = "{adapter}"\n{target}[rules]\nselect = ["SQBRSQL020"]\n'
+            f'name = "orders"\nadapter = "{adapter}"\n{target}[rules]\nselect = ["SQLCLEAN020"]\n'
         ),
     }
     for model in models:
@@ -2962,7 +2962,7 @@ def run_set_operation_lifecycle(
 def run_set_arity_rule(*, project_dir: Path) -> subprocess.CompletedProcess[str]:
     """Run the set-operation arity Rule over every model."""
 
-    return run_sqb(project_dir=project_dir, command=("rules", "run", "SQBRSQL020"))
+    return run_sqb(project_dir=project_dir, command=("rules", "run", "SQLCLEAN020"))
 
 
 def format_set_operation_models(

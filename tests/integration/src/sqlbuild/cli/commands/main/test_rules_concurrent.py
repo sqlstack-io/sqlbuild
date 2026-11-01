@@ -26,9 +26,9 @@ def test_given_sql_and_custom_exceptions_when_compiling_cold_and_warm_then_both_
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n'
-        '[rules]\nselect = ["SQBRSQL004", "XSQBRARCH001"]\n'
+        '[rules]\nselect = ["SQLCLEAN004", "XSQBRARCH001"]\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
-        '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\n'
+        '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\n'
         'path = "models/orders.sql"\nreason = "A single synthetic row is intentional."\n'
         '[[rules.rule_exceptions]]\nrule = "XSQBRARCH001"\n'
         'path = "models/orders.sql"\nreason = "The synthetic model name is intentional."\n'

@@ -1,4 +1,4 @@
-"""E2E coverage of macro mocks that name their value, as SQBRSQL022 asks."""
+"""E2E coverage of macro mocks that name their value, as SQLCLEAN022 asks."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
 
 _PROJECT_TOML: str = (
     'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
-    '[scopes]\nenforce_placement = false\n\n[rules]\nselect = ["SQBRSQL022"]\n'
+    '[scopes]\nenforce_placement = false\n\n[rules]\nselect = ["SQLCLEAN022"]\n'
 )
 _REGION_MACRO: str = (
     "MACRO (\n  description \"The sales region filter\",\n  returns BOOLEAN,\n);\n\nregion = 'NA'\n"
@@ -38,7 +38,7 @@ _TEST: str = (
     "test_case",
     [
         MacroMockAliasTestCase(
-            description="an aliased mock satisfies SQBRSQL022",
+            description="an aliased mock satisfies SQLCLEAN022",
             mock_select="SELECT 'region = ''EU''' AS region_filter",
             command=("--no-color", "compile"),
             expected_exit_code=0,
@@ -52,11 +52,11 @@ _TEST: str = (
             expected_fragment="PASS=1  FAIL=0",
         ),
         MacroMockAliasTestCase(
-            description="an unaliased mock is reported by SQBRSQL022",
+            description="an unaliased mock is reported by SQLCLEAN022",
             mock_select="SELECT 'region = ''EU'''",
             command=("--no-color", "compile"),
             expected_exit_code=1,
-            expected_fragment="SQBRSQL022",
+            expected_fragment="SQLCLEAN022",
         ),
     ],
     ids=lambda case: case.description,

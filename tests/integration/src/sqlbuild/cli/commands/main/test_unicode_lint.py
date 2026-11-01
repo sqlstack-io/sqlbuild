@@ -26,58 +26,58 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import Unicode
             (
                 UnicodeRuleLocationTestCase(
                     "uncontrolled star",
-                    "SQBRSQL021",
+                    "SQLCLEAN021",
                     "SELECT 'LABEL' AS label, * FROM orders",
                     ("* FROM",),
                 ),
                 UnicodeRuleLocationTestCase(
-                    "controlled projection", "SQBRSQL021", "SELECT 'LABEL' AS label", ()
+                    "controlled projection", "SQLCLEAN021", "SELECT 'LABEL' AS label", ()
                 ),
                 UnicodeRuleLocationTestCase(
                     "computed terminal",
-                    "SQBRSQL035",
+                    "SQLCLEAN035",
                     "WITH final AS (SELECT 'LABEL' AS label) SELECT label || 'x' AS label FROM final",
                     ("SELECT label ||",),
                 ),
                 UnicodeRuleLocationTestCase(
                     "plain terminal",
-                    "SQBRSQL035",
+                    "SQLCLEAN035",
                     "((WITH final AS (SELECT 'LABEL' AS label) SELECT label FROM final))",
                     (),
                 ),
                 UnicodeRuleLocationTestCase(
                     "nested CTE",
-                    "SQBRSQL036",
+                    "SQLCLEAN036",
                     "SELECT 'LABEL' AS label, (WITH nested_orders AS (SELECT 1 AS order_id) SELECT order_id FROM nested_orders) AS order_id",
                     ("WITH nested_orders",),
                 ),
                 UnicodeRuleLocationTestCase(
                     "root wrapper",
-                    "SQBRSQL036",
+                    "SQLCLEAN036",
                     "((WITH final AS (SELECT 'LABEL' AS label) SELECT label FROM final))",
                     (),
                 ),
                 UnicodeRuleLocationTestCase(
                     "computed join",
-                    "SQBRSQL040",
+                    "SQLCLEAN040",
                     "WITH orders AS (SELECT 'LABEL' AS label) SELECT o.label FROM orders AS o JOIN orders AS c ON LOWER(o.label) = c.label",
                     ("ON LOWER",),
                 ),
                 UnicodeRuleLocationTestCase(
                     "plain join",
-                    "SQBRSQL040",
+                    "SQLCLEAN040",
                     "WITH orders AS (SELECT 'LABEL' AS label) SELECT o.label FROM orders AS o JOIN orders AS c ON o.label = c.label",
                     (),
                 ),
                 UnicodeRuleLocationTestCase(
                     "wrong final name",
-                    "SQBRSQL041",
+                    "SQLCLEAN041",
                     "WITH marker AS (SELECT 'LABEL' AS label), orders AS (SELECT label FROM marker) SELECT label FROM orders",
                     ("orders AS",),
                 ),
                 UnicodeRuleLocationTestCase(
                     "valid final name",
-                    "SQBRSQL041",
+                    "SQLCLEAN041",
                     "((WITH marker AS (SELECT 'LABEL' AS label), final AS (SELECT label FROM marker) SELECT label FROM final))",
                     (),
                 ),

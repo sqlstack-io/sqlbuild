@@ -21,6 +21,7 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     PreparedArtifactsCompileTestCase,
 )
 from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
+    NO_RULES_CONFIG,
     SELECTED_RULES_CONFIG,
     TEST_PLANNING_MODELS,
     compile_project_json,
@@ -68,7 +69,10 @@ _SECOND_FILESYSTEM: Path = Path("/dev/shm")
             max_prepared_models=1,
         ),
         BackgroundTestPlanningCompileTestCase(
-            "no-cache compile without selected rules", ("--no-cache",), "", keep_project_unchanged
+            "no-cache compile without selected rules",
+            ("--no-cache",),
+            NO_RULES_CONFIG,
+            keep_project_unchanged,
         ),
         BackgroundTestPlanningCompileTestCase(
             "no-cache compile that stages every artifact",
@@ -188,7 +192,7 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
 ) -> None:
     use_staging_directory_factory(monkeypatch, create_staging=test_case.staging_directory_factory)
     config_path: Path = tmp_path / "sqlbuild_project.toml"
-    config: str = 'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQBRSQL021"]\n'
+    config: str = 'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN021"]\n'
     config_path.write_text(config, encoding="utf-8")
     models: Path = tmp_path / "models"
     models.mkdir()
@@ -228,7 +232,7 @@ def test_given_existing_artifacts_when_rules_fail_then_staged_changes_are_not_pu
         encoding="utf-8",
     )
     config_path.write_text(
-        config.replace('select = ["SQBRSQL021"]', 'select = ["XSQBRARCH001"]'), encoding="utf-8"
+        config.replace('select = ["SQLCLEAN021"]', 'select = ["XSQBRARCH001"]'), encoding="utf-8"
     )
     assert main(arguments) == 1
     failed: dict[str, object] = json.loads(capsys.readouterr().out)

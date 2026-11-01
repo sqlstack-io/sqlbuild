@@ -1,3 +1,5 @@
+pub mod backtick_identifiers;
+pub mod defined_cte_names;
 pub mod dependency_sites;
 pub mod first_header_only;
 pub mod format_fixture_blocks;
@@ -11,6 +13,7 @@ pub mod neutralize_context_interpolation;
 pub mod neutralize_interpolation;
 pub mod neutralize_sql_macro_parameters;
 pub mod neutralize_test_parameters;
+pub mod preparation;
 pub mod reject_inline_suppressions;
 pub mod resolve_format_settings;
 pub mod restore_interpolation;

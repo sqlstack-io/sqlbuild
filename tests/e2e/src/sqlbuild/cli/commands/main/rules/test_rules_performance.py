@@ -49,7 +49,7 @@ def test_given_advanced_project_and_disabled_cache_when_running_rules_then_finis
     config_path: Path = project_dir / "sqlbuild_project.toml"
     config_path.write_text(
         config_path.read_text(encoding="utf-8")
-        + ('\n[rules]\nselect = ["SQBR", "XSQBR"]\n[rules.cache]\nenabled = true\n'),
+        + ('\n[rules]\nselect = ["SQBR", "SQLCLEAN", "XSQBR"]\n[rules.cache]\nenabled = true\n'),
         encoding="utf-8",
     )
 

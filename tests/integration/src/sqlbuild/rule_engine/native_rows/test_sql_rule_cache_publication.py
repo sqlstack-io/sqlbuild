@@ -63,7 +63,7 @@ def test_given_increasing_findings_when_publishing_cache_then_findings_are_store
             project_dir=project_dir,
             project=project,
             model_paths=frozenset(paths),
-            selected=(SimpleNamespace(code="SQBRSQL004", custom=False),),
+            selected=(SimpleNamespace(code="SQLCLEAN004", custom=False),),
             effective_config=SimpleNamespace(thresholds={}, cache=SimpleNamespace(enabled=True)),
         )
         result: SqlRulesEvaluation = native.run_planned_sql_rules(

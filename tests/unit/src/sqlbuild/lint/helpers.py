@@ -2,7 +2,6 @@
 
 import itertools
 import json
-import re
 from pathlib import Path
 from typing import cast
 
@@ -50,14 +49,33 @@ def write_fixture_format_project(
     return test_file
 
 
-_RESERVED_KEYWORDS_DIR: Path = (
-    Path(__file__).resolve().parents[5]
-    / "crates"
-    / "sqlbuild-analysis"
-    / "src"
-    / "sql_tokens"
-    / "reserved_keywords"
-)
+_RESERVED_NAMES: dict[str, frozenset[str]] = {
+    "duckdb": frozenset({"any", "only", "order", "pivot", "some"}),
+    "postgres": frozenset({"any", "only", "order", "some"}),
+    "bigquery": frozenset(
+        {
+            "any",
+            "exclude",
+            "ignore",
+            "left",
+            "nulls",
+            "order",
+            "preceding",
+            "range",
+            "recursive",
+            "rows",
+            "some",
+            "tablesample",
+            "within",
+        }
+    ),
+    "snowflake": frozenset({"any", "order", "row", "rows", "some", "tablesample"}),
+    "tsql": frozenset(
+        {"any", "index", "key", "left", "order", "pivot", "some", "tablesample", "view"}
+    ),
+    "databricks": frozenset(),
+}
+_FOLDED_KEYWORDS: tuple[str, ...] = ("select", "from", "where", "union", "order")
 _DIALECTS: tuple[str, ...] = ("duckdb", "postgres", "bigquery", "snowflake", "tsql", "databricks")
 _KEYWORD_NAMED_IDENTIFIERS: tuple[str, ...] = (
     "Left",
@@ -102,10 +120,9 @@ _DUCKDB_SHAPES: tuple[tuple[str, str], ...] = (("struct key", "select {{{name}: 
 
 
 def reserved_keywords(dialect: str) -> frozenset[str]:
-    """Return the lower-case reserved keywords of one dialect from the native data files."""
+    """Return which of the keyword-named identifiers SQLClean reserves in one dialect."""
 
-    text: str = (_RESERVED_KEYWORDS_DIR / f"{dialect}.txt").read_text(encoding="utf-8")
-    return frozenset(re.findall(r"^[a-z_]+$", text, flags=re.MULTILINE))
+    return _RESERVED_NAMES[dialect]
 
 
 def keyword_name_positions() -> tuple[tuple[str, str, str, str], ...]:
@@ -128,12 +145,14 @@ def keyword_name_positions() -> tuple[tuple[str, str, str, str], ...]:
 
 
 def reserved_keyword_pairs() -> tuple[tuple[str, str], ...]:
-    """Return every (dialect, reserved keyword) pair from the native data files."""
+    """Return (dialect, keyword) pairs for core keywords every dialect but Databricks reserves."""
 
-    pairs: list[tuple[str, str]] = []
-    for dialect in _DIALECTS:
-        pairs.extend((dialect, keyword) for keyword in sorted(reserved_keywords(dialect)))
-    return tuple(pairs)
+    return tuple(
+        (dialect, keyword)
+        for dialect in _DIALECTS
+        if _RESERVED_NAMES[dialect]
+        for keyword in _FOLDED_KEYWORDS
+    )
 
 
 def format_project_json(

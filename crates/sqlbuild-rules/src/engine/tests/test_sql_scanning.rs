@@ -1,9 +1,9 @@
 use crate::engine::tests::test_types::{
     DialectCallsTestCase, DollarQuoteSiteTestCase, LintDialectSiteTestCase, SqlScannerTestCase,
 };
+use crate::lint_text::_helpers::preparation::prepare;
 use crate::query_facts::main::model_shape::model_shape;
 use crate::rules::_helpers::numeric_decisions::compact_sql;
-use crate::sql_lint::_helpers::preparation::prepare;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
 use sqlbuild_sqltext::sql_scan::main::quote_policy::quote_policy as rules_quote_policy;
 use sqlbuild_sqltext::sql_scan::models::QuotePolicy;

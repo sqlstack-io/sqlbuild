@@ -48,7 +48,7 @@ class UnevaluatedResourceCase:
     expected_reason: str = "E_GUARD_FUNCTION_NESTING_DEPTH_EXCEEDED"
     adapter: str = "duckdb"
     extra_files: tuple[tuple[str, str], ...] = ()
-    rule: str = "SQBRSQL035"
+    rule: str = "SQLCLEAN035"
 
 
 @dataclass(frozen=True)
@@ -356,3 +356,14 @@ class ClickHouseCommentE2ETestCase:
     description: str
     comment: str
     expected_location: str
+
+
+@dataclass(frozen=True)
+class DefaultRuleSelectionCase:
+    description: str
+    rules_section: str
+    sql: str
+    command: tuple[str, ...]
+    expected_exit: int
+    expected_finding: bool
+    expected_notices: int

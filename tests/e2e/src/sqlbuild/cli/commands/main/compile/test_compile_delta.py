@@ -204,7 +204,7 @@ _FOLDER_RULE_CASES: tuple[str, str] = (
 # Built-in Rules cannot parse PIVOT models, which would fail the stored compile's Rules.
 _BUILT_IN_RULES_OFF: tuple[str, str, str] = (
     "sqlbuild_project.toml",
-    'select = ["SQBR", "XSQBR"]',
+    'select = ["SQBR", "SQLCLEAN", "XSQBR"]',
     'select = ["XSQBR"]',
 )
 _RULE_READ_MORE: str = "delta compile fell back: a custom rule read more than the changed models"

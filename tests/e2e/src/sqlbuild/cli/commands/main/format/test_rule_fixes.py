@@ -23,7 +23,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.format._test_types import (
             "verification failure",
             'MODEL (description "Test model.", sql_analysis false);\nWITH unused AS (SELECT 1 AS item) SELECT 2 AS item',
             "refused",
-            "SQBRSQL005",
+            "SQLCLEAN005",
             1,
             True,
             True,
@@ -33,7 +33,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.format._test_types import (
             'MODEL (description "Test model.");\n'
             'WITH unused AS (SELECT customer_id FROM __ref("customers")) SELECT 2 AS item',
             "refused",
-            "SQBRSQL005",
+            "SQLCLEAN005",
             0,
             False,
             True,
@@ -44,7 +44,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.format._test_types import (
             "WITH first AS (SELECT 1 AS item), second AS (SELECT item FROM first), "
             "third AS (SELECT item FROM second) SELECT 2 AS item",
             "applied",
-            "SQBRSQL005",
+            "SQLCLEAN005",
             0,
             False,
             False,

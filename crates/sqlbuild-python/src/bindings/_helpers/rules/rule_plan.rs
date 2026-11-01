@@ -89,6 +89,18 @@ pub(crate) fn rule_run_plan<'py>(
         }
         selected = kept;
     }
+    if no_sql_analysis {
+        let mut kept: Vec<Bound<'py, PyAny>> = Vec::with_capacity(selected.len());
+        for rule in selected {
+            if !field(&rule, "code")?
+                .extract::<String>()?
+                .starts_with(SQL_RULE_PREFIX)
+            {
+                kept.push(rule);
+            }
+        }
+        selected = kept;
+    }
     let mut custom_rules: Vec<Bound<'py, PyAny>> = Vec::new();
     for rule in &selected {
         if field(rule, "custom")?.is_truthy()? {

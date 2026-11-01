@@ -29,10 +29,11 @@ use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
+use crate::bindings::_helpers::rules::constants::UNSAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::early_sql_lint::{
-    EarlyLintResult, EarlySqlLint, PreparedSqlLint, sql_lint_settings, sql_rule_cache_path,
+    EarlyLintResult, EarlySqlLint, ExpansionReuse, PreparedSqlLint, sql_lint_settings,
+    sql_rule_cache_path,
 };
 use crate::bindings::_helpers::rules::fact_replay::project_attribute;
 use crate::bindings::_helpers::rules::lint_expansion::{
@@ -52,7 +53,7 @@ const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";
 const BUILTINS_MODULE: &str = "builtins";
 const PATHLIB_MODULE: &str = "pathlib";
-const SQL_RULE_SUPPRESSION_CODE: &str = "SQBRSQL000";
+const SQL_RULE_SUPPRESSION_CODE: &str = "SQBRSUPPRESSION000";
 const DEFAULT_REMEDIATION: &str = "Update the authored SQL to satisfy this rule.";
 const UTF8: &str = "utf-8";
 
@@ -615,18 +616,17 @@ fn lint_expansion_context(
     run: &SqlRun<'_, '_>,
 ) -> PyResult<crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs> {
     let py: Python<'_> = run.project.py();
-    let declaration_scope: Option<Bound<'_, PyAny>> = run
+    let reuse: Option<&ExpansionReuse> = run
         .early_lint
         .as_ref()
         .and_then(|early| early.expansion_reuse())
-        .filter(|reuse| reuse.discovered_inputs.bind(py).is(&run.discovered_inputs))
-        .map(|reuse| reuse.declaration_scope.bind(py).clone());
+        .filter(|reuse| reuse.discovered_inputs.bind(py).is(&run.discovered_inputs));
     lint_expansion_inputs(LintExpansionSources {
         project_dir: run.project_dir.clone().into_pyobject(py)?.into_any(),
-        value_renderer: None,
+        value_renderer: reuse.map(|reuse| reuse.value_renderer.bind(py).clone()),
         discovered_inputs: (!run.discovered_inputs.is_none())
             .then(|| run.discovered_inputs.clone()),
-        declaration_scope,
+        declaration_scope: reuse.map(|reuse| reuse.declaration_scope.bind(py).clone()),
         static_declaration_scope: None,
     })
 }
@@ -678,7 +678,7 @@ fn lint_finding(
     };
     let path: String = posix(path);
     let fixable: bool = violation.fix.is_some()
-        && SAFE_RULE_FIX_CODES.contains(&violation.code.as_str())
+        && !UNSAFE_RULE_FIX_CODES.contains(&violation.code.as_str())
         && fixable_paths.contains(&path);
     RuleFinding {
         code: violation.code.clone(),

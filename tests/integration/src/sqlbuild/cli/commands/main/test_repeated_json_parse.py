@@ -1,4 +1,4 @@
-"""Real-CLI coverage for SQBRSQL045, a JSON payload parsed more than once in one SELECT."""
+"""Real-CLI coverage for SQLCLEAN045, a JSON payload parsed more than once in one SELECT."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ def test_given_json_parses_when_compiling_and_running_rules_then_repeats_fail_at
 
     assert main(["--project-dir", str(tmp_path), "compile", "--no-cache"]) == expected_exit_code
     capsys.readouterr()
-    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL045"])
+    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN045"])
     findings: list[dict[str, object]] = json.loads(capsys.readouterr().out)["findings"]
 
     assert result == expected_exit_code
@@ -147,7 +147,7 @@ def test_given_snowflake_json_parses_when_running_rules_then_repeats_are_reporte
 ) -> None:
     write_repeated_json_parse_project(tmp_path=tmp_path, test_case=test_case)
 
-    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL045"])
+    result: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN045"])
     findings: list[dict[str, object]] = json.loads(capsys.readouterr().out)["findings"]
 
     assert result == int(bool(test_case.expected_locations))

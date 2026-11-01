@@ -1570,11 +1570,6 @@ path = "crates/sqlbuild-analysis/src/assembly/analysis_session/models.rs"
 reason = "NullabilityCallback implements Debug manually because it holds the adapter's nullability rule closure, which cannot implement Debug; other models derive it."
 
 [[targets.rust.rule_exceptions]]
-rule = "FPRSL105"
-path = "crates/sqlbuild-analysis/src/sql_tokens/main/builtin_function_names.rs"
-reason = "This test-support entry exists only for the SQL lint tests in sqlbuild-rules, which the analyzer does not count as importers."
-
-[[targets.rust.rule_exceptions]]
 rule = "FPRSS130"
 path = "crates/sqlbuild-python/src/bindings/_helpers/native_threads/exit_signal.rs"
 symbols = ["signal_interpreter_exit"]

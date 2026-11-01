@@ -25,7 +25,7 @@ fn given_models_when_hashing_rule_keys_together_then_each_key_matches_its_single
             expected_key_count: 64,
         },
     ];
-    let codes: Vec<String> = vec!["SQBRSQL001".to_owned(), "SQBRSQL033".to_owned()];
+    let codes: Vec<String> = vec!["SQLCLEAN001".to_owned(), "SQLCLEAN033".to_owned()];
 
     for test_case in test_cases {
         let inputs: Vec<ModelKeyInput<'_>> = test_case

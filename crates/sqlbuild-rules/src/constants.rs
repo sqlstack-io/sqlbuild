@@ -26,15 +26,14 @@ pub(crate) const BOOLEAN_TYPE: &str = "BOOLEAN";
 pub(crate) const DATE_TYPE: &str = "DATE";
 pub(crate) const DECLARATION_DOMAIN_COMPONENTS: usize = 3;
 pub(crate) const RULE_CODE_NUMBER_LENGTH: usize = 3;
-pub(crate) const EMPTY_FIXTURE_QUERY_TOKEN_COUNT: usize = 6;
-pub(crate) const ENCLOSING_CTE_TOKEN_COUNT: usize = 3;
 pub(crate) const SETTING_SNIPPET_INDENT: &str = "            ";
 pub(crate) const NATIVE_ROWS_MEMO_VERSION: &str = "native-rules-rows-response-v2";
-pub(crate) const SQL_RULE_PREFIX: &str = "SQBRSQL";
+/// The namespace of the SQL Rules SQLClean owns, whose codes are `SQLCLEAN` and three digits.
+pub(crate) const SQL_RULE_PREFIX: &str = "SQLCLEAN";
 /// Threshold key setting the fewest test cases a custom rule must ship.
 pub const MIN_CUSTOM_RULE_TEST_CASES_KEY: &str = "min_custom_rule_test_cases";
 /// Rules whose findings name a joined relation, so an exception may cover just that relation.
-pub(crate) const RELATION_EXCEPTION_RULES: [&str; 1] = ["SQBRSQL038"];
+pub(crate) const RELATION_EXCEPTION_RULES: [&str; 1] = ["SQLCLEAN038"];
 /// The layers the `<domain>__<layer>__<entity>` model name grammar accepts.
 pub(crate) const MODEL_NAME_LAYERS: [&str; 7] = [
     "stg",

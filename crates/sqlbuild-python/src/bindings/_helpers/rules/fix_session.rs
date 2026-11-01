@@ -28,8 +28,8 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::{field, replaced};
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs;
-use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
+use crate::bindings::_helpers::rules::constants::UNSAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::fix_facts::compile_facts;
 use crate::bindings::_helpers::rules::fix_verdict::fix_verdict;
 use crate::bindings::_helpers::rules::lint_expansion::{
@@ -214,7 +214,7 @@ impl<'py> FixSession<'py> {
         for violation in violations {
             if !field(&violation, "code")?
                 .extract::<String>()?
-                .starts_with("SQBRSQL")
+                .starts_with("SQLCLEAN")
             {
                 continue;
             }
@@ -272,8 +272,8 @@ impl<'py> FixSession<'py> {
         let facts = FixEligibility {
             model_body: model_paths.contains(&path)?,
             has_fix,
-            safe_code: SAFE_RULE_FIX_CODES.contains(&code.extract::<String>()?.as_str()),
-            conditionless_join: code.eq("SQBRSQL003")?,
+            safe_code: !UNSAFE_RULE_FIX_CODES.contains(&code.extract::<String>()?.as_str()),
+            conditionless_join: code.eq("SQLCLEAN003")?,
             snowflake: field(&self.config, "dialect")?.eq("snowflake")?,
         };
         if let Some(reason) = refusal(&facts) {

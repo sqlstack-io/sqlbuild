@@ -19,7 +19,12 @@ from tests.integration.src.sqlbuild.cli.commands.main._test_types import (
     StarExpansionCompileTestCase,
     StarLineageCompileTestCase,
 )
-from tests.integration.src.sqlbuild.cli.commands.main.helpers import compile_duckdb_projection
+from tests.integration.src.sqlbuild.cli.commands.main.helpers import compile_duckdb_query
+
+# Cases that check facts through derived tables turn off the Rule that asks for a CTE instead.
+_DERIVED_RELATION_PROJECT: str = (
+    'name = "orders"\nadapter = "duckdb"\n\n[rules]\nignore = ["SQLCLEAN039"]\n'
+)
 
 
 @pytest.mark.parametrize(
@@ -64,7 +69,7 @@ def test_given_derived_native_facts_when_compiling_then_contract_and_execution_a
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     models: Path = tmp_path / "models"
     models.mkdir()
     (models / "orders.sql").write_text(
@@ -112,7 +117,7 @@ def test_given_star_over_inferred_upstream_when_compiling_then_downstream_bindin
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     models: Path = tmp_path / "models"
     models.mkdir()
     (models / "staged_orders.sql").write_text(
@@ -155,7 +160,7 @@ def test_given_star_over_derived_table_when_compiling_then_lineage_matches_proje
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     seeds: Path = tmp_path / "seeds"
     seeds.mkdir()
     (seeds / "order_labels.csv").write_text("order_id,label\n1,first\n")
@@ -255,8 +260,8 @@ def test_given_snapshot_reader_when_compiling_then_validity_columns_are_known(
     (
         KeywordFunctionCompileTestCase(
             description="keyword timestamps compile and execute",
-            projection=(
-                "CURRENT_TIMESTAMP AS created_at, LOCALTIMESTAMP AS local_created_at, "
+            query=(
+                "SELECT CURRENT_TIMESTAMP AS created_at, LOCALTIMESTAMP AS local_created_at, "
                 "CURRENT_TIME AS created_time, LOCALTIME AS local_created_time"
             ),
             expected_exit_code=0,
@@ -264,9 +269,9 @@ def test_given_snapshot_reader_when_compiling_then_validity_columns_are_known(
         ),
         KeywordFunctionCompileTestCase(
             description="keyword timestamp in a CTE arithmetic filter",
-            projection=(
-                "created_at FROM (SELECT CURRENT_TIMESTAMP AS created_at) AS recent "
-                "WHERE created_at > CURRENT_TIMESTAMP - INTERVAL 1 DAY"
+            query=(
+                "WITH recent AS (SELECT CURRENT_TIMESTAMP AS created_at) "
+                "SELECT created_at FROM recent WHERE created_at > CURRENT_TIMESTAMP - INTERVAL 1 DAY"
             ),
             expected_exit_code=0,
             expected_diagnostics=(),
@@ -279,9 +284,7 @@ def test_given_duckdb_keyword_function_when_compiling_then_compiled_sql_executes
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    exit_code, codes = compile_duckdb_projection(
-        tmp_path=tmp_path, capsys=capsys, projection=test_case.projection
-    )
+    exit_code, codes = compile_duckdb_query(tmp_path=tmp_path, capsys=capsys, query=test_case.query)
 
     assert exit_code == test_case.expected_exit_code
     assert codes == test_case.expected_diagnostics
@@ -295,7 +298,7 @@ def test_given_duckdb_keyword_function_when_compiling_then_compiled_sql_executes
     (
         KeywordFunctionCompileTestCase(
             description="parenthesized keyword timestamp is still unknown",
-            projection="CURRENT_TIMESTAMP() AS created_at",
+            query="SELECT CURRENT_TIMESTAMP() AS created_at",
             expected_exit_code=1,
             expected_diagnostics=("B101",),
         ),
@@ -307,9 +310,7 @@ def test_given_invalid_duckdb_keyword_call_when_compiling_then_function_is_rejec
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    exit_code, codes = compile_duckdb_projection(
-        tmp_path=tmp_path, capsys=capsys, projection=test_case.projection
-    )
+    exit_code, codes = compile_duckdb_query(tmp_path=tmp_path, capsys=capsys, query=test_case.query)
 
     assert exit_code == test_case.expected_exit_code
     assert codes == test_case.expected_diagnostics
@@ -444,7 +445,7 @@ def test_given_bound_wildcard_or_using_join_when_compiling_then_facts_match_exec
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
+    (tmp_path / "sqlbuild_project.toml").write_text(_DERIVED_RELATION_PROJECT)
     sources: Path = tmp_path / "sources"
     sources.mkdir()
     (sources / "orders.yml").write_text(

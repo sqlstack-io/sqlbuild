@@ -165,7 +165,7 @@ fn paren_end(bytes: &[u8], open: usize, policy: QuotePolicy) -> Option<usize> {
     }
 }
 
-/// A numbered sentinel such as `__sqb_lint_0__`.
+/// A numbered sentinel such as `__sqlclean_interpolation_0__`.
 pub(crate) fn sentinel(prefix: &str, index: usize) -> String {
     format!("{prefix}{index}{SENTINEL_SUFFIX}")
 }
