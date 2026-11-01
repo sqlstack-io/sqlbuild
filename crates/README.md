@@ -107,6 +107,14 @@ the goldens in `tests/goldens/compiler`, with stage captures and full discovery,
 analysis coverage required. CI also runs it on Python 3.13 and 3.14, and compiles and builds a
 playground project on Windows.
 
+## Service credentials
+
+Principal API tokens require an active service account at issuance and on every authenticated
+request. Person sessions are a separate credential mechanism. Existing personal API-token rows
+remain in storage for history but cannot authenticate; disabling a service account also
+invalidates its tokens across replicas without a process-local cache. Location and run-claim
+credentials retain their separate scopes and lifecycle checks.
+
 ## Individual node and check transitions
 
 `NodeEventKind.FAILED` matches entry into failure; repeated failures do not retrigger it.

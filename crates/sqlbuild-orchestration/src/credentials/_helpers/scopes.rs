@@ -23,7 +23,8 @@ pub(crate) async fn scope_is_active(
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let (sql, parameters) = match scope {
         CredentialScope::Principal { principal_id } => (
-            "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 AND disabled_at IS NULL",
+            "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 \
+             AND kind='service_account' AND disabled_at IS NULL",
             vec![Parameter::Id(principal_id)],
         ),
         CredentialScope::Location { location_id } => (
