@@ -11,6 +11,7 @@ use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
+use crate::native_commands::types::LocationPublication;
 
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
@@ -151,12 +152,6 @@ pub(crate) struct LocationWatch {
     pub(crate) changed_at: tokio::time::Instant,
     pub(crate) retry_at: Option<tokio::time::Instant>,
 }
-
-/// Private interpreter response: publication metadata and its earliest calendar refresh deadline.
-pub(crate) type LocationPublication = (
-    sqlbuild_orchestration::snapshots::models::SnapshotRecord,
-    Option<DateTime<Utc>>,
-);
 
 /// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
 #[derive(Debug)]

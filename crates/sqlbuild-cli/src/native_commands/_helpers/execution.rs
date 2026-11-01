@@ -45,9 +45,10 @@ use crate::native_commands::constants::{
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationPublication,
-    LocationServe, LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
+    LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
 };
+use crate::native_commands::types::LocationPublication;
 use crate::workers::main::open_workers::open_workers;
 use crate::workers::models::Workers;
 

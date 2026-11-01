@@ -19,7 +19,7 @@ use crate::bindings::_helpers::compiled_project::snapshot::{
     NativeOrchestrationSnapshot, build_orchestration_snapshot,
 };
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::location_command::constants::PUBLISH_ACTION;
+use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::native_host::host::write_console;
@@ -50,7 +50,7 @@ fn metadata(
     let generation = arguments
         .value("generation")?
         .extract::<Option<i64>>()?
-        .or_else(|| (action.as_deref() == Some("execute")).then_some(1))
+        .or_else(|| (action.as_deref() == Some(EXECUTE_ACTION)).then_some(1))
         .ok_or_else(|| PyValueError::new_err("publish requires --generation"))?;
     if target.trim().is_empty() || generation < 1 {
         return Err(PyValueError::new_err(
@@ -132,11 +132,10 @@ fn compile_location<'py>(
         view,
         &serde_json::to_string(input).map_err(|error| PyValueError::new_err(error.to_string()))?,
         project_dir.extract()?,
-        // Workers verify nodes and environment, not dynamic calendar declarations.
         arguments
             .value("action")?
             .extract::<Option<String>>()?
-            .is_some_and(|action| action == "execute")
+            .is_some_and(|action| action == EXECUTE_ACTION)
             .then(Vec::new),
     )?;
     status(py, "Location snapshot compiled.")?;
