@@ -80,3 +80,10 @@ pub(crate) struct PasswordApiTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_lifetime: i64,
 }
+
+pub(crate) struct ProxyApiTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) trusted_peer: &'static str,
+    pub(crate) expected_authentications: usize,
+}

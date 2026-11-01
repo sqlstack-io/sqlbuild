@@ -1052,6 +1052,13 @@
         "group": 1
        },
        {
+        "kind": "store",
+        "options": ["--trusted-proxy-config"],
+        "dest": "control_trusted_proxy_config",
+        "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",
+        "group": 1
+       },
+       {
         "kind": "store_true",
         "options": [
          "--no-scheduler"

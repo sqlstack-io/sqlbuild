@@ -3,7 +3,7 @@
 use utoipa::OpenApi;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 
-use crate::api::constants::PASSWORD_COOKIE;
+use crate::api::constants::{PASSWORD_COOKIE, PROXY_USER_HEADER};
 use crate::api::models::ControlApi;
 
 #[must_use]
@@ -22,6 +22,16 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
         .add_security_scheme(
             "session",
             SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new(PASSWORD_COOKIE))),
+        );
+    document
+        .components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(
+            "proxy",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                PROXY_USER_HEADER,
+                "Upstream-replaced subject; only accepted from explicitly configured socket peers",
+            ))),
         );
     document
 }

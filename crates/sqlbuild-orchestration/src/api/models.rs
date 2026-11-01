@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
+use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::resources::{
     changes, location_health, location_work, run_reads, runs, snapshots, trigger_reads,
     warehouse_metadata,
@@ -14,6 +15,7 @@ use crate::api::_helpers::resources::{
     password_sessions::current,
     password_sessions::logout,
     password_sessions::change_password,
+    trusted_proxy::identity,
     changes::subscribe,
     location_health::report,
     location_health::recent,
@@ -100,10 +102,25 @@ pub struct DevelopmentScope {
 pub struct ApiAuthentication {
     pub development_scope: Option<DevelopmentScope>,
     pub password_origin: Option<String>,
+    pub trusted_proxy: Option<TrustedProxyAuthentication>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PasswordOrigin(pub(crate) String);
+pub(crate) struct BrowserOrigin(pub(crate) String);
+
+/// Explicit person bindings require an upstream-replaced X-SQB-User; no provisioning or grants.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrustedProxyAuthentication {
+    pub origin: String,
+    pub trusted_peers: std::collections::BTreeSet<std::net::IpAddr>,
+    pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ProxyIdentityResponse {
+    pub principal_id: uuid::Uuid,
+}
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

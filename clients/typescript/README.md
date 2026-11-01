@@ -38,3 +38,33 @@ refetching the authorized REST resources; the stream is not durable history.
 Browser `EventSource` cannot set a bearer header: use a fetch-based SSE consumer
 for the existing machine-authenticated endpoint. Human browser sessions are a
 separate authentication contract, not an inferred privilege of this client.
+
+## Authenticate through a trusted proxy
+
+Create a person with `sqb admin create-principal orders-reader`, then put the
+returned `principal_id` in a server-owned JSON file. Subjects are exact ASCII
+upstream identities, not inferred local usernames or email addresses:
+
+```json
+{
+  "origin": "https://control.example.com",
+  "trusted_peers": ["127.0.0.1"],
+  "identities": {
+    "external-orders-reader": "00000000-0000-0000-0000-000000000001"
+  }
+}
+```
+
+Replace the example UUID with the created person's ID, then start
+`sqb server --trusted-proxy-config proxy.json`. The proxy must terminate HTTPS,
+remove any client-supplied `X-SQB-User`, and replace it with the authenticated
+upstream subject. Restrict access to the HTTP backend to the configured proxy
+peers. Trusting loopback also trusts other local processes on that host;
+`Forwarded` and `X-Forwarded-For` never establish peer trust.
+
+Through that proxy, `GET /api/auth/proxy` returns the bound `principal_id` only.
+It issues no cookie or bearer and grants no machine or resource authority.
+Unbound subjects, missing or disabled people, and service accounts are denied;
+accounts are not auto-provisioned. Password and trusted-proxy modes cannot be
+combined. No default role or SSO group assignment is inferred by this identity
+endpoint.

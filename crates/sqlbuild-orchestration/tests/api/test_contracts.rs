@@ -20,6 +20,8 @@ mod test_location_health;
 mod test_location_work;
 #[path = "test_passwords.rs"]
 mod test_passwords;
+#[path = "test_proxy.rs"]
+mod test_proxy;
 #[path = "test_reads.rs"]
 mod test_reads;
 #[path = "test_types.rs"]

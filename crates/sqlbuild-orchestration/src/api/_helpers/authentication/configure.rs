@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use axum::Router;
 
-use crate::api::_helpers::authentication::password_sessions::router;
+use crate::api::_helpers::authentication::{password_sessions, trusted_proxy};
 use crate::api::models::{ApiAuthentication, DevelopmentScope};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -17,6 +17,7 @@ pub(crate) fn configure(
     let ApiAuthentication {
         development_scope,
         password_origin,
+        trusted_proxy,
     } = authentication;
     if development_scope.is_some() && password_origin.is_some() {
         return Err(ControlError::Invalid(
@@ -28,5 +29,14 @@ pub(crate) fn configure(
             "disabled authentication requires a loopback listener".into(),
         ));
     }
-    Ok((development_scope, router(store, password_origin)?))
+    if trusted_proxy.is_some() && (development_scope.is_some() || password_origin.is_some()) {
+        return Err(ControlError::Invalid(
+            "trusted-proxy authentication cannot be combined with disabled or password authentication".into(),
+        ));
+    }
+    Ok((
+        development_scope,
+        password_sessions::router(store, password_origin)?
+            .merge(trusted_proxy::router(store, trusted_proxy)?),
+    ))
 }

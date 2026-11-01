@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
+use sqlbuild_orchestration::api::models::ApiAuthentication;
 use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
@@ -251,6 +252,26 @@ pub(crate) fn control_address(
         _ => 8000,
     };
     Ok(Some(SocketAddr::new(host, port)))
+}
+
+pub(crate) fn control_authentication(
+    namespace: &Namespace,
+) -> Result<ApiAuthentication, ControlError> {
+    let trusted_proxy = text(namespace, "control_trusted_proxy_config")
+        .map(|path| {
+            let document = std::fs::read_to_string(path).map_err(|_| {
+                ControlError::Invalid("could not read trusted-proxy configuration".into())
+            })?;
+            serde_json::from_str(&document).map_err(|_| ControlError::Invalid(
+                "trusted-proxy configuration requires valid JSON with origin, trusted_peers and identities".into(),
+            ))
+        })
+        .transpose()?;
+    Ok(ApiAuthentication {
+        password_origin: text(namespace, "control_password_origin"),
+        trusted_proxy,
+        ..ApiAuthentication::default()
+    })
 }
 
 pub(crate) fn control_database(namespace: &Namespace) -> Result<String, ControlError> {
