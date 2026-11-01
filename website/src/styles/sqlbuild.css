@@ -2,7 +2,7 @@
 :root {
 	--sl-font: 'Inter', system-ui, sans-serif;
 	--sl-font-mono: 'IBM Plex Mono', 'SQLBuild Box Drawing', ui-monospace, monospace;
-	--sl-nav-height: 60px;
+	--sl-nav-height: 80px;
 	--sl-content-width: 50rem;
 	--sl-sidebar-width: 18rem;
 	--sqb-toc-width: 16rem;

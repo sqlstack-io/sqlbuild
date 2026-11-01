@@ -24,6 +24,7 @@
 		<link rel="icon" type="image/png" href="assets/icon.png" />
 		<link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 		<link rel="stylesheet" href="styles.css" />
+		<link rel="stylesheet" href="brand.css" />
 		<script>
 			(function () {
 				var stored = localStorage.getItem('sqlbuild-theme');
@@ -35,10 +36,13 @@
 	<body>
 		<header class="site-header">
 			<div class="wrap">
-				<a class="brand" href="/" aria-label="SQLBuild home">
-					<img class="logo-for-light" src="assets/logo-light.png" alt="SQLBuild" width="116" height="30" />
-					<img class="logo-for-dark" src="assets/logo-dark.png" alt="SQLBuild" width="116" height="30" />
-				</a>
+				<div class="brand-group">
+					<a class="brand" href="/" aria-label="SQLBuild home">
+						<img class="logo-for-light" src="assets/logo-light.png" alt="SQLBuild" width="116" height="30" />
+						<img class="logo-for-dark" src="assets/logo-dark.png" alt="SQLBuild" width="116" height="30" />
+					</a>
+					<a class="brand-byline" href="https://sqlstack.io">by SQLStack</a>
+				</div>
 				<nav class="nav" aria-label="Main">
 					<a class="hide-sm" href="#how">How it works</a>
 					<a href="/docs/">Docs</a>
@@ -491,6 +495,19 @@ payment_id <span class="dim">|</span> order_id <span class="dim">|</span> amount
 					<a href="https://github.com/sqlstack-io/sqlbuild">GitHub</a> ·
 					<a href="https://pypi.org/project/sqlbuild/">PyPI</a>
 				</span>
+			</div>
+			<div class="wrap sqlstack-family">
+				<a class="sqlstack-parent" href="https://sqlstack.io">
+					<img class="sqlstack-for-light" src="/assets/sqlstack.png" width="28" height="23" alt="" />
+					<img class="sqlstack-for-dark" src="/assets/sqlstack-dark.png" width="28" height="23" alt="" />
+					<span>Part of SQLStack</span>
+				</a>
+				<nav class="sqlstack-products" aria-label="SQLStack products">
+					<a href="/">SQLBuild</a>
+					<a href="https://sqlclean.io">SQLClean</a>
+					<a href="https://docs.streambuild.dev">SQLTide</a>
+					<a href="https://docs.fensu.dev">Fensu</a>
+				</nav>
 			</div>
 		</footer>
 
