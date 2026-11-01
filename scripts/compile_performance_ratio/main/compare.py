@@ -16,7 +16,6 @@ from scripts.compile_performance_ratio._helpers.measure import (
 from scripts.compile_performance_ratio._helpers.report import append_summary, comparison_markdown
 from scripts.compile_performance_ratio._helpers.verdict import phase_failures, ratio_failures
 from scripts.compile_performance_ratio.constants import (
-    COLD_MODE,
     COMPILE_MODES,
     DEFAULT_MAX_RATIO,
     DEFAULT_RUNS,
@@ -64,20 +63,13 @@ def compare_compile_performance(argv: list[str] | None = None) -> int:
             modes=modes,
             compile_args=tuple(args.compile_args),
         )
-    mode_max_ratios: dict[str, float] = {
-        mode: limit
-        for mode, limit in ((COLD_MODE, args.cold_max_ratio), (EDIT_MODE, args.edit_max_ratio))
-        if limit is not None
-    }
+    mode_max_ratios: dict[str, float] = (
+        {} if args.edit_max_ratio is None else {EDIT_MODE: args.edit_max_ratio}
+    )
     gate_phases: tuple[str, ...] = tuple(dict.fromkeys(args.gate_phases))
-    mode_cpu_max_ratios: dict[str, float] = {
-        mode: limit
-        for mode, limit in (
-            (COLD_MODE, args.cold_max_cpu_ratio),
-            (EDIT_MODE, args.edit_max_cpu_ratio),
-        )
-        if limit is not None
-    }
+    mode_cpu_max_ratios: dict[str, float] = (
+        {} if args.edit_max_cpu_ratio is None else {EDIT_MODE: args.edit_max_cpu_ratio}
+    )
     failures: tuple[str, ...] = (
         phase_failures(
             comparisons=comparisons,
@@ -139,18 +131,6 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--max-ratio", type=float, default=DEFAULT_MAX_RATIO)
-    parser.add_argument(
-        "--cold-max-ratio",
-        type=float,
-        default=None,
-        help="Ratio limit of the cold mode only; defaults to --max-ratio.",
-    )
-    parser.add_argument(
-        "--cold-max-cpu-ratio",
-        type=float,
-        default=None,
-        help="CPU ratio limit for cold mode only; defaults to the mode's ratio limit.",
-    )
     parser.add_argument(
         "--edit-max-cpu-ratio",
         type=float,
