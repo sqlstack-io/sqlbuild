@@ -42,6 +42,19 @@ For a change confined to one Rust crate, run its focused tests before rebuilding
 cargo test -p sqlbuild-sqltext given_model_files_when_matching_headers_then_offsets_follow_the_python_pattern
 ```
 
+Control-plane integration tests require Docker and run both SQLite and PostgreSQL:
+
+```bash
+make test-native NATIVE_TEST_ARGS='-p sqlbuild-orchestration --lib'
+```
+
+The same Testcontainers harness runs under `make rust-check` in CI. Each invocation starts one
+digest-pinned PostgreSQL container, waits for database readiness, shares it across the suite with
+an isolated schema per fixture, and removes it after success or failure. No host PostgreSQL setup
+is needed. Missing Docker, startup failures or missing database configuration fail the gate;
+PostgreSQL cases never silently skip. `NATIVE_TEST_ARGS` accepts Cargo test arguments; its default
+runs the workspace with all features.
+
 Keep the toolchain, `CARGO_TARGET_DIR`, profile and `RUSTFLAGS` consistent between iterations.
 Changing them can invalidate compiled artifacts. Coordinate builds that share a target directory;
 do not delete another task's artifacts or change global compiler-cache settings. The first build

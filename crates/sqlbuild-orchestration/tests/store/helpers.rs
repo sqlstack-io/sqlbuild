@@ -32,14 +32,9 @@ pub(crate) async fn open_test_store(backend: Backend) -> Option<TestStore> {
             postgres: None,
         });
     };
-    let Ok(url) = std::env::var("SQLBUILD_TEST_CONTROL_POSTGRES_URL") else {
-        assert!(
-            std::env::var_os("SQLBUILD_REQUIRE_POSTGRES_TESTS").is_none(),
-            "PostgreSQL test URL is required"
-        );
-        eprintln!("PostgreSQL integration requires SQLBUILD_TEST_CONTROL_POSTGRES_URL");
-        return None;
-    };
+    let url = std::env::var("SQLBUILD_TEST_CONTROL_POSTGRES_URL").expect(
+        "PostgreSQL integration requires the disposable database harness; run make test-native",
+    );
     let admin = sqlx_postgres::PgPool::connect(&url)
         .await
         .expect("connect to test PostgreSQL");
