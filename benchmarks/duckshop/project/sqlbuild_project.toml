@@ -286,4 +286,40 @@ The edge case selects the key columns that FULL OUTER JOIN ... USING merges. The
 side, so qualifying them with either alias would drop the keys of rows found only on the other side.
 """
 
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN003", "SQLCLEAN023", "SQLCLEAN027"]
+paths = ["models/intermediate/edge_cases/int_edge_join_keys.sql"]
+reason = """
+The edge cases read the merged key of RIGHT JOIN ... USING and of a USING join followed by an outer
+join unqualified, because it belongs to neither side; the side aliases are then unused. An ASOF
+JOIN's condition is its MATCH_CONDITION, so it has no ON clause.
+"""
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN018"]
+paths = [
+  "models/intermediate/edge_cases/int_edge_grouped_windows.sql",
+  "models/intermediate/edge_cases/int_edge_null_arithmetic.sql",
+]
+reason = """
+The ranking windows order by the group code of a grouped query and by the check id, both unique
+where they are ranked, which Rules cannot prove through a GROUP BY or a CTE.
+"""
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN022"]
+paths = ["models/intermediate/edge_cases/int_edge_analysis_patterns.sql"]
+reason = """
+The edge case leaves two calculated columns unaliased on purpose, and reads them by the names
+Snowflake gives them.
+"""
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN028"]
+paths = ["models/intermediate/edge_cases/int_edge_category_walk.sql"]
+reason = """
+LEVEL is a hierarchical-query pseudo-column that cannot be qualified, and the edge case reads a
+column named level from another relation unqualified inside a scalar subquery on purpose.
+"""
+
 # <<< edge-case area
