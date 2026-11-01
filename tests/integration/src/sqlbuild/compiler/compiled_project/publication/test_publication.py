@@ -149,6 +149,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
             "kind": "run_event",
             "job_key": "edge_snapshot_group",
             "kinds": ["completed"],
+            "executed_successfully": ["model:orders"],
         }
         assert by_name["edge_job_outcomes"]["status"] == "paused"
         assert by_name["edge_group_outcomes"]["status"] == "paused"

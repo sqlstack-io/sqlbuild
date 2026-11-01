@@ -86,7 +86,11 @@ edge_job_outcomes = sensor(
 edge_group_outcomes = sensor(
     "edge_group_outcomes",
     description="Observe group completion including cancellation and presumed failure.",
-    when=run_event(job=edge_group, kinds=[RunEventKind.COMPLETED]),
+    when=run_event(
+        job=edge_group,
+        kinds=[RunEventKind.COMPLETED],
+        executed_successfully=("tag:edge_case",),
+    ),
     run=edge_inventory,
     default_status="stopped",
 )

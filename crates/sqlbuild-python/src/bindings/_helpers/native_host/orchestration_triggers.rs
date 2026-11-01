@@ -10,6 +10,8 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use serde_json::{Value, json};
+use sqlbuild_analysis::graph::main::resolve_selectors::resolve_selectors;
+use sqlbuild_analysis::graph::models::ProjectGraph;
 use sqlbuild_cursor::algebra::main::parse_duration::parse_duration;
 use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::declarations::models::{Definitions, Schedule, TriggerDefinition};
@@ -249,6 +251,7 @@ pub(crate) fn compile_calendars(
 
 pub(crate) fn compile_sensors(
     target: &str,
+    graph: &ProjectGraph,
     authored: Vec<AuthoredSensor>,
     mut definitions: Definitions,
 ) -> PyResult<Definitions> {
@@ -266,6 +269,19 @@ pub(crate) fn compile_sensors(
         let mut condition = json!({"kind": sensor.when.kind, "kinds": sensor.when.kinds});
         if let Some(job) = sensor.when.job {
             condition["job_key"] = json!(job.name);
+        }
+        if let Some(selectors) = sensor.when.executed_successfully {
+            if selectors.is_empty() || selectors.iter().any(|value| value.trim().is_empty()) {
+                return Err(PyValueError::new_err(
+                    "executed_successfully needs nonempty selectors",
+                ));
+            }
+            let nodes: BTreeSet<String> = resolve_selectors(graph, &selectors, &[])
+                .map_err(|error| PyValueError::new_err(error.message))?
+                .into_iter()
+                .map(|(kind, name)| format!("{kind}:{name}"))
+                .collect();
+            condition["executed_successfully"] = json!(nodes);
         }
         let definition: SensorDefinition = serde_json::from_value(json!({
             "description": sensor.description,

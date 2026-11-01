@@ -1,6 +1,7 @@
 //! Sensor attempts and cursor commits are immutable facts, not mutable lifecycle rows.
 
 pub(crate) mod _helpers;
+pub(crate) mod constants;
 pub mod main;
 pub mod models;
 

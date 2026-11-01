@@ -147,7 +147,7 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
             ).read_text(),
             "providers/fulfillment.py": (
-                "import json, os\nfrom pathlib import Path\nfrom datetime import timedelta\n"
+                "import json, os\nfrom pathlib import Path\nfrom datetime import timedelta, timezone\n"
                 "from sqlbuild.provider.classes.provider import Provider\n"
                 "class Fulfillment(Provider):\n"
                 '    """Upcoming synthetic fulfillment times."""\n'
@@ -160,7 +160,8 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "        self.record({'phase': 'evaluate', 'start': window.start.isoformat(), 'end': window.end.isoformat(), 'zone': window.start.tzinfo.key})\n"
                 "        data = json.loads(Path(os.environ['SQLBUILD_FULFILLMENT_DATA']).read_text())\n"
                 "        if data.get('fail'):\n            raise ValueError('synthetic calendar unavailable')\n"
-                "        return [window.start + timedelta(seconds=offset) for offset in data['offsets']]\n"
+                "        start = window.start.astimezone(timezone.utc)\n"
+                "        return [start + timedelta(seconds=offset) for offset in data['offsets']]\n"
             ),
         },
     )

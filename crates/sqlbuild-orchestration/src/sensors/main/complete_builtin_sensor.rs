@@ -51,8 +51,18 @@ pub async fn complete_builtin_sensor(
         SensorCondition::PlatformEvent { kinds } => {
             consume_platform_events(transaction, evaluation, kinds).await?
         }
-        SensorCondition::RunEvent { job_key, kinds } => {
-            consume_run_events(transaction, evaluation, job_key, kinds).await?
+        SensorCondition::RunEvent {
+            job_key,
+            kinds,
+            executed_successfully,
+        } => {
+            consume_run_events(
+                transaction,
+                evaluation,
+                (job_key, kinds),
+                executed_successfully.as_ref(),
+            )
+            .await?
         }
     };
     let count = run_ids.len();

@@ -145,6 +145,7 @@ pub(crate) async fn finish_run(
     job_key: &str,
     outcome: RunOutcome,
     nodes: [NodeOutcome; 2],
+    started: [bool; 2],
 ) -> Uuid {
     let run_id = Uuid::now_v7();
     let context = AuditContext {
@@ -168,6 +169,20 @@ pub(crate) async fn finish_run(
     )
     .await
     .expect("request source run");
+    finish_claimed_run(store, lease, scope, run_id, outcome, nodes, started).await;
+    run_id
+}
+
+/// Execute only the frozen selection, including a from-failure rerun's reduced scope.
+pub(crate) async fn finish_claimed_run(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+    scope: (Uuid, &str),
+    run_id: Uuid,
+    outcome: RunOutcome,
+    nodes: [NodeOutcome; 2],
+    started: [bool; 2],
+) {
     let limits = std::collections::BTreeMap::new();
     advance_groups(store, lease, (&limits, scope))
         .await
@@ -181,23 +196,23 @@ pub(crate) async fn finish_run(
         run_id: claim.request.run_id,
         claim_id: claim.claim_id,
     };
-    let changes = [
-        RunChange::Started,
-        RunChange::NodeFinished {
-            node_key: "customers".into(),
-            outcome: nodes[0],
+    let mut changes = vec![RunChange::Started];
+    for (index, key) in ["customers", "orders"]
+        .into_iter()
+        .enumerate()
+        .filter(|(_, key)| claim.request.selection.contains(*key))
+    {
+        changes.extend(started[index].then_some(RunChange::NodeStarted {
+            node_key: key.into(),
+        }));
+        changes.push(RunChange::NodeFinished {
+            node_key: key.into(),
+            outcome: nodes[index],
             rows_affected: None,
             error_code: None,
             skipped_because_of: None,
-        },
-        RunChange::NodeFinished {
-            node_key: "orders".into(),
-            outcome: nodes[1],
-            rows_affected: None,
-            error_code: None,
-            skipped_because_of: None,
-        },
-    ];
+        });
+    }
     for change in changes {
         change_run(
             store,
@@ -235,5 +250,4 @@ pub(crate) async fn finish_run(
     advance_groups(store, lease, (&limits, scope))
         .await
         .expect("complete parent");
-    run_id
 }
