@@ -496,12 +496,21 @@ pub(crate) fn sql_lint_selection(
         .filter(|rule| rule.code.starts_with(SQL_RULE_PREFIX))
         .filter(|rule| match selected {
             None => rule.enabled_by_default,
-            Some(selectors) => selectors
-                .iter()
-                .any(|selector| grammar.code_matches_selector(&rule.code, selector)),
+            Some(selectors) => matches_any_selector(grammar, &rule.code, selectors),
         })
         .map(|rule| rule.code.clone())
         .collect()
+}
+
+/// Whether any of `selectors` matches `code`.
+pub(crate) fn matches_any_selector(
+    grammar: &RulesCodeGrammar,
+    code: &str,
+    selectors: &[String],
+) -> bool {
+    selectors
+        .iter()
+        .any(|selector| grammar.code_matches_selector(code, selector))
 }
 
 fn activate_explicit_custom_matches(

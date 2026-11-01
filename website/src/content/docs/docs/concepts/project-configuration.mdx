@@ -688,8 +688,9 @@ the same checks:
 select = ["SQLCLEAN", "SQBRGRAPH", "XSQBRARCH"]
 ```
 
-Rules are opt-in. Exact codes activate individual checks and prefixes activate a family. Built-in
-codes begin with `SQBR`; repository-defined codes begin with `XSQBR`. See
+Without `select`, the SQL Rules enabled by default run; `select = []` runs no configurable Rules.
+Exact codes activate individual checks and prefixes activate a family. SQL Rule codes begin with
+`SQLCLEAN`, other built-in codes with `SQBR`, and repository-defined codes with `XSQBR`. See
 [Compiler-integrated Rules](/docs/concepts/rules) for configuration, authoring, and exceptions.
 
 | Key | Description |

@@ -172,6 +172,7 @@ impl<'py> FixSession<'py> {
         let sources: Vec<LintFile> = lint_sources(&project_dir, Some(&selected), given)?;
         let context: Option<SqlExpansionInputs> = if settings.native_enabled {
             Some(lint_expansion_inputs(LintExpansionSources {
+                compile: None,
                 project_dir: self.project_dir.clone(),
                 value_renderer: self.adapter.is_truthy()?.then(|| self.adapter.clone()),
                 discovered_inputs: Some(updated_inputs(&self.inputs, files)?),

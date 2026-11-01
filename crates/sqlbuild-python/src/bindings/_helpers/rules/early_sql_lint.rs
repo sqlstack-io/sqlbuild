@@ -211,7 +211,7 @@ fn same_codes(left: &[String], right: &[String]) -> bool {
 /// Start early SQL lint on a native thread when the project selects SQL rules without a cache.
 fn start_early_lint(
     (inputs, dialect): (&Bound<'_, PyAny>, &str),
-    value_renderer: &Bound<'_, PyAny>,
+    reuse: ExpansionReuse,
     no_cache: bool,
     stop: &Arc<AtomicBool>,
 ) -> PyResult<Option<PreparedSqlLint>> {
@@ -227,9 +227,7 @@ fn start_early_lint(
     let work: EarlyLintWork = EarlyLintWork {
         project_dir: plan.project_dir.clone(),
         settings: plan.settings,
-        discovered: record_field(inputs, "discovered_inputs")?.unbind(),
-        static_scope: record_field(inputs, "declaration_scope")?.unbind(),
-        value_renderer: value_renderer.clone().unbind(),
+        reuse,
         compiled,
         stop: Arc::clone(stop),
     };
@@ -250,9 +248,7 @@ fn start_early_lint(
 struct EarlyLintWork {
     project_dir: PathBuf,
     settings: LintSettings,
-    discovered: Py<PyAny>,
-    static_scope: Py<PyAny>,
-    value_renderer: Py<PyAny>,
+    reuse: ExpansionReuse,
     compiled: HashMap<PathBuf, CompiledSource>,
     stop: Arc<AtomicBool>,
 }
@@ -262,10 +258,11 @@ fn early_lint(py: Python<'_>, work: &EarlyLintWork) -> PyResult<EarlyLintResult>
     let project_dir: &Path = &work.project_dir;
     let context: SqlExpansionInputs = lint_expansion_inputs(LintExpansionSources {
         project_dir: project_dir.into_pyobject(py)?.into_any(),
-        value_renderer: Some(work.value_renderer.bind(py).clone()),
-        discovered_inputs: Some(work.discovered.bind(py).clone()),
+        value_renderer: Some(work.reuse.value_renderer(py)),
+        compile: Some(&work.reuse),
+        discovered_inputs: Some(work.reuse.discovered_inputs(py)?),
         declaration_scope: None,
-        static_declaration_scope: present(work.static_scope.bind(py).clone()),
+        static_declaration_scope: present(work.reuse.declaration_scope(py)?),
     })?;
     let files: Vec<LintFile> = lint_sources(project_dir, None, None)?;
     let outcome: LintOutcome = lint(
@@ -284,11 +281,39 @@ fn early_lint(py: Python<'_>, work: &EarlyLintWork) -> PyResult<EarlyLintResult>
     Ok(EarlyLintResult { outcome, context })
 }
 
-/// The compiler's discovery, declaration scope and adapter, which lint expansion reuses for the same discovery.
+/// The compiler's inputs and adapter, which lint expansion reuses for the same discovery.
 pub(crate) struct ExpansionReuse {
-    pub(crate) discovered_inputs: Py<PyAny>,
-    pub(crate) declaration_scope: Py<PyAny>,
-    pub(crate) value_renderer: Py<PyAny>,
+    inputs: Py<PyAny>,
+    value_renderer: Py<PyAny>,
+}
+
+impl ExpansionReuse {
+    fn clone_ref(&self, py: Python<'_>) -> Self {
+        Self {
+            inputs: self.inputs.clone_ref(py),
+            value_renderer: self.value_renderer.clone_ref(py),
+        }
+    }
+
+    /// The discovery the compile ran on.
+    pub(crate) fn discovered_inputs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        record_field(self.inputs.bind(py), "discovered_inputs")
+    }
+
+    /// The compile's declaration scope.
+    pub(crate) fn declaration_scope<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        record_field(self.inputs.bind(py), "declaration_scope")
+    }
+
+    /// The compile's macro context, carrying its target and vars.
+    pub(crate) fn macro_context<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        record_field(self.inputs.bind(py), "macro_context")
+    }
+
+    /// The adapter that renders declared values.
+    pub(crate) fn value_renderer<'py>(&self, py: Python<'py>) -> Bound<'py, PyAny> {
+        self.value_renderer.bind(py).clone()
+    }
 }
 
 /// Own speculative SQL checks for one compilation invocation.
@@ -300,6 +325,8 @@ pub(crate) struct EarlySqlLint {
     no_cache: bool,
     preparation: Option<Py<PreparedSqlLint>>,
     expansion_reuse: Option<ExpansionReuse>,
+    /// The dialect and adapter the `on_inputs_ready` call passes to `start`.
+    ready_arguments: Option<(String, Py<PyAny>)>,
     stop_requested: Arc<AtomicBool>,
 }
 
@@ -311,6 +338,7 @@ impl EarlySqlLint {
             no_cache,
             preparation: None,
             expansion_reuse: None,
+            ready_arguments: None,
             stop_requested: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -323,6 +351,17 @@ impl EarlySqlLint {
     /// The compile's discovery and declaration scope, if it had one.
     pub(crate) fn expansion_reuse(&self) -> Option<&ExpansionReuse> {
         self.expansion_reuse.as_ref()
+    }
+
+    /// This manager as the `on_inputs_ready` hook, which calls `start` with `dialect` and `value_renderer`.
+    pub(crate) fn inputs_ready_hook<'py>(
+        slf: &Bound<'py, Self>,
+        dialect: &str,
+        value_renderer: &Bound<'py, PyAny>,
+    ) -> Bound<'py, PyAny> {
+        slf.borrow_mut().ready_arguments =
+            Some((dialect.to_owned(), value_renderer.clone().unbind()));
+        slf.clone().into_any()
     }
 
     /// Abandon speculative work, return the milliseconds spent joining it, and raise Ctrl+C caught while waiting.
@@ -369,24 +408,35 @@ impl EarlySqlLint {
         value_renderer: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
         let py: Python<'_> = inputs.py();
+        let reuse: ExpansionReuse = ExpansionReuse {
+            inputs: inputs.clone().unbind(),
+            value_renderer: value_renderer.clone().unbind(),
+        };
         if slf.enabled {
             let stop: Arc<AtomicBool> = Arc::clone(&slf.stop_requested);
             slf.preparation =
-                start_early_lint((inputs, dialect), value_renderer, slf.no_cache, &stop)?
+                start_early_lint((inputs, dialect), reuse.clone_ref(py), slf.no_cache, &stop)?
                     .map(|preparation| Py::new(py, preparation))
                     .transpose()?;
         }
-        let declaration_scope: Bound<'_, PyAny> = record_field(inputs, "declaration_scope")?;
-        slf.expansion_reuse = if declaration_scope.is_none() {
-            None
-        } else {
-            Some(ExpansionReuse {
-                discovered_inputs: record_field(inputs, "discovered_inputs")?.unbind(),
-                declaration_scope: declaration_scope.unbind(),
-                value_renderer: value_renderer.clone().unbind(),
-            })
-        };
+        slf.expansion_reuse = (!reuse.declaration_scope(py)?.is_none()).then_some(reuse);
         Ok(())
+    }
+
+    /// Start with the arguments `inputs_ready_hook` stored, as the compile's `on_inputs_ready` hook.
+    #[pyo3(signature = (*, inputs))]
+    fn __call__(slf: PyRefMut<'_, Self>, inputs: &Bound<'_, PyAny>) -> PyResult<()> {
+        let py: Python<'_> = inputs.py();
+        let Some((dialect, value_renderer)) = slf
+            .ready_arguments
+            .as_ref()
+            .map(|(dialect, renderer)| (dialect.clone(), renderer.clone_ref(py)))
+        else {
+            return Err(PyRuntimeError::new_err(
+                "EarlySqlLint was called before inputs_ready_hook armed it",
+            ));
+        };
+        Self::start(slf, inputs, &dialect, value_renderer.bind(py))
     }
 
     /// Abandon unconsumed speculative work and return the milliseconds spent joining it.

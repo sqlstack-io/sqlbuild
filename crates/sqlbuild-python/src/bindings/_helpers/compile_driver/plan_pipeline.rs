@@ -6,7 +6,7 @@ use pyo3::{IntoPyObject, PyErr, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
-use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported, keywords};
+use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
 use crate::bindings::_helpers::compile_driver::phases::monotonic;
 use crate::bindings::_helpers::compile_driver::pipeline::{
     compiled_phase, progress, timing_tracker,
@@ -20,8 +20,8 @@ use crate::bindings::_helpers::compile_driver::selection_phases::{
 };
 use crate::bindings::_helpers::frontier::stage_capture::write_plan_capture;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
+use crate::bindings::_helpers::records::construct::{error_class, new_annotated_error};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
@@ -59,17 +59,8 @@ pub(crate) fn run_compile_pipeline<'py>(
     let on_progress: Bound<'py, PyAny> = native_field(&hooks, "on_progress")?;
     let expansion_reuse: Bound<'py, EarlySqlLint> =
         Bound::new(py, EarlySqlLint::new(false, false))?;
-    let on_inputs_ready: Bound<'py, PyAny> = imported(py, "functools", "partial")?.call(
-        (expansion_reuse.getattr("start")?,),
-        Some(&keywords(
-            py,
-            &[
-                // Only expansion reuse is kept here; early lint is off, so the dialect is unused.
-                ("dialect", GENERIC_DIALECT.into_pyobject(py)?.into_any()),
-                ("value_renderer", adapter.clone()),
-            ],
-        )?),
-    )?;
+    let on_inputs_ready: Bound<'py, PyAny> =
+        EarlySqlLint::inputs_ready_hook(&expansion_reuse, GENERIC_DIALECT, &adapter);
     let compiled: Bound<'py, PyAny> = compiled_phase(
         (&discovered, &adapter),
         &options,
@@ -170,13 +161,18 @@ fn run_rules_gate<'py>(
         .try_iter()?
         .map(|finding| native_field(&finding?, "code")?.extract())
         .collect::<PyResult<_>>()?;
-    let error: Bound<'py, PyAny> =
-        rules_error.call1((format!("configured compiler rules failed:\n{rendered}"),))?;
     let select_omitted: bool = native_field(&config, "select")?.is_none();
-    if let Some(notice) = default_rules_notice(select_omitted, codes.iter().map(String::as_str)) {
-        error.setattr(DEFAULT_RULES_NOTICE_ATTR, notice)?;
-    }
-    Err(PyErr::from_value(error))
+    let notice: Vec<(&str, String)> =
+        default_rules_notice(select_omitted, codes.iter().map(String::as_str))
+            .map(|notice| (DEFAULT_RULES_NOTICE_ATTR, notice))
+            .into_iter()
+            .collect();
+    Err(new_annotated_error(
+        py,
+        ErrorId::Rules,
+        format!("configured compiler rules failed:\n{rendered}"),
+        &notice,
+    ))
 }
 
 /// Open the planning connection, plan, and record the compile and planning times.

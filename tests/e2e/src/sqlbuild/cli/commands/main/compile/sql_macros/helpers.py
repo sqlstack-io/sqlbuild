@@ -24,7 +24,11 @@ _SEED_COLUMNS: tuple[tuple[str, str], ...] = (
 BASE_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "shop"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n\n'
-        "[scopes]\nenforce_placement = false\n"
+        "[scopes]\nenforce_placement = false\n\n"
+        "[[rules.rule_ignores]]\n"
+        'rules = ["SQLCLEAN018"]\n'
+        'paths = ["macros/sql/**", "models/**"]\n'
+        'reason = "The dedup macros rank by updated_at alone; these tests cover expansion."\n'
     ),
     "seeds/raw_orders.csv": (
         "order_id,status,amount_cents,fee_cents,tax_cents,created_at,updated_at,is_deleted,"
@@ -194,6 +198,16 @@ def with_rules(*codes: str) -> dict[str, str]:
     return {
         "sqlbuild_project.toml": BASE_FILES["sqlbuild_project.toml"]
         + f"\n[rules]\nselect = [{selected}]\n"
+    }
+
+
+def with_ignored_rules(*codes: str, reason: str) -> dict[str, str]:
+    """The base project with the given Rules ignored, for cases whose SQL shape is their subject."""
+
+    ignored: str = ", ".join(f'"{code}"' for code in codes)
+    return {
+        "sqlbuild_project.toml": BASE_FILES["sqlbuild_project.toml"]
+        + f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["**"]\nreason = "{reason}"\n'
     }
 
 

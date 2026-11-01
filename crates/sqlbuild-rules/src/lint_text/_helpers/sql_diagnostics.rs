@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::{Map, Value};
 
+use crate::lint_text::_helpers::sites::backtick_identifiers;
 use crate::lint_text::_helpers::sites::{byte_offset, compiled, lint_policy, site_end};
 use crate::lint_text::constants::{
     GENERATED_FIX, GENERATED_SQL_SUFFIX, HARNESS_CTE_PREFIXES, INVALID_DIAGNOSTIC,
@@ -15,7 +16,6 @@ use crate::lint_text::constants::{
     PARSE_ERROR_POSITION_PATTERN, PARSE_FAILURE_PREFIX, PARSE_FAILURE_REMEDIATION,
     SQL_MACRO_PARAMETER_SENTINEL_PREFIX, UNSUPPORTED_VERSION, UNUSED_CTE_CODE,
 };
-use crate::lint_text::main::backtick_identifiers::backtick_identifiers;
 use crate::lint_text::models::{AuthoredDiagnostic, AuthoredEdit, ExpansionSpan, LintSqlBody};
 use sqlbuild_analysis::sql_macros::constants::SQL_CALL_PREFIX;
 use sqlbuild_sqltext::sql_scan::main::non_code_end::non_code_end;

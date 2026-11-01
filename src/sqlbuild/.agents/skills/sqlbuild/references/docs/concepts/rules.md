@@ -10,7 +10,7 @@ Online: https://sqlbuild.com/docs/concepts/rules/
 
 - What Rules are for
 - How Rules work
-- Where SQL linting went
+- SQL Rules
 - Built-in and custom Rules
 - One definition of project validity
 - Rules compared with tests, audits, and contracts
@@ -54,30 +54,31 @@ model.
 Use `sqb rules show` to understand a Rule before enabling it:
 
 ```bash
-sqb rules show SQBRSQL004
+sqb rules show SQLCLEAN004
 ```
 
 ```text
-SQBRSQL004: Row selection is nondeterministic
-Family: SQBRSQL
+SQLCLEAN004: Row selection is nondeterministic
+Family: SQLCLEAN
 Slug: unordered-limit
 Subject: model
 Enabled by default: yes
 Remediation: Add ORDER BY with a deterministic tie-breaker before LIMIT or OFFSET.
 ```
 
-`Enabled by default` means the Rule is included when a matching family is selected. Configurable
-Rules do not run unless `select` contains an exact code or matching family.
+`Enabled by default` means the Rule runs when `select` is unset. Without `select`, SQLBuild runs
+the default SQL Rules and no other configurable Rules.
 
 Select Rules in `sqlbuild_project.toml`. This example enables the complete built-in SQL family:
 
 ```toml
 [rules]
-select = ["SQBRSQL"]
+select = ["SQLCLEAN"]
 ```
 
-An exact code such as `SQBRSQL004` selects one Rule. A family code such as `SQBRSQL` selects every
-Rule in that family. An empty `select` disables configurable Rules, but mandatory compiler
+An exact code such as `SQLCLEAN004` selects one Rule. A family code such as `SQLCLEAN` selects every
+Rule in that family, including Rules that are not enabled by default. To run no configurable Rules, set
+`select = []`; to turn off only the SQL Rules, add `SQLCLEAN` to `ignore`. Mandatory compiler
 correctness still applies.
 
 Now consider a model that returns an arbitrary row because its `LIMIT` has no ordering:
@@ -96,7 +97,7 @@ sqb compile
 The selected Rule reports the source location, problem, and remediation:
 
 ```text
-error[SQBRSQL004]: Row selection is nondeterministic
+error[SQLCLEAN004]: Row selection is nondeterministic
   --> models/orders.sql:2:36
     |
   2 | SELECT order_id FROM orders LIMIT 1
@@ -115,17 +116,20 @@ Use focused commands when discovering or adopting Rules:
 
 ```bash
 sqb rules list
-sqb rules run SQBRSQL004
+sqb rules run SQLCLEAN004
 ```
 
 A focused run checks only the requested Rule or family. Run `sqb compile` before treating the whole
 project as valid.
 
-## Where SQL linting went
+## SQL Rules
 
-SQL linting is part of the Rules system rather than a separate command.
+SQL linting is part of the Rules system rather than a separate command. The SQL Rules come from
+[SQLClean](https://sqlclean.io), the SQL linter and formatter SQLBuild runs on every SQL body.
+They have the same codes, defaults, findings and fixes as in the `sqlclean` command; see the
+[SQLClean Rule reference](https://sqlclean.io/docs/rules/overview/).
 
-The `SQBRSQL` built-in family covers deterministic SQL diagnostics such as:
+The `SQLCLEAN` family covers deterministic SQL diagnostics such as:
 
 - unsafe `NULL` comparisons;
 - implicit cartesian joins;
@@ -146,7 +150,7 @@ SQL responsibility:
 | Responsibility | Owner | Example |
 |---|---|---|
 | Correctness required to understand the project | Compiler | Invalid syntax, unresolved references, incompatible output shape |
-| Configurable, deterministic requirements | `SQBRSQL` Rules (executed by the compiler) | Unordered `LIMIT`, unused CTE, implicit cartesian join |
+| Configurable, deterministic requirements | `SQLCLEAN` Rules (executed by the compiler) | Unordered `LIMIT`, unused CTE, implicit cartesian join |
 | Canonical presentation | [`sqb format`](../cli/format.md) (separate from the compiler) | Capitalization, indentation, spacing, comma and clause layout |
 
 Rules never rewrite source. `sqb format` rewrites source and does not decide whether a project
@@ -154,8 +158,9 @@ passes its configured Rules. This keeps diagnostics and source mutation separate
 
 ## Built-in and custom Rules
 
-SQLBuild maintains native built-in Rules for reusable requirements. Their codes begin with `SQBR`,
-for example `SQBRSQL004` and `SQBRGRAPH101`.
+SQLBuild maintains native built-in Rules for reusable requirements. SQL Rule codes begin with
+`SQLCLEAN`, for example `SQLCLEAN004`. Rules that read the project, such as `SQBRGRAPH101`, begin
+with `SQBR`.
 
 Projects can define custom Python Rules under `rules/**/*.py`. Their codes begin with `XSQBR`, for
 example `XSQBRARCH001`. Custom Rules use the same selection, findings, exceptions, execution order,
@@ -164,7 +169,7 @@ and cache system as built-ins.
 ```toml
 [rules]
 select = [
-  "SQBRSQL",
+  "SQLCLEAN",
   "SQBRGRAPH",
   "XSQBRARCH",
 ]

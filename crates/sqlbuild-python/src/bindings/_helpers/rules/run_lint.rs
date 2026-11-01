@@ -125,6 +125,7 @@ fn run_lint<'py>(
     } else if settings.native_enabled {
         let renderer: Bound<'py, PyAny> = arguments.value("value_renderer")?;
         Some(lint_expansion_inputs(LintExpansionSources {
+            compile: None,
             project_dir: project_dir.clone(),
             value_renderer: renderer.is_truthy()?.then_some(renderer),
             discovered_inputs: present(arguments.value("discovered_inputs")?),

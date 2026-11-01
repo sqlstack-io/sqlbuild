@@ -65,8 +65,9 @@ select = ["SQLCLEAN"]
 ```
 
 An exact code such as `SQLCLEAN004` selects one Rule. A family code such as `SQLCLEAN` selects every
-Rule in that family, including Rules that are not enabled by default. To run no SQL Rules, add
-`SQLCLEAN` to `ignore`; mandatory compiler correctness still applies.
+Rule in that family, including Rules that are not enabled by default. To run no configurable Rules, set
+`select = []`; to turn off only the SQL Rules, add `SQLCLEAN` to `ignore`. Mandatory compiler
+correctness still applies.
 
 Now consider a model that returns an arbitrary row because its `LIMIT` has no ordering:
 

@@ -73,7 +73,7 @@ def test_given_benchmark_project_when_compiling_then_reports_no_errors_or_warnin
             expected_errors=0,
             expected_warnings=0,
             expected_compiled_checksum=(
-                "a36dfda0afbe642c86441adc078d026cf6eefc95921173c32df74f2783a04f87"
+                "1ff1d0955ea3839b3c969707fd47ca9a4d7d7216753759d23911836f6ea5879d"
             ),
         )
     ],

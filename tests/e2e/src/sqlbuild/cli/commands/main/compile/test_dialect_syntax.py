@@ -12,7 +12,10 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     DialectSyntaxCompileE2ETestCase,
 )
-from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import dialect_syntax_model
+from tests.e2e.src.sqlbuild.cli.commands.main.compile.helpers import (
+    dialect_ignored_rules_entry,
+    dialect_syntax_model,
+)
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 _CONNECTIONS: dict[str, str] = {
@@ -52,6 +55,7 @@ _CONNECTIONS: dict[str, str] = {
             expected_exit_code=0,
             expected_codes=(),
             expected_column_counts={"unaliased": 2, "set_operation": 1, "renamed": 2},
+            ignored_rules=("SQLCLEAN039",),
         ),
         DialectSyntaxCompileE2ETestCase(
             description="star EXCLUDE drops a column before set operation arms are compared",
@@ -66,6 +70,7 @@ _CONNECTIONS: dict[str, str] = {
             expected_exit_code=0,
             expected_codes=(),
             expected_column_counts={"orders": 1},
+            ignored_rules=("SQLCLEAN007", "SQLCLEAN039"),
         ),
         DialectSyntaxCompileE2ETestCase(
             description="column alias lists name table function and table columns",
@@ -101,6 +106,7 @@ _CONNECTIONS: dict[str, str] = {
             expected_exit_code=0,
             expected_codes=(),
             expected_column_counts={"totals": 1, "names": 1},
+            ignored_rules=("SQLCLEAN039",),
         ),
         DialectSyntaxCompileE2ETestCase(
             description="Snowflake rejects Oracle's CONNECT_BY_ISLEAF pseudo-column",
@@ -142,6 +148,7 @@ _CONNECTIONS: dict[str, str] = {
             expected_exit_code=0,
             expected_codes=(),
             expected_column_counts={"codes": 1},
+            ignored_rules=("SQLCLEAN039",),
         ),
         DialectSyntaxCompileE2ETestCase(
             description="a ClickHouse DATE_TRUNC timestamp cursor keeps its timestamp type",
@@ -186,6 +193,9 @@ def test_given_dialect_syntax_when_compiling_then_analysis_parses_and_types_it(
             "sqlbuild_project.toml": (
                 f'name = "shop"\nadapter = "{test_case.adapter}"\n\n'
                 f"{_CONNECTIONS[test_case.adapter]}\n[scopes]\nenforce_placement = false\n"
+                + {True: dialect_ignored_rules_entry(test_case.ignored_rules), False: ""}[
+                    bool(test_case.ignored_rules)
+                ]
             ),
             **{f"models/{name}.sql": sql for name, sql in test_case.models.items()},
         },

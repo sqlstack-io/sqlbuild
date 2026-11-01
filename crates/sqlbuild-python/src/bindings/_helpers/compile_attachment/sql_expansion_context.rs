@@ -10,7 +10,9 @@ use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_attachment::declaration_scope::build_declaration_scope;
 use crate::bindings::_helpers::compile_attachment::declaration_scope::rebind_declaration_scope;
-use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_vars;
+use crate::bindings::_helpers::compile_attachment::effective_config::{
+    build_effective_vars, target_selection,
+};
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_collection_rendering;
@@ -86,10 +88,18 @@ fn local_declarations<'py>(discovered: &Bound<'py, PyAny>) -> PyResult<Bound<'py
 pub(crate) struct ExpansionSources<'py> {
     pub(crate) project_dir: Bound<'py, PyAny>,
     pub(crate) value_renderer: Bound<'py, PyAny>,
-    pub(crate) cli_vars: Option<Bound<'py, PyAny>>,
+    pub(crate) vars: ExpansionVars<'py>,
     pub(crate) discovered_inputs: Option<Bound<'py, PyAny>>,
     pub(crate) declaration_scope: Option<Bound<'py, PyAny>>,
     pub(crate) static_declaration_scope: Option<Bound<'py, PyAny>>,
+}
+
+/// Where expansion takes its target and vars from.
+pub(crate) enum ExpansionVars<'py> {
+    /// The default target's effective vars, overridden by these CLI vars when given.
+    DefaultTarget(Option<Bound<'py, PyAny>>),
+    /// The target and vars of the compiling command's macro context.
+    Compile(Bound<'py, PyAny>),
 }
 
 /// Assemble SQL expansion inputs; a static scope lends only its index to private macros.
@@ -114,16 +124,23 @@ pub(crate) fn sql_expansion_inputs(sources: ExpansionSources<'_>) -> PyResult<Sq
     };
     let project_config: Bound<'_, PyAny> = native_field(&discovered, "project_config")?;
     let local_config: Bound<'_, PyAny> = native_field(&discovered, "local_config")?;
-    let cli_vars: Bound<'_, PyAny> = sources
-        .cli_vars
-        .unwrap_or_else(|| PyDict::new(py).into_any());
-    let effective_vars: Bound<'_, PyAny> = build_effective_vars(
-        &project_config.clone(),
-        &local_config.clone(),
-        &py.None().into_bound(py),
-        &cli_vars,
-    )
-    .and_then(|value| value.into_bound_py_any(py))?;
+    let (target_name, effective_vars): (Bound<'_, PyAny>, Bound<'_, PyAny>) = match sources.vars {
+        ExpansionVars::Compile(context) => (
+            native_field(&context, "target_name")?,
+            native_field(&context, "vars")?,
+        ),
+        ExpansionVars::DefaultTarget(cli_vars) => {
+            let cli_vars: Bound<'_, PyAny> = cli_vars.unwrap_or_else(|| PyDict::new(py).into_any());
+            let (target_name, target_config) = target_selection(&discovered, None)?;
+            let vars: Bound<'_, PyAny> = build_effective_vars(
+                &project_config.clone(),
+                &local_config.clone(),
+                &target_config,
+                &cli_vars,
+            )?;
+            (target_name, vars)
+        }
+    };
     let scope: Bound<'_, PyAny> = match sources.declaration_scope {
         Some(scope) => scope,
         None => declaration_scope(
@@ -154,10 +171,7 @@ pub(crate) fn sql_expansion_inputs(sources: ExpansionSources<'_>) -> PyResult<Sq
                 "sql_analysis_enabled",
                 PyBool::new(py, false).to_owned().into_any(),
             ),
-            (
-                "target_name",
-                native_field(&project_config, "default_target")?,
-            ),
+            ("target_name", target_name),
             ("vars", effective_vars.clone()),
             ("_value_renderer", value_renderer.clone()),
             ("_collection_rendering", collection_rendering.clone()),
@@ -213,7 +227,7 @@ pub(crate) fn build_sql_expansion_context<'py>(
     sql_expansion_inputs(ExpansionSources {
         project_dir: arguments.value("project_dir")?,
         value_renderer: arguments.value("value_renderer")?,
-        cli_vars: present(arguments.value("cli_vars")?),
+        vars: ExpansionVars::DefaultTarget(present(arguments.value("cli_vars")?)),
         discovered_inputs: present(arguments.value("discovered_inputs")?),
         declaration_scope: present(arguments.value("declaration_scope")?),
         static_declaration_scope: present(arguments.value("static_declaration_scope")?),

@@ -128,6 +128,13 @@ def prepare_semantic_corpus_project(
     for relative_path, contents in test_case.repo_files.items():
         path: Path = project / relative_path
         path.write_text(contents, encoding="utf-8")
+    ignored: str = ", ".join(f'"{code}"' for code in test_case.ignored_rules)
+    ignore_entry: str = (
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        'reason = "The probe SQL exercises compiler semantics, not this Rule."\n'
+    )
+    with (project / "sqlbuild_project.toml").open("a", encoding="utf-8") as config:
+        config.write({True: ignore_entry, False: ""}[bool(test_case.ignored_rules)])
     return project
 
 
@@ -1271,6 +1278,11 @@ def _write_compile_project_config(project_dir: Path) -> None:
                 "[targets.dev]",
                 'schema = "main"',
                 "",
+                "[[rules.rule_ignores]]",
+                'rules = ["SQLCLEAN018"]',
+                'paths = ["models/**"]',
+                'reason = "The generated workload ranks by a non-unique id; keep its SQL stable."',
+                "",
             )
         ),
         encoding="utf-8",
@@ -1642,6 +1654,11 @@ materialized = "table"
 
 [path_defaults."mart"]
 materialized = "table"
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN039"]
+paths = ["models/**"]
+reason = "The workload mixes nested query shapes on purpose to cover their compile path."
 """,
         encoding="utf-8",
     )
@@ -2590,7 +2607,11 @@ def write_relation_stub_project(
                 "[connection]\n"
                 'database = "orders.duckdb"\n\n'
                 "[targets.dev]\n"
-                'schema = "main"\n'
+                'schema = "main"\n\n'
+                "[[rules.rule_ignores]]\n"
+                'rules = ["SQLCLEAN005"]\n'
+                'paths = ["models/order_status.sql"]\n'
+                'reason = "The stub-named CTE is left unread on purpose."\n'
             ),
             "models/orders.sql": (
                 "MODEL (description 'Test model orders.', "
@@ -5345,6 +5366,16 @@ def dialect_syntax_model(description: str, sql: str, config: str = "") -> str:
     """Build a model file with a description, optional extra header config and its query."""
 
     return f"MODEL (description '{description}'{config});\n{sql}\n"
+
+
+def dialect_ignored_rules_entry(codes: tuple[str, ...]) -> str:
+    """A scoped ignore of `codes` for cases whose SQL shape is the parser input under test."""
+
+    ignored: str = ", ".join(f'"{code}"' for code in codes)
+    return (
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        'reason = "The case covers parsing this SQL shape."\n'
+    )
 
 
 def append_to_compiled_sql_tests(project_dir: Path) -> None:

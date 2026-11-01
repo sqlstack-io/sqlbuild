@@ -36,6 +36,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     refunded_weeks,
     run_project,
     slot_model,
+    with_ignored_rules,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import query_duckdb, run_sqb
 
@@ -416,6 +417,9 @@ def test_given_wrong_slot_mappings_when_compiling_then_the_error_names_the_slot(
                     "SELECT s.@weekly.keys FROM @weekly AS s),\n"
                     "grouped AS (SELECT @weekly.keys FROM refunded GROUP BY @weekly.keys"
                 ),
+                **with_ignored_rules(
+                    "SQLCLEAN005", reason="The chain's last CTE is a slot read the caller ignores."
+                ),
             },
             command=("compile",),
             expected_returncode=0,
@@ -429,6 +433,9 @@ def test_given_wrong_slot_mappings_when_compiling_then_the_error_names_the_slot(
                 **refunded_weeks(
                     "SELECT t.@weekly.keys FROM (SELECT @weekly.keys, week FROM @weekly) AS t\n"
                     "WHERE t.week IN (SELECT r.week FROM @refunds AS r)"
+                ),
+                **with_ignored_rules(
+                    "SQLCLEAN039", reason="The case reads slots in a derived table."
                 ),
             },
             command=("compile",),

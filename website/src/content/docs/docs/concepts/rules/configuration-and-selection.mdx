@@ -17,8 +17,9 @@ Without `select`, SQLBuild runs the SQL Rules that are enabled by default and no
 configurable Rules. `select = []` runs no configurable Rules. Mandatory compiler correctness
 always applies.
 
-SQL Rules read the SQL that SQLBuild analyses, so they skip a model with `sql_analysis false` and
-every model in a run with `--no-sql-analysis`.
+SQL Rules read the SQL that SQLBuild analyses, so they skip a model with `sql_analysis false`, an
+audit or SQL test file whose headers all set `sql_analysis false`, and every model in a run with
+`--no-sql-analysis`.
 
 ## Codes and families
 

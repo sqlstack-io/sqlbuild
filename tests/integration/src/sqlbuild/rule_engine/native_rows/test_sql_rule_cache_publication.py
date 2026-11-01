@@ -34,11 +34,12 @@ def test_given_increasing_findings_when_publishing_cache_then_findings_are_store
         paths: list[Path] = [Path(f"models/orders_{index}.sql") for index in range(size)]
         for index, path in enumerate(paths[:-1]):
             (project_dir / path).write_text(
-                f'MODEL (description "Orders {index}");\nSELECT 1 AS order_id LIMIT 1\n',
+                f'MODEL (description "Orders {index}");\n'
+                "SELECT o.order_id FROM orders AS o LIMIT 1\n",
                 encoding="utf-8",
             )
         (project_dir / paths[-1]).write_text(
-            'MODEL (description "Orders without a limit");\nSELECT 1 AS order_id\n',
+            'MODEL (description "Orders without a limit");\nSELECT o.order_id FROM orders AS o\n',
             encoding="utf-8",
         )
         models: list[SimpleNamespace] = [

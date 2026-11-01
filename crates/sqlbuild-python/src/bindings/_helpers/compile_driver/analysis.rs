@@ -382,16 +382,11 @@ impl<'py> Driver<'_, 'py> {
                 ),
             ],
         )?;
-        let on_inputs_ready: Bound<'py, PyAny> = imported(py, "functools", "partial")?.call(
-            (self.early_lint.getattr("start")?,),
-            Some(&keywords(
-                py,
-                &[
-                    ("dialect", lint_dialect.clone()),
-                    ("value_renderer", adapter.clone()),
-                ],
-            )?),
-        )?;
+        let on_inputs_ready: Bound<'py, PyAny> = EarlySqlLint::inputs_ready_hook(
+            self.early_lint,
+            &lint_dialect.extract::<String>()?,
+            adapter,
+        );
         let analysis_selection: Bound<'py, PyAny> = replaced(
             &options.analysis_selection.clone(),
             &[("on_inputs_ready", on_inputs_ready)],

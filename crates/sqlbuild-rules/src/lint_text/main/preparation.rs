@@ -8,10 +8,5 @@ pub fn prepare(
     prior_sites: &[usize],
     dialect: &str,
 ) -> Result<Option<PreparedSql>, String> {
-    crate::lint_text::_helpers::preparation::prepare(
-        expanded,
-        before_expansion,
-        prior_sites,
-        dialect,
-    )
+    crate::lint_text::_helpers::sites::prepare(expanded, before_expansion, prior_sites, dialect)
 }

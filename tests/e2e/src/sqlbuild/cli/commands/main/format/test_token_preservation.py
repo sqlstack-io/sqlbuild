@@ -79,14 +79,16 @@ def test_given_case_sensitive_tokens_when_formatting_then_cli_writes_them_exactl
             description="split literal and keyword-named aliases build unchanged",
             authored_sql=(
                 'MODEL (description "Order lines", materialized table);\n\n'
+                "with line as (select 1 as pos, 'waffle' as sku)\n"
                 "select 'north'\n'east' as region, line.pos as index, line.sku as replace "
-                "from (select 1 as pos, 'waffle' as sku) as line\n"
+                "from line\n"
             ),
             expected_sql=(
                 'MODEL (description "Order lines", materialized table);\n\n'
+                "WITH line AS (\n  SELECT\n    1 AS pos,\n    'waffle' AS sku\n)\n\n"
                 "SELECT\n  'north'\n  'east' AS region,\n  line.pos AS index,\n"
                 "  line.sku AS replace\n"
-                "FROM (\n  SELECT\n    1 AS pos,\n    'waffle' AS sku\n) AS line\n"
+                "FROM line\n"
             ),
             expected_columns=["region", "index", "replace"],
             expected_rows=[("northeast", 1, "waffle")],

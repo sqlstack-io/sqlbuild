@@ -147,12 +147,8 @@ def keyword_name_positions() -> tuple[tuple[str, str, str, str], ...]:
 def reserved_keyword_pairs() -> tuple[tuple[str, str], ...]:
     """Return (dialect, keyword) pairs for core keywords every dialect but Databricks reserves."""
 
-    return tuple(
-        (dialect, keyword)
-        for dialect in _DIALECTS
-        if _RESERVED_NAMES[dialect]
-        for keyword in _FOLDED_KEYWORDS
-    )
+    reserving: tuple[str, ...] = tuple(filter(_RESERVED_NAMES.__getitem__, _DIALECTS))
+    return tuple(itertools.product(reserving, _FOLDED_KEYWORDS))
 
 
 def format_project_json(

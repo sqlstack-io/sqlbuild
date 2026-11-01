@@ -39,6 +39,7 @@ class SemanticCorpusCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     pending_native: bool
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1360,6 +1361,7 @@ class DialectSyntaxCompileE2ETestCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     expected_column_counts: dict[str, int]
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

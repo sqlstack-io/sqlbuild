@@ -3,5 +3,5 @@
 /// Every CTE name `sql` defines, lowercased, in order and without repeats.
 #[must_use]
 pub fn defined_cte_names(sql: &str) -> Vec<String> {
-    crate::lint_text::_helpers::preparation::defined_cte_names(sql)
+    crate::lint_text::_helpers::sites::defined_cte_names(sql)
 }

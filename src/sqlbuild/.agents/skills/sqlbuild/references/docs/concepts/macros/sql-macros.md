@@ -316,7 +316,7 @@ fully typed.
 - Every read inside `USING (...)` stands unqualified, as `USING` needs, including
   `USING (@weekly.week)` for a column the type does not declare.
 - In a column-list macro, `o.@weekly.keys` outputs the group's columns under their own names.
-- Rules judge a read as you wrote it. `SQBRSQL028`, which rejects a query mixing qualified and
+- Rules judge a read as you wrote it. `SQLCLEAN028`, which rejects a query mixing qualified and
   unqualified columns, judges a query the macro writes whole, such as a CTE of a CTE-list macro,
   once, in the macro file. There every plain read counts as unqualified and every
   `alias.@weekly...` read as qualified. A step written only in plain reads, such as

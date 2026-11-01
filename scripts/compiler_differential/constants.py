@@ -143,6 +143,13 @@ GENERATOR_INVALID_CODES: dict[str, str] = {
     "header_syntax": "D002",
     "over_broad_constant": "S024",
 }
+GENERATOR_SQL_RULE_IGNORES: tuple[str, ...] = (
+    "",
+    "[[rules.rule_ignores]]",
+    'rules = ["SQLCLEAN"]',
+    'paths = ["**"]',
+    'reason = "Generated SQL picks shapes at random to cover compiler paths."',
+)
 GENERATOR_HALF: float = 0.5
 GENERATOR_CROSS_DOMAIN_SHARE: float = 0.4
 GENERATOR_NON_ASCII_DESCRIPTION_SHARE: float = 0.3

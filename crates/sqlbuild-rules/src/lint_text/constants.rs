@@ -205,3 +205,6 @@ pub(crate) const EXPRESSION_SELECT_PREFIX: &str = "SELECT ";
 pub(crate) const LINTED_EXPRESSION_ALIAS: &str = "__sqlbuild_macro_expression__";
 /// The characters that open a quoted string or identifier in formatted SQL.
 pub(crate) const STRING_QUOTES: [char; 3] = ['\'', '"', '`'];
+
+/// A CTE definition, capturing its `name`.
+pub(crate) const CTE_DEFINITION_PATTERN: &str = r#"(?is)(?:\bWITH(?:\s+RECURSIVE)?|,)\s*["`\[]?(?P<name>[A-Za-z_][A-Za-z0-9_]*)["`\]]?(?:\s*\([^)]*\))?\s+AS\s*\("#;

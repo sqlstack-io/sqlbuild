@@ -44,17 +44,16 @@ impl fensu_policy::policy::types::RuleCodeGrammar for RulesCodeGrammar {
 
 impl RulesCodeGrammar {
     fn namespace_and_remainder(value: &str) -> Option<(&'static str, &str)> {
-        [
+        for namespace in [
             CUSTOM_RULE_NAMESPACE,
             SQL_RULE_PREFIX,
             BUILT_IN_RULE_NAMESPACE,
-        ]
-        .into_iter()
-        .find_map(|namespace| {
-            value
-                .strip_prefix(namespace)
-                .map(|remainder| (namespace, remainder))
-        })
+        ] {
+            if let Some(remainder) = value.strip_prefix(namespace) {
+                return Some((namespace, remainder));
+            }
+        }
+        None
     }
 }
 
