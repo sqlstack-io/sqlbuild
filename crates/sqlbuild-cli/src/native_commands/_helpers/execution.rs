@@ -8,7 +8,11 @@ use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
+use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
+use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_platform_webhook;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
+use sqlbuild_orchestration::platform::main::run_platform_sink::run_platform_sink;
+use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -298,6 +302,49 @@ fn location_child(options: &LocationServe, script: &Path) -> Command {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
     command
+}
+
+/// Health production and delivery remain native and independent of scheduler leadership.
+pub(crate) fn start_platform_roles(
+    tasks: &mut JoinSet<Result<(), ControlError>>,
+    (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
+) -> Result<(), ControlError> {
+    let sink = match std::env::var(PLATFORM_WEBHOOK_VARIABLE) {
+        Ok(endpoint) => Some(connect_platform_webhook(&endpoint)?),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(_) => {
+            return Err(ControlError::Invalid(
+                "platform webhook configuration must be UTF-8".into(),
+            ));
+        }
+    };
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Starting platform watchdog...\n",
+    )]));
+    let watchdog_store = store.clone();
+    let watchdog_shutdown = shutdown.clone();
+    tasks.spawn(
+        async move { run_watchdog(&watchdog_store, Uuid::now_v7(), watchdog_shutdown).await },
+    );
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Platform watchdog started\n",
+    )]));
+    if let Some(sink) = sink {
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Starting platform webhook...\n",
+        )]));
+        let sink_store = store.clone();
+        let sink_shutdown = shutdown.clone();
+        tasks.spawn(async move { run_platform_sink(&sink_store, sink, sink_shutdown).await });
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Platform webhook started\n",
+        )]));
+    }
+    Ok(())
 }
 
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.

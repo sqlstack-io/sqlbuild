@@ -1,9 +1,11 @@
 pub mod claim_location_work;
 pub mod complete_location_work;
 pub mod connect_location_work;
+pub mod connect_platform_webhook;
 pub mod location_health;
 pub mod location_work;
 pub mod report_location_health;
 pub mod report_remote_location_health;
 pub mod request_location_work;
+pub mod run_platform_sink;
 pub mod run_watchdog;

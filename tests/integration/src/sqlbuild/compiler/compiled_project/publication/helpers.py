@@ -169,6 +169,7 @@ def snapshot_api(directory: Path) -> Iterator[SnapshotApi]:
     log: Path = directory / "server.log"
     environment: dict[str, str] = os.environ.copy()
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
+    environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     with log.open("wb") as stderr:
         process: subprocess.Popen[bytes] = subprocess.Popen(
             [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", "--no-scheduler"],
@@ -271,7 +272,9 @@ def scheduled_worker(
                 "MODEL (description 'Orders.', materialized table);\n" + test_case.model_sql + "\n"
             ),
             "orchestration/orders.py": (
-                "from sqlbuild.orchestration import job, schedule\n"
+                "import os\nfrom sqlbuild.orchestration import job, schedule\n"
+                "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
+                "    assert 'SQLBUILD_PLATFORM_WEBHOOK_URL' not in os.environ\n"
                 'annual_orders = job("annual_orders", select="orders", '
                 'description="Build orders.", '
                 'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
@@ -334,6 +337,10 @@ def scheduled_worker(
         with sqlite3.connect(control_store) as control:
             _ = control.executescript(test_case.store_setup)
         monkeypatch.setenv("SQLBUILD_SCHEDULER_TEST_STORE", f"sqlite://{control_store}")
+        monkeypatch.setenv(
+            "SQLBUILD_PLATFORM_WEBHOOK_URL",
+            "http://127.0.0.1:1/events?token=synthetic-delivery-credential",
+        )
         log: Path = directory / "scheduler.log"
         with location_process(
             [

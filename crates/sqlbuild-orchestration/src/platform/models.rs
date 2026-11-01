@@ -152,3 +152,33 @@ pub(crate) struct WatchdogTrigger {
     pub(crate) definition_json: TriggerDefinition,
     pub(crate) next_due_at: Option<DateTime<Utc>>,
 }
+
+/// The endpoint may contain credentials; neither errors nor Debug reveal it.
+#[derive(Clone)]
+pub struct PlatformWebhook {
+    pub(crate) client: reqwest::Client,
+    pub(crate) url: reqwest::Url,
+    pub(crate) sink_id: String,
+}
+
+impl std::fmt::Debug for PlatformWebhook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PlatformWebhook")
+            .finish_non_exhaustive()
+    }
+}
+
+/// Stable event identity permits receiver-side deduplication after uncertain acknowledgements.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlatformEventEnvelope {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    pub payload: PlatformEventPayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlatformEventPayload {
+    pub platform: PlatformEvent,
+}

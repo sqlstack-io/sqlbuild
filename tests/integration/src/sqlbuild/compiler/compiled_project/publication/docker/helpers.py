@@ -89,6 +89,8 @@ def docker_deployment(directory: Path, executable: str) -> Iterator[WorkerDeploy
         "--env",
         "SQLBUILD_CONTROL_DATABASE_URL=synthetic-control-store",
         "--env",
+        "SQLBUILD_PLATFORM_WEBHOOK_URL=http://127.0.0.1:1/events?token=synthetic-delivery-credential",
+        "--env",
         "SQLBUILD_SCHEDULER_TEST_STORE=synthetic-configured-store",
         *mounts,
         image_id,

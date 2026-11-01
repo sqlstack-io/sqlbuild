@@ -6,3 +6,5 @@ mod helpers;
 mod test_types;
 #[path = "test_watchdog.rs"]
 mod test_watchdog;
+#[path = "test_webhook.rs"]
+mod test_webhook;

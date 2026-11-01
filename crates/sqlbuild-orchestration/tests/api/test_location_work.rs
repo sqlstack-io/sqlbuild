@@ -46,9 +46,9 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             let store = &fixture.store;
             migrate_store(store).await.expect("fresh migration");
             // Exercise both deployed predecessors, including checksums and repeated startup.
-            execute(store, "DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DELETE FROM sqb_schema_migrations WHERE version=3").await;
+            execute(store, "DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DELETE FROM sqb_schema_migrations WHERE version>=3").await;
             migrate_store(store).await.expect("schema 2 upgrade");
-            execute(store, "DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2").await;
+            execute(store, "DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2").await;
             migrate_store(store).await.expect("schema 1 upgrade");
             migrate_store(store).await.expect("repeat migration");
             let location_id = create_location(store, "orders", "test-admin")
