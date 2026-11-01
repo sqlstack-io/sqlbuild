@@ -1,0 +1,82 @@
+name: ${COMPOSE_PROJECT_NAME:-sqlbuild}
+
+services:
+  postgres:
+    image: postgres:17.6-alpine3.22
+    environment:
+      POSTGRES_USER: sqlbuild
+      POSTGRES_DB: sqlbuild
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U sqlbuild -d sqlbuild"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - control:/var/lib/postgresql/data
+    networks: [control]
+
+  server:
+    image: ${SQLBUILD_SERVER_IMAGE:-sqlbuild-server:local}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: server
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    environment:
+      - SQLBUILD_CONTROL_DATABASE_URL=${SQLBUILD_CONTROL_DATABASE_URL:?Set SQLBUILD_CONTROL_DATABASE_URL}
+      - SQLBUILD_PLATFORM_WEBHOOK_URL
+    group_add: ["${DOCKER_GID:?Set DOCKER_GID to the Docker socket group}"]
+    volumes:
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    configs:
+      - source: launchers
+        target: /etc/sqlbuild/launchers.json
+    ports:
+      - "${SQLBUILD_BIND_ADDRESS:-127.0.0.1}:${SQLBUILD_PORT:-8000}:8000"
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --output, /dev/null, "http://localhost:8000/api/openapi.json"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [control, workers]
+
+  location:
+    image: ${SQLBUILD_LOCATION_IMAGE:-sqlbuild-orders:local}
+    container_name: ${COMPOSE_PROJECT_NAME:-sqlbuild}-location
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: location
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+        SQLBUILD_GIT_REVISION: ${SQLBUILD_GIT_REVISION:?Set SQLBUILD_GIT_REVISION}
+    command: [location, serve, --server, "http://server:8000", --location-id, "${SQLBUILD_LOCATION_ID:?Set SQLBUILD_LOCATION_ID}", --target, development]
+    environment:
+      SQLBUILD_LOCATION_TOKEN: ${SQLBUILD_LOCATION_TOKEN:-}
+    volumes:
+      - warehouse:/warehouse
+    cpus: 2
+    mem_limit: 1g
+    depends_on:
+      server:
+        condition: service_healthy
+    networks: [workers]
+
+configs:
+  launchers:
+    content: |
+      {"docker":[{"location_id":"${SQLBUILD_LOCATION_ID}","target":"development","server_url":"http://server:8000","max_workers":1,"socket":"/var/run/docker.sock","location_container":"${COMPOSE_PROJECT_NAME:-sqlbuild}-location","executable":"/usr/local/bin/sqb"}]}
+
+volumes:
+  control:
+  warehouse:
+
+networks:
+  control:
+    internal: true
+  workers:

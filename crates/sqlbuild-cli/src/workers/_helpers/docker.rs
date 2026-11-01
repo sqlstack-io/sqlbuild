@@ -86,7 +86,7 @@ impl DockerWorker {
             "WorkingDir": project, "User": parent["Config"]["User"], "Env": variables,
             "Labels": {"io.sqlbuild.claim-id": self.claim_id.to_string()},
             "HostConfig": {
-                "NetworkMode": format!("container:{}", location.location_container),
+                "NetworkMode": parent["HostConfig"]["NetworkMode"],
                 "VolumesFrom": [location.location_container],
                 "Memory": parent["HostConfig"]["Memory"], "MemorySwap": parent["HostConfig"]["MemorySwap"],
                 "NanoCpus": parent["HostConfig"]["NanoCpus"], "PidsLimit": parent["HostConfig"]["PidsLimit"],

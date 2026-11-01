@@ -58,6 +58,7 @@ target/
 *.dylib
 .dlt/
 .amp/portals/*
+/.env
 
 # Local SQLBuild overrides
 sqlbuild_local.yml

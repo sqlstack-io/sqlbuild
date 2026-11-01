@@ -184,3 +184,9 @@ class DevelopmentTestCase:
     control_path: str
     expected_rows: list[tuple[int, int]]
     local_config: str = ""
+
+
+@dataclass(frozen=True)
+class ComposeDeploymentTestCase:
+    description: str
+    expected_warehouse_rows: list[list[int]]
