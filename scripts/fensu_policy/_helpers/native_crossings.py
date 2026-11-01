@@ -27,6 +27,11 @@ _CROSSING: re.Pattern[str] = re.compile("|".join(NATIVE_CROSSING_PATTERNS))
 _PYTHON_FIELD: re.Pattern[str] = re.compile(NATIVE_PYTHON_FIELD_PATTERN)
 _STRUCT_OPEN: re.Pattern[str] = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+\w+[^;]*\{\s*$")
 _FIELD: re.Pattern[str] = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?\w+\s*:")
+_PYCLASS_MODULE: re.Pattern[str] = re.compile(
+    r"(^[ \t]*#\[\s*(?:pyo3::)?pyclass\s*\([^]]*?\bmodule\s*=\s*(?:r#*)?)"
+    r'"(?:\\.|[^"\\\n])*"',
+    re.MULTILINE,
+)
 
 
 def is_checked_binding(*, path: str) -> bool:
@@ -72,8 +77,9 @@ def _code_lines(*, source: str) -> list[tuple[int, str]]:
 
 
 def crossing_lines(*, source: str) -> list[int]:
-    """Line numbers of Rust-to-Python crossings, one entry per crossing."""
+    """Line numbers of Rust-to-Python crossings, excluding inert PyO3 module metadata."""
 
+    source = _PYCLASS_MODULE.sub(r'\1""', source)
     found: list[int] = []
     number: int
     line: str

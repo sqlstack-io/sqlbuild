@@ -136,6 +136,37 @@ def test_given_test_module_when_checking_native_patches_then_matches_contract(
             expected_lines=(3, 4, 5, 5, 6, 6),
         ),
         NativeLinesTestCase(
+            description="pyclass module metadata is not a Python crossing",
+            source='#[pyclass(frozen, module = "sqlbuild._native")]\nstruct Snapshot;\n',
+            expected_lines=(),
+        ),
+        NativeLinesTestCase(
+            description="multiline namespaced pyclass metadata preserves callback line numbers",
+            source=dedent(
+                """
+                #[pyo3::pyclass(
+                    frozen,
+                    module = "sqlbuild._native",
+                )]
+                struct Snapshot;
+                fn read(py: Python<'_>) {
+                    py.import("sqlbuild.compiler");
+                }
+                """
+            ),
+            expected_lines=(8, 8),
+        ),
+        NativeLinesTestCase(
+            description="raw pyclass module metadata does not hide an adjacent real crossing",
+            source='#[pyclass(module = r#"sqlbuild._native"#)] struct Snapshot; fn read() { imported(py, "sqlbuild.compiler", "compile"); }\n',
+            expected_lines=(1, 1),
+        ),
+        NativeLinesTestCase(
+            description="module assignments outside pyclass remain crossings",
+            source='fn read() { let module = "sqlbuild.compiler"; load(module); }\n',
+            expected_lines=(1,),
+        ),
+        NativeLinesTestCase(
             description="comments, imports and test modules are skipped",
             source=dedent(
                 """
