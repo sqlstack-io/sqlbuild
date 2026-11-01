@@ -57,6 +57,5 @@ pub const SOURCE_FRESHNESS_COLUMN_TYPES: [(&str, &str); 10] = [
 pub const SOURCE_FRESHNESS_EVENT_ID: &str = "event_id";
 pub const OBSERVED_AT_COLUMN: &str = "observed_at";
 pub const SQLITE_ADAPTER: &str = "sqlite";
-pub(crate) const SQLSERVER_ADAPTER: &str = "sqlserver";
 pub(crate) const PHYSICAL_TABLE_SOURCE_FRAGMENT: &str = "requires a physical table source";
 pub(crate) const INCOMPLETE_CONFIGURATION_FRAGMENT: &str = "incomplete";
