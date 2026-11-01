@@ -48,7 +48,10 @@ use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_argument
 use crate::sql_macros::models::SqlMacroFinding;
 use crate::sql_macros::types::ArgumentCheckInput;
 use crate::sqlquack_analysis::main::compile_lineage::compile_lineage;
-use crate::sqlquack_analysis::models::{CompileFunctions, CompileLineageColumn, CompiledModelSql};
+use crate::sqlquack_analysis::main::reads_dialect::reads_dialect;
+use crate::sqlquack_analysis::models::{
+    CompileFunctions, CompileLineageColumn, CompiledLineage, CompiledModelSql,
+};
 
 /// What an internal native failure of the session names.
 const SESSION_CONTEXT: &str = "native model analysis";
@@ -80,6 +83,7 @@ impl AnalysisSession {
             complete_shapes,
             outcomes: vec![None; request.models.len()],
             pending_cleaned: vec![false; request.models.len()],
+            routed: vec![false; request.models.len()],
             waves: if dependency_ordered || request.models.is_empty() {
                 waves
             } else {
@@ -238,6 +242,7 @@ impl AnalysisSession {
             .map(|model| self.binding_schema(&self.request.models[*model]))
             .collect();
         let misses: Vec<usize> = self.read_cache(models, &schemas)?;
+        let misses: Vec<usize> = self.sqlquack_analyses(models, misses, &schemas)?;
         let batch = Batch {
             dialect: &self.request.dialect,
             function_return_types: &self.request.function_return_types,
@@ -388,7 +393,7 @@ impl AnalysisSession {
         }
         let mut candidates: Vec<(usize, Shapes, bool)> = Vec::new();
         for model in self.waves[wave].clone() {
-            if self.cached(model) {
+            if self.cached(model) || self.routed[model] {
                 continue;
             }
             let request: &ModelRequest = &self.request.models[model];
@@ -550,7 +555,7 @@ impl AnalysisSession {
         let analysed: Vec<usize> = models
             .iter()
             .copied()
-            .filter(|model| !self.cached(*model))
+            .filter(|model| !self.cached(*model) && !self.routed[*model])
             .collect();
         if analysed.is_empty() {
             return Ok(());
@@ -580,10 +585,7 @@ impl AnalysisSession {
         let Some(lineages) = compile_lineage(
             &self.request.dialect,
             &inputs,
-            CompileFunctions {
-                return_types: &self.request.function_return_types,
-                nullability_rules: self.request.nullability_rules.as_deref().unwrap_or(&[]),
-            },
+            self.compile_functions(),
             &pool,
         )?
         else {
@@ -594,8 +596,8 @@ impl AnalysisSession {
             let (Some(lineage), true) = (lineage, outcome.analysis.analysis_succeeded) else {
                 continue;
             };
-            outcome.analysis.columns = Some(lineage.iter().map(column_fact).collect());
-            let rows: Vec<LineageRow> = lineage.into_iter().map(lineage_row).collect();
+            outcome.analysis.columns = Some(lineage.columns.iter().map(column_fact).collect());
+            let rows: Vec<LineageRow> = lineage.columns.into_iter().map(lineage_row).collect();
             outcome.analysis.lineage = match &outcome.analysis.lineage {
                 LineageFacts::Native(_) => LineageFacts::Native(rows),
                 LineageFacts::NativeFacts(_) => LineageFacts::NativeFacts(rows),
@@ -1016,5 +1018,159 @@ fn column_fact(column: &CompileLineageColumn) -> ColumnFact {
         name: column.output_column.clone(),
         data_type: column.data_type.clone(),
         nullability: column.nullability.to_owned(),
+    }
+}
+
+/// One wave model SQLQuack read: its position among the misses, cleaned SQL and lineage.
+struct ReadModel {
+    position: usize,
+    cleaned_sql: String,
+    lineage: CompiledLineage,
+}
+
+impl AnalysisSession {
+    /// Analyse the cache misses SQLQuack reads; returns the positions it leaves to polyglot.
+    fn sqlquack_analyses(
+        &mut self,
+        models: &[usize],
+        misses: Vec<usize>,
+        schemas: &[Shapes],
+    ) -> Result<Vec<usize>, String> {
+        if misses.is_empty() || !reads_dialect(&self.request.dialect) {
+            return Ok(misses);
+        }
+        let read: Vec<ReadModel> = self.read_models(models, &misses, schemas)?;
+        if read.is_empty() {
+            return Ok(misses);
+        }
+        let requests: Vec<(&str, &Shapes)> = read
+            .iter()
+            .map(|model| (model.cleaned_sql.as_str(), &schemas[model.position]))
+            .collect();
+        let prepared: Vec<_> = self.catalog.prepare(&requests);
+        let diagnostics: Vec<Vec<DiagnosticRow>> = self.catalog.native.binding_results(prepared)?;
+        let answered: Vec<usize> = read.iter().map(|model| model.position).collect();
+        for (model, diagnostics) in read.into_iter().zip(diagnostics) {
+            let index: usize = models[model.position];
+            let inputs_known: bool = self.request.models[index]
+                .required_names
+                .iter()
+                .all(|name| self.complete_shapes.contains(name));
+            self.routed[index] = true;
+            self.outcomes[index] = Some(ModelOutcome {
+                sql_macro_findings: Vec::new(),
+                analysis: read_analysis(model.lineage, diagnostics, inputs_known),
+                cleaned_sql: model.cleaned_sql,
+                deferred_cleaning: None,
+                validated_schema: schemas[model.position].clone(),
+                fused_binding_validated: true,
+            });
+        }
+        Ok(misses
+            .into_iter()
+            .filter(|position| !answered.contains(position))
+            .collect())
+    }
+
+    /// The misses whose SQL cleans and SQLQuack reads, with their lineage.
+    fn read_models(
+        &mut self,
+        models: &[usize],
+        misses: &[usize],
+        schemas: &[Shapes],
+    ) -> Result<Vec<ReadModel>, String> {
+        let mut required: Vec<String> = Vec::new();
+        for position in misses {
+            for reference in &self.request.models[models[*position]].references {
+                if !required.contains(&reference.analysis_name) {
+                    required.push(reference.analysis_name.clone());
+                }
+            }
+        }
+        self.catalog.prepare_analysis(
+            &required,
+            &self.available_types,
+            &self.available_nullability,
+        );
+        let members: Vec<BatchMember<'_>> = misses
+            .iter()
+            .map(|position| {
+                batch_member(&self.request.models[models[*position]], &schemas[*position])
+            })
+            .collect();
+        let cleaned: Vec<Result<String, String>> = self
+            .catalog
+            .normalize_each(&self.request.dialect, &members)?;
+        let clean: Vec<(usize, String)> = misses
+            .iter()
+            .zip(cleaned)
+            .filter_map(|(position, sql)| match sql {
+                Ok(sql) => Some((*position, sql)),
+                Err(_uncleaned) => None,
+            })
+            .collect();
+        let types: Vec<Shapes> = clean
+            .iter()
+            .map(|(position, _)| self.input_types(models[*position]))
+            .collect();
+        let nullability: Vec<Shapes> = clean
+            .iter()
+            .map(|(position, _)| self.input_nullability(models[*position]))
+            .collect();
+        let inputs: Vec<CompiledModelSql<'_>> = clean
+            .iter()
+            .zip(types.iter().zip(&nullability))
+            .map(|((position, sql), (types, nullability))| CompiledModelSql {
+                sql,
+                references: &self.request.models[models[*position]].lineage_references,
+                schema: &schemas[*position],
+                types,
+                nullability,
+            })
+            .collect();
+        let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
+        let lineages: Vec<Option<CompiledLineage>> = compile_lineage(
+            &self.request.dialect,
+            &inputs,
+            self.compile_functions(),
+            &pool,
+        )?
+        .unwrap_or_default();
+        Ok(clean
+            .into_iter()
+            .zip(lineages)
+            .filter_map(|((position, cleaned_sql), lineage)| {
+                Some(ReadModel {
+                    position,
+                    cleaned_sql,
+                    lineage: lineage?,
+                })
+            })
+            .collect())
+    }
+
+    /// The adapter's function facts, as SQLQuack reads them.
+    fn compile_functions(&self) -> CompileFunctions<'_> {
+        CompileFunctions {
+            return_types: &self.request.function_return_types,
+            nullability_rules: self.request.nullability_rules.as_deref().unwrap_or(&[]),
+        }
+    }
+}
+
+/// SQLQuack's analysis with polyglot's diagnostics; a star is unresolved only over unknown inputs.
+fn read_analysis(
+    lineage: CompiledLineage,
+    diagnostics: Vec<DiagnosticRow>,
+    inputs_known: bool,
+) -> ModelAnalysis {
+    ModelAnalysis {
+        analysis_succeeded: true,
+        columns: Some(lineage.columns.iter().map(column_fact).collect()),
+        has_star: lineage.projects_star,
+        star_resolved: !(lineage.projects_star && lineage.open_star && !inputs_known),
+        lineage: LineageFacts::Native(lineage.columns.into_iter().map(lineage_row).collect()),
+        binding_diagnostics: diagnostics,
+        binding_validated: true,
     }
 }

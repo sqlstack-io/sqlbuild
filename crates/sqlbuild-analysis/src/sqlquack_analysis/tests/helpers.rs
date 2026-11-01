@@ -41,7 +41,7 @@ pub(crate) fn compile_lines(dialect: &str, sql: &str) -> Vec<String> {
     };
     models.pop().flatten().map_or_else(
         || vec![UNREAD.to_owned()],
-        |columns| columns.iter().map(described).collect(),
+        |lineage| lineage.columns.iter().map(described).collect(),
     )
 }
 
@@ -105,7 +105,7 @@ pub(crate) fn compile_types(sql: &str) -> Vec<String> {
         .and_then(|mut models| models.pop().flatten())
         .map_or_else(
             || vec![UNREAD.to_owned()],
-            |columns| columns.iter().map(typed).collect(),
+            |lineage| lineage.columns.iter().map(typed).collect(),
         )
 }
 

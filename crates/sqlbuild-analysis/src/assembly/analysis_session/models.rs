@@ -358,6 +358,8 @@ pub struct AnalysisSession {
     pub(crate) cache: Option<AnalysisCache>,
     /// Models whose analysis took the legacy path.
     pub(crate) legacy_models: Vec<String>,
+    /// Models SQLQuack analysed, which need no completion or later lineage pass.
+    pub(crate) routed: Vec<bool>,
 }
 
 /// Which of Python's column analyses one query outside the session takes.

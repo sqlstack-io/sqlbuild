@@ -18,12 +18,12 @@ fn given_typed_markers_when_analysing_then_each_call_has_its_asserted_or_inferre
         TypedMarkerTestCase {
             description: "a known body keeps its inferred type",
             sql: "SELECT __polyglot_typed(order_id, 'VARCHAR') AS v FROM __ref(\"staged\")",
-            expected_column: "v INT ",
+            expected_column: "v INTEGER ",
         },
         TypedMarkerTestCase {
             description: "a known aliased column keeps its inferred type",
             sql: "SELECT __polyglot_typed(o.order_id, 'VARCHAR') AS v FROM __ref(\"staged\") AS o",
-            expected_column: "v INT ",
+            expected_column: "v INTEGER ",
         },
         TypedMarkerTestCase {
             description: "a later set-operation branch types the union",

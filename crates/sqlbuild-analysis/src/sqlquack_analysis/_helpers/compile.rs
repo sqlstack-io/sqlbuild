@@ -17,14 +17,16 @@ use crate::sqlquack_analysis::_helpers::schema::{TypedRelations, relation_key, s
 use crate::sqlquack_analysis::constants::{
     NON_NULL, NULLABLE, QUOTE, TEXT_TYPE, UNKNOWN_NULLABILITY, VARCHAR_TYPE,
 };
-use crate::sqlquack_analysis::models::{CompileFunctions, CompileLineageColumn, CompiledModelSql};
+use crate::sqlquack_analysis::models::{
+    CompileFunctions, CompileLineageColumn, CompiledLineage, CompiledModelSql,
+};
 
 /// The model's lineage columns, `None` when SQLQuack cannot read its SQL.
 pub(crate) fn model_lineage(
     model: &CompiledModelSql<'_>,
     functions: CompileFunctions<'_>,
     (dialect, profile): (Dialect, &'static dyn DialectProfile),
-) -> Option<Vec<CompileLineageColumn>> {
+) -> Option<CompiledLineage> {
     let quoted: HashSet<&str> = quoted_identifiers(model.sql);
     let relations =
         |shapes: &[(String, Vec<(String, String)>)]| -> HashMap<String, Vec<SchemaColumn>> {
@@ -66,14 +68,16 @@ pub(crate) fn model_lineage(
         sql: None,
     };
     match query_lineage(model.sql, dialect, &lineage_parse_options(), context) {
-        Ok(lineage) => Some(
-            lineage
+        Ok(lineage) => Some(CompiledLineage {
+            columns: lineage
                 .outputs
                 .iter()
                 .filter(|output| !output.name.is_empty())
                 .map(|output| lineage_column(output, &references, profile))
                 .collect(),
-        ),
+            projects_star: lineage.projects_star,
+            open_star: lineage.open_star,
+        }),
         Err(_unreadable) => None,
     }
 }

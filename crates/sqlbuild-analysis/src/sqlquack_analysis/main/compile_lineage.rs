@@ -6,7 +6,7 @@ use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
 use crate::sqlquack_analysis::_helpers::compile::model_lineage;
 use crate::sqlquack_analysis::_helpers::schema::sqlquack_dialect;
-use crate::sqlquack_analysis::models::{CompileFunctions, CompileLineageColumn, CompiledModelSql};
+use crate::sqlquack_analysis::models::{CompileFunctions, CompiledLineage, CompiledModelSql};
 
 /// Each model's lineage, `None` for one SQLQuack cannot read; `None` overall for another dialect.
 pub fn compile_lineage(
@@ -14,7 +14,7 @@ pub fn compile_lineage(
     models: &[CompiledModelSql<'_>],
     functions: CompileFunctions<'_>,
     pool: &ThreadPool,
-) -> Result<Option<Vec<Option<Vec<CompileLineageColumn>>>>, String> {
+) -> Result<Option<Vec<Option<CompiledLineage>>>, String> {
     let Some(dialect) = sqlquack_dialect(dialect) else {
         return Ok(None);
     };

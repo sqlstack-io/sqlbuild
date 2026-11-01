@@ -20,6 +20,16 @@ pub struct CompiledModelSql<'a> {
     pub nullability: &'a [(String, Vec<(String, String)>)],
 }
 
+/// One compiled model's lineage: its output columns and where its stars stand.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledLineage {
+    pub columns: Vec<CompileLineageColumn>,
+    /// Whether the outermost query level projects a star.
+    pub projects_star: bool,
+    /// Whether a star over a relation of unknown columns left outputs out.
+    pub open_star: bool,
+}
+
 /// One output column's compile lineage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompileLineageColumn {

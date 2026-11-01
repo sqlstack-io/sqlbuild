@@ -22,7 +22,7 @@ const UNTYPED_ORDERS: ModelSpec = (
     &[],
 );
 
-/// A producer whose output types stay unknown without rich inference.
+/// A producer of literal columns, which SQLQuack types in fast and rich inference alike.
 const STAR_PRODUCER: ModelSpec = ("stg_orders", "SELECT 1 AS order_id, 10 AS amount", &[], &[]);
 
 #[test]
@@ -52,8 +52,8 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             ],
             expected_steps: &[&[
                 "publish stg_orders order_id:INTEGER doubled:DOUBLE",
-                "publish orders_mart doubled:DOUBLE next_id:INT",
-                "publish orders_star order_id:INT doubled:DOUBLE",
+                "publish orders_mart doubled:DOUBLE next_id:INTEGER",
+                "publish orders_star order_id:INTEGER doubled:DOUBLE",
             ]],
             expected_outcomes: &[
                 &[
@@ -63,11 +63,11 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
                 ],
                 &[
                     "doubled DOUBLE unknown",
-                    "next_id INT unknown",
+                    "next_id INTEGER unknown",
                     "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
-                    "order_id INT unknown",
+                    "order_id INTEGER unknown",
                     "doubled DOUBLE unknown",
                     "succeeded=true star=true/true diagnostics=[]",
                 ],
@@ -84,7 +84,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_steps: &[&[]],
             expected_outcomes: &[&[
                 "missing_column - unknown",
-                "succeeded=true star=false/false diagnostics=[\"B002\"]",
+                "succeeded=true star=false/true diagnostics=[\"B002\"]",
             ]],
         },
         SessionTestCase {
@@ -110,12 +110,12 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_outcomes: &[
                 &[
                     "event_id - unknown",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
                     "event_id - unknown",
                     "one INT non_null",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
             ],
         },
@@ -143,11 +143,11 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_outcomes: &[
                 &[
                     "gr\u{f6}\u{df}e - unknown",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
                 &[
                     "gr\u{f6}\u{df}e - non_null",
-                    "succeeded=true star=false/false diagnostics=[]",
+                    "succeeded=true star=false/true diagnostics=[]",
                 ],
             ],
         },
@@ -162,7 +162,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
             expected_steps: &[&["publish orders_union order_id:UNKNOWN"]],
             expected_outcomes: &[&[
                 "order_id - unknown",
-                "succeeded=true star=false/false diagnostics=[]",
+                "succeeded=true star=false/true diagnostics=[]",
             ]],
         },
     ];
@@ -182,7 +182,7 @@ fn given_models_when_running_the_session_then_publishes_as_python_does() {
 fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the_star() {
     let test_cases = [
         StarExpansionTestCase {
-            description: "fast inference keeps the starred columns before the cast constant",
+            description: "fast inference types the starred columns before the cast constant",
             rich_type_inference: false,
             models: &[
                 STAR_PRODUCER,
@@ -194,12 +194,12 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:UNKNOWN amount:UNKNOWN",
-                "publish orders_flagged order_id:UNKNOWN amount:UNKNOWN flag:INT",
+                "publish stg_orders order_id:INT amount:INT",
+                "publish orders_flagged order_id:INT amount:INT flag:INT",
             ]],
         },
         StarExpansionTestCase {
-            description: "fast inference expands a star over a derived table",
+            description: "fast inference expands and types a star over a derived table",
             rich_type_inference: false,
             models: &[
                 STAR_PRODUCER,
@@ -212,8 +212,8 @@ fn given_a_star_beside_a_cast_constant_when_running_the_session_then_expands_the
                 ),
             ],
             expected_steps: &[&[
-                "publish stg_orders order_id:UNKNOWN amount:UNKNOWN",
-                "publish orders_flagged order_id:UNKNOWN amount:UNKNOWN flag:INT",
+                "publish stg_orders order_id:INT amount:INT",
+                "publish orders_flagged order_id:INT amount:INT flag:INT",
             ]],
         },
         StarExpansionTestCase {
@@ -720,7 +720,7 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
             "raw_orders",
             true,
         ),
-        expected_columns: [&["customer_id INTEGER non_null"], &["1 - non_null"]],
+        expected_columns: [&["customer_id INTEGER non_null"], &["1 INT non_null"]],
     }];
     for test_case in test_cases {
         let kept = kept_model_analyses(test_case.dialect, test_case.sql, test_case.family);
