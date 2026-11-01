@@ -39,7 +39,13 @@ fast-native:
 
 rust-check: rust-lint
 	uv run fensu check
-	cargo test --workspace --all-features
+	$(MAKE) test-native
+
+NATIVE_TEST_ARGS ?= --workspace --all-features
+
+.PHONY: test-native
+test-native:
+	uv run --no-sync python -m scripts.run_native_tests $(NATIVE_TEST_ARGS)
 
 .PHONY: rust-lint
 rust-lint:
