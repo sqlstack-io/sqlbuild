@@ -87,3 +87,15 @@ pub(crate) struct ProxyApiTestCase {
     pub(crate) trusted_peer: &'static str,
     pub(crate) expected_authentications: usize,
 }
+
+pub(crate) struct OidcApiTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_authentications: usize,
+}
+
+pub(crate) struct OidcThrottleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_allowed: usize,
+}

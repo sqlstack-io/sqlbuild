@@ -8,6 +8,7 @@ pub(crate) const MAX_PASSWORD_BYTES: usize = 1024;
 pub(crate) const PASSWORD_ALGORITHM: &str = "argon2id";
 pub(crate) const PASSWORD_KDF_SLOTS: usize = 4;
 pub(crate) const PASSWORD_SESSION_SECONDS: i64 = 3600;
+pub(crate) const OIDC_FLOW_SECONDS: i64 = 300;
 pub(crate) const LOGIN_WINDOW_SECONDS: i64 = 60;
 pub(crate) const LOGIN_USER_LIMIT: u64 = 5;
 pub(crate) const LOGIN_PEER_LIMIT: u64 = 20;

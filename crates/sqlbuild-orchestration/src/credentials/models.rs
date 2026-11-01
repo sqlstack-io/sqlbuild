@@ -96,9 +96,32 @@ pub enum PasswordLogin {
     Denied { decision_id: Uuid, throttled: bool },
 }
 
-pub enum PasswordAttempt<'a> {
+pub enum AuthenticationAttempt<'a> {
     Login(&'a str),
     Reauthenticate(Uuid),
+    IdentityProvider,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ExternalIdentityMechanism {
+    TrustedProxy,
+    Oidc,
+}
+
+#[derive(Debug)]
+pub(crate) struct OidcFlowStart {
+    pub(crate) state: openidconnect::CsrfToken,
+    pub(crate) browser: openidconnect::CsrfToken,
+    pub(crate) nonce: openidconnect::Nonce,
+    pub(crate) pkce_verifier: openidconnect::PkceCodeVerifier,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredOidcFlow {
+    pub(crate) flow_id: Uuid,
+    pub(crate) browser_hash: String,
+    pub(crate) nonce: openidconnect::Nonce,
+    pub(crate) pkce_verifier: openidconnect::PkceCodeVerifier,
 }
 
 #[derive(Debug, Deserialize)]

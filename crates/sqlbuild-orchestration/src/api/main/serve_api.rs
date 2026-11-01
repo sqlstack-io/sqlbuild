@@ -16,10 +16,14 @@ pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
     authentication: ApiAuthentication,
-    shutdown: impl Future<Output = ()> + Send + 'static,
+    (ready, shutdown): (
+        impl FnOnce() + Send + 'static,
+        impl Future<Output = ()> + Send + 'static,
+    ),
 ) -> Result<(), ControlError> {
     let address = listener.local_addr()?;
-    let (development_scope, password_routes) = configure(&store, authentication, address)?;
+    let (development_scope, authentication_routes) =
+        configure(&store, authentication, address).await?;
     migrate_store(&store).await?;
     let (sender, listener_changes) = subscribe_changes(&store).await?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
@@ -28,7 +32,7 @@ pub async fn serve_api(
         stopped,
     };
     let application = router(&store, feed)
-        .merge(password_routes)
+        .merge(authentication_routes)
         .route(
             "/api/openapi.json",
             get(|| async { Json(openapi_document()) }),
@@ -43,6 +47,7 @@ pub async fn serve_api(
         shutdown.await;
         stop.send_replace(true);
     });
+    ready();
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store, listener_changes, sender) => result,

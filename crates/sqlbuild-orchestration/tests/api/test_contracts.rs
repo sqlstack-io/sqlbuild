@@ -4,6 +4,10 @@
 mod changes_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "oidc/helpers.rs"]
+mod oidc_helpers;
+#[path = "oidc/test_types.rs"]
+mod oidc_test_types;
 #[path = "output/helpers.rs"]
 mod output_helpers;
 #[path = "recall/helpers.rs"]
@@ -18,6 +22,8 @@ mod test_development;
 mod test_location_health;
 #[path = "test_location_work.rs"]
 mod test_location_work;
+#[path = "test_oidc.rs"]
+mod test_oidc;
 #[path = "test_passwords.rs"]
 mod test_passwords;
 #[path = "test_proxy.rs"]

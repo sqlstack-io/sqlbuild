@@ -90,7 +90,12 @@ pub(crate) async fn run_development_roles(
             development_scope: Some(scope),
             ..ApiAuthentication::default()
         },
-        development_stopped(shutdown.clone()),
+        (move || {
+            drop(write_output(&[(Stream::Stderr, &format!(
+                "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
+                if triggers { "follow code defaults and operator overrides" } else { "start paused" }
+            ))]));
+        }, development_stopped(shutdown.clone())),
     ));
     start_platform_roles(&mut tasks, (&store, &shutdown))?;
     tasks.spawn(development_location_role(
@@ -119,17 +124,6 @@ pub(crate) async fn run_development_roles(
             "Development scheduler started\n",
         )]));
     }
-    drop(write_output(&[(
-        Stream::Stderr,
-        &format!(
-            "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",
-            if triggers {
-                "follow code defaults and operator overrides"
-            } else {
-                "start paused"
-            }
-        ),
-    )]));
     supervise_control_roles(tasks, stop).await
 }
 

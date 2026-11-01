@@ -1059,6 +1059,13 @@
         "group": 1
        },
        {
+        "kind": "store",
+        "options": ["--oidc-config"],
+        "dest": "control_oidc_config",
+        "help": "JSON HTTPS origin/issuer, client_id and explicit subject-to-person identities; native code flow with PKCE; no provisioning or grants",
+        "group": 1
+       },
+       {
         "kind": "store_true",
         "options": [
          "--no-scheduler"

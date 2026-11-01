@@ -68,3 +68,45 @@ Unbound subjects, missing or disabled people, and service accounts are denied;
 accounts are not auto-provisioned. Password and trusted-proxy modes cannot be
 combined. No default role or SSO group assignment is inferred by this identity
 endpoint.
+
+## Verify an OIDC identity
+
+Register an authorization-code client with your HTTPS identity provider, using
+`https://control.example.com/api/auth/oidc/callback` as its redirect URI. Create
+each person through the local control-store-owner administration path and put
+their UUID and exact provider subject in a server-owned JSON configuration:
+
+```json
+{
+  "origin": "https://control.example.com",
+  "issuer": "https://identity.example.com",
+  "client_id": "orders-control",
+  "identities": {
+    "external-orders-reader": "00000000-0000-0000-0000-000000000001"
+  }
+}
+```
+
+Start `sqb server --oidc-config oidc.json` behind an HTTPS-terminating proxy that
+preserves the configured Host and restricts access to the HTTP backend. For a
+confidential client, add `client_secret_env` naming the server environment
+variable holding its secret; never put the secret in the JSON file. To trust a
+private provider CA, add `certificate_authority` pointing to a PEM bundle.
+Relative certificate paths resolve from the server process's working directory.
+TLS verification remains mandatory and upstream HTTP redirects are not followed.
+Password, proxy, disabled-auth and OIDC human-authentication modes are exclusive.
+
+Navigate the browser to `/api/auth/oidc/login`. The server redirects to the
+provider using S256 PKCE and sets a Secure, HttpOnly, host-only, five-minute
+SameSite=Lax flow cookie. The provider's GET callback must return through that
+same browser. State is single-use across server replicas; a changed server
+identity configuration requires starting a fresh flow. The server validates
+the ID token's signature, issuer, audience, expiry and nonce, and an access-token
+hash when supplied. Provider keys are refreshed for each exchange.
+
+The callback returns only `principal_id` and clears the flow cookie. Unbound,
+missing or disabled people and service accounts are denied. This identity-only
+endpoint does not create an account, browser/CLI session, bearer or role grant,
+and cannot authenticate machine routes. It is not a complete browser SSO or
+`sqb login` workflow. Authentication denial and successful identity verification
+are audited; flow starts share a 20-per-minute real-peer limit across replicas.

@@ -16,6 +16,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/oidc/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Validates one browser-bound code and returns the explicitly bound person only; no session, bearer, provisioning or grants. */
+        get: operations["oidcIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/oidc/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Begins a browser-bound code flow with S256 PKCE; no account provisioning or grants. */
+        get: operations["loginOidc"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/password": {
         parameters: {
             query?: never;
@@ -459,6 +493,10 @@ export interface components {
             /** @enum {string} */
             status: "timed_out";
         };
+        ExternalIdentityResponse: {
+            /** Format: uuid */
+            principal_id: string;
+        };
         /** @description Fingerprint observations from one registered reader, independent of automatic polling. */
         FingerprintBatch: {
             /** Format: int64 */
@@ -648,10 +686,6 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
-        ProxyIdentityResponse: {
-            /** Format: uuid */
-            principal_id: string;
-        };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
             invocation_id: string;
@@ -1126,6 +1160,66 @@ export interface operations {
             };
         };
     };
+    oidcIdentity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExternalIdentityResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    loginOidc: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
     changePassword: {
         parameters: {
             query?: never;
@@ -1211,7 +1305,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProxyIdentityResponse"];
+                    "application/json": components["schemas"]["ExternalIdentityResponse"];
                 };
             };
             401: {

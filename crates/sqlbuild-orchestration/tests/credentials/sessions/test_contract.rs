@@ -8,11 +8,12 @@ use uuid::Uuid;
 use crate::credentials::main::{
     authenticate_session::authenticate_session, authenticate_token::authenticate_token,
     create_principal::create_principal, login_password::login_password,
-    reserve_password_attempt::reserve_password_attempt, revoke_session::revoke_session,
+    reserve_authentication_attempt::reserve_authentication_attempt, revoke_session::revoke_session,
     set_password::set_password, verify_password::verify_password,
 };
 use crate::credentials::models::{
-    AuditContext, PasswordAttempt, PasswordAuthority, PasswordLogin, PrincipalKind, SessionAccess,
+    AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, PrincipalKind,
+    SessionAccess,
 };
 use crate::credentials::tests::test_sessions::test_types::SessionTestCase;
 use crate::store::main::{
@@ -148,10 +149,10 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 let name = format!("customers-{index}");
                 let context = &another_peer;
                 async move {
-                    reserve_password_attempt(
+                    reserve_authentication_attempt(
                         stores[index % 2],
                         context,
-                        PasswordAttempt::Login(&name),
+                        AuthenticationAttempt::Login(&name),
                     )
                     .await
                     .expect("shared peer reservation")

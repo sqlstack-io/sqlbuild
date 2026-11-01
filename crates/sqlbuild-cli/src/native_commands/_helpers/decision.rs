@@ -257,21 +257,35 @@ pub(crate) fn control_address(
 pub(crate) fn control_authentication(
     namespace: &Namespace,
 ) -> Result<ApiAuthentication, ControlError> {
-    let trusted_proxy = text(namespace, "control_trusted_proxy_config")
-        .map(|path| {
-            let document = std::fs::read_to_string(path).map_err(|_| {
-                ControlError::Invalid("could not read trusted-proxy configuration".into())
-            })?;
-            serde_json::from_str(&document).map_err(|_| ControlError::Invalid(
-                "trusted-proxy configuration requires valid JSON with origin, trusted_peers and identities".into(),
-            ))
-        })
-        .transpose()?;
     Ok(ApiAuthentication {
         password_origin: text(namespace, "control_password_origin"),
-        trusted_proxy,
+        trusted_proxy: authentication_settings(
+            text(namespace, "control_trusted_proxy_config"),
+            ("trusted-proxy", "origin, trusted_peers and identities"),
+        )?,
+        oidc: authentication_settings(
+            text(namespace, "control_oidc_config"),
+            ("OIDC", "origin, issuer, client_id and identities"),
+        )?,
         ..ApiAuthentication::default()
     })
+}
+
+fn authentication_settings<T: serde::de::DeserializeOwned>(
+    path: Option<String>,
+    (mechanism, fields): (&str, &str),
+) -> Result<Option<T>, ControlError> {
+    path.map(|path| {
+        let document = std::fs::read_to_string(path).map_err(|_| {
+            ControlError::Invalid(format!("could not read {mechanism} configuration"))
+        })?;
+        serde_json::from_str(&document).map_err(|_| {
+            ControlError::Invalid(format!(
+                "{mechanism} configuration requires valid JSON with {fields}"
+            ))
+        })
+    })
+    .transpose()
 }
 
 pub(crate) fn control_database(namespace: &Namespace) -> Result<String, ControlError> {

@@ -7,7 +7,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router, middleware};
 
 use crate::api::_helpers::authentication::password_transport::{
-    authenticate, deny, guard, parse_origin,
+    authenticate, deny, guard, parse_origin, set_cookie,
 };
 use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE};
 use crate::api::errors::ApiError;
@@ -16,11 +16,11 @@ use crate::api::models::{
 };
 use crate::credentials::constants::{LOGIN_WINDOW_SECONDS, PASSWORD_SESSION_SECONDS};
 use crate::credentials::main::{
-    login_password::login_password, reserve_password_attempt::reserve_password_attempt,
+    login_password::login_password, reserve_authentication_attempt::reserve_authentication_attempt,
     revoke_session::revoke_session, set_password::set_password, verify_password::verify_password,
 };
 use crate::credentials::models::{
-    AuditContext, PasswordAttempt, PasswordAuthority, PasswordLogin, SessionIdentity,
+    AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, SessionIdentity,
 };
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -65,13 +65,13 @@ pub(crate) async fn login(
                 &mut response,
                 (PASSWORD_COOKIE, &session.bearer),
                 PASSWORD_SESSION_SECONDS,
-                true,
+                (true, "Strict"),
             )?;
             set_cookie(
                 &mut response,
                 (PASSWORD_CSRF_COOKIE, &session.csrf),
                 PASSWORD_SESSION_SECONDS,
-                false,
+                (false, "Strict"),
             )?;
             Ok(response)
         }
@@ -137,10 +137,10 @@ pub(crate) async fn change_password(
     Extension(identity): Extension<SessionIdentity>,
     Json(request): Json<PasswordChangeRequest>,
 ) -> Result<Response, ApiError> {
-    let (_, allowed) = reserve_password_attempt(
+    let (_, allowed) = reserve_authentication_attempt(
         &store,
         &context,
-        PasswordAttempt::Reauthenticate(identity.principal_id),
+        AuthenticationAttempt::Reauthenticate(identity.principal_id),
     )
     .await?;
     if !allowed {
@@ -166,23 +166,12 @@ pub(crate) async fn change_password(
 
 fn clear_cookies() -> Result<Response, ApiError> {
     let mut response = StatusCode::NO_CONTENT.into_response();
-    set_cookie(&mut response, (PASSWORD_COOKIE, ""), 0, true)?;
-    set_cookie(&mut response, (PASSWORD_CSRF_COOKIE, ""), 0, false)?;
+    set_cookie(&mut response, (PASSWORD_COOKIE, ""), 0, (true, "Strict"))?;
+    set_cookie(
+        &mut response,
+        (PASSWORD_CSRF_COOKIE, ""),
+        0,
+        (false, "Strict"),
+    )?;
     Ok(response)
-}
-
-fn set_cookie(
-    response: &mut Response,
-    (name, value): (&str, &str),
-    max_age: i64,
-    http_only: bool,
-) -> Result<(), ApiError> {
-    let attributes = if http_only { "; HttpOnly" } else { "" };
-    let mut cookie = HeaderValue::from_str(&format!(
-        "{name}={value}; Path=/; Secure; SameSite=Strict; Max-Age={max_age}{attributes}"
-    ))
-    .map_err(|_| ControlError::Invalid("could not encode a session cookie".into()))?;
-    cookie.set_sensitive(true);
-    response.headers_mut().append(header::SET_COOKIE, cookie);
-    Ok(())
 }
