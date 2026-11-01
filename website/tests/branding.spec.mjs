@@ -13,7 +13,7 @@ for (const path of ['/', '/docs/quickstart/']) {
 				await expect(page.getByRole('link', { name: 'Part of SQLStack', exact: true })).toHaveAttribute('href', 'https://sqlstack.io');
 				const products = page.getByRole('navigation', { name: 'SQLStack products' });
 				await expect(products.getByRole('link')).toHaveText(['SQLBuild', 'SQLClean', 'SQLTide', 'Fensu']);
-				for (const [name, href] of Object.entries({ SQLBuild: '/', SQLClean: 'https://sqlclean.io', SQLTide: 'https://docs.streambuild.dev', Fensu: 'https://docs.fensu.dev' })) {
+				for (const [name, href] of Object.entries({ SQLBuild: '/', SQLClean: 'https://sqlclean.io', SQLTide: 'https://sqltide.io/', Fensu: 'https://fensu.io/' })) {
 					await expect(products.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
 				}
 				const metrics = await page.evaluate(() => {
