@@ -124,6 +124,16 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             frozenset({"model", "source"}),
         ),
         SnapshotCatalogTestCase(
+            "DuckShop polling callback with nested code is relocatable",
+            TYPE_PROOF_FILES
+            | {
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/custom_orders.py"
+                ).read_text(),
+            },
+            frozenset({"model"}),
+        ),
+        SnapshotCatalogTestCase(
             "DuckShop inherited seed and function namespaces",
             TYPE_PROOF_FILES
             | {
@@ -800,6 +810,32 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=TypeError,
             expected_message="group members must be Job objects",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="a polling sensor needs an actual callback",
+            files={
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, sensor\n"
+                    "orders = job('orders', description='Build orders.', select='orders')\n"
+                    "poll = sensor('poll', description='Poll orders.', run=orders)\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message="either a built-in condition or a decorated polling callback",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="callbacks with event conditions remain explicitly unsupported",
+            files={
+                "orchestration/orders.py": (
+                    "from sqlbuild.orchestration import job, sensor, platform_event, PlatformEventKind\n"
+                    "orders = job('orders', description='Build orders.', select='orders')\n"
+                    "@sensor('poll', description='Poll orders.', run=orders, "
+                    "when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]))\n"
+                    "def poll(ctx):\n    return []\n"
+                ),
+            },
+            expected_error=ValueError,
+            expected_message="callbacks with when are not supported yet",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="explicit group cycles cannot publish",

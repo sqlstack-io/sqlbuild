@@ -1,10 +1,17 @@
 use crate::runs::models::{NodeOutcome, RunOutcome};
+use crate::sensors::models::CustomSensorOutcome;
 use crate::store::tests::store_test_types::Backend;
 
 pub(crate) struct SensorTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_runs: usize,
+}
+
+pub(crate) struct CustomSensorResultCase {
+    pub(crate) outcome: CustomSensorOutcome,
+    pub(crate) expected_phase: &'static str,
+    pub(crate) expected_cursor: Option<&'static str>,
 }
 
 pub(crate) struct SensorExecutionTestCase {

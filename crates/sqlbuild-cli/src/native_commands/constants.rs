@@ -90,3 +90,6 @@ pub(crate) const EXIT_FLUSH_FAILURE: &str =
     "Exception ignored in: <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>";
 pub(crate) const EXIT_FLUSH_FAILURE_STATUS: i32 = 120;
 pub(crate) const UNCAUGHT_EXCEPTION_STATUS: i32 = 1;
+/// Reserve half the location work claim for acknowledgement retries after killing a callback.
+pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
+pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;

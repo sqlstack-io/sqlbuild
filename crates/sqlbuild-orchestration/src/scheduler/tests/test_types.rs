@@ -1,6 +1,15 @@
 //! Inputs make cursor, catch-up, and overlap decisions observably different.
 
 use crate::scheduler::models::{CatchUp, Overlap};
+use crate::store::tests::store_test_types::Backend;
+
+pub(super) struct SensorFairnessTestCase {
+    pub(super) description: &'static str,
+    pub(super) backend: Backend,
+    pub(super) pending: usize,
+    pub(super) builtin_status: &'static str,
+    pub(super) expected_completed: usize,
+}
 
 #[derive(Debug)]
 pub(super) struct TickTestCase {

@@ -63,7 +63,8 @@ pub(crate) struct AuthoredSensorCondition {
 pub(crate) struct AuthoredSensor {
     pub(crate) name: String,
     pub(crate) description: String,
-    pub(crate) when: AuthoredSensorCondition,
+    pub(crate) when: Option<AuthoredSensorCondition>,
+    pub(crate) function: Option<Py<PyAny>>,
     pub(crate) run: AuthoredJobReference,
     #[pyo3(from_py_with = authored_setting)]
     pub(crate) minimum_interval_seconds: Value,
@@ -163,7 +164,9 @@ pub(crate) fn collect_declarations<'py>(
             }
             pending.push(target);
             let condition = declaration.getattr("when")?;
-            if condition.getattr("kind")?.extract::<String>()? == RUN_EVENT_CONDITION {
+            if !condition.is_none()
+                && condition.getattr("kind")?.extract::<String>()? == RUN_EVENT_CONDITION
+            {
                 let source = condition.getattr("job")?;
                 if !source.is_instance(&job)? && !source.is_instance(&group)? {
                     return Err(PyTypeError::new_err(

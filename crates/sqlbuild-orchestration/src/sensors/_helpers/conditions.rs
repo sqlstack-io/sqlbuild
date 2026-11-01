@@ -14,6 +14,9 @@ pub(crate) async fn consume_condition(
     evaluation: &SensorEvaluationRequest,
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
     match &evaluation.definition.when {
+        SensorCondition::Custom { .. } => Err(ControlError::Invalid(
+            "custom sensors require a location result".into(),
+        )),
         SensorCondition::PlatformEvent { kinds } => {
             consume_platform_events(transaction, evaluation, kinds).await
         }

@@ -11,6 +11,10 @@ pub(crate) fn validate_sensors(
 ) -> Result<(), ControlError> {
     for (name, sensor) in &definitions.sensors {
         let valid_condition = match &sensor.when {
+            SensorCondition::Custom {
+                function,
+                code_hash,
+            } => !function.trim().is_empty() && !code_hash.is_empty(),
             SensorCondition::PlatformEvent { kinds } => !kinds.is_empty(),
             SensorCondition::NodeEvent { selection, kinds } => {
                 !kinds.is_empty()

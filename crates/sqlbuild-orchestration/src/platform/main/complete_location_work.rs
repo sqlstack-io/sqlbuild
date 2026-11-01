@@ -3,8 +3,11 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::platform::_helpers::location_work::{read_work, require_instance};
-use crate::platform::models::LocationWorkResult;
+use crate::platform::_helpers::location_work::require_instance;
+use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::models::{LocationWork, LocationWorkOutcome, LocationWorkResult};
+use crate::sensors::constants::MAX_SENSOR_RUN_REQUESTS;
+use crate::sensors::models::CustomSensorOutcome;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -17,7 +20,7 @@ pub async fn complete_location_work(
     result: &LocationWorkResult,
 ) -> Result<bool, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, stored) = read_work(transaction, request_id).await?;
+    let (transaction, stored) = read_location_work(transaction, request_id).await?;
     let stored = stored
         .filter(|stored| stored.record.request_json.location_id == location_id)
         .ok_or_else(|| ControlError::Invalid("work is not assigned to this location".into()))?;
@@ -47,6 +50,27 @@ pub async fn complete_location_work(
         || stored.record.expires_at <= transaction.now
     {
         return Err(ControlError::Fenced);
+    }
+    let valid = match (&stored.record.request_json.work, &result.outcome) {
+        (_, LocationWorkOutcome::Superseded {})
+        | (LocationWork::CheckConnection {}, LocationWorkOutcome::Connection { .. }) => true,
+        (
+            LocationWork::EvaluateSensor { .. },
+            LocationWorkOutcome::SensorEvaluation { outcome },
+        ) => match outcome {
+            CustomSensorOutcome::Completed { run_keys, .. } => {
+                run_keys.len() <= MAX_SENSOR_RUN_REQUESTS
+                    && run_keys.iter().all(|key| !key.trim().is_empty())
+            }
+            CustomSensorOutcome::Skipped { reason, .. } => !reason.trim().is_empty(),
+            CustomSensorOutcome::Failed | CustomSensorOutcome::TimedOut => true,
+        },
+        _ => false,
+    };
+    if !valid {
+        return Err(ControlError::Invalid(
+            "location result does not match its work".into(),
+        ));
     }
     let now = transaction.now;
     let (transaction, _) = query(transaction,

@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::platform::_helpers::location_work::read_work;
+use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::LocationWorkRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -14,7 +14,7 @@ pub async fn location_work(
     request_id: Uuid,
 ) -> Result<Option<LocationWorkRecord>, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, record) = read_work(transaction, request_id).await?;
+    let (transaction, record) = read_location_work(transaction, request_id).await?;
     commit(transaction).await?;
     Ok(record.map(|stored| stored.record))
 }

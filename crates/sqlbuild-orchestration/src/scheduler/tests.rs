@@ -6,6 +6,8 @@ mod helpers;
 mod test_backlog;
 #[path = "tests/test_cron.rs"]
 mod test_cron;
+#[path = "../../tests/scheduler/test_sensor_fairness.rs"]
+mod test_sensor_fairness;
 #[path = "tests/test_simulation.rs"]
 mod test_simulation;
 #[path = "tests/test_ticks.rs"]

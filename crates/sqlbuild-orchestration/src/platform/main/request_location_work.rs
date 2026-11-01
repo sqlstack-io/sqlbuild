@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
-use crate::platform::_helpers::location_work::read_work;
-use crate::platform::models::LocationWorkRequest;
+use crate::platform::main::read_location_work::read_location_work;
+use crate::platform::models::{LocationWork, LocationWorkRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -19,6 +19,11 @@ pub async fn request_location_work(
     context: &AuditContext,
     request: &LocationWorkRequest,
 ) -> Result<bool, ControlError> {
+    if matches!(request.work, LocationWork::EvaluateSensor { .. }) {
+        return Err(ControlError::Invalid(
+            "sensor work must originate from a fenced evaluation".into(),
+        ));
+    }
     if request.target.trim().is_empty()
         || request.reason.trim().is_empty()
         || context.actor.trim().is_empty()
@@ -28,7 +33,7 @@ pub async fn request_location_work(
         ));
     }
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, previous) = read_work(transaction, request.request_id).await?;
+    let (transaction, previous) = read_location_work(transaction, request.request_id).await?;
     if let Some(previous) = previous {
         if previous.record.request_json != *request || previous.record.requested_by != context.actor
         {

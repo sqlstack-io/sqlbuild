@@ -7,6 +7,7 @@ pub(crate) mod host;
 pub(crate) mod model_lookup;
 pub(crate) mod orchestration_declarations;
 pub(crate) mod orchestration_environment;
+pub(crate) mod orchestration_sensors;
 pub(crate) mod orchestration_triggers;
 pub(crate) mod registration;
 pub(crate) mod results;

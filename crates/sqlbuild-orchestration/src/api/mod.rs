@@ -8,4 +8,4 @@ pub mod models;
 
 #[cfg(test)]
 #[path = "../../tests/api/test_contracts.rs"]
-mod tests;
+pub(crate) mod tests;

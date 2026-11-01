@@ -4,3 +4,6 @@
 pub(crate) const CALENDAR_WINDOW_PARAMETER: &str = "window";
 
 pub(crate) const RUN_EVENT_CONDITION: &str = "run_event";
+
+/// The sensor context is supplied by the host, not a provider.
+pub(crate) const SENSOR_CONTEXT_PARAMETER: &str = "ctx";

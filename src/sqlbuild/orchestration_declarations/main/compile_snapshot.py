@@ -7,7 +7,12 @@ from pathlib import Path
 
 from sqlbuild._native import NativeOrchestrationSnapshot, build_orchestration_snapshot
 from sqlbuild.compiler.compile.types import CompiledProjectView
-from sqlbuild.orchestration_declarations.models import CalendarSchedule, Job, JobGroup, Sensor
+from sqlbuild.orchestration_declarations.models.authoring import (
+    CalendarSchedule,
+    Job,
+    JobGroup,
+    Sensor,
+)
 
 
 def compile_snapshot(

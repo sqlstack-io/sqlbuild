@@ -3,7 +3,8 @@
 use chrono::Duration;
 use uuid::Uuid;
 
-use crate::platform::_helpers::location_work::{read_work, require_instance};
+use crate::platform::_helpers::location_work::require_instance;
+use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWorkClaim, LocationWorkPoll};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -26,6 +27,14 @@ pub async fn claim_location_work(
         "SELECT w.request_id FROM sqb_location_work w WHERE w.location_id=$1 AND w.target=$2 \
          AND w.expires_at>$3 AND NOT EXISTS (SELECT 1 FROM sqb_location_work_results r WHERE r.request_id=w.request_id) \
          AND (w.claimed_until IS NULL OR w.claimed_until<=$3 OR w.session_id=$4) \
+         AND (w.request_json->'work'->>'kind'='check_connection' OR EXISTS ( \
+         SELECT 1 FROM sqb_sensor_evaluation_events e JOIN sqb_triggers t ON t.trigger_id=e.trigger_id \
+         JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id JOIN sqb_scheduler_lease l ON l.name='scheduler' \
+         WHERE e.evaluation_id=w.request_id AND e.phase='requested' AND s.status='running' \
+         AND t.snapshot_id=w.snapshot_id AND t.removed_in_snapshot_id IS NULL AND l.expires_at>$3 \
+         AND l.epoch=CAST(e.fact_json->'request'->>'epoch' AS BIGINT) \
+         AND NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events f \
+         WHERE f.evaluation_id=e.evaluation_id AND f.phase<>'requested'))) \
          ORDER BY w.requested_at, w.request_id LIMIT 1",
         vec![Parameter::Id(location_id), Parameter::Text(poll.target.clone()), Parameter::Time(now), Parameter::Id(poll.session_id)]).await?;
     let Some(row) = rows.first() else {
@@ -34,7 +43,7 @@ pub async fn claim_location_work(
     };
     let request_id = serde_json::from_value(row["request_id"].clone())
         .map_err(|error| ControlError::Invalid(format!("invalid work identity: {error}")))?;
-    let (transaction, stored) = read_work(transaction, request_id).await?;
+    let (transaction, stored) = read_location_work(transaction, request_id).await?;
     let stored = stored.ok_or_else(|| ControlError::Invalid("location work disappeared".into()))?;
     let retained = stored.session_id == Some(poll.session_id)
         && stored.claimed_until.is_some_and(|until| until > now);
