@@ -315,13 +315,13 @@ sources:
       - name: zoned_text
         type: VARCHAR
       - name: wall_clock
-        type: TIMESTAMP_NTZ(3)
+        type: TIMESTAMP_NTZ
       - name: wall_clock_text
         type: VARCHAR
       - name: local_time
-        type: TIME(3)
+        type: TIME
       - name: fine_time
-        type: TIME(9)
+        type: TIME
       - name: _loaded_at
         type: TIMESTAMP_NTZ
         nullable: false

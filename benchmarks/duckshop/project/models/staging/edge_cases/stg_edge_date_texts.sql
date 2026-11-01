@@ -1,7 +1,8 @@
 MODEL (
   description """
-    One row per partner date and time text, with the clock columns kept at their declared precisions
-    so later models can read them as text, zoned times and times of day
+    One row per partner date and time text, with the clock columns cast to fixed precisions
+    (TIMESTAMP_NTZ(3), TIME(3) and TIME(9)) so later models can read them as text, zoned times and
+    times of day
   """,
   tags [edge_case],
   columns (
@@ -25,10 +26,10 @@ final AS (
     s.text_id,
     s.date_text,
     s.zoned_text,
-    s.wall_clock,
+    s.wall_clock::TIMESTAMP_NTZ(3) AS wall_clock,
     s.wall_clock_text,
-    s.local_time,
-    s.fine_time
+    s.local_time::TIME(3) AS local_time,
+    s.fine_time::TIME(9) AS fine_time
   FROM src AS s
 )
 

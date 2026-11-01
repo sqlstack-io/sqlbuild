@@ -16,9 +16,47 @@ WITH __ref__stg_edge_category_links AS (
 
 __expected__int_edge_category_walk AS (
   SELECT
-    NULL AS category_id,
-    NULL AS walk_depth,
-    NULL AS root_name,
-    NULL AS category_path,
-    NULL AS deepest_shelf
+    'CAT-1' AS category_id,
+    1 AS walk_depth,
+    'Ducks' AS root_name,
+    ' > Ducks' AS category_path,
+    1 AS joined_level,
+    'Ducks' AS joined_root_name,
+    7 AS deepest_shelf
+  UNION ALL
+  SELECT
+    'CAT-2' AS category_id,
+    2 AS walk_depth,
+    'Ducks' AS root_name,
+    ' > Ducks > Rubber ducks' AS category_path,
+    2 AS joined_level,
+    'Rubber ducks' AS joined_root_name,
+    7 AS deepest_shelf
+  UNION ALL
+  SELECT
+    'CAT-3' AS category_id,
+    3 AS walk_depth,
+    'Ducks' AS root_name,
+    ' > Ducks > Rubber ducks > Collectible series' AS category_path,
+    3 AS joined_level,
+    'Collectible series' AS joined_root_name,
+    7 AS deepest_shelf
+  UNION ALL
+  SELECT
+    'CAT-4' AS category_id,
+    2 AS walk_depth,
+    'Ducks' AS root_name,
+    ' > Ducks > Decoys' AS category_path,
+    2 AS joined_level,
+    'Decoys' AS joined_root_name,
+    7 AS deepest_shelf
+  UNION ALL
+  SELECT
+    'CAT-5' AS category_id,
+    1 AS walk_depth,
+    'Pond supplies' AS root_name,
+    ' > Pond supplies' AS category_path,
+    1 AS joined_level,
+    'Pond supplies' AS joined_root_name,
+    7 AS deepest_shelf
 )

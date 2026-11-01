@@ -3,8 +3,7 @@ MODEL (
     One row per check with numeric edges: DIV0 and DIV0NULL by literal zeros and NULL, TRUNC of
     FLOAT ratios that sit just below a whole number of cents, FLOAT values as text (pi among them),
     infinity and NaN words in other scripts read by TRY_TO_DOUBLE, and LAG with offset 0 and IGNORE
-    NULLS. A running COUNT_IF without ORDER BY is not compared row by row, since Snowflake may
-    number the rows in any order; the test checks only its total per group
+    NULLS. A running window frame without ORDER BY is left out: Snowflake rejects it
   """,
   tags [edge_case],
   columns (
@@ -22,7 +21,6 @@ MODEL (
     pi_text (type VARCHAR),
     key_text_as_double (type FLOAT),
     same_amount_lag (type NUMBER(18, 2)),
-    running_paid_count (type NUMBER(38, 0)),
   ),
 );
 
@@ -51,12 +49,7 @@ final AS (
     c.ratio::VARCHAR AS ratio_text,
     PI()::VARCHAR AS pi_text,
     TRY_TO_DOUBLE(c.key_text)::FLOAT AS key_text_as_double,
-    LAG(c.amount, 0) IGNORE NULLS OVER (ORDER BY c.check_id)::NUMBER(18, 2) AS same_amount_lag,
-    -- No ORDER BY: each row's count depends on the order Snowflake reads the group in.
-    COUNT_IF(c.amount > 0) OVER (
-      PARTITION BY c.group_code
-      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-    )::NUMBER(38, 0) AS running_paid_count
+    LAG(c.amount, 0) IGNORE NULLS OVER (ORDER BY c.check_id)::NUMBER(18, 2) AS same_amount_lag
   FROM checks AS c
 )
 

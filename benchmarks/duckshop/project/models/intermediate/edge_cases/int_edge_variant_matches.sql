@@ -4,8 +4,10 @@ MODEL (
     against "1" and 1.0, JSON null against SQL NULL, objects with reordered keys, and a DATE or
     TIMESTAMP held in a VARIANT against the same text, which Snowflake keeps typed. Each value also
     carries its group's MIN_BY and MAX_BY VARIANT picks, how many rows share its value in a window
-    partition, the group's distinct values by SELECT DISTINCT and ARRAY_AGG(DISTINCT), a scalar cast
-    of the value, and an OBJECT_CONSTRUCT star excluding a quoted lower-case column
+    partition, the group's distinct values by SELECT DISTINCT (counted with COUNT, which skips JSON
+    null) and ARRAY_AGG(DISTINCT), a scalar cast of the value, and an OBJECT_CONSTRUCT star
+    excluding a quoted lower-case column. Picks and objects that can hold typed values are output as
+    their kind and JSON text, since JSON text alone would lose the type
   """,
   tags [edge_case],
   columns (
@@ -15,12 +17,12 @@ MODEL (
     values_equal (type BOOLEAN),
     values_equal_null (type BOOLEAN),
     left_partition_size (type NUMBER(38, 0)),
-    group_first_value (type VARIANT),
-    group_last_value (type VARIANT),
+    group_first_value (type VARCHAR),
+    group_last_value (type VARCHAR),
     group_distinct_rows (type NUMBER(38, 0)),
     group_distinct_elements (type NUMBER(38, 0)),
     left_scalar_text (type VARCHAR),
-    left_object_without_note (type OBJECT),
+    left_object_without_note (type VARCHAR),
   ),
 );
 
@@ -127,8 +129,12 @@ final AS (
     )::BOOLEAN AS values_equal,
     EQUAL_NULL(l.attribute_value, r.attribute_value)::BOOLEAN AS values_equal_null,
     l.partition_size::NUMBER(38, 0) AS left_partition_size,
-    g.group_first_value,
-    g.group_last_value,
+    (
+      TYPEOF(g.group_first_value) || ' ' || TO_JSON(g.group_first_value)
+    )::VARCHAR AS group_first_value,
+    (
+      TYPEOF(g.group_last_value) || ' ' || TO_JSON(g.group_last_value)
+    )::VARCHAR AS group_last_value,
     c.group_distinct_rows::NUMBER(38, 0) AS group_distinct_rows,
     g.group_distinct_elements::NUMBER(38, 0) AS group_distinct_elements,
     IFF(
@@ -136,7 +142,7 @@ final AS (
       NULL,
       l.attribute_value
     )::VARCHAR AS left_scalar_text,
-    l.object_without_note::OBJECT AS left_object_without_note
+    TO_JSON(l.object_without_note)::VARCHAR AS left_object_without_note
   FROM partitioned AS l
   INNER JOIN partitioned AS r
     ON l.group_code = r.group_code

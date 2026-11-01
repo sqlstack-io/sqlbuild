@@ -100,12 +100,14 @@ gift_flags AS (
   SELECT
     'exists_output' AS decider,
     b.basket_id,
-    EXISTS(
-      SELECT 1
-      FROM lines AS g
-      WHERE
-        g.basket_id = b.basket_id
-        AND g.tag = 'gift'
+    (
+      EXISTS(
+        SELECT 1
+        FROM lines AS g
+        WHERE
+          g.basket_id = b.basket_id
+          AND g.tag = 'gift'
+      )
     )::VARCHAR AS detail
   FROM baskets AS b
 ),

@@ -3,9 +3,9 @@ MODEL (
     One row per zoned partner timestamp text read as TIMESTAMP_TZ and TIMESTAMP_LTZ, with T, Z,
     +00:00, +0000, +09:00 and -05:30 spellings, read back as the instant at UTC, its date, year and
     day start, and compared with wall-clock text, a TIMESTAMP_NTZ and a DATE. Also the date of the
-    first zoned value by window, CONVERT_TIMEZONE with a lower-case 'utc', and the UTC hour of a
-    wall-clock time just before 1970. TIMESTAMP_LTZ results depend on the session time zone, which
-    the edge target pins to UTC
+    first zoned value by window and the UTC hour of a wall-clock time just before 1970.
+    CONVERT_TIMEZONE with a lower-case 'utc' is left out: Snowflake rejects it as an unknown time
+    zone. TIMESTAMP_LTZ results depend on the session time zone, which the edge target pins to UTC
   """,
   tags [edge_case, known_divergence],
   columns (
@@ -28,7 +28,6 @@ MODEL (
     zoned_from_next_day (type BOOLEAN),
     local_zoned_from_next_day (type BOOLEAN),
     first_zoned_date (type DATE),
-    zoned_lower_utc (type TIMESTAMP_NTZ),
     wall_clock_utc_hour (type NUMBER(38, 0)),
   ),
 );
@@ -77,7 +76,6 @@ final AS (
       ORDER BY p.text_id
       ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
     )::DATE AS first_zoned_date,
-    CONVERT_TIMEZONE('utc', p.zoned)::TIMESTAMP_NTZ AS zoned_lower_utc,
     DATE_PART(hour, CONVERT_TIMEZONE('UTC', p.wall_clock))::NUMBER(38, 0) AS wall_clock_utc_hour
   FROM parsed AS p
 )

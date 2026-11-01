@@ -2,9 +2,10 @@ MODEL (
   description """
     One row per check group with MEDIAN at scales 0 to 15, where the two middle values differ in
     their last digits; MODE and COUNT_IF per group; and MODE, MEDIAN and COUNT_IF over no rows,
-    without GROUP BY and with HAVING but no GROUP BY, which Snowflake answers with one row. The tie
-    pick of a MAX_BY whose keys all tie, over FLOAT values of either sign of zero, is not compared:
-    either row is a valid answer
+    without GROUP BY and with HAVING but no GROUP BY, which Snowflake answers with one row; MODE of
+    a number over no rows can come back as 0, not NULL. Tied modes, the pick of a MAX_BY whose keys
+    all tie and MEDIAN above scale 12, which Snowflake does not compute exactly, are checked by
+    assertions rather than compared
   """,
   tags [edge_case],
   columns (

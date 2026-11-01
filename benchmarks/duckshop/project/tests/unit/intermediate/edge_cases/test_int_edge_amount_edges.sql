@@ -22,26 +22,98 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_amount_edges AS (
   SELECT
-    NULL AS check_id,
-    NULL AS group_code,
-    NULL AS one_over_zero,
-    NULL AS amount_over_zero,
-    NULL AS amount_over_scaled_zero,
-    NULL AS amount_over_minus_zero,
-    NULL AS amount_over_null,
-    NULL AS null_over_zero,
-    NULL AS ratio_truncated_2,
-    NULL AS ratio_truncated_3,
-    NULL AS ratio_text,
-    NULL AS pi_text,
-    NULL AS key_text_as_double,
-    NULL AS same_amount_lag
-),
-
-__assert__running_count_ends_at_the_group_total AS (
-  SELECT e.group_code
-  FROM __ref("int_edge_amount_edges") AS e
-  GROUP BY
-    e.group_code
-  HAVING MAX(e.running_paid_count) <> IFF(e.group_code = 'G-1', 2, 1)
+    'AC-01' AS check_id,
+    'G-1' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_scaled_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_minus_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '0.28'::FLOAT AS ratio_truncated_2,
+    '0.29'::FLOAT AS ratio_truncated_3,
+    '0.29' AS ratio_text,
+    '3.141592654' AS pi_text,
+    CAST(NULL AS FLOAT) AS key_text_as_double,
+    10.00::NUMBER(18, 2) AS same_amount_lag
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    'G-1' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    CAST(NULL AS NUMBER(38, 6)) AS amount_over_zero,
+    CAST(NULL AS NUMBER(38, 6)) AS amount_over_scaled_zero,
+    CAST(NULL AS NUMBER(38, 6)) AS amount_over_minus_zero,
+    CAST(NULL AS NUMBER(38, 6)) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '1.0'::FLOAT AS ratio_truncated_2,
+    '1.004'::FLOAT AS ratio_truncated_3,
+    '1.005' AS ratio_text,
+    '3.141592654' AS pi_text,
+    'inf'::FLOAT AS key_text_as_double,
+    CAST(NULL AS NUMBER(18, 2)) AS same_amount_lag
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    'G-1' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_scaled_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_minus_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '2.67'::FLOAT AS ratio_truncated_2,
+    '2.675'::FLOAT AS ratio_truncated_3,
+    '2.675' AS ratio_text,
+    '3.141592654' AS pi_text,
+    'nan'::FLOAT AS key_text_as_double,
+    2.50::NUMBER(18, 2) AS same_amount_lag
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    'G-2' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_scaled_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_minus_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '-155.5'::FLOAT AS ratio_truncated_2,
+    '-155.5'::FLOAT AS ratio_truncated_3,
+    '-155.5' AS ratio_text,
+    '3.141592654' AS pi_text,
+    '-inf'::FLOAT AS key_text_as_double,
+    -0.50::NUMBER(18, 2) AS same_amount_lag
+  UNION ALL
+  SELECT
+    'AC-05' AS check_id,
+    'G-2' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_scaled_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_minus_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '0.56'::FLOAT AS ratio_truncated_2,
+    '0.57'::FLOAT AS ratio_truncated_3,
+    '0.57' AS ratio_text,
+    '3.141592654' AS pi_text,
+    CAST(NULL AS FLOAT) AS key_text_as_double,
+    0.00::NUMBER(18, 2) AS same_amount_lag
+  UNION ALL
+  SELECT
+    'AC-06' AS check_id,
+    'G-2' AS group_code,
+    0.000000::NUMBER(38, 6) AS one_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_scaled_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_minus_zero,
+    0.000000::NUMBER(38, 6) AS amount_over_null,
+    CAST(NULL AS NUMBER(38, 6)) AS null_over_zero,
+    '3.0'::FLOAT AS ratio_truncated_2,
+    '3.0'::FLOAT AS ratio_truncated_3,
+    '3' AS ratio_text,
+    '3.141592654' AS pi_text,
+    '1000.0'::FLOAT AS key_text_as_double,
+    4.00::NUMBER(18, 2) AS same_amount_lag
 )

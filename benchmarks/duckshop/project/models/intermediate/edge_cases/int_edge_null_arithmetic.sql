@@ -52,8 +52,15 @@ missing AS (
 ),
 
 counted AS (
-  SELECT SYSTEM$TYPEOF(COUNT(c.check_id)) AS count_type
+  SELECT COUNT(c.check_id) AS check_count
   FROM checks AS c
+),
+
+-- SYSTEM$TYPEOF of an aggregate does not make its query aggregate, so each type is read from a
+-- column of a finished CTE.
+count_typed AS (
+  SELECT SYSTEM$TYPEOF(k.check_count) AS count_type
+  FROM counted AS k
 ),
 
 with_decimal AS (
@@ -63,9 +70,19 @@ with_decimal AS (
   SELECT 1.5 AS mixed_amount
 ),
 
-union_typed AS (
-  SELECT MAX(SYSTEM$TYPEOF(w.mixed_amount)) AS union_decimal_type
+union_types AS (
+  SELECT SYSTEM$TYPEOF(w.mixed_amount) AS mixed_type
   FROM with_decimal AS w
+),
+
+-- Every row has the same type. MAX over SYSTEM$TYPEOF fails in Snowflake with an internal error
+-- once the result is joined on, so one row is taken instead.
+union_typed AS (
+  SELECT u.mixed_type AS union_decimal_type
+  FROM union_types AS u
+  ORDER BY
+    u.mixed_type
+  LIMIT 1
 ),
 
 all_null AS (
@@ -74,9 +91,17 @@ all_null AS (
   SELECT NULL AS note
 ),
 
-all_null_typed AS (
-  SELECT MAX(SYSTEM$TYPEOF(a.note)) AS all_null_union_type
+all_null_types AS (
+  SELECT SYSTEM$TYPEOF(a.note) AS note_type
   FROM all_null AS a
+),
+
+all_null_typed AS (
+  SELECT n.note_type AS all_null_union_type
+  FROM all_null_types AS n
+  ORDER BY
+    n.note_type
+  LIMIT 1
 ),
 
 computed AS (
@@ -154,7 +179,7 @@ final AS (
     c.case_without_else::VARCHAR AS case_without_else,
     c.decoded::VARCHAR AS decoded
   FROM computed AS c
-  CROSS JOIN counted AS k
+  CROSS JOIN count_typed AS k
   CROSS JOIN union_typed AS u
   CROSS JOIN all_null_typed AS n
 )

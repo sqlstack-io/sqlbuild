@@ -315,11 +315,12 @@ Snowflake gives them.
 """
 
 [[rules.rule_ignores]]
-rules = ["SQLCLEAN028"]
+rules = ["SQLCLEAN027", "SQLCLEAN028"]
 paths = ["models/intermediate/edge_cases/int_edge_category_walk.sql"]
 reason = """
-LEVEL is a hierarchical-query pseudo-column that cannot be qualified, and the edge case reads a
-column named level from another relation unqualified inside a scalar subquery on purpose.
+LEVEL and CONNECT_BY_ROOT belong to the walk, not to a relation, so they cannot be qualified, and
+the edge case reads a column named level from another relation unqualified inside a scalar
+subquery on purpose.
 """
 
 # <<< edge-case area
