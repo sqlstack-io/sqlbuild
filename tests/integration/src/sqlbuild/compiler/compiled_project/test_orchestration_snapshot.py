@@ -609,7 +609,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "job_key": "edge_snapshot_group",
                     "when": {
                         "kind": "platform_event",
-                        "kinds": ["tick_overdue", "location_broken"],
+                        "kinds": ["tick_overdue", "location_broken", "launch_failed"],
                     },
                     "minimum_interval_seconds": 7,
                     "default_status": "stopped",

@@ -4,7 +4,40 @@ use crate::runs::models::{
     ChangingRun, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
 use crate::store::errors::ControlError;
+use crate::store::main::query::query;
+use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
+
+/// A launch-response observation is append-only even after completion, but requires recorded ownership.
+pub(crate) async fn check_launch_claim(
+    transaction: ControlTransaction,
+    request: &RunChangeRequest,
+) -> Result<ControlTransaction, ControlError> {
+    let claim_id = request.claim_id.ok_or_else(|| {
+        ControlError::Invalid("launch observation requires a recorded claim".into())
+    })?;
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT payload FROM recall_events WHERE event_id=$1 AND run_id=$2 \
+         AND event_type='run_claimed' AND producer='scheduler' AND invocation_id=$3",
+        vec![
+            Parameter::Text(claim_id.to_string()),
+            Parameter::Text(request.run_id.to_string()),
+            Parameter::Text(format!("scheduler/{}", request.run_id)),
+        ],
+    )
+    .await?;
+    let recorded = rows.first().map(|row| &row["payload"]["claim"]);
+    if recorded.is_none_or(|claim| {
+        claim["claim_id"] != claim_id.to_string()
+            || claim["request"]["run_id"] != request.run_id.to_string()
+    }) {
+        return Err(ControlError::Invalid(
+            "launch observation does not belong to a recorded claim".into(),
+        ));
+    }
+    Ok(transaction)
+}
 
 pub(crate) fn validate_retry(
     previous: &Row,
@@ -85,6 +118,7 @@ pub(crate) fn validate_change(
         ));
     }
     let valid = match request.change {
+        RunChange::LaunchFailed { .. } => false,
         RunChange::Launched { .. } => state.worker_instance.is_some(),
         RunChange::Started => {
             state.worker_instance.is_some() && matches!(state.status, Queued | Launched)

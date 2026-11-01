@@ -63,12 +63,20 @@ impl Workers {
                         "Worker supervision recovered for run {}",
                         claim.request.run_id
                     ));
+                    let rejected = child.is_none();
+                    let index = self.active.len();
                     self.active.push(ClaimedWorker {
                         claim,
                         child,
                         stopping: None,
                         exit: None,
+                        launch_failure: rejected.then_some("docker_configuration_rejected"),
                     });
+                    if rejected {
+                        self.active[index]
+                            .publish_launch_failure(store, lease)
+                            .await?;
+                    }
                 }
             }
         }

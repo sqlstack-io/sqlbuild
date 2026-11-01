@@ -177,10 +177,14 @@ impl Workers {
                     child: None,
                     stopping: None,
                     exit: None,
+                    launch_failure: None,
                 });
                 let worker = &mut self.active[index];
                 let claim = &worker.claim;
                 if matches!(location, Launcher::Local(_)) && claim.request.image_id.is_some() {
+                    worker.launch_failure = Some("local_image_rejected");
+                    worker.publish_launch_failure(store, lease).await?;
+                    let claim = &worker.claim;
                     publish(store, lease, claim, ("local-image-rejected", RunChange::Finished { outcome: RunOutcome::Failed, reason: "image-pinned runs require a Docker launcher, not a local interpreter".into(), exit_code: None })).await?;
                     self.active.swap_remove(index);
                     continue;
@@ -193,6 +197,9 @@ impl Workers {
                             Some(name)
                         }
                         Err(_) => {
+                            worker.launch_failure = Some("docker_configuration_rejected");
+                            worker.publish_launch_failure(store, lease).await?;
+                            let claim = &worker.claim;
                             publish(store, lease, claim, ("docker-image-rejected", RunChange::Finished {
                                 outcome: RunOutcome::Failed, reason: "Docker worker requires a pinned image and supported launcher configuration".into(), exit_code: None,
                             })).await?;
@@ -220,12 +227,19 @@ impl Workers {
                 )
                 .await?;
                 let local_command = match location {
-                    Launcher::Local(location) => Some(prepare_spawn(
+                    Launcher::Local(location) => match prepare_spawn(
                         location,
                         claim,
                         &credential.bearer,
                         &self.control_variable,
-                    )?),
+                    ) {
+                        Ok(command) => Some(command),
+                        Err(error) => {
+                            worker.launch_failure = Some("local_preparation_failed");
+                            worker.publish_launch_failure(store, lease).await?;
+                            return Err(error);
+                        }
+                    },
                     Launcher::Docker(_) => None,
                 };
                 publish(
@@ -245,10 +259,13 @@ impl Workers {
                     None => {
                         if let (Launcher::Docker(location), Some(WorkerChild::Docker(child))) =
                             (location, &worker.child)
-                        {
-                            child
+                            && let Err(error) = child
                                 .launch(location, claim, &credential.bearer, &self.control_variable)
-                                .await?;
+                                .await
+                        {
+                            worker.launch_failure = Some("docker_launch_failed");
+                            worker.publish_launch_failure(store, lease).await?;
+                            return Err(error);
                         }
                         Ok(())
                     }
@@ -262,6 +279,9 @@ impl Workers {
                         ));
                     }
                     Err(_) => {
+                        worker.launch_failure = Some("local_spawn_failed");
+                        worker.publish_launch_failure(store, lease).await?;
+                        let claim = &worker.claim;
                         publish(
                             store,
                             lease,
@@ -309,6 +329,26 @@ fn prepare_spawn(
     #[cfg(target_os = "linux")]
     crate::workers::_helpers::local::inherit_claim(&mut command, location, claim)?;
     Ok(command)
+}
+
+impl ClaimedWorker {
+    pub(in crate::workers) async fn publish_launch_failure(
+        &mut self,
+        store: &ControlStore,
+        lease: &SchedulerLease,
+    ) -> Result<(), ControlError> {
+        if let Some(code) = self.launch_failure {
+            publish(
+                store,
+                lease,
+                &self.claim,
+                (code, RunChange::LaunchFailed { code: code.into() }),
+            )
+            .await?;
+            self.launch_failure = None;
+        }
+        Ok(())
+    }
 }
 
 pub(in crate::workers) async fn publish(

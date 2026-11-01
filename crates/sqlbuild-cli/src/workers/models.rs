@@ -98,6 +98,7 @@ pub(super) struct ClaimedWorker {
     pub(super) child: Option<WorkerChild>,
     pub(super) stopping: Option<Instant>,
     pub(super) exit: Option<WorkerExit>,
+    pub(super) launch_failure: Option<&'static str>,
 }
 
 /// Physical ownership survives leadership loss; only the current fence changes durable lifecycle.
