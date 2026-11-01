@@ -1,6 +1,7 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
+use sqlbuild_orchestration::api::models::ApiAuthentication;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -45,7 +46,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            None,
+            ApiAuthentication::default(),
             stopped(shutdown.clone()),
         ));
         start_platform_roles(&mut tasks, (&store, &shutdown))?;

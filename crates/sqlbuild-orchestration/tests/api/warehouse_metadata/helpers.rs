@@ -21,13 +21,18 @@ pub(crate) async fn fingerprint_history(
     (client, freshness_url, bearer): (&Client, &str, &str),
 ) {
     // Upgrade the immediate predecessor while published snapshots and freshness facts exist.
-    let (transaction, _) = query(
-        begin(store, TransactionMode::Write).await.expect("upgrade"),
-        "DROP INDEX sqb_node_decisive_history",
-        vec![],
-    )
-    .await
-    .expect("remove subsequent transition migration");
+    let mut transaction = begin(store, TransactionMode::Write).await.expect("upgrade");
+    for table in ["sqb_password_sessions", "sqb_password_login_attempts"] {
+        (transaction, _) = query(transaction, &format!("DROP TABLE {table}"), vec![])
+            .await
+            .expect("remove subsequent session migration");
+    }
+    let (transaction, _) = query(transaction, "DROP TABLE sqb_password_credentials", vec![])
+        .await
+        .expect("remove subsequent password migration");
+    let (transaction, _) = query(transaction, "DROP INDEX sqb_node_decisive_history", vec![])
+        .await
+        .expect("remove subsequent transition migration");
     let (transaction, _) = query(transaction, "DROP TABLE sqb_development_locations", vec![])
         .await
         .expect("remove subsequent development migration");
@@ -36,7 +41,7 @@ pub(crate) async fn fingerprint_history(
         .expect("predecessor table set");
     let (transaction, _) = query(
         transaction,
-        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations','node_transitions')",
+        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions')",
         vec![],
     )
     .await

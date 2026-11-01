@@ -1,4 +1,4 @@
-//! Each client runtime owns its pool; credentials and server response bodies stay out of diagnostics.
+//! Outbound clients own their pools; credentials and response bodies stay out of diagnostics.
 
 use std::time::Duration;
 

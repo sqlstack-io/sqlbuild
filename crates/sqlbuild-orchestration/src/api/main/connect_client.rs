@@ -2,7 +2,7 @@
 
 use reqwest::header::HeaderValue;
 
-use crate::api::_helpers::client::http_client;
+use crate::api::_helpers::resources::client::http_client;
 use crate::api::errors::ClientError;
 use crate::api::models::ControlClient;
 

@@ -2,13 +2,18 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::_helpers::{
+use crate::api::_helpers::authentication::password_sessions;
+use crate::api::_helpers::resources::{
     changes, location_health, location_work, run_reads, runs, snapshots, trigger_reads,
     warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
+    password_sessions::login,
+    password_sessions::current,
+    password_sessions::logout,
+    password_sessions::change_password,
     changes::subscribe,
     location_health::report,
     location_health::recent,
@@ -89,6 +94,67 @@ pub struct DevelopmentScope {
     pub location_id: uuid::Uuid,
     pub target: String,
     pub triggers: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct ApiAuthentication {
+    pub development_scope: Option<DevelopmentScope>,
+    pub password_origin: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PasswordOrigin(pub(crate) String);
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PasswordLoginRequest {
+    pub(crate) username: String,
+    pub(crate) password: String,
+}
+
+impl std::fmt::Debug for PasswordLoginRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PasswordLoginRequest")
+            .field("username", &self.username)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PasswordChangeRequest {
+    pub(crate) current_password: String,
+    pub(crate) new_password: String,
+}
+
+impl std::fmt::Debug for PasswordChangeRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PasswordChangeRequest")
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PasswordSessionResponse {
+    pub identity: crate::credentials::models::SessionIdentity,
+    pub csrf_token: String,
+}
+
+impl std::fmt::Debug for PasswordSessionResponse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PasswordSessionResponse")
+            .field("identity", &self.identity)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AuthenticationDenial {
+    pub error: String,
+    pub decision_id: uuid::Uuid,
 }
 
 #[derive(Clone, Debug)]

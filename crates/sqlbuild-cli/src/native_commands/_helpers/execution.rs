@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime};
 use chrono::{DateTime, Utc};
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::api::models::DevelopmentScope;
+use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_platform_webhook;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -86,7 +86,10 @@ pub(crate) async fn run_development_roles(
     tasks.spawn(serve_api(
         store.clone(),
         listener,
-        Some(scope),
+        ApiAuthentication {
+            development_scope: Some(scope),
+            ..ApiAuthentication::default()
+        },
         development_stopped(shutdown.clone()),
     ));
     start_platform_roles(&mut tasks, (&store, &shutdown))?;

@@ -1,11 +1,7 @@
 //! Every request sees revocation and current scope state, including across server replicas.
 
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
-use subtle::ConstantTimeEq;
-use uuid::Uuid;
-
 use crate::credentials::_helpers::scopes::scope_is_active;
-use crate::credentials::constants::TOKEN_SECRET_HEX_LENGTH;
+use crate::credentials::_helpers::secrets::{bearer_id, secret_matches};
 use crate::credentials::models::{StoredToken, TokenIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -18,15 +14,7 @@ pub async fn authenticate_token(
     store: &ControlStore,
     bearer: &str,
 ) -> Result<Option<TokenIdentity>, ControlError> {
-    let Some((id, secret)) = bearer.split_once('.') else {
-        return Ok(None);
-    };
-    if secret.len() != TOKEN_SECRET_HEX_LENGTH
-        || !secret.bytes().all(|value| value.is_ascii_hexdigit())
-    {
-        return Ok(None);
-    }
-    let Ok(id) = Uuid::parse_str(id) else {
+    let Some(id) = bearer_id(bearer) else {
         return Ok(None);
     };
     let transaction = begin(store, TransactionMode::Read).await?;
@@ -44,8 +32,7 @@ pub async fn authenticate_token(
     };
     let token: StoredToken = serde_json::from_value(serde_json::json!(row))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let digest = sha256_hex(bearer.as_bytes());
-    if !bool::from(digest.as_bytes().ct_eq(token.secret_hash.as_bytes())) {
+    if !secret_matches(bearer, &token.secret_hash) {
         commit(transaction).await?;
         return Ok(None);
     }

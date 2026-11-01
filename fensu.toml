@@ -1567,8 +1567,14 @@ reason = "CompactAnalysisJob holds a prepared analysis closure, which cannot imp
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/credentials/models.rs"
-symbols = ["IssuedToken"]
-reason = "IssuedToken implements Debug manually to redact its bearer credential; deriving Debug would expose the secret."
+symbols = ["IssuedToken", "IssuedSession"]
+reason = "Issued credentials implement Debug manually to redact bearer and CSRF secrets; deriving Debug would expose them."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-orchestration/src/api/models.rs"
+symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordSessionResponse"]
+reason = "Password transport models implement Debug manually to redact passwords and CSRF secrets; other models derive Debug."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"

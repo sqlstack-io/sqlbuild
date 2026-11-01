@@ -45,6 +45,70 @@ pub struct TokenIdentity {
     pub expires_at: DateTime<Utc>,
 }
 
+/// Proof of one password version, not authorization or an issued session.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VerifiedPassword {
+    pub principal_id: Uuid,
+    pub credential_id: Uuid,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PasswordAuthority {
+    Operator(Uuid),
+    Reauthenticated {
+        proof: VerifiedPassword,
+        session_id: Uuid,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SessionIdentity {
+    pub session_id: Uuid,
+    pub principal_id: Uuid,
+    pub expires_at: DateTime<Utc>,
+}
+
+pub enum SessionAccess<'a> {
+    Read,
+    Write { csrf: &'a str },
+}
+
+pub struct IssuedSession {
+    pub identity: SessionIdentity,
+    pub bearer: String,
+    pub csrf: String,
+}
+
+impl std::fmt::Debug for IssuedSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IssuedSession")
+            .field("identity", &self.identity)
+            .field("bearer", &"[redacted]")
+            .field("csrf", &"[redacted]")
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub enum PasswordLogin {
+    Authenticated(IssuedSession),
+    Denied { decision_id: Uuid, throttled: bool },
+}
+
+pub enum PasswordAttempt<'a> {
+    Login(&'a str),
+    Reauthenticate(Uuid),
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredSession {
+    #[serde(flatten)]
+    pub(crate) identity: SessionIdentity,
+    pub(crate) secret_hash: String,
+    pub(crate) csrf_hash: String,
+}
+
 /// The bearer is returned once. Debug output must never contain it.
 #[derive(Serialize)]
 pub struct IssuedToken {

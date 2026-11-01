@@ -1,4 +1,4 @@
-//! Worker reports are bound to the authenticated run and claim, never a caller-supplied actor.
+//! Worker resource reports bind to the authenticated run and claim, never a caller-supplied actor.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
