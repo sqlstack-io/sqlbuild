@@ -249,6 +249,8 @@ jobs:
         run: uv python install 3.12
       - name: Verify lockfile
         run: uv lock --check --python 3.12
+      - name: Verify native workspace lockfile
+        run: cargo metadata --locked --format-version 1 > /dev/null
 
   checks:
     name: Static checks and unit + integration tests
@@ -471,15 +473,7 @@ jobs:
           shared-key: verify-windows
           save-if: false
       - name: Test the native discovery crate (walk, junctions, ordering, read errors)
-        run: |
-          status=0
-          cargo test --locked -p sqlbuild-discovery || status=$?
-          if [ "${status}" -ne 0 ]; then
-            echo "Windows dependency resolution diagnostics (original failure is retained):"
-            cargo tree --offline -p sqlbuild-discovery || true
-            git diff -- Cargo.lock
-          fi
-          exit "${status}"
+        run: cargo test --locked -p sqlbuild-discovery
       - name: Install Python
         run: uv python install 3.12
       - name: Install SQLBuild and pytest
