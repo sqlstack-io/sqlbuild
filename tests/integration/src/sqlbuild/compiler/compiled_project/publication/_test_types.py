@@ -198,3 +198,10 @@ class DevelopmentTestCase:
 class ComposeDeploymentTestCase:
     description: str
     expected_warehouse_rows: list[list[int]]
+
+
+@dataclass(frozen=True)
+class InstalledRecoveryTestCase:
+    description: str
+    executable: str
+    expected_rejection: str
