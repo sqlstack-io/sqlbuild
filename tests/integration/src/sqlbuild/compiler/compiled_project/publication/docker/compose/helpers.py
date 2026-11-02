@@ -45,6 +45,7 @@ class ComposeStack:
                 {"services": {"server": {"extra_hosts": ["host.docker.internal:host-gateway"]}}}
             )
         )
+        self.compose_files = [Path("compose.yml").resolve(), self.override]
 
     def docker(
         self, *arguments: str, check: bool = True, timeout: float = 120
@@ -73,12 +74,12 @@ class ComposeStack:
         return result
 
     def compose(self, *arguments: str, check: bool = True) -> str:
+        configuration: list[str] = []
+        for file in self.compose_files:
+            configuration.extend(("--file", str(file)))
         return self.docker(
             "compose",
-            "--file",
-            str(Path("compose.yml").resolve()),
-            "--file",
-            str(self.override),
+            *configuration,
             *arguments,
             check=check,
         ).stdout.strip()
@@ -98,6 +99,82 @@ class ComposeStack:
             f"SELECT COALESCE(json_agg(result),'[]'::json)::text FROM ({sql}) result",
         )
         return json.loads(result)
+
+    def database_manifest(self) -> dict[str, list[dict[str, Any]]]:
+        """Compare persisted rows without exposing credential hashes or payloads in failures."""
+        tables: list[dict[str, Any]] = self.query(
+            "SELECT tablename,quote_ident(tablename) AS identifier FROM pg_tables "
+            "WHERE schemaname='public' ORDER BY tablename"
+        )
+        return {
+            table["tablename"]: self.query(
+                "SELECT count(*) AS rows,md5(COALESCE(string_agg(row_to_json(t)::text,"
+                "E'\\n' ORDER BY row_to_json(t)::text),'')) AS digest "
+                f"FROM public.{table['identifier']} t"
+            )
+            for table in tables
+        }
+
+    def verify_control_store_restore(self, snapshot: dict[str, Any]) -> None:
+        """Restore the populated stack into an empty store before allowing either writer back."""
+        self.compose("stop", "--timeout", "5", "server")
+        manifest: dict[str, list[dict[str, Any]]] = self.database_manifest()
+        assert manifest["sqb_runs"][0]["rows"] > 0
+        assert manifest["sqb_ticks"][0]["rows"] > 0
+        assert manifest["sqb_access_tokens"][0]["rows"] > 0
+        self.compose(
+            "exec",
+            "-T",
+            "postgres",
+            "pg_dump",
+            "-U",
+            "sqlbuild",
+            "--format=custom",
+            "--file=/tmp/control.backup",
+            "sqlbuild",
+        )
+        self.compose("exec", "-T", "postgres", "dropdb", "-U", "sqlbuild", "sqlbuild")
+        self.compose("exec", "-T", "postgres", "createdb", "-U", "sqlbuild", "sqlbuild")
+        assert self.database_manifest() == {}
+        self.compose(
+            "exec",
+            "-T",
+            "postgres",
+            "pg_restore",
+            "-U",
+            "sqlbuild",
+            "--exit-on-error",
+            "--dbname=sqlbuild",
+            "/tmp/control.backup",
+        )
+        assert self.database_manifest() == manifest
+        (self.directory / "restore-manifest.json").write_text(json.dumps(manifest, indent=2))
+        self.compose("exec", "-T", "postgres", "rm", "/tmp/control.backup")
+
+        # Retained credentials authenticate the broken location without replacing last-good.
+        self.redeploy("broken")
+        resumed_at: str = datetime.now(UTC).isoformat()
+        self.compose("up", "-d", "--wait", "server")
+        self.wait(
+            "SELECT event_id FROM recall_events WHERE event_type='location_health' "
+            "AND payload->'report'->'health'->>'kind'='compile_failed' "
+            f"AND occurred_at>'{resumed_at}'"
+        )
+        self.wait(
+            f"SELECT run_id FROM sqb_runs WHERE origin='schedule' AND queued_at>'{resumed_at}' "
+            f"AND snapshot_id='{snapshot['snapshot_id']}' AND status='success'"
+        )
+        assert (
+            self.query(
+                "SELECT trigger_id,scheduled_for,count(*) FROM sqb_ticks "
+                "GROUP BY trigger_id,scheduled_for HAVING count(*)>1"
+            )
+            == []
+        )
+        assert self.query(
+            "SELECT image_id,snapshot_id FROM sqb_snapshots "
+            "JOIN sqb_current_snapshots USING(snapshot_id,location_id,target)"
+        ) == [snapshot]
 
     def wait(self, sql: str, *, timeout: float = 150) -> list[dict[str, Any]]:
         deadline: float = time.monotonic() + timeout
@@ -179,9 +256,10 @@ class ComposeStack:
             "ps", "--all", "--quiet", "--filter", f"name=sqlbuild-{self.location_id}-"
         ).stdout.split()
         for worker in workers:
-            (self.directory / f"worker-{worker}.log").write_text(
-                self.docker("logs", worker, check=False).stdout
+            output: subprocess.CompletedProcess[str] = self.docker(
+                "logs", "--timestamps", worker, check=False
             )
+            (self.directory / f"worker-{worker}.log").write_text(output.stdout + output.stderr)
             self.docker("rm", "--force", worker)
         self.compose("down", "--volumes", "--remove-orphans")
         for version in ("first", "second", "broken"):

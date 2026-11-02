@@ -98,8 +98,11 @@ For bind-mounted source development, explicitly add the development overlay:
 docker compose -f compose.yml -f deploy/compose.dev.yml up -d
 ```
 
-The location watcher republishes changed source. Workers reject source drift against a pinned
-snapshot; the bind mount is not an immutable deployment and does not provide old-source fallback.
+The location watcher republishes changed source. The overlay keeps `target` and `logs` in
+named volumes owned by the image's runtime user, so location and worker output does not require
+changing the host source tree's ownership. Use the same overlay for `down --volumes` when removing
+these development caches and logs. Workers reject source drift against a pinned snapshot; the
+bind mount is not an immutable deployment and does not provide old-source fallback.
 
 ## Credentials, identity, and platform events
 
@@ -142,6 +145,11 @@ The Docker launcher adopts an existing claim-labeled worker rather than starting
 
 `make test-compose` builds matching wheels and images, then tests scheduled Docker execution,
 redeploy during an active run, failed-deploy fallback, scheduler catch-up, credential/mount
-isolation, and the stopped-location platform webhook against PostgreSQL. It creates disposable
-containers and volumes and removes them on exit. It needs Docker, Compose, and network access
-for image and Python dependency downloads; it never deploys to an external installation.
+isolation, the development overlay's source reload and worker outputs, and the stopped-location
+platform webhook against PostgreSQL. It also backs up the
+populated control store, restores into an empty database, compares every public table's row count
+and content digest before restarting writers, and checks that retained credentials and last-good
+scheduling work after restore without duplicate ticks. This is a control-store restore check,
+not an image, secret-file, or warehouse disaster-recovery test. It creates disposable containers
+and volumes and removes them on exit. It needs Docker, Compose, and network access for image
+and Python dependency downloads; it never deploys to an external installation.
