@@ -11,8 +11,8 @@ use sqlbuild_analysis::planner_identity::constants::{
 };
 use sqlbuild_analysis::planner_identity::main::expected_graph_identity_hashes::expected_graph_identity_hashes;
 use sqlbuild_analysis::planner_identity::main::graph_write_identity_hashes::graph_write_identity_hashes;
-use sqlbuild_analysis::planner_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, IdentityNode};
+use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;

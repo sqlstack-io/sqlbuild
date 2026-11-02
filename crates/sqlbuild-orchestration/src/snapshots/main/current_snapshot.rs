@@ -2,7 +2,8 @@
 
 use uuid::Uuid;
 
-use crate::snapshots::_helpers::reading::{attach_sources, read_current_record};
+use crate::snapshots::_helpers::reading::attach_sources;
+use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::{CurrentSnapshot, SnapshotChange};

@@ -19,7 +19,7 @@ pub(crate) async fn fingerprint_reads(
     store: &ControlStore,
     credentials: (&AuditContext, (&str, &str)),
     (location, other): (Uuid, Uuid),
-) {
+) -> Uuid {
     let session_id = Uuid::now_v7();
     report_location_health(
         store,
@@ -164,4 +164,5 @@ pub(crate) async fn fingerprint_reads(
         ),
         serialized
     );
+    session_id
 }

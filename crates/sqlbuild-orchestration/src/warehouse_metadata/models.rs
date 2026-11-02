@@ -571,3 +571,50 @@ pub struct FingerprintObservation {
     pub version_hash: String,
     pub schema_fingerprint: String,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NodeStatusQuery {
+    pub node_key: String,
+}
+
+/// Observed physical evidence is not a live warehouse-existence guarantee.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum PhysicalEvidence {
+    Observed { observation: CatalogObservation },
+    Unavailable { reason: String },
+}
+
+/// Local definition identity only, not upstream data or graph currency.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum DefinitionEvidence {
+    Matched {
+        local_hash: String,
+    },
+    Changed {
+        current_local_hash: String,
+        recorded_local_hash: String,
+    },
+    Unavailable {
+        reason: String,
+        current_local_hash: Option<String>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum SourceDataStatus {
+    Unknown { reason: String },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NodeStatus {
+    pub snapshot_id: Uuid,
+    pub node_key: String,
+    pub physical: PhysicalEvidence,
+    pub definition: DefinitionEvidence,
+    pub build: Option<FingerprintObservation>,
+    pub source_data: SourceDataStatus,
+}

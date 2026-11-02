@@ -70,6 +70,10 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/fingerprint",
             get(crate::api::_helpers::resources::person_operations::fingerprint),
         )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/node-status",
+            get(crate::api::_helpers::resources::person_operations::node_status),
+        )
         .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }

@@ -1,7 +1,9 @@
 //! Drop the declared-columns hash from fingerprint metadata.
 
-use crate::planner_changes::_helpers::json_payload::{canonical_text, decoded_object};
-use crate::planner_changes::constants::DECLARED_COLUMNS_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::constants::DECLARED_COLUMNS_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::main::{
+    canonical_text::canonical_text, decoded_object::decoded_object,
+};
 
 /// Canonical metadata JSON without the declared-columns hash, or the text unchanged when it has none.
 pub fn without_declared_columns_hash(metadata_json: &str) -> String {

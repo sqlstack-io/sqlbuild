@@ -6,6 +6,8 @@ mod changes_helpers;
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "node_status/helpers.rs"]
+mod node_status_helpers;
 #[path = "oidc/helpers.rs"]
 mod oidc_helpers;
 #[path = "oidc/test_types.rs"]

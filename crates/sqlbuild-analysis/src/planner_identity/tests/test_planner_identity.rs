@@ -7,8 +7,6 @@ use crate::planner_identity::main::function_fingerprint_sql::function_fingerprin
 use crate::planner_identity::main::graph_write_identity_hashes::graph_write_identity_hashes;
 use crate::planner_identity::main::missing_upstream_message::missing_upstream_message;
 use crate::planner_identity::main::missing_upstreams::missing_upstreams;
-use crate::planner_identity::main::model_local_identity_hash::model_local_identity_hash;
-use crate::planner_identity::main::stable_identity_hash::stable_identity_hash;
 use crate::planner_identity::main::stale_upstream_warning_message::stale_upstream_warning_message;
 use crate::planner_identity::main::topological_order::topological_order;
 use crate::planner_identity::models::{
@@ -25,6 +23,8 @@ use crate::planner_identity::tests::test_types::{
     WarningTextTestCase,
 };
 use crate::planner_identity::types::IdentityHashes;
+use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
+use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_identity_hash;
 
 #[test]
 fn given_persisted_identity_inputs_when_hashing_then_matches_pinned_python_hashes() {

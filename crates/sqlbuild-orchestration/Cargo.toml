@@ -23,6 +23,7 @@ rusqlite.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sqlbuild-core.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-state.workspace = true
 sqlx-core.workspace = true

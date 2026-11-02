@@ -8,9 +8,6 @@ use sqlbuild_analysis::fingerprint_storage::constants::{
     COLUMN_TARGET_DATABASE, COLUMN_TARGET_NAME, COLUMN_TARGET_SCHEMA, COLUMN_TIMESTAMP,
     COLUMN_VERSION_HASH, NODE_TYPE_MODEL, NODE_TYPE_SEED,
 };
-use sqlbuild_analysis::planner_changes::constants::{
-    AUDIT_GATE_METADATA_KEY, MIGRATION_FINGERPRINT_METADATA_KEY,
-};
 use sqlbuild_analysis::snowflake_cost::constants::QUERY_TAG_APP;
 use sqlbuild_cli::compute_logs::constants::{
     COMPUTE_LOG_FORMAT_VERSION, DEFAULT_RETENTION_COUNT, MAX_READ_BYTES,
@@ -28,6 +25,9 @@ use sqlbuild_core::constants::{
 };
 use sqlbuild_core::diagnostic_routing::constants::{
     SQL_DIGEST_FIELD, SQL_PRIVATE_RECORD_FIELD, SQL_TEXT_FIELD,
+};
+use sqlbuild_core::fingerprint_identity::constants::{
+    AUDIT_GATE_METADATA_KEY, MIGRATION_FINGERPRINT_METADATA_KEY,
 };
 use sqlbuild_host::entries::constants::CUSTOM_HOST_LAUNCH_MODULE;
 use sqlbuild_rules::constants::MIN_CUSTOM_RULE_TEST_CASES_KEY;
