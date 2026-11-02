@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use serde_json::{Map, Value, json};
@@ -126,6 +127,8 @@ pub(crate) fn boundary_nodes(
             )?;
         }
     }
+    let mut python_sources: Vec<(String, (String, PathBuf))> =
+        project.python_execution_inputs().into_iter().collect();
     for (kind, objects) in [
         ("loader", project.loader_functions(py)),
         ("hook", project.hook_functions(py)),
@@ -135,19 +138,25 @@ pub(crate) fn boundary_nodes(
             let item = item?;
             let name: String = field(&item, "name")?.extract()?;
             let path: PathBuf = field(&item, "file_path")?.extract()?;
-            let source = py.detach(|| std::fs::read_to_string(path))?;
-            nodes = insert_node(
-                nodes,
-                format!("{kind}:{name}"),
-                SnapshotNode {
-                    kind: kind.into(),
-                    definition: json!({"name": name, "path": relative_path(&item)?}),
-                    raw_sql: None,
-                    compiled_sql: None,
-                    python_source: Some(source),
-                },
-            )?;
+            python_sources.push((format!("{kind}:{name}"), (relative_path(&item)?, path)));
         }
+    }
+    for (key, (relative, path)) in python_sources {
+        let (kind, name) = key
+            .split_once(':')
+            .ok_or_else(|| PyValueError::new_err("invalid Python execution input identity"))?;
+        let source = py.detach(|| std::fs::read_to_string(path))?;
+        nodes = insert_node(
+            nodes,
+            key.clone(),
+            SnapshotNode {
+                kind: kind.into(),
+                definition: json!({"name": name, "path": relative}),
+                raw_sql: None,
+                compiled_sql: None,
+                python_source: Some(source),
+            },
+        )?;
     }
     for item in project.sql_hook_files(py).bind(py).try_iter()? {
         let item = item?;
