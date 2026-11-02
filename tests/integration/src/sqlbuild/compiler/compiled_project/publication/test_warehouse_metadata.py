@@ -47,6 +47,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     append_contended_fingerprints,
     append_janitor_history,
     append_legacy_history,
+    append_microbatch_history,
     append_migration_history,
     append_old_name_history,
     append_retried_fingerprints,
@@ -100,6 +101,8 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                 ("audit_description", "audit_meta_json"),
             ),
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
+            # SQLite has no supported concurrent-microbatch coordination writer.
+            ("duckdb", "database", "microbatch_history", append_microbatch_history, "", ()),
             (
                 "duckdb",
                 "database",
@@ -171,7 +174,7 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
     }
     expected: dict[str, Any] = fixture["record"] | dict.fromkeys(legacy_columns)
     assert rows[0] == expected
-    assert rows[0]["run_id"] == test_case.expected_run_id
+    assert rows[0][fixture.get("run_key", "run_id")] == test_case.expected_run_id
     assert rows[fixture["later_index"]] == (
         expected | fixture["later_record"] | dict.fromkeys(legacy_columns)
     )
@@ -236,6 +239,7 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
                 ("audit_description", "audit_meta_json"),
             ),
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
+            ("duckdb", "database", "microbatch_history", append_microbatch_history, "", ()),
             (
                 "duckdb",
                 "database",
@@ -333,7 +337,7 @@ def test_given_a_served_location_when_state_event_history_is_rebuilt_and_retaine
                         | {source_key: record[source_key]}
                         | fixture["record_overrides"].get(record[source_key], {})
                     )
-                    assert record["run_id"] == test_case.expected_run_id
+                    assert record[fixture.get("run_key", "run_id")] == test_case.expected_run_id
                     assert identities.setdefault(record[source_key], event_id) == event_id
                 with closing(sqlite3.connect(control)) as database:
                     _ = database.execute(mirror_sql)

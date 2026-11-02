@@ -451,6 +451,15 @@ pub(crate) async fn deliver_metadata_page(
                 )
                 .await
         }
+        WarehouseHistoryKind::Microbatches => {
+            client
+                .sync_microbatches(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid microbatches batch"))?,
+                )
+                .await
+        }
     }
 }
 

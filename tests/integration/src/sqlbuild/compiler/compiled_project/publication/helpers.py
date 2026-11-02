@@ -46,6 +46,10 @@ from sqlbuild.executor.janitor_events.main.create_table_sql import (
 )
 from sqlbuild.executor.janitor_events.models import JanitorEventRecord
 from sqlbuild.executor.janitor_events.types import JanitorEventType
+from sqlbuild.microbatches.classes.direct_store import DirectMicrobatchEventStore
+from sqlbuild.microbatches.classes.event_codec import MicrobatchEventCodec
+from sqlbuild.microbatches.constants import MICROBATCH_COLUMNS
+from sqlbuild.microbatches.models import MicrobatchEvent, MicrobatchWriteResult
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -188,6 +192,27 @@ def append_janitor_history(adapter: Any, connection: Any, fixture: dict[str, Any
     )
     writer.write(connection=connection, records=tuple(records))
     writer.write(connection=connection, records=(records[0],) * fixture["duplicate_rows"])
+
+
+def append_microbatch_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real append-only coordination writer; reading never enters the executor's state path."""
+    rows: list[dict[str, Any]] = [
+        fixture["record"]
+        | {"event_id": f"{fixture['id_prefix']}-{index:03}"}
+        | fixture["record_overrides"].get(f"{fixture['id_prefix']}-{index:03}", {})
+        for index in range(fixture["source_rows"])
+    ]
+    records: list[MicrobatchEvent] = []
+    for row in rows:
+        values: tuple[Any, ...] = tuple(row[column] for column in MICROBATCH_COLUMNS)
+        records.append(MicrobatchEventCodec.from_row(values))
+    writer: DirectMicrobatchEventStore = DirectMicrobatchEventStore(
+        adapter=adapter, connection=connection
+    )
+    first: MicrobatchWriteResult = writer.write_many(tuple(records))
+    assert first.inserted == fixture["source_rows"]
+    repeated: MicrobatchWriteResult = writer.write_many((records[0],) * fixture["duplicate_rows"])
+    assert repeated.inserted == 0
 
 
 def append_migration_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:

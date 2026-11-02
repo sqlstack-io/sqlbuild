@@ -11,13 +11,14 @@ use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
 use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
 use crate::warehouse_metadata::main::ingest_janitor_events::ingest_janitor_events;
+use crate::warehouse_metadata::main::ingest_microbatches::ingest_microbatches;
 use crate::warehouse_metadata::main::ingest_migrations::ingest_migrations;
 use crate::warehouse_metadata::main::ingest_old_name_views::ingest_old_name_views;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, FingerprintBatch, JanitorEventsBatch, MigrationsBatch, OldNameViewsBatch,
-    SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
+    AuditResultsBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch, MigrationsBatch,
+    OldNameViewsBatch, SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/watermark",
@@ -138,5 +139,22 @@ pub(crate) async fn report_old_name_views(
     require_location(&identity, location_id)?;
     Ok(Json(
         ingest_old_name_views(&store, (location_id, &target), &batch).await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/microbatches",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = MicrobatchesBatch,
+    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
+    security(("bearer" = [])))]
+pub(crate) async fn report_microbatches(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(batch): Json<MicrobatchesBatch>,
+) -> Result<Json<WarehouseSyncResponse>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        ingest_microbatches(&store, (location_id, &target), &batch).await?,
     ))
 }

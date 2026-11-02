@@ -323,6 +323,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/microbatches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_microbatches"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/migrations": {
         parameters: {
             query?: never;
@@ -884,6 +900,14 @@ export interface components {
             /** Format: uuid */
             claim_id: string;
             outcome: components["schemas"]["LocationWorkOutcome"];
+            /** Format: uuid */
+            session_id: string;
+        };
+        MicrobatchesBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseMicrobatchRecord"][];
             /** Format: uuid */
             session_id: string;
         };
@@ -1503,7 +1527,7 @@ export interface components {
          * @description Only immutable history tables support a timestamp watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -1524,6 +1548,56 @@ export interface components {
             schema_version: number;
             state_database?: string | null;
             state_schema: string;
+        };
+        /** @description Immutable coordination evidence, never authority to execute or mark a batch complete. */
+        WarehouseMicrobatchRecord: {
+            batch_size: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+            completion_type?: string | null;
+            coverage_source?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            cursor_column: string;
+            cursor_grain?: string | null;
+            cursor_type: string;
+            definition_hash?: string | null;
+            event_id: string;
+            execution_run_id: string;
+            /** Format: date-time */
+            execution_run_started_at?: string | null;
+            fingerprint_status: string;
+            model_name: string;
+            model_version_hash?: string | null;
+            /** Format: date-time */
+            observed_at?: string | null;
+            /** Format: int64 */
+            observed_row_count?: number | null;
+            origin_run_id: string;
+            /** Format: date-time */
+            origin_run_started_at?: string | null;
+            partition_end?: string | null;
+            partition_start?: string | null;
+            physical_generation_id: string;
+            previous_model_version_hash?: string | null;
+            record_type: string;
+            replay_policy?: string | null;
+            replay_requirement_id?: string | null;
+            required_model_version_hash?: string | null;
+            /** Format: int64 */
+            rows_affected?: number | null;
+            run_end: string;
+            run_start: string;
+            run_type: string;
+            scope_key: string;
+            scope_kind: string;
+            state_database?: string | null;
+            state_schema: string;
+            synthetic_reason?: string | null;
+            target_database?: string | null;
+            target_name: string;
+            target_schema?: string | null;
+            unaccounted_policy?: string | null;
         };
         /** @description Model-move history is evidence, not authority to migrate a warehouse relation. */
         WarehouseMigrationRecord: {
@@ -2402,6 +2476,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JanitorEventsBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_microbatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MicrobatchesBatch"];
             };
         };
         responses: {

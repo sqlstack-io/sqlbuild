@@ -194,6 +194,62 @@ pub struct OldNameViewsBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
+/// Immutable coordination evidence, never authority to execute or mark a batch complete.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseMicrobatchRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub record_type: String,
+    pub scope_kind: String,
+    pub scope_key: String,
+    pub model_name: String,
+    pub target_database: Option<String>,
+    pub target_schema: Option<String>,
+    pub target_name: String,
+    pub physical_generation_id: String,
+    pub origin_run_id: String,
+    pub origin_run_started_at: Option<DateTime<Utc>>,
+    pub execution_run_id: String,
+    pub execution_run_started_at: Option<DateTime<Utc>>,
+    pub run_type: String,
+    pub completion_type: Option<String>,
+    pub run_start: String,
+    pub run_end: String,
+    pub partition_start: Option<String>,
+    pub partition_end: Option<String>,
+    pub batch_size: String,
+    pub cursor_column: String,
+    pub cursor_type: String,
+    pub cursor_grain: Option<String>,
+    pub model_version_hash: Option<String>,
+    pub definition_hash: Option<String>,
+    pub fingerprint_status: String,
+    pub replay_requirement_id: Option<String>,
+    pub required_model_version_hash: Option<String>,
+    pub previous_model_version_hash: Option<String>,
+    pub replay_policy: Option<String>,
+    pub rows_affected: Option<i64>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub coverage_source: Option<String>,
+    pub observed_row_count: Option<i64>,
+    pub observed_at: Option<DateTime<Utc>>,
+    pub synthetic_reason: Option<String>,
+    pub unaccounted_policy: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MicrobatchesBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseMicrobatchRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -214,16 +270,18 @@ pub enum WarehouseHistoryKind {
     JanitorEvents,
     Migrations,
     OldNameViews,
+    Microbatches,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
         Self::JanitorEvents,
         Self::Migrations,
         Self::OldNameViews,
+        Self::Microbatches,
     ];
 
     #[must_use]
@@ -235,6 +293,7 @@ impl WarehouseHistoryKind {
             Self::JanitorEvents => "janitor_events",
             Self::Migrations => "migrations",
             Self::OldNameViews => "old_name_views",
+            Self::Microbatches => "microbatches",
         }
     }
 
@@ -247,6 +306,7 @@ impl WarehouseHistoryKind {
             Self::JanitorEvents => "sqb_warehouse_janitor_events",
             Self::Migrations => "sqb_warehouse_migrations",
             Self::OldNameViews => "sqb_warehouse_old_name_views",
+            Self::Microbatches => "sqb_warehouse_microbatches",
         }
     }
 }
@@ -361,6 +421,7 @@ pub enum WarehouseHistoryRead {
     JanitorEvents(StateEventsRead),
     Migrations(StateEventsRead),
     OldNameViews(StateEventsRead),
+    Microbatches(StateEventsRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -372,6 +433,7 @@ pub enum WarehouseHistoryRecord {
     JanitorEvent(WarehouseJanitorRecord),
     Migration(Box<WarehouseMigrationRecord>),
     OldNameView(Box<WarehouseOldNameRecord>),
+    Microbatch(Box<WarehouseMicrobatchRecord>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
