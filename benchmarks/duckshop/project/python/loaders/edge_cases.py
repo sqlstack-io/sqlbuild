@@ -79,6 +79,11 @@ def edge__category_links(ctx: LoaderContext) -> object:
 
 
 @loader
+def edge__supplier_notes(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__supplier_notes")
+
+
+@loader
 def edge__delivery_updates(ctx: LoaderContext) -> object:
     batch = int(ctx.vars.get(DELIVERY_BATCH_VAR, 2))  # type: ignore[call-overload]
     rows = delivery_updates(batch)

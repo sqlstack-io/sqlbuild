@@ -11,7 +11,7 @@ project creates rather than drop the schema or archive whatever looks stale. The
 `check` lists tables, views and functions that already exist under a DuckShop name, and any
 SQLBuild state tables (`_sqlbuild_*`) already in the schema. `drop` is one Snowflake Scripting
 block that drops every model, snapshot, seed and source table and every function the project
-creates. SQLBuild's own state tables (`_sqlbuild_*`) are left alone, since other projects in the
+creates, including functions a SQL hook creates, which the compile output does not list. SQLBuild's own state tables (`_sqlbuild_*`) are left alone, since other projects in the
 same schema may share them.
 """
 
@@ -48,6 +48,22 @@ def managed_sources() -> list[str]:
     return names
 
 
+HOOK_FUNCTION = re.compile(
+    r"CREATE\s+OR\s+REPLACE\s+FUNCTION\s+\S*?\.(\w+)\s*\(([^)]*)\)", flags=re.IGNORECASE
+)
+
+
+def hook_functions() -> list[str]:
+    """`name(type, ...)` of each function a SQL hook creates; SQLBuild does not declare them."""
+
+    found: list[str] = []
+    for path in sorted(PROJECT_DIR.glob("models/**/_hooks/sql/*.sql")):
+        for name, arguments in HOOK_FUNCTION.findall(path.read_text()):
+            types = [part.strip().split(None, 1)[1] for part in arguments.split(",") if part.strip()]
+            found.append(f"{name}({', '.join(types)})")
+    return found
+
+
 def objects(compile_json: dict[str, object]) -> tuple[str, list[tuple[str, str]]]:
     """The schema-qualified prefix and each (object kind, name or signature) the project creates."""
 
@@ -69,6 +85,8 @@ def objects(compile_json: dict[str, object]) -> tuple[str, list[tuple[str, str]]
     for function in functions:  # type: ignore[union-attr]
         arguments = ", ".join(_function_arguments(function["relative_path"]))
         found.append(("FUNCTION", f"{function['name']}({arguments})"))
+    for signature in hook_functions():
+        found.append(("FUNCTION", signature))
     return f"{database}.{schema}", found
 
 

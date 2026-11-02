@@ -119,6 +119,20 @@ __ref__int_edge_callback_clock_times AS (
     ('callback_clo-1') AS v(callback_id)
 ),
 
+__ref__int_edge_check_number_arrays AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('check_number-1') AS v(check_id)
+),
+
+__ref__int_edge_check_text_arrays AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('check_text_a-1') AS v(check_id)
+),
+
 __ref__int_edge_check_key_rewrites AS (
   SELECT
     v.check_id::VARCHAR AS check_id
@@ -308,6 +322,13 @@ __ref__int_edge_check_month_starts AS (
     ('check_month_-1') AS v(period_id)
 ),
 
+__ref__int_edge_check_key_parts AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('check_key_pa-1') AS v(check_id)
+),
+
 __ref__int_edge_variant_expected_values AS (
   SELECT
     v.value_id::VARCHAR AS value_id
@@ -481,6 +502,139 @@ __ref__int_edge_check_unnamed_labels AS (
     v.check_id::VARCHAR AS check_id
   FROM VALUES
     ('check_unname-1') AS v(check_id)
+),
+
+__ref__int_edge_basket_tag_list_reads AS (
+  SELECT
+    v.basket_id::VARCHAR AS basket_id
+  FROM VALUES
+    ('basket_tag_l-1') AS v(basket_id)
+),
+
+__ref__int_edge_basket_sku_part_filters AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id
+  FROM VALUES
+    ('basket_sku_p-1') AS v(line_id)
+),
+
+__ref__int_edge_basket_distinct_tags AS (
+  SELECT
+    v.tag_text::VARCHAR AS tag_text
+  FROM VALUES
+    ('basket_disti-1') AS v(tag_text)
+),
+
+__ref__int_edge_check_amount_spreads AS (
+  SELECT
+    v.group_code::VARCHAR AS group_code
+  FROM VALUES
+    ('check_amount-1') AS v(group_code)
+),
+
+__ref__int_edge_check_group_pivots AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('check_group_-1') AS v(check_id)
+),
+
+__ref__int_edge_check_complete_pairs AS (
+  SELECT
+    v.group_code::VARCHAR AS group_code
+  FROM VALUES
+    ('check_comple-1') AS v(group_code)
+),
+
+__ref__int_edge_ledger_paid_quantities AS (
+  SELECT
+    v.order_ref::VARCHAR AS order_ref
+  FROM VALUES
+    ('ledger_paid_-1') AS v(order_ref)
+),
+
+__ref__int_edge_variant_element_counts AS (
+  SELECT
+    v.group_code::VARCHAR AS group_code
+  FROM VALUES
+    ('variant_elem-1') AS v(group_code)
+),
+
+__ref__int_edge_basket_line_lookups AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id
+  FROM VALUES
+    ('basket_line_-1') AS v(line_id)
+),
+
+__ref__int_edge_basket_running_peaks AS (
+  SELECT
+    v.basket_id::VARCHAR AS basket_id
+  FROM VALUES
+    ('basket_runni-1') AS v(basket_id)
+),
+
+__ref__stg_edge_supplier_notes AS (
+  SELECT
+    v.note_id::VARCHAR AS note_id
+  FROM VALUES
+    ('supplier_not-1') AS v(note_id)
+),
+
+__ref__int_edge_clock_text_reads AS (
+  SELECT
+    v.text_id::VARCHAR AS text_id
+  FROM VALUES
+    ('clock_text_r-1') AS v(text_id)
+),
+
+__ref__int_edge_amount_bit_reads AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('amount_bit_r-1') AS v(check_id)
+),
+
+__ref__int_edge_note_patterns AS (
+  SELECT
+    v.note_id::VARCHAR AS note_id
+  FROM VALUES
+    ('note_pattern-1') AS v(note_id)
+),
+
+__ref__int_edge_ticket_tokens AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id
+  FROM VALUES
+    ('ticket_token-1') AS v(line_id)
+),
+
+__ref__int_edge_basket_xml_reads AS (
+  SELECT
+    v.line_id::VARCHAR AS line_id
+  FROM VALUES
+    ('basket_xml_r-1') AS v(line_id)
+),
+
+__ref__int_edge_join_keys AS (
+  SELECT
+    v.row_key::VARCHAR AS row_key
+  FROM VALUES
+    ('join_keys-1') AS v(row_key)
+),
+
+__ref__int_edge_json_numbers AS (
+  SELECT
+    v.check_id::VARCHAR AS check_id
+  FROM VALUES
+    ('json_numbers-1') AS v(check_id)
+),
+
+__ref__int_edge_quantity_checks AS (
+  SELECT
+    v.entry_id::VARCHAR AS entry_id
+  FROM VALUES
+    ('quantity_che-1') AS v(entry_id)
 ),
 
 __expected__rpt_edge_case_model_keys AS (

@@ -63,6 +63,12 @@ WITH model_keys AS (
   SELECT 'int_edge_callback_clock_times' AS model_name, r.callback_id::VARCHAR AS model_key
   FROM __ref("int_edge_callback_clock_times") AS r
   UNION ALL
+  SELECT 'int_edge_check_number_arrays' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_check_number_arrays") AS r
+  UNION ALL
+  SELECT 'int_edge_check_text_arrays' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_check_text_arrays") AS r
+  UNION ALL
   SELECT 'int_edge_check_key_rewrites' AS model_name, r.check_id::VARCHAR AS model_key
   FROM __ref("int_edge_check_key_rewrites") AS r
   UNION ALL
@@ -144,6 +150,9 @@ WITH model_keys AS (
   SELECT 'int_edge_check_month_starts' AS model_name, r.period_id::VARCHAR AS model_key
   FROM __ref("int_edge_check_month_starts") AS r
   UNION ALL
+  SELECT 'int_edge_check_key_parts' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_check_key_parts") AS r
+  UNION ALL
   SELECT 'int_edge_variant_expected_values' AS model_name, r.value_id::VARCHAR AS model_key
   FROM __ref("int_edge_variant_expected_values") AS r
   UNION ALL
@@ -218,6 +227,63 @@ WITH model_keys AS (
   UNION ALL
   SELECT 'int_edge_check_unnamed_labels' AS model_name, r.check_id::VARCHAR AS model_key
   FROM __ref("int_edge_check_unnamed_labels") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_tag_list_reads' AS model_name, r.basket_id::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_tag_list_reads") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_sku_part_filters' AS model_name, r.line_id::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_sku_part_filters") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_distinct_tags' AS model_name, r.tag_text::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_distinct_tags") AS r
+  UNION ALL
+  SELECT 'int_edge_check_amount_spreads' AS model_name, r.group_code::VARCHAR AS model_key
+  FROM __ref("int_edge_check_amount_spreads") AS r
+  UNION ALL
+  SELECT 'int_edge_check_group_pivots' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_check_group_pivots") AS r
+  UNION ALL
+  SELECT 'int_edge_check_complete_pairs' AS model_name, r.group_code::VARCHAR AS model_key
+  FROM __ref("int_edge_check_complete_pairs") AS r
+  UNION ALL
+  SELECT 'int_edge_ledger_paid_quantities' AS model_name, r.order_ref::VARCHAR AS model_key
+  FROM __ref("int_edge_ledger_paid_quantities") AS r
+  UNION ALL
+  SELECT 'int_edge_variant_element_counts' AS model_name, r.group_code::VARCHAR AS model_key
+  FROM __ref("int_edge_variant_element_counts") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_line_lookups' AS model_name, r.line_id::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_line_lookups") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_running_peaks' AS model_name, r.basket_id::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_running_peaks") AS r
+  UNION ALL
+  SELECT 'stg_edge_supplier_notes' AS model_name, r.note_id::VARCHAR AS model_key
+  FROM __ref("stg_edge_supplier_notes") AS r
+  UNION ALL
+  SELECT 'int_edge_clock_text_reads' AS model_name, r.text_id::VARCHAR AS model_key
+  FROM __ref("int_edge_clock_text_reads") AS r
+  UNION ALL
+  SELECT 'int_edge_amount_bit_reads' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_amount_bit_reads") AS r
+  UNION ALL
+  SELECT 'int_edge_note_patterns' AS model_name, r.note_id::VARCHAR AS model_key
+  FROM __ref("int_edge_note_patterns") AS r
+  UNION ALL
+  SELECT 'int_edge_ticket_tokens' AS model_name, r.line_id::VARCHAR AS model_key
+  FROM __ref("int_edge_ticket_tokens") AS r
+  UNION ALL
+  SELECT 'int_edge_basket_xml_reads' AS model_name, r.line_id::VARCHAR AS model_key
+  FROM __ref("int_edge_basket_xml_reads") AS r
+  UNION ALL
+  SELECT 'int_edge_join_keys' AS model_name, r.row_key::VARCHAR AS model_key
+  FROM __ref("int_edge_join_keys") AS r
+  UNION ALL
+  SELECT 'int_edge_json_numbers' AS model_name, r.check_id::VARCHAR AS model_key
+  FROM __ref("int_edge_json_numbers") AS r
+  UNION ALL
+  SELECT 'int_edge_quantity_checks' AS model_name, r.entry_id::VARCHAR AS model_key
+  FROM __ref("int_edge_quantity_checks") AS r
 ),
 
 final AS (

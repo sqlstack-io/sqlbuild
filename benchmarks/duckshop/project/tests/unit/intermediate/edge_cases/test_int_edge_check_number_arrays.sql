@@ -19,5 +19,5 @@ WITH __ref__stg_edge_amount_checks AS (
 __expected__int_edge_check_number_arrays AS (
   SELECT
     NULL AS check_id,
-    NULL AS amounts
+    NULL AS amount_count
 )

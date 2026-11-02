@@ -12,17 +12,8 @@ MODEL (
 );
 
 WITH model_keys AS (
-  SELECT 'int_edge_check_number_arrays' AS model_name, r.check_id::VARCHAR AS model_key
-  FROM __ref("int_edge_check_number_arrays") AS r
-  UNION ALL
-  SELECT 'int_edge_check_text_arrays' AS model_name, r.check_id::VARCHAR AS model_key
-  FROM __ref("int_edge_check_text_arrays") AS r
-  UNION ALL
   SELECT 'int_edge_callback_wall_time_lists' AS model_name, r.merchant_zone::VARCHAR AS model_key
   FROM __ref("int_edge_callback_wall_time_lists") AS r
-  UNION ALL
-  SELECT 'int_edge_check_key_parts' AS model_name, r.check_id::VARCHAR AS model_key
-  FROM __ref("int_edge_check_key_parts") AS r
 ),
 
 final AS (

@@ -411,3 +411,24 @@ sources:
         nullable: false
         audits:
           - not_null
+  - name: edge__supplier_notes
+    description: >-
+      Supplier notes whose columns are declared but whose contract is not enforced, so readers see
+      an open source
+    managed: true
+    columns:
+      - name: note_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: supplier_code
+        type: VARCHAR
+      - name: note_text
+        type: VARCHAR
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null

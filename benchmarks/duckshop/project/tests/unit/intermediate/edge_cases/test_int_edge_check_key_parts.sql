@@ -19,5 +19,5 @@ WITH __ref__stg_edge_amount_checks AS (
 __expected__int_edge_check_key_parts AS (
   SELECT
     NULL AS check_id,
-    NULL AS key_parts
+    NULL AS key_number_count
 )
