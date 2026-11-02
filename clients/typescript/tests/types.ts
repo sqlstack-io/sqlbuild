@@ -86,6 +86,16 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/catalog
 // @ts-expect-error Catalog scans must include reconciliation; incremental imports cannot remove relations safely.
 const incompleteCatalog: components["schemas"]["CatalogBatch"] = { session_id: "synthetic-session", generation: 1, records: [] };
 void incompleteCatalog;
+void client.GET("/api/control/locations/{location_id}/targets/{target}/catalog", {
+  params: {
+    path: { location_id: "synthetic-location", target: "development" },
+    query: { schema: "main", after_observed_at: "2026-01-02T03:04:05Z", after_event_id: "synthetic-relation", limit: 100 },
+  },
+});
+const catalogPage: components["schemas"]["CatalogPage"] = { records: [], next_after: null };
+void catalogPage;
+// @ts-expect-error Catalog reads require an exact physical schema.
+void client.GET("/api/control/locations/{location_id}/targets/{target}/catalog", { params: { path: { location_id: "synthetic-location", target: "development" } } });
 const sourceCondition: components["schemas"]["SensorCondition"] = {
   kind: "source_new_data", selection: ["source:raw_orders"],
 };

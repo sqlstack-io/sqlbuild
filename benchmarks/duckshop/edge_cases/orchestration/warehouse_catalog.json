@@ -25,5 +25,10 @@
     {"state_database": null, "state_schema": "main", "name": "Orders", "relation_type": "BASE TABLE", "columns": [{"name": "note", "data_type": "text"}, {"name": "shipped", "data_type": "boolean"}]},
     {"state_database": null, "state_schema": "main", "name": "orders", "relation_type": "BASE TABLE", "columns": [{"name": "order_id", "data_type": "integer"}, {"name": "amount", "data_type": "numeric"}]}
   ],
-  "lifecycle": ["create", "unchanged scan", "column added", "table becomes view", "drop", "empty mirror rebuild"]
+  "lifecycle": ["create", "unchanged scan", "column added", "table becomes view", "drop", "empty mirror rebuild"],
+  "read_namespaces": [
+    {"database": null, "schema": "main"},
+    {"database": "orders_data", "schema": "main"},
+    {"database": null, "schema": "reporting"}
+  ]
 }

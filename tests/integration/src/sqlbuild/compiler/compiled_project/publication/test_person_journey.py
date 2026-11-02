@@ -31,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_request,
     provision_person,
     verify_security_audit,
+    wait_for_person_catalog,
 )
 
 
@@ -230,12 +231,15 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             recovery: dict[str, Any] = wait_for_run(
                 worker.api, worker.process, worker.log, run_id=request["run_id"]
             )
-            assert recovery["status"] == test_case.expected_status
-            assert recovery["snapshot_id"] == recovered["record"]["snapshot_id"]
+            assert (recovery["status"], recovery["snapshot_id"]) == (
+                test_case.expected_status,
+                recovered["record"]["snapshot_id"],
+            )
             with duckdb.connect(
                 str(worker.project / "warehouse.duckdb"), read_only=True
             ) as warehouse:
                 assert warehouse.sql(test_case.warehouse_query).fetchall() == [(41,)]
+            wait_for_person_catalog(worker.api, session, location, log)
         assignment["revoke"] = True
         assert person_request(
             worker.api, "/api/admin/roles", body=assignment, session=admin_session

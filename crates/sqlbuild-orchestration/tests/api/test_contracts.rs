@@ -12,6 +12,8 @@ mod oidc_test_types;
 mod output_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "test_catalog_reads.rs"]
+mod test_catalog_reads;
 #[path = "test_changes.rs"]
 mod test_changes;
 #[path = "test_contract.rs"]

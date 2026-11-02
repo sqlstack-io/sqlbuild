@@ -524,3 +524,27 @@ pub struct CatalogRead {
     pub observed_since: Option<DateTime<Utc>>,
     pub limit: Option<usize>,
 }
+
+/// Read one exact physical namespace; an omitted database means SQL NULL, never a wildcard.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogQuery {
+    pub database: Option<String>,
+    pub schema: String,
+    pub after_observed_at: Option<DateTime<Utc>>,
+    pub after_event_id: Option<Uuid>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogObservation {
+    pub event_id: Uuid,
+    pub observed_at: DateTime<Utc>,
+    pub record: WarehouseCatalogRecord,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogPage {
+    pub records: Vec<CatalogObservation>,
+    pub next_after: Option<WarehouseReconciliationCursor>,
+}

@@ -163,6 +163,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -717,6 +733,17 @@ export interface components {
             records: components["schemas"]["WarehouseCatalogRecord"][];
             /** Format: uuid */
             session_id: string;
+        };
+        CatalogObservation: {
+            /** Format: uuid */
+            event_id: string;
+            /** Format: date-time */
+            observed_at: string;
+            record: components["schemas"]["WarehouseCatalogRecord"];
+        };
+        CatalogPage: {
+            next_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+            records: components["schemas"]["CatalogObservation"][];
         };
         CatchUp: "latest" | {
             /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
@@ -2077,6 +2104,59 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonCatalog: {
+        parameters: {
+            query: {
+                /** @description Exact database; omitted matches SQL NULL */
+                database?: string;
+                /** @description Exact physical schema */
+                schema: string;
+                after_observed_at?: string;
+                after_event_id?: string;
+                /** @description Page size; defaults to 100, clamped to 1..100 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogPage"];
+                };
+            };
+            /** @description Invalid namespace or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
