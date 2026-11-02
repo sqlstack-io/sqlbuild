@@ -633,6 +633,7 @@ export interface components {
         FingerprintBatch: {
             /** Format: int64 */
             generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
             records: components["schemas"]["WarehouseFingerprintRecord"][];
             /** Format: uuid */
             session_id: string;
@@ -1163,6 +1164,7 @@ export interface components {
         SourceFreshnessBatch: {
             /** Format: int64 */
             generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
             records: components["schemas"]["WarehouseFreshnessRecord"][];
             /** Format: uuid */
             session_id: string;
@@ -1287,6 +1289,29 @@ export interface components {
             target_name?: string | null;
             target_schema?: string | null;
             value_kind: string;
+        };
+        WarehouseReconciliationCursor: {
+            /** Format: uuid */
+            event_id: string;
+            /** Format: date-time */
+            observed_at: string;
+        };
+        /** @description A complete, ordered key-set scan of one physical state table and UTC observation day. */
+        WarehouseReconciliationPage: {
+            after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+            complete: boolean;
+            /** Format: date */
+            day: string;
+            /** Format: int32 */
+            page: number;
+            /** Format: uuid */
+            scan_id: string;
+            state_database?: string | null;
+            state_schema: string;
+        };
+        WarehouseSyncResponse: {
+            applied: boolean;
+            next_reconciliation_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
         };
     };
     responses: never;
@@ -1941,7 +1966,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MutationResponse"];
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
                 };
             };
             400: {
@@ -1989,7 +2014,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MutationResponse"];
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
                 };
             };
             400: {

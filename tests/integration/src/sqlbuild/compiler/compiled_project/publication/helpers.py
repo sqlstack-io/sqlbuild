@@ -138,6 +138,18 @@ def warehouse_history_page(
     return json.loads(result.stdout)
 
 
+def sync_warehouse_history(api: SnapshotApi, table: str, batch: dict[str, Any]) -> dict[str, Any]:
+    """Use the public location transport and return its bounded reconciliation continuation."""
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/targets/development/metadata/{table}",
+        data=json.dumps(batch).encode(),
+        headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
+    )
+    with urlopen(request, timeout=5) as response:
+        result: dict[str, Any] = json.load(response)
+    return result
+
+
 def wait_for_generation(
     api: SnapshotApi, target: str, generation: int, process: subprocess.Popen[bytes], log: Path
 ) -> dict[str, Any]:

@@ -1,6 +1,6 @@
 //! Existing warehouse state rows, with their physical state-table provenance.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -30,6 +30,8 @@ pub struct SourceFreshnessBatch {
     pub session_id: Uuid,
     pub generation: i64,
     pub records: Vec<WarehouseFreshnessRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
@@ -78,6 +80,36 @@ pub struct FingerprintBatch {
     pub session_id: Uuid,
     pub generation: i64,
     pub records: Vec<WarehouseFingerprintRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
+/// A complete, ordered key-set scan of one physical state table and UTC observation day.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseReconciliationPage {
+    pub scan_id: Uuid,
+    pub page: u32,
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub day: NaiveDate,
+    pub complete: bool,
+    /// Repeat the identical final page with this mirror cursor until the response has none.
+    pub after: Option<WarehouseReconciliationCursor>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseReconciliationCursor {
+    pub observed_at: DateTime<Utc>,
+    pub event_id: Uuid,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct WarehouseSyncResponse {
+    pub applied: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_reconciliation_after: Option<WarehouseReconciliationCursor>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

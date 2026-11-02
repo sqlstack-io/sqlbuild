@@ -1657,6 +1657,10 @@ reason = "Resource asset projections intentionally mirror their public JSON sche
 paths = ["crates/sqlbuild-python/src/bindings/_helpers/result_output/documents.rs"]
 reason = "Command document projections intentionally mirror the public envelope while preserving command-specific summaries: seeds require a plan and loads report skipped_count."
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/fingerprints.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/freshness.rs"]
+reason = "Typed observation field projections intentionally mirror provenance checks while preserving different required identity fields and timestamp names. Bounds, rejection rules and reconciliation completion share the ingestion owner."
+
 [[targets.python.rule_exceptions]]
 rule = "XSB051"
 path = "src/sqlbuild/executor/migrations/_helpers/old_name_views.py"

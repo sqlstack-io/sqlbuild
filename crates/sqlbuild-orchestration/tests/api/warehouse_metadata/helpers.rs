@@ -12,6 +12,7 @@ use crate::store::main::{
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
+use crate::store::tests::store_helpers::reconstruct_warehouse_predecessor;
 use crate::warehouse_metadata::models::FingerprintBatch;
 
 pub(crate) async fn fingerprint_history(
@@ -21,6 +22,7 @@ pub(crate) async fn fingerprint_history(
     (client, freshness_url, bearer): (&Client, &str, &str),
 ) {
     // Upgrade the immediate predecessor while published snapshots and freshness facts exist.
+    reconstruct_warehouse_predecessor(store).await;
     let mut transaction = begin(store, TransactionMode::Write).await.expect("upgrade");
     for table in [
         "sqb_external_sessions",
@@ -99,7 +101,8 @@ pub(crate) async fn fingerprint_history(
             outbound
                 .sync_fingerprints("development", &typed)
                 .await
-                .expect("sync"),
+                .expect("sync")
+                .applied,
             expected
         );
     }
@@ -246,6 +249,7 @@ pub(crate) async fn fingerprint_history(
             .sync_fingerprints("development", &typed)
             .await
             .expect("resync")
+            .applied
     );
     assert_eq!(
         mirrored_fingerprints(store).await,
@@ -289,6 +293,7 @@ pub(crate) async fn fingerprint_history(
             .sync_fingerprints("development", &marker)
             .await
             .expect("review marker sync")
+            .applied
     );
     let rows = mirrored_fingerprints(store).await;
     let marker = rows
@@ -311,6 +316,7 @@ pub(crate) async fn fingerprint_history(
             .sync_fingerprints("development", &scoped)
             .await
             .expect("distinct physical scopes")
+            .applied
     );
     let preview: FingerprintBatch = serde_json::from_value(json!({
         "session_id": preview_session_id, "generation": 1, "records": [record],
@@ -321,6 +327,7 @@ pub(crate) async fn fingerprint_history(
             .sync_fingerprints("preview", &preview)
             .await
             .expect("distinct target scope")
+            .applied
     );
     let after = mirrored_fingerprints(store).await;
     assert_eq!(

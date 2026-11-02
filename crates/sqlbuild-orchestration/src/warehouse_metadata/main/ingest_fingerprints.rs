@@ -5,19 +5,20 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
-use crate::store::main::{
-    commit::commit, compress::compress, query::query, store_source_text::store_source_text,
-};
-use crate::store::models::{Change, ControlStore, Parameter};
+use crate::store::main::{compress::compress, query::query, store_source_text::store_source_text};
+use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::fingerprints::{source_event_id, validate_batch};
-use crate::warehouse_metadata::_helpers::ingestion::{begin_ingestion, scoped_event_id};
-use crate::warehouse_metadata::models::FingerprintBatch;
+use crate::warehouse_metadata::_helpers::ingestion::{
+    begin_ingestion, commit_ingestion, scoped_event_id,
+};
+use crate::warehouse_metadata::_helpers::reconciliation::begin_reconciliation;
+use crate::warehouse_metadata::models::{FingerprintBatch, WarehouseSyncResponse};
 
 pub async fn ingest_fingerprints(
     store: &ControlStore,
     (location_id, target): (Uuid, &str),
     batch: &FingerprintBatch,
-) -> Result<bool, ControlError> {
+) -> Result<WarehouseSyncResponse, ControlError> {
     validate_batch(batch)?;
     let mut transaction = begin_ingestion(
         store,
@@ -25,7 +26,17 @@ pub async fn ingest_fingerprints(
         (batch.session_id, batch.generation),
     )
     .await?;
+    if let Some(page) = &batch.reconciliation {
+        transaction = begin_reconciliation(
+            transaction,
+            ("sqb_warehouse_fingerprints", location_id, target),
+            page,
+            json!(batch),
+        )
+        .await?;
+    }
     let mut applied = false;
+    let mut keys: Vec<Uuid> = Vec::new();
     for record in &batch.records {
         let source_event_id = source_event_id(record);
         let event_id = scoped_event_id(
@@ -37,6 +48,9 @@ pub async fn ingest_fingerprints(
             ),
             &source_event_id,
         )?;
+        if batch.reconciliation.is_some() {
+            keys.push(event_id);
+        }
         let existing;
         (transaction, existing) = query(
             transaction,
@@ -63,18 +77,18 @@ pub async fn ingest_fingerprints(
         .await?;
         let inserted;
         (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_warehouse_fingerprints (event_id,location_id,target,source_event_id,observed_at,definition_text_hash,record_json,received_at) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
+            "INSERT INTO sqb_warehouse_fingerprints (event_id,location_id,target,source_event_id,observed_at,definition_text_hash,record_json,received_at,state_database,state_schema) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
             vec![Parameter::Id(event_id), Parameter::Id(location_id), Parameter::Text(target.into()),
                 Parameter::Text(source_event_id), Parameter::Time(record.ts), Parameter::Text(definition_text_hash),
-                Parameter::Json(record_json), Parameter::Time(received_at)]).await?;
+                Parameter::Json(record_json), Parameter::Time(received_at), Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone())]).await?;
         applied |= !inserted.is_empty();
     }
-    if applied {
-        transaction
-            .changes
-            .insert(Change::NodeStatus(location_id, target.into()));
-    }
-    commit(transaction).await?;
-    Ok(applied)
+    commit_ingestion(
+        transaction,
+        ("sqb_warehouse_fingerprints", location_id, target),
+        (batch.reconciliation.as_ref(), &keys),
+        applied,
+    )
+    .await
 }

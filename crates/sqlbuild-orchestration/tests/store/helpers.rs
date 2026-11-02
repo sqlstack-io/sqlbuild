@@ -1,7 +1,8 @@
 //! Real-database setup shared by storage, scheduling, and queue contracts.
 
 use crate::store::main::open_store::open_store;
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, TransactionMode};
 use uuid::Uuid;
 
 use crate::store::tests::store_test_types::{Backend, TestStore};
@@ -72,4 +73,26 @@ pub(crate) async fn close_store(store: ControlStore) {
         return;
     };
     pool.close().await;
+}
+
+pub(crate) async fn reconstruct_warehouse_predecessor(store: &ControlStore) {
+    let mut transaction = begin(store, TransactionMode::Write)
+        .await
+        .expect("predecessor");
+    for sql in [
+        "DROP TABLE sqb_warehouse_scan_keys",
+        "DROP TABLE sqb_warehouse_scan_pages",
+        "DROP INDEX sqb_fingerprints_reconciliation",
+        "DROP INDEX sqb_freshness_reconciliation",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN state_database",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN state_schema",
+        "ALTER TABLE sqb_warehouse_freshness DROP COLUMN state_database",
+        "ALTER TABLE sqb_warehouse_freshness DROP COLUMN state_schema",
+        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_reconciliation'",
+    ] {
+        (transaction, _) = query(transaction, sql, vec![])
+            .await
+            .expect("reconstruct predecessor");
+    }
+    commit(transaction).await.expect("commit predecessor");
 }
