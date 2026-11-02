@@ -1,3 +1,4 @@
+pub(crate) mod browser_sessions;
 pub(crate) mod locations;
 pub(crate) mod password_sessions;
 pub(crate) mod passwords;

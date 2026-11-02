@@ -55,7 +55,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Validates one browser-bound code and returns the explicitly bound person only; no session, bearer, provisioning or grants. */
+        /** @description Validates one browser-bound code and issues a bounded browser session for an explicitly bound person; no provisioning, personal API tokens or implicit grants. */
         get: operations["oidcIdentity"];
         put?: never;
         post?: never;
@@ -121,7 +121,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Requires a configured socket peer and an upstream-replaced X-SQB-User subject. Does not issue sessions or grant permissions. */
+        /** @description Requires a configured socket peer and upstream-replaced X-SQB-User subject; issues a bounded browser session without provisioning, personal API tokens or implicit grants. */
         get: operations["proxyIdentity"];
         put?: never;
         post?: never;
@@ -621,8 +621,13 @@ export interface components {
             status: "timed_out";
         };
         ExternalIdentityResponse: {
+            csrf_token: string;
+            /** Format: date-time */
+            expires_at: string;
             /** Format: uuid */
             principal_id: string;
+            /** Format: uuid */
+            session_id: string;
         };
         /** @description Fingerprint observations from one registered reader, independent of automatic polling. */
         FingerprintBatch: {
@@ -1553,6 +1558,14 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -6,14 +6,14 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::get;
-use axum::{Extension, Json, Router, middleware};
+use axum::{Extension, Router, middleware};
 use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge};
 
-use crate::api::_helpers::authentication::oidc_provider;
 use crate::api::_helpers::authentication::password_transport::{
-    browser_cookie, deny, guard, set_cookie,
+    browser_cookie, deny, external_session, guard, set_cookie,
 };
+use crate::api::_helpers::authentication::{oidc_provider, password_sessions};
 use crate::api::constants::OIDC_FLOW_COOKIE;
 use crate::api::errors::ApiError;
 use crate::api::models::{
@@ -44,6 +44,7 @@ pub(crate) async fn router(
     Ok(Router::new()
         .route("/api/auth/oidc/login", get(login))
         .route("/api/auth/oidc/callback", get(callback))
+        .merge(password_sessions::protected(store))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
         .layer(Extension(BrowserOrigin(runtime.settings.origin.clone())))
         .layer(Extension(Arc::new(runtime))))
@@ -96,7 +97,7 @@ pub(crate) async fn login(
 }
 
 #[utoipa::path(get, path = "/api/auth/oidc/callback", operation_id = "oidcIdentity",
-    description = "Validates one browser-bound code and returns the explicitly bound person only; no session, bearer, provisioning or grants.",
+    description = "Validates one browser-bound code and issues a bounded browser session for an explicitly bound person; no provisioning, personal API tokens or implicit grants.",
     responses((status = 200, body = ExternalIdentityResponse), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn callback(
     State(store): State<ControlStore>,
@@ -129,19 +130,15 @@ pub(crate) async fn callback(
     let mut response = match subject {
         Ok(subject) => match runtime.settings.identities.get(&subject).copied() {
             Some(principal) => {
-                if authenticate_bound_person(
+                if let Some(session) = authenticate_bound_person(
                     &store,
                     &context,
                     principal,
                     ExternalIdentityMechanism::Oidc,
                 )
                 .await?
-                .is_some()
                 {
-                    Json(ExternalIdentityResponse {
-                        principal_id: principal,
-                    })
-                    .into_response()
+                    external_session(session)?
                 } else {
                     deny(&store, &context, "inactive_oidc_person").await?
                 }

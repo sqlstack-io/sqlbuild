@@ -5,5 +5,9 @@
   "service_subject": "external-orders-service",
   "absent_subject": "external-absent-reader",
   "unknown_subject": "external-unbound-reader",
-  "untrusted_peer": "192.0.2.24"
+  "untrusted_peer": "192.0.2.24",
+  "administrator_journey": {
+    "bound": ["orders-admin", "customers-admin"],
+    "unbound_password_person": "products-admin"
+  }
 }

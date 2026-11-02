@@ -3,7 +3,8 @@
 use crate::authorization::_helpers::administrator_roles::assign_role_in;
 use crate::authorization::main::authorize_session::authorize_session;
 use crate::credentials::models::{
-    Action, AuditContext, DefaultRole, PermissionScope, RoleAssignmentRequest,
+    Action, AdministratorAuthentication, AuditContext, DefaultRole, PermissionScope,
+    RoleAssignmentRequest,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -13,6 +14,7 @@ pub async fn assign_builtin_role(
     store: &ControlStore,
     (context, credentials): (&AuditContext, (&str, &str)),
     request: &RoleAssignmentRequest,
+    authentication: &AdministratorAuthentication,
 ) -> Result<bool, ControlError> {
     let (transaction, context) = authorize_session(
         begin(store, TransactionMode::Write).await?,
@@ -26,5 +28,5 @@ pub async fn assign_builtin_role(
         DefaultRole::None,
     )
     .await?;
-    assign_role_in(transaction, &context, request).await
+    assign_role_in(transaction, &context, request, authentication).await
 }

@@ -11,8 +11,8 @@ use crate::credentials::main::{
     create_principal::create_principal, login_password::login_password, set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorChange, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin,
-    PrincipalKind, RoleAssignmentRequest,
+    AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole, DefaultRole,
+    PasswordAuthority, PasswordLogin, PrincipalKind, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
@@ -161,7 +161,8 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                                 &context,
                                 (sessions[0].bearer.as_str(), sessions[0].csrf.as_str())
                             ),
-                            &assignment
+                            &assignment,
+                            &AdministratorAuthentication::Password,
                         )
                         .await
                         .expect("authenticated assignment")
@@ -364,7 +365,11 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             store,
                             &context,
                             administrator_credentials,
-                            (person, AdministratorChange::Disable)
+                            (
+                                person,
+                                AdministratorChange::Disable,
+                                &AdministratorAuthentication::Password
+                            ),
                         )
                         .await
                         .expect("disable person")
@@ -376,7 +381,8 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             &RoleAssignmentRequest {
                                 revoke: true,
                                 ..assignment
-                            }
+                            },
+                            &AdministratorAuthentication::Password,
                         )
                         .await
                         .expect("revoke a disabled person's grant before reenabling")
@@ -386,7 +392,11 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             store,
                             &context,
                             administrator_credentials,
-                            (person, AdministratorChange::Enable)
+                            (
+                                person,
+                                AdministratorChange::Enable,
+                                &AdministratorAuthentication::Password
+                            ),
                         )
                         .await
                         .expect("enable person")

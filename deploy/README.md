@@ -111,22 +111,30 @@ TOKEN_UUID`, store its one-time replacement bearer, and recreate the location. T
 expiry stay unchanged, and the old credential is revoked atomically. Service-account principal
 tokens are separate from location/run tokens. Person identities do not become machine bearers.
 
-For opt-in OIDC identity verification, mount a server-owned JSON file with `origin`, `issuer`,
+For OIDC sign-in, mount a server-owned JSON file with `origin`, `issuer`,
 `client_id`, and explicit `identities` subject-to-existing-person UUID bindings; append
 `--oidc-config /etc/sqlbuild/oidc.json` to the server command. Both origin and issuer require
 HTTPS. Terminate HTTPS at a trusted proxy, preserve the external Host, restrict backend access,
-and register `/api/auth/oidc/callback` at the issuer. This verifies an explicitly bound enabled
-person; it does not provision people, issue a browser session, or grant roles.
+and register `/api/auth/oidc/callback` at the issuer. The callback verifies an explicitly bound,
+enabled person and issues a one-hour browser session. Trusted-proxy sign-in through
+`GET /api/auth/proxy` uses the same session protections after verifying the configured socket
+peer and upstream-replaced subject. Neither mechanism provisions people or grants roles.
+The bearer stays in a Secure, HttpOnly, host-only cookie; mutations require the returned CSRF
+token and matching origin. Sessions work across replicas sharing the installation, with live
+person and role checks. `POST /api/auth/logout` revokes the session across replicas; password
+resets and offline administrator recovery revoke all of that person's browser sessions.
 
 The local control-store owner initializes the first installation administrator with
 `sqb admin create-user NAME`, then provisions its password separately with
 `sqb admin set-password PRINCIPAL_ID`. Initialization is available once only; losing or disabling
 administrators never reopens it. `create-principal` creates a role-free identity, not another
-administrator. With password authentication enabled, authenticated installation administrators
+administrator. With password, OIDC or trusted-proxy authentication, installation administrators
 use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revoke`, `disable`,
-or `enable`, their session cookie and CSRF header. This cannot remove or disable the final enabled,
-password-provisioned administrator; an unprovisioned person is not a usable alternative in this
-password-only administration path. It never authorizes a machine bearer or grants non-admin defaults.
+or `enable`, their session cookie and CSRF header. This cannot remove or disable the final usable
+administrator. A password installation requires another enabled, password-provisioned admin;
+an OIDC or proxy installation requires another enabled admin in its configured identity bindings.
+A password alone does not make an unbound person a usable SSO administrator. These endpoints
+never authorize a machine bearer or grant non-admin defaults.
 
 If administrator access is lost, stop every server and administration process connected to the
 installation, then run `sqb admin recover-user PRINCIPAL_ID --reason "restore administrator access"`
@@ -145,7 +153,7 @@ and `revoke` (false for a grant). An administrator assignment must be installati
 Other built-ins can be installation-wide or restricted to a location or target. Revocation
 also works while a person is disabled, before they are enabled again.
 
-Password sessions use `GET /api/control/locations/{location_id}/targets/{target}/runs`
+Browser sessions use `GET /api/control/locations/{location_id}/targets/{target}/runs`
 for recent run metadata, `POST /api/control/runs` for published-job requests, and
 `POST /api/control/triggers` for trigger overrides. Use `POST /api/control/runs/cancel`
 with `run_id`, `event_id` and `reason` to request cancellation; use

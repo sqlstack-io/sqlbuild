@@ -97,6 +97,14 @@ pub enum DefaultRole {
     Viewer,
 }
 
+/// Server-owned sign-in configuration, used to protect a genuinely usable administrator.
+#[derive(Clone, Debug, Default)]
+pub enum AdministratorAuthentication {
+    #[default]
+    Password,
+    BoundPeople(std::collections::BTreeSet<Uuid>),
+}
+
 /// Scope is computed by the server from the operation, never accepted as a claimed write set.
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct PermissionScope {

@@ -37,8 +37,22 @@ fn given_an_owner_configured_proxy_when_a_standalone_server_authenticates_then_o
                 .header(header::HOST, "control.example.com").header(header::ORIGIN, "https://control.example.com")
                 .header("x-sqb-user", test_case.subject).send().await.expect("upstream identity");
             assert_eq!(response.status(), test_case.expected_status, "{}", test_case.description);
-            assert!(!response.headers().contains_key(header::SET_COOKIE));
-            assert_eq!(response.json::<Value>().await.expect("identity"), json!({"principal_id": principal}));
+            let cookie = response.headers().get_all(header::SET_COOKIE).iter()
+                .map(|value| value.to_str().expect("cookie"))
+                .find(|value| value.starts_with("__Host-sqb-session=")).expect("browser session")
+                .split(';').next().expect("cookie pair").to_owned();
+            let body = response.json::<Value>().await.expect("identity");
+            assert_eq!(body["principal_id"], principal);
+            assert!(body.get("bearer").is_none());
+            let session = client.get(format!("{url}/api/auth/session"))
+                .header(header::HOST, "control.example.com").header(header::COOKIE, &cookie)
+                .send().await.expect("standalone shared session path");
+            assert_eq!(session.status(), StatusCode::OK);
+            assert_eq!(session.json::<Value>().await.expect("session identity")["principal_id"], principal);
+            let metadata = client.get(format!("{url}/api/control/locations/{}/targets/development/runs", uuid::Uuid::now_v7()))
+                .header(header::HOST, "control.example.com").header(header::COOKIE, &cookie)
+                .send().await.expect("no implicit viewer grant");
+            assert_eq!(metadata.status(), StatusCode::FORBIDDEN);
             let machine = client.get(format!("{url}/api/locations/{}/health", uuid::Uuid::now_v7()))
                 .header("x-sqb-user", test_case.subject).send().await.expect("machine boundary");
             assert_eq!(machine.status(), StatusCode::UNAUTHORIZED);

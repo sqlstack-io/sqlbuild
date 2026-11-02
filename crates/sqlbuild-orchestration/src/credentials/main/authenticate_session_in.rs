@@ -1,4 +1,4 @@
-//! Live password versions invalidate all earlier sessions without per-process caches.
+//! Live person eligibility, password versions and revocation apply to every browser request.
 
 use crate::credentials::_helpers::secrets::{bearer_id, secret_matches};
 use crate::credentials::models::{SessionAccess, SessionIdentity, StoredSession};
@@ -16,9 +16,12 @@ pub(crate) async fn authenticate_session_in(
     };
     let now = transaction.now;
     let (transaction, rows) = query(transaction,
-        "SELECT s.session_id, s.principal_id, s.expires_at, s.secret_hash, s.csrf_hash \
-         FROM sqb_password_sessions s JOIN sqb_principals p ON p.principal_id=s.principal_id \
-         JOIN sqb_password_credentials c ON c.principal_id=s.principal_id AND c.credential_id=s.credential_id \
+        "SELECT s.session_id, s.principal_id, s.expires_at, s.secret_hash, s.csrf_hash FROM (\
+         SELECT s.session_id,s.principal_id,s.expires_at,s.secret_hash,s.csrf_hash,s.revoked_at \
+         FROM sqb_password_sessions s JOIN sqb_password_credentials c \
+         ON c.principal_id=s.principal_id AND c.credential_id=s.credential_id \
+         UNION ALL SELECT session_id,principal_id,expires_at,secret_hash,csrf_hash,revoked_at FROM sqb_external_sessions\
+         ) s JOIN sqb_principals p ON p.principal_id=s.principal_id \
          WHERE s.session_id=$1 AND s.revoked_at IS NULL AND s.expires_at>$2 \
          AND p.kind='person' AND p.disabled_at IS NULL",
         vec![Parameter::Id(id), Parameter::Time(now)]).await?;

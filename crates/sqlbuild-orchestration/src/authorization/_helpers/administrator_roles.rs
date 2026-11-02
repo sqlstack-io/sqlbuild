@@ -7,7 +7,8 @@ use crate::authorization::_helpers::administrator_changes::apply_change;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::{
-    AdministratorChange, AuditContext, BuiltinRole, RoleAssignmentRequest,
+    AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole,
+    RoleAssignmentRequest,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
@@ -17,6 +18,7 @@ pub(crate) async fn assign_role_in(
     transaction: ControlTransaction,
     context: &AuditContext,
     request: &RoleAssignmentRequest,
+    authentication: &AdministratorAuthentication,
 ) -> Result<bool, ControlError> {
     if request
         .target
@@ -49,6 +51,7 @@ pub(crate) async fn assign_role_in(
                     AdministratorChange::Grant
                 },
             ),
+            authentication,
         )
         .await;
     }

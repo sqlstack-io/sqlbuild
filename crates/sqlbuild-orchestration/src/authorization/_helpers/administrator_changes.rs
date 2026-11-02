@@ -7,7 +7,7 @@ use crate::authorization::_helpers::administrators::{
     deny_change, grant_installation_admin, remaining_administrator,
 };
 use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::models::{AdministratorChange, AuditContext};
+use crate::credentials::models::{AdministratorAuthentication, AdministratorChange, AuditContext};
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -16,6 +16,7 @@ pub(crate) async fn apply_change(
     transaction: ControlTransaction,
     context: &AuditContext,
     (principal_id, change): (Uuid, AdministratorChange),
+    authentication: &AdministratorAuthentication,
 ) -> Result<bool, ControlError> {
     let (mut transaction, rows) = query(transaction,
         "SELECT p.disabled_at,a.assignment_id FROM sqb_principals p LEFT JOIN sqb_role_assignments a \
@@ -41,7 +42,8 @@ pub(crate) async fn apply_change(
         )
     {
         let other;
-        (transaction, other) = remaining_administrator(transaction, principal_id).await?;
+        (transaction, other) =
+            remaining_administrator(transaction, principal_id, authentication).await?;
         if !other {
             return deny_change(
                 transaction,

@@ -24,6 +24,7 @@ pub(crate) const AUTHENTICATION_REVISION: &str = include_str!("../authentication
 pub(crate) const OIDC_LOGIN_FLOWS: &str = include_str!("../oidc_login_flows.sql");
 pub(crate) const ADMINISTRATOR_INITIALIZATION: &str =
     include_str!("../administrator_initialization.sql");
+pub(crate) const EXTERNAL_SESSIONS: &str = include_str!("../external_sessions.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

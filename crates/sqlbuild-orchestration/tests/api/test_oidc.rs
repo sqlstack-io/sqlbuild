@@ -121,15 +121,62 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             assert_eq!(response.status(), StatusCode::OK);
             assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
             assert!(
-                response.headers()[header::SET_COOKIE]
-                    .to_str()
-                    .expect("cleared cookie")
-                    .contains("Max-Age=0")
+                response
+                    .headers()
+                    .get_all(header::SET_COOKIE)
+                    .iter()
+                    .any(|value| value
+                        .to_str()
+                        .expect("cookie")
+                        .contains("__Host-sqb-oidc=;"))
             );
-            assert_eq!(
-                response.json::<Value>().await.expect("identity"),
-                json!({"principal_id":person})
-            );
+            let cookie = response
+                .headers()
+                .get_all(header::SET_COOKIE)
+                .iter()
+                .map(|value| value.to_str().expect("cookie"))
+                .find(|value| value.starts_with("__Host-sqb-session="))
+                .expect("SSO session cookie")
+                .split(';')
+                .next()
+                .expect("cookie pair")
+                .to_owned();
+            let body = response
+                .json::<Value>()
+                .await
+                .expect("authenticated session");
+            assert_eq!(body["principal_id"], json!(person));
+            assert!(body.get("bearer").is_none());
+            for url in [&api.url, &other.url] {
+                let session = provider
+                    .client
+                    .get(format!("{url}/api/auth/session"))
+                    .header(header::HOST, "control.example.com")
+                    .header(header::COOKIE, &cookie)
+                    .send()
+                    .await
+                    .expect("OIDC session shared across replicas");
+                assert_eq!(session.status(), StatusCode::OK);
+                assert_eq!(
+                    session.json::<Value>().await.expect("live identity")["principal_id"],
+                    json!(person)
+                );
+                assert_eq!(
+                    provider
+                        .client
+                        .get(format!(
+                            "{url}/api/control/locations/{}/targets/development/runs",
+                            Uuid::now_v7()
+                        ))
+                        .header(header::HOST, "control.example.com")
+                        .header(header::COOKIE, &cookie)
+                        .send()
+                        .await
+                        .expect("no implicit role")
+                        .status(),
+                    StatusCode::FORBIDDEN
+                );
+            }
             assert_eq!(
                 callback(&provider, &api.url, &flow).await.status(),
                 StatusCode::UNAUTHORIZED
@@ -221,6 +268,20 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             .await
             .expect("live disable");
             commit(transaction).await.expect("disable commit");
+            for url in [&api.url, &other.url] {
+                assert_eq!(
+                    provider
+                        .client
+                        .get(format!("{url}/api/auth/session"))
+                        .header(header::HOST, "control.example.com")
+                        .header(header::COOKIE, &cookie)
+                        .send()
+                        .await
+                        .expect("disabled person session")
+                        .status(),
+                    StatusCode::UNAUTHORIZED
+                );
+            }
             assert_eq!(
                 callback(&provider, &other.url, &flow).await.status(),
                 StatusCode::UNAUTHORIZED
@@ -255,11 +316,11 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             assert_eq!(machine.status(), StatusCode::UNAUTHORIZED);
             let transaction = begin(store, TransactionMode::Read).await.expect("evidence");
             let (transaction, rows) = query(transaction,
-                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_password_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
+                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
                 vec![]).await.expect("no provisioning");
             assert_eq!(
                 json!(rows[0]),
-                json!({"principals":2,"sessions":0,"tokens":0,"authentications":test_case.expected_authentications}),
+                json!({"principals":2,"sessions":test_case.expected_authentications,"tokens":0,"authentications":test_case.expected_authentications}),
                 "{}",
                 test_case.description
             );
