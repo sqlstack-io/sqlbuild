@@ -322,6 +322,13 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (session_id, preview_session),
             )
             .await;
+            crate::api::tests::warehouse_audit_results_helpers::audit_history(
+                store,
+                &outbound,
+                (session_id, preview_session),
+                (&client, &url, &token.bearer),
+            )
+            .await;
             stop_api(api).await;
             close_test_store(fixture).await;
         });

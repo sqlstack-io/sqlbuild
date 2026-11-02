@@ -11,19 +11,20 @@ pub fn read_history_sql(
 ) -> Result<String, String> {
     let HistoryRead {
         columns,
+        key_columns,
         timestamp_column,
         observed_since,
         adapter,
         has_event_id,
         limit,
     } = read;
-    let mut columns = columns.to_vec();
     let mut projection = columns.join(", ");
     projection.push_str(if has_event_id {
         ", event_id"
     } else {
         ", NULL AS event_id"
     });
+    let mut columns = key_columns.unwrap_or(columns).to_vec();
     columns.push(if has_event_id { "event_id" } else { "NULL" });
     let ordered = columns
         .iter()

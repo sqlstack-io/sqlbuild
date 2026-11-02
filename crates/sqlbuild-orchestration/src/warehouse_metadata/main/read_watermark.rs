@@ -7,7 +7,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::Parameter;
 use crate::warehouse_metadata::_helpers::ingestion::begin_ingestion;
-use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseWatermarkRead};
+use crate::warehouse_metadata::models::WarehouseWatermarkRead;
 
 pub async fn read_watermark(
     store: &crate::store::models::ControlStore,
@@ -16,10 +16,7 @@ pub async fn read_watermark(
 ) -> Result<Option<DateTime<Utc>>, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
-    let table = match request.kind {
-        WarehouseHistoryKind::Fingerprints => "sqb_warehouse_fingerprints",
-        WarehouseHistoryKind::SourceFreshness => "sqb_warehouse_freshness",
-    };
+    let table = request.kind.mirror_table();
     let mut parameters = vec![
         Parameter::Id(scope.0),
         Parameter::Text(scope.1.into()),

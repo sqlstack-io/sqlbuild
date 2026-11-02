@@ -10,7 +10,7 @@ use sqlbuild_orchestration::platform::models::{
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseWatermarkRead,
+    WarehouseHistoryPage, WarehouseWatermarkRead,
 };
 use tokio::time::Instant;
 
@@ -50,12 +50,8 @@ pub(super) async fn sync_location_metadata(
                 let request = WarehouseWatermarkRead {
                     session_id: poll.session_id,
                     generation: state.generation,
-                    location: state.locations[state.index / 2].clone(),
-                    kind: if state.index.is_multiple_of(2) {
-                        WarehouseHistoryKind::Fingerprints
-                    } else {
-                        WarehouseHistoryKind::SourceFreshness
-                    },
+                    location: state.location().clone(),
+                    kind: state.kind(),
                 };
                 let watermark = tokio::select! {
                     result = &mut stopped => { result?; return Ok(None); },
@@ -105,7 +101,7 @@ pub(super) async fn sync_location_metadata(
     };
     let response = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        response = deliver_metadata_page((client, &options.target), &pending.body, state.index.is_multiple_of(2)) => response,
+        response = deliver_metadata_page((client, &options.target), &pending.body, state.kind()) => response,
     };
     let response = match response {
         Ok(response) => response,

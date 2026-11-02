@@ -6,7 +6,9 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_orchestration::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
-use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryRead;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryKind, WarehouseHistoryRead,
+};
 
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
@@ -46,8 +48,9 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                     }
                 };
                 serde_json::to_string(&record)
-            } else if request.get("source_freshness").is_some()
-                || request.get("fingerprints").is_some()
+            } else if WarehouseHistoryKind::ALL
+                .iter()
+                .any(|kind| request.get(kind.as_str()).is_some())
             {
                 let metadata: WarehouseHistoryRead =
                     serde_json::from_value(request).map_err(|_| {

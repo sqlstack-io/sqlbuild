@@ -12,6 +12,8 @@ pub struct TableColumn {
 #[derive(Clone, Copy, Debug)]
 pub struct HistoryRead<'a> {
     pub columns: &'a [&'a str],
+    /// Stable identity and timestamp keys omit numeric or evidence payloads from ordering.
+    pub key_columns: Option<&'a [&'a str]>,
     pub timestamp_column: &'a str,
     pub observed_since: Option<&'a str>,
     pub adapter: &'a str,

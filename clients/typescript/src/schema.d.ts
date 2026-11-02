@@ -275,6 +275,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/audit-results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_audit_results"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/fingerprints": {
         parameters: {
             query?: never;
@@ -590,6 +606,14 @@ export interface components {
         AdministratorChange: "grant" | "revoke" | "disable" | "enable";
         ApiErrorBody: {
             error: string;
+        };
+        AuditResultsBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseAuditRecord"][];
+            /** Format: uuid */
+            session_id: string;
         };
         AuthenticationDenial: {
             /** Format: uuid */
@@ -1316,6 +1340,57 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
+        /** @description Preserve the warehouse representation, including text-encoded measurements and booleans. */
+        WarehouseAuditRecord: {
+            attached_column_name?: string | null;
+            attached_target_kind?: string | null;
+            attached_target_name?: string | null;
+            attachment_kind: string;
+            audit_definition_name: string;
+            audit_description?: string | null;
+            audit_meta_json?: string | null;
+            audit_name: string;
+            binding_key: string;
+            definition_fingerprint: string;
+            evaluation_mode: string;
+            /** Format: int64 */
+            evidence_count?: number | null;
+            evidence_error?: string | null;
+            evidence_json?: string | null;
+            evidence_sql?: string | null;
+            evidence_truncated?: string | null;
+            executed_sql?: string | null;
+            execution_error?: string | null;
+            execution_fingerprint: string;
+            invocation_id: string;
+            measured_value?: string | null;
+            measurement_sql?: string | null;
+            metadata_json?: string | null;
+            /** Format: int64 */
+            minimum_samples?: number | null;
+            /** Format: date-time */
+            occurred_at: string;
+            outcome: string;
+            result_id: string;
+            reused: string;
+            run_id: string;
+            run_scope_phase: string;
+            /** Format: int64 */
+            sample_count?: number | null;
+            sample_unit?: string | null;
+            /** Format: int64 */
+            schema_version: number;
+            severity: string;
+            sql_digest?: string | null;
+            state_database?: string | null;
+            state_schema: string;
+            target_database?: string | null;
+            target_name?: string | null;
+            target_schema?: string | null;
+            thresholds_json?: string | null;
+            /** Format: int64 */
+            violation_count?: number | null;
+        };
         /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
         WarehouseFingerprintRecord: {
             definition: string;
@@ -1356,7 +1431,7 @@ export interface components {
          * @description Only immutable history tables support a timestamp watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results";
         WarehouseReconciliationCursor: {
             /** Format: uuid */
             event_id: string;
@@ -2059,6 +2134,54 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["ChangeNotice"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_audit_results: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditResultsBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
             /** @description Invalid credential */

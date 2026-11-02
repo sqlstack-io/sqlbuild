@@ -13,6 +13,7 @@ import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, closing, contextmanager, nullcontext, suppress
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
@@ -27,6 +28,8 @@ import pytest
 
 from sqlbuild._native import Fingerprint, write_fingerprint
 from sqlbuild.adapter.discovery.main.resolve_adapter import resolve_adapter
+from sqlbuild.executor.audit_results.main._write import write_audit_result_records
+from sqlbuild.executor.audit_results.models import AuditResultRecord
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -38,6 +41,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.docker
     docker_deployment,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+from tests.integration.src.sqlbuild.executor.audit_results.main.helpers import build_record
 
 
 class RejectedPublicationOutput(StringIO):
@@ -107,6 +111,34 @@ def append_legacy_history(
             _ = adapter.execute(connection=connection, sql=statement.format(**row))
 
 
+def append_audit_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Use the public warehouse writer, including duplicate IDs and an external CLI run."""
+    record: AuditResultRecord = replace(
+        build_record(),
+        run_id="",
+        evidence_json=fixture["record"]["evidence_json"],
+        evidence_count=1,
+        evidence_truncated=True,
+        audit_meta_json=fixture["record"]["audit_meta_json"],
+    )
+    records: list[AuditResultRecord] = [
+        replace(record, result_id=f"result-{index:03}") for index in range(fixture["source_rows"])
+    ]
+    records.extend([records[0]] * fixture["duplicate_rows"])
+    records.append(replace(records[0], occurred_at=datetime.fromisoformat(fixture["later_time"])))
+    write_audit_result_records(
+        connection=connection,
+        execute=adapter.execute,
+        database=None,
+        schema="main",
+        records=records,
+        render_qualified_name=adapter.render_qualified_name,
+        render_framework_type=adapter.render_framework_type,
+        render_create_table_sql=adapter.render_create_audit_result_table_sql,
+        render_create_index_sqls=adapter.render_create_audit_result_index_sqls,
+    )
+
+
 def warehouse_history_page(
     project: Path,
     table: str,
@@ -145,6 +177,23 @@ def warehouse_history_page(
     )
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)
+
+
+def warehouse_history_pages(
+    project: Path, table: str, observed_since: str | None = None
+) -> list[dict[str, Any]]:
+    """Follow bounded source pages, including empty filtered pages with a continuation."""
+    pages: list[dict[str, Any]] = []
+    after: list[str | None] | None = None
+    more: bool = True
+    while more:
+        page: dict[str, Any] = warehouse_history_page(project, table, after, observed_since)
+        assert page is not None
+        pages.append(page)
+        after = page["next_after"]
+        more = after is not None
+        assert len(pages) <= 4, "history cursor must advance past duplicate physical rows"
+    return pages
 
 
 def sync_warehouse_history(api: SnapshotApi, table: str, batch: dict[str, Any]) -> dict[str, Any]:
@@ -218,7 +267,12 @@ def wait_for_warehouse_sync_health(
                 datetime.fromisoformat(report["received_at"]) > after,
             )
             by_outcome.setdefault(key, []).append(report)
-        reports = by_outcome.get(("warehouse_sync", expected["failure"], True), [])
+        reports = list(
+            filter(
+                lambda report: report["report"]["health"]["table"] in expected["tables"],
+                by_outcome.get(("warehouse_sync", expected["failure"], True), []),
+            )
+        )
         assert time.monotonic() < deadline, (reports, log.read_text())
         time.sleep(0.05)
     for report in reports:

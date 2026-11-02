@@ -345,13 +345,9 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
             "Reading warehouse history for automatic synchronization...\n",
         )]));
     }
-    let kind = if state.index.is_multiple_of(2) {
-        "fingerprints"
-    } else {
-        "source_freshness"
-    };
+    let kind = state.kind().as_str();
     serde_json::to_vec(&json!({(kind): {
-        "location":state.locations[state.index / 2],"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
+        "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
     }})).map_err(|error| ControlError::Invalid(error.to_string()))
 }
 
@@ -361,7 +357,7 @@ pub(crate) fn freeze_history_page(
     page: WarehouseHistoryPage,
     poll: &LocationWorkPoll,
 ) -> Result<LocationMetadataSync, ControlError> {
-    let location = &state.locations[state.index / 2];
+    let location = state.location();
     let mut body = json!({"session_id":poll.session_id,"generation":state.generation,"records":page.records,
         "reconciliation":{"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
             "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
@@ -398,24 +394,36 @@ pub(crate) fn freeze_history_page(
 pub(crate) async fn deliver_metadata_page(
     (client, target): (&LocationWorkClient, &str),
     body: &serde_json::Value,
-    fingerprints: bool,
+    kind: WarehouseHistoryKind,
 ) -> Result<WarehouseSyncResponse, ClientError> {
-    if fingerprints {
-        client
-            .sync_fingerprints(
-                target,
-                &serde_json::from_value(body.clone())
-                    .map_err(|_| ClientError::Configuration("invalid fingerprint batch"))?,
-            )
-            .await
-    } else {
-        client
-            .sync_source_freshness(
-                target,
-                &serde_json::from_value(body.clone())
-                    .map_err(|_| ClientError::Configuration("invalid freshness batch"))?,
-            )
-            .await
+    match kind {
+        WarehouseHistoryKind::Fingerprints => {
+            client
+                .sync_fingerprints(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid fingerprint batch"))?,
+                )
+                .await
+        }
+        WarehouseHistoryKind::SourceFreshness => {
+            client
+                .sync_source_freshness(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid freshness batch"))?,
+                )
+                .await
+        }
+        WarehouseHistoryKind::AuditResults => {
+            client
+                .sync_audit_results(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid audit results batch"))?,
+                )
+                .await
+        }
     }
 }
 
@@ -444,7 +452,7 @@ pub(crate) fn acknowledge_metadata_page(
             state.observed_since = None;
             state.watermark_loaded = false;
             state.limit = MAX_HISTORY_RECORDS;
-            if state.index == state.locations.len() * 2 {
+            if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
                 state.index = 0;
                 if state.reconcile {
                     state.reconcile_at =
@@ -473,12 +481,8 @@ pub(crate) async fn metadata_health(
         target: poll.target.clone(),
         health: LocationHealth::WarehouseSync {
             generation: state.generation,
-            location: state.locations[state.index / 2].clone(),
-            table: if state.index.is_multiple_of(2) {
-                WarehouseHistoryKind::Fingerprints
-            } else {
-                WarehouseHistoryKind::SourceFreshness
-            },
+            location: state.location().clone(),
+            table: state.kind(),
             failure,
             records_sent: state
                 .pending

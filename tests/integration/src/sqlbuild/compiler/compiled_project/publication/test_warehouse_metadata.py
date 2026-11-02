@@ -42,6 +42,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     WarehouseHistoryTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
+    append_audit_history,
     append_contended_fingerprints,
     append_legacy_history,
     append_retried_fingerprints,
@@ -52,8 +53,160 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     wait_for_generation,
     wait_for_warehouse_sync_health,
     warehouse_history_page,
+    warehouse_history_pages,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CatalogConnectionTestCase("DuckDB audit history", "duckdb", "database", ""),
+        CatalogConnectionTestCase("SQLite audit history", "sqlite", "path", ""),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_external_audit_results_when_reading_legacy_pages_then_duplicates_text_and_timestamps_survive(
+    test_case: CatalogConnectionTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/audit_result_history.json").read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    append_audit_history(adapter, connection, fixture)
+    for column in ("audit_description", "audit_meta_json"):
+        _ = adapter.execute(
+            connection=connection, sql=f"ALTER TABLE _sqlbuild_audit_results DROP COLUMN {column}"
+        )
+    adapter.close(connection)
+    pages: list[dict[str, Any]] = warehouse_history_pages(project, "audit_results")
+    rows: list[dict[str, Any]] = []
+    for page in pages:
+        rows.extend(page["records"])
+    assert [len(page["records"]) for page in pages] == [100, 100, 4]
+    assert {row["result_id"] for row in rows} == {
+        f"result-{index:03}" for index in range(fixture["source_rows"])
+    }
+    expected: dict[str, Any] = fixture["record"] | {
+        "audit_description": None,
+        "audit_meta_json": None,
+    }
+    assert rows[0] == expected
+    assert rows[0]["run_id"] == test_case.expected_run_id
+    assert rows[100] == expected | {"occurred_at": fixture["later_time"]}
+    assert rows[-1] == expected | {"result_id": fixture["retained_result"]}
+    recent_pages: list[dict[str, Any]] = warehouse_history_pages(
+        project, "audit_results", fixture["later_time"]
+    )
+    recent_rows: list[dict[str, Any]] = []
+    for page in recent_pages:
+        recent_rows.extend(page["records"])
+    assert recent_rows == [expected | {"occurred_at": fixture["later_time"]}]
+    connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
+    columns: set[str] = {
+        column.name
+        for column in adapter.get_columns(
+            connection=connection, database=None, schema="main", name="_sqlbuild_audit_results"
+        )
+    }
+    assert not columns & {"audit_description", "audit_meta_json"}, (
+        "the reader never upgrades source storage"
+    )
+    assert adapter.query(
+        connection=connection, sql="SELECT COUNT(*) FROM _sqlbuild_audit_results", limit=1
+    ).rows == ((fixture["source_rows"] + fixture["duplicate_rows"] + 1,),)
+    adapter.close(connection)
+    assert not (project / ".sqlbuild/control.sqlite3").exists()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CatalogConnectionTestCase("DuckDB automatic audit mirror", "duckdb", "database", ""),
+        CatalogConnectionTestCase("SQLite automatic audit mirror", "sqlite", "path", ""),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_served_location_when_audit_history_is_rebuilt_and_retained_then_only_complete_scans_delete(
+    test_case: CatalogConnectionTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/audit_result_history.json").read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    append_audit_history(adapter, connection, fixture)
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    write_files(project_dir=project, files={"models/orders.sql": fixture["model"]})
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ
+            | {"SQLBUILD_LOCATION_TOKEN": api.bearer, "SQLBUILD_METADATA_RECONCILE_SECONDS": "30"},
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+            identities: dict[str, str] = {}
+            all_ids: set[str] = {f"result-{index:03}" for index in range(fixture["source_rows"])}
+            for expected_ids, mirror_sql, warehouse_sql in (
+                (all_ids, "DELETE FROM sqb_warehouse_audit_results", "SELECT 1"),
+                (
+                    all_ids,
+                    "SELECT 1",
+                    "DELETE FROM _sqlbuild_audit_results "
+                    f"WHERE result_id <> '{fixture['retained_result']}'",
+                ),
+                ({fixture["retained_result"]}, "SELECT 1", "SELECT 1"),
+            ):
+                deadline: float = time.monotonic() + 45
+                mirrored: list[tuple[str, str]] = []
+                while len(mirrored) != len(expected_ids):
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    with closing(sqlite3.connect(control)) as database:
+                        mirrored = database.execute(
+                            "SELECT event_id,record_json FROM sqb_warehouse_audit_results ORDER BY event_id"
+                        ).fetchall()
+                    time.sleep(0.05)
+                assert {json.loads(row)["result_id"] for _, row in mirrored} == expected_ids
+                for event_id, text in mirrored:
+                    record: dict[str, Any] = json.loads(text)
+                    assert record == fixture["record"] | {"result_id": record["result_id"]}
+                    assert record["run_id"] == test_case.expected_run_id
+                    assert identities.setdefault(record["result_id"], event_id) == event_id
+                with closing(sqlite3.connect(control)) as database:
+                    _ = database.execute(mirror_sql)
+                    database.commit()
+                connection = adapter.connect(
+                    {test_case.connection_key: str(project / "warehouse.db")}
+                )
+                _ = adapter.execute(connection=connection, sql=warehouse_sql)
+                adapter.close(connection)
 
 
 @pytest.mark.parametrize(
