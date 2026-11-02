@@ -98,6 +98,15 @@ def open_legacy_warehouse(project: Path, adapter_name: str, connection_key: str)
     return adapter, connection
 
 
+def append_legacy_history(
+    adapter: Any, connection: Any, rows: list[dict[str, str]], statements: list[str]
+) -> None:
+    """Append synthetic arrivals with independent observation times to real history tables."""
+    for row in rows:
+        for statement in statements:
+            _ = adapter.execute(connection=connection, sql=statement.format(**row))
+
+
 def warehouse_history_page(
     project: Path,
     table: str,

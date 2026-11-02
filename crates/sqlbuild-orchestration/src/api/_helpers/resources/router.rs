@@ -40,6 +40,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             post(warehouse_metadata::report_fingerprints),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/watermark",
+            post(warehouse_metadata::watermark),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/snapshots",
             get(snapshots::current).post(snapshots::publish),
         )

@@ -13,7 +13,7 @@ use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::reconstruct_warehouse_predecessor;
-use crate::warehouse_metadata::models::FingerprintBatch;
+use crate::warehouse_metadata::models::{FingerprintBatch, WarehouseWatermarkRead};
 
 pub(crate) async fn fingerprint_history(
     store: &ControlStore,
@@ -345,6 +345,139 @@ pub(crate) async fn fingerprint_history(
         mirrored_fingerprints(store).await,
         after,
         "warm migration preserves imported history"
+    );
+    for (kind, database, schema, target, reader, expected) in [
+        (
+            "fingerprints",
+            None,
+            "main",
+            "development",
+            session_id,
+            Some("2026-01-01T10:00:00.000001Z"),
+        ),
+        (
+            "fingerprints",
+            Some("analytics"),
+            "main",
+            "development",
+            session_id,
+            Some("2026-01-01T10:00:00Z"),
+        ),
+        (
+            "fingerprints",
+            None,
+            "reporting",
+            "development",
+            session_id,
+            Some("2026-01-01T10:00:00Z"),
+        ),
+        (
+            "fingerprints",
+            None,
+            "main",
+            "preview",
+            preview_session_id,
+            Some("2026-01-01T10:00:00Z"),
+        ),
+        (
+            "source_freshness",
+            None,
+            "main",
+            "development",
+            session_id,
+            Some("2026-01-01T11:00:00Z"),
+        ),
+        (
+            "source_freshness",
+            Some("analytics"),
+            "main",
+            "development",
+            session_id,
+            None,
+        ),
+        (
+            "fingerprints",
+            None,
+            "missing",
+            "development",
+            session_id,
+            None,
+        ),
+    ] {
+        let request: WarehouseWatermarkRead = serde_json::from_value(json!({
+            "kind": kind, "session_id": reader, "generation": 1,
+            "location": {"database": database, "schema": schema},
+        }))
+        .expect("watermark request");
+        assert_eq!(
+            serde_json::to_value(
+                outbound
+                    .metadata_watermark(target, &request)
+                    .await
+                    .expect("durable scoped watermark")
+            )
+            .expect("watermark"),
+            json!(expected)
+        );
+    }
+    let watermark_url = freshness_url.replace("source-freshness", "watermark");
+    let request = json!({"kind": "fingerprints", "session_id":session_id,"generation":1,
+        "location":{"database":null,"schema":"main"}});
+    for (endpoint, mut body, status, field, value) in [
+        (
+            watermark_url.clone(),
+            request.clone(),
+            StatusCode::CONFLICT,
+            "generation",
+            json!(2),
+        ),
+        (
+            watermark_url.clone(),
+            request.clone(),
+            StatusCode::BAD_REQUEST,
+            "session_id",
+            json!(preview_session_id),
+        ),
+        (
+            watermark_url.clone(),
+            request.clone(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "kind",
+            json!("arbitrary_table"),
+        ),
+        (
+            watermark_url.replace(
+                &outbound.location_id.to_string(),
+                &Uuid::now_v7().to_string(),
+            ),
+            request.clone(),
+            StatusCode::FORBIDDEN,
+            "generation",
+            json!(1),
+        ),
+    ] {
+        body[field] = value;
+        assert_eq!(
+            client
+                .post(endpoint)
+                .bearer_auth(bearer)
+                .json(&body)
+                .send()
+                .await
+                .expect("fenced watermark")
+                .status(),
+            status
+        );
+    }
+    assert_eq!(
+        client
+            .post(watermark_url)
+            .json(&request)
+            .send()
+            .await
+            .expect("anonymous watermark")
+            .status(),
+        StatusCode::UNAUTHORIZED
     );
 }
 

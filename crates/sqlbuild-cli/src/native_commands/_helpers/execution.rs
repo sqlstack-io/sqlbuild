@@ -60,8 +60,8 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS, UNCAUGHT_EXCEPTION_STATUS,
-    UNKNOWN_COMMAND,
+    COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS, METADATA_RECONCILE_SECONDS,
+    UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -317,6 +317,7 @@ pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
 
 pub(crate) fn metadata_sync(
     (locations, generation): (Vec<WarehouseStateLocation>, i64),
+    reconcile_seconds: u32,
 ) -> LocationMetadataSync {
     LocationMetadataSync {
         locations,
@@ -325,6 +326,11 @@ pub(crate) fn metadata_sync(
         scan_id: Uuid::now_v7(),
         page: 0,
         source_after: None,
+        observed_since: None,
+        watermark_loaded: false,
+        reconcile: true,
+        reconcile_at: Instant::now(),
+        reconcile_seconds,
         limit: MAX_HISTORY_RECORDS,
         pending: None,
         next_at: Instant::now(),
@@ -344,7 +350,7 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
         "source_freshness"
     };
     serde_json::to_vec(&json!({(kind): {
-        "location":state.locations[state.index / 2],"after":state.source_after,"observed_since":null,"limit":state.limit
+        "location":state.locations[state.index / 2],"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
     }})).map_err(|error| ControlError::Invalid(error.to_string()))
 }
 
@@ -359,6 +365,9 @@ pub(crate) fn freeze_history_page(
         "reconciliation":{"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
             "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
             "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }}});
+    if !state.reconcile {
+        body["reconciliation"] = serde_json::Value::Null;
+    }
     if serde_json::to_vec(&body)
         .map_err(|error| ControlError::Invalid(error.to_string()))?
         .len()
@@ -374,7 +383,9 @@ pub(crate) fn freeze_history_page(
             )]));
         }
     } else {
-        body["reconciliation"]["after"] = serde_json::Value::Null;
+        if state.reconcile {
+            body["reconciliation"]["after"] = serde_json::Value::Null;
+        }
         state.pending = Some(LocationMetadataPage {
             body,
             next_source_after: page.next_after,
@@ -429,9 +440,15 @@ pub(crate) fn acknowledge_metadata_page(
             state.index += 1;
             state.scan_id = Uuid::now_v7();
             state.page = 0;
+            state.observed_since = None;
+            state.watermark_loaded = false;
             state.limit = MAX_HISTORY_RECORDS;
             if state.index == state.locations.len() * 2 {
                 state.index = 0;
+                if state.reconcile {
+                    state.reconcile_at =
+                        Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
+                }
                 state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
                 drop(write_output(&[(
                     Stream::Stderr,
@@ -504,12 +521,24 @@ pub(crate) fn location_options(namespace: &Namespace) -> Result<LocationServe, C
     if target.trim().is_empty() {
         return Err(ControlError::Invalid("target must not be blank".into()));
     }
+    let metadata_reconcile_seconds = std::env::var("SQLBUILD_METADATA_RECONCILE_SECONDS")
+        .map_or(Ok(METADATA_RECONCILE_SECONDS), |value| {
+            value
+                .parse::<std::num::NonZeroU32>()
+                .map(std::num::NonZeroU32::get)
+        })
+        .map_err(|_| {
+            ControlError::Invalid(
+                "SQLBUILD_METADATA_RECONCILE_SECONDS must be a positive integer".into(),
+            )
+        })?;
     Ok(LocationServe {
         project_dir,
         server_url: text(namespace, "location_server_url").unwrap_or_default(),
         location_id,
         target,
         image_id: text(namespace, "location_image_id"),
+        metadata_reconcile_seconds,
     })
 }
 
