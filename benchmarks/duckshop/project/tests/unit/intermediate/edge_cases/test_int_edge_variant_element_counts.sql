@@ -16,6 +16,6 @@ WITH __ref__stg_edge_variant_values AS (
 
 __expected__int_edge_variant_element_counts AS (
   SELECT
-    NULL AS group_code,
-    NULL AS element_count
+    'V-1' AS group_code,
+    2 AS element_count
 )

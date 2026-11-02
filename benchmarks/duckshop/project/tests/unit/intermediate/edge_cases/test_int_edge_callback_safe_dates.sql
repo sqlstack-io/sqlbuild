@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_safe_dates AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS callback_json,
-    NULL AS business_date_again
+    'GC-01' AS callback_id,
+    '{"year":2026,"zone":"Europe/London"}' AS callback_json,
+    '2026-03-28'::DATE AS business_date_again
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '{"year":2026,"zone":"America/New_York"}' AS callback_json,
+    '2026-03-08'::DATE AS business_date_again
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '{"year":2026,"zone":"Asia/Kolkata"}' AS callback_json,
+    '2026-02-28'::DATE AS business_date_again
 )

@@ -12,7 +12,12 @@ WITH __source__edge__supplier_notes AS (
 
 __expected__stg_edge_supplier_notes AS (
   SELECT
-    NULL AS note_id,
-    NULL AS supplier_code,
-    NULL AS note_upper
+    'SN-1' AS note_id,
+    'SUP-PINTAIL' AS supplier_code,
+    'RESTOCK TEAL DECOYS' AS note_upper
+  UNION ALL
+  SELECT
+    'SN-2' AS note_id,
+    CAST(NULL AS VARCHAR) AS supplier_code,
+    CAST(NULL AS VARCHAR) AS note_upper
 )

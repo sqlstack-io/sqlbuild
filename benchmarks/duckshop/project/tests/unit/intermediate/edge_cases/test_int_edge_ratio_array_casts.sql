@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_array_casts AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_count
+    'AC-01' AS check_id,
+    1 AS ratio_count
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    1 AS ratio_count
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    1 AS ratio_count
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    1 AS ratio_count
 )

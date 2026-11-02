@@ -18,7 +18,22 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_group_pivots AS (
   SELECT
-    NULL AS check_id,
-    NULL AS first_group_amount,
-    NULL AS second_group_amount
+    'AC-01' AS check_id,
+    10.05::NUMBER(38,2) AS first_group_amount,
+    CAST(NULL AS NUMBER(38,2)) AS second_group_amount
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    -0.55::NUMBER(38,2) AS first_group_amount,
+    CAST(NULL AS NUMBER(38,2)) AS second_group_amount
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS NUMBER(38,2)) AS first_group_amount,
+    0.00::NUMBER(38,2) AS second_group_amount
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS NUMBER(38,2)) AS first_group_amount,
+    CAST(NULL AS NUMBER(38,2)) AS second_group_amount
 )

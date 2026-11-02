@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_sparse_arrays AS (
   SELECT
-    NULL AS check_id,
-    NULL AS pair_text
+    'AC-01' AS check_id,
+    '["101,7","G-1"]' AS pair_text
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '["2026-03-04","G-1"]' AS pair_text
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '["7","G-2"]' AS pair_text
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '[undefined,"G-2"]' AS pair_text
 )

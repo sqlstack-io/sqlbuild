@@ -18,6 +18,14 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_object_differences AS (
   SELECT
-    NULL AS check_id,
-    NULL AS check_json
+    'AC-02' AS check_id,
+    '{"r":2.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '{"r":3.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '{}' AS check_json
 )

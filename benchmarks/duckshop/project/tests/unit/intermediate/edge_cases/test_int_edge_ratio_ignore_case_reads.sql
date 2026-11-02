@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_ignore_case_reads AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_again
+    'AC-01' AS check_id,
+    '0.1'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '0.2'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '0.3'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS FLOAT) AS ratio_again
 )

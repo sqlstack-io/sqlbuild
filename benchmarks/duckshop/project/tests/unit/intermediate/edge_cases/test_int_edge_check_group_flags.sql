@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_group_flags AS (
   SELECT
-    NULL AS check_id,
-    NULL AS is_unpaid_group
+    'AC-01' AS check_id,
+    FALSE AS is_unpaid_group
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    FALSE AS is_unpaid_group
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    TRUE AS is_unpaid_group
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    TRUE AS is_unpaid_group
 )

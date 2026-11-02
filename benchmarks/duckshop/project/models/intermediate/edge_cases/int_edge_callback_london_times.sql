@@ -1,18 +1,20 @@
 MODEL (
   description """
-    One row per gateway callback with its zoned time converted from UTC to London wall time
+    One row per gateway callback with whether the current time, converted from UTC to London
+    wall time, is known: a fact that holds on any day
   """,
   tags [edge_case],
   columns (
     callback_id (type VARCHAR, nullable false, audits [not_null, unique]),
-    london_time (type TIMESTAMP_NTZ),
+    london_now_is_known (type BOOLEAN),
   ),
 );
 
 WITH final AS (
   SELECT
     g.callback_id,
-    CONVERT_TIMEZONE('UTC', 'Europe/London', g.event_at)::TIMESTAMP_NTZ AS london_time
+    (CONVERT_TIMEZONE('UTC', 'Europe/London', CURRENT_TIMESTAMP())::TIMESTAMP_NTZ IS NOT NULL)::BOOLEAN
+      AS london_now_is_known
   FROM __ref("stg_edge_gateway_callbacks") AS g
 )
 

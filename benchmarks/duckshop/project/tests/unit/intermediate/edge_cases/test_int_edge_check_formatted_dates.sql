@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_formatted_dates AS (
   SELECT
-    NULL AS check_id,
-    NULL AS key_date
+    'AC-01' AS check_id,
+    CAST(NULL AS DATE) AS key_date
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2026-03-04'::DATE AS key_date
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS DATE) AS key_date
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS DATE) AS key_date
 )

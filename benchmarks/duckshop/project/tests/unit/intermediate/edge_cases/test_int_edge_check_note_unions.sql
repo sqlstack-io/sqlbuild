@@ -18,6 +18,34 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_note_unions AS (
   SELECT
-    NULL AS note_row_id,
-    NULL AS note
+    'AC-01~left' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-01~right' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-02~left' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-02~right' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-03~left' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-03~right' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-04~left' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
+  UNION ALL
+  SELECT
+    'AC-04~right' AS note_row_id,
+    CAST(NULL AS VARCHAR) AS note
 )

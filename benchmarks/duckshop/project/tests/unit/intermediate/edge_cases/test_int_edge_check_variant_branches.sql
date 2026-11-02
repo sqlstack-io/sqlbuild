@@ -19,8 +19,26 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_variant_branches AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_branch,
-    NULL AS dates_differ,
-    NULL AS largest_ratio_text
+    'AC-01' AS check_id,
+    1 AS ratio_branch,
+    TRUE AS dates_differ,
+    '0.2' AS largest_ratio_text
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    2 AS ratio_branch,
+    TRUE AS dates_differ,
+    '0.2' AS largest_ratio_text
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    2 AS ratio_branch,
+    TRUE AS dates_differ,
+    '0.3' AS largest_ratio_text
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    2 AS ratio_branch,
+    TRUE AS dates_differ,
+    '0.3' AS largest_ratio_text
 )

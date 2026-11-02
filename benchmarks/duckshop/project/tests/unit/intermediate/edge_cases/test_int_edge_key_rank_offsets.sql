@@ -18,7 +18,22 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_key_rank_offsets AS (
   SELECT
-    NULL AS check_id,
-    NULL AS candidate_rank,
-    NULL AS wide_key_number
+    'AC-01' AS check_id,
+    8 AS candidate_rank,
+    7 AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    13 AS candidate_rank,
+    12 AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    1000 AS candidate_rank,
+    CAST(NULL AS NUMBER(38,0)) AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    41 AS candidate_rank,
+    40 AS wide_key_number
 )

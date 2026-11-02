@@ -16,12 +16,22 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_tag_list_reads AS (
   SELECT
-    NULL AS basket_id,
-    NULL AS has_colour,
-    NULL AS distinct_tag_count,
-    NULL AS red_position,
-    NULL AS non_red_count,
-    NULL AS upper_tags,
-    NULL AS basket_time,
-    NULL AS pair_size
+    'B-1' AS basket_id,
+    TRUE AS has_colour,
+    2 AS distinct_tag_count,
+    0 AS red_position,
+    1 AS non_red_count,
+    'RED,BLUE,RED' AS upper_tags,
+    CAST(NULL AS TIME(9)) AS basket_time,
+    2 AS pair_size
+  UNION ALL
+  SELECT
+    'B-2' AS basket_id,
+    FALSE AS has_colour,
+    0 AS distinct_tag_count,
+    CAST(NULL AS NUMBER(38,0)) AS red_position,
+    0 AS non_red_count,
+    '' AS upper_tags,
+    CAST(NULL AS TIME(9)) AS basket_time,
+    2 AS pair_size
 )

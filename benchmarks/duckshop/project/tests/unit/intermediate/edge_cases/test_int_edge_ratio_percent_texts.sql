@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_percent_texts AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_percent
+    'AC-01' AS check_id,
+    '10.0%' AS ratio_percent
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '20.0%' AS ratio_percent
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '30.0%' AS ratio_percent
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS ratio_percent
 )

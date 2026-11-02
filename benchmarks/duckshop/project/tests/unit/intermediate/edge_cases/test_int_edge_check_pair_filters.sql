@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_pair_filters AS (
   SELECT
-    NULL AS check_id,
-    NULL AS has_seven
+    'AC-01' AS check_id,
+    TRUE AS has_seven
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    TRUE AS has_seven
 )

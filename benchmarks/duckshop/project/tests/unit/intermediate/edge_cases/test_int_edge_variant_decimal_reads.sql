@@ -16,6 +16,6 @@ WITH __ref__stg_edge_variant_values AS (
 
 __expected__int_edge_variant_decimal_reads AS (
   SELECT
-    NULL AS value_id,
-    NULL AS decimal_value
+    'VV-02' AS value_id,
+    1.5000::NUMBER(10,4) AS decimal_value
 )

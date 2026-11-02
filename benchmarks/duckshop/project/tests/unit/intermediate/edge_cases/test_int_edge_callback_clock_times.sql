@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_clock_times AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS text_date,
-    NULL AS text_time
+    'GC-01' AS callback_id,
+    '2026-03-28'::DATE AS text_date,
+    '23:30:00'::TIME(9) AS text_time
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08'::DATE AS text_date,
+    '01:15:00'::TIME(9) AS text_time
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '2026-02-28'::DATE AS text_date,
+    '00:00:00'::TIME(9) AS text_time
 )

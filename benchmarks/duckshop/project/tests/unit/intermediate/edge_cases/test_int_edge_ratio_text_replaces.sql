@@ -18,7 +18,22 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_text_replaces AS (
   SELECT
-    NULL AS check_id,
-    NULL AS key_time,
-    NULL AS ratio_text
+    'AC-01' AS check_id,
+    CAST(NULL AS TIMESTAMP_NTZ(9)) AS key_time,
+    '0,1' AS ratio_text
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2026-03-04 00:00:00'::TIMESTAMP_NTZ(9) AS key_time,
+    '0,2' AS ratio_text
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '1970-01-01 00:00:07'::TIMESTAMP_NTZ(9) AS key_time,
+    '0,3' AS ratio_text
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS TIMESTAMP_NTZ(9)) AS key_time,
+    CAST(NULL AS VARCHAR) AS ratio_text
 )

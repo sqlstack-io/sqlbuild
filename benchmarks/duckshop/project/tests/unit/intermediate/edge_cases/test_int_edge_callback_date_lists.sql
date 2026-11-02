@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_date_lists AS (
   SELECT
-    NULL AS merchant_zone,
-    NULL AS date_count
+    'America/New_York' AS merchant_zone,
+    1 AS date_count
+  UNION ALL
+  SELECT
+    'Asia/Kolkata' AS merchant_zone,
+    1 AS date_count
+  UNION ALL
+  SELECT
+    'Europe/London' AS merchant_zone,
+    1 AS date_count
 )

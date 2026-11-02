@@ -14,6 +14,10 @@ WITH __ref__stg_edge_ledger_entries AS (
 
 __expected__int_edge_ledger_quantity_steps AS (
   SELECT
-    NULL AS order_ref,
-    NULL AS quantity_less_one
+    'DS-O-1' AS order_ref,
+    2.500000::NUMBER(38,6) AS quantity_less_one
+  UNION ALL
+  SELECT
+    'DS-O-2' AS order_ref,
+    CAST(NULL AS NUMBER(38,6)) AS quantity_less_one
 )

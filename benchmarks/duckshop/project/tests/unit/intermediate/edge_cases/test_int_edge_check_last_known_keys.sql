@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_last_known_keys AS (
   SELECT
-    NULL AS check_id,
-    NULL AS last_listed_key
+    'AC-01' AS check_id,
+    '101,7' AS last_listed_key
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '101,7' AS last_listed_key
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS VARCHAR) AS last_listed_key
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS last_listed_key
 )

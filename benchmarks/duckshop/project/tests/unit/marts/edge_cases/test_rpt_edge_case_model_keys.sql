@@ -639,7 +639,457 @@ __ref__int_edge_quantity_checks AS (
 
 __expected__rpt_edge_case_model_keys AS (
   SELECT
-    NULL AS model_key_id,
-    NULL AS model_name,
-    NULL AS model_key
+    'int_edge_amount_bit_reads~amount_bit_r-1' AS model_key_id,
+    'int_edge_amount_bit_reads' AS model_name,
+    'amount_bit_r-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_amount_percent_texts~amount_perce-1' AS model_key_id,
+    'int_edge_amount_percent_texts' AS model_name,
+    'amount_perce-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_distinct_tags~basket_disti-1' AS model_key_id,
+    'int_edge_basket_distinct_tags' AS model_name,
+    'basket_disti-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_line_lookups~basket_line_-1' AS model_key_id,
+    'int_edge_basket_line_lookups' AS model_name,
+    'basket_line_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_running_peaks~basket_runni-1' AS model_key_id,
+    'int_edge_basket_running_peaks' AS model_name,
+    'basket_runni-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_sku_part_filters~basket_sku_p-1' AS model_key_id,
+    'int_edge_basket_sku_part_filters' AS model_name,
+    'basket_sku_p-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_tag_list_reads~basket_tag_l-1' AS model_key_id,
+    'int_edge_basket_tag_list_reads' AS model_name,
+    'basket_tag_l-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_basket_xml_reads~basket_xml_r-1' AS model_key_id,
+    'int_edge_basket_xml_reads' AS model_name,
+    'basket_xml_r-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_clock_times~callback_clo-1' AS model_key_id,
+    'int_edge_callback_clock_times' AS model_name,
+    'callback_clo-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_date_lists~callback_dat-1' AS model_key_id,
+    'int_edge_callback_date_lists' AS model_name,
+    'callback_dat-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_day_documents~callback_day-1' AS model_key_id,
+    'int_edge_callback_day_documents' AS model_name,
+    'callback_day-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_day_starts~callback_day-1' AS model_key_id,
+    'int_edge_callback_day_starts' AS model_name,
+    'callback_day-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_epoch_parts~callback_epo-1' AS model_key_id,
+    'int_edge_callback_epoch_parts' AS model_name,
+    'callback_epo-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_epoch_reads~callback_epo-1' AS model_key_id,
+    'int_edge_callback_epoch_reads' AS model_name,
+    'callback_epo-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_last_day~callback_las-1' AS model_key_id,
+    'int_edge_callback_last_day' AS model_name,
+    'callback_las-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_latest_dates~callback_lat-1' AS model_key_id,
+    'int_edge_callback_latest_dates' AS model_name,
+    'callback_lat-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_london_times~callback_lon-1' AS model_key_id,
+    'int_edge_callback_london_times' AS model_name,
+    'callback_lon-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_recent_offsets~callback_rec-1' AS model_key_id,
+    'int_edge_callback_recent_offsets' AS model_name,
+    'callback_rec-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_row_numbers~callback_row-1' AS model_key_id,
+    'int_edge_callback_row_numbers' AS model_name,
+    'callback_row-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_safe_dates~callback_saf-1' AS model_key_id,
+    'int_edge_callback_safe_dates' AS model_name,
+    'callback_saf-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_start_fallbacks~callback_sta-1' AS model_key_id,
+    'int_edge_callback_start_fallbacks' AS model_name,
+    'callback_sta-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_text_dates~callback_tex-1' AS model_key_id,
+    'int_edge_callback_text_dates' AS model_name,
+    'callback_tex-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_zone_words~callback_zon-1' AS model_key_id,
+    'int_edge_callback_zone_words' AS model_name,
+    'callback_zon-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_callback_zoned_dates~callback_zon-1' AS model_key_id,
+    'int_edge_callback_zoned_dates' AS model_name,
+    'callback_zon-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_amount_spreads~check_amount-1' AS model_key_id,
+    'int_edge_check_amount_spreads' AS model_name,
+    'check_amount-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_any_amounts~check_any_am-1' AS model_key_id,
+    'int_edge_check_any_amounts' AS model_name,
+    'check_any_am-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_bracket_strips~check_bracke-1' AS model_key_id,
+    'int_edge_check_bracket_strips' AS model_name,
+    'check_bracke-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_complete_pairs~check_comple-1' AS model_key_id,
+    'int_edge_check_complete_pairs' AS model_name,
+    'check_comple-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_decoded_keys~check_decode-1' AS model_key_id,
+    'int_edge_check_decoded_keys' AS model_name,
+    'check_decode-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_distinct_tuples~check_distin-1' AS model_key_id,
+    'int_edge_check_distinct_tuples' AS model_name,
+    'check_distin-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_formatted_dates~check_format-1' AS model_key_id,
+    'int_edge_check_formatted_dates' AS model_name,
+    'check_format-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_generated_rows~check_genera-1' AS model_key_id,
+    'int_edge_check_generated_rows' AS model_name,
+    'check_genera-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_group_flags~check_group_-1' AS model_key_id,
+    'int_edge_check_group_flags' AS model_name,
+    'check_group_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_group_key_lists~check_group_-1' AS model_key_id,
+    'int_edge_check_group_key_lists' AS model_name,
+    'check_group_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_group_pivots~check_group_-1' AS model_key_id,
+    'int_edge_check_group_pivots' AS model_name,
+    'check_group_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_key_list_edits~check_key_li-1' AS model_key_id,
+    'int_edge_check_key_list_edits' AS model_name,
+    'check_key_li-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_key_parts~check_key_pa-1' AS model_key_id,
+    'int_edge_check_key_parts' AS model_name,
+    'check_key_pa-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_key_rewrites~check_key_re-1' AS model_key_id,
+    'int_edge_check_key_rewrites' AS model_name,
+    'check_key_re-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_label_lookups~check_label_-1' AS model_key_id,
+    'int_edge_check_label_lookups' AS model_name,
+    'check_label_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_last_known_keys~check_last_k-1' AS model_key_id,
+    'int_edge_check_last_known_keys' AS model_name,
+    'check_last_k-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_local_times~check_local_-1' AS model_key_id,
+    'int_edge_check_local_times' AS model_name,
+    'check_local_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_minute_times~check_minute-1' AS model_key_id,
+    'int_edge_check_minute_times' AS model_name,
+    'check_minute-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_month_starts~check_month_-1' AS model_key_id,
+    'int_edge_check_month_starts' AS model_name,
+    'check_month_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_note_unions~check_note_u-1' AS model_key_id,
+    'int_edge_check_note_unions' AS model_name,
+    'check_note_u-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_number_arrays~check_number-1' AS model_key_id,
+    'int_edge_check_number_arrays' AS model_name,
+    'check_number-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_number_labels~check_number-1' AS model_key_id,
+    'int_edge_check_number_labels' AS model_name,
+    'check_number-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_pair_filters~check_pair_f-1' AS model_key_id,
+    'int_edge_check_pair_filters' AS model_name,
+    'check_pair_f-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_pattern_matches~check_patter-1' AS model_key_id,
+    'int_edge_check_pattern_matches' AS model_name,
+    'check_patter-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_reduced_keys~check_reduce-1' AS model_key_id,
+    'int_edge_check_reduced_keys' AS model_name,
+    'check_reduce-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_sparse_arrays~check_sparse-1' AS model_key_id,
+    'int_edge_check_sparse_arrays' AS model_name,
+    'check_sparse-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_text_arrays~check_text_a-1' AS model_key_id,
+    'int_edge_check_text_arrays' AS model_name,
+    'check_text_a-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_unnamed_labels~check_unname-1' AS model_key_id,
+    'int_edge_check_unnamed_labels' AS model_name,
+    'check_unname-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_variant_branches~check_varian-1' AS model_key_id,
+    'int_edge_check_variant_branches' AS model_name,
+    'check_varian-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_wide_sums~check_wide_s-1' AS model_key_id,
+    'int_edge_check_wide_sums' AS model_name,
+    'check_wide_s-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_xml_checks~check_xml_ch-1' AS model_key_id,
+    'int_edge_check_xml_checks' AS model_name,
+    'check_xml_ch-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_check_zoned_literals~check_zoned_-1' AS model_key_id,
+    'int_edge_check_zoned_literals' AS model_name,
+    'check_zoned_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_clock_text_reads~clock_text_r-1' AS model_key_id,
+    'int_edge_clock_text_reads' AS model_name,
+    'clock_text_r-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_join_keys~join_keys-1' AS model_key_id,
+    'int_edge_join_keys' AS model_name,
+    'join_keys-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_json_numbers~json_numbers-1' AS model_key_id,
+    'int_edge_json_numbers' AS model_name,
+    'json_numbers-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_key_number_reads~key_number_r-1' AS model_key_id,
+    'int_edge_key_number_reads' AS model_name,
+    'key_number_r-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_key_rank_offsets~key_rank_off-1' AS model_key_id,
+    'int_edge_key_rank_offsets' AS model_name,
+    'key_rank_off-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ledger_paid_quantities~ledger_paid_-1' AS model_key_id,
+    'int_edge_ledger_paid_quantities' AS model_name,
+    'ledger_paid_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ledger_quantity_steps~ledger_quant-1' AS model_key_id,
+    'int_edge_ledger_quantity_steps' AS model_name,
+    'ledger_quant-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_note_patterns~note_pattern-1' AS model_key_id,
+    'int_edge_note_patterns' AS model_name,
+    'note_pattern-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_quantity_checks~quantity_che-1' AS model_key_id,
+    'int_edge_quantity_checks' AS model_name,
+    'quantity_che-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_array_bounds~ratio_array_-1' AS model_key_id,
+    'int_edge_ratio_array_bounds' AS model_name,
+    'ratio_array_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_array_casts~ratio_array_-1' AS model_key_id,
+    'int_edge_ratio_array_casts' AS model_name,
+    'ratio_array_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_array_positions~ratio_array_-1' AS model_key_id,
+    'int_edge_ratio_array_positions' AS model_name,
+    'ratio_array_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_averages~ratio_averag-1' AS model_key_id,
+    'int_edge_ratio_averages' AS model_name,
+    'ratio_averag-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_fixed_scales~ratio_fixed_-1' AS model_key_id,
+    'int_edge_ratio_fixed_scales' AS model_name,
+    'ratio_fixed_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_group_objects~ratio_group_-1' AS model_key_id,
+    'int_edge_ratio_group_objects' AS model_name,
+    'ratio_group_-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_hashes~ratio_hashes-1' AS model_key_id,
+    'int_edge_ratio_hashes' AS model_name,
+    'ratio_hashes-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_identity_objects~ratio_identi-1' AS model_key_id,
+    'int_edge_ratio_identity_objects' AS model_name,
+    'ratio_identi-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_ignore_case_reads~ratio_ignore-1' AS model_key_id,
+    'int_edge_ratio_ignore_case_reads' AS model_name,
+    'ratio_ignore-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_object_differences~ratio_object-1' AS model_key_id,
+    'int_edge_ratio_object_differences' AS model_name,
+    'ratio_object-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_object_flags~ratio_object-1' AS model_key_id,
+    'int_edge_ratio_object_flags' AS model_name,
+    'ratio_object-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_object_inserts~ratio_object-1' AS model_key_id,
+    'int_edge_ratio_object_inserts' AS model_name,
+    'ratio_object-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_object_reads~ratio_object-1' AS model_key_id,
+    'int_edge_ratio_object_reads' AS model_name,
+    'ratio_object-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_path_checks~ratio_path_c-1' AS model_key_id,
+    'int_edge_ratio_path_checks' AS model_name,
+    'ratio_path_c-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_percent_texts~ratio_percen-1' AS model_key_id,
+    'int_edge_ratio_percent_texts' AS model_name,
+    'ratio_percen-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_running_totals~ratio_runnin-1' AS model_key_id,
+    'int_edge_ratio_running_totals' AS model_name,
+    'ratio_runnin-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_safe_casts~ratio_safe_c-1' AS model_key_id,
+    'int_edge_ratio_safe_casts' AS model_name,
+    'ratio_safe_c-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_text_forms~ratio_text_f-1' AS model_key_id,
+    'int_edge_ratio_text_forms' AS model_name,
+    'ratio_text_f-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_text_replaces~ratio_text_r-1' AS model_key_id,
+    'int_edge_ratio_text_replaces' AS model_name,
+    'ratio_text_r-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ratio_variant_unions~ratio_varian-1' AS model_key_id,
+    'int_edge_ratio_variant_unions' AS model_name,
+    'ratio_varian-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_ticket_tokens~ticket_token-1' AS model_key_id,
+    'int_edge_ticket_tokens' AS model_name,
+    'ticket_token-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_variant_decimal_reads~variant_deci-1' AS model_key_id,
+    'int_edge_variant_decimal_reads' AS model_name,
+    'variant_deci-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_variant_element_counts~variant_elem-1' AS model_key_id,
+    'int_edge_variant_element_counts' AS model_name,
+    'variant_elem-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_variant_expected_values~variant_expe-1' AS model_key_id,
+    'int_edge_variant_expected_values' AS model_name,
+    'variant_expe-1' AS model_key
+  UNION ALL
+  SELECT
+    'int_edge_variant_xml_elements~variant_xml_-1' AS model_key_id,
+    'int_edge_variant_xml_elements' AS model_name,
+    'variant_xml_-1' AS model_key
+  UNION ALL
+  SELECT
+    'stg_edge_supplier_notes~supplier_not-1' AS model_key_id,
+    'stg_edge_supplier_notes' AS model_name,
+    'supplier_not-1' AS model_key
 )

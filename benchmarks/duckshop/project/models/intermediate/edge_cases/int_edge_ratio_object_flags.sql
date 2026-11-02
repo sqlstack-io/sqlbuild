@@ -1,6 +1,7 @@
 MODEL (
   description """
-    One row per reconciliation check with its FLOAT ratio read back from an object as a BOOLEAN
+    One row per reconciliation check with a positive-ratio flag read back as a BOOLEAN from an
+    object that also holds the FLOAT ratio
   """,
   tags [edge_case],
   columns (
@@ -10,14 +11,14 @@ MODEL (
 );
 
 WITH ratio_objects AS (
-  SELECT a.check_id, OBJECT_CONSTRUCT('r', a.ratio) AS ratio_object
+  SELECT a.check_id, OBJECT_CONSTRUCT('r', a.ratio, 'is_positive', a.ratio > 0) AS ratio_object
   FROM __ref("stg_edge_amount_checks") AS a
 ),
 
 final AS (
   SELECT
     r.check_id,
-    r.ratio_object:r::BOOLEAN AS ratio_flag
+    r.ratio_object:is_positive::BOOLEAN AS ratio_flag
   FROM ratio_objects AS r
 )
 

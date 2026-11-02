@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_last_day AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS is_recent
+    'GC-01' AS callback_id,
+    FALSE AS is_recent
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    FALSE AS is_recent
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    FALSE AS is_recent
 )

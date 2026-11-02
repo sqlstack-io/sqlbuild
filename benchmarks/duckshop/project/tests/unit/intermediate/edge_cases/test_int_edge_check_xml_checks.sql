@@ -18,7 +18,22 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_xml_checks AS (
   SELECT
-    NULL AS check_id,
-    NULL AS stripped_key,
-    NULL AS xml_error
+    'AC-01' AS check_id,
+    '101,7' AS stripped_key,
+    'not an XML element, pos 1' AS xml_error
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2026-03-04' AS stripped_key,
+    'not an XML element, pos 1' AS xml_error
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '7' AS stripped_key,
+    'not an XML element, pos 1' AS xml_error
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS stripped_key,
+    CAST(NULL AS VARCHAR) AS xml_error
 )

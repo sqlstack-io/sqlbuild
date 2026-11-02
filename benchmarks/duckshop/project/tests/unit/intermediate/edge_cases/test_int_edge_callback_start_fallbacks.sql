@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_start_fallbacks AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS start_at
+    'GC-01' AS callback_id,
+    '2026-03-28 23:30:00.123456789'::TIMESTAMP_NTZ(9) AS start_at
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08 01:15:00.5'::TIMESTAMP_NTZ(9) AS start_at
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '2026-02-28 00:00:00'::TIMESTAMP_NTZ(9) AS start_at
 )

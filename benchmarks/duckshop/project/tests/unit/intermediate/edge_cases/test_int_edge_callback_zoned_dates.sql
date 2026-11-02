@@ -17,6 +17,10 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_zoned_dates AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS event_date
+    'GC-01' AS callback_id,
+    '2026-03-28'::DATE AS event_date
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08'::DATE AS event_date
 )

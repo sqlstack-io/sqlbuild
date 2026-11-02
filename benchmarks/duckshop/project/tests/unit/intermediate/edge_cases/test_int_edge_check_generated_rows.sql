@@ -18,8 +18,8 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_generated_rows AS (
   SELECT
-    NULL AS summary_id,
-    NULL AS generated_count,
-    NULL AS numbers_are_valid,
-    NULL AS draws_are_one
+    'all' AS summary_id,
+    4 AS generated_count,
+    TRUE AS numbers_are_valid,
+    TRUE AS draws_are_one
 )

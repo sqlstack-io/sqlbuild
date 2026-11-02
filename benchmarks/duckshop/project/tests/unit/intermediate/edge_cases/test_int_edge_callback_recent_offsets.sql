@@ -17,6 +17,10 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_recent_offsets AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS event_at
+    'GC-01' AS callback_id,
+    '2026-03-28 23:30:00 Z'::TIMESTAMP_TZ(9) AS event_at
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08 01:15:00 -05:00'::TIMESTAMP_TZ(9) AS event_at
 )

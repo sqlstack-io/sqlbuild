@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_wall_time_lists AS (
   SELECT
-    NULL AS merchant_zone,
-    NULL AS wall_times
+    'America/New_York' AS merchant_zone,
+    PARSE_JSON('["2026-03-08 01:15:00.000"]')::ARRAY AS wall_times
+  UNION ALL
+  SELECT
+    'Asia/Kolkata' AS merchant_zone,
+    PARSE_JSON('["2026-02-28 18:45:30.000"]')::ARRAY AS wall_times
+  UNION ALL
+  SELECT
+    'Europe/London' AS merchant_zone,
+    PARSE_JSON('["2026-03-28 23:30:00.000"]')::ARRAY AS wall_times
 )

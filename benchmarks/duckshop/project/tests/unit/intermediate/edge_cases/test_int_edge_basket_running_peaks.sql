@@ -16,7 +16,12 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_running_peaks AS (
   SELECT
-    NULL AS basket_id,
-    NULL AS peak_count,
-    NULL AS last_peak
+    'B-1' AS basket_id,
+    3 AS peak_count,
+    3 AS last_peak
+  UNION ALL
+  SELECT
+    'B-2' AS basket_id,
+    1 AS peak_count,
+    1 AS last_peak
 )

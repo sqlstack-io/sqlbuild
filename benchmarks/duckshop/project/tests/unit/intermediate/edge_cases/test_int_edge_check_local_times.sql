@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_local_times AS (
   SELECT
-    NULL AS check_id,
-    NULL AS noted_at
+    'AC-01' AS check_id,
+    '2026-03-04 12:00:00 Z'::TIMESTAMP_LTZ(9) AS noted_at
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2026-03-04 12:00:00 Z'::TIMESTAMP_LTZ(9) AS noted_at
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '2026-03-04 12:00:00 Z'::TIMESTAMP_LTZ(9) AS noted_at
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '2026-03-04 12:00:00 Z'::TIMESTAMP_LTZ(9) AS noted_at
 )

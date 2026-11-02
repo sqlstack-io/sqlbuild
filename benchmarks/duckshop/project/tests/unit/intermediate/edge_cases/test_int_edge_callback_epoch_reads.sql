@@ -33,7 +33,22 @@ __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_epoch_reads AS (
   SELECT
-    NULL AS check_id,
-    NULL AS key_as_time,
-    NULL AS has_early_callback
+    'AC-01' AS check_id,
+    '1970-01-01 00:00:00.007'::TIMESTAMP_NTZ(9) AS key_as_time,
+    TRUE AS has_early_callback
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '1970-01-01 00:00:00.012'::TIMESTAMP_NTZ(9) AS key_as_time,
+    TRUE AS has_early_callback
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS TIMESTAMP_NTZ(9)) AS key_as_time,
+    TRUE AS has_early_callback
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '1970-01-01 00:00:00.04'::TIMESTAMP_NTZ(9) AS key_as_time,
+    TRUE AS has_early_callback
 )

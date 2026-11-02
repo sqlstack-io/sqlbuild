@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_epoch_parts AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS wall_time_ns,
-    NULL AS epoch_microsecond
+    'GC-01' AS callback_id,
+    '2026-03-28 23:30:00'::TIMESTAMP_NTZ(9) AS wall_time_ns,
+    1774740600000000 AS epoch_microsecond
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08 01:15:00'::TIMESTAMP_NTZ(9) AS wall_time_ns,
+    1772932500000000 AS epoch_microsecond
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '2026-02-28 18:45:30'::TIMESTAMP_NTZ(9) AS wall_time_ns,
+    1772304330000000 AS epoch_microsecond
 )

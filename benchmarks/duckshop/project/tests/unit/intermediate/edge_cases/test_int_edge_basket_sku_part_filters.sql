@@ -16,6 +16,18 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_sku_part_filters AS (
   SELECT
-    NULL AS line_id,
-    NULL AS long_part_count
+    'BL-01' AS line_id,
+    3 AS long_part_count
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    3 AS long_part_count
+  UNION ALL
+  SELECT
+    'BL-03' AS line_id,
+    3 AS long_part_count
+  UNION ALL
+  SELECT
+    'BL-04' AS line_id,
+    3 AS long_part_count
 )

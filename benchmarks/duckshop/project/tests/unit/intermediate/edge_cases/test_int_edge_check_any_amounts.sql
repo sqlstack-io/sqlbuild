@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_any_amounts AS (
   SELECT
-    NULL AS group_code,
-    NULL AS amounts_agree
+    'G-1' AS group_code,
+    TRUE AS amounts_agree
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    TRUE AS amounts_agree
 )

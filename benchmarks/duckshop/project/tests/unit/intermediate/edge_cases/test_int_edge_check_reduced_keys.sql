@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_reduced_keys AS (
   SELECT
-    NULL AS check_id,
-    NULL AS folded_key
+    'AC-01' AS check_id,
+    'G-1/101/7' AS folded_key
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    'G-1/2026-03-04' AS folded_key
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    'G-2/7' AS folded_key
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS folded_key
 )

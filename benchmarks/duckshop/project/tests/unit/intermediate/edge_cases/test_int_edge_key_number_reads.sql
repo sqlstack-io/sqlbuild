@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_key_number_reads AS (
   SELECT
-    NULL AS check_id,
-    NULL AS wide_key_number
+    'AC-01' AS check_id,
+    7 AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    12 AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    CAST(NULL AS NUMBER(38,0)) AS wide_key_number
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    40 AS wide_key_number
 )

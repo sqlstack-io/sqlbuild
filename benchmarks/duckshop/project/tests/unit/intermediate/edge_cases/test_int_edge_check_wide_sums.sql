@@ -18,6 +18,34 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_wide_sums AS (
   SELECT
-    NULL AS key_row_id,
-    NULL AS key_value
+    'AC-01~amount' AS key_row_id,
+    11.05::NUMBER(38,2) AS key_value
+  UNION ALL
+  SELECT
+    'AC-01~wide' AS key_row_id,
+    7.00::NUMBER(38,2) AS key_value
+  UNION ALL
+  SELECT
+    'AC-02~amount' AS key_row_id,
+    0.45::NUMBER(38,2) AS key_value
+  UNION ALL
+  SELECT
+    'AC-02~wide' AS key_row_id,
+    12.00::NUMBER(38,2) AS key_value
+  UNION ALL
+  SELECT
+    'AC-03~amount' AS key_row_id,
+    1.00::NUMBER(38,2) AS key_value
+  UNION ALL
+  SELECT
+    'AC-03~wide' AS key_row_id,
+    CAST(NULL AS NUMBER(38,2)) AS key_value
+  UNION ALL
+  SELECT
+    'AC-04~amount' AS key_row_id,
+    CAST(NULL AS NUMBER(38,2)) AS key_value
+  UNION ALL
+  SELECT
+    'AC-04~wide' AS key_row_id,
+    40.00::NUMBER(38,2) AS key_value
 )

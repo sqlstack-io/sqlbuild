@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_zone_words AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS shared_word_count,
-    NULL AS event_json
+    'GC-01' AS callback_id,
+    1 AS shared_word_count,
+    '{"at":"2026-03-28 23:30:00.000 Z","zone":"Europe/London"}' AS event_json
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    0 AS shared_word_count,
+    '{"at":"2026-03-08 01:15:00.000 -0500","zone":"America/New_York"}' AS event_json
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    1 AS shared_word_count,
+    '{"at":"2026-02-28 18:45:30.000 +0530","zone":"Asia/Kolkata"}' AS event_json
 )

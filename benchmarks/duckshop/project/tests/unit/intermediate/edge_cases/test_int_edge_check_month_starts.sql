@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_month_starts AS (
   SELECT
-    NULL AS period_id,
-    NULL AS period_start
+    'P-1' AS period_id,
+    '2026-02-01' AS period_start
+  UNION ALL
+  SELECT
+    'P-2' AS period_id,
+    '2026-01-01' AS period_start
 )

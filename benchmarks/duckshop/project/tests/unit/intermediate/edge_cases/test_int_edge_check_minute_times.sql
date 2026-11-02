@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_minute_times AS (
   SELECT
-    NULL AS check_id,
-    NULL AS opened_at
+    'AC-01' AS check_id,
+    '2024-05-01 15:00:00'::TIMESTAMP_NTZ(9) AS opened_at
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2024-05-01 15:00:00'::TIMESTAMP_NTZ(9) AS opened_at
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '2024-05-01 15:00:00'::TIMESTAMP_NTZ(9) AS opened_at
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '2024-05-01 15:00:00'::TIMESTAMP_NTZ(9) AS opened_at
 )

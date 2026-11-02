@@ -18,7 +18,22 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_safe_casts AS (
   SELECT
-    NULL AS check_id,
-    NULL AS check_json,
-    NULL AS ratio_again
+    'AC-01' AS check_id,
+    '{"key":"101,7","keys":{"narrow":7}}' AS check_json,
+    '0.1'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '{"key":"2026-03-04","keys":{"narrow":12}}' AS check_json,
+    '0.2'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '{"key":"7","keys":{"narrow":3}}' AS check_json,
+    '0.3'::FLOAT AS ratio_again
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '{"keys":{}}' AS check_json,
+    CAST(NULL AS FLOAT) AS ratio_again
 )

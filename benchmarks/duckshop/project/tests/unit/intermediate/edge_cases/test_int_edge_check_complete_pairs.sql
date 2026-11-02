@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_complete_pairs AS (
   SELECT
-    NULL AS group_code,
-    NULL AS complete_pair_count
+    'G-1' AS group_code,
+    2 AS complete_pair_count
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    1 AS complete_pair_count
 )

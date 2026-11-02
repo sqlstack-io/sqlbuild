@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_array_positions AS (
   SELECT
-    NULL AS group_code,
-    NULL AS last_ratio
+    'G-1' AS group_code,
+    '0.2'::FLOAT AS last_ratio
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    '0.3'::FLOAT AS last_ratio
 )

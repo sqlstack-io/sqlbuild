@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_object_reads AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_integer
+    'AC-01' AS check_id,
+    0 AS ratio_integer
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    0 AS ratio_integer
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    0 AS ratio_integer
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS NUMBER(38,0)) AS ratio_integer
 )

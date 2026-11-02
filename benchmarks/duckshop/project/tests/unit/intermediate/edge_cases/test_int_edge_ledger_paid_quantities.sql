@@ -15,6 +15,10 @@ WITH __ref__stg_edge_ledger_entries AS (
 
 __expected__int_edge_ledger_paid_quantities AS (
   SELECT
-    NULL AS order_ref,
-    NULL AS paid_quantity_count
+    'DS-O-1' AS order_ref,
+    1 AS paid_quantity_count
+  UNION ALL
+  SELECT
+    'DS-O-2' AS order_ref,
+    0 AS paid_quantity_count
 )

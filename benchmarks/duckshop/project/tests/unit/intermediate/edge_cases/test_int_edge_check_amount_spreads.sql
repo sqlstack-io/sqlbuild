@@ -18,7 +18,12 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_amount_spreads AS (
   SELECT
-    NULL AS group_code,
-    NULL AS median_amount,
-    NULL AS rate_spread
+    'G-1' AS group_code,
+    4.750::NUMBER(18,3) AS median_amount,
+    -0.047934024139::NUMBER(38,12) AS rate_spread
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    0.000::NUMBER(18,3) AS median_amount,
+    CAST(NULL AS NUMBER(38,12)) AS rate_spread
 )

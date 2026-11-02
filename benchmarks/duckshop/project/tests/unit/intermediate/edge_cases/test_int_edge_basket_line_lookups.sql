@@ -13,7 +13,12 @@ WITH __table_fn__edge_basket_lines_for AS (
 
 __expected__int_edge_basket_line_lookups AS (
   SELECT
-    NULL AS line_id,
-    NULL AS line_no,
-    NULL AS sku
+    'BL-01' AS line_id,
+    1 AS line_no,
+    'DK-RED-01' AS sku
+  UNION ALL
+  SELECT
+    'BL-02' AS line_id,
+    2 AS line_no,
+    'DK-BLUE-02' AS sku
 )

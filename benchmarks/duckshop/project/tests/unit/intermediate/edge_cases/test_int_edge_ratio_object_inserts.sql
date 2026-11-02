@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_object_inserts AS (
   SELECT
-    NULL AS check_id,
-    NULL AS check_json
+    'AC-01' AS check_id,
+    '{"check":"AC-01","r":1.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '{"check":"AC-02","r":2.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '{"check":"AC-03","r":3.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '{"check":"AC-04"}' AS check_json
 )

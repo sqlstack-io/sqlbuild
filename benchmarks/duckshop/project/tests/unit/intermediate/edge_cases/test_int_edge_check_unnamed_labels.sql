@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_unnamed_labels AS (
   SELECT
-    NULL AS check_id,
-    NULL AS label
+    'AC-01' AS check_id,
+    'fixed' AS label
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    'fixed' AS label
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    'fixed' AS label
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    'fixed' AS label
 )

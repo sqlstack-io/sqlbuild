@@ -18,8 +18,26 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_key_list_edits AS (
   SELECT
-    NULL AS check_id,
-    NULL AS kept_part_count,
-    NULL AS appended_part_count,
-    NULL AS check_json
+    'AC-01' AS check_id,
+    1 AS kept_part_count,
+    3 AS appended_part_count,
+    '{"k":7,"r":1.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    1 AS kept_part_count,
+    2 AS appended_part_count,
+    '{"k":12,"r":2.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    0 AS kept_part_count,
+    2 AS appended_part_count,
+    '{"k":3,"r":3.000000000000000e-01}' AS check_json
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS NUMBER(38,0)) AS kept_part_count,
+    CAST(NULL AS NUMBER(38,0)) AS appended_part_count,
+    '{}' AS check_json
 )

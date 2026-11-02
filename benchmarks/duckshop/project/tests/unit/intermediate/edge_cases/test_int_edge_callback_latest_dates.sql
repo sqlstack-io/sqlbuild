@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_latest_dates AS (
   SELECT
-    NULL AS merchant_zone,
-    NULL AS latest_date_text
+    'America/New_York' AS merchant_zone,
+    '2026-03-08' AS latest_date_text
+  UNION ALL
+  SELECT
+    'Asia/Kolkata' AS merchant_zone,
+    '2026-02-28' AS latest_date_text
+  UNION ALL
+  SELECT
+    'Europe/London' AS merchant_zone,
+    '2026-03-28' AS latest_date_text
 )

@@ -18,6 +18,6 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_path_checks AS (
   SELECT
-    NULL AS check_id,
-    NULL AS key_span
+    'AC-04' AS check_id,
+    CAST(NULL AS NUMBER(38,0)) AS key_span
 )

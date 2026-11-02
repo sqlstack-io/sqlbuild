@@ -16,5 +16,11 @@ WITH __ref__stg_edge_variant_values AS (
 
 __expected__int_edge_variant_expected_values AS (
   SELECT
-    NULL AS value_id
+    'VV-01' AS value_id
+  UNION ALL
+  SELECT
+    'VV-03' AS value_id
+  UNION ALL
+  SELECT
+    'VV-04' AS value_id
 )

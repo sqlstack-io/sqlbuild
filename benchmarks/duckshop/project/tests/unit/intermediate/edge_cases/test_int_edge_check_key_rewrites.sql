@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_key_rewrites AS (
   SELECT
-    NULL AS check_id,
-    NULL AS rewritten_key
+    'AC-01' AS check_id,
+    'G,1,7' AS rewritten_key
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    'G,1-03-04' AS rewritten_key
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '7' AS rewritten_key
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS rewritten_key
 )

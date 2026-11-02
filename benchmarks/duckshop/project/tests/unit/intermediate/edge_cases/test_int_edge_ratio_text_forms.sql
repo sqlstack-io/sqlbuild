@@ -18,8 +18,26 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_text_forms AS (
   SELECT
-    NULL AS check_id,
-    NULL AS ratio_text,
-    NULL AS ratio_stars,
-    NULL AS narrow_key_exp
+    'AC-01' AS check_id,
+    '   0.1 ' AS ratio_text,
+    '*' AS ratio_stars,
+    '1096.6331584284585'::FLOAT AS narrow_key_exp
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '   0.2 ' AS ratio_text,
+    '**' AS ratio_stars,
+    '162754.79141900392'::FLOAT AS narrow_key_exp
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '   0.3 ' AS ratio_text,
+    '***' AS ratio_stars,
+    '20.085536923187668'::FLOAT AS narrow_key_exp
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    CAST(NULL AS VARCHAR) AS ratio_text,
+    CAST(NULL AS VARCHAR) AS ratio_stars,
+    CAST(NULL AS FLOAT) AS narrow_key_exp
 )

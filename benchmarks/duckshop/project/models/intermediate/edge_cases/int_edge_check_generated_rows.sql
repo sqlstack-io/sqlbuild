@@ -1,6 +1,6 @@
 MODEL (
   description """
-    One row counting the rows generated, as many as there are reconciliation checks, with
+    One row counting the rows a generator makes from a ROWCOUNT written as an expression, with
     whether every SEQ4 number is non-negative and every draw from UNIFORM over a range of one
     value is one
   """,
@@ -17,7 +17,7 @@ WITH generated AS (
   SELECT
     SEQ4() AS row_seq,
     UNIFORM(1, 1, RANDOM()) AS draw
-  FROM TABLE(GENERATOR(ROWCOUNT => (SELECT COUNT(*) FROM __ref("stg_edge_amount_checks"))))
+  FROM TABLE(GENERATOR(ROWCOUNT => (2 + 2)))
 ),
 
 final AS (

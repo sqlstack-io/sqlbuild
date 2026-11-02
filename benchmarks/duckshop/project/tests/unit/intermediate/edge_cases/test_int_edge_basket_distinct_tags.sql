@@ -16,5 +16,8 @@ WITH __ref__stg_edge_basket_lines AS (
 
 __expected__int_edge_basket_distinct_tags AS (
   SELECT
-    NULL AS tag_text
+    'blue' AS tag_text
+  UNION ALL
+  SELECT
+    'red' AS tag_text
 )

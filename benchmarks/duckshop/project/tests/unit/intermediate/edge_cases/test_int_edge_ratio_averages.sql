@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_averages AS (
   SELECT
-    NULL AS group_code,
-    NULL AS average_ratio
+    'G-1' AS group_code,
+    '0.15000000000000002'::FLOAT AS average_ratio
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    '0.3'::FLOAT AS average_ratio
 )

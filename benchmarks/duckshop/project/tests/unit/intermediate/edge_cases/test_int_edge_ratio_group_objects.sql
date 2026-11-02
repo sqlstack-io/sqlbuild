@@ -18,7 +18,12 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_group_objects AS (
   SELECT
-    NULL AS group_code,
-    NULL AS ratio_json,
-    NULL AS distinct_ratio_count
+    'G-1' AS group_code,
+    '{"AC-01":1.000000000000000e-01,"AC-02":2.000000000000000e-01}' AS ratio_json,
+    2 AS distinct_ratio_count
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    '{"AC-03":3.000000000000000e-01}' AS ratio_json,
+    1 AS distinct_ratio_count
 )

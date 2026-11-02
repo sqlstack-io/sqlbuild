@@ -1,4 +1,4 @@
-TEST (name "int_edge_callback_london_times__converts_zoned_times_to_london");
+TEST (name "int_edge_callback_london_times__converts_the_current_time_to_london");
 
 WITH __ref__stg_edge_gateway_callbacks AS (
   SELECT
@@ -17,6 +17,14 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_london_times AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS london_time
+    'GC-01' AS callback_id,
+    TRUE AS london_now_is_known
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    TRUE AS london_now_is_known
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    TRUE AS london_now_is_known
 )

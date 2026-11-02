@@ -18,6 +18,10 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_distinct_tuples AS (
   SELECT
-    NULL AS group_code,
-    NULL AS distinct_tuples
+    'G-1' AS group_code,
+    2 AS distinct_tuples
+  UNION ALL
+  SELECT
+    'G-2' AS group_code,
+    2 AS distinct_tuples
 )

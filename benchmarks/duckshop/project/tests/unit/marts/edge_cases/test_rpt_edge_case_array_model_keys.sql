@@ -9,7 +9,7 @@ WITH __ref__int_edge_callback_wall_time_lists AS (
 
 __expected__rpt_edge_case_array_model_keys AS (
   SELECT
-    NULL AS model_key_id,
-    NULL AS model_name,
-    NULL AS model_key
+    'int_edge_callback_wall_time_lists~callback_wal-1' AS model_key_id,
+    'int_edge_callback_wall_time_lists' AS model_name,
+    'callback_wal-1' AS model_key
 )

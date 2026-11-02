@@ -14,6 +14,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_running_totals AS (
   SELECT
-    NULL AS check_id,
-    NULL AS running_ratio
+    'AC-01' AS check_id,
+    '0.1'::FLOAT AS running_ratio
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '0.30000000000000004'::FLOAT AS running_ratio
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '0.6'::FLOAT AS running_ratio
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '1.5'::FLOAT AS running_ratio
 )

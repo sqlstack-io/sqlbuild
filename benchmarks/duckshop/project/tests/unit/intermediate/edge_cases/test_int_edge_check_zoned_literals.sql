@@ -18,6 +18,18 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_check_zoned_literals AS (
   SELECT
-    NULL AS check_id,
-    NULL AS cutover_at
+    'AC-01' AS check_id,
+    '2026-03-04 12:00:02 Z'::TIMESTAMP_TZ(9) AS cutover_at
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    '2026-03-04 12:00:02 Z'::TIMESTAMP_TZ(9) AS cutover_at
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    '2026-03-04 12:00:02 Z'::TIMESTAMP_TZ(9) AS cutover_at
+  UNION ALL
+  SELECT
+    'AC-04' AS check_id,
+    '2026-03-04 12:00:02 Z'::TIMESTAMP_TZ(9) AS cutover_at
 )

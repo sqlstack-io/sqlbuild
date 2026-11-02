@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_text_dates AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS text_date,
-    NULL AS event_json
+    'GC-01' AS callback_id,
+    '2026-03-28'::DATE AS text_date,
+    '{"at":"2026-03-28 23:30:00.000 Z"}' AS event_json
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08'::DATE AS text_date,
+    '{"at":"2026-03-08 01:15:00.000 -0500"}' AS event_json
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '2026-02-28'::DATE AS text_date,
+    '{"at":"2026-02-28 18:45:30.000 +0530"}' AS event_json
 )

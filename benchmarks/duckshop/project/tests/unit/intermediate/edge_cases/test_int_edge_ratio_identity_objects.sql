@@ -18,6 +18,14 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_identity_objects AS (
   SELECT
-    NULL AS check_id,
-    NULL AS identity_kind
+    'AC-01' AS check_id,
+    'ratio' AS identity_kind
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    'ratio' AS identity_kind
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    'ratio' AS identity_kind
 )

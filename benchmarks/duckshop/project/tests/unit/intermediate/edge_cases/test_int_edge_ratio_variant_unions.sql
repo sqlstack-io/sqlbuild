@@ -18,6 +18,34 @@ WITH __ref__stg_edge_amount_checks AS (
 
 __expected__int_edge_ratio_variant_unions AS (
   SELECT
-    NULL AS value_row_id,
-    NULL AS value_text
+    'AC-01~key' AS value_row_id,
+    '101,7' AS value_text
+  UNION ALL
+  SELECT
+    'AC-01~ratio' AS value_row_id,
+    '0.1' AS value_text
+  UNION ALL
+  SELECT
+    'AC-02~key' AS value_row_id,
+    '2026-03-04' AS value_text
+  UNION ALL
+  SELECT
+    'AC-02~ratio' AS value_row_id,
+    '0.2' AS value_text
+  UNION ALL
+  SELECT
+    'AC-03~key' AS value_row_id,
+    '7' AS value_text
+  UNION ALL
+  SELECT
+    'AC-03~ratio' AS value_row_id,
+    '0.3' AS value_text
+  UNION ALL
+  SELECT
+    'AC-04~key' AS value_row_id,
+    CAST(NULL AS VARCHAR) AS value_text
+  UNION ALL
+  SELECT
+    'AC-04~ratio' AS value_row_id,
+    CAST(NULL AS VARCHAR) AS value_text
 )

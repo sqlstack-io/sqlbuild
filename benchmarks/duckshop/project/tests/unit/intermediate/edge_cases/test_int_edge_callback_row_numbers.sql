@@ -17,7 +17,17 @@ WITH __ref__stg_edge_gateway_callbacks AS (
 
 __expected__int_edge_callback_row_numbers AS (
   SELECT
-    NULL AS callback_id,
-    NULL AS wall_time_text,
-    NULL AS has_row_number
+    'GC-01' AS callback_id,
+    '2026-03-28 23:30:00.000' AS wall_time_text,
+    TRUE AS has_row_number
+  UNION ALL
+  SELECT
+    'GC-02' AS callback_id,
+    '2026-03-08 01:15:00.000' AS wall_time_text,
+    TRUE AS has_row_number
+  UNION ALL
+  SELECT
+    'GC-03' AS callback_id,
+    '2026-02-28 18:45:30.000' AS wall_time_text,
+    TRUE AS has_row_number
 )

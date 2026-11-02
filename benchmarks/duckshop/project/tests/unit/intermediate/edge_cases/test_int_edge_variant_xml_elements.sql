@@ -14,6 +14,10 @@ WITH __ref__stg_edge_variant_values AS (
 
 __expected__int_edge_variant_xml_elements AS (
   SELECT
-    NULL AS value_id,
-    NULL AS sku_text
+    'VX-01' AS value_id,
+    'DK-1' AS sku_text
+  UNION ALL
+  SELECT
+    'VX-02' AS value_id,
+    CAST(NULL AS VARCHAR) AS sku_text
 )

@@ -6,12 +6,21 @@ WITH __ref__stg_edge_amount_checks AS (
     v.group_code::VARCHAR AS group_code,
     v.key_text::VARCHAR AS key_text
   FROM VALUES
-    ('AC-01', '^1(?=0)', '101,7'),
-    ('AC-02', '[[:digit:]]+', '7') AS v(check_id, group_code, key_text)
+    ('AC-01', '[[:digit:]]{3}', '101,7'),
+    ('AC-02', '^7$', '7'),
+    ('AC-03', '[[:alpha:]]+', '7') AS v(check_id, group_code, key_text)
 ),
 
 __expected__int_edge_check_pattern_matches AS (
   SELECT
-    NULL AS check_id,
-    NULL AS matches_group
+    'AC-01' AS check_id,
+    FALSE AS matches_group
+  UNION ALL
+  SELECT
+    'AC-02' AS check_id,
+    TRUE AS matches_group
+  UNION ALL
+  SELECT
+    'AC-03' AS check_id,
+    FALSE AS matches_group
 )
