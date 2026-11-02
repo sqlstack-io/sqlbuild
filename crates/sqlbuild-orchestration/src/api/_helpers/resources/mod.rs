@@ -1,4 +1,5 @@
 pub(crate) mod administrators;
+pub(crate) mod audit;
 pub(crate) mod changes;
 pub(crate) mod client;
 pub(crate) mod docker_image;

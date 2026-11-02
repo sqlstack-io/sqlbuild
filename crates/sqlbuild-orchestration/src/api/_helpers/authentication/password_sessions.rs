@@ -31,6 +31,10 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
         .route(
+            "/api/control/audit",
+            get(crate::api::_helpers::resources::audit::read),
+        )
+        .route(
             "/api/admin/people/{principal_id}",
             post(crate::api::_helpers::resources::administrators::change),
         )

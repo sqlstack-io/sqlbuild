@@ -30,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_read,
     person_request,
     provision_person,
+    verify_security_audit,
 )
 
 
@@ -82,6 +83,7 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
         )
         admin_session: tuple[str, str] = person_login(worker.api, admin["name"])
         session: tuple[str, str] = person_login(worker.api, person["name"])
+        verify_security_audit(worker.api, admin_session, session)
         runs_path: str = f"/api/control/locations/{worker.api.location_id}/targets/development/runs"
         request: dict[str, Any] = {
             "run_id": str(uuid4()),
@@ -162,10 +164,10 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
         assert person_request(worker.api, "/api/control/runs", body=request, session=session) == {
             "applied": True
         }
-        manual: dict[str, Any] = wait_for_run(
-            worker.api, worker.process, worker.log, run_id=request["run_id"]
+        assert (
+            wait_for_run(worker.api, worker.process, worker.log, run_id=request["run_id"])["status"]
+            == test_case.expected_status
         )
-        assert manual["status"] == test_case.expected_status
         assert person_request(worker.api, "/api/control/runs", body=request, session=session) == {
             "applied": False
         }
