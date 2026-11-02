@@ -3548,6 +3548,7 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read ``ROW_COUNT`` from the information schema; views report no count."""
 
@@ -3556,13 +3557,17 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             database=database,
             schema=schema,
             name=name,
-            projection="row_count",
+            projection="row_count,bytes" if metadata_only else "row_count",
         )
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        if row[0] is None:
-            return RelationRowCountEstimate(row_count=None, detail="no row count (view)")
-        return RelationRowCountEstimate(row_count=int(row[0]))
+        byte_count: int | None = int(row[1]) if metadata_only and row[1] is not None else None
+        return RelationRowCountEstimate(
+            row_count=int(row[0]) if row[0] is not None else None,
+            detail="no row count (view)" if row[0] is None else None,
+            byte_count=byte_count,
+            byte_count_basis="information_schema_bytes" if byte_count is not None else None,
+        )
 
     def inspect_row_diff_coverage(
         self,

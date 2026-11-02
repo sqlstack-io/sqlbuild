@@ -118,6 +118,7 @@ class FakeBigQueryTable:
 
     table_type: str
     num_rows: int | None
+    num_bytes: int | None = None
 
 
 class FakeBigQueryClient:

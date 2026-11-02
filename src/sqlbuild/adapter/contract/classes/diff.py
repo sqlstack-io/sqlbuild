@@ -84,8 +84,9 @@ class DiffMixin(ABC):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
-        """Return the metadata row count for one relation without scanning its data."""
+        """Estimate counts, forbidding data scans when metadata_only is requested."""
         ...
 
     @abstractmethod

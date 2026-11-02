@@ -1,0 +1,10 @@
+{
+  "sqlite": {
+    "setup_sql": [
+      "CREATE TABLE orders (order_id INTEGER)",
+      "INSERT INTO orders VALUES (17), (31), (59)"
+    ],
+    "name": "orders",
+    "metadata_detail": "SQLite does not report table row counts from metadata"
+  }
+}
