@@ -30,6 +30,7 @@ pub(crate) const AUDIT_STORAGE_ORDER: &str = include_str!("../audit_storage_orde
 pub(crate) const WAREHOUSE_AUDIT_RESULTS: &str = include_str!("../warehouse_audit_results.sql");
 pub(crate) const WAREHOUSE_JANITOR_EVENTS: &str = include_str!("../warehouse_janitor_events.sql");
 pub(crate) const WAREHOUSE_MIGRATIONS: &str = include_str!("../warehouse_migrations.sql");
+pub(crate) const WAREHOUSE_MICROBATCHES: &str = include_str!("../warehouse_microbatches.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

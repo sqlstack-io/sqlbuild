@@ -343,6 +343,11 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                     "old_name_history",
                     "event_id",
                 ),
+                (
+                    WarehouseHistoryKind::Microbatches,
+                    "microbatch_history",
+                    "event_id",
+                ),
             ] {
                 crate::api::tests::warehouse_events_helpers::event_history(
                     store,

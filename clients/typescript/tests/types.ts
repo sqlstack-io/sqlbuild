@@ -57,6 +57,16 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/old-nam
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const microbatchHistory: components["schemas"]["WarehouseHistoryKind"] = "microbatches";
+const cursorBound: components["schemas"]["WarehouseMicrobatchRecord"]["run_end"] = "18446744073709551617";
+const optionalCompletion: components["schemas"]["WarehouseMicrobatchRecord"]["completed_at"] = null;
+void microbatchHistory;
+void cursorBound;
+void optionalCompletion;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/microbatches", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.

@@ -56,6 +56,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             post(warehouse_metadata::report_old_name_views),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/microbatches",
+            post(warehouse_metadata::report_microbatches),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/metadata/watermark",
             post(warehouse_metadata::watermark),
         )

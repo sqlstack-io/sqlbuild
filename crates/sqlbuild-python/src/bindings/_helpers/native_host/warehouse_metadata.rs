@@ -45,7 +45,8 @@ pub(crate) fn read_history(
         WarehouseHistoryRead::AuditResults(read)
         | WarehouseHistoryRead::JanitorEvents(read)
         | WarehouseHistoryRead::Migrations(read)
-        | WarehouseHistoryRead::OldNameViews(read) => &read.location,
+        | WarehouseHistoryRead::OldNameViews(read)
+        | WarehouseHistoryRead::Microbatches(read) => &read.location,
     };
     if location.schema.trim().is_empty() {
         return Err(PyValueError::new_err(
@@ -114,6 +115,10 @@ fn read_page(
             .import("sqlbuild.executor.janitor_events.constants")?
             .getattr("JANITOR_EVENT_COLUMNS")?
             .extract()?,
+        WarehouseHistoryRead::Microbatches(_) => py
+            .import("sqlbuild.microbatches.constants")?
+            .getattr("MICROBATCH_COLUMNS")?
+            .extract()?,
         _ => Vec::new(),
     };
     let event_columns: Vec<&str> = event_columns.iter().map(String::as_str).collect();
@@ -170,6 +175,15 @@ fn read_page(
             read.limit,
             "_sqlbuild_old_name_views",
             OLD_NAME_VIEW_COLUMNS.as_slice(),
+            "created_at",
+        ),
+        WarehouseHistoryRead::Microbatches(read) => (
+            &read.location,
+            read.after.as_ref().map(|cursor| cursor.as_slice()),
+            read.observed_since,
+            read.limit,
+            "_sqlbuild_microbatches",
+            event_columns.as_slice(),
             "created_at",
         ),
     };
@@ -242,9 +256,9 @@ fn read_page(
     let key_columns: Option<&[&str]> = match request {
         WarehouseHistoryRead::AuditResults(_) => Some(&["result_id", "occurred_at"]),
         WarehouseHistoryRead::JanitorEvents(_) => Some(&["event_id", "occurred_at"]),
-        WarehouseHistoryRead::Migrations(_) | WarehouseHistoryRead::OldNameViews(_) => {
-            Some(&["event_id", "created_at"])
-        }
+        WarehouseHistoryRead::Migrations(_)
+        | WarehouseHistoryRead::OldNameViews(_)
+        | WarehouseHistoryRead::Microbatches(_) => Some(&["event_id", "created_at"]),
         _ => None,
     };
     let mut cursor_indexes: Vec<usize> = columns
@@ -359,6 +373,7 @@ fn read_page(
             WarehouseHistoryRecord::JanitorEvent(record) => record.occurred_at,
             WarehouseHistoryRecord::Migration(record) => record.created_at,
             WarehouseHistoryRecord::OldNameView(record) => record.created_at,
+            WarehouseHistoryRecord::Microbatch(record) => record.created_at,
         };
         if since.is_none_or(|since| observed >= since) {
             records.push(record);
@@ -404,6 +419,22 @@ fn decode_record(
         }
         WarehouseHistoryRead::OldNameViews(read) => {
             return decode_event_record(&read.location, row, (columns, &[timestamp, "expires_at"]));
+        }
+        WarehouseHistoryRead::Microbatches(read) => {
+            return decode_event_record(
+                &read.location,
+                row,
+                (
+                    columns,
+                    &[
+                        timestamp,
+                        "origin_run_started_at",
+                        "execution_run_started_at",
+                        "completed_at",
+                        "observed_at",
+                    ],
+                ),
+            );
         }
     };
     let mut value = json!({
