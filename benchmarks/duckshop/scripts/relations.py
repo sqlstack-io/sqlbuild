@@ -11,8 +11,9 @@ project creates rather than drop the schema or archive whatever looks stale. The
 `check` lists tables, views and functions that already exist under a DuckShop name, and any
 SQLBuild state tables (`_sqlbuild_*`) already in the schema. `drop` is one Snowflake Scripting
 block that drops every model, snapshot, seed and source table and every function the project
-creates, including functions a SQL hook creates, which the compile output does not list. SQLBuild's own state tables (`_sqlbuild_*`) are left alone, since other projects in the
-same schema may share them.
+creates, including functions a SQL hook creates, which the compile output does not list.
+SQLBuild's own state tables (`_sqlbuild_*`) are left alone, since other projects in the same schema
+may share them.
 """
 
 from __future__ import annotations
@@ -59,7 +60,9 @@ def hook_functions() -> list[str]:
     found: list[str] = []
     for path in sorted(PROJECT_DIR.glob("models/**/_hooks/sql/*.sql")):
         for name, arguments in HOOK_FUNCTION.findall(path.read_text()):
-            types = [part.strip().split(None, 1)[1] for part in arguments.split(",") if part.strip()]
+            types = [
+                part.strip().split(None, 1)[1] for part in arguments.split(",") if part.strip()
+            ]
             found.append(f"{name}({', '.join(types)})")
     return found
 

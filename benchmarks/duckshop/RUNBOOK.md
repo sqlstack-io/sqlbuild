@@ -182,6 +182,12 @@ the area's Python functions (`functions/python/edge_*.py`, tagged `edge_case`), 
 models and runs their tests and audits. `fct_edge_delivery_events` is disabled and reports
 `skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
 
+`int_edge_basket_running_peaks` calls `edge_running_peaks`, a JavaScript function its pre-hook
+creates in the target schema. SQLBuild does not declare it, so the model's unit test needs a build
+of that model first, and the model calls the function without a schema: set `database` and
+`schema` on the edge connection as well as on the target, so that the session's current schema is
+the target schema. `relations.py drop` drops the function too.
+
 `int_edge_ticket_tokens` calls volatile Python functions, so its values change on every run; its
 test compares only the deterministic columns and asserts facts that hold for any values, such as
 every token being distinct.
