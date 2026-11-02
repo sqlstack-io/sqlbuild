@@ -480,6 +480,14 @@ class PostgresNameChecksTestCase:
 
 
 @dataclass(frozen=True)
+class SqliteNameChecksTestCase:
+    description: str
+    model_sql: str
+    expected_diagnostics: tuple[tuple[str, str, str], ...]
+    expected_columns: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
 class TruthValueTestBuildTestCase:
     description: str
     repo_files: dict[str, str]

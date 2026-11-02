@@ -4,6 +4,7 @@ pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 pub(crate) const POSTGRESQL_DIALECT: &str = "postgresql";
+pub(crate) const SQLITE_DIALECT: &str = "sqlite";
 pub(crate) const QUOTE: char = '"';
 pub(crate) const RELATION_PART_SEPARATOR: &str = ".";
 /// How a table function call opens in model SQL.

@@ -4,7 +4,7 @@ use crate::sqlquack_analysis::_helpers::function_arities::duckdb_arities;
 use std::collections::HashMap;
 
 use sqlquack_semantics::dialects::constants::{
-    DUCKDB, POSTGRES, SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE,
+    DUCKDB, POSTGRES, SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE, SQLITE,
 };
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule, SchemaColumn};
@@ -14,6 +14,7 @@ use sqlquack_syntax::Dialect;
 use crate::sqlquack_analysis::constants::{
     CONDITIONAL_RESULT_RULE, DUCKDB_DIALECT, FIRST_ARGUMENT_RULE, POSTGRES_DIALECT,
     POSTGRESQL_DIALECT, QUOTE, RELATION_PART_SEPARATOR, SAFE_CAST_RULE, SNOWFLAKE_DIALECT,
+    SQLITE_DIALECT,
 };
 use crate::sqlquack_analysis::models::CompileFunctions;
 
@@ -99,6 +100,7 @@ pub(crate) fn sqlquack_dialect(
         SNOWFLAKE_DIALECT => Some((Dialect::Snowflake, &SNOWFLAKE)),
         DUCKDB_DIALECT => Some((Dialect::DuckDB, &DUCKDB)),
         POSTGRES_DIALECT | POSTGRESQL_DIALECT => Some((Dialect::PostgreSQL, &POSTGRES)),
+        SQLITE_DIALECT => Some((Dialect::SQLite, &SQLITE)),
         _ => None,
     }
 }
