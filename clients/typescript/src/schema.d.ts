@@ -291,6 +291,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_catalog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/fingerprints": {
         parameters: {
             query?: never;
@@ -693,6 +709,14 @@ export interface components {
             reason: string;
             /** Format: uuid */
             run_id: string;
+        };
+        CatalogBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation: components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseCatalogRecord"][];
+            /** Format: uuid */
+            session_id: string;
         };
         CatchUp: "latest" | {
             /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
@@ -1497,6 +1521,18 @@ export interface components {
             /** Format: int64 */
             violation_count?: number | null;
         };
+        WarehouseCatalogColumn: {
+            data_type: string;
+            name: string;
+        };
+        /** @description Physical identity and ordered columns come from the adapter catalog, not fingerprints. */
+        WarehouseCatalogRecord: {
+            columns: components["schemas"]["WarehouseCatalogColumn"][];
+            name: string;
+            relation_type: string;
+            state_database?: string | null;
+            state_schema: string;
+        };
         /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
         WarehouseFingerprintRecord: {
             definition: string;
@@ -1534,10 +1570,10 @@ export interface components {
             value_kind: string;
         };
         /**
-         * @description Only immutable history tables support a timestamp watermark.
+         * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -2418,6 +2454,61 @@ export interface operations {
             };
             /** @description Location not authorized */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

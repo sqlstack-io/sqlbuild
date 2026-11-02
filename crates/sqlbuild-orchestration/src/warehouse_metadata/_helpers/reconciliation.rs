@@ -8,7 +8,8 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
-use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use crate::warehouse_metadata::_helpers::catalog::append_catalog_fact;
+use crate::warehouse_metadata::constants::{CATALOG_MIRROR, MAX_HISTORY_RECORDS};
 use crate::warehouse_metadata::models::{
     WarehouseReconciliationCursor, WarehouseReconciliationPage, WarehouseSyncResponse,
 };
@@ -176,11 +177,29 @@ pub(crate) async fn finish_reconciliation(
         .map(|index| format!("${index}"))
         .collect::<Vec<_>>()
         .join(",");
+    let returning = if table == CATALOG_MIRROR {
+        "event_id,record_json"
+    } else {
+        "event_id"
+    };
     let removed;
     (transaction, removed) = query(transaction, &format!(
         "DELETE FROM {table} WHERE event_id IN ({placeholders}) \
          AND received_at<(SELECT received_at FROM sqb_warehouse_scan_pages WHERE scan_id=$1 AND page=0) \
-         AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_scan_keys k WHERE k.scan_id=$1 AND k.event_id={table}.event_id) RETURNING event_id"), parameters).await?;
+         AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_scan_keys k WHERE k.scan_id=$1 AND k.event_id={table}.event_id) RETURNING {returning}"), parameters).await?;
+    if table == CATALOG_MIRROR {
+        for row in &removed {
+            let relation_id = serde_json::from_value(row["event_id"].clone())
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+            transaction = append_catalog_fact(
+                transaction,
+                (page.scan_id, page.page, relation_id),
+                (location_id, target),
+                (row["record_json"].clone(), false),
+            )
+            .await?;
+        }
+    }
     response.applied = !removed.is_empty();
     Ok((transaction, response))
 }

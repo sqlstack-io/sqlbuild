@@ -350,9 +350,10 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
         )]));
     }
     let kind = state.kind().as_str();
-    serde_json::to_vec(&json!({(kind): {
+    let request = json!({(kind): {
         "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
-    }})).map_err(|error| ControlError::Invalid(error.to_string()))
+    }});
+    serde_json::to_vec(&request).map_err(|error| ControlError::Invalid(error.to_string()))
 }
 
 /// Reserve the largest mirror cursor before freezing: receipts prohibit later content splitting.
@@ -366,7 +367,7 @@ pub(crate) fn freeze_history_page(
         "reconciliation":{"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
             "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
             "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }}});
-    if !state.reconcile {
+    if !state.reconciling() {
         body["reconciliation"] = serde_json::Value::Null;
     }
     if serde_json::to_vec(&body)
@@ -384,7 +385,7 @@ pub(crate) fn freeze_history_page(
             )]));
         }
     } else {
-        if state.reconcile {
+        if state.reconciling() {
             body["reconciliation"]["after"] = serde_json::Value::Null;
         }
         state.pending = Some(LocationMetadataPage {
@@ -401,6 +402,15 @@ pub(crate) async fn deliver_metadata_page(
     kind: WarehouseHistoryKind,
 ) -> Result<WarehouseSyncResponse, ClientError> {
     match kind {
+        WarehouseHistoryKind::Catalog => {
+            client
+                .sync_catalog(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid catalog batch"))?,
+                )
+                .await
+        }
         WarehouseHistoryKind::Fingerprints => {
             client
                 .sync_fingerprints(

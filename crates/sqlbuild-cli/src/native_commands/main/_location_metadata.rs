@@ -10,7 +10,7 @@ use sqlbuild_orchestration::platform::models::{
 };
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryPage, WarehouseWatermarkRead,
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseWatermarkRead,
 };
 use tokio::time::Instant;
 
@@ -46,7 +46,7 @@ pub(super) async fn sync_location_metadata(
             if state.index == 0 {
                 state.reconcile = Instant::now() >= state.reconcile_at;
             }
-            if !state.reconcile {
+            if !state.reconcile && state.kind() != WarehouseHistoryKind::Catalog {
                 let request = WarehouseWatermarkRead {
                     session_id: poll.session_id,
                     generation: state.generation,

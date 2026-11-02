@@ -137,6 +137,8 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .await
                 .expect("predecessor");
             for sql in [
+                "DROP TABLE sqb_warehouse_catalog",
+                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_catalog'",
                 "DROP TABLE sqb_security_audit_deliveries",
                 "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
                 "DROP INDEX sqb_freshness_source_latest",

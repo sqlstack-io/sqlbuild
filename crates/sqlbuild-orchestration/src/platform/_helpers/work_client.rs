@@ -10,11 +10,20 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch, MigrationsBatch,
-    OldNameViewsBatch, SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
+    AuditResultsBatch, CatalogBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch,
+    MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, WarehouseSyncResponse,
+    WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
+    pub async fn sync_catalog(
+        &self,
+        target: &str,
+        batch: &CatalogBatch,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.sync_metadata((target, "catalog"), batch).await
+    }
+
     pub async fn report_health(&self, report: &LocationHealthReport) -> Result<bool, ClientError> {
         let endpoint = self.connection.endpoint(&[
             "api",

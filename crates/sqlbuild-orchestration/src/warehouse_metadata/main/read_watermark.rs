@@ -7,7 +7,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::Parameter;
 use crate::warehouse_metadata::_helpers::ingestion::begin_ingestion;
-use crate::warehouse_metadata::models::WarehouseWatermarkRead;
+use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseWatermarkRead};
 
 pub async fn read_watermark(
     store: &crate::store::models::ControlStore,
@@ -16,6 +16,11 @@ pub async fn read_watermark(
 ) -> Result<Option<DateTime<Utc>>, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
+    if request.kind == WarehouseHistoryKind::Catalog {
+        return Err(ControlError::Invalid(
+            "catalog observations require full scans, not timestamp watermarks".into(),
+        ));
+    }
     let table = request.kind.mirror_table();
     let mut parameters = vec![
         Parameter::Id(scope.0),

@@ -55,6 +55,7 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::report_migrations,
     warehouse_metadata::report_old_name_views,
     warehouse_metadata::report_microbatches,
+    warehouse_metadata::report_catalog,
     warehouse_metadata::watermark
 ))]
 pub(crate) struct ControlApi;
