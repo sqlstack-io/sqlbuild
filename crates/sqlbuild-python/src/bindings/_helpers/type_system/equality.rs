@@ -6,6 +6,7 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyString;
 use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
+use sqlbuild_analysis::type_system::main::same_type::same_type;
 use sqlbuild_analysis::type_system::models::{NormalizedType, TypeNormalization};
 use sqlbuild_host::entries::models::ExecutorHost;
 
@@ -32,7 +33,7 @@ pub(crate) fn types_equal(dialect: &Bound<'_, PyAny>, left: &str, right: &str) -
     };
     let left_type: NormalizedType = normalized(dialect, &name, left)?;
     let right_type: NormalizedType = normalized(dialect, &name, right)?;
-    Ok(left_type == right_type)
+    Ok(same_type(&left_type, &right_type, &name))
 }
 
 fn normalized(dialect: &Bound<'_, PyAny>, name: &str, type_sql: &str) -> PyResult<NormalizedType> {
