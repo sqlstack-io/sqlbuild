@@ -25,7 +25,8 @@ pub async fn report_location_health(
     let generation = match report.health {
         LocationHealth::Heartbeat {} => None,
         LocationHealth::CompileFailed { generation }
-        | LocationHealth::Connection { generation, .. } => Some(generation),
+        | LocationHealth::Connection { generation, .. }
+        | LocationHealth::WarehouseSync { generation, .. } => Some(generation),
     };
     if generation.is_some_and(|generation| generation < 1) {
         return Err(ControlError::Invalid(
@@ -65,16 +66,21 @@ pub async fn report_location_health(
     if location.is_empty() {
         return Err(ControlError::Invalid("active location is required".into()));
     }
-    let transaction = if let LocationHealth::Connection { generation, .. } = report.health {
+    let transaction = if let LocationHealth::Connection { generation, .. }
+    | LocationHealth::WarehouseSync { generation, .. } = report.health
+    {
         let (transaction, snapshot) = query(
             transaction,
             "SELECT snapshot_id FROM sqb_snapshots WHERE location_id=$1 AND target=$2 AND generation=$3",
             vec![Parameter::Id(location_id), Parameter::Text(report.target.clone()), Parameter::Integer(generation)],
         ).await?;
         if snapshot.is_empty() {
-            return Err(ControlError::Invalid(
-                "connection health requires a published generation".into(),
-            ));
+            let message = if matches!(report.health, LocationHealth::WarehouseSync { .. }) {
+                "warehouse sync health requires a published generation"
+            } else {
+                "connection health requires a published generation"
+            };
+            return Err(ControlError::Invalid(message.into()));
         }
         transaction
     } else {

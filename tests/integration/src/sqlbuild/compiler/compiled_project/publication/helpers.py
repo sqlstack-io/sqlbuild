@@ -188,6 +188,49 @@ def wait_for_log(
         time.sleep(0.02)
 
 
+def location_health_reports(api: SnapshotApi) -> list[dict[str, Any]]:
+    request: Request = Request(
+        f"{api.url}/api/locations/{api.location_id}/health",
+        headers={"Authorization": f"Bearer {api.bearer}"},
+    )
+    with urlopen(request, timeout=2) as response:
+        return json.load(response)
+
+
+def wait_for_warehouse_sync_health(
+    api: SnapshotApi,
+    expected: dict[str, Any],
+    process: subprocess.Popen[bytes],
+    log: Path,
+    *,
+    after: datetime,
+) -> list[dict[str, Any]]:
+    deadline: float = time.monotonic() + 45
+    reports: list[dict[str, Any]] = []
+    while {report["report"]["health"]["table"] for report in reports} != set(expected["tables"]):
+        assert process.poll() is None, log.read_text()
+        by_outcome: dict[tuple[str, str | None, bool], list[dict[str, Any]]] = {}
+        for report in location_health_reports(api):
+            health: dict[str, Any] = report["report"]["health"]
+            key: tuple[str, str | None, bool] = (
+                health["kind"],
+                health.get("failure"),
+                datetime.fromisoformat(report["received_at"]) > after,
+            )
+            by_outcome.setdefault(key, []).append(report)
+        reports = by_outcome.get(("warehouse_sync", expected["failure"], True), [])
+        assert time.monotonic() < deadline, (reports, log.read_text())
+        time.sleep(0.05)
+    for report in reports:
+        assert report["report"]["target"] == "development"
+        health = report["report"]["health"]
+        assert health["generation"] == 1
+        assert health["location"] == {"database": None, "schema": "main"}
+        assert 0 <= health["records_sent"] <= 100
+        assert health["elapsed_millis"] > 0
+    return reports
+
+
 def wait_for_location_health(
     api: SnapshotApi,
     target: str,
@@ -198,18 +241,12 @@ def wait_for_location_health(
     minimum_reports: int = 1,
 ) -> dict[str, Any]:
     deadline: float = time.monotonic() + 15 + 30 * (minimum_reports - 1)
-    request: Request = Request(
-        f"{api.url}/api/locations/{api.location_id}/health",
-        headers={"Authorization": f"Bearer {api.bearer}"},
-    )
     key: tuple[str, str] = (target, json.dumps(health, sort_keys=True))
     observations: dict[tuple[str, str], dict[str, dict[str, Any]]] = {}
     while len(observations.get(key, ())) < minimum_reports:
         assert process.poll() is None, log.read_text()
         assert time.monotonic() < deadline, log.read_text()
-        with urlopen(request, timeout=2) as response:
-            reports: list[dict[str, Any]] = json.load(response)
-        for report in reversed(reports):
+        for report in reversed(location_health_reports(api)):
             event_id: str = report["report"]["event_id"]
             observed_key: tuple[str, str] = (
                 report["report"]["target"],

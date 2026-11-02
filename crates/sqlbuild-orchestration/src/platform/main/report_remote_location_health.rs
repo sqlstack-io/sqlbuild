@@ -3,9 +3,7 @@
 use uuid::Uuid;
 
 use crate::api::errors::ClientError;
-use crate::api::main::client_response::client_response;
-use crate::api::main::connect_client::connect_client;
-use crate::api::models::MutationResponse;
+use crate::platform::main::connect_location_work::connect_location_work;
 use crate::platform::models::LocationHealthReport;
 
 pub async fn report_remote_location_health(
@@ -13,9 +11,7 @@ pub async fn report_remote_location_health(
     location_id: Uuid,
     report: &LocationHealthReport,
 ) -> Result<bool, ClientError> {
-    let connection = connect_client(server_url, bearer)?;
-    let url = connection.endpoint(&["api", "locations", &location_id.to_string(), "health"])?;
-    let response: MutationResponse =
-        client_response(connection.client.post(url).json(report)).await?;
-    Ok(response.applied)
+    connect_location_work((server_url, bearer), location_id)?
+        .report_health(report)
+        .await
 }

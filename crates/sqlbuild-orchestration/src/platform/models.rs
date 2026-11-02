@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::api::models::ControlClient;
 use crate::declarations::models::TriggerDefinition;
 use crate::sensors::models::{CustomSensorOutcome, SensorEvaluationRequest};
+use crate::warehouse_metadata::models::{WarehouseHistoryKind, WarehouseStateLocation};
 
 /// One pooled outbound connection; the location never receives a store handle.
 #[derive(Clone, Debug)]
@@ -21,8 +22,30 @@ pub struct LocationWorkClient {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationHealth {
     Heartbeat {},
-    CompileFailed { generation: i64 },
-    Connection { generation: i64, healthy: bool },
+    CompileFailed {
+        generation: i64,
+    },
+    Connection {
+        generation: i64,
+        healthy: bool,
+    },
+    WarehouseSync {
+        generation: i64,
+        location: WarehouseStateLocation,
+        table: WarehouseHistoryKind,
+        failure: Option<WarehouseSyncFailure>,
+        records_sent: u64,
+        elapsed_millis: u64,
+    },
+}
+
+/// Closed failure stages keep warehouse errors and credentials out of health observations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WarehouseSyncFailure {
+    Watermark,
+    Read,
+    Delivery,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

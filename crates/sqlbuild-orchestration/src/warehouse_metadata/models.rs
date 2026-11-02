@@ -45,7 +45,7 @@ pub struct WarehouseStateLocation {
 }
 
 /// Only immutable history tables support a timestamp watermark.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WarehouseHistoryKind {
     Fingerprints,

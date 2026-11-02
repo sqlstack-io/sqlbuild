@@ -6,13 +6,26 @@ use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::models::MutationResponse;
 use crate::platform::models::{
-    LocationWorkClaim, LocationWorkClient, LocationWorkPoll, LocationWorkResult,
+    LocationHealthReport, LocationWorkClaim, LocationWorkClient, LocationWorkPoll,
+    LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
     FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
+    pub async fn report_health(&self, report: &LocationHealthReport) -> Result<bool, ClientError> {
+        let endpoint = self.connection.endpoint(&[
+            "api",
+            "locations",
+            &self.location_id.to_string(),
+            "health",
+        ])?;
+        let response: MutationResponse =
+            client_response(self.connection.client.post(endpoint).json(report)).await?;
+        Ok(response.applied)
+    }
+
     pub async fn metadata_watermark(
         &self,
         target: &str,
