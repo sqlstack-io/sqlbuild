@@ -236,6 +236,40 @@ pub(crate) async fn reconcile_history(
             before,
             "empty-copy resync preserves exact identities and observations"
         );
+        let mut namespace = json!({"session_id":session_id,"generation":1,"records":[],"reconciliation":{
+            "scan_id":Uuid::now_v7(),"page":0,"state_database":null,"state_schema":"reconcile_orders","day":null,"complete":false,"after":null}});
+        post((client, &url, bearer), &namespace, StatusCode::OK).await;
+        assert_eq!(
+            observations(store, table).await,
+            before,
+            "partial namespace scan cannot delete"
+        );
+        namespace["reconciliation"]["page"] = json!(1);
+        namespace["reconciliation"]["complete"] = json!(true);
+        for index in 0..3 {
+            let reply = post((client, &url, bearer), &namespace, StatusCode::OK).await;
+            namespace["reconciliation"]["after"] = reply["next_reconciliation_after"].clone();
+            assert_eq!(namespace["reconciliation"]["after"].is_null(), index == 2);
+        }
+        let survivors = observations(store, table).await;
+        let mut ids: Vec<_> = survivors
+            .iter()
+            .map(|row| {
+                row["record_json"]["event_id"]
+                    .as_str()
+                    .expect("scoped control")
+            })
+            .collect();
+        ids.sort();
+        assert_eq!(
+            ids,
+            [
+                "reconciliation-other-database",
+                "reconciliation-other-schema",
+                "reconciliation-preview"
+            ],
+            "whole namespace includes both day boundaries, never other scopes"
+        );
         retained_history(
             (store, table),
             (client, &url, bearer),

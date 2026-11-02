@@ -7,6 +7,8 @@ use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, Utc};
+use serde_json::json;
+use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
@@ -17,7 +19,9 @@ use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_pl
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_platform_sink::run_platform_sink;
 use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
-use sqlbuild_orchestration::platform::models::{LocationHealth, LocationHealthReport};
+use sqlbuild_orchestration::platform::models::{
+    LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
+};
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
@@ -26,11 +30,16 @@ use sqlbuild_orchestration::store::main::begin_offline_recovery::begin_offline_r
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
+use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryPage, WarehouseReconciliationCursor, WarehouseStateLocation,
+    WarehouseSyncResponse,
+};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
-use tokio::time::MissedTickBehavior;
+use tokio::time::{Instant, MissedTickBehavior};
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream, Value};
@@ -51,14 +60,16 @@ use crate::native_commands::_helpers::terminal::{
     finish_lost_stdout, terminal_columns, write_output,
 };
 use crate::native_commands::constants::{
-    COLUMNS_VARIABLE, FALLBACK_COLUMNS, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
+    COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS, UNCAUGHT_EXCEPTION_STATUS,
+    UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_cost::run_cost;
 use crate::native_commands::models::{
-    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler, LocationServe,
-    LostStdout, NativeCommand, NativeInvocation, ProjectLocation,
+    CommandOutput, InstalledPackage, LocationCompileRequest, LocationCompiler,
+    LocationMetadataPage, LocationMetadataSync, LocationServe, LostStdout, NativeCommand,
+    NativeInvocation, ProjectLocation,
 };
 use crate::native_commands::types::LocationPublication;
 use crate::workers::main::docker_image_sources::docker_image_sources;
@@ -199,7 +210,7 @@ pub(crate) async fn compile_generation(
     generation: i64,
     sources: &[sqlbuild_cache::project_snapshot::models::PathStamp],
     stopped: impl Future<Output = Result<(), ControlError>>,
-) -> Result<Option<(bool, Option<DateTime<Utc>>)>, ControlError> {
+) -> Result<Option<(bool, Option<Instant>, Vec<WarehouseStateLocation>)>, ControlError> {
     let (reply, publication) = oneshot::channel();
     requests
         .send(LocationCompileRequest {
@@ -231,8 +242,12 @@ pub(crate) async fn compile_generation(
         }
     };
     let published = record.is_some();
-    let refresh_at = record.as_ref().and_then(|(_, refresh_at)| *refresh_at);
-    if let Some((record, _)) = record {
+    let mut refresh_at = None;
+    let mut locations: Vec<WarehouseStateLocation> = Vec::new();
+    if let Some((record, refresh, state_locations)) = record {
+        refresh_at = refresh
+            .map(|deadline| Instant::now() + (deadline - Utc::now()).to_std().unwrap_or_default());
+        locations = state_locations;
         let output = serde_json::to_string(&record)
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         if write_output(&[(Stream::Stdout, &format!("{output}\n"))]).is_some() {
@@ -242,7 +257,7 @@ pub(crate) async fn compile_generation(
             )));
         }
     }
-    Ok(Some((published, refresh_at)))
+    Ok(Some((published, refresh_at, locations)))
 }
 
 /// The child is retained by its owning task while this exchange can be cancelled.
@@ -264,6 +279,168 @@ pub(crate) async fn exchange_location_generation(
     serde_json::from_str(&line).map_err(|_| {
         ControlError::Invalid("location interpreter returned an invalid publication record".into())
     })
+}
+
+/// The caller retains and reaps the child while a cancellable bounded exchange owns its pipes.
+pub(crate) fn location_result<T: serde::de::DeserializeOwned>(
+    (options, script): (&LocationServe, &Path),
+    (request, maximum_bytes): (Vec<u8>, u64),
+) -> Result<(Child, impl Future<Output = Result<T, ControlError>>), ControlError> {
+    let mut child = location_runtime_child(options, script)?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| ControlError::Invalid("location input is unavailable".into()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| ControlError::Invalid("location output is unavailable".into()))?;
+    Ok((child, async move {
+        stdin.write_all(&request).await?;
+        stdin.write_all(b"\n").await?;
+        stdin.shutdown().await?;
+        drop(stdin);
+        let mut bytes: Vec<u8> = Vec::new();
+        stdout
+            .take(maximum_bytes + 1)
+            .read_to_end(&mut bytes)
+            .await?;
+        if bytes.len() as u64 > maximum_bytes {
+            return Err(ControlError::Invalid(
+                "location reply exceeds its byte limit".into(),
+            ));
+        }
+        serde_json::from_slice(&bytes)
+            .map_err(|_| ControlError::Invalid("invalid location reply".into()))
+    }))
+}
+
+pub(crate) fn metadata_sync(
+    (locations, generation): (Vec<WarehouseStateLocation>, i64),
+) -> LocationMetadataSync {
+    LocationMetadataSync {
+        locations,
+        generation,
+        index: 0,
+        scan_id: Uuid::now_v7(),
+        page: 0,
+        source_after: None,
+        limit: MAX_HISTORY_RECORDS,
+        pending: None,
+        next_at: Instant::now(),
+    }
+}
+
+pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, ControlError> {
+    if state.index == 0 && state.page == 0 && state.limit == MAX_HISTORY_RECORDS {
+        drop(write_output(&[(
+            Stream::Stderr,
+            "Reading warehouse history for automatic synchronization...\n",
+        )]));
+    }
+    let kind = if state.index.is_multiple_of(2) {
+        "fingerprints"
+    } else {
+        "source_freshness"
+    };
+    serde_json::to_vec(&json!({(kind): {
+        "location":state.locations[state.index / 2],"after":state.source_after,"observed_since":null,"limit":state.limit
+    }})).map_err(|error| ControlError::Invalid(error.to_string()))
+}
+
+/// Reserve the largest mirror cursor before freezing: receipts prohibit later content splitting.
+pub(crate) fn freeze_history_page(
+    mut state: LocationMetadataSync,
+    page: WarehouseHistoryPage,
+    poll: &LocationWorkPoll,
+) -> Result<LocationMetadataSync, ControlError> {
+    let location = &state.locations[state.index / 2];
+    let mut body = json!({"session_id":poll.session_id,"generation":state.generation,"records":page.records,
+        "reconciliation":{"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
+            "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
+            "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }}});
+    if serde_json::to_vec(&body)
+        .map_err(|error| ControlError::Invalid(error.to_string()))?
+        .len()
+        > BODY_BYTES
+    {
+        if state.limit > 1 {
+            state.limit = (state.limit / 2).max(1);
+        } else {
+            state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+            drop(write_output(&[(
+                Stream::Stderr,
+                "Warehouse history row exceeds the request bound; synchronization incomplete, no reconciliation authorized.\n",
+            )]));
+        }
+    } else {
+        body["reconciliation"]["after"] = serde_json::Value::Null;
+        state.pending = Some(LocationMetadataPage {
+            body,
+            next_source_after: page.next_after,
+        });
+    }
+    Ok(state)
+}
+
+pub(crate) async fn deliver_metadata_page(
+    (client, target): (&LocationWorkClient, &str),
+    body: &serde_json::Value,
+    fingerprints: bool,
+) -> Result<WarehouseSyncResponse, ClientError> {
+    if fingerprints {
+        client
+            .sync_fingerprints(
+                target,
+                &serde_json::from_value(body.clone())
+                    .map_err(|_| ClientError::Configuration("invalid fingerprint batch"))?,
+            )
+            .await
+    } else {
+        client
+            .sync_source_freshness(
+                target,
+                &serde_json::from_value(body.clone())
+                    .map_err(|_| ClientError::Configuration("invalid freshness batch"))?,
+            )
+            .await
+    }
+}
+
+/// Source progress waits for all mirror continuations of the identical frozen final batch.
+pub(crate) fn acknowledge_metadata_page(
+    mut state: LocationMetadataSync,
+    response: WarehouseSyncResponse,
+) -> Result<LocationMetadataSync, ControlError> {
+    let Some(mut pending) = state.pending.take() else {
+        return Ok(state);
+    };
+    if let Some(after) = response.next_reconciliation_after {
+        pending.body["reconciliation"]["after"] = json!(after);
+        state.pending = Some(pending);
+    } else {
+        state.source_after = pending.next_source_after;
+        if state.source_after.is_some() {
+            state.page = state
+                .page
+                .checked_add(1)
+                .ok_or_else(|| ControlError::Invalid("warehouse scan page overflow".into()))?;
+        } else {
+            state.index += 1;
+            state.scan_id = Uuid::now_v7();
+            state.page = 0;
+            state.limit = MAX_HISTORY_RECORDS;
+            if state.index == state.locations.len() * 2 {
+                state.index = 0;
+                state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+                drop(write_output(&[(
+                    Stream::Stderr,
+                    "Warehouse history synchronization completed.\n",
+                )]));
+            }
+        }
+    }
+    Ok(state)
 }
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
@@ -384,6 +561,37 @@ pub(crate) fn location_runtime_child(options: &LocationServe, script: &Path) -> 
         command.args(["--image-id", image]);
     }
     command.stdin(Stdio::piped()).stdout(Stdio::piped()).spawn()
+}
+
+pub(crate) async fn check_published_location(
+    options: &LocationServe,
+    script: &Path,
+    (bearer, session_id, generation): (&str, Uuid, i64),
+    stopped: impl Future<Output = Result<(), ControlError>>,
+) -> Result<Option<Vec<PathBuf>>, ControlError> {
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Checking location connection with sqb debug...\n",
+    )]));
+    tokio::pin!(stopped);
+    let Some((connected, files)) =
+        check_location_connection(options, script, stopped.as_mut()).await?
+    else {
+        return Ok(None);
+    };
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = report_location_health(options, bearer, session_id, LocationHealth::Connection { generation, healthy: connected }) => {},
+    }
+    drop(write_output(&[(
+        Stream::Stderr,
+        if connected {
+            "Code location ready; connection check passed; watching for changes.\n"
+        } else {
+            "Code location published; connection check failed; watching for changes.\n"
+        },
+    )]));
+    Ok(Some(files))
 }
 
 /// Capture the ordinary debug check's exact local file paths without contaminating publication stdout.

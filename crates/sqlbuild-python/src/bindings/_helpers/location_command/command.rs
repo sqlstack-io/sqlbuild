@@ -1,6 +1,6 @@
 //! Compile in the location interpreter and publish data through its scoped HTTP credential.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -14,6 +14,7 @@ use sqlbuild_orchestration::declarations::models::{
     Schedule, TriggerDeclaration, TriggerDefinition,
 };
 use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotRecord};
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
@@ -173,7 +174,11 @@ pub(super) fn location_arguments<'py>(
 pub(super) fn publish_location(
     py: Python<'_>,
     arguments: &KeywordArguments<'_>,
-) -> PyResult<(SnapshotRecord, Option<DateTime<Utc>>)> {
+) -> PyResult<(
+    SnapshotRecord,
+    Option<DateTime<Utc>>,
+    Vec<WarehouseStateLocation>,
+)> {
     if arguments
         .value("action")?
         .extract::<Option<String>>()?
@@ -196,6 +201,18 @@ pub(super) fn publish_location(
         .extract::<std::path::PathBuf>()?;
     let input = metadata(py, arguments, &directory)?;
     let (snapshot, _) = compile_location(py, arguments, &input)?;
+    let locations: BTreeSet<_> = snapshot
+        .input
+        .nodes
+        .values()
+        .filter_map(|node| {
+            let destination = &node.definition["destination"];
+            Some(WarehouseStateLocation {
+                database: destination["database"].as_str().map(str::to_owned),
+                schema: destination["schema"].as_str()?.to_owned(),
+            })
+        })
+        .collect();
     let triggers: BTreeMap<String, TriggerDeclaration> = serde_json::from_value(
         snapshot
             .input
@@ -229,7 +246,7 @@ pub(super) fn publish_location(
             PyValueError::new_err(message)
         })?;
     status(py, "Location snapshot published.")?;
-    Ok((record, refresh_at))
+    Ok((record, refresh_at, locations.into_iter().collect()))
 }
 
 /// One-shot publication and the supervisor's private stdio runtime share the same compiler path.
@@ -282,7 +299,7 @@ pub(crate) fn run_location<'py>(
         return run_runtime(py, options.unwrap_or_else(|| PyDict::new(py)));
     }
     let publication = (|| {
-        let (record, _) = publish_location(py, &arguments)?;
+        let (record, _, _) = publish_location(py, &arguments)?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {

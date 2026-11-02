@@ -8,6 +8,7 @@ use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -171,6 +172,27 @@ pub(crate) struct LocationCompiler {
     pub(crate) stdin: tokio::process::ChildStdin,
     pub(crate) stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
     pub(crate) python_sources: Vec<PathStamp>,
+}
+
+/// A delivered source page remains frozen until the API acknowledges it and any mirror cursor.
+#[derive(Debug)]
+pub(crate) struct LocationMetadataPage {
+    pub(crate) body: serde_json::Value,
+    pub(crate) next_source_after: Option<Vec<Option<String>>>,
+}
+
+/// Only local retry/navigation state; durable scan receipts remain in the control store.
+#[derive(Debug)]
+pub(crate) struct LocationMetadataSync {
+    pub(crate) locations: Vec<WarehouseStateLocation>,
+    pub(crate) generation: i64,
+    pub(crate) index: usize,
+    pub(crate) scan_id: Uuid,
+    pub(crate) page: u32,
+    pub(crate) source_after: Option<Vec<Option<String>>>,
+    pub(crate) limit: usize,
+    pub(crate) pending: Option<LocationMetadataPage>,
+    pub(crate) next_at: tokio::time::Instant,
 }
 
 /// What Python's buffered stdout does with output its reader no longer takes.
