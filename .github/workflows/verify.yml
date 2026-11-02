@@ -293,8 +293,6 @@ jobs:
           uv run --no-sync npm --prefix clients/typescript test
       - name: Run static checks
         run: make check-ci
-      - name: Run native checks
-        run: make rust-check
       - name: Prepare Docker worker tests
         run: |
           docker info > /dev/null
@@ -303,6 +301,38 @@ jobs:
         env:
           SQLBUILD_REQUIRE_DOCKER_TESTS: "1"
         run: make test
+
+  native_checks:
+    name: Native workspace checks
+    needs: [changes, lockfile]
+    if: needs.changes.outputs.checks == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.3"
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            Cargo.lock
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify-checks
+          save-if: false
+      - name: Install Python
+        run: uv python install 3.12
+      - name: Install native test dependencies without rebuilding the packages
+        run: uv sync --locked --all-groups --all-extras --no-install-package sqlbuild --no-install-package sqlbuild-cli
+      - name: Run native checks
+        env:
+          UV_NO_SYNC: "1"
+          PYO3_PYTHON: ${{ github.workspace }}/.venv/bin/python
+        run: make rust-check
 
   e2e_shards:
     name: DuckDB E2E (${{ matrix.name }})
@@ -1030,6 +1060,7 @@ jobs:
         changes,
         lockfile,
         checks,
+        native_checks,
         e2e_shards,
         compiler_differential,
         compiler_differential_python_versions,
@@ -1054,6 +1085,7 @@ jobs:
           CHECKS_SELECTED: ${{ needs.changes.outputs.checks }}
           LOCKFILE_RESULT: ${{ needs.lockfile.result }}
           CHECKS_RESULT: ${{ needs.checks.result }}
+          NATIVE_CHECKS_RESULT: ${{ needs.native_checks.result }}
           E2E_SHARDS_RESULT: ${{ needs.e2e_shards.result }}
           COMPILER_DIFFERENTIAL_RESULT: ${{ needs.compiler_differential.result }}
           COMPILER_DIFFERENTIAL_PYTHON_VERSIONS_RESULT: ${{ needs.compiler_differential_python_versions.result }}
@@ -1074,11 +1106,13 @@ jobs:
             echo "Required classification or lockfile checks did not pass" >&2
             exit 1
           fi
-          if [[ "${CHECKS_RESULT}" != "success" ]] && \
-             ! [[ "${CHECKS_SELECTED}" == "false" && "${CHECKS_RESULT}" == "skipped" ]]; then
-            echo "Required static checks did not pass: ${CHECKS_RESULT}" >&2
-            exit 1
-          fi
+          for result in "${CHECKS_RESULT}" "${NATIVE_CHECKS_RESULT}"; do
+            if [[ "${result}" != "success" ]] && \
+               ! [[ "${CHECKS_SELECTED}" == "false" && "${result}" == "skipped" ]]; then
+              echo "Required static or native checks did not pass: ${result}" >&2
+              exit 1
+            fi
+          done
           if [[ "${WHEELS_RESULT}" == "success" && "${COMPOSE_RESULT}" != "success" ]]; then
             echo "Required packaged Compose verification did not pass: ${COMPOSE_RESULT}" >&2
             exit 1
