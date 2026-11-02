@@ -43,3 +43,12 @@ pub(crate) const POLYGLOT_TYPE_NAME_ALIASES: &[(&str, &str)] = &[
 pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 /// Python's `str(0)`, the only integer text Python treats as false.
 pub(crate) const ZERO_TEXT: &str = "0";
+/// Snowflake time and timestamp types, word separators removed, whose precision metadata omits.
+pub(crate) const SNOWFLAKE_PRECISION_TEMPORAL_TYPES: &[&str] =
+    &["TIME", "TIMESTAMPLTZ", "TIMESTAMPNTZ", "TIMESTAMPTZ"];
+/// The character that opens a type's parameter list.
+pub(crate) const TYPE_PARAMETERS_OPEN: char = '(';
+/// The word separator in Snowflake type names such as `TIMESTAMP_TZ`.
+pub(crate) const TYPE_WORD_SEPARATOR: char = '_';
+/// The character that closes a type's parameter list.
+pub(crate) const TYPE_PARAMETERS_CLOSE: char = ')';

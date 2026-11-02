@@ -23,3 +23,10 @@ pub(super) struct BracketDepthTestCase {
     pub(super) depth: usize,
     pub(super) expected_native: bool,
 }
+
+pub(super) struct SameTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static str,
+    pub(super) types: (&'static str, &'static str),
+    pub(super) expected_same: bool,
+}
