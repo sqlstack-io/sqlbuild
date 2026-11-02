@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.187.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.2...v0.187.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* Snowflake time and timestamp precision no longer fails source contracts ([#1294](https://github.com/sqlstack-io/sqlbuild/issues/1294)) ([9c41a61](https://github.com/sqlstack-io/sqlbuild/commit/9c41a61825c3dd5db34f91447143821684bc718c))
+
+## [0.187.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.1...v0.187.2) (2026-11-02)
+
+
+### Performance Improvements
+
+* **rules:** pin SQLClean 0.4.3 for cheaper unused-CTE facts ([#1296](https://github.com/sqlstack-io/sqlbuild/issues/1296)) ([1ba0a3d](https://github.com/sqlstack-io/sqlbuild/commit/1ba0a3df837cdf34c4ef81f9a163127fe62841a9))
+
 ## [0.187.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.0...v0.187.1) (2026-11-02)
 
 

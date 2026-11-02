@@ -132,3 +132,14 @@ class QuotedConfiguredColumnTestCase:
     expected_exit_code: int
     expected_fragments: tuple[str, ...] = ()
     expected_errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TemporalSourceContractTestCase:
+    """An enforced source contract's temporal type and the column type the warehouse holds."""
+
+    description: str
+    declared_type: str
+    warehouse_type: str
+    expected_models: tuple[str, ...]
+    expected_error: str = ""
