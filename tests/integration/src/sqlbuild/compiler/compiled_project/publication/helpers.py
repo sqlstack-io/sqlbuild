@@ -517,6 +517,7 @@ def snapshot_api(
     environment: dict[str, str] = os.environ.copy()
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
     environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
+    environment.pop("SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL", None)
     with log.open("wb") as stderr:
         process: subprocess.Popen[bytes] = subprocess.Popen(
             [
@@ -633,6 +634,7 @@ def scheduled_worker(
                 "import os\nfrom sqlbuild.orchestration import job, schedule\n"
                 "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
                 "    assert 'SQLBUILD_PLATFORM_WEBHOOK_URL' not in os.environ\n"
+                "    assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
                 'annual_orders = job("annual_orders", select="orders", '
                 'description="Build orders.", '
                 'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
@@ -698,6 +700,10 @@ def scheduled_worker(
         monkeypatch.setenv(
             "SQLBUILD_PLATFORM_WEBHOOK_URL",
             "http://127.0.0.1:1/events?token=synthetic-delivery-credential",
+        )
+        monkeypatch.setenv(
+            "SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL",
+            "http://127.0.0.1:1/audit?token=synthetic-audit-credential",
         )
         log: Path = directory / "scheduler.log"
         with location_process(

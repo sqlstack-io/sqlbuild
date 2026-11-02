@@ -70,6 +70,7 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
     pidfile: Path = tmp_path / "interpreter.pid"
     declaration: str = (
         "import os\nfrom pathlib import Path\n"
+        "assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
         f"Path({str(pidfile)!r}).write_text(str(os.getpid()))\n"
         + Path("benchmarks/duckshop/edge_cases/orchestration/development_orders.py").read_text()
     )
@@ -94,7 +95,10 @@ def test_given_development_when_reloaded_and_restarted_then_local_scope_and_paus
         argument.format(control=control) for argument in test_case.arguments
     ]
     environment: dict[str, str] = os.environ | {
-        "SQLBUILD_CONTROL_DATABASE_URL": "unsupported://not-development"
+        "SQLBUILD_CONTROL_DATABASE_URL": "unsupported://not-development",
+        "SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL": (
+            "http://127.0.0.1:1/audit?token=synthetic-audit-credential"
+        ),
     }
     _ = environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     log: Path = tmp_path / "development.log"

@@ -54,7 +54,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "if 'SQLBUILD_RUN_TOKEN' in os.environ:\n"
                     "    assert os.getenv('SQLBUILD_WORKER_TEST_VALUE') == 'orders-context'\n"
                     "    for name in ('SQLBUILD_LOCATION_TOKEN', 'SQLBUILD_CONTROL_DATABASE_URL', "
-                    "'SQLBUILD_SCHEDULER_TEST_STORE', 'SQLBUILD_PLATFORM_WEBHOOK_URL'):\n"
+                    "'SQLBUILD_SCHEDULER_TEST_STORE', 'SQLBUILD_PLATFORM_WEBHOOK_URL', "
+                    "'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL'):\n"
                     "        assert name not in os.environ, name\n"
                     'annual_orders = job("annual_orders", select="orders", '
                     'description="Build orders.", '
