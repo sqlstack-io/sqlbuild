@@ -11,6 +11,8 @@ MODEL (
     supports_same_day (type BOOLEAN),
     supports_cold_chain (type BOOLEAN),
     max_parcel_kg (type NUMBER(6, 2)),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

@@ -10,6 +10,9 @@ MODEL (
     updated_at (type TIMESTAMP_TZ),
     line_count (type INT),
     coupon_code (type VARCHAR),
+    contents (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
