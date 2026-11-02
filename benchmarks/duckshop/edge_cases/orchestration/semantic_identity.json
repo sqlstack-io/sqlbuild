@@ -1,0 +1,57 @@
+{
+  "files": {
+    "hooks/python/notifications.py": "from sqlbuild.hooks import hook\n\n@hook\ndef notify(ctx, channel):\n    \"\"\"Notify support.\"\"\"\n    return 'orders'\n",
+    "models/orders.sql": "MODEL (description 'Orders.', materialized 'table', pre_hooks [python('notify', channel: 'support')], columns (order_id (type INTEGER), amount (type BIGINT)));\nSELECT order_id, __udf(\"edge_next_quantity\")(amount) AS amount FROM __ref(\"stg_orders\")\n"
+  },
+  "cases": [
+    {
+      "description": "layout does not change semantic identity",
+      "path": "models/orders.sql",
+      "before": "SELECT order_id,",
+      "after": "-- Order presentation\nSELECT\n    order_id,",
+      "expected_changed": []
+    },
+    {
+      "description": "config changes with identical query",
+      "path": "models/orders.sql",
+      "before": "materialized 'table'",
+      "after": "materialized 'view'",
+      "expected_changed": ["model:orders"]
+    },
+    {
+      "description": "hook code changes with identical query and config",
+      "path": "hooks/python/notifications.py",
+      "before": "return 'orders'",
+      "after": "return 'products'",
+      "expected_changed": ["model:orders"]
+    },
+    {
+      "description": "referenced function changes consumer local identity",
+      "path": "functions/sql/edge_cases/edge_next_quantity.sql",
+      "before": "quantity + 1",
+      "after": "quantity + 3",
+      "expected_changed": ["udf:edge_next_quantity", "model:orders"]
+    },
+    {
+      "description": "upstream query changes only its local identity",
+      "path": "models/stg_orders.sql",
+      "before": "CAST(5 AS INTEGER)",
+      "after": "CAST(9 AS INTEGER)",
+      "expected_changed": ["model:stg_orders"]
+    },
+    {
+      "description": "seed data changes its planner content identity",
+      "path": "seeds/edge_cases/edge_quantity_steps.csv",
+      "before": "\n7\n",
+      "after": "\n11\n",
+      "expected_changed": ["seed:edge_quantity_steps"]
+    },
+    {
+      "description": "CSV layout is not seed semantic data",
+      "path": "seeds/edge_cases/edge_quantity_steps.csv",
+      "before": "\n7\n",
+      "after": "\n\"7\"\n",
+      "expected_changed": []
+    }
+  ]
+}

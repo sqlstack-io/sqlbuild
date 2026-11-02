@@ -18,12 +18,11 @@ use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_driver::pipeline::compiled_phase;
-use crate::bindings::_helpers::compiled_project::snapshot::{
-    NativeOrchestrationSnapshot, build_orchestration_snapshot,
-};
+use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUBLISH_ACTION};
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
+use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
 use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
@@ -317,5 +316,6 @@ pub(crate) fn run_location<'py>(
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(build_orchestration_snapshot, module)?)?;
     module.add_function(wrap_pyfunction!(run_location_command, module)?)
 }
