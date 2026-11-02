@@ -31,9 +31,10 @@ use crate::assembly::analysis_session::_helpers::mappings::{
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::_helpers::resolution_rows::with_resolution_rows;
 use crate::assembly::analysis_session::constants::{
-    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, QUOTE, SQLQUACK_NAMES_ONLY_DIALECTS,
-    TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT, TRANSFORM_DIRECT,
-    TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, CONFIDENCE_UNKNOWN, ERROR_SEVERITY, QUOTE,
+    SQLQUACK_NAMES_ONLY_DIALECTS, TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT,
+    TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, TRANSFORM_STAR, UNKNOWN_COLUMN_CODE,
+    UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -1028,6 +1029,21 @@ fn column_fact(column: &CompileLineageColumn) -> ColumnFact {
     }
 }
 
+/// Whether polyglot reported an unknown column SQLQuack does not, so polyglot misread the query
+/// and its output types stay withheld, as when the error stood.
+fn dropped_unknown_columns(
+    diagnostics: &[DiagnosticRow],
+    resolved: &[(u8, DiagnosticRow)],
+) -> bool {
+    diagnostics.iter().any(|row| {
+        row.code == UNKNOWN_COLUMN_CODE
+            && row.severity == ERROR_SEVERITY
+            && !resolved.iter().any(|(_, found)| {
+                found.code == row.code && found.line == row.line && found.column == row.column
+            })
+    })
+}
+
 /// One wave model SQLQuack read: its position among the misses, cleaned SQL and lineage.
 struct ReadModel {
     position: usize,
@@ -1132,6 +1148,13 @@ impl AnalysisSession {
             };
             let analysis: &mut ModelAnalysis = &mut self.outcome_mut(*model)?.analysis;
             let diagnostics: Vec<DiagnosticRow> = std::mem::take(&mut analysis.binding_diagnostics);
+            if dropped_unknown_columns(&diagnostics, &resolved)
+                && let Some(columns) = analysis.columns.as_mut()
+            {
+                for column in columns {
+                    column.data_type = None;
+                }
+            }
             analysis.binding_diagnostics = with_resolution_rows(diagnostics, resolved, true);
         }
         Ok(())

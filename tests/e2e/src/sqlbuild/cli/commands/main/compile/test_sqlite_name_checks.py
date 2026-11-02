@@ -79,3 +79,40 @@ def test_given_sqlite_models_when_compiling_then_sqlquack_checks_names_only(
         tuple((column["name"], column.get("type")) for column in columns)
         == test_case.expected_columns
     )
+
+
+def test_given_a_cached_sqlite_compile_when_recompiling_then_name_rows_are_unchanged(
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={
+            "sqlbuild_project.toml": _PROJECT,
+            "models/orders.sql": _ORDERS,
+            "models/report.sql": "MODEL (description 'Report.');\n\n"
+            + 'SELECT x FROM __ref("orders") WHERE x NOT NULL ORDER BY x'
+            + "\n",
+        },
+    )
+
+    fresh: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json")
+    )
+    (project_dir / "models" / "orders.sql").write_text(_ORDERS + "-- touched\n")
+    cached: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json")
+    )
+
+    expected: tuple[tuple[str, str, str], ...] = (
+        ("B002", "error", "Unknown column 'x' in orders"),
+        ("B002", "error", "Unknown column 'x' in orders"),
+        ("B002", "warning", "Unknown column 'x' in orders"),
+    )
+    for result in (fresh, cached):
+        payload: dict[str, object] = json.loads(result.stdout)
+        diagnostics: list[dict[str, str]] = payload["diagnostics"]  # type: ignore[assignment]
+        assert (
+            tuple((item["code"], item["severity"], item["message"]) for item in diagnostics)
+            == expected
+        ), result.stdout + result.stderr

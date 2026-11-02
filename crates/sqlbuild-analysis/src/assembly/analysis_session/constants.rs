@@ -265,3 +265,7 @@ pub(crate) const SCOPE_RULE_PHASE: u8 = 0;
 pub(crate) const QUOTE: char = '"';
 /// The severity of a diagnostic that does not fail the model.
 pub(crate) const WARNING_SEVERITY: &str = "warning";
+/// polyglot's unknown-column code.
+pub(crate) const UNKNOWN_COLUMN_CODE: &str = "B002";
+/// The severity of a diagnostic that fails the compile.
+pub(crate) const ERROR_SEVERITY: &str = "error";

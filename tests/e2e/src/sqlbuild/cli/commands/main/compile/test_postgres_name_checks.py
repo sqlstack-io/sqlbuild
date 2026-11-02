@@ -24,19 +24,19 @@ _ORDERS: str = (
     "test_case",
     (
         PostgresNameChecksTestCase(
-            description="a CTE reference's column aliases name its columns",
+            description="a CTE reference's column aliases name its columns; polyglot's types for it stay withheld",
             model_sql=(
                 'WITH o AS (SELECT order_id, amount FROM __ref("orders"))\n'
                 "SELECT a.id1, b.id2, a.amount1 > 0 AS positive FROM o AS a(id1, amount1), o AS b(id2)"
             ),
             expected_diagnostics=(),
-            expected_columns=(("id1", None), ("id2", None), ("positive", "BOOLEAN")),
+            expected_columns=(("id1", None), ("id2", None), ("positive", None)),
         ),
         PostgresNameChecksTestCase(
             description="a relation's name reads its whole row",
             model_sql="SELECT r, r IS NULL AS missing FROM (VALUES (1, 2)) AS r(a, b)",
             expected_diagnostics=(),
-            expected_columns=(("r", None), ("missing", "BOOLEAN")),
+            expected_columns=(("r", None), ("missing", None)),
         ),
         PostgresNameChecksTestCase(
             description="a column the aliased CTE lacks is still an error",
@@ -87,3 +87,38 @@ def test_given_postgres_models_when_compiling_then_sqlquack_checks_names_only(
         tuple((column["name"], column.get("type")) for column in columns)
         == test_case.expected_columns
     )
+
+
+def test_given_a_cached_postgres_compile_when_recompiling_then_name_rows_are_unchanged(
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={
+            "sqlbuild_project.toml": _PROJECT,
+            "models/orders.sql": _ORDERS,
+            "models/report.sql": "MODEL (description 'Report.');\n\n"
+            + 'WITH o AS (SELECT order_id FROM __ref("orders"))\nSELECT a.nope, b.id2 FROM o AS a(id1), o AS b(id2)'
+            + "\n",
+        },
+    )
+
+    fresh: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json")
+    )
+    (project_dir / "models" / "orders.sql").write_text(_ORDERS + "-- touched\n")
+    cached: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("compile", "--json")
+    )
+
+    expected: tuple[tuple[str, str, str], ...] = (
+        ("B002", "error", "Unknown column 'nope' in o (as a)"),
+    )
+    for result in (fresh, cached):
+        payload: dict[str, object] = json.loads(result.stdout)
+        diagnostics: list[dict[str, str]] = payload["diagnostics"]  # type: ignore[assignment]
+        assert (
+            tuple((item["code"], item["severity"], item["message"]) for item in diagnostics)
+            == expected
+        ), result.stdout + result.stderr
