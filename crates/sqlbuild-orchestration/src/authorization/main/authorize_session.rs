@@ -5,7 +5,7 @@ use serde_json::json;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::authenticate_session_in::authenticate_session_in;
 use crate::credentials::models::{
-    Action, AuditContext, BuiltinRole, PermissionScope, SessionAccess,
+    Action, AuditContext, BuiltinRole, DefaultRole, PermissionScope, SessionAccess,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -40,6 +40,7 @@ pub(crate) async fn authorize_session(
     transaction: ControlTransaction,
     (context, credentials): (&AuditContext, (&str, &str)),
     scope: &PermissionScope,
+    default_role: DefaultRole,
 ) -> Result<(ControlTransaction, AuditContext), ControlError> {
     let access = match scope.action {
         Action::View | Action::ViewSql | Action::ViewEvidence | Action::AuditView => {
@@ -82,6 +83,10 @@ pub(crate) async fn authorize_session(
             context.granting_role = row["role_key"].as_str().unwrap_or_default().into();
             return Ok((transaction, context));
         }
+    }
+    if default_role == DefaultRole::Viewer && role_allows(BuiltinRole::Viewer, scope.action) {
+        context.granting_role = "default:viewer".into();
+        return Ok((transaction, context));
     }
     deny(
         transaction,

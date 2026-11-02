@@ -112,6 +112,7 @@ pub struct ApiAuthentication {
     pub password_origin: Option<String>,
     pub trusted_proxy: Option<TrustedProxyAuthentication>,
     pub oidc: Option<OidcAuthentication>,
+    pub default_role: crate::credentials::models::DefaultRole,
 }
 
 /// Only the server's installation configuration selects the daemon and container to inspect.

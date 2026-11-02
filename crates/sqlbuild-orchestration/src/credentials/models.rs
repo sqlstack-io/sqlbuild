@@ -88,6 +88,15 @@ pub enum BuiltinRole {
     Admin,
 }
 
+/// Installation-owned ambient access; never permits an administrative or execution default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DefaultRole {
+    #[default]
+    None,
+    Viewer,
+}
+
 /// Scope is computed by the server from the operation, never accepted as a claimed write set.
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct PermissionScope {

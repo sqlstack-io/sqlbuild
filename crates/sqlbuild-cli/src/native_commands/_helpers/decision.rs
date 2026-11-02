@@ -265,6 +265,10 @@ pub(crate) fn control_authentication(
 ) -> Result<ApiAuthentication, ControlError> {
     Ok(ApiAuthentication {
         password_origin: text(namespace, "control_password_origin"),
+        default_role: serde_json::from_value(json!(
+            text(namespace, "control_default_role").unwrap_or_else(|| "none".into())
+        ))
+        .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
         trusted_proxy: authentication_settings(
             text(namespace, "control_trusted_proxy_config"),
             ("trusted-proxy", "origin, trusted_peers and identities"),

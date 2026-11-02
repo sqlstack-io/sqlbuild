@@ -2,7 +2,7 @@
 
 use std::net::SocketAddr;
 
-use axum::Router;
+use axum::{Extension, Router};
 
 use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
 use crate::api::models::{ApiAuthentication, DevelopmentScope};
@@ -19,6 +19,7 @@ pub(crate) async fn configure(
         password_origin,
         trusted_proxy,
         oidc,
+        default_role,
     } = authentication;
     if development_scope.is_some() && password_origin.is_some() {
         return Err(ControlError::Invalid(
@@ -46,6 +47,7 @@ pub(crate) async fn configure(
         development_scope,
         password_sessions::router(store, password_origin)?
             .merge(trusted_proxy::router(store, trusted_proxy)?)
-            .merge(oidc::router(store, oidc).await?),
+            .merge(oidc::router(store, oidc).await?)
+            .layer(Extension(default_role)),
     ))
 }

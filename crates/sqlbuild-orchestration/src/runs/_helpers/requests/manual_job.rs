@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::authorize_session::authorize_session;
 use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::models::{Action, AuditContext, PermissionScope};
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::job::frozen_group_children;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
 use crate::runs::main::frozen_job_request::frozen_job_request;
@@ -26,8 +26,13 @@ pub(crate) async fn request_job_run_in(
         nodes: Default::default(),
     };
     if let Some(credentials) = credentials {
-        (transaction, context) =
-            authorize_session(transaction, (&context, credentials), &scope).await?;
+        (transaction, context) = authorize_session(
+            transaction,
+            (&context, credentials),
+            &scope,
+            DefaultRole::None,
+        )
+        .await?;
     }
     if context.actor.trim().is_empty()
         || context.granting_role.trim().is_empty()
@@ -82,8 +87,13 @@ pub(crate) async fn request_job_run_in(
             })
         {
             scope.action = Action::RunRewriteHistory;
-            (transaction, context) =
-                authorize_session(transaction, (&context, credentials), &scope).await?;
+            (transaction, context) = authorize_session(
+                transaction,
+                (&context, credentials),
+                &scope,
+                DefaultRole::None,
+            )
+            .await?;
         }
     }
     let (transaction, _) = publish_request(transaction, &frozen).await?;

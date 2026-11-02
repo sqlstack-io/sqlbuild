@@ -150,8 +150,13 @@ for recent run metadata, `POST /api/control/runs` for published-job requests, an
 `POST /api/control/triggers` for trigger overrides. Viewers can read metadata but cannot
 run jobs; operators and developers can run ordinary jobs and toggle triggers. Full-refresh
 jobs, published cursor bounds, explicit backfill windows and cursor resets require an installation
-administrator in these endpoints. A person with no assigned role cannot use them. Metadata responses do not
-contain SQL, sampled rows or captured output. These person routes do not accept machine
+administrator in these endpoints. The server defaults to `--default-role none`: a person with no
+assigned role cannot use them. Set `--default-role viewer` to give every authenticated person
+installation-wide metadata access, including people whose explicit roles have been revoked.
+This is a live server setting, not a persisted assignment; returning it to `none` removes that
+ambient access without changing explicit grants. It never permits SQL, evidence, job execution
+or administration. Metadata responses do not contain SQL, sampled rows or captured output.
+These person routes do not accept machine
 credentials; location and worker credentials continue to use the separate machine routes.
 
 Set `SQLBUILD_PLATFORM_WEBHOOK_URL` in `.env` before creating the server to receive the native
