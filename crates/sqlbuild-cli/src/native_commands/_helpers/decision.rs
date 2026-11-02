@@ -51,6 +51,12 @@ pub(crate) fn flag(namespace: &Namespace, name: &str) -> bool {
 pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, ControlError> {
     let value = text(namespace, "admin_subject").unwrap_or_default();
     let action = text(namespace, "admin_command");
+    if action.as_deref() == Some("create-user") {
+        if value.trim().is_empty() {
+            return Err(ControlError::Invalid("user name is required".into()));
+        }
+        return Ok(ControlAdmin::BootstrapUser(value));
+    }
     if action.as_deref() == Some("create-location") {
         if value.trim().is_empty() {
             return Err(ControlError::Invalid("location name is required".into()));

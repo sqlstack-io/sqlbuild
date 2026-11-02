@@ -116,8 +116,33 @@ For opt-in OIDC identity verification, mount a server-owned JSON file with `orig
 `--oidc-config /etc/sqlbuild/oidc.json` to the server command. Both origin and issuer require
 HTTPS. Terminate HTTPS at a trusted proxy, preserve the external Host, restrict backend access,
 and register `/api/auth/oidc/callback` at the issuer. This verifies an explicitly bound enabled
-person; it does not provision people, issue a browser session, or grant roles. The reference
-does not assign an initial administrator or authorize non-admin operations.
+person; it does not provision people, issue a browser session, or grant roles.
+
+The local control-store owner initializes the first installation administrator with
+`sqb admin create-user NAME`, then provisions its password separately with
+`sqb admin set-password PRINCIPAL_ID`. Initialization is available once only; losing or disabling
+administrators never reopens it. `create-principal` creates a role-free identity, not another
+administrator. With password authentication enabled, authenticated installation administrators
+use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revoke`, `disable`,
+or `enable`, their session cookie and CSRF header. This cannot remove or disable the final enabled,
+password-provisioned administrator; an unprovisioned person is not a usable alternative in this
+password-only administration path. It never authorizes a machine bearer or grants non-admin defaults.
+The explicit offline recovery command is not yet available.
+
+An installation administrator assigns or revokes additive built-in roles through
+`POST /api/admin/roles`, using `principal_id`, `role`, optional `location_id` and `target`,
+and `revoke` (false for a grant). An administrator assignment must be installation-wide.
+Other built-ins can be installation-wide or restricted to a location or target. Revocation
+also works while a person is disabled, before they are enabled again.
+
+Password sessions use `GET /api/control/locations/{location_id}/targets/{target}/runs`
+for recent run metadata, `POST /api/control/runs` for published-job requests, and
+`POST /api/control/triggers` for trigger overrides. Viewers can read metadata but cannot
+run jobs; operators and developers can run ordinary jobs and toggle triggers. Full-refresh
+jobs, published cursor bounds, explicit backfill windows and cursor resets require an installation
+administrator in these endpoints. A person with no assigned role cannot use them. Metadata responses do not
+contain SQL, sampled rows or captured output. These person routes do not accept machine
+credentials; location and worker credentials continue to use the separate machine routes.
 
 Set `SQLBUILD_PLATFORM_WEBHOOK_URL` in `.env` before creating the server to receive the native
 platform stream. Leave it unset to disable delivery. Receivers must deduplicate by `event_id`

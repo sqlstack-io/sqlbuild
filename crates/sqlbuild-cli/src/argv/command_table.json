@@ -341,6 +341,18 @@
           }
          },
          {
+          "name": "create-user",
+          "parser": {
+           "prog": "sqb admin create-user",
+           "description": "Initialize the first installation administrator through local control-store ownership. Available once only; losing usable administrators never reopens bootstrap. Password provisioning is separate.",
+           "groups": [{"title": "positional arguments"}, {"title": "options"}],
+           "actions": [
+            {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "NAME", "required": true, "help": "first administrator's person name", "group": 0}
+           ]
+          }
+         },
+         {
           "name": "issue-location-token",
           "parser": {
            "prog": "sqb admin issue-location-token",
@@ -922,6 +934,11 @@
           "dest": "set-password",
           "metavar": "set-password",
           "help": "set an active person's password without granting permissions"
+         },
+         {
+          "dest": "create-user",
+          "metavar": "create-user",
+          "help": "initialize the first installation administrator once through local store ownership"
          },
          {
           "dest": "issue-location-token",

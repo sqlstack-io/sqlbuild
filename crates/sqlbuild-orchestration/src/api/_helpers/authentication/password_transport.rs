@@ -130,6 +130,13 @@ pub(crate) fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'
     values.next().is_none().then_some(value)
 }
 
+pub(crate) fn session_credentials(headers: &HeaderMap) -> (&str, &str) {
+    (
+        browser_cookie(headers, PASSWORD_COOKIE).unwrap_or_default(),
+        single_header(headers, PASSWORD_CSRF_HEADER).unwrap_or_default(),
+    )
+}
+
 pub(crate) fn browser_cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     let mut session = None;
     for header in headers.get_all(header::COOKIE) {

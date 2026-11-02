@@ -1,0 +1,70 @@
+//! Person operations use browser authentication, never the machine-resource bearer router.
+
+use axum::extract::{Path, Query, State};
+use axum::http::HeaderMap;
+use axum::{Extension, Json};
+use uuid::Uuid;
+
+use crate::api::_helpers::authentication::password_transport::session_credentials;
+use crate::api::errors::ApiError;
+use crate::api::models::{MutationResponse, ReadQuery};
+use crate::credentials::models::AuditContext;
+use crate::declarations::main::change_person_trigger::change_person_trigger;
+use crate::declarations::models::TriggerChangeRequest;
+use crate::runs::main::list_person_runs::list_person_runs;
+use crate::runs::main::request_person_job_run::request_person_job_run;
+use crate::runs::models::{JobRunRequest, RunRecord};
+use crate::store::models::ControlStore;
+
+#[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
+    params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,
+    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn request_job(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(request): Json<JobRunRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: request_person_job_run(
+            &store,
+            (&context, session_credentials(&headers)),
+            &request,
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/control/triggers", operation_id = "changeTrigger",
+    params(("x-sqb-csrf" = String, Header)), request_body = TriggerChangeRequest,
+    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn change_trigger(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(request): Json<TriggerChangeRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: change_person_trigger(&store, (&context, session_credentials(&headers)), &request)
+            .await?,
+    }))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs", operation_id = "listPersonRuns",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("limit" = Option<u32>, Query)),
+    responses((status = 200, body = Vec<RunRecord>), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn recent_runs(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<ReadQuery>),
+    headers: HeaderMap,
+) -> Result<Json<Vec<RunRecord>>, ApiError> {
+    Ok(Json(
+        list_person_runs(
+            &store,
+            (&context, session_credentials(&headers)),
+            (location_id, &target, options.limit.unwrap_or(100)),
+        )
+        .await?,
+    ))
+}

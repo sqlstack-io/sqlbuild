@@ -2,10 +2,18 @@
 
 use std::collections::BTreeSet;
 
+use crate::credentials::models::BuiltinRole;
 use crate::runs::models::{RerunRequest, RunStatus};
 
 pub(crate) use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_test_types::Backend;
+
+pub(crate) struct PersonRunPermissionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) role: BuiltinRole,
+    pub(crate) settings_range: std::ops::Range<usize>,
+    pub(crate) expected_allowed: bool,
+}
 
 pub(crate) struct ScopedClaimTestCase {
     pub(crate) description: &'static str,

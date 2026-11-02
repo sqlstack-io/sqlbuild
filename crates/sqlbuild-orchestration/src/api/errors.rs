@@ -30,6 +30,13 @@ impl From<ControlError> for ApiError {
                 status: StatusCode::BAD_REQUEST,
                 message,
             },
+            ControlError::Denied {
+                reason,
+                decision_id,
+            } => Self {
+                status: StatusCode::FORBIDDEN,
+                message: format!("{reason}; decision {decision_id}"),
+            },
             ControlError::StaleGeneration | ControlError::Fenced => Self {
                 status: StatusCode::CONFLICT,
                 message: error.to_string(),

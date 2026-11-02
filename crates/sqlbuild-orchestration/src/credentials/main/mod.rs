@@ -1,12 +1,14 @@
 pub(crate) mod append_audit;
 pub(crate) mod authenticate_bound_person;
 pub mod authenticate_session;
+pub(crate) mod authenticate_session_in;
 pub mod authenticate_token;
 pub(crate) mod claim_oidc_flow;
 pub mod create_location;
 pub(crate) mod create_oidc_flow;
 pub mod create_principal;
 pub mod development_location;
+pub(crate) mod insert_principal;
 pub mod issue_token;
 pub mod login_password;
 pub mod record_authentication_denial;

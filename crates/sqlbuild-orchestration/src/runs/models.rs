@@ -115,7 +115,7 @@ pub struct RunRequest {
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JobRunRequest {
     pub run_id: Uuid,

@@ -38,6 +38,76 @@ pub struct AuditContext {
     pub ip_address: Option<IpAddr>,
 }
 
+/// Closed permission vocabulary; unknown actions fail deserialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub enum Action {
+    #[serde(rename = "view")]
+    View,
+    #[serde(rename = "view.sql")]
+    ViewSql,
+    #[serde(rename = "view.evidence")]
+    ViewEvidence,
+    #[serde(rename = "job.run")]
+    JobRun,
+    #[serde(rename = "run.cancel")]
+    RunCancel,
+    #[serde(rename = "run.rerun")]
+    RunRerun,
+    #[serde(rename = "run.rewrite_history")]
+    RunRewriteHistory,
+    #[serde(rename = "trigger.toggle")]
+    TriggerToggle,
+    #[serde(rename = "sensor.reset_cursor")]
+    SensorResetCursor,
+    #[serde(rename = "warehouse.sync")]
+    WarehouseSync,
+    #[serde(rename = "run.adhoc")]
+    RunAdhoc,
+    #[serde(rename = "connection.test")]
+    ConnectionTest,
+    #[serde(rename = "plan.preview")]
+    PlanPreview,
+    #[serde(rename = "location.manage")]
+    LocationManage,
+    #[serde(rename = "user.manage")]
+    UserManage,
+    #[serde(rename = "role.assign")]
+    RoleAssign,
+    #[serde(rename = "token.manage")]
+    TokenManage,
+    #[serde(rename = "audit.view")]
+    AuditView,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BuiltinRole {
+    Viewer,
+    Operator,
+    Developer,
+    Admin,
+}
+
+/// Scope is computed by the server from the operation, never accepted as a claimed write set.
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct PermissionScope {
+    pub(crate) action: Action,
+    pub(crate) location_id: Option<Uuid>,
+    pub(crate) target: Option<String>,
+    pub(crate) nodes: std::collections::BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RoleAssignmentRequest {
+    pub principal_id: Uuid,
+    pub role: BuiltinRole,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+    #[serde(default)]
+    pub revoke: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenIdentity {
     pub token_id: Uuid,
@@ -59,6 +129,16 @@ pub enum PasswordAuthority {
         proof: VerifiedPassword,
         session_id: Uuid,
     },
+}
+
+/// Administrator membership and person eligibility share the final-admin invariant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AdministratorChange {
+    Grant,
+    Revoke,
+    Disable,
+    Enable,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

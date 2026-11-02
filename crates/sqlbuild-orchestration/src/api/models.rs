@@ -6,12 +6,17 @@ use crate::api::_helpers::authentication::oidc;
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::resources::{
-    changes, location_health, location_work, run_reads, runs, snapshots, trigger_reads,
-    warehouse_metadata,
+    administrators, changes, location_health, location_work, person_operations, run_reads, runs,
+    snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
+    administrators::change,
+    administrators::assign,
+    person_operations::request_job,
+    person_operations::change_trigger,
+    person_operations::recent_runs,
     password_sessions::login,
     password_sessions::current,
     password_sessions::logout,

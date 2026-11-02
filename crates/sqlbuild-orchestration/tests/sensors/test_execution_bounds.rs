@@ -15,6 +15,7 @@ use crate::runs::main::{
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
+use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
@@ -132,23 +133,30 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         outcome: RunOutcome::Success,
                         reason: "All logical nodes succeed".into(),
                         exit_code: None,
-                    }));
-                for change in changes {
-                    change_run(
-                        store,
-                        RunAuthority::Worker {
-                            run_id: claim.request.run_id,
-                            claim_id: claim.claim_id,
-                        },
-                        &RunChangeRequest {
-                            event_id: Uuid::now_v7(),
-                            run_id: claim.request.run_id,
-                            claim_id: Some(claim.claim_id),
-                            change,
-                        },
-                    )
-                    .await
-                    .expect("real node evidence");
+                    }))
+                    .collect::<Vec<_>>();
+                for batch in changes.chunks(100) {
+                    // Evidence setup must keep its scheduler alive, just like the real loop.
+                    renew_lease(store, &lease)
+                        .await
+                        .expect("renew during setup");
+                    for change in batch {
+                        change_run(
+                            store,
+                            RunAuthority::Worker {
+                                run_id: claim.request.run_id,
+                                claim_id: claim.claim_id,
+                            },
+                            &RunChangeRequest {
+                                event_id: Uuid::now_v7(),
+                                run_id: claim.request.run_id,
+                                claim_id: Some(claim.claim_id),
+                                change: change.clone(),
+                            },
+                        )
+                        .await
+                        .expect("real node evidence");
+                    }
                 }
                 advance_groups(store, &lease, (&limits, scope))
                     .await

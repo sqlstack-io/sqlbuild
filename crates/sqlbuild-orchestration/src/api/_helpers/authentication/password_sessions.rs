@@ -37,6 +37,26 @@ pub(crate) fn router(
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/password", post(change_password))
+        .route(
+            "/api/admin/people/{principal_id}",
+            post(crate::api::_helpers::resources::administrators::change),
+        )
+        .route(
+            "/api/admin/roles",
+            post(crate::api::_helpers::resources::administrators::assign),
+        )
+        .route(
+            "/api/control/runs",
+            post(crate::api::_helpers::resources::person_operations::request_job),
+        )
+        .route(
+            "/api/control/triggers",
+            post(crate::api::_helpers::resources::person_operations::change_trigger),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs",
+            get(crate::api::_helpers::resources::person_operations::recent_runs),
+        )
         .route_layer(middleware::from_fn_with_state(store.clone(), authenticate));
     Ok(protected
         .route("/api/auth/password/login", post(login))

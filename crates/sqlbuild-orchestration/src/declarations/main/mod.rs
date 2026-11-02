@@ -1,3 +1,4 @@
+pub mod change_person_trigger;
 pub mod change_trigger;
 pub(crate) mod frozen_definitions;
 pub mod group_dependencies;
