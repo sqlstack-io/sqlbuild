@@ -10,7 +10,9 @@ use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::change_administrator::change_administrator;
-use crate::credentials::models::{AdministratorChange, AuditContext, RoleAssignmentRequest};
+use crate::credentials::models::{
+    AdministratorAuthentication, AdministratorChange, AuditContext, RoleAssignmentRequest,
+};
 use crate::store::models::ControlStore;
 
 #[utoipa::path(post, path = "/api/admin/people/{principal_id}", operation_id = "changeAdministrator",
@@ -19,7 +21,11 @@ use crate::store::models::ControlStore;
     responses((status = 200, body = MutationResponse), (status = 401, body = crate::api::models::AuthenticationDenial),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
 pub(crate) async fn change(
-    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (State(store), Extension(context), Extension(authentication)): (
+        State<ControlStore>,
+        Extension<AuditContext>,
+        Extension<AdministratorAuthentication>,
+    ),
     Path(principal_id): Path<Uuid>,
     headers: HeaderMap,
     Json(change): Json<AdministratorChange>,
@@ -29,7 +35,7 @@ pub(crate) async fn change(
             &store,
             &context,
             session_credentials(&headers),
-            (principal_id, change),
+            (principal_id, change, &authentication),
         )
         .await?,
     }))
@@ -41,11 +47,17 @@ pub(crate) async fn change(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
 pub(crate) async fn assign(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(authentication): Extension<AdministratorAuthentication>,
     headers: HeaderMap,
     Json(request): Json<RoleAssignmentRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: assign_builtin_role(&store, (&context, session_credentials(&headers)), &request)
-            .await?,
+        applied: assign_builtin_role(
+            &store,
+            (&context, session_credentials(&headers)),
+            &request,
+            &authentication,
+        )
+        .await?,
     }))
 }

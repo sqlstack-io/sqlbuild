@@ -10,12 +10,15 @@ use axum::{Extension, Json};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::api::constants::{HTTPS_SCHEME, PASSWORD_COOKIE, PASSWORD_CSRF_HEADER, ROOT_PATH};
+use crate::api::constants::{
+    HTTPS_SCHEME, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER, ROOT_PATH,
+};
 use crate::api::errors::ApiError;
-use crate::api::models::{AuthenticationDenial, BrowserOrigin};
+use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
+use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
 use crate::credentials::main::authenticate_session::authenticate_session;
 use crate::credentials::main::record_authentication_denial::record_authentication_denial;
-use crate::credentials::models::{AuditContext, SessionAccess};
+use crate::credentials::models::{AuditContext, IssuedSession, SessionAccess};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -116,7 +119,7 @@ pub(crate) async fn authenticate(
     };
     let mut context = context;
     context.actor = format!("principal:{}", identity.principal_id);
-    context.granting_role = "password-session".into();
+    context.granting_role = "browser-session".into();
     request.extensions_mut().insert(context);
     request.extensions_mut().insert(identity);
     Ok(next.run(request).await)
@@ -156,6 +159,36 @@ pub(crate) fn browser_cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&
         }
     }
     session
+}
+
+pub(crate) fn external_session(session: IssuedSession) -> Result<Response, ApiError> {
+    let response = Json(ExternalIdentityResponse {
+        principal_id: session.identity.principal_id,
+        session_id: session.identity.session_id,
+        expires_at: session.identity.expires_at,
+        csrf_token: session.csrf.clone(),
+    })
+    .into_response();
+    session_cookies(response, &session)
+}
+
+pub(crate) fn session_cookies(
+    mut response: Response,
+    session: &IssuedSession,
+) -> Result<Response, ApiError> {
+    set_cookie(
+        &mut response,
+        (PASSWORD_COOKIE, &session.bearer),
+        PASSWORD_SESSION_SECONDS,
+        (true, "Strict"),
+    )?;
+    set_cookie(
+        &mut response,
+        (PASSWORD_CSRF_COOKIE, &session.csrf),
+        PASSWORD_SESSION_SECONDS,
+        (false, "Strict"),
+    )?;
+    Ok(response)
 }
 
 pub(crate) fn set_cookie(

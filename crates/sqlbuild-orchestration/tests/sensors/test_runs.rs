@@ -426,6 +426,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 .await
                 .expect("upgrade fixture");
             for table in [
+                "sqb_external_sessions",
                 "sqb_role_assignments",
                 "sqb_admin_initialization",
                 "sqb_oidc_login_flows",

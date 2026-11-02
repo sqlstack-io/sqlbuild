@@ -18,6 +18,8 @@ mod test_changes;
 mod test_contract;
 #[path = "test_development.rs"]
 mod test_development;
+#[path = "test_external_sessions.rs"]
+mod test_external_sessions;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]

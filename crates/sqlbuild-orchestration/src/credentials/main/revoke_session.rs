@@ -1,51 +1,56 @@
-//! Logout preserves session history and commits its security audit with revocation.
+//! Revoke one session or every browser session without releasing the caller's write lock.
 
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::models::{AuditContext, SessionIdentity};
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
+use crate::store::main::query::query;
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
-pub async fn revoke_session(
-    store: &ControlStore,
+/// A missing session ID revokes all mechanisms; the caller audits its password/reset operation.
+pub(crate) async fn revoke_session(
+    mut transaction: ControlTransaction,
     context: &AuditContext,
-    identity: &SessionIdentity,
-) -> Result<bool, ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
+    (principal_id, session_id): (Uuid, Option<Uuid>),
+) -> Result<(ControlTransaction, usize), ControlError> {
     let now = transaction.now;
-    let (transaction, rows) = query(
-        transaction,
-        "UPDATE sqb_password_sessions SET revoked_at=$1 WHERE session_id=$2 \
-         AND principal_id=$3 AND revoked_at IS NULL RETURNING session_id",
-        vec![
-            Parameter::Time(now),
-            Parameter::Id(identity.session_id),
-            Parameter::Id(identity.principal_id),
-        ],
-    )
-    .await?;
-    if rows.is_empty() {
-        commit(transaction).await?;
-        return Ok(false);
+    let mut parameters = vec![Parameter::Time(now), Parameter::Id(principal_id)];
+    let predicate = match session_id {
+        Some(id) => {
+            parameters.push(Parameter::Id(id));
+            "AND session_id=$3"
+        }
+        None => "",
+    };
+    let mut revoked = 0;
+    for table in ["sqb_password_sessions", "sqb_external_sessions"] {
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            &format!("UPDATE {table} SET revoked_at=$1 WHERE principal_id=$2 {predicate} AND revoked_at IS NULL RETURNING session_id"),
+            parameters.clone(),
+        )
+        .await?;
+        revoked += rows.len();
     }
-    let mut transaction = append_audit(
-        transaction,
-        context,
-        (
-            Uuid::new_v5(&identity.session_id, b"revoked"),
-            "session.revoked",
-        ),
-        (
-            json!({"principal_id": identity.principal_id}),
-            json!({"session_id": identity.session_id, "revoked": false}),
-            json!({"session_id": identity.session_id, "revoked": true}),
-        ),
-    )
-    .await?;
+    if revoked == 0 {
+        return Ok((transaction, 0));
+    }
+    if let Some(id) = session_id {
+        transaction = append_audit(
+            transaction,
+            context,
+            (Uuid::new_v5(&id, b"revoked"), "session.revoked"),
+            (
+                json!({"principal_id":principal_id}),
+                json!({"session_id":id,"revoked":false}),
+                json!({"session_id":id,"revoked":true}),
+            ),
+        )
+        .await?;
+    }
     transaction.changes.insert(Change::Credentials);
-    commit(transaction).await?;
-    Ok(true)
+    Ok((transaction, revoked))
 }

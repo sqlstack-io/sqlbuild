@@ -7,14 +7,14 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router, middleware};
 
 use crate::api::_helpers::authentication::password_transport::{
-    authenticate, deny, guard, parse_origin, set_cookie,
+    authenticate, deny, guard, parse_origin, session_cookies, set_cookie,
 };
 use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE};
 use crate::api::errors::ApiError;
 use crate::api::models::{
     AuthenticationDenial, PasswordChangeRequest, PasswordLoginRequest, PasswordSessionResponse,
 };
-use crate::credentials::constants::{LOGIN_WINDOW_SECONDS, PASSWORD_SESSION_SECONDS};
+use crate::credentials::constants::LOGIN_WINDOW_SECONDS;
 use crate::credentials::main::{
     login_password::login_password, reserve_authentication_attempt::reserve_authentication_attempt,
     revoke_session::revoke_session, set_password::set_password, verify_password::verify_password,
@@ -23,20 +23,13 @@ use crate::credentials::models::{
     AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, SessionIdentity,
 };
 use crate::store::errors::ControlError;
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::{ControlStore, TransactionMode};
 
-pub(crate) fn router(
-    store: &ControlStore,
-    origin: Option<String>,
-) -> Result<Router<ControlStore>, ControlError> {
-    let Some(origin) = origin else {
-        return Ok(Router::new());
-    };
-    let origin = parse_origin(&origin, "password")?;
-    let protected = Router::new()
+pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
+    Router::new()
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
-        .route("/api/auth/password", post(change_password))
         .route(
             "/api/admin/people/{principal_id}",
             post(crate::api::_helpers::resources::administrators::change),
@@ -65,7 +58,23 @@ pub(crate) fn router(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
-        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate));
+        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
+        .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
+}
+
+pub(crate) fn router(
+    store: &ControlStore,
+    origin: Option<String>,
+) -> Result<Router<ControlStore>, ControlError> {
+    let Some(origin) = origin else {
+        return Ok(Router::new());
+    };
+    let origin = parse_origin(&origin, "password")?;
+    let protected = protected(store).merge(
+        Router::new()
+            .route("/api/auth/password", post(change_password))
+            .route_layer(middleware::from_fn_with_state(store.clone(), authenticate)),
+    );
     Ok(protected
         .route("/api/auth/password/login", post(login))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
@@ -84,24 +93,12 @@ pub(crate) async fn login(
 ) -> Result<Response, ApiError> {
     match login_password(&store, &context, (&request.username, &request.password)).await? {
         PasswordLogin::Authenticated(session) => {
-            let mut response = Json(PasswordSessionResponse {
-                identity: session.identity,
+            let response = Json(PasswordSessionResponse {
+                identity: session.identity.clone(),
                 csrf_token: session.csrf.clone(),
             })
             .into_response();
-            set_cookie(
-                &mut response,
-                (PASSWORD_COOKIE, &session.bearer),
-                PASSWORD_SESSION_SECONDS,
-                (true, "Strict"),
-            )?;
-            set_cookie(
-                &mut response,
-                (PASSWORD_CSRF_COOKIE, &session.csrf),
-                PASSWORD_SESSION_SECONDS,
-                (false, "Strict"),
-            )?;
-            Ok(response)
+            session_cookies(response, &session)
         }
         PasswordLogin::Denied {
             decision_id,
@@ -150,7 +147,13 @@ pub(crate) async fn logout(
     Extension(context): Extension<AuditContext>,
     Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Response, ApiError> {
-    revoke_session(&store, &context, &identity).await?;
+    let (transaction, _) = revoke_session(
+        begin(&store, TransactionMode::Write).await?,
+        &context,
+        (identity.principal_id, Some(identity.session_id)),
+    )
+    .await?;
+    commit(transaction).await?;
     clear_cookies()
 }
 

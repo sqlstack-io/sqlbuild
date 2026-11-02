@@ -164,9 +164,23 @@ pub(crate) struct OidcCallback {
     pub(crate) code: Option<openidconnect::AuthorizationCode>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ExternalIdentityResponse {
     pub principal_id: uuid::Uuid,
+    pub session_id: uuid::Uuid,
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    pub csrf_token: String,
+}
+
+impl std::fmt::Debug for ExternalIdentityResponse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ExternalIdentityResponse")
+            .field("principal_id", &self.principal_id)
+            .field("session_id", &self.session_id)
+            .field("expires_at", &self.expires_at)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]

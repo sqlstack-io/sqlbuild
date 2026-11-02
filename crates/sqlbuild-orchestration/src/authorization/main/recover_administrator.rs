@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::authorization::_helpers::administrators::grant_installation_admin;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::revoke_session::revoke_session;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
@@ -51,7 +52,6 @@ pub async fn recover_administrator(
         )
         .await;
     };
-    let now = transaction.now;
     let (transaction, _) = query(
         transaction,
         "UPDATE sqb_principals SET disabled_at=NULL WHERE principal_id=$1",
@@ -60,12 +60,11 @@ pub async fn recover_administrator(
     .await?;
     let (transaction, _) =
         grant_installation_admin(transaction, context, principal_id, "offline_recovery").await?;
-    let (mut transaction, sessions) = query(transaction,
-        "UPDATE sqb_password_sessions SET revoked_at=$1 WHERE principal_id=$2 AND revoked_at IS NULL RETURNING session_id",
-        vec![Parameter::Time(now),Parameter::Id(principal_id)]).await?;
+    let (mut transaction, sessions_revoked) =
+        revoke_session(transaction, context, (principal_id, None)).await?;
     transaction = append_audit(transaction, context, (Uuid::now_v7(), "admin.offline_recovered"),
         (json!({"principal_id":principal_id}),json!({"enabled":person["disabled_at"].is_null()}),
-         json!({"enabled":true,"role":"admin","reason":reason,"sessions_revoked":sessions.len()}))).await?;
+         json!({"enabled":true,"role":"admin","reason":reason,"sessions_revoked":sessions_revoked}))).await?;
     transaction.changes.insert(Change::Credentials);
     commit(transaction).await
 }

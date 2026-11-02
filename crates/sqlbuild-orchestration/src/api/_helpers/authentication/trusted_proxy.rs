@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
+use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::password_transport::{
-    deny, guard, parse_origin, single_header,
+    deny, external_session, guard, parse_origin, single_header,
 };
 use crate::api::constants::PROXY_USER_HEADER;
 use crate::api::errors::ApiError;
@@ -11,14 +12,15 @@ use crate::api::models::{
     AuthenticationDenial, ExternalIdentityResponse, TrustedProxyAuthentication,
 };
 use crate::credentials::main::authenticate_bound_person::authenticate_bound_person;
-use crate::credentials::models::{AuditContext, ExternalIdentityMechanism};
+use crate::credentials::main::reserve_authentication_attempt::reserve_authentication_attempt;
+use crate::credentials::models::{AuditContext, AuthenticationAttempt, ExternalIdentityMechanism};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use axum::extract::State;
-use axum::http::{HeaderMap, HeaderValue};
-use axum::response::{IntoResponse, Response};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::Response;
 use axum::routing::get;
-use axum::{Extension, Json, Router, middleware};
+use axum::{Extension, Router, middleware};
 
 pub(crate) fn router(
     store: &ControlStore,
@@ -52,15 +54,16 @@ pub(crate) fn router(
         .collect();
     Ok(Router::new()
         .route("/api/auth/proxy", get(identity))
+        .merge(password_sessions::protected(store))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
         .layer(Extension(origin))
         .layer(Extension(Arc::new(settings))))
 }
 
 #[utoipa::path(get, path = "/api/auth/proxy", operation_id = "proxyIdentity",
-    description = "Requires a configured socket peer and an upstream-replaced X-SQB-User subject. Does not issue sessions or grant permissions.",
+    description = "Requires a configured socket peer and upstream-replaced X-SQB-User subject; issues a bounded browser session without provisioning, personal API tokens or implicit grants.",
     security(("proxy" = [])),
-    responses((status = 200, body = ExternalIdentityResponse), (status = 401, body = AuthenticationDenial)))]
+    responses((status = 200, body = ExternalIdentityResponse), (status = 401, body = AuthenticationDenial), (status = 429, body = AuthenticationDenial)))]
 pub(crate) async fn identity(
     State(store): State<ControlStore>,
     Extension(settings): Extension<Arc<TrustedProxyAuthentication>>,
@@ -79,16 +82,23 @@ pub(crate) async fn identity(
     let Some(principal_id) = principal else {
         return deny(&store, &context, "unbound_proxy_subject").await;
     };
-    if authenticate_bound_person(
+    let (_, allowed) =
+        reserve_authentication_attempt(&store, &context, AuthenticationAttempt::IdentityProvider)
+            .await?;
+    if !allowed {
+        let mut response = deny(&store, &context, "proxy_login_throttled").await?;
+        *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
+        return Ok(response);
+    }
+    let Some(session) = authenticate_bound_person(
         &store,
         &context,
         principal_id,
         ExternalIdentityMechanism::TrustedProxy,
     )
     .await?
-    .is_none()
-    {
+    else {
         return deny(&store, &context, "inactive_proxy_person").await;
-    }
-    Ok(Json(ExternalIdentityResponse { principal_id }).into_response())
+    };
+    external_session(session)
 }

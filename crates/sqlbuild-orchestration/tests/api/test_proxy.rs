@@ -115,6 +115,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                     .header(header::HOST, "control.example.com")
                     .header(header::ORIGIN, value("origin"))
             };
+            let mut sessions = Vec::new();
             for url in [&api.url, &other.url] {
                 let response = request(url)
                     .header("x-sqb-user", value("subject"))
@@ -123,10 +124,89 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                     .expect("proxy authentication");
                 assert_eq!(response.status(), StatusCode::OK);
                 assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
-                assert!(!response.headers().contains_key(header::SET_COOKIE));
+                let cookie = response
+                    .headers()
+                    .get_all(header::SET_COOKIE)
+                    .iter()
+                    .map(|value| value.to_str().expect("cookie"))
+                    .find(|value| value.starts_with("__Host-sqb-session="))
+                    .expect("browser session cookie")
+                    .to_owned();
+                for attribute in ["Secure", "HttpOnly", "SameSite=Strict", "Path=/"] {
+                    assert!(cookie.contains(attribute));
+                }
+                assert!(!cookie.contains("Domain="));
+                let body = response
+                    .json::<Value>()
+                    .await
+                    .expect("authenticated person session");
+                assert_eq!(body["principal_id"], json!(person));
+                assert!(body.get("bearer").is_none());
+                sessions.push((
+                    cookie.split(';').next().expect("cookie pair").to_owned(),
+                    body["csrf_token"].as_str().expect("CSRF").to_owned(),
+                ));
+            }
+            for url in [&api.url, &other.url] {
+                let response = client
+                    .get(format!("{url}/api/auth/session"))
+                    .header(header::HOST, "control.example.com")
+                    .header(header::COOKIE, &sessions[0].0)
+                    .send()
+                    .await
+                    .expect("shared browser session");
+                assert_eq!(response.status(), StatusCode::OK);
                 assert_eq!(
-                    response.json::<Value>().await.expect("identity only"),
-                    json!({"principal_id": person})
+                    response.json::<Value>().await.expect("session identity")["principal_id"],
+                    json!(person)
+                );
+                let denied = client
+                    .get(format!(
+                        "{url}/api/control/locations/{}/targets/development/runs",
+                        Uuid::now_v7()
+                    ))
+                    .header(header::HOST, "control.example.com")
+                    .header(header::COOKIE, &sessions[0].0)
+                    .send()
+                    .await
+                    .expect("no implicit viewer permission");
+                assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+            }
+            let logout = |csrf: &str| {
+                client
+                    .post(format!("{}/api/auth/logout", other.url))
+                    .header(header::HOST, "control.example.com")
+                    .header(header::ORIGIN, value("origin"))
+                    .header(header::COOKIE, &sessions[0].0)
+                    .header("x-sqb-csrf", csrf)
+            };
+            assert_eq!(
+                logout("wrong-csrf")
+                    .send()
+                    .await
+                    .expect("CSRF rejection")
+                    .status(),
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                logout(&sessions[0].1)
+                    .send()
+                    .await
+                    .expect("audited logout")
+                    .status(),
+                StatusCode::NO_CONTENT
+            );
+            for url in [&api.url, &other.url] {
+                assert_eq!(
+                    client
+                        .get(format!("{url}/api/auth/session"))
+                        .header(header::HOST, "control.example.com")
+                        .header(header::COOKIE, &sessions[0].0)
+                        .send()
+                        .await
+                        .expect("revoked across replicas")
+                        .status(),
+                    StatusCode::UNAUTHORIZED
                 );
             }
             let mut denials = Vec::new();
@@ -221,6 +301,17 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                         .expect("disabled denial")
                         .decision_id,
                 );
+                assert_eq!(
+                    client
+                        .get(format!("{url}/api/auth/session"))
+                        .header(header::HOST, "control.example.com")
+                        .header(header::COOKIE, &sessions[1].0)
+                        .send()
+                        .await
+                        .expect("disabled session denied live")
+                        .status(),
+                    StatusCode::UNAUTHORIZED
+                );
             }
             let mut transaction = begin(store, TransactionMode::Read)
                 .await
@@ -245,10 +336,10 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 assert_eq!(row["granting_role"], "trusted-proxy");
                 assert_eq!(row["ip_address"], "127.0.0.1");
             }
-            let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_password_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning");
+            let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning or personal tokens");
             assert_eq!(
                 json!(rows[0]),
-                json!({"principals": 2, "sessions": 0, "tokens": 0})
+                json!({"principals": 2, "sessions": test_case.expected_authentications, "tokens": 0})
             );
             commit(transaction).await.expect("inspection complete");
             stop_api(untrusted).await;

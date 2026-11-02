@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::credentials::_helpers::passwords::hash_password;
 use crate::credentials::constants::{MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARACTERS};
 use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::revoke_session::revoke_session;
 use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -80,6 +81,7 @@ pub async fn set_password(
         vec![Parameter::Id(principal_id), Parameter::Id(credential_id), Parameter::Text(hash), Parameter::Time(now)],
     )
     .await?;
+    let (transaction, _) = revoke_session(transaction, context, (principal_id, None)).await?;
     let mut transaction = append_audit(
         transaction,
         context,

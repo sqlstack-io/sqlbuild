@@ -230,9 +230,15 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
             };
             install_fault(store, &revocation_fault).await;
             assert!(
-                revoke_session(store, context, &customer_session.identity)
-                    .await
-                    .is_err()
+                revoke_session(
+                    begin(store, TransactionMode::Write)
+                        .await
+                        .expect("logout transaction"),
+                    context,
+                    (customer, Some(customer_session.identity.session_id))
+                )
+                .await
+                .is_err()
             );
             remove_fault(store, &revocation_fault).await;
             assert!(
@@ -289,16 +295,35 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 .await
                 .is_err()
             );
-            assert!(
-                revoke_session(store, context, &customer_session.identity)
+            let PasswordLogin::Authenticated(customer_session) =
+                login_password(store, context, ("customers-reader", replacement))
                     .await
-                    .expect("logout")
-            );
-            assert!(
-                !revoke_session(&replica, context, &customer_session.identity)
+                    .expect("fresh login after password reset")
+            else {
+                panic!("expected fresh session for logout");
+            };
+            let (transaction, revoked) = revoke_session(
+                begin(store, TransactionMode::Write)
                     .await
-                    .expect("idempotent logout")
-            );
+                    .expect("logout transaction"),
+                context,
+                (customer, Some(customer_session.identity.session_id)),
+            )
+            .await
+            .expect("logout");
+            assert_eq!(revoked, 1);
+            commit(transaction).await.expect("publish logout");
+            let (transaction, revoked) = revoke_session(
+                begin(&replica, TransactionMode::Write)
+                    .await
+                    .expect("retry logout transaction"),
+                context,
+                (customer, Some(customer_session.identity.session_id)),
+            )
+            .await
+            .expect("idempotent logout");
+            assert_eq!(revoked, 0);
+            commit(transaction).await.expect("finish retry");
             let PasswordLogin::Authenticated(disabled_session) =
                 login_password(store, context, ("customers-reader", replacement))
                     .await

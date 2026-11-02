@@ -9,11 +9,13 @@ use crate::authorization::main::{
     bootstrap_user::bootstrap_user, recover_administrator::recover_administrator,
 };
 use crate::credentials::main::{
+    authenticate_bound_person::authenticate_bound_person,
     authenticate_session::authenticate_session, create_principal::create_principal,
     login_password::login_password, set_password::set_password,
 };
 use crate::credentials::models::{
-    AuditContext, PasswordAuthority, PasswordLogin, PrincipalKind, SessionAccess,
+    AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, PrincipalKind,
+    SessionAccess,
 };
 use crate::credentials::tests::helpers::authentication_revision;
 use crate::credentials::tests::test_types::AdministratorRecoveryTestCase;
@@ -102,6 +104,15 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
             else {
                 panic!("valid password");
             };
+            let external_session = authenticate_bound_person(
+                &fixture.store,
+                &context,
+                principal,
+                ExternalIdentityMechanism::Oidc,
+            )
+            .await
+            .expect("verified OIDC identity")
+            .expect("SSO session");
             assert!(
                 begin_offline_recovery(&url).await.is_err(),
                 "even idle normal clients exclude recovery"
@@ -128,6 +139,7 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
                 ("sqb_security_audit", "INSERT"),
                 ("sqb_role_assignments", "INSERT"),
                 ("sqb_password_sessions", "UPDATE"),
+                ("sqb_external_sessions", "UPDATE"),
                 ("sqb_authentication_revision", "UPDATE"),
             ] {
                 let fault = TransactionFault {
@@ -159,10 +171,10 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
                     revision
                 );
                 let (transaction, rows) = query(begin(&fixture.store, TransactionMode::Read).await.expect("inspect rollback"),
-                    "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL) AS disabled, (SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL) AS roles, (SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered') AS recovered", vec![]).await.expect("rollback counts");
+                    "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL) AS disabled, (SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL) AS roles, (SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_external_sessions WHERE revoked_at IS NULL) AS external_sessions, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered') AS recovered", vec![]).await.expect("rollback counts");
                 assert_eq!(
                     serde_json::to_value(&rows[0]).expect("row"),
-                    json!({"disabled":1,"roles":0,"sessions":1,"recovered":0})
+                    json!({"disabled":1,"roles":0,"sessions":1,"external_sessions":1,"recovered":0})
                 );
                 commit(transaction).await.expect("finish rollback read");
             }
@@ -202,6 +214,16 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
                     .expect("old session")
                     .is_none()
             );
+            assert!(
+                authenticate_session(
+                    &fixture.store,
+                    &external_session.bearer,
+                    SessionAccess::Read
+                )
+                .await
+                .expect("old SSO session")
+                .is_none()
+            );
             assert!(matches!(
                 login_password(&fixture.store, &context, (name, password))
                     .await
@@ -226,7 +248,7 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
             assert_eq!(rows[0]["granting_role"], "control-store-owner");
             let after = &rows[0]["after_json"];
             assert_eq!(after["reason"], reason);
-            assert_eq!(after["sessions_revoked"], 1);
+            assert_eq!(after["sessions_revoked"], 2);
             commit(transaction).await.expect("finish audit read");
             close_test_store(fixture).await;
         });
