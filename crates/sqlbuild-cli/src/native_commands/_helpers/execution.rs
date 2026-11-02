@@ -31,8 +31,8 @@ use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseReconciliationCursor,
-    WarehouseStateLocation, WarehouseSyncResponse,
+    StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
+    WarehouseReconciliationCursor, WarehouseStateLocation, WarehouseSyncResponse,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -333,6 +333,7 @@ pub(crate) fn metadata_sync(
         source_after: None,
         observed_since: None,
         watermark_loaded: false,
+        statistics: None,
         reconcile: true,
         reconcile_at: Instant::now(),
         reconcile_seconds,
@@ -350,10 +351,40 @@ pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, C
         )]));
     }
     let kind = state.kind().as_str();
-    let request = json!({(kind): {
-        "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
-    }});
+    let request = if state.kind() == WarehouseHistoryKind::Statistics {
+        json!({(kind): state.statistics.as_ref().ok_or_else(|| ControlError::Invalid("statistics eligibility page missing".into()))?})
+    } else {
+        json!({(kind): {
+            "location":state.location(),"after":state.source_after,"observed_since":state.observed_since,"limit":state.limit
+        }})
+    };
     serde_json::to_vec(&request).map_err(|error| ControlError::Invalid(error.to_string()))
+}
+
+pub(crate) async fn statistics_page(
+    (client, target): (&LocationWorkClient, &str),
+    (state, poll): (&LocationMetadataSync, &LocationWorkPoll),
+) -> Result<StatisticsRead, ClientError> {
+    let after = state
+        .source_after
+        .as_ref()
+        .and_then(|values| values.first())
+        .and_then(|value| value.as_deref())
+        .map(Uuid::parse_str)
+        .transpose()
+        .map_err(|_| ClientError::Configuration("invalid statistics eligibility cursor"))?;
+    client
+        .statistics_due(
+            target,
+            &StatisticsDueRead {
+                session_id: poll.session_id,
+                generation: state.generation,
+                location: state.location().clone(),
+                after,
+                limit: state.limit,
+            },
+        )
+        .await
 }
 
 /// Reserve the largest mirror cursor before freezing: receipts prohibit later content splitting.
@@ -363,11 +394,13 @@ pub(crate) fn freeze_history_page(
     poll: &LocationWorkPoll,
 ) -> Result<LocationMetadataSync, ControlError> {
     let location = state.location();
-    let mut body = json!({"session_id":poll.session_id,"generation":state.generation,"records":page.records,
-        "reconciliation":{"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
+    let mut body =
+        json!({"session_id":poll.session_id,"generation":state.generation,"records":page.records});
+    if state.reconciling() {
+        body["reconciliation"] = json!({"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
             "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
-            "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }}});
-    if !state.reconciling() {
+            "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }});
+    } else if state.kind() != WarehouseHistoryKind::Statistics {
         body["reconciliation"] = serde_json::Value::Null;
     }
     if serde_json::to_vec(&body)
@@ -375,6 +408,7 @@ pub(crate) fn freeze_history_page(
         .len()
         > BODY_BYTES
     {
+        state.statistics = None;
         if state.limit > 1 {
             state.limit = (state.limit / 2).max(1);
         } else {
@@ -402,6 +436,15 @@ pub(crate) async fn deliver_metadata_page(
     kind: WarehouseHistoryKind,
 ) -> Result<WarehouseSyncResponse, ClientError> {
     match kind {
+        WarehouseHistoryKind::Statistics => {
+            client
+                .sync_statistics(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid statistics batch"))?,
+                )
+                .await
+        }
         WarehouseHistoryKind::Catalog => {
             client
                 .sync_catalog(
@@ -490,6 +533,9 @@ pub(crate) fn acknowledge_metadata_page(
         state.pending = Some(pending);
     } else {
         state.source_after = pending.next_source_after;
+        if state.kind() == WarehouseHistoryKind::Statistics {
+            state.statistics = None;
+        }
         if state.source_after.is_some() {
             state.page = state
                 .page

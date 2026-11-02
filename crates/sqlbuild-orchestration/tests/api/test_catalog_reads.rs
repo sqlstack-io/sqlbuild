@@ -180,6 +180,12 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 (location, other),
             )
             .await;
+            crate::api::tests::statistics_helpers::statistics_reads(
+                store,
+                credentials,
+                (location, other, reader_session),
+            )
+            .await;
             let mut actual = Vec::new();
             for _ in 0..2 {
                 let page = read_person_catalog(
@@ -303,6 +309,27 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             )
             .await
             .expect("revoke");
+            assert!(matches!(
+                crate::warehouse_metadata::main::read_person_statistics::read_person_statistics(
+                    store,
+                    credentials,
+                    (
+                        location,
+                        "development",
+                        &crate::warehouse_metadata::models::StatisticsQuery {
+                            database: None,
+                            schema: "main".into(),
+                            name: "orders_🧾_000".into(),
+                            after_observed_at: None,
+                            after_event_id: None,
+                            limit: None,
+                        }
+                    ),
+                    DefaultRole::None,
+                )
+                .await,
+                Err(ControlError::Denied { .. })
+            ));
             assert!(matches!(
                 crate::warehouse_metadata::main::read_person_node_status::read_person_node_status(
                     store,

@@ -20,10 +20,37 @@ use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
 use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
 use crate::warehouse_metadata::main::read_person_node_status::read_person_node_status;
+use crate::warehouse_metadata::main::read_person_statistics::read_person_statistics;
 use crate::warehouse_metadata::models::{
     CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery, NodeStatus,
-    NodeStatusQuery,
+    NodeStatusQuery, StatisticsPage, StatisticsQuery,
 };
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/statistics", operation_id = "readPersonStatistics",
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("database" = Option<String>, Query, description = "Exact database; omitted matches SQL NULL"),
+        ("schema" = String, Query), ("name" = String, Query),
+        ("after_observed_at" = Option<chrono::DateTime<chrono::Utc>>, Query),
+        ("after_event_id" = Option<Uuid>, Query), ("limit" = Option<u32>, Query)),
+    responses((status = 200, body = StatisticsPage), (status = 400, description = "Invalid relation or cursor"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn statistics(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<StatisticsQuery>),
+    headers: HeaderMap,
+) -> Result<Json<StatisticsPage>, ApiError> {
+    Ok(Json(
+        read_person_statistics(
+            &store,
+            (&context, session_credentials(&headers)),
+            (location_id, &target, &options),
+            default_role,
+        )
+        .await?,
+    ))
+}
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
     params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,

@@ -7,6 +7,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from collections import Counter
 from contextlib import closing
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
     catalog_facts,
     wait_for_catalog,
+    wait_for_statistics,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     location_process,
@@ -170,7 +172,7 @@ def test_given_non_authoritative_adapter_scope_when_reading_catalog_then_no_page
     "test_case",
     [
         CatalogInspectionTestCase(
-            "DuckDB automatic catalog", "duckdb", "database", "BASE TABLE", "VIEW"
+            "DuckDB automatic catalog", "duckdb", "database", "BASE TABLE", "VIEW", 0
         ),
         CatalogInspectionTestCase(
             "SQLite automatic catalog", "sqlite", "path", "BASE TABLE", "VIEW"
@@ -220,6 +222,14 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
     ):
         _ = wait_for_generation(api, "development", 1, location, log)
         wait_for_catalog(control, [expected], location, log)
+        samples: list[dict[str, Any]] = wait_for_statistics(
+            control, expected["name"], location, log
+        )
+        assert len(samples) == 1
+        assert samples[0]["name"] == expected["name"]
+        assert samples[0]["byte_count"] is None
+        assert samples[0]["byte_count_basis"] is None
+        assert samples[0]["row_count"] == test_case.expected_metadata_rows
         assert [fact["present"] for fact in catalog_facts(control)] == [True]
         time.sleep(6)
         assert [fact["present"] for fact in catalog_facts(control)] == [True]
@@ -257,3 +267,13 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
             database.commit()
         wait_for_catalog(control, [expected], location, log)
         assert catalog_facts(control)[-1]["record"] == expected
+        current: list[dict[str, Any]] = wait_for_statistics(
+            control, expected["name"], location, log
+        )
+        assert samples[0] in current
+        assert (
+            Counter(record["observed_at"][:13] for record in current)[
+                samples[0]["observed_at"][:13]
+            ]
+            == 1
+        )

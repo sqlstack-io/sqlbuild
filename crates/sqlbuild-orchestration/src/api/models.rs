@@ -21,6 +21,7 @@ use crate::api::_helpers::resources::{
     person_operations::change_trigger,
     person_operations::recent_runs,
     person_operations::catalog,
+    person_operations::statistics,
     person_operations::fingerprint,
     person_operations::node_status,
     password_sessions::login,
@@ -59,6 +60,8 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::report_old_name_views,
     warehouse_metadata::report_microbatches,
     warehouse_metadata::report_catalog,
+    warehouse_metadata::report_statistics,
+    warehouse_metadata::statistics_due,
     warehouse_metadata::watermark
 ))]
 pub(crate) struct ControlApi;

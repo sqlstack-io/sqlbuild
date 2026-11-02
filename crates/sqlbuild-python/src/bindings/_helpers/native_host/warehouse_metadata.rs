@@ -29,6 +29,7 @@ use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
 use crate::bindings::_helpers::native_host::warehouse_catalog::read_catalog;
+use crate::bindings::_helpers::native_host::warehouse_statistics::read_statistics;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
@@ -41,6 +42,7 @@ pub(crate) fn read_history(
     request: &WarehouseHistoryRead,
 ) -> PyResult<WarehouseHistoryPage> {
     let location = match request {
+        WarehouseHistoryRead::Statistics(read) => &read.location,
         WarehouseHistoryRead::Catalog(read) => &read.location,
         WarehouseHistoryRead::SourceFreshness(read) => &read.location,
         WarehouseHistoryRead::Fingerprints(read) => &read.location,
@@ -125,6 +127,9 @@ fn read_page(
     };
     let event_columns: Vec<&str> = event_columns.iter().map(String::as_str).collect();
     let (location, after, since, limit, table, columns, timestamp) = match request {
+        WarehouseHistoryRead::Statistics(read) => {
+            return read_statistics(py, (adapter, connection), read);
+        }
         WarehouseHistoryRead::Catalog(read) => {
             return read_catalog(py, (adapter, connection), read);
         }
@@ -372,7 +377,7 @@ fn read_page(
             };
         }
         let observed = match &record {
-            WarehouseHistoryRecord::Catalog(_) => {
+            WarehouseHistoryRecord::Catalog(_) | WarehouseHistoryRecord::Statistics(_) => {
                 return Err(PyValueError::new_err(
                     "catalog does not use timestamp history filtering",
                 ));
@@ -405,7 +410,7 @@ fn decode_record(
     (columns, timestamp): (&[&str], &str),
 ) -> PyResult<WarehouseHistoryRecord> {
     let (location, record) = match request {
-        WarehouseHistoryRead::Catalog(_) => {
+        WarehouseHistoryRead::Catalog(_) | WarehouseHistoryRead::Statistics(_) => {
             return Err(PyValueError::new_err(
                 "catalog does not use state-table row decoding",
             ));

@@ -290,10 +290,11 @@ pub enum WarehouseHistoryKind {
     OldNameViews,
     Microbatches,
     Catalog,
+    Statistics,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -302,6 +303,7 @@ impl WarehouseHistoryKind {
         Self::OldNameViews,
         Self::Microbatches,
         Self::Catalog,
+        Self::Statistics,
     ];
 
     #[must_use]
@@ -315,6 +317,7 @@ impl WarehouseHistoryKind {
             Self::OldNameViews => "old_name_views",
             Self::Microbatches => "microbatches",
             Self::Catalog => "catalog",
+            Self::Statistics => "statistics",
         }
     }
 
@@ -329,6 +332,7 @@ impl WarehouseHistoryKind {
             Self::OldNameViews => "sqb_warehouse_old_name_views",
             Self::Microbatches => "sqb_warehouse_microbatches",
             Self::Catalog => "sqb_warehouse_catalog",
+            Self::Statistics => "sqb_warehouse_statistics",
         }
     }
 }
@@ -445,6 +449,7 @@ pub enum WarehouseHistoryRead {
     OldNameViews(StateEventsRead),
     Microbatches(StateEventsRead),
     Catalog(CatalogRead),
+    Statistics(StatisticsRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -458,6 +463,7 @@ pub enum WarehouseHistoryRecord {
     OldNameView(Box<WarehouseOldNameRecord>),
     Microbatch(Box<WarehouseMicrobatchRecord>),
     Catalog(WarehouseCatalogRecord),
+    Statistics(WarehouseStatisticsRecord),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -617,4 +623,69 @@ pub struct NodeStatus {
     pub definition: DefinitionEvidence,
     pub build: Option<FingerprintObservation>,
     pub source_data: SourceDataStatus,
+}
+
+/// A metadata estimate at collection time, never evidence of source-data currency.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseStatisticsRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub name: String,
+    pub observed_at: DateTime<Utc>,
+    pub row_count: Option<u64>,
+    pub detail: Option<String>,
+    pub byte_count: Option<u64>,
+    pub byte_count_basis: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StatisticsBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseStatisticsRecord>,
+}
+
+/// Eligibility comes from each relation's committed hour, never a namespace watermark.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StatisticsDueRead {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub location: WarehouseStateLocation,
+    pub after: Option<Uuid>,
+    pub limit: usize,
+}
+
+/// One bounded catalog page; sampled and unsampled relations both advance its cursor.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StatisticsRead {
+    pub location: WarehouseStateLocation,
+    pub names: Vec<String>,
+    pub next_after: Option<Uuid>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StatisticsQuery {
+    pub database: Option<String>,
+    pub schema: String,
+    pub name: String,
+    pub after_observed_at: Option<DateTime<Utc>>,
+    pub after_event_id: Option<Uuid>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct StatisticsObservation {
+    pub event_id: Uuid,
+    pub record: WarehouseStatisticsRecord,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct StatisticsPage {
+    pub records: Vec<StatisticsObservation>,
+    pub next_after: Option<WarehouseReconciliationCursor>,
 }

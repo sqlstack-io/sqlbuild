@@ -11,6 +11,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
 use crate::store::models::ControlStore;
+use crate::warehouse_metadata::main::run_statistics_retention::run_statistics_retention;
 
 pub async fn serve_api(
     store: ControlStore,
@@ -51,7 +52,8 @@ pub async fn serve_api(
     ready();
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
-        result = changes::relay(store, listener_changes, sender) => result,
+        result = changes::relay(store.clone(), listener_changes, sender) => result,
+        result = run_statistics_retention(&store) => result,
     }
 }
 

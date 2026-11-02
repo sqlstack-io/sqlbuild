@@ -67,6 +67,10 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_operations::catalog),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/statistics",
+            get(crate::api::_helpers::resources::person_operations::statistics),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/fingerprint",
             get(crate::api::_helpers::resources::person_operations::fingerprint),
         )

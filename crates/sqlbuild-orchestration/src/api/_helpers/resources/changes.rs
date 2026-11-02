@@ -142,7 +142,9 @@ pub(crate) async fn relay(
                     let _ = sender.send(ChangeMessage::Resync);
                     Some(listener)
                 }
-                Err(ControlError::Database(error)) if transient_listener_error(&error) => continue,
+                Err(ControlError::Database(error)) if ControlError::transient_database(&error) => {
+                    continue;
+                }
                 Err(error) => return Err(error),
             };
         }
@@ -153,26 +155,12 @@ pub(crate) async fn relay(
             Ok(Some(notification)) => serde_json::from_str(notification.payload())
                 .map_err(|error| ControlError::Invalid(error.to_string()))?,
             Ok(None) => ChangeMessage::Resync,
-            Err(error) if transient_listener_error(&error) => {
+            Err(error) if ControlError::transient_database(&error) => {
                 listener = None;
                 continue;
             }
             Err(error) => return Err(error.into()),
         };
         let _ = sender.send(message);
-    }
-}
-
-fn transient_listener_error(error: &sqlx_core::Error) -> bool {
-    match error {
-        sqlx_core::Error::Io(_)
-        | sqlx_core::Error::PoolTimedOut
-        | sqlx_core::Error::WorkerCrashed => true,
-        sqlx_core::Error::Database(error) => error.code().is_some_and(|code| {
-            code.starts_with("08")
-                || code.starts_with("53")
-                || matches!(code.as_ref(), "57P01" | "57P02" | "57P03")
-        }),
-        _ => false,
     }
 }

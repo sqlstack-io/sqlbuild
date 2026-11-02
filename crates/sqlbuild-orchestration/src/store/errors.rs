@@ -25,3 +25,19 @@ pub enum ControlError {
     #[error("scheduler lease expired or was fenced by another holder")]
     Fenced,
 }
+
+impl ControlError {
+    pub(crate) fn transient_database(error: &sqlx_core::Error) -> bool {
+        match error {
+            sqlx_core::Error::Io(_)
+            | sqlx_core::Error::PoolTimedOut
+            | sqlx_core::Error::WorkerCrashed => true,
+            sqlx_core::Error::Database(error) => error.code().is_some_and(|code| {
+                code.starts_with("08")
+                    || code.starts_with("53")
+                    || matches!(code.as_ref(), "57P01" | "57P02" | "57P03")
+            }),
+            _ => false,
+        }
+    }
+}

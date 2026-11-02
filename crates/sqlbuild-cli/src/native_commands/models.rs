@@ -9,7 +9,7 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryKind, WarehouseStateLocation,
+    StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
 };
 use uuid::Uuid;
 
@@ -195,6 +195,7 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) source_after: Option<Vec<Option<String>>>,
     pub(crate) observed_since: Option<DateTime<Utc>>,
     pub(crate) watermark_loaded: bool,
+    pub(crate) statistics: Option<StatisticsRead>,
     pub(crate) reconcile: bool,
     pub(crate) reconcile_at: tokio::time::Instant,
     pub(crate) reconcile_seconds: u32,
@@ -204,8 +205,25 @@ pub(crate) struct LocationMetadataSync {
 }
 
 impl LocationMetadataSync {
+    /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
+    pub(crate) fn retry_read(&mut self) {
+        self.limit = (self.limit / 2).max(1);
+        self.statistics = None;
+        if self.kind() == WarehouseHistoryKind::Statistics {
+            self.index -= 1;
+            self.source_after = None;
+            self.scan_id = Uuid::now_v7();
+            self.page = 0;
+            self.observed_since = None;
+            self.watermark_loaded = false;
+        }
+        self.next_at = tokio::time::Instant::now()
+            + std::time::Duration::from_secs(super::constants::METADATA_POLL_SECONDS);
+    }
+
     pub(crate) fn reconciling(&self) -> bool {
-        self.reconcile || self.kind() == WarehouseHistoryKind::Catalog
+        self.kind() != WarehouseHistoryKind::Statistics
+            && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
     }
 
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {
