@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
+.PHONY: duckshop-local verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
 	check-e2e-shards test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
 	test-e2e-duckdb-cli-data test-e2e-duckdb-cli test-e2e-duckdb-inspection \
@@ -719,3 +719,11 @@ verify-ci:
 	uv run pytest tests/e2e -m "not real_warehouse and not dbt and not performance" -vv -n auto --dist loadfile
 	uv run pytest tests/e2e -m "performance and not real_warehouse and not dbt" -vv
 	uv run fensu check
+
+
+# DuckShop's unit tests on local DuckDB through SQLQuack, by default and in strict mode; exits 1 on a
+# wrong result. SQLBUILD_SQLQUACK is the sqlquack executable and SQLQUACK_POLICY its checkout's
+# sqlquack.toml; DUCKSHOP_LOCAL_ARGS passes --select or --exclude. See benchmarks/duckshop/RUNBOOK.md.
+duckshop-local:
+	uv run --no-sync python benchmarks/duckshop/scripts/local_run.py \
+		--sqb "$$(uv run --no-sync which sqb)" $(DUCKSHOP_LOCAL_ARGS)

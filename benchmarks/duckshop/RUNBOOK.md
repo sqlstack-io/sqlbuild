@@ -249,7 +249,22 @@ rerun of a window deletes only that window's deliveries and inserts deliveries o
 It stays disabled (`enabled false`) until cursor `delete_insert` models guard rows outside the
 window; its unit test records the rows outside the window that the model emits today.
 
-## 8. Clean up
+## 8. Run the unit tests locally through SQLQuack
+
+No warehouse is needed. Build SQLQuack and take `sqlquack.toml` from the same SQLQuack checkout:
+
+```bash
+SQLBUILD_SQLQUACK=/path/to/sqlquack SQLQUACK_POLICY=/path/to/sqlquack-checkout/sqlquack.toml \
+  make duckshop-local
+```
+
+The script (`scripts/local_run.py`) copies the project to a temporary directory without
+`sqlbuild_local.toml`, runs `sqb test --local --target edge` by default and with `--strict`, and
+writes `default.json`, `strict.json` and their logs to `project/target/local-run/`. It prints pass,
+refused (and how many of those a run-time guard refused), error and wrong counts per mode. A wrong
+result fails the run: report it to SQLQuack rather than changing the test.
+
+## 9. Clean up
 
 Drop everything the project created, by name:
 
