@@ -93,7 +93,9 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 priority: 7,
             };
             assert!(
-                request_rerun(store, &context, &retry).await.is_err(),
+                request_rerun(store, (&context, None), &retry)
+                    .await
+                    .is_err(),
                 "a live source cannot be rerun"
             );
             let lease = acquire_lease(store, Uuid::now_v7())
@@ -192,7 +194,11 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 postgres_body: "RAISE EXCEPTION 'injected audit failure'",
             };
             install_fault(store, &fault).await;
-            assert!(request_rerun(store, &context, &retry).await.is_err());
+            assert!(
+                request_rerun(store, (&context, None), &retry)
+                    .await
+                    .is_err()
+            );
             remove_fault(store, &fault).await;
             assert_eq!(
                 list_runs(store, scope, 20)
@@ -203,20 +209,24 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 "audit failure rolls back parent and all children"
             );
             let (first, again) = tokio::join!(
-                request_rerun(store, &context, &retry),
-                request_rerun(store, &context, &retry)
+                request_rerun(store, (&context, None), &retry),
+                request_rerun(store, (&context, None), &retry)
             );
             assert_ne!(first.expect("rerun"), again.expect("replica retry"));
             let changed = RerunRequest {
                 from_failure: false,
                 ..retry.clone()
             };
-            assert!(request_rerun(store, &context, &changed).await.is_err());
+            assert!(
+                request_rerun(store, (&context, None), &changed)
+                    .await
+                    .is_err()
+            );
             let other = AuditContext {
                 actor: "other-operator".into(),
                 ..context.clone()
             };
-            assert!(request_rerun(store, &other, &retry).await.is_err());
+            assert!(request_rerun(store, (&other, None), &retry).await.is_err());
             let settings = BTreeMap::from([
                 (
                     "staging",
@@ -249,7 +259,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             ] {
                 let request = execution.request;
                 assert_eq!(
-                    request_rerun(store, &context, &request)
+                    request_rerun(store, (&context, None), &request)
                         .await
                         .expect("publish rerun"),
                     execution.expected_applied,
@@ -311,7 +321,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 );
                 assert!(slot_counts(store).await.is_empty());
                 assert!(
-                    !request_rerun(store, &context, &request)
+                    !request_rerun(store, (&context, None), &request)
                         .await
                         .expect("completed transport retry")
                 );
@@ -322,7 +332,9 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     ..request.clone()
                 };
                 assert!(
-                    request_rerun(store, &context, &successful).await.is_err(),
+                    request_rerun(store, (&context, None), &successful)
+                        .await
+                        .is_err(),
                     "successful work has nothing to retry from failure"
                 );
             }

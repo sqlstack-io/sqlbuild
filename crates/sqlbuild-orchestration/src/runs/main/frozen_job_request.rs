@@ -1,4 +1,4 @@
-//! Freeze published job inputs for manual requests and sensor evaluations alike.
+//! Freeze published jobs for manual and sensor requests in their owning transaction.
 
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;

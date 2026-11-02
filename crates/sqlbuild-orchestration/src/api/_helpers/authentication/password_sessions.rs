@@ -50,6 +50,14 @@ pub(crate) fn router(
             post(crate::api::_helpers::resources::person_operations::request_job),
         )
         .route(
+            "/api/control/runs/cancel",
+            post(crate::api::_helpers::resources::person_operations::cancel_run),
+        )
+        .route(
+            "/api/control/runs/rerun",
+            post(crate::api::_helpers::resources::person_operations::rerun),
+        )
+        .route(
             "/api/control/triggers",
             post(crate::api::_helpers::resources::person_operations::change_trigger),
         )

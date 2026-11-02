@@ -16,12 +16,16 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    list_person_runs::list_person_runs, list_runs::list_runs,
-    request_person_job_run::request_person_job_run,
+    advance_groups::advance_groups, cancel_person_run::cancel_person_run, change_run::change_run,
+    list_person_runs::list_person_runs, list_runs::list_runs, request_job_run::request_job_run,
+    request_person_job_run::request_person_job_run, request_rerun::request_rerun,
 };
-use crate::runs::models::JobRunRequest;
-use crate::runs::tests::helpers::snapshot;
+use crate::runs::models::{
+    CancelRunRequest, JobRunRequest, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
+};
+use crate::runs::tests::helpers::{request_run, snapshot};
 use crate::runs::tests::test_types::PersonRunPermissionTestCase;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -124,7 +128,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     "customers": {"description":"Build customers", "selection":["customers"], "settings":inputs["job_settings"][0]}
                 }));
                     input.documents.insert("groups".into(), json!({"orders_group": {"description":"Build both jobs", "selection":["customers","orders"], "jobs":{"daily_orders":[],"customers":[]}}}));
-                    publish_snapshot(store, &input)
+                    let published = publish_snapshot(store, &input)
                         .await
                         .expect("publish immutable job");
                     let request = JobRunRequest {
@@ -173,6 +177,11 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         .expect("built-in metadata access")
                         .is_empty()
                     );
+                    let lease = acquire_lease(store, Uuid::now_v7())
+                        .await
+                        .expect("elect")
+                        .expect("leader");
+                    let mut reruns = Vec::new();
                     for job_key in ["daily_orders", "orders_group"] {
                         let result = request_person_job_run(
                             store,
@@ -196,14 +205,157 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             "{}",
                             test_case.description
                         );
+                        let source_id = Uuid::now_v7();
+                        request_job_run(
+                            store,
+                            &context,
+                            &JobRunRequest {
+                                run_id: source_id,
+                                job_key: job_key.into(),
+                                ..request.clone()
+                            },
+                        )
+                        .await
+                        .expect("owner creates source with frozen settings");
+                        let cancellation = CancelRunRequest {
+                            run_id: source_id,
+                            event_id: Uuid::now_v7(),
+                            reason: "Stop before worker launch".into(),
+                        };
+                        let can_cancel = test_case.role != BuiltinRole::Viewer;
+                        for expected in [true, false] {
+                            assert_eq!(
+                                cancel_person_run(store, (&context, credentials), &cancellation)
+                                    .await
+                                    .ok(),
+                                can_cancel.then_some(expected),
+                                "cancellation permits stopping even sensitive work"
+                            );
+                        }
+                        let source_id = Uuid::now_v7();
+                        request_job_run(
+                            store,
+                            &context,
+                            &JobRunRequest {
+                                run_id: source_id,
+                                job_key: job_key.into(),
+                                ..request.clone()
+                            },
+                        )
+                        .await
+                        .expect("owner creates independent rerun source");
+                        change_run(
+                            store,
+                            RunAuthority::Operator(&context),
+                            &RunChangeRequest {
+                                event_id: Uuid::now_v7(),
+                                run_id: source_id,
+                                claim_id: None,
+                                change: RunChange::CancelRequested {
+                                    actor: context.actor.clone(),
+                                    reason: cancellation.reason.clone(),
+                                },
+                            },
+                        )
+                        .await
+                        .expect("owner stops independent rerun source");
+                        for _ in 0..2 {
+                            advance_groups(
+                                store,
+                                &lease,
+                                (&Default::default(), (location_id, "development")),
+                            )
+                            .await
+                            .expect("scheduler confirms stopped children and parent");
+                        }
+                        let rerun = RerunRequest {
+                            run_id: Uuid::now_v7(),
+                            source_run_id: source_id,
+                            from_failure: false,
+                            reason: "Rerun the original frozen execution".into(),
+                            priority: 0,
+                        };
+                        for expected in [true, false] {
+                            let result =
+                                request_rerun(store, (&context, Some(credentials)), &rerun).await;
+                            assert_eq!(
+                                result.as_ref().ok().copied(),
+                                test_case.expected_allowed.then_some(expected),
+                                "{}: frozen job/group rerun and idempotent retry: {result:?}",
+                                test_case.description,
+                            );
+                            assert_eq!(
+                                matches!(result, Err(ControlError::Denied { .. })),
+                                !test_case.expected_allowed,
+                                "denial must be authorization, not invalid input"
+                            );
+                        }
+                        assert!(matches!(
+                            request_rerun(
+                                store,
+                                (&context, Some((credentials.0, "wrong-csrf"))),
+                                &rerun
+                            )
+                            .await,
+                            Err(ControlError::Denied { .. })
+                        ));
+                        reruns.push(rerun);
                     }
+                    let mut adhoc = crate::runs::tests::helpers::request(
+                        (location_id, published.snapshot_id),
+                        Uuid::now_v7().as_u128(),
+                        0,
+                        &["orders"],
+                    );
+                    adhoc.settings =
+                        serde_json::from_value(inputs["job_settings"][settings_index].clone())
+                            .expect("ad-hoc frozen settings");
+                    request_run(store, &adhoc)
+                        .await
+                        .expect("owner requests ad-hoc execution");
+                    cancel_person_run(
+                        store,
+                        (
+                            &context,
+                            (sessions[0].bearer.as_str(), sessions[0].csrf.as_str()),
+                        ),
+                        &CancelRunRequest {
+                            run_id: adhoc.run_id,
+                            event_id: Uuid::now_v7(),
+                            reason: "Stop ad-hoc source".into(),
+                        },
+                    )
+                    .await
+                    .expect("administrator stops ad-hoc execution");
+                    let adhoc_rerun = RerunRequest {
+                        run_id: Uuid::now_v7(),
+                        source_run_id: adhoc.run_id,
+                        from_failure: false,
+                        reason: "Repeat ad-hoc execution".into(),
+                        priority: 0,
+                    };
+                    let can_rerun_adhoc = test_case.role == BuiltinRole::Admin
+                        || (test_case.role == BuiltinRole::Developer && settings_index == 0);
+                    let result =
+                        request_rerun(store, (&context, Some(credentials)), &adhoc_rerun).await;
                     assert_eq!(
-                        list_runs(store, (location_id, "development"), 10)
+                        result.as_ref().ok().copied(),
+                        can_rerun_adhoc.then_some(true),
+                        "ad-hoc: {result:?}"
+                    );
+                    assert_eq!(
+                        matches!(result, Err(ControlError::Denied { .. })),
+                        !can_rerun_adhoc
+                    );
+                    reruns.push(adhoc_rerun);
+                    assert_eq!(
+                        list_runs(store, (location_id, "development"), 100)
                             .await
                             .expect("queue projection")
                             .len(),
-                        4 * usize::from(test_case.expected_allowed),
-                        "denial cannot publish work; success queues the job, group and two children"
+                        9 + 8 * usize::from(test_case.expected_allowed)
+                            + usize::from(can_rerun_adhoc),
+                        "owner sources plus allowed manual/rerun jobs and expanded groups only"
                     );
                     let administrator_credentials =
                         (sessions[0].bearer.as_str(), sessions[0].csrf.as_str());
@@ -254,6 +406,15 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         ),
                         "reenabling cannot restore a revoked grant"
                     );
+                    for rerun in reruns {
+                        assert!(
+                            matches!(
+                                request_rerun(store, (&context, Some(credentials)), &rerun).await,
+                                Err(ControlError::Denied { .. })
+                            ),
+                            "retry must reauthorize after revocation"
+                        );
+                    }
                     close_test_store(fixture).await;
                 });
             }

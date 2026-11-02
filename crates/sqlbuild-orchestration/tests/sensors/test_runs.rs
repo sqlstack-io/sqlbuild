@@ -340,12 +340,12 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 ip_address: None,
             };
             assert!(
-                request_rerun(store, &context, &retry)
+                request_rerun(store, (&context, None), &retry)
                     .await
                     .expect("request rerun")
             );
             assert!(
-                !request_rerun(store, &context, &retry)
+                !request_rerun(store, (&context, None), &retry)
                     .await
                     .expect("retry request")
             );

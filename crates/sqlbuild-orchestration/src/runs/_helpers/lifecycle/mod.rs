@@ -1,3 +1,4 @@
+pub(in crate::runs) mod change_run;
 pub(in crate::runs) mod changes;
 pub(in crate::runs) mod claims;
 pub(in crate::runs) mod events;
