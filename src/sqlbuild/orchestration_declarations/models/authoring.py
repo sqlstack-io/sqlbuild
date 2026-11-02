@@ -109,15 +109,27 @@ class NodeEventCondition:
     kind: Literal["node_event"] = field(default="node_event", init=False)
 
 
+@dataclass(frozen=True, kw_only=True)
+class SourceNewDataCondition:
+    """Match the first non-null source version and later changed versions, in receipt order."""
+
+    select: str
+    kind: Literal["source_new_data"] = field(default="source_new_data", init=False)
+
+
 @dataclass(frozen=True, eq=False)
 class Sensor:
     """Start a job for each matching event; event identity deduplicates replayed requests."""
 
     name: str
     description: str = field(kw_only=True)
-    when: PlatformEventCondition | RunEventCondition | NodeEventCondition | None = field(
-        default=None, kw_only=True
-    )
+    when: (
+        PlatformEventCondition
+        | RunEventCondition
+        | NodeEventCondition
+        | SourceNewDataCondition
+        | None
+    ) = field(default=None, kw_only=True)
     run: Job | JobGroup = field(kw_only=True)
     minimum_interval_seconds: int = field(default=30, kw_only=True)
     default_status: Literal["running", "stopped"] = field(default="running", kw_only=True)

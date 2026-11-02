@@ -67,6 +67,13 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/microba
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const sourceCondition: components["schemas"]["SensorCondition"] = {
+  kind: "source_new_data", selection: ["source:raw_orders"],
+};
+void sourceCondition;
+// @ts-expect-error Source conditions select sources, not execution event kinds.
+const invalidSourceCondition: components["schemas"]["SensorCondition"] = { kind: "source_new_data", selection: ["source:raw_orders"], kinds: ["success"] };
+void invalidSourceCondition;
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.

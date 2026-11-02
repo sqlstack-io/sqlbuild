@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::sensors::_helpers::nodes::consume_node_events;
+use crate::sensors::_helpers::nodes::{consume_node_events, consume_source_events};
 use crate::sensors::_helpers::platform::consume_platform_events;
 use crate::sensors::_helpers::runs::consume_run_events;
 use crate::sensors::models::{SensorCondition, SensorCursor, SensorEvaluationRequest};
@@ -22,6 +22,9 @@ pub(crate) async fn consume_condition(
         }
         SensorCondition::NodeEvent { selection, kinds } => {
             consume_node_events(transaction, evaluation, selection, kinds).await
+        }
+        SensorCondition::SourceNewData { selection } => {
+            consume_source_events(transaction, evaluation, selection).await
         }
         SensorCondition::RunEvent {
             job_key,

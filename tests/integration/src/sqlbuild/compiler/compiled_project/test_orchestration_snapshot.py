@@ -742,6 +742,27 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
             },
         ),
         SnapshotDiscoveryTestCase(
+            description="source_new_data selectors freeze only source nodes without event kinds",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
+                ).read_text(),
+                "sources/orders.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
+                ).read_text(),
+            },
+            expected_jobs=("orders_refresh",),
+            expected_sensors={
+                "on_source_orders": {
+                    "description": "Refresh orders for the first source version and each changed version.",
+                    "job_key": "orders_refresh",
+                    "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
+                    "minimum_interval_seconds": 1,
+                    "default_status": "running",
+                }
+            },
+        ),
+        SnapshotDiscoveryTestCase(
             description="source-job execution selectors compile to frozen canonical keys",
             files={
                 "orchestration/orders.py": Path(
@@ -989,6 +1010,30 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             },
             expected_error=ValueError,
             expected_message="unknown variant",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="source_new_data rejects model selections",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
+                )
+                .read_text()
+                .replace('select="source:raw_orders"', 'select="orders"'),
+            },
+            expected_error=ValueError,
+            expected_message="source_new_data must select only source nodes",
+        ),
+        SnapshotDiscoveryRejectionTestCase(
+            description="source_new_data rejects blank selections",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_orders.py"
+                )
+                .read_text()
+                .replace('select="source:raw_orders"', 'select=" "'),
+            },
+            expected_error=ValueError,
+            expected_message="source_new_data needs nonempty selectors",
         ),
         SnapshotDiscoveryRejectionTestCase(
             description="explicit empty execution selectors cannot broaden matching",

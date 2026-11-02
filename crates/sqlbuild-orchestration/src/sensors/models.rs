@@ -45,6 +45,9 @@ pub enum SensorCondition {
         selection: BTreeSet<String>,
         kinds: BTreeSet<NodeEventKind>,
     },
+    SourceNewData {
+        selection: BTreeSet<String>,
+    },
     Custom {
         function: String,
         code_hash: String,
@@ -104,6 +107,15 @@ pub(crate) struct NodeSensorEvent {
     pub(crate) run_id: Uuid,
     pub(crate) storage_id: i64,
     pub(crate) payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SourceSensorEvent {
+    pub(crate) event_id: Uuid,
+    pub(crate) invocation_id: String,
+    pub(crate) invocation_sequence: i64,
+    pub(crate) storage_id: i64,
+    pub(crate) payload: crate::warehouse_metadata::models::SourceFreshnessObservation,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

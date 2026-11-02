@@ -14,6 +14,8 @@ mod test_nodes;
 mod test_recovery;
 #[path = "test_runs.rs"]
 mod test_runs;
+#[path = "test_sources.rs"]
+mod test_sources;
 #[path = "test_transitions.rs"]
 mod test_transitions;
 #[path = "test_types.rs"]

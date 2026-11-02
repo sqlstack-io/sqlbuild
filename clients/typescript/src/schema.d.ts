@@ -1271,6 +1271,10 @@ export interface components {
             kinds: components["schemas"]["NodeEventKind"][];
             selection: string[];
         } | {
+            /** @enum {string} */
+            kind: "source_new_data";
+            selection: string[];
+        } | {
             code_hash: string;
             function: string;
             /** @enum {string} */

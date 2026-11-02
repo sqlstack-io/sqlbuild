@@ -1,6 +1,7 @@
 //! Native publication validates every sensor before any snapshot pointer moves.
 
 use crate::declarations::models::Definitions;
+use crate::sensors::constants::SOURCE_NODE_KIND;
 use crate::sensors::models::SensorCondition;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
@@ -20,6 +21,15 @@ pub(crate) fn validate_sensors(
                 !kinds.is_empty()
                     && !selection.is_empty()
                     && selection.iter().all(|key| input.nodes.contains_key(key))
+            }
+            SensorCondition::SourceNewData { selection } => {
+                !selection.is_empty()
+                    && selection.iter().all(|key| {
+                        input
+                            .nodes
+                            .get(key)
+                            .is_some_and(|node| node.kind == SOURCE_NODE_KIND)
+                    })
             }
             SensorCondition::RunEvent {
                 job_key,
@@ -45,7 +55,7 @@ pub(crate) fn validate_sensors(
                 && !definitions.groups.contains_key(&sensor.job_key))
         {
             return Err(ControlError::Invalid(format!(
-                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes; node_event must select nonempty snapshot nodes"
+                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes; node_event must select nonempty snapshot nodes; source_new_data must select nonempty snapshot sources"
             )));
         }
     }

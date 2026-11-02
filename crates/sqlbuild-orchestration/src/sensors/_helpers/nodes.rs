@@ -1,4 +1,4 @@
-//! Node transitions require earlier immutable start evidence from the same run claim.
+//! Node conditions consume immutable execution evidence or warehouse source observations.
 
 use std::collections::BTreeSet;
 
@@ -8,7 +8,7 @@ use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::_helpers::transitions::matches_transition;
 use crate::sensors::models::{
-    NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest,
+    NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest, SourceSensorEvent,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -71,6 +71,60 @@ pub(crate) async fn consume_node_events(
                 queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
             run_ids.push(run_id);
         }
+    }
+    Ok((transaction, (cursor, run_ids)))
+}
+
+pub(crate) async fn consume_source_events(
+    transaction: ControlTransaction,
+    evaluation: &SensorEvaluationRequest,
+    selection: &BTreeSet<String>,
+) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+    let (mut transaction, rows) = query(
+        transaction,
+        "SELECT storage_id,event_id,invocation_id,invocation_sequence,payload FROM recall_events \
+         WHERE producer='warehouse' AND event_type='warehouse_source_freshness' \
+         AND invocation_id LIKE 'warehouse/source-freshness/%' AND storage_id>$1 \
+         ORDER BY storage_id LIMIT 100",
+        vec![Parameter::Integer(evaluation.cursor.event_storage_id)],
+    )
+    .await?;
+    let mut cursor = evaluation.cursor.clone();
+    let mut run_ids: Vec<Uuid> = Vec::new();
+    for row in rows {
+        let event: SourceSensorEvent = decode_row(row)?;
+        cursor.event_storage_id = event.storage_id;
+        let observation = &event.payload;
+        let record = &observation.record;
+        if observation.location_id != evaluation.location_id
+            || observation.target != evaluation.target
+            || !selection.contains(&format!("source:{}", record.source_name))
+            || record.data_version.is_none()
+        {
+            continue;
+        }
+        let previous;
+        (transaction, previous) = query(
+            transaction,
+            "SELECT payload -> 'record' ->> 'data_version_hash' AS hash FROM recall_events \
+             WHERE producer='warehouse' AND event_type='warehouse_source_freshness' \
+             AND invocation_id=$1 AND invocation_sequence=$2 LIMIT 1",
+            vec![
+                Parameter::Text(event.invocation_id),
+                Parameter::Integer(event.invocation_sequence - 1),
+            ],
+        )
+        .await?;
+        if previous
+            .first()
+            .is_some_and(|row| row["hash"] == record.data_version_hash)
+        {
+            continue;
+        }
+        let run_id;
+        (transaction, run_id) =
+            queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
+        run_ids.push(run_id);
     }
     Ok((transaction, (cursor, run_ids)))
 }
