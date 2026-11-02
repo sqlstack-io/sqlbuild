@@ -20,7 +20,7 @@ use crate::bindings::_helpers::build_command::support::{
     boolean, display_text, emit, frozenset, joined, keyword_relay, line_writer, none, text, tuple,
 };
 use crate::bindings::_helpers::build_progress::build_callbacks::{
-    BuildProgressCallbacks, batch_complete_callback,
+    BuildProgressCallbacks, batch_complete_callback, check_callback,
 };
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
@@ -596,10 +596,16 @@ pub(crate) fn run_post_build_python_checks<'py>(
         )?;
         let callbacks: Bound<'py, PyAny> = call_with(
             &host::entry(py, ExecutorHost::PythonCheckCallbacks)?,
-            &[(
-                "on_check_complete",
-                native_field(&preparation.callbacks, "write_execution_event")?,
-            )],
+            &[
+                (
+                    "on_check_start",
+                    check_callback(&preparation.callbacks, false)?,
+                ),
+                (
+                    "on_check_complete",
+                    check_callback(&preparation.callbacks, true)?,
+                ),
+            ],
         )?;
         call_with(
             &host::entry(py, ExecutorHost::ExecutePythonChecks)?,

@@ -113,6 +113,12 @@ class WorkerExecutionTestCase:
     launcher: Literal["native", "uncooperative", "docker"] = "native"
 
 
+@dataclass(frozen=True)
+class CheckExecutionTestCase(WorkerExecutionTestCase):
+    description: str
+    expected_check_outcome: str = "success"
+
+
 @dataclass(frozen=True, kw_only=True)
 class PersonJourneyTestCase(WorkerExecutionTestCase):
     description: str

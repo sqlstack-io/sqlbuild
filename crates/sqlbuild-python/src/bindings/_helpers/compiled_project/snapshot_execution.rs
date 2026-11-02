@@ -19,6 +19,7 @@ pub(crate) struct WorkerBuild {
     pub(crate) worker: Py<NativeOrchestrationWorker>,
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
+    checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
 }
 
 impl WorkerBuild {
@@ -27,6 +28,7 @@ impl WorkerBuild {
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
+            checks: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None))?;
@@ -195,6 +197,67 @@ impl WorkerBuild {
         Ok(())
     }
 
+    pub(crate) fn start_check(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.check_cancelled(py)?;
+        let key = format!("check:{name}");
+        self.worker.bind(py).get().change(
+            py,
+            &format!("check-started/{key}"),
+            RunChange::CheckStarted {
+                node_key: key.clone(),
+            },
+        )?;
+        self.checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .insert(key, None);
+        Ok(())
+    }
+
+    /// A completion without our actual-execution start callback is a blocked check, not a failure.
+    pub(crate) fn completed_check(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
+        let name: String = field(result, "node_name")?.extract()?;
+        let key = format!("check:{name}");
+        let started = self
+            .checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .contains_key(&key);
+        let outcome = if !started {
+            NodeOutcome::Skipped
+        } else if field(result, "passed")?.is_truthy()? {
+            NodeOutcome::Success
+        } else if field(result, "warned")?.is_truthy()? {
+            NodeOutcome::Warn
+        } else if self
+            .worker
+            .bind(result.py())
+            .get()
+            .refresh_cancellation(result.py())?
+        {
+            NodeOutcome::Cancelled
+        } else {
+            NodeOutcome::Failed
+        };
+        self.finish_check(result.py(), &key, outcome)
+    }
+
+    fn finish_check(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
+        self.worker.bind(py).get().change(
+            py,
+            &format!("check-finished/{key}"),
+            RunChange::CheckFinished {
+                node_key: key.into(),
+                outcome,
+            },
+        )?;
+        self.checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .insert(key.into(), Some(outcome));
+        Ok(())
+    }
+
     /// Never call missing selected nodes successful merely because the executor returned zero.
     pub(crate) fn outcome(&self, py: Python<'_>, exit_code: i32) -> PyResult<RunOutcome> {
         let cancelled = self.worker.bind(py).get().refresh_cancellation(py)?;
@@ -242,6 +305,25 @@ impl WorkerBuild {
     /// Terminal publication follows executor teardown and the invocation's bounded Recall drain.
     pub(crate) fn finish(&self, py: Python<'_>, exit_code: i32) -> PyResult<RunOutcome> {
         let outcome = self.outcome(py, exit_code)?;
+        let unfinished: Vec<String> = self
+            .checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .iter()
+            .filter(|(_, outcome)| outcome.is_none())
+            .map(|(key, _)| key.clone())
+            .collect();
+        for key in unfinished {
+            self.finish_check(
+                py,
+                &key,
+                if outcome == RunOutcome::Cancelled {
+                    NodeOutcome::Cancelled
+                } else {
+                    NodeOutcome::Skipped
+                },
+            )?;
+        }
         self.worker.bind(py).get().change(
             py,
             "worker-finished",

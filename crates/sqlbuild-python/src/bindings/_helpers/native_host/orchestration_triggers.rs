@@ -1,6 +1,6 @@
 //! Authored trigger controls and bounded calendars evaluated only in the location interpreter.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use chrono::{DateTime, TimeDelta, Timelike, Utc};
@@ -17,12 +17,14 @@ use sqlbuild_host::entries::models::UserCodeHost;
 use sqlbuild_orchestration::declarations::models::{Definitions, Schedule, TriggerDefinition};
 use sqlbuild_orchestration::scheduler::constants::MAX_TICKS_PER_BATCH;
 use sqlbuild_orchestration::sensors::models::SensorDefinition;
+use sqlbuild_orchestration::snapshots::models::{SnapshotInput, SnapshotNode};
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::native_host::constants::{
-    CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION, SOURCE_STALE_CONDITION,
+    CALENDAR_WINDOW_PARAMETER, CHECK_KIND, NODE_EVENT_CONDITION, SOURCE_NEW_DATA_CONDITION,
+    SOURCE_STALE_CONDITION,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
@@ -256,7 +258,7 @@ pub(crate) fn compile_calendars(
 
 pub(crate) fn compile_sensors(
     py: Python<'_>,
-    (project_dir, target, graph): (&Path, &str, &ProjectGraph),
+    (project_dir, input, graph): (&Path, &SnapshotInput, &ProjectGraph),
     authored: Vec<AuthoredSensor>,
     mut definitions: Definitions,
 ) -> PyResult<Definitions> {
@@ -273,7 +275,8 @@ pub(crate) fn compile_sensors(
                 sensor.name
             )));
         }
-        if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == target) {
+        if !sensor.targets.is_empty() && !sensor.targets.iter().any(|value| value == &input.target)
+        {
             continue;
         }
         let condition = match (sensor.when, sensor.function) {
@@ -290,11 +293,12 @@ pub(crate) fn compile_sensors(
                 if let Some(select) = when.select {
                     let selectors: Vec<String> =
                         select.split_whitespace().map(str::to_owned).collect();
-                    condition["selection"] = sensor_nodes(graph, &selectors, &when.kind)?;
+                    condition["selection"] =
+                        sensor_nodes(graph, &input.nodes, &selectors, &when.kind)?;
                 }
                 if let Some(selectors) = when.executed_successfully {
                     condition["executed_successfully"] =
-                        sensor_nodes(graph, &selectors, "executed_successfully")?;
+                        sensor_nodes(graph, &input.nodes, &selectors, "executed_successfully")?;
                 }
                 condition
             }
@@ -319,17 +323,42 @@ pub(crate) fn compile_sensors(
     Ok(definitions)
 }
 
-fn sensor_nodes(graph: &ProjectGraph, selectors: &[String], field: &str) -> PyResult<Value> {
+fn sensor_nodes(
+    graph: &ProjectGraph,
+    available: &BTreeMap<String, SnapshotNode>,
+    selectors: &[String],
+    field: &str,
+) -> PyResult<Value> {
     if selectors.is_empty() || selectors.iter().any(|value| value.trim().is_empty()) {
         return Err(PyValueError::new_err(format!(
             "{field} needs nonempty selectors"
         )));
     }
-    let nodes: BTreeSet<String> = resolve_selectors(graph, selectors, &[])
-        .map_err(|error| PyValueError::new_err(error.message))?
-        .into_iter()
-        .map(|(kind, name)| format!("{kind}:{name}"))
-        .collect();
+    let mut nodes: BTreeSet<String> = BTreeSet::new();
+    let mut sql_selectors: Vec<String> = Vec::new();
+    for selector in selectors {
+        if field == NODE_EVENT_CONDITION && selector.starts_with("check:") {
+            if !available
+                .get(selector)
+                .is_some_and(|node| node.kind == CHECK_KIND)
+            {
+                return Err(PyValueError::new_err(format!(
+                    "unknown check node {selector}"
+                )));
+            }
+            nodes.insert(selector.clone());
+        } else {
+            sql_selectors.push(selector.clone());
+        }
+    }
+    if !sql_selectors.is_empty() {
+        nodes.extend(
+            resolve_selectors(graph, &sql_selectors, &[])
+                .map_err(|error| PyValueError::new_err(error.message))?
+                .into_iter()
+                .map(|(kind, name)| format!("{kind}:{name}")),
+        );
+    }
     if nodes.is_empty() {
         return Err(PyValueError::new_err(format!(
             "{field} needs nonempty selectors"

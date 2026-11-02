@@ -203,7 +203,7 @@ pub(crate) fn compile_declarations(
         sensors,
     } = compile_sensors(
         py,
-        (project_dir, input.target.as_str(), graph),
+        (project_dir, &input, graph),
         authored_sensors,
         compile_calendars(
             py,
