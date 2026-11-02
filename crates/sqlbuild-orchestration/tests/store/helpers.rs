@@ -80,6 +80,10 @@ pub(crate) async fn reconstruct_fingerprint_predecessor(store: &ControlStore) {
         .await
         .expect("fingerprint predecessor");
     for sql in [
+        "DROP INDEX sqb_observed_node_cursor",
+        "DROP INDEX sqb_observed_node_identity",
+        "DROP INDEX sqb_observed_node_decisive",
+        "DELETE FROM sqb_schema_migrations WHERE name='check_observations'",
         "DROP TABLE sqb_warehouse_statistics",
         "DROP INDEX sqb_catalog_statistics_scan",
         "DELETE FROM sqb_schema_migrations WHERE name='warehouse_statistics'",

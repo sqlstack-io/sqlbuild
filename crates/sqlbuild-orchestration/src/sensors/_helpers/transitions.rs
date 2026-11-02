@@ -29,14 +29,15 @@ pub(crate) async fn matches_transition(
         transaction,
         "SELECT e.payload -> 'change' -> 'change' ->> 'outcome' AS outcome \
          FROM recall_events e JOIN sqb_runs r ON e.run_id=CAST(r.run_id AS TEXT) \
-         WHERE e.producer='scheduler' AND e.event_type='run_node_finished' \
+         WHERE e.producer='scheduler' AND e.event_type IN ('run_node_finished','run_check_finished') \
          AND e.invocation_id='scheduler/' || e.run_id AND e.storage_id<$1 \
          AND (e.payload -> 'change' -> 'change' ->> 'node_key')=$2 \
          AND (e.payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed') \
          AND r.location_id=$3 AND r.target=$4 AND r.kind<>'group' \
          AND EXISTS (SELECT 1 FROM recall_events s \
              WHERE s.invocation_id=e.invocation_id AND s.run_id=e.run_id \
-             AND s.producer='scheduler' AND s.event_type='run_node_started' \
+             AND s.producer='scheduler' AND s.event_type=CASE WHEN e.event_type='run_check_finished' \
+                 THEN 'run_check_started' ELSE 'run_node_started' END \
              AND s.storage_id<e.storage_id \
              AND (s.payload -> 'change' ->> 'claim_id')=(e.payload -> 'change' ->> 'claim_id') \
              AND (s.payload -> 'change' -> 'change' ->> 'node_key')=$2) \

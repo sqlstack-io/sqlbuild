@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 
+use crate::runs::_helpers::lifecycle::checks::check_execution_history;
 use crate::runs::_helpers::lifecycle::nodes::project_node;
 use crate::runs::models::{ChangingRun, RunChange, RunChangeRequest, RunOutcome};
 use crate::store::errors::ControlError;
@@ -18,6 +19,9 @@ pub(crate) async fn project_change(
     let now = transaction.now;
     match &request.change {
         RunChange::LaunchFailed { .. } => {}
+        RunChange::CheckStarted { .. } | RunChange::CheckFinished { .. } => {
+            return check_execution_history(transaction, request).await;
+        }
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }

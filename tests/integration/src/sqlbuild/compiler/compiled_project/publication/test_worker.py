@@ -27,6 +27,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    CheckExecutionTestCase,
     ClaimedWorker,
     GroupExecutionTestCase,
     SnapshotWorkerTestCase,
@@ -539,6 +540,168 @@ def test_given_attached_python_code_when_a_worker_starts_then_publication_pins_i
         assert (worker.project / "warehouse.duckdb").exists() == (
             test_case.expected_status == "success"
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CheckExecutionTestCase(
+            "passed", "SELECT 17 AS amount", "SELECT amount FROM orders", "success", [(17,)]
+        ),
+        CheckExecutionTestCase(
+            "warned",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            expected_check_outcome="warn",
+        ),
+        CheckExecutionTestCase(
+            "failed",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "failed",
+            [(17,)],
+            expected_check_outcome="failed",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_attached_check_when_a_worker_executes_then_its_own_outcome_is_durable(
+    test_case: CheckExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture: dict[str, str] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/attached_checks.json").read_text()
+    )
+    test_case = replace(
+        test_case, files={"python/checks/orders.py": fixture[test_case.description]}
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        assert run["selection_json"] == ["model:orders"]
+        assert run["node_counts_json"] == {"success": 1}
+        with sqlite3.connect(worker.control_store) as control:
+            events: list[tuple[str, str]] = control.execute(
+                "SELECT event_type,payload FROM recall_events WHERE run_id=? "
+                "AND event_type IN ('run_check_started','run_check_finished') "
+                "ORDER BY storage_id",
+                (run["run_id"],),
+            ).fetchall()
+        assert [(kind, json.loads(payload)["change"]["change"]) for kind, payload in events] == [
+            ("run_check_started", {"kind": "check_started", "node_key": "check:orders_valid"}),
+            (
+                "run_check_finished",
+                {
+                    "kind": "check_finished",
+                    "node_key": "check:orders_valid",
+                    "outcome": test_case.expected_check_outcome,
+                },
+            ),
+        ]
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "actual attached check failure starts a sensor destination",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM inventory",
+            "success",
+            [(59,)],
+            files={
+                "python/checks/orders.py": "failed",
+                "orchestration/orders.py": "on_failure",
+                "models/inventory.sql": "inventory",
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_attached_check_failure_when_a_sensor_observes_it_then_its_destination_executes(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture: dict[str, str] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/attached_checks.json").read_text()
+    )
+    test_case = replace(
+        test_case, files={path: fixture[key] for path, key in test_case.files.items()}
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        source: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert source["status"] == "failed", worker.log.read_text()
+        destination: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="refresh_inventory"
+        )
+        assert destination["status"] == test_case.expected_status, worker.log.read_text()
+        assert destination["selection_json"] == ["model:inventory"]
+        assert destination["snapshot_id"] == source["snapshot_id"]
+        assert source["selection_json"] == ["model:orders"]
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
+            "cancelling active attached-check SQL cannot set failure health",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "cancelled",
+            [(17,)],
+            files={
+                "python/checks/orders.py": "cancelled",
+                "orchestration/orders.py": "on_failure",
+                "models/inventory.sql": "inventory",
+            },
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_failure_health(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture: dict[str, str] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/attached_checks.json").read_text()
+    )
+    test_case = replace(
+        test_case, files={path: fixture[key] for path, key in test_case.files.items()}
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        cancel_running_statement(worker, job_key="annual_orders")
+        run: dict[str, Any] = wait_for_run(
+            worker.api, worker.process, worker.log, job_key="annual_orders"
+        )
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            outcomes: list[tuple[int, str]] = control.execute(
+                "SELECT storage_id,payload -> 'change' -> 'change' ->> 'outcome' "
+                "FROM recall_events WHERE run_id=? AND event_type='run_check_finished'",
+                (run["run_id"],),
+            ).fetchall()
+            assert [outcome for _, outcome in outcomes] == ["cancelled"]
+            deadline: float = time.monotonic() + 15
+            cursor: int = 0
+            while cursor < outcomes[0][0]:
+                assert worker.process.poll() is None, worker.log.read_text()
+                assert time.monotonic() < deadline, worker.log.read_text()
+                cursor = control.execute(
+                    "SELECT COALESCE(MAX(CAST(cursor_json ->> 'event_storage_id' AS INTEGER)),0) "
+                    "FROM sqb_sensor_cursor_commits"
+                ).fetchone()[0]
+                time.sleep(0.02)
+            assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE job_key='refresh_inventory'"
+            ).fetchone() == (0,)
+        with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
+            assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
 
 @pytest.mark.parametrize(

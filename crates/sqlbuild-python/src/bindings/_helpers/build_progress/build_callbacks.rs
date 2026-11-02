@@ -615,6 +615,20 @@ impl BuildProgressCallbacks {
         self.write_event(py, result)
     }
 
+    fn on_check_start(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            worker.start_check(py, name)?;
+        }
+        Ok(())
+    }
+
+    fn on_check_complete(&self, py: Python<'_>, result: &Bound<'_, PyAny>) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            worker.completed_check(result)?;
+        }
+        self.write_event(py, result)
+    }
+
     /// Close the optional structured execution event stream.
     fn close(&self, py: Python<'_>) -> PyResult<()> {
         let (scheduler, query) = {
@@ -664,6 +678,28 @@ pub(crate) fn batch_complete_callback<'py>(
         owned
             .get()
             .write_batch_complete(arguments.py(), &arguments.get_item(0)?)
+    };
+    Ok(PyCFunction::new_closure(callbacks.py(), None, None, forward)?.into_any())
+}
+
+/// Forward a Python check lifecycle callback directly to its native progress owner.
+pub(crate) fn check_callback<'py>(
+    callbacks: &Bound<'py, PyAny>,
+    completion: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let owned: Py<BuildProgressCallbacks> = callbacks
+        .downcast::<BuildProgressCallbacks>()?
+        .clone()
+        .unbind();
+    let forward = move |arguments: &Bound<'_, PyTuple>,
+                        _keywords: Option<&Bound<'_, PyDict>>|
+          -> PyResult<()> {
+        let value = arguments.get_item(0)?;
+        if completion {
+            owned.get().on_check_complete(arguments.py(), &value)
+        } else {
+            owned.get().on_check_start(arguments.py(), value.extract()?)
+        }
     };
     Ok(PyCFunction::new_closure(callbacks.py(), None, None, forward)?.into_any())
 }

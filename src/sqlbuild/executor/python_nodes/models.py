@@ -404,3 +404,4 @@ class PythonCheckCallbacks:
     logger: logging.Logger | None = None
     identity_recorder: PythonIdentityRecorder | None = None
     on_check_complete: Callable[[PythonCheckExecutionResult], None] | None = None
+    on_check_start: Callable[[str], None] | None = None

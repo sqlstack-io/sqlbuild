@@ -30,7 +30,7 @@ pub(crate) async fn consume_node_events(
     let (mut transaction, rows) = query(
         transaction,
         "SELECT storage_id,event_id,run_id,payload FROM recall_events \
-         WHERE producer='scheduler' AND event_type='run_node_finished' \
+         WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished') \
          AND invocation_id='scheduler/' || run_id AND storage_id>$1 \
          ORDER BY storage_id LIMIT 100",
         vec![Parameter::Integer(evaluation.cursor.event_storage_id)],
@@ -46,10 +46,7 @@ pub(crate) async fn consume_node_events(
         if request.run_id != event.run_id || request.event_id != event.event_id {
             return Err(ControlError::Invalid("node event identity mismatch".into()));
         }
-        let RunChange::NodeFinished {
-            node_key, outcome, ..
-        } = &request.change
-        else {
+        let Some((node_key, outcome)) = request.change.finished_node() else {
             continue;
         };
         if !selection.contains(node_key)
@@ -67,7 +64,7 @@ pub(crate) async fn consume_node_events(
         (transaction, matches) = matches_transition(
             transaction,
             evaluation,
-            (node_key, *outcome, event.storage_id),
+            (node_key, outcome, event.storage_id),
             kinds,
         )
         .await?;
@@ -249,16 +246,20 @@ async fn prior_start(
     request: &RunChangeRequest,
     storage_id: i64,
 ) -> Result<(ControlTransaction, bool), ControlError> {
-    let (RunChange::NodeFinished { node_key, .. }, Some(claim_id)) =
-        (&request.change, request.claim_id)
+    let (Some((node_key, _)), Some(claim_id)) = (request.change.finished_node(), request.claim_id)
     else {
         return Ok((transaction, false));
+    };
+    let started_type = if matches!(request.change, RunChange::CheckFinished { .. }) {
+        "run_check_started"
+    } else {
+        "run_node_started"
     };
     let (transaction, rows) = query(
         transaction,
         "SELECT s.event_id FROM sqb_runs r JOIN recall_events s ON s.run_id=CAST(r.run_id AS TEXT) \
          WHERE s.invocation_id=$1 AND s.run_id=$2 AND s.producer='scheduler' \
-         AND s.event_type='run_node_started' AND s.storage_id<$3 \
+         AND s.event_type=$9 AND s.storage_id<$3 \
          AND (s.payload -> 'change' ->> 'claim_id')=$4 \
          AND (s.payload -> 'change' -> 'change' ->> 'node_key')=$5 \
          AND r.run_id=$6 AND r.location_id=$7 AND r.target=$8 AND r.kind<>'group' LIMIT 1",
@@ -267,10 +268,11 @@ async fn prior_start(
             Parameter::Text(request.run_id.to_string()),
             Parameter::Integer(storage_id),
             Parameter::Text(claim_id.to_string()),
-            Parameter::Text(node_key.clone()),
+            Parameter::Text(node_key.into()),
             Parameter::Id(request.run_id),
             Parameter::Id(evaluation.location_id),
             Parameter::Text(evaluation.target.clone()),
+            Parameter::Text(started_type.into()),
         ],
     )
     .await?;

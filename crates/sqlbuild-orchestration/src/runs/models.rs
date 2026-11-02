@@ -274,6 +274,14 @@ pub enum RunChange {
         error_code: Option<String>,
         skipped_because_of: Option<String>,
     },
+    /// Observational attached-check facts never expand the frozen execution selection.
+    CheckStarted {
+        node_key: String,
+    },
+    CheckFinished {
+        node_key: String,
+        outcome: NodeOutcome,
+    },
     Unresponsive,
     Recovered,
     CancelRequested {
@@ -296,10 +304,22 @@ impl RunChange {
             Self::Started => "run_started",
             Self::NodeStarted { .. } => "run_node_started",
             Self::NodeFinished { .. } => "run_node_finished",
+            Self::CheckStarted { .. } => "run_check_started",
+            Self::CheckFinished { .. } => "run_check_finished",
             Self::Unresponsive => "run_unresponsive",
             Self::Recovered => "run_recovered",
             Self::CancelRequested { .. } => "run_cancel_requested",
             Self::Finished { .. } => "run_terminated",
+        }
+    }
+
+    pub(crate) fn finished_node(&self) -> Option<(&str, NodeOutcome)> {
+        match self {
+            Self::NodeFinished {
+                node_key, outcome, ..
+            }
+            | Self::CheckFinished { node_key, outcome } => Some((node_key, *outcome)),
+            _ => None,
         }
     }
 }

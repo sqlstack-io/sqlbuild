@@ -1255,6 +1255,15 @@ export interface components {
             skipped_because_of?: string | null;
         } | {
             /** @enum {string} */
+            kind: "check_started";
+            node_key: string;
+        } | {
+            /** @enum {string} */
+            kind: "check_finished";
+            node_key: string;
+            outcome: components["schemas"]["NodeOutcome"];
+        } | {
+            /** @enum {string} */
             kind: "unresponsive";
         } | {
             /** @enum {string} */
