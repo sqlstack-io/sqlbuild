@@ -1344,6 +1344,7 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Sum heap or clustered-index partition row counts from the catalog."""
 

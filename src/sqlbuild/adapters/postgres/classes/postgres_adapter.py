@@ -2356,6 +2356,7 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read the planner's ``reltuples`` estimate, treating unanalyzed data as unknown."""
 
@@ -2381,12 +2382,16 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
                 row_count=None, detail="no table statistics (view or partitioned table)"
             )
         estimated_rows: float = float(row[1])
+        row_count: int | None = None
         if estimated_rows > 0:
-            return RelationRowCountEstimate(row_count=int(estimated_rows))
-        if int(row[2]) == 0:
-            return RelationRowCountEstimate(row_count=0)
+            row_count = int(estimated_rows)
+        elif int(row[2]) == 0:
+            row_count = 0
         return RelationRowCountEstimate(
-            row_count=None, detail="table statistics not collected; run ANALYZE"
+            row_count=row_count,
+            detail="table statistics not collected; run ANALYZE" if row_count is None else None,
+            byte_count=int(row[2]) if metadata_only else None,
+            byte_count_basis="pg_relation_size_main_fork" if metadata_only else None,
         )
 
     def diff_schema(

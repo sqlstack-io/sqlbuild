@@ -465,22 +465,34 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         return generation_comment(tuple(row)).removeprefix(GENERATION_COMMENT_PREFIX)
 
     def estimate_relation_row_count(
-        self, *, connection: Any, database: str | None, schema: str | None, name: str
+        self,
+        *,
+        connection: Any,
+        database: str | None,
+        schema: str | None,
+        name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         del database
         row: Any = self.execute(
             connection=connection,
-            sql="SELECT engine, total_rows FROM system.tables WHERE "
+            sql=(
+                "SELECT engine, total_rows, total_bytes FROM system.tables WHERE "
+                if metadata_only
+                else "SELECT engine, total_rows FROM system.tables WHERE "
+            )
             + _database_filter(schema)
             + f" AND name = {quote_string(name)}",
         ).fetchone()
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        if row[1] is None:
-            return RelationRowCountEstimate(
-                row_count=None, detail=f"engine {row[0]} does not report row counts"
-            )
-        return RelationRowCountEstimate(row_count=int(row[1]))
+        byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
+        return RelationRowCountEstimate(
+            row_count=int(row[1]) if row[1] is not None else None,
+            detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
+            byte_count=byte_count,
+            byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
+        )
 
     def read_view_definition(
         self, *, connection: Any, database: str | None, schema: str, name: str

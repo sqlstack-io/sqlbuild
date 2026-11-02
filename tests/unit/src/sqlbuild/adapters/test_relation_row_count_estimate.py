@@ -9,6 +9,7 @@ import pytest
 
 from sqlbuild.adapter.contract.models import RelationRowCountEstimate
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
+from sqlbuild.adapters.clickhouse.classes.clickhouse_adapter import ClickHouseAdapter
 from sqlbuild.adapters.databricks.classes.databricks_adapter import DatabricksAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
@@ -159,6 +160,80 @@ _DATABRICKS_DETAIL_HEADER: tuple[tuple[object, ...], ...] = (
             expected_detail="relation not found",
             expected_sql_fragment="schemas.name = N'dev'",
         ),
+        RelationRowCountEstimateTestCase(
+            description="postgres bytes remain available without analyzed rows",
+            adapter=PostgresAdapter(),
+            metadata_rows=(("r", -1.0, 8192),),
+            expected_row_count=None,
+            expected_detail="table statistics not collected; run ANALYZE",
+            expected_sql_fragment="pg_relation_size",
+            metadata_only=True,
+            expected_byte_count=8192,
+            expected_byte_count_basis="pg_relation_size_main_fork",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="postgres empty storage is a known zero",
+            adapter=PostgresAdapter(),
+            metadata_rows=(("r", -1.0, 0),),
+            expected_row_count=0,
+            expected_detail=None,
+            expected_sql_fragment="pg_relation_size",
+            metadata_only=True,
+            expected_byte_count=0,
+            expected_byte_count_basis="pg_relation_size_main_fork",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake bytes and rows are distinct",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=((17, 4096),),
+            expected_row_count=17,
+            expected_detail=None,
+            expected_sql_fragment="SELECT row_count,bytes FROM",
+            metadata_only=True,
+            expected_byte_count=4096,
+            expected_byte_count_basis="information_schema_bytes",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="snowflake missing view statistics remain unavailable",
+            adapter=SnowflakeAdapter(),
+            metadata_rows=((None, None),),
+            expected_row_count=None,
+            expected_detail="no row count (view)",
+            expected_sql_fragment="SELECT row_count,bytes FROM",
+            metadata_only=True,
+        ),
+        RelationRowCountEstimateTestCase(
+            description="databricks bytes do not imply an analyzed row count",
+            adapter=DatabricksAdapter(),
+            metadata_rows=_DATABRICKS_DETAIL_HEADER
+            + (("Type", "MANAGED", ""), ("Statistics", "2048 bytes", "")),
+            expected_row_count=None,
+            expected_detail="table statistics not collected; run ANALYZE TABLE ... COMPUTE STATISTICS",
+            expected_sql_fragment="DESCRIBE TABLE EXTENDED",
+            metadata_only=True,
+            expected_byte_count=2048,
+            expected_byte_count_basis="describe_table_statistics_bytes",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="clickhouse bytes do not imply a known row count",
+            adapter=ClickHouseAdapter(),
+            metadata_rows=(("MergeTree", None, 16384),),
+            expected_row_count=None,
+            expected_detail="engine MergeTree does not report row counts",
+            expected_sql_fragment="SELECT engine, total_rows, total_bytes FROM system.tables",
+            metadata_only=True,
+            expected_byte_count=16384,
+            expected_byte_count_basis="system_tables_total_bytes",
+        ),
+        RelationRowCountEstimateTestCase(
+            description="clickhouse missing bytes do not imply empty storage",
+            adapter=ClickHouseAdapter(),
+            metadata_rows=(("Memory", 3, None),),
+            expected_row_count=3,
+            expected_detail=None,
+            expected_sql_fragment="SELECT engine, total_rows, total_bytes FROM system.tables",
+            metadata_only=True,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -174,10 +249,13 @@ def test_given_catalog_metadata_when_estimating_row_count_then_reads_only_metada
         database=test_case.database,
         schema=test_case.schema,
         name="orders",
+        metadata_only=test_case.metadata_only,
     )
 
     assert estimate.row_count == test_case.expected_row_count
     assert estimate.detail == test_case.expected_detail
+    assert estimate.byte_count == test_case.expected_byte_count
+    assert estimate.byte_count_basis == test_case.expected_byte_count_basis
     assert len(connection.executed) == 1
     assert test_case.expected_sql_fragment in connection.executed[0]
 
@@ -203,6 +281,23 @@ def test_given_catalog_metadata_when_estimating_row_count_then_reads_only_metada
             num_rows=0,
             expected_row_count=None,
         ),
+        BigQueryRowCountEstimateTestCase(
+            description="native bytes remain available without row statistics",
+            table_type="TABLE",
+            num_rows=None,
+            num_bytes=32768,
+            metadata_only=True,
+            expected_row_count=None,
+            expected_byte_count=32768,
+        ),
+        BigQueryRowCountEstimateTestCase(
+            description="external bytes are not native-table storage",
+            table_type="EXTERNAL",
+            num_rows=12,
+            num_bytes=65536,
+            metadata_only=True,
+            expected_row_count=None,
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -210,15 +305,24 @@ def test_given_bigquery_table_metadata_when_estimating_row_count_then_uses_table
     test_case: BigQueryRowCountEstimateTestCase,
 ) -> None:
     client: FakeBigQueryClient = FakeBigQueryClient(
-        FakeBigQueryTable(table_type=test_case.table_type, num_rows=test_case.num_rows)
+        FakeBigQueryTable(
+            table_type=test_case.table_type,
+            num_rows=test_case.num_rows,
+            num_bytes=test_case.num_bytes,
+        )
     )
     connection: Any = cast(Any, FakeBigQueryConnection(client=client))
 
     estimate: RelationRowCountEstimate = BigQueryAdapter().estimate_relation_row_count(
-        connection=connection, database="proj", schema="dev", name="orders"
+        connection=connection,
+        database="proj",
+        schema="dev",
+        name="orders",
+        metadata_only=test_case.metadata_only,
     )
 
     assert estimate.row_count == test_case.expected_row_count
+    assert estimate.byte_count == test_case.expected_byte_count
     assert client.requested == [test_case.expected_table_id]
 
 

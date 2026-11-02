@@ -2565,6 +2565,7 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read ``ANALYZE TABLE`` statistics; ``DESCRIBE DETAIL`` has no row count."""
 
@@ -2596,12 +2597,19 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         statistics_match: re.Match[str] | None = re.search(
             r"(\d+)\s+rows", details.get("statistics", "")
         )
-        if statistics_match is None:
-            return RelationRowCountEstimate(
-                row_count=None,
-                detail="table statistics not collected; run ANALYZE TABLE ... COMPUTE STATISTICS",
-            )
-        return RelationRowCountEstimate(row_count=int(statistics_match.group(1)))
+        bytes_match: re.Match[str] | None = (
+            re.search(r"(\d+)\s+bytes", details.get("statistics", "")) if metadata_only else None
+        )
+        return RelationRowCountEstimate(
+            row_count=int(statistics_match.group(1)) if statistics_match is not None else None,
+            detail=(
+                "table statistics not collected; run ANALYZE TABLE ... COMPUTE STATISTICS"
+                if statistics_match is None
+                else None
+            ),
+            byte_count=int(bytes_match.group(1)) if bytes_match is not None else None,
+            byte_count_basis="describe_table_statistics_bytes" if bytes_match is not None else None,
+        )
 
     def inspect_row_diff_coverage(
         self,

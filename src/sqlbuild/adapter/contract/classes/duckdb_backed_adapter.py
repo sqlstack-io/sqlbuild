@@ -2270,6 +2270,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read DuckDB's estimated table size from the catalog."""
 

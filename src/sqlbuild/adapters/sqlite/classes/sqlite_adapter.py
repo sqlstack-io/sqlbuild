@@ -1502,9 +1502,14 @@ class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
-        """Count table rows: a local file has no metadata count, and counting reads only pages."""
+        """Keep interactive counts; background metadata sampling never reads table pages."""
 
+        if metadata_only:
+            return RelationRowCountEstimate(
+                row_count=None, detail="SQLite does not report table row counts from metadata"
+            )
         del database
         table_name: str = physical_name(schema=schema, name=name)
         row: tuple[Any, ...] | None = connection.execute_with(

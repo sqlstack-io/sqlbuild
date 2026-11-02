@@ -1661,6 +1661,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Report an unknown row count for custom adapters without metadata support."""
 

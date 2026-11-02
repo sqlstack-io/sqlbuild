@@ -145,6 +145,9 @@ class RelationRowCountEstimateTestCase:
     expected_sql_fragment: str
     database: str | None = "analytics"
     schema: str | None = "dev"
+    metadata_only: bool = False
+    expected_byte_count: int | None = None
+    expected_byte_count_basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -154,6 +157,9 @@ class BigQueryRowCountEstimateTestCase:
     num_rows: int | None
     expected_row_count: int | None
     expected_table_id: str = "proj.dev.orders"
+    metadata_only: bool = False
+    num_bytes: int | None = None
+    expected_byte_count: int | None = None
 
 
 @dataclass(frozen=True)
