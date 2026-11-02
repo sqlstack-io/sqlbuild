@@ -17,6 +17,7 @@ use crate::native_commands::types::LocationPublication;
 pub(crate) enum ControlAdmin {
     CreateLocation(String),
     CreatePrincipal(String, PrincipalKind),
+    BootstrapUser(String),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),
     RotateToken(Uuid),

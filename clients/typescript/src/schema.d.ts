@@ -1,5 +1,37 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/admin/people/{principal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeAdministrator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["assignBuiltinRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -109,6 +141,54 @@ export interface paths {
         get: operations["currentSession"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestJobRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["changeTrigger"];
         delete?: never;
         options?: never;
         head?: never;
@@ -439,6 +519,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Administrator membership and person eligibility share the final-admin invariant.
+         * @enum {string}
+         */
+        AdministratorChange: "grant" | "revoke" | "disable" | "enable";
         ApiErrorBody: {
             error: string;
         };
@@ -447,6 +532,8 @@ export interface components {
             decision_id: string;
             error: string;
         };
+        /** @enum {string} */
+        BuiltinRole: "viewer" | "operator" | "developer" | "admin";
         CatchUp: "latest" | {
             /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
             all: {
@@ -519,6 +606,19 @@ export interface components {
             /** @description Tables whose insert failed, so their rows were not written, and the first failure. */
             failed: components["schemas"]["Table"][];
             failure?: string | null;
+        };
+        /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
+        JobRunRequest: {
+            job_key: string;
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            priority: number;
+            reason: string;
+            /** Format: uuid */
+            run_id: string;
+            target: string;
+            window?: null | components["schemas"]["RunWindow"];
         };
         /** @description Locations report bounded facts, never connection strings or user exception text. */
         LocationHealth: {
@@ -719,6 +819,15 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        RoleAssignmentRequest: {
+            /** Format: uuid */
+            location_id?: string | null;
+            /** Format: uuid */
+            principal_id: string;
+            revoke?: boolean;
+            role: components["schemas"]["BuiltinRole"];
+            target?: string | null;
         };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
@@ -1132,6 +1241,90 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    changeAdministrator: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Session CSRF token */
+                "x-sqb-csrf": string;
+            };
+            path: {
+                principal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdministratorChange"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    assignBuiltinRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAssignmentRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     logoutSession: {
         parameters: {
             query?: never;
@@ -1341,6 +1534,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    listPersonRuns: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    requestJobRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    changeTrigger: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerChangeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

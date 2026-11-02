@@ -41,6 +41,11 @@ pub(crate) struct PasswordOriginTestCase {
     pub(crate) expected_error: &'static str,
 }
 
+pub(crate) struct AdministratorCliTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_administrators: i64,
+}
+
 pub(crate) struct ProxyCliTestCase {
     pub(crate) description: &'static str,
     pub(crate) subject: &'static str,

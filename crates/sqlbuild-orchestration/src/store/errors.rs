@@ -13,6 +13,11 @@ pub enum ControlError {
     Io(#[from] std::io::Error),
     #[error("invalid control-plane data: {0}")]
     Invalid(String),
+    #[error("control-plane operation denied: {reason}; decision {decision_id}")]
+    Denied {
+        reason: String,
+        decision_id: uuid::Uuid,
+    },
     #[error("control-store schema is unsupported: {0}")]
     Schema(String),
     #[error("snapshot generation is not newer than the current generation")]

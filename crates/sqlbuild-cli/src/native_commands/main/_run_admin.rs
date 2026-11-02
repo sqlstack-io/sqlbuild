@@ -1,6 +1,7 @@
 //! Direct database ownership authorizes bootstrap, not an untrusted HTTP request or supplied role.
 
 use serde_json::{Value, json};
+use sqlbuild_orchestration::authorization::main::bootstrap_user::bootstrap_user;
 use sqlbuild_orchestration::credentials::main::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
@@ -35,6 +36,10 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ip_address: None,
     };
     match action {
+        ControlAdmin::BootstrapUser(name) => {
+            let id = bootstrap_user(&store, &context, &name).await?;
+            Ok(json!({"principal_id":id,"name":name,"kind":"person","role":"admin"}))
+        }
         ControlAdmin::CreateLocation(name) => {
             let id = create_location(&store, &name, &context).await?;
             Ok(json!({"location_id": id, "name": name}))

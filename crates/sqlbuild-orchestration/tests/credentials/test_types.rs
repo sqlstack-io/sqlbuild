@@ -6,3 +6,9 @@ pub(crate) struct CredentialTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_hash_length: usize,
 }
+
+pub(crate) struct AdministratorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_administrators: usize,
+}

@@ -20,6 +20,8 @@ mod test_groups;
 mod test_lifecycle;
 #[path = "test_monitor.rs"]
 mod test_monitor;
+#[path = "test_permissions.rs"]
+mod test_permissions;
 #[path = "test_requests.rs"]
 mod test_requests;
 #[path = "test_reruns.rs"]

@@ -238,7 +238,9 @@ def api_address(process: subprocess.Popen[bytes], log: Path) -> str:
 
 
 @contextmanager
-def snapshot_api(directory: Path) -> Iterator[SnapshotApi]:
+def snapshot_api(
+    directory: Path, *, server_arguments: tuple[str, ...] = ()
+) -> Iterator[SnapshotApi]:
     """Only this fixture seeds the control database; the code location uses HTTP exclusively."""
     directory.mkdir()
     log: Path = directory / "server.log"
@@ -247,7 +249,14 @@ def snapshot_api(directory: Path) -> Iterator[SnapshotApi]:
     environment.pop("SQLBUILD_PLATFORM_WEBHOOK_URL", None)
     with log.open("wb") as stderr:
         process: subprocess.Popen[bytes] = subprocess.Popen(
-            [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", "--no-scheduler"],
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "server",
+                "--port",
+                "0",
+                "--no-scheduler",
+                *server_arguments,
+            ],
             cwd=directory,
             env=environment,
             stdout=subprocess.DEVNULL,
@@ -331,7 +340,11 @@ def uncooperative_launcher(directory: Path, executable: str) -> Iterator[WorkerD
 
 @contextmanager
 def scheduled_worker(
-    directory: Path, monkeypatch: pytest.MonkeyPatch, test_case: WorkerExecutionTestCase
+    directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    test_case: WorkerExecutionTestCase,
+    *,
+    server_arguments: tuple[str, ...] = (),
 ) -> Iterator[ScheduledWorker]:
     """Declare, publish and schedule isolated DuckDB work without provisioning claims."""
     project: Path = directory / "project"
@@ -365,7 +378,7 @@ def scheduled_worker(
         "uncooperative": uncooperative_launcher,
     }
     with (
-        snapshot_api(directory / "control") as api,
+        snapshot_api(directory / "control", server_arguments=server_arguments) as api,
         launchers[test_case.launcher](directory, executable) as deployment,
     ):
         published: subprocess.CompletedProcess[str] = subprocess.run(
