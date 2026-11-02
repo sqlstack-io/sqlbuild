@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
+from contextlib import nullcontext
 from decimal import Decimal
 from pathlib import Path
+from threading import Timer
 from typing import Any
 
 import duckdb
@@ -32,6 +37,7 @@ from tests.integration.src.sqlbuild.adapters.duckdb._test_types import (
     CompositeRowDiffSamplingTestCase,
     ConnectSettingsTestCase,
     ConnectTestCase,
+    ContendedConnectTestCase,
     DeleteInsertTestCase,
     DiffRowsErrorTestCase,
     DiffRowsTestCase,
@@ -170,6 +176,80 @@ def test_given_config_when_connecting_then_returns_usable_connection(
 
     assert (connection is not None) == test_case.expected_connects
     adapter.close(connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ContendedConnectTestCase(
+            description="writer waits for a catalog reader",
+            read_only=False,
+            release_key="release_after_seconds",
+            expected_connection=nullcontext(),
+            expected_rows=[(23,)],
+        ),
+        ContendedConnectTestCase(
+            description="catalog reader waits for a writer",
+            read_only=True,
+            release_key="release_after_seconds",
+            expected_connection=nullcontext(),
+            expected_rows=[(23,)],
+        ),
+        ContendedConnectTestCase(
+            description="persistent contention remains an error",
+            read_only=False,
+            release_key="persistent_release_after_seconds",
+            expected_connection=pytest.raises(duckdb.IOException, match="lock|already open"),
+            expected_rows=[(23,)],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_catalog_contention_when_connecting_then_temporary_locks_wait_and_persistent_locks_fail(
+    test_case: ContendedConnectTestCase, adapter: DuckDbAdapter, tmp_path: Path
+) -> None:
+    inputs: dict[str, Any] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/local_catalog_contention.json"
+        ).read_text()
+    )
+    database: Path = tmp_path / "orders.duckdb"
+    connection: Any = adapter.connect({"database": str(database)})
+    adapter.execute(connection=connection, sql=inputs["setup_sql"])
+    adapter.close(connection)
+    with subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import duckdb,sys; c=duckdb.connect(sys.argv[1],read_only=sys.argv[2]=='true'); "
+            "print('ready',flush=True); sys.stdin.read(1); c.close()",
+            str(database),
+            str(not test_case.read_only).lower(),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    ) as holder:
+        assert holder.stdout is not None
+        assert holder.stdout.readline().strip() == "ready"
+        release: Timer = Timer(
+            inputs[test_case.release_key],
+            holder.communicate,
+            kwargs={"input": "\n", "timeout": 5},
+        )
+        release.start()
+        try:
+            with test_case.expected_connection:
+                connection = adapter.connect(
+                    {"database": str(database), "read_only": test_case.read_only}
+                )
+                try:
+                    assert connection.execute(inputs["query"]).fetchall() == test_case.expected_rows
+                finally:
+                    adapter.close(connection)
+        finally:
+            release.join()
+        assert holder.returncode == 0
 
 
 @pytest.mark.parametrize(
