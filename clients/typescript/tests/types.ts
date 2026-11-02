@@ -31,6 +31,14 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/audit-r
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const janitorHistory: components["schemas"]["WarehouseHistoryKind"] = "janitor_events";
+const archivedAt: components["schemas"]["WarehouseJanitorRecord"]["archived_at"] = "2026-01-02T03:04:05Z";
+void janitorHistory;
+void archivedAt;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/janitor-events", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.

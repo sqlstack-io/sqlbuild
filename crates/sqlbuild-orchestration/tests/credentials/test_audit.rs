@@ -124,6 +124,8 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .await
                 .expect("predecessor");
             for sql in [
+                "DROP TABLE sqb_warehouse_janitor_events",
+                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_janitor_events'",
                 "DROP TABLE sqb_warehouse_audit_results",
                 "DELETE FROM sqb_schema_migrations WHERE name='warehouse_audit_results'",
                 "DROP INDEX sqb_security_audit_storage_id",

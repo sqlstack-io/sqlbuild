@@ -177,6 +177,15 @@ class CatalogConnectionTestCase:
 
 
 @dataclass(frozen=True)
+class StateEventsTestCase(CatalogConnectionTestCase):
+    description: str
+    expected_run_id: str
+    fixture_name: str
+    append_history: Callable[..., None]
+    legacy_columns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class AutomaticHistoryTestCase:
     description: str
     adapter_name: str

@@ -51,6 +51,7 @@ use crate::api::_helpers::resources::{
     warehouse_metadata::report,
     warehouse_metadata::report_fingerprints,
     warehouse_metadata::report_audit_results,
+    warehouse_metadata::report_janitor_events,
     warehouse_metadata::watermark
 ))]
 pub(crate) struct ControlApi;

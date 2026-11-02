@@ -24,7 +24,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::models::SourceFreshnessBatch;
+use crate::warehouse_metadata::models::{SourceFreshnessBatch, WarehouseHistoryKind};
 
 #[test]
 fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicity_are_preserved() {
@@ -322,13 +322,26 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (session_id, preview_session),
             )
             .await;
-            crate::api::tests::warehouse_audit_results_helpers::audit_history(
-                store,
-                &outbound,
-                (session_id, preview_session),
-                (&client, &url, &token.bearer),
-            )
-            .await;
+            for event_case in [
+                (
+                    WarehouseHistoryKind::AuditResults,
+                    "audit_result_history",
+                    "result_id",
+                ),
+                (
+                    WarehouseHistoryKind::JanitorEvents,
+                    "janitor_event_history",
+                    "event_id",
+                ),
+            ] {
+                crate::api::tests::warehouse_events_helpers::event_history(
+                    store,
+                    &outbound,
+                    (session_id, preview_session),
+                    (&client, &url, &token.bearer, event_case),
+                )
+                .await;
+            }
             stop_api(api).await;
             close_test_store(fixture).await;
         });

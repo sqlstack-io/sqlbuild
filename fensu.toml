@@ -1661,6 +1661,10 @@ reason = "Command document projections intentionally mirror the public envelope 
 paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/fingerprints.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/freshness.rs"]
 reason = "Typed observation field projections intentionally mirror provenance checks while preserving different required identity fields and timestamp names. Bounds, rejection rules and reconciliation completion share the ingestion owner."
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_janitor_events.rs"]
+reason = "Typed event projections retain distinct required identities and indexed payload columns. Event persistence, fencing, atomic retries and reconciliation share the events ingestion owner; no per-table lifecycle is copied."
+
 [[targets.python.rule_exceptions]]
 rule = "XSB051"
 path = "src/sqlbuild/executor/migrations/_helpers/old_name_views.py"

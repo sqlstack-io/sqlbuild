@@ -92,6 +92,37 @@ pub struct AuditResultsBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
+/// Warehouse cleanup facts do not authorize control-plane deletion or worker recovery.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseJanitorRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub schema_version: i64,
+    pub event_type: String,
+    pub occurred_at: DateTime<Utc>,
+    pub run_id: String,
+    pub relation_database: Option<String>,
+    pub relation_schema: String,
+    pub relation_type: Option<String>,
+    pub original_name: Option<String>,
+    pub original_qualified_name: Option<String>,
+    pub archive_name: String,
+    pub archive_qualified_name: String,
+    pub archived_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct JanitorEventsBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseJanitorRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -109,13 +140,15 @@ pub enum WarehouseHistoryKind {
     Fingerprints,
     SourceFreshness,
     AuditResults,
+    JanitorEvents,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 3] = [
+    pub const ALL: [Self; 4] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
+        Self::JanitorEvents,
     ];
 
     #[must_use]
@@ -124,6 +157,7 @@ impl WarehouseHistoryKind {
             Self::Fingerprints => "fingerprints",
             Self::SourceFreshness => "source_freshness",
             Self::AuditResults => "audit_results",
+            Self::JanitorEvents => "janitor_events",
         }
     }
 
@@ -133,6 +167,7 @@ impl WarehouseHistoryKind {
             Self::Fingerprints => "sqb_warehouse_fingerprints",
             Self::SourceFreshness => "sqb_warehouse_freshness",
             Self::AuditResults => "sqb_warehouse_audit_results",
+            Self::JanitorEvents => "sqb_warehouse_janitor_events",
         }
     }
 }
@@ -227,10 +262,10 @@ pub struct FingerprintRead {
     pub limit: Option<usize>,
 }
 
-/// Duplicate result IDs may be appended; timestamps distinguish their ordered observations.
+/// Stable event identities and timestamps order observations without comparing their payloads.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AuditResultsRead {
+pub struct StateEventsRead {
     pub location: WarehouseStateLocation,
     pub after: Option<[Option<String>; 3]>,
     pub observed_since: Option<DateTime<Utc>>,
@@ -243,7 +278,8 @@ pub struct AuditResultsRead {
 pub enum WarehouseHistoryRead {
     SourceFreshness(SourceFreshnessRead),
     Fingerprints(FingerprintRead),
-    AuditResults(AuditResultsRead),
+    AuditResults(StateEventsRead),
+    JanitorEvents(StateEventsRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -252,6 +288,7 @@ pub enum WarehouseHistoryRecord {
     SourceFreshness(WarehouseFreshnessRecord),
     Fingerprint(WarehouseFingerprintRecord),
     AuditResult(Box<WarehouseAuditRecord>),
+    JanitorEvent(WarehouseJanitorRecord),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -259,4 +296,25 @@ pub enum WarehouseHistoryRecord {
 pub struct WarehouseHistoryPage {
     pub records: Vec<WarehouseHistoryRecord>,
     pub next_after: Option<Vec<Option<String>>>,
+}
+
+/// Typed import columns are selected by code, never from location-supplied field names.
+#[derive(Debug)]
+pub(crate) struct StateEventImport {
+    pub source_id: String,
+    pub location: WarehouseStateLocation,
+    pub observed_at: DateTime<Utc>,
+    pub columns: Vec<(&'static str, crate::store::models::Parameter)>,
+    pub record_json: serde_json::Value,
+}
+
+#[derive(Debug)]
+pub(crate) struct StateEventsImport<'a> {
+    pub kind: WarehouseHistoryKind,
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<StateEventImport>,
+    pub invalid_identity: bool,
+    pub reconciliation: Option<&'a WarehouseReconciliationPage>,
+    pub payload: serde_json::Value,
 }
