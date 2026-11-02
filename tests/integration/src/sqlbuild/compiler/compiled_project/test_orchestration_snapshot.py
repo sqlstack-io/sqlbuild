@@ -101,6 +101,19 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             frozenset({"model", "hook"}),
         ),
         SnapshotCatalogTestCase(
+            "DuckShop Python execution inputs",
+            TYPE_PROOF_FILES
+            | {
+                f"python/{kind}s/orders.py": json.loads(
+                    Path(
+                        "benchmarks/duckshop/edge_cases/orchestration/python_execution_inputs.json"
+                    ).read_text()
+                )[source]
+                for kind, source in (("task", "task"), ("asset", "asset"), ("check", "initial"))
+            },
+            frozenset({"model", "task", "asset", "check"}),
+        ),
+        SnapshotCatalogTestCase(
             "SQL hooks",
             TYPE_PROOF_FILES
             | {

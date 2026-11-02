@@ -491,6 +491,60 @@ def test_given_a_scheduled_job_when_published_then_an_isolated_worker_reports_re
     "test_case",
     [
         WorkerExecutionTestCase(
+            "unchanged attached Python check",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(17,)],
+            files={"python/checks/orders.py": "initial"},
+        ),
+        WorkerExecutionTestCase(
+            "attached Python check changed after publication",
+            "SELECT 17 AS amount",
+            "SELECT amount FROM orders",
+            "failed",
+            [],
+            files={"python/checks/orders.py": "initial"},
+            files_after_publication={"python/checks/orders.py": "changed"},
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_attached_python_code_when_a_worker_starts_then_publication_pins_it_before_execution(
+    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture: dict[str, str] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/python_execution_inputs.json"
+        ).read_text()
+    )
+    test_case = replace(
+        test_case,
+        files={path: fixture[key] for path, key in test_case.files.items()},
+        files_after_publication={
+            path: fixture[key] for path, key in test_case.files_after_publication.items()
+        },
+    )
+    with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
+        run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
+        assert run["status"] == test_case.expected_status, worker.log.read_text()
+        with sqlite3.connect(worker.control_store) as control:
+            nodes: list[tuple[str, str | None]] = control.execute(
+                "SELECT node_key,started_at FROM sqb_run_nodes WHERE run_id=? ORDER BY node_key",
+                (run["run_id"],),
+            ).fetchall()
+        assert [(name, started is not None) for name, started in nodes] == [
+            ("model:orders", test_case.expected_status == "success")
+        ]
+        assert (worker.project / "warehouse.duckdb").exists() == (
+            test_case.expected_status == "success"
+        )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        WorkerExecutionTestCase(
             "group completion starts a real sensor worker",
             "SELECT 59 AS amount",
             "SELECT amount FROM orders",

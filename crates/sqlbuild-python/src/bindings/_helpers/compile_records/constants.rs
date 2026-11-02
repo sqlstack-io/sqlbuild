@@ -1590,6 +1590,7 @@ const R_COMPILED_PROJECT: RecordSpec = RecordSpec {
             compared: false,
             shown: false,
         },
+        FieldSpec::new("python_execution_inputs", FieldDefault::EmptyDict),
     ],
 };
 const R_COMPILED_SQL_TEST: RecordSpec = RecordSpec {

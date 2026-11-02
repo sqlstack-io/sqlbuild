@@ -1823,6 +1823,8 @@ class NativeProjectView:
     @property
     def loader_functions(self) -> tuple[DiscoveredLoaderFunction, ...]: ...
     @property
+    def python_execution_inputs(self) -> dict[str, tuple[str, Path]]: ...
+    @property
     def hook_functions(self) -> tuple[DiscoveredHookFunction, ...]: ...
     @property
     def enforce_explicit_references(self) -> bool: ...
@@ -15615,6 +15617,7 @@ class CompiledProject(NativeRecord):
     sql_expansions: dict[Path, CompiledSqlExpansion]
     native_session: Any | None
     native_project: NativeCompiledProject | None
+    python_execution_inputs: dict[str, tuple[str, Path]]
     def __init__(
         self,
         run_id: str,
@@ -15651,6 +15654,7 @@ class CompiledProject(NativeRecord):
         sql_expansions: dict[Path, CompiledSqlExpansion] = ...,
         native_session: Any | None = ...,
         native_project: NativeCompiledProject | None = ...,
+        python_execution_inputs: dict[str, tuple[str, Path]] = ...,
     ) -> None: ...
     @property
     def lineage_graph(self) -> NativeProjectGraph: ...
