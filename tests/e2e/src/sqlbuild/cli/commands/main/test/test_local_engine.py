@@ -172,6 +172,92 @@ def test_given_real_sqlquack_when_testing_locally_then_converted_tests_run_on_du
     "test_case",
     [
         LocalEngineE2ETestCase(
+            description="without a project policy the converter's bundled policy judges the tests",
+            arguments=("test", "--local", "--select", "customer_orders"),
+            expected_exit_code=1,
+            expected_stdout_fragments=(
+                "policy bundled with SQLQuack 0.2.0 (no project sqlquack.toml)",
+            ),
+            expected_conversion_count=4,
+            expected_converter_arguments=(
+                "--bundled-policy",
+                "--session",
+                "QUOTED_IDENTIFIERS_IGNORE_CASE=true",
+            ),
+            unexpected_converter_arguments=("--policy", "--builtin-policy"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_no_project_policy_when_testing_locally_then_the_bundled_policy_is_used(
+    test_case: LocalEngineE2ETestCase, tmp_path: Path
+) -> None:
+    files: dict[str, str] = build_local_engine_project_files()
+    del files[_POLICY_FILE]
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="duckshop_local", repo_files=files
+    )
+    converter_dir: Path = tmp_path / "converter"
+    _ = write_fake_sqlquack(directory=converter_dir, version=test_case.converter_version)
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.arguments),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(converter_dir / test_case.converter_name)},
+    )
+
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout + result.stderr, result.stdout + result.stderr
+    conversions: tuple[tuple[str, ...], ...] = read_fake_sqlquack_conversions(
+        directory=converter_dir
+    )
+    assert len(conversions) == test_case.expected_conversion_count, conversions
+    for argument in test_case.expected_converter_arguments:
+        assert all(argument in call for call in conversions), conversions
+    for argument in test_case.unexpected_converter_arguments:
+        assert not any(argument in call for call in conversions), conversions
+
+
+@pytest.mark.skipif(not _REAL_SQLQUACK.is_file(), reason="the sqlquack executable is not installed")
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RealLocalEngineE2ETestCase(
+            description="the bundled policy matches the target's session and judges every test",
+            expected_stdout_fragments=(
+                "PASS=1  FAIL=1  REFUSED=1  TOTAL=3",
+                "differing column TOTAL_AMOUNT: actual=12.50, expected=99.00",
+                "no rule converts fn:UNCONVERTIBLE_FN",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_real_sqlquack_without_project_policy_when_testing_locally_then_tests_are_judged(
+    test_case: RealLocalEngineE2ETestCase, tmp_path: Path
+) -> None:
+    files: dict[str, str] = build_real_local_engine_project_files(policy="")
+    del files[_POLICY_FILE]
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="duckshop_real_local", repo_files=files
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test", "--local"),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(_REAL_SQLQUACK)},
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalEngineE2ETestCase(
             description="settings.strict = true refuses assumptions as --strict does",
             arguments=("test", "--local", "--select", "order_zones"),
             expected_exit_code=1,

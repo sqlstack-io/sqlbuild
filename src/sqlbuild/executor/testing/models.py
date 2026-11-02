@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlbuild._native import SqlTestParameterDeclaration, SqlValue
+from sqlbuild.executor.testing.constants import SQLQUACK_POLICY_FILE
 from sqlbuild.executor.testing.types import SqlTestOutcome
 from sqlbuild.runtime.execution_limits.models import ItemTimeoutReport
 
@@ -84,7 +85,9 @@ class LocalTestEngine:
         """One line naming the converter, its policy and mode."""
 
         policy: str = (
-            str(self.policy) if self.policy is not None else "built-in (refuses every divergence)"
+            str(self.policy)
+            if self.policy is not None
+            else f"bundled with SQLQuack {self.version} (no project {SQLQUACK_POLICY_FILE})"
         )
         mode: str = "strict" if self.strict else "assumptions allowed"
         return f"SQLQuack {self.version} at {self.executable}; policy {policy}; {mode}"

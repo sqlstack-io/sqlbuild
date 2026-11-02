@@ -56,7 +56,7 @@ def convert_statement(*, engine: LocalTestEngine, sql: str) -> SqlQuackConversio
 
 def _options(engine: LocalTestEngine) -> list[str]:
     options: list[str] = (
-        ["--policy", str(engine.policy)] if engine.policy is not None else ["--builtin-policy"]
+        ["--policy", str(engine.policy)] if engine.policy is not None else ["--bundled-policy"]
     )
     if engine.strict:
         options.append("--strict")

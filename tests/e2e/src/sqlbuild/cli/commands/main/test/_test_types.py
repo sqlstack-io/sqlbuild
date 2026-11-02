@@ -629,6 +629,7 @@ class LocalEngineE2ETestCase:
     converter_name: str = "sqlquack"
     expected_conversion_count: int = 0
     expected_converter_arguments: tuple[str, ...] = field(default_factory=tuple)
+    unexpected_converter_arguments: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
