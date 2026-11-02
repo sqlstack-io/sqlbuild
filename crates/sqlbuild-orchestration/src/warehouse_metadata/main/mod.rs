@@ -1,3 +1,4 @@
+pub(crate) mod bootstrap_source_observations;
 pub mod ingest_audit_results;
 pub mod ingest_fingerprints;
 pub mod ingest_janitor_events;

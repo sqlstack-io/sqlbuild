@@ -21,7 +21,9 @@ use sqlbuild_orchestration::sensors::models::SensorDefinition;
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, within};
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
-use crate::bindings::_helpers::native_host::constants::CALENDAR_WINDOW_PARAMETER;
+use crate::bindings::_helpers::native_host::constants::{
+    CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION,
+};
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
     AuthoredSensor, authored_setting,
@@ -276,14 +278,17 @@ pub(crate) fn compile_sensors(
         }
         let condition = match (sensor.when, sensor.function) {
             (Some(when), None) => {
-                let mut condition = json!({"kind": when.kind, "kinds": when.kinds});
+                let mut condition = json!({"kind": when.kind});
+                if when.kind != SOURCE_NEW_DATA_CONDITION {
+                    condition["kinds"] = json!(when.kinds);
+                }
                 if let Some(job) = when.job {
                     condition["job_key"] = json!(job.name);
                 }
                 if let Some(select) = when.select {
                     let selectors: Vec<String> =
                         select.split_whitespace().map(str::to_owned).collect();
-                    condition["selection"] = sensor_nodes(graph, &selectors, "node_event")?;
+                    condition["selection"] = sensor_nodes(graph, &selectors, &when.kind)?;
                 }
                 if let Some(selectors) = when.executed_successfully {
                     condition["executed_successfully"] =
@@ -327,6 +332,11 @@ fn sensor_nodes(graph: &ProjectGraph, selectors: &[String], field: &str) -> PyRe
         return Err(PyValueError::new_err(format!(
             "{field} needs nonempty selectors"
         )));
+    }
+    if field == SOURCE_NEW_DATA_CONDITION && nodes.iter().any(|key| !key.starts_with("source:")) {
+        return Err(PyValueError::new_err(
+            "source_new_data must select only source nodes",
+        ));
     }
     Ok(json!(nodes))
 }

@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
-use crate::warehouse_metadata::_helpers::freshness::validate_batch;
+use crate::warehouse_metadata::_helpers::freshness::{append_observation, validate_batch};
 use crate::warehouse_metadata::_helpers::ingestion::{
     begin_ingestion, commit_ingestion, scoped_event_id,
 };
@@ -75,7 +75,11 @@ pub async fn ingest_source_freshness(
             vec![Parameter::Id(event_id), Parameter::Id(location_id), Parameter::Text(target.into()),
                 Parameter::Text(source_event_id), Parameter::Time(record.observed_at), Parameter::Json(json!(record)), Parameter::Time(received_at),
                 Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone())]).await?;
-        applied |= !inserted.is_empty();
+        if !inserted.is_empty() {
+            transaction =
+                append_observation(transaction, (location_id, target, event_id), record).await?;
+            applied = true;
+        }
     }
     commit_ingestion(
         transaction,

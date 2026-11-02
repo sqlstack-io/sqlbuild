@@ -50,6 +50,7 @@ pub(crate) struct AuthoredGroup {
 #[derive(FromPyObject)]
 pub(crate) struct AuthoredSensorCondition {
     pub(crate) kind: String,
+    #[pyo3(default)]
     pub(crate) kinds: Vec<String>,
     #[pyo3(default)]
     pub(crate) job: Option<AuthoredJobReference>,
