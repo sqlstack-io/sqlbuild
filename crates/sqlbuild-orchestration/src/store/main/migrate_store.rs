@@ -7,8 +7,8 @@ use crate::store::_helpers::migration::{
     ADMINISTRATOR_INITIALIZATION, AUDIT_STORAGE_ORDER, AUTHENTICATION_REVISION,
     DEVELOPMENT_LOCATIONS, EXECUTED_NODES, EXTERNAL_SESSIONS, LOCATION_INSTANCES, LOCATION_WORK,
     NODE_SENSORS, NODE_TRANSITIONS, OIDC_LOGIN_FLOWS, PASSWORD_CREDENTIALS, PASSWORD_SESSIONS,
-    PLATFORM_SINK, RUN_SENSORS, SCHEMA, SENSORS, WAREHOUSE_FINGERPRINTS, WAREHOUSE_FRESHNESS,
-    WAREHOUSE_RECONCILIATION, render, verify_migrations,
+    PLATFORM_SINK, RUN_SENSORS, SCHEMA, SENSORS, WAREHOUSE_AUDIT_RESULTS, WAREHOUSE_FINGERPRINTS,
+    WAREHOUSE_FRESHNESS, WAREHOUSE_RECONCILIATION, render, verify_migrations,
 };
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
@@ -51,6 +51,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         ("external_sessions", EXTERNAL_SESSIONS),
         ("warehouse_reconciliation", WAREHOUSE_RECONCILIATION),
         ("audit_storage_order", AUDIT_STORAGE_ORDER),
+        ("warehouse_audit_results", WAREHOUSE_AUDIT_RESULTS),
     ];
     let mut digests = vec![digest.clone()];
     digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));

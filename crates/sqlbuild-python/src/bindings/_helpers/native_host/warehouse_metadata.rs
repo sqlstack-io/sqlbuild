@@ -12,7 +12,7 @@ use sqlbuild_core::constants::{FINGERPRINT_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NA
 use sqlbuild_core::models::SqlValue;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryPage, WarehouseHistoryRead, WarehouseHistoryRecord,
+    WarehouseHistoryPage, WarehouseHistoryRead, WarehouseHistoryRecord, WarehouseStateLocation,
 };
 use sqlbuild_state::freshness::constants::{
     OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
@@ -23,6 +23,7 @@ use sqlbuild_state::state_tables::models::HistoryRead;
 use crate::bindings::_helpers::authored_values::sql_values::{SqlValueClasses, sql_value};
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
 use crate::bindings::_helpers::command_runtime::connection::project_connection_config;
+use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
@@ -40,6 +41,7 @@ pub(crate) fn read_history(
     let location = match request {
         WarehouseHistoryRead::SourceFreshness(read) => &read.location,
         WarehouseHistoryRead::Fingerprints(read) => &read.location,
+        WarehouseHistoryRead::AuditResults(read) => &read.location,
     };
     if location.schema.trim().is_empty() {
         return Err(PyValueError::new_err(
@@ -99,6 +101,14 @@ fn read_page(
     request: &WarehouseHistoryRead,
 ) -> PyResult<WarehouseHistoryPage> {
     let freshness_columns = SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name);
+    let audit_columns: Vec<String> = if matches!(request, WarehouseHistoryRead::AuditResults(_)) {
+        py.import("sqlbuild.executor.audit_results.constants")?
+            .getattr("AUDIT_RESULT_COLUMNS")?
+            .extract()?
+    } else {
+        Vec::new()
+    };
+    let audit_columns: Vec<&str> = audit_columns.iter().map(String::as_str).collect();
     let (location, after, since, limit, table, columns, timestamp) = match request {
         WarehouseHistoryRead::SourceFreshness(read) => (
             &read.location,
@@ -117,6 +127,15 @@ fn read_page(
             FINGERPRINT_TABLE_NAME,
             FINGERPRINT_COLUMNS.as_slice(),
             COLUMN_TIMESTAMP,
+        ),
+        WarehouseHistoryRead::AuditResults(read) => (
+            &read.location,
+            read.after.as_ref().map(|cursor| cursor.as_slice()),
+            read.observed_since,
+            read.limit,
+            "_sqlbuild_audit_results",
+            audit_columns.as_slice(),
+            "occurred_at",
         ),
     };
     let limit = limit.unwrap_or(MAX_HISTORY_RECORDS);
@@ -156,13 +175,14 @@ fn read_page(
             ("name", name.clone()),
         ],
     )?;
-    let mut has_event_id = false;
+    let mut actual_columns: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for column in catalog_columns.try_iter()? {
-        has_event_id |= field(&column?, "name")?
-            .extract::<String>()?
-            .eq_ignore_ascii_case("event_id");
+        actual_columns.insert(field(&column?, "name")?.extract::<String>()?.to_lowercase());
     }
-    let mut literals = vec![None; columns.len() + 1];
+    let has_event_id = actual_columns.contains("event_id");
+    let audit = matches!(request, WarehouseHistoryRead::AuditResults(_));
+    let key_columns: Option<&[&str]> = audit.then_some(&["result_id", "occurred_at"]);
+    let mut literals = vec![None; key_columns.unwrap_or(columns).len() + 1];
     if let Some(after) = after {
         let classes = SqlValueClasses::load(py)?;
         for (output, value) in literals.iter_mut().zip(after) {
@@ -205,11 +225,26 @@ fn read_page(
             .extract::<String>()
         })
         .transpose()?;
+    let projection: Vec<String> = columns
+        .iter()
+        .map(|column| {
+            if audit
+                && matches!(*column, "audit_description" | "audit_meta_json")
+                && !actual_columns.contains(*column)
+            {
+                format!("NULL AS {column}")
+            } else {
+                (*column).to_owned()
+            }
+        })
+        .collect();
+    let projection: Vec<&str> = projection.iter().map(String::as_str).collect();
     let sql = read_history_sql(
         &qualified,
         after.map(|_| literals.as_slice()),
         HistoryRead {
-            columns,
+            columns: &projection,
+            key_columns: key_columns.or(Some(columns)),
             timestamp_column: timestamp,
             observed_since: observed_since.as_deref(),
             adapter: &adapter_name,
@@ -236,9 +271,14 @@ fn read_page(
         read_count += 1;
         let row = row?;
         let record = decode_record(py, (request, &row, &qualified), (columns, timestamp))?;
-        let mut cursor = vec![None; columns.len() + 1];
+        let cursor_indexes: Vec<usize> = if audit {
+            vec![0, 2, columns.len()]
+        } else {
+            (0..columns.len() + 1).collect()
+        };
+        let mut cursor = vec![None; cursor_indexes.len()];
         for (index, value) in cursor.iter_mut().enumerate() {
-            let raw = row.get_item(index)?;
+            let raw = row.get_item(cursor_indexes[index])?;
             *value = if raw.is_none() {
                 None
             } else {
@@ -248,6 +288,7 @@ fn read_page(
         let observed = match &record {
             WarehouseHistoryRecord::SourceFreshness(record) => record.observed_at,
             WarehouseHistoryRecord::Fingerprint(record) => record.ts,
+            WarehouseHistoryRecord::AuditResult(record) => record.occurred_at,
         };
         if since.is_none_or(|since| observed >= since) {
             records.push(record);
@@ -281,6 +322,9 @@ fn decode_record(
                 qualified,
             )?,
         ),
+        WarehouseHistoryRead::AuditResults(read) => {
+            return decode_audit_record(&read.location, row, (columns, timestamp));
+        }
     };
     let mut value = json!({
         "state_database": location.database,
@@ -306,13 +350,41 @@ fn decode_record(
             json!(item.extract::<String>()?)
         };
     }
-    match request {
-        WarehouseHistoryRead::SourceFreshness(_) => {
-            serde_json::from_value(value).map(WarehouseHistoryRecord::SourceFreshness)
-        }
-        WarehouseHistoryRead::Fingerprints(_) => {
-            serde_json::from_value(value).map(WarehouseHistoryRecord::Fingerprint)
-        }
+    if matches!(request, WarehouseHistoryRead::SourceFreshness(_)) {
+        serde_json::from_value(value).map(WarehouseHistoryRecord::SourceFreshness)
+    } else {
+        serde_json::from_value(value).map(WarehouseHistoryRecord::Fingerprint)
     }
     .map_err(|error| PyValueError::new_err(error.to_string()))
+}
+
+fn decode_audit_record(
+    location: &WarehouseStateLocation,
+    row: &Bound<'_, PyAny>,
+    (columns, timestamp): (&[&str], &str),
+) -> PyResult<WarehouseHistoryRecord> {
+    let mut value = json!({"state_database": location.database, "state_schema": location.schema});
+    for (index, name) in columns.iter().enumerate() {
+        let item = row.get_item(index)?;
+        value[*name] = if *name == timestamp {
+            let item = if item.is_instance_of::<PyString>() {
+                item.py()
+                    .import("datetime")?
+                    .getattr("datetime")?
+                    .call_method1("fromisoformat", (&item,))?
+            } else {
+                item
+            };
+            json!(
+                presumed_utc_datetime(&item)?
+                    .call_method0("isoformat")?
+                    .extract::<String>()?
+            )
+        } else {
+            plain_value(&item)?
+        };
+    }
+    serde_json::from_value(value)
+        .map(WarehouseHistoryRecord::AuditResult)
+        .map_err(|error| PyValueError::new_err(error.to_string()))
 }

@@ -34,6 +34,64 @@ pub struct SourceFreshnessBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
+/// Preserve the warehouse representation, including text-encoded measurements and booleans.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseAuditRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub result_id: String,
+    pub schema_version: i64,
+    pub occurred_at: DateTime<Utc>,
+    pub invocation_id: String,
+    pub run_id: String,
+    pub audit_name: String,
+    pub audit_definition_name: String,
+    pub audit_description: Option<String>,
+    pub binding_key: String,
+    pub definition_fingerprint: String,
+    pub execution_fingerprint: String,
+    pub evaluation_mode: String,
+    pub run_scope_phase: String,
+    pub attachment_kind: String,
+    pub attached_target_kind: Option<String>,
+    pub attached_target_name: Option<String>,
+    pub attached_column_name: Option<String>,
+    pub target_database: Option<String>,
+    pub target_schema: Option<String>,
+    pub target_name: Option<String>,
+    pub severity: String,
+    pub outcome: String,
+    pub execution_error: Option<String>,
+    pub violation_count: Option<i64>,
+    pub measured_value: Option<String>,
+    pub sample_count: Option<i64>,
+    pub sample_unit: Option<String>,
+    pub minimum_samples: Option<i64>,
+    pub thresholds_json: Option<String>,
+    pub evidence_json: Option<String>,
+    pub evidence_count: Option<i64>,
+    pub evidence_truncated: Option<String>,
+    pub evidence_error: Option<String>,
+    pub measurement_sql: Option<String>,
+    pub evidence_sql: Option<String>,
+    pub executed_sql: Option<String>,
+    pub sql_digest: Option<String>,
+    pub metadata_json: Option<String>,
+    pub reused: String,
+    pub audit_meta_json: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AuditResultsBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseAuditRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -50,6 +108,33 @@ pub struct WarehouseStateLocation {
 pub enum WarehouseHistoryKind {
     Fingerprints,
     SourceFreshness,
+    AuditResults,
+}
+
+impl WarehouseHistoryKind {
+    pub const ALL: [Self; 3] = [
+        Self::Fingerprints,
+        Self::SourceFreshness,
+        Self::AuditResults,
+    ];
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Fingerprints => "fingerprints",
+            Self::SourceFreshness => "source_freshness",
+            Self::AuditResults => "audit_results",
+        }
+    }
+
+    #[must_use]
+    pub const fn mirror_table(self) -> &'static str {
+        match self {
+            Self::Fingerprints => "sqb_warehouse_fingerprints",
+            Self::SourceFreshness => "sqb_warehouse_freshness",
+            Self::AuditResults => "sqb_warehouse_audit_results",
+        }
+    }
 }
 
 /// Derive progress from committed mirror rows, scoped to the active physical reader.
@@ -142,12 +227,23 @@ pub struct FingerprintRead {
     pub limit: Option<usize>,
 }
 
-/// The private interpreter accepts only these two known state tables, never arbitrary SQL.
+/// Duplicate result IDs may be appended; timestamps distinguish their ordered observations.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuditResultsRead {
+    pub location: WarehouseStateLocation,
+    pub after: Option<[Option<String>; 3]>,
+    pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
+}
+
+/// The private interpreter accepts only known state tables, never arbitrary SQL.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WarehouseHistoryRead {
     SourceFreshness(SourceFreshnessRead),
     Fingerprints(FingerprintRead),
+    AuditResults(AuditResultsRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -155,6 +251,7 @@ pub enum WarehouseHistoryRead {
 pub enum WarehouseHistoryRecord {
     SourceFreshness(WarehouseFreshnessRecord),
     Fingerprint(WarehouseFingerprintRecord),
+    AuditResult(Box<WarehouseAuditRecord>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

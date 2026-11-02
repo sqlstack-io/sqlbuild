@@ -27,6 +27,7 @@ pub(crate) const ADMINISTRATOR_INITIALIZATION: &str =
 pub(crate) const EXTERNAL_SESSIONS: &str = include_str!("../external_sessions.sql");
 pub(crate) const WAREHOUSE_RECONCILIATION: &str = include_str!("../warehouse_reconciliation.sql");
 pub(crate) const AUDIT_STORAGE_ORDER: &str = include_str!("../audit_storage_order.sql");
+pub(crate) const WAREHOUSE_AUDIT_RESULTS: &str = include_str!("../warehouse_audit_results.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

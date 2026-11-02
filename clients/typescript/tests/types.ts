@@ -23,6 +23,14 @@ if (observation.report.health.kind === "warehouse_sync") {
 // @ts-expect-error Raw warehouse exceptions cannot be used as a health failure stage.
 const invalidFailure: components["schemas"]["WarehouseSyncFailure"] = "warehouse exception text";
 void invalidFailure;
+const auditHistory: components["schemas"]["WarehouseHistoryKind"] = "audit_results";
+const auditMeasurement: components["schemas"]["WarehouseAuditRecord"]["measured_value"] = "99.5";
+void auditHistory;
+void auditMeasurement;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/audit-results", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.

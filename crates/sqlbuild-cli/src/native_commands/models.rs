@@ -8,7 +8,9 @@ use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
-use sqlbuild_orchestration::warehouse_metadata::models::WarehouseStateLocation;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryKind, WarehouseStateLocation,
+};
 use uuid::Uuid;
 
 use crate::argv::models::Namespace;
@@ -199,6 +201,16 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) limit: usize,
     pub(crate) pending: Option<LocationMetadataPage>,
     pub(crate) next_at: tokio::time::Instant,
+}
+
+impl LocationMetadataSync {
+    pub(crate) fn kind(&self) -> WarehouseHistoryKind {
+        WarehouseHistoryKind::ALL[self.index % WarehouseHistoryKind::ALL.len()]
+    }
+
+    pub(crate) fn location(&self) -> &WarehouseStateLocation {
+        &self.locations[self.index / WarehouseHistoryKind::ALL.len()]
+    }
 }
 
 /// What Python's buffered stdout does with output its reader no longer takes.
