@@ -38,6 +38,22 @@ pub struct AuditContext {
     pub ip_address: Option<IpAddr>,
 }
 
+/// Durable security facts with an exclusive storage-order cursor.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SecurityAuditEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    pub actor: String,
+    pub action: String,
+    pub granting_role: String,
+    pub request_id: Uuid,
+    pub ip_address: Option<String>,
+    pub scope_json: serde_json::Value,
+    pub before_json: serde_json::Value,
+    pub after_json: serde_json::Value,
+}
+
 /// Closed permission vocabulary; unknown actions fail deserialization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub enum Action {

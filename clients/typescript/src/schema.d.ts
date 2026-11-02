@@ -147,6 +147,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readSecurityAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -1073,6 +1089,24 @@ export interface components {
             refresh_at: string;
             times: string[];
         };
+        /** @description Durable security facts with an exclusive storage-order cursor. */
+        SecurityAuditEvent: {
+            action: string;
+            actor: string;
+            after_json: unknown;
+            before_json: unknown;
+            /** Format: uuid */
+            event_id: string;
+            granting_role: string;
+            ip_address?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: uuid */
+            request_id: string;
+            scope_json: unknown;
+            /** Format: int64 */
+            storage_id: number;
+        };
         SensorCondition: {
             /** @enum {string} */
             kind: "platform_event";
@@ -1623,6 +1657,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    readSecurityAudit: {
+        parameters: {
+            query?: {
+                /** @description Exclusive storage-order cursor; pre-upgrade facts are ordered by timestamp and event ID */
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAuditEvent"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
                 };
             };
         };

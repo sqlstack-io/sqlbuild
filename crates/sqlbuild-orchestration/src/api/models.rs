@@ -6,14 +6,15 @@ use crate::api::_helpers::authentication::oidc;
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::resources::{
-    administrators, changes, location_health, location_work, person_operations, run_reads, runs,
-    snapshots, trigger_reads, warehouse_metadata,
+    administrators, audit, changes, location_health, location_work, person_operations, run_reads,
+    runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
 #[openapi(paths(
     administrators::change,
     administrators::assign,
+    audit::read,
     person_operations::request_job,
     person_operations::cancel_run,
     person_operations::rerun,
@@ -55,6 +56,13 @@ pub(crate) struct ControlApi;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadQuery {
+    pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReadAuditQuery {
+    pub(crate) after: Option<i64>,
     pub(crate) limit: Option<u32>,
 }
 

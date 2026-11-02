@@ -7,7 +7,10 @@ import sys
 from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+
+import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     SnapshotApi,
@@ -54,6 +57,26 @@ def person_headers(session: tuple[str, str]) -> dict[str, str]:
 def person_read(api: SnapshotApi, path: str, *, session: tuple[str, str]) -> Any:
     with urlopen(Request(api.url + path, headers=person_headers(session)), timeout=5) as response:
         return json.load(response)
+
+
+def verify_security_audit(
+    api: SnapshotApi, administrator: tuple[str, str], ordinary: tuple[str, str]
+) -> None:
+    audit: list[dict[str, Any]] = person_read(
+        api, "/api/control/audit?limit=3", session=administrator
+    )
+    assert len(audit) == 3
+    cursor: int = audit[-1]["storage_id"]
+    following: list[dict[str, Any]] = person_read(
+        api, f"/api/control/audit?after={cursor}&limit=3", session=administrator
+    )
+    assert len(following) == 3
+    assert all(event["storage_id"] > cursor for event in following)
+    assert len({event["event_id"] for event in audit + following}) == 6
+    assert all(event["actor"] and event["granting_role"] for event in audit + following)
+    with pytest.raises(HTTPError) as audit_rejected:
+        person_read(api, "/api/control/audit", session=ordinary)
+    assert audit_rejected.value.code == 403
 
 
 def person_request(

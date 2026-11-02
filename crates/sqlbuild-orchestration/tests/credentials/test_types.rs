@@ -18,3 +18,9 @@ pub(crate) struct AdministratorRecoveryTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_recoveries: usize,
 }
+
+pub(crate) struct AuditTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_page_length: usize,
+}
