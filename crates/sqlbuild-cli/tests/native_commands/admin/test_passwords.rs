@@ -73,6 +73,39 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         }
         let initialized: i64 = connection.query_row("SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.initialized' AND actor='local-control-store-owner'",[],|row| row.get(0)).expect("bootstrap audit");
         assert_eq!(initialized,1);
+        let arguments = ["recover-user", id.as_str(), "--reason", "restore access after administrator loss"];
+        let rejected = invoke_admin(&control, &arguments);
+        assert!(!rejected.status.success(), "online recovery is forbidden");
+        assert!(rejected.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&rejected.stderr).contains("exclusive access"));
+        control.child.kill().expect("stop server before offline recovery");
+        assert!(!wait_for_exit(&mut control).await.success());
+        let recovery = invoke_admin(&control, &arguments);
+        assert!(recovery.status.success(), "{}", String::from_utf8_lossy(&recovery.stderr));
+        assert_eq!(serde_json::from_slice::<Value>(&recovery.stdout).expect("JSON-only recovery"), json!({"principal_id":id,"role":"admin","recovered":true}));
+        assert_eq!(String::from_utf8_lossy(&recovery.stderr), "Acquiring exclusive offline control-store access...\nControl administration completed successfully\n");
+        let (audits, initialized): (i64,i64) = connection.query_row("SELECT (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered'),(SELECT COUNT(*) FROM sqb_admin_initialization)",[],|row| Ok((row.get(0)?,row.get(1)?))).expect("recovery and bootstrap audits");
+        assert_eq!((audits,initialized),(1,1));
+        control.child = crate::helpers::spawn_control((control.directory.path(), &control.stderr), &["server","--port","0","--no-scheduler","--password-origin","https://control.example.com"]);
+        let url = api_ready(&mut control).await;
+        let previous = client.get(format!("{url}/api/auth/session")).header(header::HOST,"control.example.com")
+            .header(header::COOKIE,&sessions[0].0).send().await.expect("old session after recovery");
+        assert_eq!(previous.status(),StatusCode::UNAUTHORIZED);
+        let response = client.post(format!("{url}/api/auth/password/login"))
+            .header(header::HOST,"control.example.com").header(header::ORIGIN,"https://control.example.com")
+            .json(&json!({"username":first["name"],"password":"orders-admin-password-2026"})).send().await.expect("recovered admin login");
+        assert_eq!(response.status(),StatusCode::OK);
+        let cookie = response.headers().get_all(header::SET_COOKIE).iter().filter_map(|value| value.to_str().ok())
+            .find(|value| value.starts_with("__Host-sqb-session=")).expect("new session cookie").split(';').next().expect("cookie pair").to_owned();
+        let body: Value = response.json().await.expect("recovered session");
+        let denied = client.post(format!("{url}/api/admin/people/{id}"))
+            .header(header::HOST,"control.example.com").header(header::ORIGIN,"https://control.example.com")
+            .header(header::COOKIE,cookie).header("x-sqb-csrf",body["csrf_token"].as_str().expect("new CSRF"))
+            .json(&"revoke").send().await.expect("final-admin protection after recovery");
+        assert_eq!(denied.status(),StatusCode::FORBIDDEN);
+        let rejected = invoke_admin(&control,&["create-user","replacement-admin"]);
+        assert!(!rejected.status.success());
+        assert!(String::from_utf8_lossy(&rejected.stderr).contains("bootstrap is closed"));
         #[cfg(unix)]
         crate::helpers::terminate(&mut control).await;
       });

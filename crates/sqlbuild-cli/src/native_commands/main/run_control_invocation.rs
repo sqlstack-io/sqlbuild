@@ -4,9 +4,9 @@ use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{flag, text};
+use crate::native_commands::_helpers::execution::run_administration;
 use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
 use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
-use crate::native_commands::main::_run_admin::run_admin;
 use crate::native_commands::main::_run_control::run_control;
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
@@ -50,7 +50,7 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
     let role = if admin { "administration" } else { "service" };
     let result = runtime.block_on(async {
         if admin {
-            run_admin(namespace).await.map(Some)
+            run_administration(namespace).await.map(Some)
         } else {
             run_control(namespace, command == SCHEDULER_COMMAND)
                 .await

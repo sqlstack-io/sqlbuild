@@ -19,22 +19,29 @@ pub(crate) fn start_control(arguments: &[&str]) -> TestControl {
 }
 
 pub(crate) fn start_control_in(directory: tempfile::TempDir, arguments: &[&str]) -> TestControl {
-    let binary = isolated_binary(directory.path());
+    isolated_binary(directory.path());
     let stderr = directory.path().join("control.log");
-    let child = Command::new(binary)
-        .args(arguments)
-        .current_dir(directory.path())
-        .env("PATH", "")
-        .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
-        .stdout(Stdio::null())
-        .stderr(std::fs::File::create(&stderr).expect("control stderr"))
-        .spawn()
-        .expect("start native control process");
+    let child = spawn_control((directory.path(), &stderr), arguments);
     TestControl {
         child,
         directory,
         stderr,
     }
+}
+
+pub(crate) fn spawn_control(
+    (directory, stderr): (&Path, &Path),
+    arguments: &[&str],
+) -> std::process::Child {
+    Command::new(directory.join(format!("sqb{}", std::env::consts::EXE_SUFFIX)))
+        .args(arguments)
+        .current_dir(directory)
+        .env("PATH", "")
+        .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(stderr).expect("control stderr"))
+        .spawn()
+        .expect("start native control process")
 }
 
 pub(crate) async fn api_ready(control: &mut TestControl) -> String {

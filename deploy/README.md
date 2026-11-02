@@ -127,7 +127,17 @@ use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revo
 or `enable`, their session cookie and CSRF header. This cannot remove or disable the final enabled,
 password-provisioned administrator; an unprovisioned person is not a usable alternative in this
 password-only administration path. It never authorizes a machine bearer or grants non-admin defaults.
-The explicit offline recovery command is not yet available.
+
+If administrator access is lost, stop every server and administration process connected to the
+installation, then run `sqb admin recover-user PRINCIPAL_ID --reason "restore administrator access"`
+as its local control-store owner. Recovery requires exclusive store access, enables an existing
+person, restores installation admin membership, revokes that person's browser sessions, and records
+the reason in the same durable transaction. It never reopens first-user initialization or creates a
+person. Provision a replacement password with `set-password` if needed, restart the services and sign
+in again. SQLite clients coordinate through an adjacent `.access.lock` file: retain that file and
+use the same database path for all clients. PostgreSQL clients coordinate through advisory locks in
+the installation schema. These locks protect supported SQLBuild clients, not arbitrary database-owner
+SQL or older clients that do not implement this protocol; those processes must also be stopped.
 
 An installation administrator assigns or revokes additive built-in roles through
 `POST /api/admin/roles`, using `principal_id`, `role`, optional `location_id` and `target`,

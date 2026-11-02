@@ -14,6 +14,7 @@ chrono.workspace = true
 chrono-tz.workspace = true
 croner.workspace = true
 flate2.workspace = true
+fs4.workspace = true
 futures-util.workspace = true
 getrandom.workspace = true
 openidconnect.workspace = true
@@ -36,6 +37,7 @@ uuid.workspace = true
 axum-server.workspace = true
 proptest.workspace = true
 rcgen.workspace = true
+rusqlite = { workspace = true, features = ["functions"] }
 tempfile.workspace = true
 
 [lints]

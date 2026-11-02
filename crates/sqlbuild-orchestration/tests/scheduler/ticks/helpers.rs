@@ -63,7 +63,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
 async fn trigger_audit_rows(store: &ControlStore) -> Vec<(String, String, String, String, String)> {
     let sql = "SELECT CAST(event_id AS TEXT), actor, granting_role, CAST(before_json AS TEXT), CAST(after_json AS TEXT) FROM sqb_security_audit WHERE action='trigger.changed'";
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path) = store else {
+        let ControlStore::Sqlite(path, _) = store else {
             unreachable!()
         };
         return rusqlite::Connection::open(path)
