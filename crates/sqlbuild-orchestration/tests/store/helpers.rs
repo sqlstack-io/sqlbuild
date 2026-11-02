@@ -80,6 +80,9 @@ pub(crate) async fn reconstruct_warehouse_predecessor(store: &ControlStore) {
         .await
         .expect("predecessor");
     for sql in [
+        "DROP TABLE sqb_warehouse_old_name_views",
+        "DROP TABLE sqb_warehouse_migrations",
+        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_migrations'",
         "DROP TABLE sqb_warehouse_janitor_events",
         "DELETE FROM sqb_schema_migrations WHERE name='warehouse_janitor_events'",
         "DROP TABLE sqb_warehouse_audit_results",

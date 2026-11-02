@@ -47,6 +47,8 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     append_contended_fingerprints,
     append_janitor_history,
     append_legacy_history,
+    append_migration_history,
+    append_old_name_history,
     append_retried_fingerprints,
     location_process,
     open_legacy_warehouse,
@@ -98,6 +100,40 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                 ("audit_description", "audit_meta_json"),
             ),
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
+            (
+                "duckdb",
+                "database",
+                "migration_history",
+                append_migration_history,
+                "external-move",
+                (),
+            ),
+            (
+                "duckdb",
+                "database",
+                "old_name_history",
+                append_old_name_history,
+                "external-move",
+                (),
+            ),
+            ("sqlite", "path", "migration_history", append_migration_history, "external-move", ()),
+            ("sqlite", "path", "old_name_history", append_old_name_history, "external-move", ()),
+            (
+                "duckdb",
+                "database",
+                "old_name_history",
+                append_old_name_history,
+                "external-move",
+                ("column_aliases",),
+            ),
+            (
+                "sqlite",
+                "path",
+                "old_name_history",
+                append_old_name_history,
+                "external-move",
+                ("column_aliases",),
+            ),
         ]
     ],
     ids=lambda case: case.description,
@@ -119,7 +155,10 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
     test_case.append_history(adapter, connection, fixture)
     table: str = f"_sqlbuild_{fixture['kind']}"
     source_key: str = fixture["source_key"]
-    for column in test_case.legacy_columns:
+    legacy_columns: tuple[str, ...] = test_case.legacy_columns + tuple(
+        fixture.get("legacy_columns", ())
+    )
+    for column in legacy_columns:
         _ = adapter.execute(connection=connection, sql=f"ALTER TABLE {table} DROP COLUMN {column}")
     adapter.close(connection)
     pages: list[dict[str, Any]] = warehouse_history_pages(project, fixture["kind"])
@@ -130,18 +169,20 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
     assert {row[source_key] for row in rows} == {
         f"{fixture['id_prefix']}-{index:03}" for index in range(fixture["source_rows"])
     }
-    expected: dict[str, Any] = fixture["record"] | dict.fromkeys(test_case.legacy_columns)
+    expected: dict[str, Any] = fixture["record"] | dict.fromkeys(legacy_columns)
     assert rows[0] == expected
     assert rows[0]["run_id"] == test_case.expected_run_id
-    assert rows[fixture["later_index"]] == expected | fixture["later_record"]
-    assert rows[-1] == expected | fixture["last_record"]
+    assert rows[fixture["later_index"]] == (
+        expected | fixture["later_record"] | dict.fromkeys(legacy_columns)
+    )
+    assert rows[-1] == expected | fixture["last_record"] | dict.fromkeys(legacy_columns)
     recent_pages: list[dict[str, Any]] = warehouse_history_pages(
         project, fixture["kind"], fixture["later_time"]
     )
     recent_rows: list[dict[str, Any]] = []
     for page in recent_pages:
         recent_rows.extend(page["records"])
-    assert recent_rows == [expected | fixture["later_record"]]
+    assert recent_rows == [expected | fixture["later_record"] | dict.fromkeys(legacy_columns)]
     connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
     columns: set[str] = {
         column.name
@@ -149,9 +190,7 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
             connection=connection, database=None, schema="main", name=table
         )
     }
-    assert not columns.intersection(test_case.legacy_columns), (
-        "the reader never upgrades source storage"
-    )
+    assert not columns.intersection(legacy_columns), "the reader never upgrades source storage"
     assert adapter.query(
         connection=connection, sql=f"SELECT COUNT(*) FROM {table}", limit=1
     ).rows == ((fixture["source_count"],),)
@@ -197,6 +236,24 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
                 ("audit_description", "audit_meta_json"),
             ),
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
+            (
+                "duckdb",
+                "database",
+                "migration_history",
+                append_migration_history,
+                "external-move",
+                (),
+            ),
+            (
+                "duckdb",
+                "database",
+                "old_name_history",
+                append_old_name_history,
+                "external-move",
+                (),
+            ),
+            ("sqlite", "path", "migration_history", append_migration_history, "external-move", ()),
+            ("sqlite", "path", "old_name_history", append_old_name_history, "external-move", ()),
         ]
     ],
     ids=lambda case: case.description,

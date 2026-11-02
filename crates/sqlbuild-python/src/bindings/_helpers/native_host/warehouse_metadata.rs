@@ -14,6 +14,7 @@ use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryPage, WarehouseHistoryRead, WarehouseHistoryRecord, WarehouseStateLocation,
 };
+use sqlbuild_state::events::constants::{MIGRATION_COLUMNS, OLD_NAME_VIEW_COLUMNS};
 use sqlbuild_state::freshness::constants::{
     OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
 };
@@ -41,9 +42,10 @@ pub(crate) fn read_history(
     let location = match request {
         WarehouseHistoryRead::SourceFreshness(read) => &read.location,
         WarehouseHistoryRead::Fingerprints(read) => &read.location,
-        WarehouseHistoryRead::AuditResults(read) | WarehouseHistoryRead::JanitorEvents(read) => {
-            &read.location
-        }
+        WarehouseHistoryRead::AuditResults(read)
+        | WarehouseHistoryRead::JanitorEvents(read)
+        | WarehouseHistoryRead::Migrations(read)
+        | WarehouseHistoryRead::OldNameViews(read) => &read.location,
     };
     if location.schema.trim().is_empty() {
         return Err(PyValueError::new_err(
@@ -152,6 +154,24 @@ fn read_page(
             event_columns.as_slice(),
             "occurred_at",
         ),
+        WarehouseHistoryRead::Migrations(read) => (
+            &read.location,
+            read.after.as_ref().map(|cursor| cursor.as_slice()),
+            read.observed_since,
+            read.limit,
+            "_sqlbuild_migrations",
+            MIGRATION_COLUMNS.as_slice(),
+            "created_at",
+        ),
+        WarehouseHistoryRead::OldNameViews(read) => (
+            &read.location,
+            read.after.as_ref().map(|cursor| cursor.as_slice()),
+            read.observed_since,
+            read.limit,
+            "_sqlbuild_old_name_views",
+            OLD_NAME_VIEW_COLUMNS.as_slice(),
+            "created_at",
+        ),
     };
     let limit = limit.unwrap_or(MAX_HISTORY_RECORDS);
     if limit == 0 || limit > MAX_HISTORY_RECORDS {
@@ -195,10 +215,36 @@ fn read_page(
         actual_columns.insert(field(&column?, "name")?.extract::<String>()?.to_lowercase());
     }
     let has_event_id = actual_columns.contains("event_id");
-    let audit = matches!(request, WarehouseHistoryRead::AuditResults(_));
+    let optional_columns: &[&str] = match request {
+        WarehouseHistoryRead::AuditResults(_) => &["audit_description", "audit_meta_json"],
+        WarehouseHistoryRead::Migrations(_) => &[
+            "target_name",
+            "origin_model",
+            "origin_database",
+            "origin_schema",
+            "destination_database",
+        ],
+        WarehouseHistoryRead::OldNameViews(_) => &[
+            "target_name",
+            "old_database",
+            "old_schema",
+            "new_database",
+            "view_retention",
+            "archive_name",
+            "column_aliases",
+            "grants_copied",
+            "view_sql",
+            "expires_at",
+            "drop_reason",
+        ],
+        _ => &[],
+    };
     let key_columns: Option<&[&str]> = match request {
         WarehouseHistoryRead::AuditResults(_) => Some(&["result_id", "occurred_at"]),
         WarehouseHistoryRead::JanitorEvents(_) => Some(&["event_id", "occurred_at"]),
+        WarehouseHistoryRead::Migrations(_) | WarehouseHistoryRead::OldNameViews(_) => {
+            Some(&["event_id", "created_at"])
+        }
         _ => None,
     };
     let mut cursor_indexes: Vec<usize> = columns
@@ -257,10 +303,7 @@ fn read_page(
     let projection: Vec<String> = columns
         .iter()
         .map(|column| {
-            if audit
-                && matches!(*column, "audit_description" | "audit_meta_json")
-                && !actual_columns.contains(*column)
-            {
+            if optional_columns.contains(column) && !actual_columns.contains(*column) {
                 format!("NULL AS {column}")
             } else {
                 (*column).to_owned()
@@ -314,6 +357,8 @@ fn read_page(
             WarehouseHistoryRecord::Fingerprint(record) => record.ts,
             WarehouseHistoryRecord::AuditResult(record) => record.occurred_at,
             WarehouseHistoryRecord::JanitorEvent(record) => record.occurred_at,
+            WarehouseHistoryRecord::Migration(record) => record.created_at,
+            WarehouseHistoryRecord::OldNameView(record) => record.created_at,
         };
         if since.is_none_or(|since| observed >= since) {
             records.push(record);
@@ -347,7 +392,7 @@ fn decode_record(
                 qualified,
             )?,
         ),
-        WarehouseHistoryRead::AuditResults(read) => {
+        WarehouseHistoryRead::AuditResults(read) | WarehouseHistoryRead::Migrations(read) => {
             return decode_event_record(&read.location, row, (columns, &[timestamp]));
         }
         WarehouseHistoryRead::JanitorEvents(read) => {
@@ -356,6 +401,9 @@ fn decode_record(
                 row,
                 (columns, &[timestamp, "archived_at"]),
             );
+        }
+        WarehouseHistoryRead::OldNameViews(read) => {
+            return decode_event_record(&read.location, row, (columns, &[timestamp, "expires_at"]));
         }
     };
     let mut value = json!({
@@ -398,7 +446,7 @@ fn decode_event_record(
     let mut value = json!({"state_database": location.database, "state_schema": location.schema});
     for (index, name) in columns.iter().enumerate() {
         let item = row.get_item(index)?;
-        value[*name] = if timestamps.contains(name) {
+        value[*name] = if timestamps.contains(name) && !item.is_none() {
             let item = if item.is_instance_of::<PyString>() {
                 item.py()
                     .import("datetime")?
