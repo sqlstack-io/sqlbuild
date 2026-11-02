@@ -147,10 +147,18 @@ also works while a person is disabled, before they are enabled again.
 
 Password sessions use `GET /api/control/locations/{location_id}/targets/{target}/runs`
 for recent run metadata, `POST /api/control/runs` for published-job requests, and
-`POST /api/control/triggers` for trigger overrides. Viewers can read metadata but cannot
-run jobs; operators and developers can run ordinary jobs and toggle triggers. Full-refresh
-jobs, published cursor bounds, explicit backfill windows and cursor resets require an installation
-administrator in these endpoints. The server defaults to `--default-role none`: a person with no
+`POST /api/control/triggers` for trigger overrides. Use `POST /api/control/runs/cancel`
+with `run_id`, `event_id` and `reason` to request cancellation; use
+`POST /api/control/runs/rerun` with `run_id`, `source_run_id`, `from_failure`, `reason`
+and `priority` to repeat a terminal run. Retrying an identical request is idempotent, but
+still requires live permission. Reruns keep the original snapshot, image, selection and bounds;
+`from_failure` narrows selection to durable failed/skipped outcomes. Cancellation of active
+work remains a request until its worker confirms shutdown; it never releases ownership early.
+Viewers can read metadata but cannot run, cancel or rerun jobs; operators and developers can
+control ordinary jobs and toggle triggers. Ad-hoc reruns also require developer or admin access.
+Full-refresh jobs, published cursor bounds, explicit backfill windows and their reruns require
+an installation administrator in these endpoints. Sensitive work can still be cancelled without
+history-rewrite permission. The server defaults to `--default-role none`: a person with no
 assigned role cannot use them. Set `--default-role viewer` to give every authenticated person
 installation-wide metadata access, including people whose explicit roles have been revoked.
 This is a live server setting, not a persisted assignment; returning it to `none` removes that

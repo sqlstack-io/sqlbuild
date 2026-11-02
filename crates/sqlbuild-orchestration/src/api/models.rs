@@ -15,6 +15,8 @@ use crate::api::_helpers::resources::{
     administrators::change,
     administrators::assign,
     person_operations::request_job,
+    person_operations::cancel_run,
+    person_operations::rerun,
     person_operations::change_trigger,
     person_operations::recent_runs,
     password_sessions::login,

@@ -179,6 +179,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/runs/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelPersonRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/runs/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rerunPersonRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/triggers": {
         parameters: {
             query?: never;
@@ -534,6 +566,14 @@ export interface components {
         };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
+        /** @description Browser cancellation cannot supply an actor, claim or lifecycle transition. */
+        CancelRunRequest: {
+            /** Format: uuid */
+            event_id: string;
+            reason: string;
+            /** Format: uuid */
+            run_id: string;
+        };
         CatchUp: "latest" | {
             /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
             all: {
@@ -819,6 +859,17 @@ export interface components {
             /** @enum {string} */
             kind: "blob";
             value: number[];
+        };
+        /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
+        RerunRequest: {
+            from_failure: boolean;
+            /** Format: int64 */
+            priority: number;
+            reason: string;
+            /** Format: uuid */
+            run_id: string;
+            /** Format: uuid */
+            source_run_id: string;
         };
         RoleAssignmentRequest: {
             /** Format: uuid */
@@ -1589,6 +1640,86 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JobRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    cancelPersonRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    rerunPersonRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RerunRequest"];
             };
         };
         responses: {

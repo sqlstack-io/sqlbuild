@@ -11,9 +11,11 @@ use crate::api::models::{MutationResponse, ReadQuery};
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
+use crate::runs::main::cancel_person_run::cancel_person_run;
 use crate::runs::main::list_person_runs::list_person_runs;
 use crate::runs::main::request_person_job_run::request_person_job_run;
-use crate::runs::models::{JobRunRequest, RunRecord};
+use crate::runs::main::request_rerun::request_rerun;
+use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunRecord};
 use crate::store::models::ControlStore;
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
@@ -29,6 +31,40 @@ pub(crate) async fn request_job(
         applied: request_person_job_run(
             &store,
             (&context, session_credentials(&headers)),
+            &request,
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/control/runs/cancel", operation_id = "cancelPersonRun",
+    params(("x-sqb-csrf" = String, Header)), request_body = CancelRunRequest,
+    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn cancel_run(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(request): Json<CancelRunRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: cancel_person_run(&store, (&context, session_credentials(&headers)), &request)
+            .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/control/runs/rerun", operation_id = "rerunPersonRun",
+    params(("x-sqb-csrf" = String, Header)), request_body = RerunRequest,
+    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn rerun(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(request): Json<RerunRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: request_rerun(
+            &store,
+            (&context, Some(session_credentials(&headers))),
             &request,
         )
         .await?,

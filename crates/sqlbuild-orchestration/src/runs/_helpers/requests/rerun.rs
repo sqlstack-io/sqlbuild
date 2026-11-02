@@ -4,7 +4,9 @@ use std::collections::BTreeSet;
 
 use serde_json::from_value;
 
-use crate::credentials::models::AuditContext;
+use crate::authorization::main::authorize_session::authorize_session;
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::models::{RerunRequest, RunOrigin, RunRequest, RunStatus};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -12,25 +14,34 @@ use crate::store::models::{ControlTransaction, Parameter};
 
 pub(crate) async fn frozen_rerun(
     transaction: ControlTransaction,
-    context: &AuditContext,
+    (context, credentials): (&AuditContext, Option<(&str, &str)>),
     request: &RerunRequest,
-) -> Result<(ControlTransaction, RunRequest), ControlError> {
+) -> Result<(ControlTransaction, (AuditContext, RunRequest)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
         "SELECT request_json, status FROM sqb_runs WHERE run_id=$1",
         vec![Parameter::Id(request.source_run_id)],
     )
     .await?;
-    let source = rows
-        .first()
-        .ok_or_else(|| ControlError::Invalid("source run was not found".into()))?;
+    let Some(source) = rows.first() else {
+        if let Some(credentials) = credentials {
+            authorize_session(
+                transaction,
+                (context, credentials),
+                &PermissionScope {
+                    action: Action::RunRerun,
+                    location_id: None,
+                    target: None,
+                    nodes: Default::default(),
+                },
+                DefaultRole::None,
+            )
+            .await?;
+        }
+        return Err(ControlError::Invalid("source run was not found".into()));
+    };
     let status: RunStatus = from_value(source["status"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    if !status.is_terminal() {
-        return Err(ControlError::Invalid(
-            "rerun requires a terminal source run".into(),
-        ));
-    }
     let mut frozen: RunRequest = from_value(source["request_json"].clone())
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     if request.from_failure {
@@ -49,11 +60,6 @@ pub(crate) async fn frozen_rerun(
         frozen
             .write_set
             .retain(|key| frozen.selection.contains(key));
-        if frozen.selection.is_empty() {
-            return Err(ControlError::Invalid(
-                "source run has no failed or skipped nodes".into(),
-            ));
-        }
     }
     frozen.run_id = request.run_id;
     frozen.origin = RunOrigin::Rerun;
@@ -64,5 +70,25 @@ pub(crate) async fn frozen_rerun(
     frozen.rerun_of_run_id = Some(request.source_run_id);
     frozen.requested_by = context.actor.clone();
     frozen.priority = request.priority;
-    Ok((transaction, frozen))
+    let mut context = context.clone();
+    if let Some(credentials) = credentials {
+        (transaction, context) = authorize_execution(
+            transaction,
+            (&context, credentials),
+            (&frozen, Action::RunRerun),
+        )
+        .await?;
+        frozen.requested_by.clone_from(&context.actor);
+    }
+    if !status.is_terminal() {
+        return Err(ControlError::Invalid(
+            "rerun requires a terminal source run".into(),
+        ));
+    }
+    if request.from_failure && frozen.selection.is_empty() {
+        return Err(ControlError::Invalid(
+            "source run has no failed or skipped nodes".into(),
+        ));
+    }
+    Ok((transaction, (context, frozen)))
 }

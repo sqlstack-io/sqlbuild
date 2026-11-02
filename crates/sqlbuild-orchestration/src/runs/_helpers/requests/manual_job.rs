@@ -6,10 +6,10 @@ use uuid::Uuid;
 use crate::authorization::main::authorize_session::authorize_session;
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::runs::_helpers::requests::job::frozen_group_children;
+use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
 use crate::runs::main::frozen_job_request::frozen_job_request;
-use crate::runs::models::{JobRunRequest, RunKind, RunWindow};
+use crate::runs::models::{JobRunRequest, RunWindow};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 
@@ -19,7 +19,7 @@ pub(crate) async fn request_job_run_in(
     request: &JobRunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let mut context = context.clone();
-    let mut scope = PermissionScope {
+    let scope = PermissionScope {
         action: Action::JobRun,
         location_id: Some(request.location_id),
         target: Some(request.target.clone()),
@@ -64,37 +64,12 @@ pub(crate) async fn request_job_run_in(
     }
     let (mut transaction, frozen) = frozen_job_request(transaction, &context, request).await?;
     if let Some(credentials) = credentials {
-        let mut executions = vec![frozen.clone()];
-        if frozen.kind == RunKind::Group {
-            (transaction, executions) = frozen_group_children(transaction, &frozen).await?;
-        }
-        scope.nodes = executions
-            .iter()
-            .flat_map(|run| run.write_set.iter().cloned())
-            .collect();
-        if request.window.is_some()
-            || executions.iter().any(|run| {
-                run.settings
-                    .get("full_refresh")
-                    .and_then(serde_json::Value::as_bool)
-                    == Some(true)
-                    || run.settings.contains_key("start_cursor")
-                    || run.settings.contains_key("end_cursor")
-                    || run.settings.contains_key("start_cursor_ts")
-                    || run.settings.contains_key("end_cursor_ts")
-                    || run.settings.contains_key("start_cursor_int")
-                    || run.settings.contains_key("end_cursor_int")
-            })
-        {
-            scope.action = Action::RunRewriteHistory;
-            (transaction, context) = authorize_session(
-                transaction,
-                (&context, credentials),
-                &scope,
-                DefaultRole::None,
-            )
-            .await?;
-        }
+        (transaction, context) = authorize_execution(
+            transaction,
+            (&context, credentials),
+            (&frozen, Action::JobRun),
+        )
+        .await?;
     }
     let (transaction, _) = publish_request(transaction, &frozen).await?;
     let transaction = append_audit(transaction, &context, (event_id, "job.run_requested"),

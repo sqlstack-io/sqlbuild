@@ -1,4 +1,5 @@
 pub mod advance_groups;
+pub mod cancel_person_run;
 pub mod change_run;
 pub mod claim_next_run;
 pub(crate) mod frozen_job_request;

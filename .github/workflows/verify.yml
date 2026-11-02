@@ -471,7 +471,15 @@ jobs:
           shared-key: verify-windows
           save-if: false
       - name: Test the native discovery crate (walk, junctions, ordering, read errors)
-        run: cargo test --locked -p sqlbuild-discovery
+        run: |
+          status=0
+          cargo test --locked -p sqlbuild-discovery || status=$?
+          if [ "${status}" -ne 0 ]; then
+            echo "Windows dependency resolution diagnostics (original failure is retained):"
+            cargo tree --offline -p sqlbuild-discovery || true
+            git diff -- Cargo.lock
+          fi
+          exit "${status}"
       - name: Install Python
         run: uv python install 3.12
       - name: Install SQLBuild and pytest

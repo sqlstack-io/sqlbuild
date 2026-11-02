@@ -129,7 +129,7 @@ pub struct JobRunRequest {
 }
 
 /// A retry derives its execution scope from a terminal run, never from caller selectors.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RerunRequest {
     pub run_id: Uuid,
@@ -137,6 +137,15 @@ pub struct RerunRequest {
     pub from_failure: bool,
     pub reason: String,
     pub priority: i64,
+}
+
+/// Browser cancellation cannot supply an actor, claim or lifecycle transition.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CancelRunRequest {
+    pub run_id: Uuid,
+    pub event_id: Uuid,
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
