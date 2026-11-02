@@ -323,6 +323,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/migrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_migrations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/old-name-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_old_name_views"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/source-freshness": {
         parameters: {
             query?: never;
@@ -855,6 +887,14 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        MigrationsBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseMigrationRecord"][];
+            /** Format: uuid */
+            session_id: string;
+        };
         MutationResponse: {
             applied: boolean;
         };
@@ -862,6 +902,14 @@ export interface components {
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        OldNameViewsBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseOldNameRecord"][];
+            /** Format: uuid */
+            session_id: string;
+        };
         /** @description Output of one stream that was not recorded because it exceeded `max_output_bytes`. */
         OmittedOutput: {
             /** Format: int64 */
@@ -1455,7 +1503,7 @@ export interface components {
          * @description Only immutable history tables support a timestamp watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -1476,6 +1524,54 @@ export interface components {
             schema_version: number;
             state_database?: string | null;
             state_schema: string;
+        };
+        /** @description Model-move history is evidence, not authority to migrate a warehouse relation. */
+        WarehouseMigrationRecord: {
+            /** Format: date-time */
+            created_at: string;
+            decision: string;
+            destination_database?: string | null;
+            destination_model: string;
+            destination_name: string;
+            destination_schema: string;
+            discovery: string;
+            event_id: string;
+            origin_database?: string | null;
+            origin_model?: string | null;
+            origin_name: string;
+            origin_schema?: string | null;
+            origin_version_hash: string;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+        };
+        /** @description Preserve nullable compatibility-view facts without projecting live warehouse existence. */
+        WarehouseOldNameRecord: {
+            archive_name?: string | null;
+            column_aliases?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            destination_model: string;
+            drop_reason?: string | null;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            grants_copied?: string | null;
+            migration_event_id: string;
+            new_database?: string | null;
+            new_name: string;
+            new_schema: string;
+            old_database?: string | null;
+            old_name: string;
+            old_schema?: string | null;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+            view_retention?: string | null;
+            view_sql?: string | null;
         };
         WarehouseReconciliationCursor: {
             /** Format: uuid */
@@ -2306,6 +2402,102 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["JanitorEventsBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_migrations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MigrationsBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_old_name_views: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OldNameViewsBatch"];
             };
         };
         responses: {

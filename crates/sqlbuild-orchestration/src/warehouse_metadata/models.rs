@@ -123,6 +123,77 @@ pub struct JanitorEventsBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
+/// Model-move history is evidence, not authority to migrate a warehouse relation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseMigrationRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub target_name: Option<String>,
+    pub origin_model: Option<String>,
+    pub origin_database: Option<String>,
+    pub origin_schema: Option<String>,
+    pub origin_name: String,
+    pub destination_model: String,
+    pub destination_database: Option<String>,
+    pub destination_schema: String,
+    pub destination_name: String,
+    pub origin_version_hash: String,
+    pub discovery: String,
+    pub decision: String,
+    pub run_id: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MigrationsBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseMigrationRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
+/// Preserve nullable compatibility-view facts without projecting live warehouse existence.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseOldNameRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub target_name: Option<String>,
+    pub event_type: String,
+    pub migration_event_id: String,
+    pub destination_model: String,
+    pub old_database: Option<String>,
+    pub old_schema: Option<String>,
+    pub old_name: String,
+    pub new_database: Option<String>,
+    pub new_schema: String,
+    pub new_name: String,
+    pub view_retention: Option<String>,
+    pub archive_name: Option<String>,
+    pub column_aliases: Option<String>,
+    pub grants_copied: Option<String>,
+    pub view_sql: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub drop_reason: Option<String>,
+    pub run_id: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OldNameViewsBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseOldNameRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -141,14 +212,18 @@ pub enum WarehouseHistoryKind {
     SourceFreshness,
     AuditResults,
     JanitorEvents,
+    Migrations,
+    OldNameViews,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 6] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
         Self::JanitorEvents,
+        Self::Migrations,
+        Self::OldNameViews,
     ];
 
     #[must_use]
@@ -158,6 +233,8 @@ impl WarehouseHistoryKind {
             Self::SourceFreshness => "source_freshness",
             Self::AuditResults => "audit_results",
             Self::JanitorEvents => "janitor_events",
+            Self::Migrations => "migrations",
+            Self::OldNameViews => "old_name_views",
         }
     }
 
@@ -168,6 +245,8 @@ impl WarehouseHistoryKind {
             Self::SourceFreshness => "sqb_warehouse_freshness",
             Self::AuditResults => "sqb_warehouse_audit_results",
             Self::JanitorEvents => "sqb_warehouse_janitor_events",
+            Self::Migrations => "sqb_warehouse_migrations",
+            Self::OldNameViews => "sqb_warehouse_old_name_views",
         }
     }
 }
@@ -280,6 +359,8 @@ pub enum WarehouseHistoryRead {
     Fingerprints(FingerprintRead),
     AuditResults(StateEventsRead),
     JanitorEvents(StateEventsRead),
+    Migrations(StateEventsRead),
+    OldNameViews(StateEventsRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -289,6 +370,8 @@ pub enum WarehouseHistoryRecord {
     Fingerprint(WarehouseFingerprintRecord),
     AuditResult(Box<WarehouseAuditRecord>),
     JanitorEvent(WarehouseJanitorRecord),
+    Migration(Box<WarehouseMigrationRecord>),
+    OldNameView(Box<WarehouseOldNameRecord>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

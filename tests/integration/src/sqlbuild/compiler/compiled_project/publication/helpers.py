@@ -17,7 +17,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -26,7 +26,17 @@ from uuid import uuid4
 import duckdb
 import pytest
 
-from sqlbuild._native import Fingerprint, write_fingerprint
+from sqlbuild._native import (
+    Fingerprint,
+    MigrationDecision,
+    MigrationDiscovery,
+    MigrationEvent,
+    MigrationRelation,
+    OldNameViewEvent,
+    OldNameViewEventType,
+    write_fingerprint,
+    write_migration_state_event,
+)
 from sqlbuild.adapter.discovery.main.resolve_adapter import resolve_adapter
 from sqlbuild.executor.audit_results.main._write import write_audit_result_records
 from sqlbuild.executor.audit_results.models import AuditResultRecord
@@ -178,6 +188,88 @@ def append_janitor_history(adapter: Any, connection: Any, fixture: dict[str, Any
     )
     writer.write(connection=connection, records=tuple(records))
     writer.write(connection=connection, records=(records[0],) * fixture["duplicate_rows"])
+
+
+def append_migration_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real model-move facts, including idempotent duplicate attempts."""
+    data: dict[str, Any] = migration_history_data(fixture, ("origin", "destination"))
+    data["discovery"] = MigrationDiscovery(data["discovery"])
+    data["decision"] = MigrationDecision(data["decision"])
+    record: MigrationEvent = MigrationEvent(**data)
+    write_migration_history(
+        adapter,
+        connection,
+        fixture,
+        record,
+        "model",
+        adapter.render_create_migration_state_table_sql(database=None, schema="main"),
+        {},
+    )
+
+
+def append_old_name_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real compatibility-view facts, including nullable and populated expiry."""
+    data: dict[str, Any] = migration_history_data(fixture, ("old", "new"))
+    data["event_type"] = OldNameViewEventType(data["event_type"])
+    data["column_aliases"] = ()
+    record: OldNameViewEvent = OldNameViewEvent(**data)
+    write_migration_history(
+        adapter,
+        connection,
+        fixture,
+        record,
+        "old_name",
+        adapter.render_create_old_name_view_state_table_sql(database=None, schema="main"),
+        {
+            "column_aliases": tuple(json.loads(fixture["last_record"]["column_aliases"]).items()),
+            "expires_at": datetime.fromisoformat(fixture["last_record"]["expires_at"]),
+            "view_sql": fixture["last_record"]["view_sql"],
+        },
+    )
+
+
+def migration_history_data(fixture: dict[str, Any], relations: tuple[str, str]) -> dict[str, Any]:
+    """Reconstruct native relation values from the warehouse-shaped fixture."""
+    data: dict[str, Any] = fixture["record"].copy()
+    del data["state_database"]
+    del data["state_schema"]
+    data["created_at"] = datetime.fromisoformat(data["created_at"])
+    for relation in relations:
+        data[relation] = MigrationRelation(
+            database=data.pop(f"{relation}_database"),
+            schema=data.pop(f"{relation}_schema"),
+            name=data.pop(f"{relation}_name"),
+        )
+    return data
+
+
+def write_migration_history(
+    adapter: Any,
+    connection: Any,
+    fixture: dict[str, Any],
+    record: MigrationEvent | OldNameViewEvent,
+    kind: Literal["model", "old_name"],
+    create_sql: str,
+    last_values: dict[str, Any],
+) -> None:
+    """Exercise the shared immutable writer with paginated, retried source facts."""
+    records: list[Any] = [
+        replace(record, event_id=f"{fixture['id_prefix']}-{index:03}")
+        for index in range(fixture["source_rows"])
+    ]
+    records[-1] = replace(
+        records[-1], created_at=datetime.fromisoformat(fixture["later_time"]), **last_values
+    )
+    records.extend([records[0]] * fixture["duplicate_rows"])
+    for record in records:
+        write_migration_state_event(
+            kind=kind,
+            connection=connection,
+            execute=adapter.execute,
+            event=record,
+            render_qualified_name=adapter.render_qualified_name,
+            create_table_sql=create_sql,
+        )
 
 
 def warehouse_history_page(

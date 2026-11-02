@@ -31,6 +31,7 @@ pub(crate) async fn event_history(
     ));
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path).expect("fixture"))
         .expect("event history");
+    let timestamp = fixture["timestamp_key"].as_str().unwrap_or("occurred_at");
     let record = fixture["record"].clone();
     let batch = json!({"session_id": session_id, "generation": 1, "records": [record, record]});
     let url = freshness_url.replace("source-freshness", &kind.as_str().replace('_', "-"));
@@ -129,7 +130,7 @@ pub(crate) async fn event_history(
                 .await
                 .expect("watermark")
         ),
-        record["occurred_at"]
+        record[timestamp]
     );
     let fault = TransactionFault {
         description: "event page rolls back atomically",

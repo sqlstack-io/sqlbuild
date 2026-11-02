@@ -433,6 +433,24 @@ pub(crate) async fn deliver_metadata_page(
                 )
                 .await
         }
+        WarehouseHistoryKind::Migrations => {
+            client
+                .sync_migrations(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid migrations batch"))?,
+                )
+                .await
+        }
+        WarehouseHistoryKind::OldNameViews => {
+            client
+                .sync_old_name_views(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid old name views batch"))?,
+                )
+                .await
+        }
     }
 }
 

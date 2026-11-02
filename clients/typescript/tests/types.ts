@@ -39,6 +39,24 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/janitor
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const migrationHistory: components["schemas"]["WarehouseHistoryKind"] = "migrations";
+const oldNameHistory: components["schemas"]["WarehouseHistoryKind"] = "old_name_views";
+const optionalExpiry: components["schemas"]["WarehouseOldNameRecord"]["expires_at"] = null;
+const optionalAliases: components["schemas"]["WarehouseOldNameRecord"]["column_aliases"] = null;
+const createdAt: components["schemas"]["WarehouseMigrationRecord"]["created_at"] = "2026-01-02T03:04:05Z";
+void migrationHistory;
+void oldNameHistory;
+void optionalExpiry;
+void optionalAliases;
+void createdAt;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/migrations", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/old-name-views", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.
