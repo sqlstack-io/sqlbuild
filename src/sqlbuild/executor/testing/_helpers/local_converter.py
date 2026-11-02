@@ -12,7 +12,9 @@ from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.testing._helpers.local_duckdb import run_converted_statement
 from sqlbuild.executor.testing.constants import (
     LOCAL_TEST_ENGINE_CODE,
+    SESSION_TIME_ZONE_PARAMETER,
     SQLQUACK_CONVERT_TIMEOUT_SECONDS,
+    UTC_TIME_ZONE,
 )
 from sqlbuild.executor.testing.models import (
     LocalStatementRun,
@@ -60,9 +62,20 @@ def _options(engine: LocalTestEngine) -> list[str]:
     )
     if engine.strict:
         options.append("--strict")
+    if _pins_utc(engine.session_parameters):
+        options.append("--utc-session")
     for name, value in engine.session_parameters:
         options.extend(("--session", f"{name}={value}"))
     return options
+
+
+def _pins_utc(session_parameters: tuple[tuple[str, str], ...]) -> bool:
+    """Whether the target's session parameters set the Snowflake session time zone to UTC."""
+
+    return any(
+        name.upper() == SESSION_TIME_ZONE_PARAMETER and value == UTC_TIME_ZONE
+        for name, value in session_parameters
+    )
 
 
 def _refusal(item: Mapping[str, Any]) -> SqlQuackRefusal:

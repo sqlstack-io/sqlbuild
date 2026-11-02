@@ -633,6 +633,17 @@ class LocalEngineE2ETestCase:
 
 
 @dataclass(frozen=True)
+class LocalSessionE2ETestCase:
+    """Test case for the target session parameters `sqb test --local` hands SQLQuack."""
+
+    description: str
+    session_parameters: str
+    expected_stdout_fragments: tuple[str, ...]
+    expected_converter_arguments: tuple[str, ...]
+    unexpected_converter_arguments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class RealLocalEngineE2ETestCase:
     """Test case for `sqb test --local` through the installed SQLQuack executable."""
 

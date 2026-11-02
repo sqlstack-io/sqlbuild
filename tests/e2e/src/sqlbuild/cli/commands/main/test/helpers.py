@@ -2499,7 +2499,7 @@ if "UNCONVERTIBLE_FN" in sql:
     ]
 elif "GUARDED_VALUE" in sql:
     report["sql"] = "SELECT CAST('json_fidelity#0123456789ab: a guarded value' AS INTEGER)"
-elif "ZONED_AT" in sql and "--strict" in arguments:
+elif "ZONED_AT" in sql and "--strict" in arguments and "--utc-session" not in arguments:
     report["converted"] = False
     report["sql"] = ""
     report["refusals"] = [

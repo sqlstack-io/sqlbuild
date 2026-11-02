@@ -10,3 +10,4 @@ pub(crate) const ERROR_SEVERITY: &str = "error";
 pub(crate) const TIMEOUT_CODE: &str = "C417";
 pub(crate) const REFUSED_CODE: &str = "T006";
 pub(crate) const STRICT_ADVICE: &str = "rerun with --strict to refuse them";
+pub(crate) const STRICT_CONFIRMED: &str = "confirmed by the target, so strict mode keeps them";

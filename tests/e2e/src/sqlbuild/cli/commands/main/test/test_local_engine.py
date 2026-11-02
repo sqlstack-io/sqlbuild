@@ -11,6 +11,7 @@ import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
     LocalEngineE2ETestCase,
+    LocalSessionE2ETestCase,
     RealLocalEngineE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
@@ -213,6 +214,70 @@ def test_given_no_project_policy_when_testing_locally_then_the_bundled_policy_is
         directory=converter_dir
     )
     assert len(conversions) == test_case.expected_conversion_count, conversions
+    for argument in test_case.expected_converter_arguments:
+        assert all(argument in call for call in conversions), conversions
+    for argument in test_case.unexpected_converter_arguments:
+        assert not any(argument in call for call in conversions), conversions
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalSessionE2ETestCase(
+            description="a target pinning UTC confirms the UTC session, so strict mode converts",
+            session_parameters='{ TIMEZONE = "UTC", QUOTED_IDENTIFIERS_IGNORE_CASE = true }',
+            expected_stdout_fragments=(
+                "PASS=1  FAIL=0  TOTAL=1",
+                "Assumptions relied on (confirmed by the target, so strict mode keeps them):",
+            ),
+            expected_converter_arguments=("--strict", "--utc-session", "TIMEZONE=UTC"),
+            unexpected_converter_arguments=(),
+        ),
+        LocalSessionE2ETestCase(
+            description="a target in another time zone does not confirm a UTC session",
+            session_parameters='{ TIMEZONE = "America/New_York" }',
+            expected_stdout_fragments=(
+                "PASS=0  FAIL=0  REFUSED=1  TOTAL=1",
+                "node:cast relies on assumption session_timezone_utc",
+            ),
+            expected_converter_arguments=("--strict", "TIMEZONE=America/New_York"),
+            unexpected_converter_arguments=("--utc-session",),
+        ),
+        LocalSessionE2ETestCase(
+            description="a target without a time zone does not confirm a UTC session",
+            session_parameters="{ QUOTED_IDENTIFIERS_IGNORE_CASE = true }",
+            expected_stdout_fragments=("PASS=0  FAIL=0  REFUSED=1  TOTAL=1",),
+            expected_converter_arguments=("--strict",),
+            unexpected_converter_arguments=("--utc-session",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_target_time_zone_when_testing_locally_then_only_utc_confirms_the_session(
+    test_case: LocalSessionE2ETestCase, tmp_path: Path
+) -> None:
+    files: dict[str, str] = build_local_engine_project_files()
+    files["sqlbuild_project.toml"] = files["sqlbuild_project.toml"].replace(
+        "{ QUOTED_IDENTIFIERS_IGNORE_CASE = true }", test_case.session_parameters
+    )
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path, project_name="duckshop_local", repo_files=files
+    )
+    converter_dir: Path = tmp_path / "converter"
+    _ = write_fake_sqlquack(directory=converter_dir, version="0.2.0")
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test", "--local", "--strict", "--select", "order_zones"),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(converter_dir / "sqlquack")},
+    )
+
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout, result.stdout + result.stderr
+    conversions: tuple[tuple[str, ...], ...] = read_fake_sqlquack_conversions(
+        directory=converter_dir
+    )
+    assert conversions, result.stdout + result.stderr
     for argument in test_case.expected_converter_arguments:
         assert all(argument in call for call in conversions), conversions
     for argument in test_case.unexpected_converter_arguments:

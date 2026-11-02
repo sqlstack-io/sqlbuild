@@ -293,6 +293,7 @@ fn given_local_results_when_summarising_assumptions_then_counts_tests_per_assump
         AssumptionsTestCase {
             description: "no assumption writes nothing",
             assumptions: vec![Vec::new(), Vec::new()],
+            strict: false,
             expected_text: "",
         },
         AssumptionsTestCase {
@@ -304,13 +305,20 @@ fn given_local_results_when_summarising_assumptions_then_counts_tests_per_assump
                     "session_timezone_utc".to_owned(),
                 ],
             ],
+            strict: false,
             expected_text: "\nAssumptions relied on (rerun with --strict to refuse them):\n  session_timezone_utc  2 tests\n  source_variant_json   1 test\n",
+        },
+        AssumptionsTestCase {
+            description: "in strict mode the assumptions left are the ones the target confirmed",
+            assumptions: vec![vec!["session_timezone_utc".to_owned()]],
+            strict: true,
+            expected_text: "\nAssumptions relied on (confirmed by the target, so strict mode keeps them):\n  session_timezone_utc  1 test\n",
         },
     ];
 
     for test_case in test_cases {
         assert_eq!(
-            render_test_assumptions(&test_case.assumptions, PLAIN),
+            render_test_assumptions(&test_case.assumptions, PLAIN, test_case.strict),
             test_case.expected_text,
             "{}",
             test_case.description

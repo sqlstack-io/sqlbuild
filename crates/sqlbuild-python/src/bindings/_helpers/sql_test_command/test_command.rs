@@ -629,7 +629,11 @@ pub(crate) fn timeout_record<'py>(
 fn complete(
     request: &Bound<'_, PyAny>,
     invocation: &Bound<'_, PyAny>,
-    (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
+    (results, since_json, strict): (
+        &[SqlTestExecutionResult<Bound<'_, PyAny>>],
+        Option<&str>,
+        bool,
+    ),
 ) -> PyResult<i32> {
     let py: Python<'_> = request.py();
     let mut failures: Vec<TestFailure> = Vec::new();
@@ -658,7 +662,7 @@ fn complete(
         (format!(
             "{}{}",
             render_test_completion((passed, results.len()), &failures, style),
-            render_test_assumptions(&assumptions, style)
+            render_test_assumptions(&assumptions, style, strict)
         ),),
     )?;
     stream.call_method0("flush")?;
@@ -751,11 +755,12 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         request.getattr("test_timeout")?.extract()?,
         TimeoutKind::Test,
     )?;
-    let local_options: Bound<'_, PyAny> = if local {
-        let enforced: bool = strict.is_truthy()?
+    let enforced: bool = local
+        && (strict.is_truthy()?
             || native_field(&native_field(&pipeline, "project")?, "settings")?
                 .getattr("strict")?
-                .eq(STRICT_ON_SETTING)?;
+                .eq(STRICT_ON_SETTING)?);
+    let local_options: Bound<'_, PyAny> = if local {
         call_with(
             &host::entry(py, ExecutorHost::LocalTestOptions)?,
             &[
@@ -781,7 +786,11 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         &pipeline.getattr("plan_output")?,
         &results,
     )?;
-    complete(request, &invocation, (&results, since_json.as_deref()))
+    complete(
+        request,
+        &invocation,
+        (&results, since_json.as_deref(), enforced),
+    )
 }
 
 /// Add source and safe typed values only for parameterized test rows.

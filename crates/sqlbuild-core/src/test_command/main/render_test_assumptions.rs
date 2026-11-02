@@ -3,11 +3,15 @@
 use std::collections::BTreeMap;
 
 use crate::cli_text::models::CliStyle;
-use crate::test_command::constants::STRICT_ADVICE;
+use crate::test_command::constants::{STRICT_ADVICE, STRICT_CONFIRMED};
 
-/// Each assumption with its test count, then how to refuse them; empty when none were relied on.
+/// Each assumption with its test count, and how to refuse them; empty when none were relied on.
 #[must_use]
-pub fn render_test_assumptions(assumptions: &[Vec<String>], style: CliStyle) -> String {
+pub fn render_test_assumptions(
+    assumptions: &[Vec<String>],
+    style: CliStyle,
+    strict: bool,
+) -> String {
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
     for relied_on in assumptions {
         for assumption in relied_on {
@@ -20,7 +24,14 @@ pub fn render_test_assumptions(assumptions: &[Vec<String>], style: CliStyle) -> 
     let width: usize = counts.keys().map(|name| name.len()).max().unwrap_or(0);
     let mut lines: Vec<String> = vec![
         String::new(),
-        style.warning_strong(&format!("Assumptions relied on ({STRICT_ADVICE}):")),
+        style.warning_strong(&format!(
+            "Assumptions relied on ({}):",
+            if strict {
+                STRICT_CONFIRMED
+            } else {
+                STRICT_ADVICE
+            }
+        )),
     ];
     for (name, tests) in counts {
         let noun: &str = if tests == 1 { "test" } else { "tests" };

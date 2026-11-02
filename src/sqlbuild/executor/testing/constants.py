@@ -27,6 +27,8 @@ SQLQUACK_VERSION_PATTERN: re.Pattern[str] = re.compile(r"^sqlquack (\d+)\.(\d+)\
 SQLQUACK_VERSION_TIMEOUT_SECONDS: int = 30
 SQLQUACK_CONVERT_TIMEOUT_SECONDS: int = 300
 SOURCE_DIALECT: str = "snowflake"
+SESSION_TIME_ZONE_PARAMETER: str = "TIMEZONE"
+UTC_TIME_ZONE: str = "UTC"
 LOCAL_DUCKDB_CONNECTION: dict[str, object] = {
     "database": ":memory:",
     "settings": {"TimeZone": "UTC"},

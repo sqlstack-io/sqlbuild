@@ -53,5 +53,6 @@ pub(super) struct ReadyTestCase {
 pub(super) struct AssumptionsTestCase {
     pub(super) description: &'static str,
     pub(super) assumptions: Vec<Vec<String>>,
+    pub(super) strict: bool,
     pub(super) expected_text: &'static str,
 }
