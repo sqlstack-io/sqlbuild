@@ -27,6 +27,7 @@ pub(crate) async fn pin(
         return Err(ApiError {
             status: StatusCode::CONFLICT,
             message: "published image differs from the configured Docker location image".into(),
+            decision_id: None,
         });
     }
     input.image_id = Some(image);
@@ -70,5 +71,6 @@ fn unavailable() -> ApiError {
     ApiError {
         status: StatusCode::SERVICE_UNAVAILABLE,
         message: "cannot inspect the configured Docker location image".into(),
+        decision_id: None,
     }
 }

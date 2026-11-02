@@ -9,13 +9,19 @@ pub(crate) async fn install_fault(store: &ControlStore, point: &TransactionFault
         let ControlStore::Sqlite(path, _) = store else {
             unreachable!()
         };
-        rusqlite::Connection::open(path)
-            .expect("fault connection")
-            .execute_batch(&format!(
-                "CREATE TRIGGER sqb_test_fault BEFORE {} ON {} {} BEGIN {}; END;",
-                point.operation, point.table, point.condition, point.sqlite_body
-            ))
-            .expect(point.description);
+        let path = path.clone();
+        let sql = format!(
+            "CREATE TRIGGER sqb_test_fault BEFORE {} ON {} {} BEGIN {}; END;",
+            point.operation, point.table, point.condition, point.sqlite_body
+        );
+        tokio::task::spawn_blocking(move || {
+            rusqlite::Connection::open(path)
+                .expect("fault connection")
+                .execute_batch(&sql)
+        })
+        .await
+        .expect("join fault setup")
+        .expect(point.description);
         return;
     };
     sqlx_core::query::query(&format!("CREATE FUNCTION sqb_test_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN {}; RETURN NEW; END $$", point.postgres_body))
@@ -30,10 +36,15 @@ pub(crate) async fn remove_fault(store: &ControlStore, point: &TransactionFault)
         let ControlStore::Sqlite(path, _) = store else {
             unreachable!()
         };
-        rusqlite::Connection::open(path)
-            .expect("fault connection")
-            .execute_batch("DROP TRIGGER sqb_test_fault")
-            .expect("remove SQLite transaction fault");
+        let path = path.clone();
+        tokio::task::spawn_blocking(move || {
+            rusqlite::Connection::open(path)
+                .expect("fault connection")
+                .execute_batch("DROP TRIGGER sqb_test_fault")
+        })
+        .await
+        .expect("join fault removal")
+        .expect("remove SQLite transaction fault");
         return;
     };
     sqlx_core::query::query(&format!("DROP TRIGGER sqb_test_fault ON {}", point.table))

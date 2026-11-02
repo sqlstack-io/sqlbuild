@@ -59,6 +59,7 @@ fn unauthorized() -> ApiError {
     ApiError {
         status: StatusCode::UNAUTHORIZED,
         message: "valid bearer credential required".into(),
+        decision_id: None,
     }
 }
 
@@ -85,6 +86,7 @@ pub(crate) async fn local_request(
         return Err(ApiError {
             status: StatusCode::FORBIDDEN,
             message: "development API requires a local authority and origin".into(),
+            decision_id: None,
         });
     }
     Ok(next.run(request).await)
@@ -98,6 +100,7 @@ pub(crate) fn require_location(
         return Err(ApiError {
             status: StatusCode::FORBIDDEN,
             message: "credential does not authorize this location".into(),
+            decision_id: None,
         });
     }
     Ok(())
@@ -135,6 +138,7 @@ pub(crate) async fn require_resource(
         return Err(ApiError {
             status: StatusCode::NOT_FOUND,
             message: missing.into(),
+            decision_id: None,
         });
     }
     Ok(())

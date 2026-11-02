@@ -126,6 +126,17 @@ test("generated client preserves native scopes, replay, path encoding, SSE and b
     assert.equal((await browser.GET("/api/auth/session")).response.status, 401);
     const session = await browser.GET("/api/auth/session", { headers });
     assert.deepEqual(session.data, login.data.identity);
+    const denied = await browser.GET("/api/control/locations/{location_id}/targets/{target}/runs", {
+      headers, params: { path: { location_id, target: "development" } },
+    });
+    assert.equal(denied.response.status, 403);
+    assert.equal(denied.response.headers.get("cache-control"), "no-store");
+    const decisionId: string | null | undefined = denied.error?.decision_id;
+    assert.ok(decisionId);
+    assert.deepEqual(denied.error, {
+      error: `missing permission in this scope; all requested nodes denied; decision ${decisionId}`,
+      decision_id: decisionId,
+    });
     const machine = await browser.GET(healthPath, { headers, params });
     assert.equal(machine.response.status, 401);
     const invalidLogout = await browser.POST("/api/auth/logout", {

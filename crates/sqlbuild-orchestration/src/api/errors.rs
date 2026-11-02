@@ -3,6 +3,7 @@
 use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use uuid::Uuid;
 
 use crate::api::models::ApiErrorBody;
 use crate::store::errors::ControlError;
@@ -21,6 +22,7 @@ pub enum ClientError {
 pub struct ApiError {
     pub(crate) status: StatusCode,
     pub(crate) message: String,
+    pub(crate) decision_id: Option<Uuid>,
 }
 
 impl From<ControlError> for ApiError {
@@ -29,6 +31,7 @@ impl From<ControlError> for ApiError {
             ControlError::Invalid(message) => Self {
                 status: StatusCode::BAD_REQUEST,
                 message,
+                decision_id: None,
             },
             ControlError::Denied {
                 reason,
@@ -36,14 +39,17 @@ impl From<ControlError> for ApiError {
             } => Self {
                 status: StatusCode::FORBIDDEN,
                 message: format!("{reason}; decision {decision_id}"),
+                decision_id: Some(decision_id),
             },
             ControlError::StaleGeneration | ControlError::Fenced => Self {
                 status: StatusCode::CONFLICT,
                 message: error.to_string(),
+                decision_id: None,
             },
             _ => Self {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
                 message: "control-store operation failed".into(),
+                decision_id: None,
             },
         }
     }
@@ -55,6 +61,7 @@ impl IntoResponse for ApiError {
             self.status,
             Json(ApiErrorBody {
                 error: self.message,
+                decision_id: self.decision_id,
             }),
         )
             .into_response();

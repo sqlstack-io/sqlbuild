@@ -99,6 +99,7 @@ pub(crate) async fn recall(
         return Err(ApiError {
             status: StatusCode::NOT_FOUND,
             message: "run invocation not found".into(),
+            decision_id: None,
         });
     }
     Ok(Json(

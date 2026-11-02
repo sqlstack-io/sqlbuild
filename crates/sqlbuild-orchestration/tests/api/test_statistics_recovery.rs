@@ -51,6 +51,8 @@ fn given_statistics_cleanup_when_connection_resets_then_http_survives() {
             .expect("actual prune is active");
             proxy.reset.send_modify(|epoch| *epoch += 1);
             tokio::time::sleep(Duration::from_millis(100)).await;
+            // A TCP reset leaves the backend sleeping with the shared database's write lock.
+            // Cancel only this fixture's query after injecting the reset, before dropping its trigger.
             sqlx_core::raw_sql::raw_sql(fault["restore_sql"].as_str().expect("restore SQL"))
                 .execute(pool)
                 .await

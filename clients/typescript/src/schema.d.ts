@@ -781,6 +781,11 @@ export interface components {
          */
         AdministratorChange: "grant" | "revoke" | "disable" | "enable";
         ApiErrorBody: {
+            /**
+             * Format: uuid
+             * @description Existing durable denial audit ID; absent when no decision was recorded.
+             */
+            decision_id?: string | null;
             error: string;
         };
         AuditResultsBatch: {

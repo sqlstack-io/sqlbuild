@@ -92,6 +92,16 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
                 StatusCode::UNAUTHORIZED,
                 "authentication precedes JSON parsing"
             );
+            assert_eq!(response.headers()["cache-control"], "no-store");
+            assert_eq!(response.headers()["www-authenticate"], "Bearer");
+            assert_eq!(
+                response
+                    .json::<serde_json::Value>()
+                    .await
+                    .expect("unaudited rejection"),
+                json!({"error": "valid bearer credential required"}),
+                "a response without a durable decision must not invent an ID"
+            );
             let openapi: serde_json::Value = client
                 .get(format!("{}/api/openapi.json", api.url))
                 .send()
