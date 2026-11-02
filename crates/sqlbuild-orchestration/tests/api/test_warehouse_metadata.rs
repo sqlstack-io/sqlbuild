@@ -126,6 +126,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                     .sync_source_freshness("development", &typed)
                     .await
                     .expect("native client sync")
+                    .applied
             );
             expect_topics(&mut changes, &["node_status:development".into()]).await;
             assert!(
@@ -133,6 +134,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                     .sync_source_freshness("development", &typed)
                     .await
                     .expect("native client replay")
+                    .applied
             );
             drop(changes);
             let mut equivalent = batch.clone();
@@ -312,6 +314,12 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 &outbound,
                 (session_id, preview_session),
                 (&client, &url, &token.bearer),
+            )
+            .await;
+            crate::api::tests::warehouse_reconciliation_helpers::reconcile_history(
+                store,
+                (&client, &url, &token.bearer),
+                (session_id, preview_session),
             )
             .await;
             stop_api(api).await;

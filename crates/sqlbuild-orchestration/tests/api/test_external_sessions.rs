@@ -22,7 +22,9 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
+use crate::store::tests::store_helpers::{
+    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor, run,
+};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
@@ -86,6 +88,7 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
             )
             .await
             .expect("unbound password");
+            reconstruct_warehouse_predecessor(store).await;
             let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("populated predecessor");

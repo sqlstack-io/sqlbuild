@@ -1,0 +1,47 @@
+{
+  "day": "2026-01-01",
+  "obsolete_count": 205,
+  "retained_count": 1000,
+  "source_freshness": {
+    "event_id": "reconciliation-keep",
+    "state_database": null,
+    "state_schema": "reconcile_orders",
+    "source_name": "raw_orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "orders",
+    "run_id": "orders-build",
+    "strategy": "max_column",
+    "value_kind": "integer",
+    "data_version": "17",
+    "data_version_hash": "orders-version-17",
+    "observed_at": "2026-01-01T10:00:00Z"
+  },
+  "fingerprints": {
+    "event_id": "reconciliation-keep",
+    "state_database": null,
+    "state_schema": "reconcile_orders",
+    "node_type": "model",
+    "node_name": "orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "orders",
+    "run_id": "orders-build",
+    "definition_hash": "orders-definition",
+    "version_hash": "orders-version",
+    "schema_fingerprint": "orders-schema",
+    "definition": "select order_id from orders",
+    "metadata_json": "{}",
+    "ts": "2026-01-01T10:00:00Z"
+  },
+  "retained_ids": [
+    "reconciliation-keep",
+    "reconciliation-late",
+    "reconciliation-final-new",
+    "reconciliation-other-database",
+    "reconciliation-other-schema",
+    "reconciliation-before-day",
+    "reconciliation-after-day",
+    "reconciliation-preview"
+  ]
+}

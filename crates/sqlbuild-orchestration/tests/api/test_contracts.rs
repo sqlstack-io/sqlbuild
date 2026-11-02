@@ -40,5 +40,7 @@ mod test_warehouse_metadata;
 mod test_worker;
 #[path = "warehouse_metadata/helpers.rs"]
 mod warehouse_metadata_helpers;
+#[path = "warehouse_metadata/reconciliation/helpers.rs"]
+mod warehouse_reconciliation_helpers;
 #[path = "work/helpers.rs"]
 mod work_helpers;

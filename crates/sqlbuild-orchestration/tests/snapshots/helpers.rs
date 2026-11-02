@@ -15,7 +15,9 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::snapshots::tests::test_types::SchemaRejectionCase;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
+use crate::store::tests::store_helpers::{
+    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor,
+};
 use crate::store::tests::store_test_types::Backend;
 
 fn snapshot(location_id: Uuid) -> SnapshotInput {
@@ -240,6 +242,7 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let good = publish_snapshot(&store, &input)
         .await
         .expect("publish good snapshot");
+    reconstruct_warehouse_predecessor(&store).await;
     let connection = rusqlite::Connection::open(&path).expect("open fault injection connection");
     connection
         .execute_batch(

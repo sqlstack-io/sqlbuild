@@ -7,6 +7,8 @@ from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.request import Request, urlopen
+from uuid import uuid4
 
 import pytest
 
@@ -14,10 +16,19 @@ from sqlbuild._native import (
     Fingerprint,
     SourceFreshnessRecord,
     SourceFreshnessRenderers,
+    build_compiled_project,
+    build_orchestration_snapshot,
+    discover_project_inputs,
     read_latest_fingerprints,
     read_latest_source_freshness,
     write_fingerprints,
     write_source_freshness_records,
+)
+from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.compiler.compile.types import CompiledProjectView
+from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
+    METADATA,
+    TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     CatalogConnectionTestCase,
@@ -28,8 +39,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     append_contended_fingerprints,
     append_retried_fingerprints,
     open_legacy_warehouse,
+    snapshot_api,
+    sync_warehouse_history,
     warehouse_history_page,
 )
+from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
 
 @pytest.mark.parametrize(
@@ -325,6 +339,126 @@ def test_given_populated_predecessor_tables_when_writers_add_ids_then_history_pr
     (project / "warehouse.db").rename(project / "retained-warehouse.db")
     assert page() is None
     assert not (project / "warehouse.db").exists()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        CatalogConnectionTestCase("DuckDB retained key set", "duckdb", "database", "retained-run"),
+        CatalogConnectionTestCase("SQLite retained key set", "sqlite", "path", "retained-run"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mirror_deletions_and_empty_resync_match_source(
+    test_case: CatalogConnectionTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "warehouse-project"
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    for table in ("_sqlbuild_source_freshness", "_sqlbuild_fingerprints"):
+        _ = adapter.execute(connection=connection, sql=f"INSERT INTO {table} SELECT * FROM {table}")
+        _ = adapter.execute(
+            connection=connection,
+            sql=f"UPDATE {table} SET run_id='retained-run' WHERE rowid=(SELECT MAX(rowid) FROM {table})",
+        )
+    adapter.close(connection)
+    declarations: Path = tmp_path / "declarations"
+    write_files(project_dir=declarations, files=TYPE_PROOF_FILES)
+    compiled: CompiledProjectView = build_compiled_project(
+        discovered_inputs=discover_project_inputs(project_dir=declarations),
+        adapter=DuckDbAdapter(),
+        resolved_connection={"database": "warehouse", "schema": "main"},
+    )
+    with snapshot_api(tmp_path / "control") as api:
+        _ = build_orchestration_snapshot(
+            compiled,
+            json.dumps(METADATA | {"location_id": api.location_id, "target": "development"}),
+            declarations,
+        ).publish(api.url, api.bearer)
+        session_id: str = str(uuid4())
+        heartbeat: Request = Request(
+            f"{api.url}/api/locations/{api.location_id}/health",
+            data=json.dumps(
+                {
+                    "session_id": session_id,
+                    "event_id": str(uuid4()),
+                    "target": "development",
+                    "health": {"kind": "heartbeat"},
+                }
+            ).encode(),
+            headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
+        )
+        with urlopen(heartbeat, timeout=5) as response:
+            assert json.load(response) == {"applied": True}
+        for kind, endpoint, mirror in [
+            ("source_freshness", "source-freshness", "sqb_warehouse_freshness"),
+            ("fingerprints", "fingerprints", "sqb_warehouse_fingerprints"),
+        ]:
+            initial: dict[str, Any] = warehouse_history_page(project, kind)
+            assert len(initial["records"]) == 2 and initial["next_after"] is None
+            batch: dict[str, Any] = {
+                "session_id": session_id,
+                "generation": 1,
+                "records": initial["records"],
+            }
+            assert sync_warehouse_history(api, endpoint, batch) == {"applied": True}
+            control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+            with closing(sqlite3.connect(control)) as database:
+                before: list[tuple[str, str]] = database.execute(
+                    f"SELECT event_id,record_json FROM {mirror} ORDER BY event_id"
+                ).fetchall()
+            assert len(before) == 2
+            connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
+            _ = adapter.execute(
+                connection=connection, sql=f"DELETE FROM _sqlbuild_{kind} WHERE run_id='legacy-run'"
+            )
+            adapter.close(connection)
+            remaining: dict[str, Any] = warehouse_history_page(project, kind)
+            assert [row["run_id"] for row in remaining["records"]] == [test_case.expected_run_id]
+            batch["records"] = remaining["records"]
+            batch["reconciliation"] = {
+                "scan_id": str(uuid4()),
+                "page": 0,
+                "state_database": None,
+                "state_schema": "main",
+                "day": "2026-01-01",
+                "complete": False,
+                "after": None,
+            }
+            assert sync_warehouse_history(api, endpoint, batch) == {"applied": False}
+            with closing(sqlite3.connect(control)) as database:
+                assert database.execute(f"SELECT COUNT(*) FROM {mirror}").fetchone() == (2,)
+            batch["records"] = []
+            batch["reconciliation"].update(page=1, complete=True)
+            assert sync_warehouse_history(api, endpoint, batch) == {"applied": True}
+            originals_by_run: dict[str, tuple[str, str]] = {
+                json.loads(row[1])["run_id"]: row for row in before
+            }
+            expected: list[tuple[str, str]] = [originals_by_run[test_case.expected_run_id]]
+            with closing(sqlite3.connect(control)) as database:
+                assert (
+                    database.execute(f"SELECT event_id,record_json FROM {mirror}").fetchall()
+                    == expected
+                )
+                _ = database.execute(f"DELETE FROM {mirror}")
+                database.commit()
+            assert sync_warehouse_history(
+                api,
+                endpoint,
+                {"session_id": session_id, "generation": 1, "records": remaining["records"]},
+            ) == {"applied": True}
+            with closing(sqlite3.connect(control)) as database:
+                assert (
+                    database.execute(f"SELECT event_id,record_json FROM {mirror}").fetchall()
+                    == expected
+                )
+            assert warehouse_history_page(project, kind) == remaining, (
+                "sync does not mutate warehouse state"
+            )
+    assert not (project / ".sqlbuild/control.sqlite3").exists()
 
 
 @pytest.mark.parametrize(

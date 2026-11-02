@@ -8,26 +8,17 @@ use crate::api::models::MutationResponse;
 use crate::platform::models::{
     LocationWorkClaim, LocationWorkClient, LocationWorkPoll, LocationWorkResult,
 };
-use crate::warehouse_metadata::models::{FingerprintBatch, SourceFreshnessBatch};
+use crate::warehouse_metadata::models::{
+    FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse,
+};
 
 impl LocationWorkClient {
     pub async fn sync_fingerprints(
         &self,
         target: &str,
         batch: &FingerprintBatch,
-    ) -> Result<bool, ClientError> {
-        let endpoint = self.connection.endpoint(&[
-            "api",
-            "locations",
-            &self.location_id.to_string(),
-            "targets",
-            target,
-            "metadata",
-            "fingerprints",
-        ])?;
-        let response: MutationResponse =
-            client_response(self.connection.client.post(endpoint).json(batch)).await?;
-        Ok(response.applied)
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.sync_metadata((target, "fingerprints"), batch).await
     }
 
     /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
@@ -35,7 +26,16 @@ impl LocationWorkClient {
         &self,
         target: &str,
         batch: &SourceFreshnessBatch,
-    ) -> Result<bool, ClientError> {
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.sync_metadata((target, "source-freshness"), batch)
+            .await
+    }
+
+    async fn sync_metadata(
+        &self,
+        (target, table): (&str, &str),
+        batch: &impl serde::Serialize,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
         let endpoint = self.connection.endpoint(&[
             "api",
             "locations",
@@ -43,11 +43,9 @@ impl LocationWorkClient {
             "targets",
             target,
             "metadata",
-            "source-freshness",
+            table,
         ])?;
-        let response: MutationResponse =
-            client_response(self.connection.client.post(endpoint).json(batch)).await?;
-        Ok(response.applied)
+        client_response(self.connection.client.post(endpoint).json(batch)).await
     }
 
     pub async fn poll(
