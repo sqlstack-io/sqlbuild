@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.2...v0.187.0) (2026-11-02)
+
+
+### Features
+
+* **rules:** run SQL Rules through the SQLClean engine ([#1283](https://github.com/sqlstack-io/sqlbuild/issues/1283)) ([f7c1e76](https://github.com/sqlstack-io/sqlbuild/commit/f7c1e7662333908bd834eb874df0b313da2cb3e8))
+
 ## [0.186.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.1...v0.186.2) (2026-10-30)
 
 

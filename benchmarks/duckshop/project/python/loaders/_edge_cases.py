@@ -7,7 +7,7 @@ and escapes reach Snowflake unchanged. The rows never depend on `data_scale`.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, time
 from decimal import Decimal
 
 Rows = list[dict[str, object]]
@@ -490,6 +490,220 @@ def partner_listings() -> Rows:
     ]
 
 
+def basket_lines() -> Rows:
+    lines = [
+        # basket, line, sku, tag: B-1 repeats a tag, B-3 holds one line, B-4 has a NULL tag
+        ("B-1", 1, "MALLARD-01", "bath"),
+        ("B-1", 2, "TEAL-02", "gift"),
+        ("B-1", 3, "EIDER-03", "bath"),
+        ("B-2", 1, "PINTAIL-04", "garden"),
+        ("B-2", 2, "MALLARD-01", "bath"),
+        ("B-3", 1, "MERGANSER-05", "pond"),
+        ("B-4", 1, "TEAL-02", None),
+        ("B-4", 2, "EIDER-03", "gift"),
+    ]
+    return [
+        {
+            "line_id": f"BL-{index + 1:02d}",
+            "basket_id": basket,
+            "line_no": line_no,
+            "sku": sku,
+            "tag": tag,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for index, (basket, line_no, sku, tag) in enumerate(lines)
+    ]
+
+
+def date_texts() -> Rows:
+    texts = [
+        # date text, zoned text, wall clock, wall clock text, local time, fine time
+        (
+            "5.3.2026",
+            "2026-03-05T23:30:00Z",
+            "2026-03-05 23:30:00.123",
+            "2026-03-05 23:30:00.1239",
+            time(23, 59, 59, 999000),
+            "23:59:59.9999999",
+        ),
+        (
+            "2026-3-5",
+            "2026-03-05 23:30:00+00:00",
+            "2026-03-05 23:30:00",
+            "2026-03-05 23:30:00.9",
+            time(0, 0, 0),
+            "12:00:00.0000005",
+        ),
+        (
+            "05/03/26",
+            "2026-03-05 23:30:00 +0000",
+            "2026-03-05 23:30:00.120",
+            "2026-03-05 23:30:00.12",
+            time(12, 30, 15, 250000),
+            "00:00:00.000000001",
+        ),
+        (
+            "2026-03-05T10:00",
+            "2026-03-06T08:30:00+09:00",
+            "1969-12-31 23:59:59.999",
+            "1969-12-31 23:59:59.999",
+            time(23, 30),
+            "23:59:59.999999999",
+        ),
+        (
+            "2026-03-05Z",
+            "2026-03-05T18:00:00-05:30",
+            "2026-12-31 23:59:59.999",
+            "2026-12-31 23:59:59.999000",
+            time(6, 0, 0, 1000),
+            "06:00:00.0000001",
+        ),
+        (
+            "05 Auguſt 2026",
+            "2026-12-31T23:30:00-05:30",
+            "2026-03-29 01:30:00",
+            "2026-03-29 01:30",
+            None,
+            None,
+        ),
+        ("5 Mar  2026", None, None, None, None, None),
+    ]
+    return [
+        {
+            "text_id": f"DT-{index + 1:02d}",
+            "date_text": date_text,
+            "zoned_text": zoned,
+            "wall_clock": None if wall is None else _at(wall),
+            "wall_clock_text": wall_text,
+            "local_time": local,
+            "fine_time": fine,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for index, (date_text, zoned, wall, wall_text, local, fine) in enumerate(texts)
+    ]
+
+
+def amount_checks() -> Rows:
+    checks = [
+        # group, narrow key, wide key, key text, amount, fine amount, ratio, JSON text
+        (
+            "G-1",
+            7,
+            7,
+            "01",
+            Decimal("10.00"),
+            Decimal("0.123456789012345"),
+            0.29,
+            '{"amount": 2.0, "qty": 1.00}',
+        ),
+        (
+            "G-1",
+            12,
+            12345678901234567890123,
+            "1",
+            Decimal("-0.50"),
+            Decimal("0.123456789012344"),
+            1.005,
+            "1.0.5",
+        ),
+        (
+            "G-1",
+            None,
+            12,
+            "12",
+            Decimal("2.50"),
+            Decimal("0.500000000000001"),
+            2.675,
+            '{"a": 1.00.25}',
+        ),
+        (
+            "G-2",
+            123456789012345678,
+            123456789012345678,
+            " 7",
+            Decimal("0.00"),
+            Decimal("1.000000000000000"),
+            -155.5,
+            "[1.0.5, 2.0]",
+        ),
+        ("G-2", 99, None, None, None, None, None, "12345678901234567890123456789012345678.0"),
+        (
+            "G-3",
+            5,
+            5,
+            "n/a",
+            Decimal("999999999999.99"),
+            Decimal("0.000000000000001"),
+            0.57,
+            "1." + "0" * 40,
+        ),
+    ]
+    return [
+        {
+            "check_id": f"AC-{index + 1:02d}",
+            "group_code": group,
+            "narrow_key": narrow,
+            "wide_key": wide,
+            "key_text": key_text,
+            "amount": amount,
+            "fine_amount": fine,
+            "ratio": ratio,
+            "json_text": json_text,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for index, (group, narrow, wide, key_text, amount, fine, ratio, json_text) in enumerate(
+            checks
+        )
+    ]
+
+
+def variant_values() -> Rows:
+    values = [
+        # group, sort key, JSON document
+        ("V-1", 1, "1"),
+        ("V-1", 2, '"1"'),
+        ("V-1", 3, "1.0"),
+        ("V-1", 4, "null"),
+        ("V-2", 1, '{"a": 1, "b": 2}'),
+        ("V-2", 2, '{"b": 2, "a": 1}'),
+        ("V-2", 3, '"2026-03-01"'),
+        ("V-3", 1, '[1, "a", 2, true, null, 12345678901234567890]'),
+        ("V-3", 2, '["a", "B", "b", "\\u00e9", "z"]'),
+        ("V-3", 3, '{"a$b": 1, "a-b": {"@x": 2}, "a[b": [3], "\\u00e9": 4, "plain key": 5}'),
+    ]
+    return [
+        {
+            "value_id": f"VV-{index + 1:02d}",
+            "group_code": group,
+            "sort_key": sort_key,
+            "attribute_value": document,
+            "value_text": document,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for index, (group, sort_key, document) in enumerate(values)
+    ]
+
+
+def category_links() -> Rows:
+    links = [
+        ("CAT-1", None, "Ducks", 1),
+        ("CAT-2", "CAT-1", "Rubber ducks", 2),
+        ("CAT-3", "CAT-2", "Collectible series", 3),
+        ("CAT-4", "CAT-1", "Decoys", 2),
+        ("CAT-5", None, "Pond supplies", 1),
+    ]
+    return [
+        {
+            "category_id": category,
+            "parent_id": parent,
+            "category_name": name,
+            "shelf_depth": depth,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for category, parent, name, depth in links
+    ]
+
+
 DELIVERY_BATCH_VAR = "edge_delivery_batch"
 """Project variable naming the last delivery-update load to include; "2" (all loads) by default."""
 
@@ -543,4 +757,9 @@ TABLES: dict[str, Rows] = {
     "edge__ticket_notes": ticket_notes(),
     "edge__partner_listings": partner_listings(),
     "edge__delivery_updates": delivery_updates(),
+    "edge__basket_lines": basket_lines(),
+    "edge__date_texts": date_texts(),
+    "edge__amount_checks": amount_checks(),
+    "edge__variant_values": variant_values(),
+    "edge__category_links": category_links(),
 }

@@ -177,9 +177,14 @@ sqb test --target edge --select tag:edge_case --concurrency 8
 sqb scenario test --target edge --select edge_cases
 ```
 
-The build loads the `edge__*` sources from fixed rows that `data_scale` does not change, then
-builds the edge models and runs their tests and audits. `fct_edge_delivery_events` is disabled and
-reports `skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
+The build loads the `edge__*` sources from fixed rows that `data_scale` does not change, creates
+the area's Python functions (`functions/python/edge_*.py`, tagged `edge_case`), then builds the edge
+models and runs their tests and audits. `fct_edge_delivery_events` is disabled and reports
+`skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
+
+`int_edge_ticket_tokens` calls volatile Python functions, so its values change on every run; its
+test compares only the deterministic columns and asserts facts that hold for any values, such as
+every token being distinct.
 
 ### Replay the delivery change log as two loads
 
@@ -221,6 +226,12 @@ against the case the test describes before committing: a capture records what Sn
 which is the point, but a fixture mistake is captured as faithfully as a real edge. Scenario
 expectations, and the assertions in tests about ties (where Snowflake may return any of the tied
 rows), are written by hand from the captured values.
+
+Some edge models read values whose order Snowflake does not define, such as an `ARRAY_AGG`
+without `WITHIN GROUP` or a `MAX_BY` whose keys tie. They output only order-free facts, and a
+comment in the model or test says so; leave any column that can still differ between runs out of
+the expected CTE and check it with an assertion instead. Run the capture twice on such tests: the
+second run must leave the files unchanged.
 
 Capture scenario snapshots for the edge scenarios with
 `sqb scenario capture --target edge --select edge_cases`.
