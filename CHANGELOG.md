@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.187.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.0...v0.187.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **duckshop:** declare the columns staging models output and downstream models read ([#1297](https://github.com/sqlstack-io/sqlbuild/issues/1297)) ([43448ef](https://github.com/sqlstack-io/sqlbuild/commit/43448ef00b7150c5c4c60be60a0d1927c2c71ab5))
+
 ## [0.187.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.2...v0.187.0) (2026-11-02)
 
 
