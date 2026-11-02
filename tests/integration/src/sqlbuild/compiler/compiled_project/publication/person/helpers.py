@@ -4,8 +4,10 @@ import json
 import os
 import subprocess
 import sys
+import time
 from http.cookies import SimpleCookie
 from pathlib import Path
+from subprocess import Popen
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -57,6 +59,35 @@ def person_headers(session: tuple[str, str]) -> dict[str, str]:
 def person_read(api: SnapshotApi, path: str, *, session: tuple[str, str]) -> Any:
     with urlopen(Request(api.url + path, headers=person_headers(session)), timeout=5) as response:
         return json.load(response)
+
+
+def wait_for_person_catalog(
+    api: SnapshotApi, session: tuple[str, str], process: Popen[bytes], log: Path
+) -> None:
+    """Wait for an actual worker-built relation through the scoped browser API, not store SQL."""
+    path: str = f"/api/control/locations/{api.location_id}/targets/development/catalog?schema=main"
+    deadline: float = time.monotonic() + 45
+    page: dict[str, Any] = person_read(api, path, session=session)
+    records: dict[str, Any] = {row["record"]["name"]: row for row in page["records"]}
+    while "orders" not in records:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, (page, log.read_text())
+        time.sleep(0.05)
+        page = person_read(api, path, session=session)
+        records = {row["record"]["name"]: row for row in page["records"]}
+    assert records["orders"]["event_id"] and records["orders"]["observed_at"]
+    assert records["orders"]["record"] == {
+        "state_database": None,
+        "state_schema": "main",
+        "name": "orders",
+        "relation_type": "BASE TABLE",
+        "columns": [{"name": "amount", "data_type": "INTEGER"}],
+    }
+    assert page["next_after"] is None
+    assert person_read(api, path + "&database=unlisted", session=session) == {
+        "records": [],
+        "next_after": None,
+    }
 
 
 def verify_security_audit(

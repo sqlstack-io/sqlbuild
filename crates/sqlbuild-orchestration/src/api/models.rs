@@ -20,6 +20,7 @@ use crate::api::_helpers::resources::{
     person_operations::rerun,
     person_operations::change_trigger,
     person_operations::recent_runs,
+    person_operations::catalog,
     password_sessions::login,
     password_sessions::current,
     password_sessions::logout,

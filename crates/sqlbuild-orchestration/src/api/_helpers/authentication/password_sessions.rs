@@ -62,6 +62,10 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/catalog",
+            get(crate::api::_helpers::resources::person_operations::catalog),
+        )
         .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }

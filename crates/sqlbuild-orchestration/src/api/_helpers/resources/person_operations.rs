@@ -17,6 +17,8 @@ use crate::runs::main::request_person_job_run::request_person_job_run;
 use crate::runs::main::request_rerun::request_rerun;
 use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunRecord};
 use crate::store::models::ControlStore;
+use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
+use crate::warehouse_metadata::models::{CatalogPage, CatalogQuery};
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
     params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,
@@ -101,6 +103,33 @@ pub(crate) async fn recent_runs(
             &store,
             (&context, session_credentials(&headers)),
             (location_id, &target, options.limit.unwrap_or(100)),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/catalog", operation_id = "readPersonCatalog",
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("database" = Option<String>, Query, description = "Exact database; omitted matches SQL NULL"),
+        ("schema" = String, Query, description = "Exact physical schema"),
+        ("after_observed_at" = Option<chrono::DateTime<chrono::Utc>>, Query),
+        ("after_event_id" = Option<Uuid>, Query),
+        ("limit" = Option<u32>, Query, description = "Page size; defaults to 100, clamped to 1..100")),
+    responses((status = 200, body = CatalogPage), (status = 400, description = "Invalid namespace or cursor"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn catalog(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<CatalogQuery>),
+    headers: HeaderMap,
+) -> Result<Json<CatalogPage>, ApiError> {
+    Ok(Json(
+        read_person_catalog(
+            &store,
+            (&context, session_credentials(&headers)),
+            (location_id, &target, &options),
             default_role,
         )
         .await?,
