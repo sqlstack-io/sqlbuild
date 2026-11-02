@@ -10,6 +10,11 @@ MODEL (
     latitude (type NUMBER(9, 6)),
     longitude (type NUMBER(9, 6)),
     geo (type OBJECT),
+    line1 (type VARCHAR),
+    line2 (type VARCHAR),
+    city (type VARCHAR),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
