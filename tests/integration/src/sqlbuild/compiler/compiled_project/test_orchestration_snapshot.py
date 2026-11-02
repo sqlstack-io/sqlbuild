@@ -34,6 +34,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotDiscoveryRejectionTestCase,
     SnapshotDiscoveryTestCase,
     SnapshotEnvironmentTestCase,
+    SnapshotIdentityTestCase,
     SnapshotRejectionTestCase,
     SnapshotScheduleTestCase,
 )
@@ -197,6 +198,69 @@ def test_given_real_projects_when_building_snapshots_then_catalogs_are_stable_an
                 == seed.destination.qualified_name
             )
     assert publications[0] == publications[1]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnapshotIdentityTestCase(**case)
+        for case in json.loads(
+            Path("benchmarks/duckshop/edge_cases/orchestration/semantic_identity.json").read_text()
+        )["cases"]
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_semantic_edits_when_publishing_then_local_identities_keep_planner_boundaries(
+    test_case: SnapshotIdentityTestCase, tmp_path: Path
+) -> None:
+    fixture: dict[str, Any] = json.loads(
+        Path("benchmarks/duckshop/edge_cases/orchestration/semantic_identity.json").read_text()
+    )
+    files: dict[str, str] = (
+        TYPE_PROOF_FILES
+        | fixture["files"]
+        | {
+            path: (Path("benchmarks/duckshop/project") / path).read_text()
+            for path in (
+                "seeds/edge_cases/edge_quantity_steps.csv",
+                "seeds/edge_cases/edge_quantity_steps.yml",
+                "functions/sql/edge_cases/edge_next_quantity.sql",
+            )
+        }
+    )
+    original: str = files[test_case.path]
+    assert test_case.before in original
+    changed: dict[str, str] = files | {
+        test_case.path: original.replace(test_case.before, test_case.after)
+    }
+    identities: list[dict[str, str]] = []
+    for label, inputs in (("original", files), ("changed", changed)):
+        directory: Path = tmp_path / label
+        write_files(project_dir=directory, files=inputs)
+        project: CompiledProjectView = build_compiled_project(
+            discovered_inputs=discover_project_inputs(project_dir=directory),
+            adapter=DuckDbAdapter(),
+            resolved_connection={"database": "warehouse", "schema": "main"},
+        )
+        assert not any(item.severity == "error" for item in project.diagnostics)
+        snapshot: dict[str, Any] = json.loads(
+            build_orchestration_snapshot(project, json.dumps(METADATA), directory).to_json()
+        )
+        hashes: dict[str, str] = {}
+        for key in (
+            "model:orders",
+            "model:stg_orders",
+            "udf:edge_next_quantity",
+            "seed:edge_quantity_steps",
+        ):
+            identity: dict[str, str] = snapshot["nodes"][key]["definition"]["planner_identity"]
+            assert set(identity) == {"local_hash"}
+            assert len(identity["local_hash"]) == 64
+            hashes[key] = identity["local_hash"]
+        identities.append(hashes)
+    assert {key: identities[0][key] != identities[1][key] for key in identities[0]} == {
+        key: key in test_case.expected_changed for key in identities[0]
+    }
 
 
 @pytest.mark.parametrize(

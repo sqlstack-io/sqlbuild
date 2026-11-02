@@ -202,6 +202,15 @@ class SnapshotCatalogTestCase:
 
 
 @dataclass(frozen=True)
+class SnapshotIdentityTestCase:
+    description: str
+    path: str
+    before: str
+    after: str
+    expected_changed: list[str]
+
+
+@dataclass(frozen=True)
 class SnapshotRejectionTestCase:
     description: str
     files: dict[str, str]
