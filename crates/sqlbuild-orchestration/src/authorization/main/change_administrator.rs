@@ -4,7 +4,9 @@ use uuid::Uuid;
 
 use crate::authorization::_helpers::administrator_changes::apply_change;
 use crate::authorization::main::authorize_session::authorize_session;
-use crate::credentials::models::{Action, AdministratorChange, AuditContext, PermissionScope};
+use crate::credentials::models::{
+    Action, AdministratorChange, AuditContext, DefaultRole, PermissionScope,
+};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::models::{ControlStore, TransactionMode};
@@ -27,6 +29,7 @@ pub async fn change_administrator(
             target: None,
             nodes: Default::default(),
         },
+        DefaultRole::None,
     )
     .await?;
     apply_change(transaction, &context, (principal_id, change)).await

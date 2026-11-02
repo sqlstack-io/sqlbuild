@@ -9,7 +9,7 @@ use crate::api::models::{ApiAuthentication, AuthenticationDenial, PasswordSessio
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::PasswordApiTestCase;
 use crate::credentials::main::{create_principal::create_principal, set_password::set_password};
-use crate::credentials::models::{AuditContext, PasswordAuthority, PrincipalKind};
+use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority, PrincipalKind};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -91,6 +91,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 &replica,
                 ApiAuthentication {
                     password_origin: Some(origin.into()),
+                    default_role: DefaultRole::Viewer,
                     ..ApiAuthentication::default()
                 },
             )
@@ -221,6 +222,55 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 .await
                 .expect("second replica read");
             assert_eq!(response.status(), StatusCode::OK);
+            let location_id = Uuid::now_v7();
+            for (server, expected_status) in
+                [(&api, StatusCode::FORBIDDEN), (&other, StatusCode::OK)]
+            {
+                let url = format!(
+                    "{}/api/control/locations/{location_id}/targets/development/runs",
+                    server.url
+                );
+                assert_eq!(
+                    client
+                        .get(&url)
+                        .send()
+                        .await
+                        .expect("unauthenticated read")
+                        .status(),
+                    StatusCode::UNAUTHORIZED,
+                    "viewer default cannot replace authentication"
+                );
+                let response = client
+                    .get(url)
+                    .header(COOKIE, &cookie)
+                    .send()
+                    .await
+                    .expect("live server-owned default role");
+                assert_eq!(response.status(), expected_status);
+                assert_eq!(
+                    response
+                        .json::<Value>()
+                        .await
+                        .expect("metadata response")
+                        .as_array()
+                        .map(Vec::len),
+                    (expected_status == StatusCode::OK).then_some(0),
+                    "only the configured viewer receives the empty metadata array"
+                );
+                let response = client
+                    .post(format!("{}/api/control/runs", server.url))
+                    .header(COOKIE, &cookie)
+                    .header("x-sqb-csrf", &issued.csrf_token)
+                    .json(
+                        &json!({"run_id": Uuid::now_v7(), "location_id": location_id,
+                        "target": "development", "job_key": "daily_orders",
+                        "reason": "Build orders", "priority": 0}),
+                    )
+                    .send()
+                    .await
+                    .expect("default role cannot execute");
+                assert_eq!(response.status(), StatusCode::FORBIDDEN);
+            }
             for csrf in cases["invalid_csrf"].as_array().expect("invalid CSRF") {
                 let response = client
                     .post(format!("{}/api/auth/logout", other.url))

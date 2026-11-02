@@ -1083,6 +1083,15 @@
        },
        {
         "kind": "store",
+        "options": ["--default-role"],
+        "dest": "control_default_role",
+        "choices": ["none", "viewer"],
+        "default": "none",
+        "help": "ambient metadata access for authenticated people: none (default) or installation-wide viewer; never grants SQL, evidence, execution or administration",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",

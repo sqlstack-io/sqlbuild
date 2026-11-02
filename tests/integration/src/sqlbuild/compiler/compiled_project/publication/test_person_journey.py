@@ -2,6 +2,8 @@
 
 import json
 import sys
+from contextlib import nullcontext
+from functools import partial
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
@@ -11,7 +13,7 @@ import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
-    WorkerExecutionTestCase,
+    PersonJourneyTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     current_snapshot,
@@ -33,24 +35,42 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
 @pytest.mark.parametrize(
     "test_case",
     [
-        WorkerExecutionTestCase(
-            "owner bootstrap, least-privilege browser operations, reload and last-good recovery",
-            "SELECT 23 AS amount",
-            "SELECT amount FROM orders",
-            "success",
-            [(23,)],
-        )
+        PersonJourneyTestCase(
+            description="no-role default, scoped browser operations, reload and last-good recovery",
+            model_sql="SELECT 23 AS amount",
+            warehouse_query="SELECT amount FROM orders",
+            expected_status="success",
+            expected_rows=[(23,)],
+            default_role="none",
+            expected_metadata_access=partial(pytest.raises, HTTPError, match="HTTP Error 403"),
+        ),
+        PersonJourneyTestCase(
+            description="configured viewer default, scoped execution, reload and last-good recovery",
+            model_sql="SELECT 23 AS amount",
+            warehouse_query="SELECT amount FROM orders",
+            expected_status="success",
+            expected_rows=[(23,)],
+            default_role="viewer",
+            expected_metadata_access=nullcontext,
+        ),
     ],
     ids=lambda case: case.description,
 )
 def test_given_an_initialized_installation_when_people_run_and_reload_then_permissions_and_recovery_hold(
-    test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    test_case: PersonJourneyTestCase,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with scheduled_worker(
         tmp_path,
         monkeypatch,
         test_case,
-        server_arguments=("--password-origin", "https://control.example.com"),
+        server_arguments=(
+            "--password-origin",
+            "https://control.example.com",
+            "--default-role",
+            test_case.default_role,
+        ),
     ) as worker:
         scheduled: dict[str, Any] = worker_result(worker, test_case)
         admin: dict[str, Any] = provision_person(
@@ -76,9 +96,11 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             "location_id": worker.api.location_id,
             "target": "development",
         }
-        with pytest.raises(HTTPError) as no_role:
-            person_read(worker.api, runs_path, session=session)
-        assert no_role.value.code == 403
+        with test_case.expected_metadata_access():
+            assert (
+                person_read(worker.api, runs_path, session=session)[0]["run_id"]
+                == scheduled["run_id"]
+            )
         for path, body in [
             ("/api/control/runs", request),
             ("/api/admin/roles", assignment),
@@ -100,9 +122,13 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             with pytest.raises(HTTPError) as rejected:
                 person_request(worker.api, path, body=body, session=session)
             assert rejected.value.code == 403
-        with pytest.raises(HTTPError) as wrong_target:
-            person_read(worker.api, runs_path.replace("development", "preview"), session=session)
-        assert wrong_target.value.code == 403
+        with test_case.expected_metadata_access():
+            assert (
+                person_read(
+                    worker.api, runs_path.replace("development", "preview"), session=session
+                )
+                == []
+            )
         assignment["role"] = "operator"
         assert person_request(
             worker.api, "/api/admin/roles", body=assignment, session=admin_session

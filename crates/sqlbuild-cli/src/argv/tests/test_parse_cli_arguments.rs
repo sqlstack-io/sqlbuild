@@ -50,6 +50,18 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             expected_value: Value::Str("diff".to_owned()),
         },
         ParsedValueTestCase {
+            description: "server grants no ambient role by default",
+            argv: &["server"],
+            attribute: "control_default_role",
+            expected_value: Value::Str("none".into()),
+        },
+        ParsedValueTestCase {
+            description: "viewer metadata access requires an explicit server option",
+            argv: &["server", "--default-role", "viewer"],
+            attribute: "control_default_role",
+            expected_value: Value::Str("viewer".into()),
+        },
+        ParsedValueTestCase {
             description: "an explicit failed-node rerun never becomes a full rerun",
             argv: &[
                 "admin",

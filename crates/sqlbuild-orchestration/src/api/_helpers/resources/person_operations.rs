@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::api::_helpers::authentication::password_transport::session_credentials;
 use crate::api::errors::ApiError;
 use crate::api::models::{MutationResponse, ReadQuery};
-use crate::credentials::models::AuditContext;
+use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
 use crate::runs::main::list_person_runs::list_person_runs;
@@ -56,6 +56,7 @@ pub(crate) async fn change_trigger(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
 pub(crate) async fn recent_runs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<ReadQuery>),
     headers: HeaderMap,
 ) -> Result<Json<Vec<RunRecord>>, ApiError> {
@@ -64,6 +65,7 @@ pub(crate) async fn recent_runs(
             &store,
             (&context, session_credentials(&headers)),
             (location_id, &target, options.limit.unwrap_or(100)),
+            default_role,
         )
         .await?,
     ))

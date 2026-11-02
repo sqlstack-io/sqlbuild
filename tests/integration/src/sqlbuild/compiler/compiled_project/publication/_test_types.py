@@ -1,6 +1,7 @@
 """Publication cases and isolated server credentials."""
 
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -107,6 +108,13 @@ class WorkerExecutionTestCase:
     store_setup: str = ""
     concurrency_limits: dict[str, int] = field(default_factory=dict)
     launcher: Literal["native", "uncooperative", "docker"] = "native"
+
+
+@dataclass(frozen=True, kw_only=True)
+class PersonJourneyTestCase(WorkerExecutionTestCase):
+    description: str
+    default_role: Literal["none", "viewer"]
+    expected_metadata_access: Callable[[], AbstractContextManager[Any]]
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::authorization::main::authorize_session::authorize_session;
 use crate::authorization::main::deny_authorization::deny;
-use crate::credentials::models::{Action, AuditContext, PermissionScope};
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::_helpers::operator_change::change_trigger_in;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::store::errors::ControlError;
@@ -37,8 +37,13 @@ pub async fn change_person_trigger(
             .map_err(|error| ControlError::Invalid(error.to_string()))?,
         nodes: Default::default(),
     };
-    let (transaction, context) =
-        authorize_session(transaction, (context, credentials), &scope).await?;
+    let (transaction, context) = authorize_session(
+        transaction,
+        (context, credentials),
+        &scope,
+        DefaultRole::None,
+    )
+    .await?;
     if request.reason.trim().is_empty() {
         return deny(
             transaction,

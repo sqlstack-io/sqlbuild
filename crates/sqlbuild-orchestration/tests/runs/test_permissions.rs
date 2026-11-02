@@ -11,7 +11,7 @@ use crate::credentials::main::{
     create_principal::create_principal, login_password::login_password, set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorChange, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
+    AdministratorChange, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin,
     PrincipalKind, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
@@ -166,7 +166,8 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         list_person_runs(
                             store,
                             (&context, credentials),
-                            (location_id, "development", 10)
+                            (location_id, "development", 10),
+                            DefaultRole::None,
                         )
                         .await
                         .expect("built-in metadata access")
