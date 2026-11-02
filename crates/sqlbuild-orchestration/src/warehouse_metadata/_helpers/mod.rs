@@ -7,3 +7,4 @@ pub(crate) mod ingestion;
 pub(crate) mod node_status;
 pub(crate) mod person_reads;
 pub(crate) mod reconciliation;
+pub(crate) mod statistics;

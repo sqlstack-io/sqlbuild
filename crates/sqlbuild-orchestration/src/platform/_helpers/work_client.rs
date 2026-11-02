@@ -11,11 +11,28 @@ use crate::platform::models::{
 };
 use crate::warehouse_metadata::models::{
     AuditResultsBatch, CatalogBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch,
-    MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, StatisticsBatch, StatisticsDueRead,
+    StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
+    pub async fn statistics_due(
+        &self,
+        target: &str,
+        request: &StatisticsDueRead,
+    ) -> Result<StatisticsRead, ClientError> {
+        self.sync_metadata((target, "statistics-due"), request)
+            .await
+    }
+
+    pub async fn sync_statistics(
+        &self,
+        target: &str,
+        batch: &StatisticsBatch,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.sync_metadata((target, "statistics"), batch).await
+    }
+
     pub async fn sync_catalog(
         &self,
         target: &str,

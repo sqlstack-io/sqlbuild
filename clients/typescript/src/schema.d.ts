@@ -227,6 +227,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonStatistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/runs": {
         parameters: {
             query?: never;
@@ -445,6 +461,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["report_source_freshness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_statistics"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/{location_id}/targets/{target}/metadata/statistics-due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["statistics_due"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1496,6 +1544,40 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        StatisticsBatch: {
+            /** Format: int64 */
+            generation: number;
+            records: components["schemas"]["WarehouseStatisticsRecord"][];
+            /** Format: uuid */
+            session_id: string;
+        };
+        /** @description Eligibility comes from each relation's committed hour, never a namespace watermark. */
+        StatisticsDueRead: {
+            /** Format: uuid */
+            after?: string | null;
+            /** Format: int64 */
+            generation: number;
+            limit: number;
+            location: components["schemas"]["WarehouseStateLocation"];
+            /** Format: uuid */
+            session_id: string;
+        };
+        StatisticsObservation: {
+            /** Format: uuid */
+            event_id: string;
+            record: components["schemas"]["WarehouseStatisticsRecord"];
+        };
+        StatisticsPage: {
+            next_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+            records: components["schemas"]["StatisticsObservation"][];
+        };
+        /** @description One bounded catalog page; sampled and unsampled relations both advance its cursor. */
+        StatisticsRead: {
+            location: components["schemas"]["WarehouseStateLocation"];
+            names: string[];
+            /** Format: uuid */
+            next_after?: string | null;
+        };
         /**
          * @description The tables Recall writes.
          * @enum {string}
@@ -1684,7 +1766,7 @@ export interface components {
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog" | "statistics";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -1827,6 +1909,20 @@ export interface components {
         WarehouseStateLocation: {
             database?: string | null;
             schema: string;
+        };
+        /** @description A metadata estimate at collection time, never evidence of source-data currency. */
+        WarehouseStatisticsRecord: {
+            /** Format: int64 */
+            byte_count?: number | null;
+            byte_count_basis?: string | null;
+            detail?: string | null;
+            name: string;
+            /** Format: date-time */
+            observed_at: string;
+            /** Format: int64 */
+            row_count?: number | null;
+            state_database?: string | null;
+            state_schema: string;
         };
         /**
          * @description Closed failure stages keep warehouse errors and credentials out of health observations.
@@ -2380,6 +2476,58 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunRecord"][];
                 };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonStatistics: {
+        parameters: {
+            query: {
+                /** @description Exact database; omitted matches SQL NULL */
+                database?: string;
+                schema: string;
+                name: string;
+                after_observed_at?: string;
+                after_event_id?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticsPage"];
+                };
+            };
+            /** @description Invalid relation or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {
@@ -3061,6 +3209,116 @@ export interface operations {
             };
             /** @description Location not authorized */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_statistics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatisticsBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    statistics_due: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatisticsDueRead"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatisticsRead"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

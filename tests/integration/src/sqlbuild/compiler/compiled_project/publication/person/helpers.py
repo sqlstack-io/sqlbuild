@@ -127,6 +127,33 @@ def wait_for_person_catalog(
         "status": "unknown",
         "reason": "consumed-input provenance is not recorded",
     }
+    statistics_path: str = (
+        f"/api/control/locations/{api.location_id}/targets/development/statistics"
+        "?schema=main&name=orders"
+    )
+    statistics: dict[str, Any] = person_read(api, statistics_path, session=session)
+    while not statistics["records"]:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, (statistics, log.read_text())
+        time.sleep(0.05)
+        statistics = person_read(api, statistics_path, session=session)
+    sample: dict[str, Any] = statistics["records"][0]
+    assert sample["event_id"] and sample["record"]["observed_at"]
+    assert sample["record"] | {"observed_at": None} == {
+        "state_database": None,
+        "state_schema": "main",
+        "name": "orders",
+        "observed_at": None,
+        "row_count": 1,
+        "detail": None,
+        "byte_count": None,
+        "byte_count_basis": None,
+    }
+    assert statistics["next_after"] is None
+    assert person_read(api, statistics_path + "&database=unlisted", session=session) == {
+        "records": [],
+        "next_after": None,
+    }
 
 
 def verify_security_audit(

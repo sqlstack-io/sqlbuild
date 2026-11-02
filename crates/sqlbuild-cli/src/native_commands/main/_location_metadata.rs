@@ -17,7 +17,7 @@ use tokio::time::Instant;
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
     acknowledge_metadata_page, deliver_metadata_page, freeze_history_page, history_request,
-    location_result, metadata_health,
+    location_result, metadata_health, statistics_page,
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
@@ -42,11 +42,25 @@ pub(super) async fn sync_location_metadata(
     let started = Instant::now();
     tokio::pin!(stopped);
     if state.pending.is_none() {
+        if state.kind() == WarehouseHistoryKind::Statistics && state.statistics.is_none() {
+            state.statistics = Some(tokio::select! {
+                result = &mut stopped => { result?; return Ok(None); },
+                result = statistics_page((client, &options.target), (&state, poll)) => match result {
+                    Ok(page) => page,
+                    Err(error) => return retry_metadata(state, error),
+                },
+            });
+        }
         if !state.watermark_loaded {
             if state.index == 0 {
                 state.reconcile = Instant::now() >= state.reconcile_at;
             }
-            if !state.reconcile && state.kind() != WarehouseHistoryKind::Catalog {
+            if !state.reconcile
+                && !matches!(
+                    state.kind(),
+                    WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
+                )
+            {
                 let request = WarehouseWatermarkRead {
                     session_id: poll.session_id,
                     generation: state.generation,
@@ -82,8 +96,7 @@ pub(super) async fn sync_location_metadata(
                 result = &mut stopped => { result?; return Ok(None); },
                 () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Read))) => {},
             }
-            state.limit = (state.limit / 2).max(1);
-            state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+            state.retry_read();
             drop(write_output(&[(
                 Stream::Stderr,
                 "Warehouse history read failed; retaining mirror and retrying a bounded page.\n",
@@ -145,6 +158,14 @@ async fn read_metadata_page(
     state: &LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Option<WarehouseHistoryPage>>, ControlError> {
+    if let Some(statistics) = &state.statistics
+        && statistics.names.is_empty()
+    {
+        return Ok(Some(Some(WarehouseHistoryPage {
+            records: Vec::new(),
+            next_after: statistics.next_after.map(|id| vec![Some(id.to_string())]),
+        })));
+    }
     let (mut child, reply) = match location_result::<Option<WarehouseHistoryPage>>(
         (options, script),
         (history_request(state)?, METADATA_REPLY_BYTES),

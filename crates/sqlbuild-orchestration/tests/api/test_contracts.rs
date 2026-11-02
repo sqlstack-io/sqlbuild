@@ -16,6 +16,12 @@ mod oidc_test_types;
 mod output_helpers;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
+#[path = "statistics/eligibility/helpers.rs"]
+mod statistics_eligibility;
+#[path = "statistics/helpers.rs"]
+mod statistics_helpers;
+#[path = "statistics/retention/helpers.rs"]
+mod statistics_retention;
 #[path = "test_catalog_reads.rs"]
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
@@ -38,6 +44,8 @@ mod test_passwords;
 mod test_proxy;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_statistics_recovery.rs"]
+mod test_statistics_recovery;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_warehouse_metadata.rs"]

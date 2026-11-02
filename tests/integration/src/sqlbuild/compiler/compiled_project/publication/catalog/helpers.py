@@ -35,3 +35,23 @@ def catalog_facts(control: Path) -> list[dict[str, Any]]:
             "AND json_extract(payload, '$.record.name')='orders_🧾' ORDER BY storage_id"
         ).fetchall()
     return [json.loads(row[0]) for row in rows]
+
+
+def wait_for_statistics(
+    control: Path, name: str, process: Popen[bytes], log: Path
+) -> list[dict[str, Any]]:
+    """Observe actual metadata-only sampling through the installed location and HTTP ingestion."""
+    deadline: float = time.monotonic() + 45
+    records: list[dict[str, Any]] = []
+    while not records:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        with closing(sqlite3.connect(control)) as connection:
+            rows: list[tuple[str]] = connection.execute(
+                "SELECT record_json FROM sqb_warehouse_statistics "
+                "WHERE relation_name=? ORDER BY observed_at,event_id",
+                (name,),
+            ).fetchall()
+        records = [json.loads(row[0]) for row in rows]
+        time.sleep(0.05)
+    return records

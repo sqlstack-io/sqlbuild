@@ -237,9 +237,16 @@ class CatalogInspectionTestCase:
     connection_key: str
     expected_table_type: str
     expected_view_type: str
+    expected_metadata_rows: int | None = None
 
 
 @dataclass(frozen=True)
 class CatalogBoundaryTestCase:
     description: str
     expected_page_delivered: bool
+
+
+@dataclass(frozen=True)
+class StatisticsRecoveryTestCase:
+    description: str
+    expected_catalog_presence: tuple[bool, ...]

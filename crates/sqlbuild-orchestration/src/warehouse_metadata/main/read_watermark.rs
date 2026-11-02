@@ -16,9 +16,12 @@ pub async fn read_watermark(
 ) -> Result<Option<DateTime<Utc>>, ControlError> {
     let transaction =
         begin_ingestion(store, scope, (request.session_id, request.generation)).await?;
-    if request.kind == WarehouseHistoryKind::Catalog {
+    if matches!(
+        request.kind,
+        WarehouseHistoryKind::Catalog | WarehouseHistoryKind::Statistics
+    ) {
         return Err(ControlError::Invalid(
-            "catalog observations require full scans, not timestamp watermarks".into(),
+            "catalog and statistics observations do not support timestamp watermarks".into(),
         ));
     }
     let table = request.kind.mirror_table();

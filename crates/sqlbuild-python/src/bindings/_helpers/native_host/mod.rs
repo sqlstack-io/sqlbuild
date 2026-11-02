@@ -16,3 +16,4 @@ pub(crate) mod sqlite_cursor;
 pub(crate) mod state_column_evolution;
 pub(crate) mod warehouse_catalog;
 pub(crate) mod warehouse_metadata;
+pub(crate) mod warehouse_statistics;
