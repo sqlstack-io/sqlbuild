@@ -144,6 +144,7 @@ pub(crate) struct LocationServe {
     pub(crate) location_id: uuid::Uuid,
     pub(crate) target: String,
     pub(crate) image_id: Option<String>,
+    pub(crate) metadata_reconcile_seconds: u32,
 }
 
 /// Retained source observations survive compilation; warehouse exclusions never replace them.
@@ -190,6 +191,11 @@ pub(crate) struct LocationMetadataSync {
     pub(crate) scan_id: Uuid,
     pub(crate) page: u32,
     pub(crate) source_after: Option<Vec<Option<String>>>,
+    pub(crate) observed_since: Option<DateTime<Utc>>,
+    pub(crate) watermark_loaded: bool,
+    pub(crate) reconcile: bool,
+    pub(crate) reconcile_at: tokio::time::Instant,
+    pub(crate) reconcile_seconds: u32,
     pub(crate) limit: usize,
     pub(crate) pending: Option<LocationMetadataPage>,
     pub(crate) next_at: tokio::time::Instant,

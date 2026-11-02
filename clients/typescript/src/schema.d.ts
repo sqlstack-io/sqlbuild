@@ -307,6 +307,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/watermark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["watermark"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -1324,6 +1340,11 @@ export interface components {
             target_schema?: string | null;
             value_kind: string;
         };
+        /**
+         * @description Only immutable history tables support a timestamp watermark.
+         * @enum {string}
+         */
+        WarehouseHistoryKind: "fingerprints" | "source_freshness";
         WarehouseReconciliationCursor: {
             /** Format: uuid */
             event_id: string;
@@ -1343,9 +1364,23 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
+        WarehouseStateLocation: {
+            database?: string | null;
+            schema: string;
+        };
         WarehouseSyncResponse: {
             applied: boolean;
             next_reconciliation_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+        };
+        /** @description Derive progress from committed mirror rows, scoped to the active physical reader. */
+        WarehouseWatermarkRead: {
+            /** Format: int64 */
+            generation: number;
+            kind: components["schemas"]["WarehouseHistoryKind"];
+            location: components["schemas"]["WarehouseStateLocation"];
+            /** Format: uuid */
+            session_id: string;
         };
     };
     responses: never;
@@ -2114,6 +2149,61 @@ export interface operations {
             };
             /** @description Location not authorized */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    watermark: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarehouseWatermarkRead"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string | null;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Reader generation fenced */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

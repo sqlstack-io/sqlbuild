@@ -43,6 +43,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_contended_fingerprints,
+    append_legacy_history,
     append_retried_fingerprints,
     location_process,
     open_legacy_warehouse,
@@ -547,7 +548,8 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
             ],
             log,
             tmp_path / "location.stdout",
-            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            env=os.environ
+            | {"SQLBUILD_LOCATION_TOKEN": api.bearer, "SQLBUILD_METADATA_RECONCILE_SECONDS": "30"},
         ) as location:
             _ = wait_for_generation(api, "development", 1, location, log)
             initial_tables: dict[str, set[str]] = {
@@ -604,6 +606,100 @@ def test_given_a_served_location_when_warehouse_history_changes_then_periodic_re
                         connection=connection, sql=warehouse_sql.format(table=table)
                     )
                 adapter.close(connection)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AutomaticHistoryTestCase("DuckDB incremental overlap", "duckdb", "database", "legacy-run"),
+        AutomaticHistoryTestCase("SQLite incremental overlap", "sqlite", "path", "legacy-run"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_preserves_history_and_empty_resyncs(
+    test_case: AutomaticHistoryTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/incremental_warehouse_history.json"
+        ).read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    append_legacy_history(adapter, connection, fixture["initial"], fixture["insert_sql"])
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    write_files(
+        project_dir=project,
+        files={"models/orders.sql": "MODEL (description 'Orders.'); SELECT 17 AS amount"},
+    )
+    with snapshot_api(tmp_path / "control") as api:
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        log: Path = tmp_path / "location.log"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ
+            | {"SQLBUILD_LOCATION_TOKEN": api.bearer, "SQLBUILD_METADATA_RECONCILE_SECONDS": "300"},
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+            for stage in fixture["stages"]:
+                connection = adapter.connect(
+                    {test_case.connection_key: str(project / "warehouse.db")}
+                )
+                arrivals: list[dict[str, str]] = stage["arrivals"] + [
+                    {"run_id": f"middle-{index:03}", "observed_at": "2026-02-01 11:58:00"}
+                    for index in range(stage["overlap_count"])
+                ]
+                append_legacy_history(adapter, connection, arrivals, fixture["insert_sql"])
+                adapter.close(connection)
+                with closing(sqlite3.connect(control)) as database:
+                    for table in ("sqb_warehouse_fingerprints", "sqb_warehouse_freshness"):
+                        _ = database.execute(stage["mirror_sql"].format(table=table))
+                    database.commit()
+                expected: set[str] = set(stage["expected_runs"]) | {
+                    f"middle-{index:03}"
+                    for index in range(stage.get("expected_overlap_count", stage["overlap_count"]))
+                }
+                deadline: float = time.monotonic() + 45
+                remaining: bool = True
+                while remaining:
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    remaining = False
+                    with closing(sqlite3.connect(control)) as database:
+                        for table in ("sqb_warehouse_fingerprints", "sqb_warehouse_freshness"):
+                            observed: set[str] = {
+                                json.loads(record)["run_id"]
+                                for (record,) in database.execute(
+                                    f"SELECT record_json FROM {table}"
+                                )
+                            }
+                            assert observed <= expected, (table, stage, observed)
+                            remaining |= observed != expected
+                    remaining |= (
+                        log.read_text().count("Warehouse history synchronization completed.")
+                        < stage["completed_cycles"]
+                    )
+                    time.sleep(0.05)
+                assert test_case.expected_run_id in observed
 
 
 @pytest.mark.parametrize(

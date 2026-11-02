@@ -7,7 +7,9 @@ use std::time::Duration;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::platform::models::{LocationWorkClient, LocationWorkPoll};
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::warehouse_metadata::models::WarehouseHistoryPage;
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseWatermarkRead,
+};
 use tokio::time::Instant;
 
 use crate::argv::models::Stream;
@@ -17,7 +19,9 @@ use crate::native_commands::_helpers::execution::{
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
-use crate::native_commands::constants::{METADATA_POLL_SECONDS, METADATA_REPLY_BYTES};
+use crate::native_commands::constants::{
+    METADATA_OVERLAP_SECONDS, METADATA_POLL_SECONDS, METADATA_REPLY_BYTES,
+};
 use crate::native_commands::models::{LocationMetadataSync, LocationServe, LocationWatch};
 
 /// One bounded source or mirror page leaves named work polling a turn between pages.
@@ -35,6 +39,35 @@ pub(super) async fn sync_location_metadata(
     }
     tokio::pin!(stopped);
     if state.pending.is_none() {
+        if !state.watermark_loaded {
+            if state.index == 0 {
+                state.reconcile = Instant::now() >= state.reconcile_at;
+            }
+            if !state.reconcile {
+                let request = WarehouseWatermarkRead {
+                    session_id: poll.session_id,
+                    generation: state.generation,
+                    location: state.locations[state.index / 2].clone(),
+                    kind: if state.index.is_multiple_of(2) {
+                        WarehouseHistoryKind::Fingerprints
+                    } else {
+                        WarehouseHistoryKind::SourceFreshness
+                    },
+                };
+                let watermark = tokio::select! {
+                    result = &mut stopped => { result?; return Ok(None); },
+                    result = client.metadata_watermark(&options.target, &request) => result,
+                };
+                let watermark = match watermark {
+                    Ok(watermark) => watermark,
+                    Err(error) => return retry_metadata(state, error),
+                };
+                state.observed_since = watermark.and_then(|time| {
+                    time.checked_sub_signed(chrono::Duration::seconds(METADATA_OVERLAP_SECONDS))
+                });
+            }
+            state.watermark_loaded = true;
+        }
         let Some(page) = read_metadata_page(
             (options, script),
             history_request(&state)?,
@@ -68,23 +101,28 @@ pub(super) async fn sync_location_metadata(
     };
     let response = match response {
         Ok(response) => response,
-        Err(error) => {
-            if matches!(error, ClientError::Configuration(_))
-                || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
-            {
-                return Err(ControlError::Invalid(error.to_string()));
-            }
-            state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
-            drop(write_output(&[(
-                Stream::Stderr,
-                &format!(
-                    "Warehouse history delivery failed; retaining exact page for retry: {error}\n"
-                ),
-            )]));
-            return Ok(Some(state));
-        }
+        Err(error) => return retry_metadata(state, error),
     };
     acknowledge_metadata_page(state, response).map(Some)
+}
+
+fn retry_metadata(
+    mut state: LocationMetadataSync,
+    error: ClientError,
+) -> Result<Option<LocationMetadataSync>, ControlError> {
+    if matches!(error, ClientError::Configuration(_))
+        || matches!(error, ClientError::Rejected(status) if matches!(status.as_u16(), 401 | 403))
+    {
+        return Err(ControlError::Invalid(error.to_string()));
+    }
+    state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+    drop(write_output(&[(
+        Stream::Stderr,
+        &format!(
+            "Warehouse history synchronization failed; retaining progress and exact pending page for retry: {error}\n"
+        ),
+    )]));
+    Ok(Some(state))
 }
 
 /// An outer absence means shutdown; an inner absence is a failed read, never an empty table.

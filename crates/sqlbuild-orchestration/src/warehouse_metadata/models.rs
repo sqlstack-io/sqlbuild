@@ -35,11 +35,31 @@ pub struct SourceFreshnessBatch {
 }
 
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 #[serde(deny_unknown_fields)]
 pub struct WarehouseStateLocation {
     pub database: Option<String>,
     pub schema: String,
+}
+
+/// Only immutable history tables support a timestamp watermark.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WarehouseHistoryKind {
+    Fingerprints,
+    SourceFreshness,
+}
+
+/// Derive progress from committed mirror rows, scoped to the active physical reader.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseWatermarkRead {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub location: WarehouseStateLocation,
+    pub kind: WarehouseHistoryKind,
 }
 
 /// Private interpreter input; cursor values are data and receive adapter literal rendering.

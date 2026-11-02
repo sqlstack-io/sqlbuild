@@ -10,9 +10,29 @@ use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
+use crate::warehouse_metadata::main::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse,
+    FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/watermark",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = WarehouseWatermarkRead,
+    responses((status = 200, body = Option<chrono::DateTime<chrono::Utc>>),
+        (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
+        (status = 409, description = "Reader generation fenced")),
+    security(("bearer" = [])))]
+pub(crate) async fn watermark(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(request): Json<WarehouseWatermarkRead>,
+) -> Result<Json<Option<chrono::DateTime<chrono::Utc>>>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        read_watermark(&store, (location_id, &target), &request).await?,
+    ))
+}
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/source-freshness", operation_id = "report_source_freshness",
     params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = SourceFreshnessBatch,

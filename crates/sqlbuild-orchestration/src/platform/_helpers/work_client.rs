@@ -9,10 +9,18 @@ use crate::platform::models::{
     LocationWorkClaim, LocationWorkClient, LocationWorkPoll, LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse,
+    FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
+    pub async fn metadata_watermark(
+        &self,
+        target: &str,
+        request: &WarehouseWatermarkRead,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ClientError> {
+        self.sync_metadata((target, "watermark"), request).await
+    }
+
     pub async fn sync_fingerprints(
         &self,
         target: &str,
@@ -31,11 +39,11 @@ impl LocationWorkClient {
             .await
     }
 
-    async fn sync_metadata(
+    async fn sync_metadata<T: serde::de::DeserializeOwned>(
         &self,
         (target, table): (&str, &str),
         batch: &impl serde::Serialize,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
+    ) -> Result<T, ClientError> {
         let endpoint = self.connection.endpoint(&[
             "api",
             "locations",

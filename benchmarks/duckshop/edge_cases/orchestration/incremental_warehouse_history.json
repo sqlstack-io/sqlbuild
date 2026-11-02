@@ -1,0 +1,17 @@
+{
+  "initial": [{"run_id": "watermark-run", "observed_at": "2026-02-01 12:00:00"}],
+  "stages": [
+    {"arrivals": [], "overlap_count": 0, "completed_cycles": 1, "mirror_sql": "SELECT 1", "expected_runs": ["legacy-run", "watermark-run"]},
+    {"arrivals": [
+      {"run_id": "a-future", "observed_at": "2026-02-01 12:01:00"},
+      {"run_id": "within-overlap", "observed_at": "2026-02-01 11:58:00"},
+      {"run_id": "zz-boundary", "observed_at": "2026-02-01 11:55:00"},
+      {"run_id": "before-overlap", "observed_at": "2026-02-01 11:54:00"}
+    ], "overlap_count": 104, "completed_cycles": 2, "mirror_sql": "SELECT 1", "expected_runs": ["legacy-run", "watermark-run", "within-overlap", "zz-boundary", "a-future"]},
+    {"arrivals": [], "overlap_count": 0, "completed_cycles": 3, "mirror_sql": "DELETE FROM {table}", "expected_overlap_count": 104, "expected_runs": ["legacy-run", "watermark-run", "within-overlap", "zz-boundary", "a-future", "before-overlap"]}
+  ],
+  "insert_sql": [
+    "INSERT INTO _sqlbuild_fingerprints SELECT node_type,node_name,target_database,target_schema,target_name,'{run_id}',definition_hash,version_hash,schema_fingerprint,definition_b64,metadata_json_b64,'{observed_at}' FROM _sqlbuild_fingerprints WHERE run_id='legacy-run'",
+    "INSERT INTO _sqlbuild_source_freshness SELECT source_name,target_database,target_schema,target_name,'{run_id}',strategy,value_kind,data_version,data_version_hash,'{observed_at}' FROM _sqlbuild_source_freshness WHERE run_id='legacy-run'"
+  ]
+}
