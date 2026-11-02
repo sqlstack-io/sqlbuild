@@ -98,6 +98,15 @@ _COPY_SOURCE_PATTERN: re.Pattern[str] = re.compile(
 _RETENTION_PATTERN: re.Pattern[str] = re.compile(r"DATA_RETENTION_TIME_IN_DAYS = (?P<days>\d+)")
 _DEFAULT_COLUMNS: tuple[FakeColumn, ...] = (FakeColumn(name="ID", data_type="NUMBER"),)
 _STATUS_DESCRIPTION: tuple[tuple[str], ...] = (("status",),)
+_SHIFTS_PROJECT: str = (
+    'name = "catalog"\nadapter = "snowflake"\n\n[connection]\n'
+    'account = "example"\nuser = "example"\ndatabase = "analytics"\nschema = "marts"\n\n'
+    '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
+)
+_SHIFTS_MODEL: str = (
+    "MODEL (description 'Shift report.');\n"
+    'SELECT shift_id, starts_at FROM __source("raw_shifts")\n'
+)
 
 
 type _Identity = tuple[str, str, str]
@@ -840,3 +849,45 @@ def quoted_configured_column_files(
             'SELECT "listingId", "eventAt" FROM __source("raw_listing_events")\n'
         ),
     }
+
+
+def shifts_warehouse(warehouse_type: str) -> SimulatedSnowflakeWarehouse:
+    """Return a simulated warehouse holding a shifts source whose start column has a type."""
+
+    return SimulatedSnowflakeWarehouse(
+        relations=(
+            FakeRelation(
+                database="ANALYTICS",
+                schema="RAW",
+                name="SHIFTS",
+                columns=(
+                    FakeColumn(
+                        name="SHIFT_ID", data_type="NUMBER", numeric_precision=38, numeric_scale=0
+                    ),
+                    FakeColumn(name="STARTS_AT", data_type=warehouse_type),
+                ),
+            ),
+        )
+    )
+
+
+def write_shifts_project(*, project_dir: Path, declared_type: str) -> None:
+    """Write one model reading a shifts source whose enforced contract declares a start type."""
+
+    files: dict[str, str] = {
+        "sqlbuild_project.toml": _SHIFTS_PROJECT,
+        "sources/raw.yml": (
+            "sources:\n  - name: raw_shifts\n    description: Shift rows.\n"
+            "    database: analytics\n    schema: raw\n    table: shifts\n"
+            "    contract: enforced\n    columns:\n"
+            "      - name: shift_id\n        type: NUMBER(38,0)\n"
+            f"      - name: starts_at\n        type: {declared_type}\n"
+        ),
+        "models/shift_report.sql": _SHIFTS_MODEL,
+    }
+    relative: str
+    content: str
+    for relative, content in files.items():
+        path: Path = project_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(content, encoding="utf-8")
