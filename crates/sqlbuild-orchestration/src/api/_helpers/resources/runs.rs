@@ -34,6 +34,7 @@ pub(crate) async fn execution(
         .ok_or_else(|| ApiError {
             status: StatusCode::UNAUTHORIZED,
             message: "run claim is no longer active".into(),
+            decision_id: None,
         })?;
     Ok(Json(execution))
 }
@@ -54,6 +55,7 @@ pub(crate) async fn report(
         return Err(ApiError {
             status: StatusCode::FORBIDDEN,
             message: "report does not match the authenticated run and claim".into(),
+            decision_id: None,
         });
     }
     let applied = change_run(&store, RunAuthority::Worker { run_id, claim_id }, &request).await?;
@@ -120,5 +122,6 @@ fn require_worker(identity: &TokenIdentity, run_id: Uuid) -> Result<Uuid, ApiErr
     Err(ApiError {
         status: StatusCode::FORBIDDEN,
         message: "credential does not authorize this run".into(),
+        decision_id: None,
     })
 }

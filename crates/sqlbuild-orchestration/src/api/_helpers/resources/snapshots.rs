@@ -40,6 +40,7 @@ pub(crate) async fn publish(
         return Err(ApiError {
             status: StatusCode::BAD_REQUEST,
             message: "snapshot does not match the requested location and target".into(),
+            decision_id: None,
         });
     }
     let pause_new = if let Some(Extension(scope)) = development {
@@ -47,6 +48,7 @@ pub(crate) async fn publish(
             return Err(ApiError {
                 status: StatusCode::FORBIDDEN,
                 message: "snapshot is outside the development scope".into(),
+                decision_id: None,
             });
         }
         !scope.triggers
@@ -77,6 +79,7 @@ pub(crate) async fn current(
         .ok_or_else(|| ApiError {
             status: StatusCode::NOT_FOUND,
             message: "no successful snapshot".into(),
+            decision_id: None,
         })?;
     Ok(Json(current))
 }
@@ -97,6 +100,7 @@ pub(crate) async fn metadata(
         .ok_or_else(|| ApiError {
             status: StatusCode::NOT_FOUND,
             message: "no successful snapshot".into(),
+            decision_id: None,
         })?;
     Ok(Json(record))
 }

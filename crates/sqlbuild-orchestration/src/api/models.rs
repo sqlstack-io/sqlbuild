@@ -113,6 +113,9 @@ pub struct HeartbeatResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ApiErrorBody {
     pub error: String,
+    /// Existing durable denial audit ID; absent when no decision was recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_id: Option<uuid::Uuid>,
 }
 
 /// SSE invalidation topics; `all` means refetch the authorized REST resources.

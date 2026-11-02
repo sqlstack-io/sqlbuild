@@ -255,6 +255,7 @@ pub const PROJECTED_ATTRIBUTES: [(&str, &[&str]); 15] = [
             "external_sql_reference_resolver",
             "scope_index",
             "sql_expansions",
+            "python_execution_inputs",
         ],
     ),
     (

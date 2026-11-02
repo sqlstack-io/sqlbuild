@@ -58,6 +58,7 @@ pub(crate) async fn guard(
         .ok_or_else(|| ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: "trusted request peer is unavailable".into(),
+            decision_id: None,
         })?
         .0;
     let context = AuditContext {
@@ -100,6 +101,7 @@ pub(crate) async fn authenticate(
         .ok_or_else(|| ApiError {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             message: "trusted authentication context is unavailable".into(),
+            decision_id: None,
         })?;
     let access = if request.method().is_safe() {
         SessionAccess::Read

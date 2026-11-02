@@ -256,3 +256,9 @@ class CatalogBoundaryTestCase:
 class StatisticsRecoveryTestCase:
     description: str
     expected_catalog_presence: tuple[bool, ...]
+
+
+@dataclass(frozen=True)
+class DenialMetadataTestCase:
+    description: str
+    expected_denial_count: int
