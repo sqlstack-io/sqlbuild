@@ -75,7 +75,30 @@ pub(crate) async fn close_store(store: ControlStore) {
     pool.close().await;
 }
 
+pub(crate) async fn reconstruct_fingerprint_predecessor(store: &ControlStore) {
+    let mut transaction = begin(store, TransactionMode::Write)
+        .await
+        .expect("fingerprint predecessor");
+    for sql in [
+        "DROP INDEX sqb_fingerprint_node_latest",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN node_type",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN node_name",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_database",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_schema",
+        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_name",
+        "DELETE FROM sqb_schema_migrations WHERE name='fingerprint_lookup'",
+    ] {
+        (transaction, _) = query(transaction, sql, vec![])
+            .await
+            .expect("fingerprint predecessor");
+    }
+    commit(transaction)
+        .await
+        .expect("commit fingerprint predecessor");
+}
+
 pub(crate) async fn reconstruct_warehouse_predecessor(store: &ControlStore) {
+    reconstruct_fingerprint_predecessor(store).await;
     let mut transaction = begin(store, TransactionMode::Write)
         .await
         .expect("predecessor");

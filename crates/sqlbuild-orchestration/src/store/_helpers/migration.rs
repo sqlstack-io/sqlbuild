@@ -35,6 +35,7 @@ pub(crate) const SOURCE_SENSORS: &str = include_str!("../source_sensors.sql");
 pub(crate) const SOURCE_STALENESS: &str = include_str!("../source_staleness.sql");
 pub(crate) const SECURITY_AUDIT_SINK: &str = include_str!("../security_audit_sink.sql");
 pub(crate) const WAREHOUSE_CATALOG: &str = include_str!("../warehouse_catalog.sql");
+pub(crate) const FINGERPRINT_LOOKUP: &str = include_str!("../fingerprint_lookup.sql");
 
 pub(crate) fn verify_migrations(rows: &[Row], digests: &[String]) -> Result<Version, ControlError> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))

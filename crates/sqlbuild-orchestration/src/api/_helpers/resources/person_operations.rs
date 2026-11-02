@@ -18,7 +18,10 @@ use crate::runs::main::request_rerun::request_rerun;
 use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunRecord};
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
-use crate::warehouse_metadata::models::{CatalogPage, CatalogQuery};
+use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
+use crate::warehouse_metadata::models::{
+    CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery,
+};
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
     params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,
@@ -127,6 +130,32 @@ pub(crate) async fn catalog(
 ) -> Result<Json<CatalogPage>, ApiError> {
     Ok(Json(
         read_person_catalog(
+            &store,
+            (&context, session_credentials(&headers)),
+            (location_id, &target, &options),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/fingerprint", operation_id = "readPersonFingerprint",
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("node_type" = String, Query), ("node_name" = String, Query),
+        ("database" = Option<String>, Query, description = "Exact destination database; omitted matches SQL NULL"),
+        ("schema" = Option<String>, Query, description = "Exact destination schema; omitted matches SQL NULL"),
+        ("name" = Option<String>, Query, description = "Exact destination name; omitted matches SQL NULL")),
+    responses((status = 200, body = Option<FingerprintObservation>), (status = 400, description = "Invalid node"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn fingerprint(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<FingerprintQuery>),
+    headers: HeaderMap,
+) -> Result<Json<Option<FingerprintObservation>>, ApiError> {
+    Ok(Json(
+        read_person_fingerprint(
             &store,
             (&context, session_credentials(&headers)),
             (location_id, &target, &options),

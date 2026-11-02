@@ -116,3 +116,9 @@ void client.POST("/api/auth/logout", {});
 void client.POST("/api/auth/password", { params: { header: { "x-sqb-csrf": "synthetic-csrf" } }, body: { new_password: "synthetic-password" } });
 // @ts-expect-error Session responses never expose a browser-readable bearer.
 void ({} as components["schemas"]["PasswordSessionResponse"]).bearer;
+void client.GET("/api/control/locations/{location_id}/targets/{target}/fingerprint", {
+  params: { path: { location_id: "orders-location", target: "development" },
+    query: { node_type: "model", node_name: "orders", schema: "main", name: "orders" } },
+});
+// @ts-expect-error Build evidence does not contain SQL or arbitrary metadata.
+void ({} as components["schemas"]["FingerprintObservation"]).definition;
