@@ -54,6 +54,31 @@ def edge__partner_listings(ctx: LoaderContext) -> object:
 
 
 @loader
+def edge__basket_lines(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__basket_lines")
+
+
+@loader
+def edge__date_texts(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__date_texts")
+
+
+@loader
+def edge__amount_checks(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__amount_checks")
+
+
+@loader
+def edge__variant_values(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__variant_values")
+
+
+@loader
+def edge__category_links(ctx: LoaderContext) -> object:
+    return _load(ctx, "edge__category_links")
+
+
+@loader
 def edge__delivery_updates(ctx: LoaderContext) -> object:
     batch = int(ctx.vars.get(DELIVERY_BATCH_VAR, 2))  # type: ignore[call-overload]
     rows = delivery_updates(batch)

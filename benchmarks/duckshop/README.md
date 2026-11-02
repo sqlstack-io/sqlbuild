@@ -117,23 +117,29 @@ project and does not change it:
 - unit tests in the matching `tests/unit/<layer>/edge_cases/` folders and scenarios in
   `tests/scenarios/edge_cases/`;
 - raw `edge__*` sources in `sources/edge_cases.yml`, loaded by `python/loaders/edge_cases.py` from
-  fixed rows that `data_scale` does not change, so core data and core expectations stay the same.
+  fixed rows that `data_scale` does not change, so core data and core expectations stay the same;
+- Python functions in `functions/python/edge_*.py`, tagged `edge_case`, and their tests in
+  `tests/unit/functions/python/test_edge_*.sql`.
 
-It has 39 models (7 staging, 22 intermediate, 10 marts), 63 unit tests and 4 scenarios, in four
-groups:
+It has 67 models (12 staging, 45 intermediate, 10 marts), 5 Python functions, 92 unit tests and 4
+scenarios, in eight groups:
 
 | Group | Covers |
 |-------|--------|
-| Semi-structured | JSON null against SQL NULL and missing keys; document text with sorted, case-differing and escaped keys; JSON number fidelity and casts out of `VARIANT`; path-like keys (`''`, `*`, `$`-prefixed, dotted) with `GET` and `GET_IGNORE_CASE`; `OBJECT_CONSTRUCT_KEEP_NULL`, `OBJECT_INSERT`, `OBJECT_DELETE`, `OBJECT_PICK`; array builders, `ARRAY_EXCEPT` and number spellings in `ARRAY_POSITION`; `FLATTEN` outer; lenient and malformed `TRY_PARSE_JSON`; typed lambdas |
-| Dates and times | `TRY_TO_TIMESTAMP_NTZ` and its siblings over free text; epoch milliseconds as numbers and text; daylight-saving gaps and overlaps; fractional offsets; nanosecond truncation and epoch parts after 2242; pre-1970 text with sub-microsecond digits; date-part normalisation; month ends and leap days; week numbering across a year; sentinel timestamps |
-| Ordering, numbers and text | NULL ordering under `DESC`; ties in ordered aggregates, `MAX_BY`, `MODE` and `ANY_VALUE`; default window frames; `UNION ALL BY NAME`; `ROUND` half-way values, decimal division, `MOD` and 38-digit amounts; integers past 2^53 against `FLOAT`; regular expressions and backslash escapes; `LIKE ... ESCAPE` and `ILIKE ANY`; `SPLIT_PART` and `SUBSTR` before the start; `NOT IN` with a NULL; names in many scripts |
+| Semi-structured | JSON null against SQL NULL and missing keys; document text with sorted, case-differing and escaped keys; JSON number fidelity and casts out of `VARIANT`; path-like keys (`''`, `*`, `$`-prefixed, dotted) with `GET` and `GET_IGNORE_CASE`; `OBJECT_CONSTRUCT_KEEP_NULL`, `OBJECT_INSERT`, `OBJECT_DELETE`, `OBJECT_PICK`; array builders, `ARRAY_EXCEPT` and number spellings in `ARRAY_POSITION`; `FLATTEN` outer; lenient and malformed `TRY_PARSE_JSON`; typed lambdas; whole numbers written with zero fractions, numbers with two decimal points and numbers past 38 digits; `FLATTEN` `RECURSIVE` paths for keys holding `$`, `-`, `@`, `[`, spaces and non-ASCII letters |
+| Ordering through arrays | an unordered `ARRAY_AGG` ranked under `LIMIT` by position, by name, through `IFF` and over `UNION ALL`, with fixtures whose pick does not depend on element order; order-free reads (`ARRAY_SIZE`, `ARRAY_CONTAINS`, `ARRAYS_OVERLAP`, `ARRAY_DISTINCT` of `ARRAY_CAT`, `FLATTEN` values through a CTE); `SELECT DISTINCT` over arrays repeated in different orders |
+| VARIANT comparisons | `ARRAY_MAX`, `ARRAY_MIN` and `ARRAY_REVERSE` over arrays mixing numbers, strings, booleans, JSON nulls and integers past 2^53; `MAX` across kinds and non-ASCII strings; `=` and `EQUAL_NULL` for `1`, `"1"` and `1.0`, reordered keys, JSON null and DATE or TIMESTAMP values held in a `VARIANT` against their text; `MIN_BY` and `MAX_BY` of `VARIANT` values; `PARTITION BY`, `SELECT DISTINCT` and `ARRAY_AGG(DISTINCT)` over `VARIANT`; JSON nulls in `ARRAY_REMOVE`, `ARRAY_DISTINCT` and `ARRAYS_OVERLAP`; decimals with trailing zeros in `ARRAY_CONTAINS` and `ARRAY_POSITION`; `OBJECT_CONSTRUCT(* EXCLUDE ("note"))` |
+| Dates and times | `TRY_TO_TIMESTAMP_NTZ` and its siblings over free text; epoch milliseconds as numbers and text; daylight-saving gaps and overlaps; fractional offsets; nanosecond truncation and epoch parts after 2242; pre-1970 text with sub-microsecond digits; date-part normalisation; month ends and leap days; week numbering across a year; sentinel timestamps; `TRY_TO_DATE` with numeric and month-name formats over unpadded fields, two-digit years, ISO `T` and `Z`, trailing letters, a long s, mixed separators and runs of spaces; text read as `TIMESTAMP_TZ` and `TIMESTAMP_LTZ` with `T`, `Z`, `+00:00`, `+0000`, `+09:00` and `-05:30`, back as the UTC instant, date, year and day start, and compared with text, `TIMESTAMP_NTZ` and `DATE`; `FIRST_VALUE` of a zoned value as a `DATE`; `DATEADD` and `TIMEADD` on `TIME(3)` and the type they return; `DATEDIFF` across units; `TIME(9)`, `FF3` and bare `FF` formats truncating |
+| Ordering, numbers and text | NULL ordering under `DESC`; ties in ordered aggregates, `MAX_BY`, `MODE` and `ANY_VALUE`; default window frames; `UNION ALL BY NAME`; `ROUND` half-way values, decimal division, `MOD` and 38-digit amounts; integers past 2^53 against `FLOAT`; regular expressions and backslash escapes; `LIKE ... ESCAPE` and `ILIKE ANY`; `SPLIT_PART` and `SUBSTR` before the start; `NOT IN` with a NULL; names in many scripts; `JOIN ... USING` between `NUMBER(18,0)`, `NUMBER(38,0)` and text keys, with the types of the merged and qualified keys; NULL arithmetic and the types of NULL, decimal and exponent literals, `COUNT`, `ROW_NUMBER`, `%` and `NULLIF`; `MEDIAN` at scales 0 to 15; `DIV0` by literal zeros; `MODE`, `MEDIAN` and `COUNT_IF` over no rows; aggregates inside window functions and `QUALIFY`; `ROLLUP` totals; `TRUNC` of `FLOAT`; infinity words in other scripts; `CASE` without `ELSE` and `DECODE` over text; regular expressions with a `?` after a lazy quantifier, classes opening with `]`, empty matches and `.` against a carriage return; case-insensitive matches outside ASCII; `ILIKE` with a long s; `JAROWINKLER_SIMILARITY` of accented names in both cases; Base64 text with line feeds |
+| Lineage and analysis | clauses whose columns decide rows without being output (`WHERE`, `QUALIFY`, `GROUP BY` by position and `ALL`, `ORDER BY` under `LIMIT`, `EXISTS`, a `FLATTEN` input, `ROLLUP` by position, `EXCEPT` under `LIMIT`); `RIGHT JOIN ... USING`, `NATURAL JOIN`, a `USING` key under a later outer join, and unmatched `ASOF JOIN` rows; `CONNECT BY` beside a column named `level`; a recursive CTE without `RECURSIVE` whose columns shift per iteration; `LAST_DAY` with a date part; positional columns and the names Snowflake gives unaliased expressions; `TEXT(5)` and widened `COUNT` contracts |
+| Python functions | volatile tokens and numbers from a column, a constant and no argument, and `DIV0` of a volatile call beside look-alike names, checked by assertions that hold for any values; a handler answering NULL input without `STRICT`; Python `None` as JSON null, and datetimes, Decimals and integers past 2^53 handed to `VARIANT` and `FLOAT` results |
 | Scenarios and lifecycle | typed values across model boundaries; `VARIANT` expected output; a star under a lower-case contract and a quoted camelCase export; a snapshot keyed and compared on quoted camelCase columns; a cursor-window incremental model over far-apart fixture loads; a change log merged across two loads, checked against a full rebuild |
 
-Unit-test expectations in the edge-case area were captured on Snowflake under the `edge` target's
+Unit-test expectations in the edge-case area are captured on Snowflake under the `edge` target's
 pinned session, rather than derived by hand; scenario expectations, and the assertions in tests
-about ties, are written by hand from those captured values. `fct_edge_delivery_events` is disabled: it is the
-acceptance case for cursor `delete_insert` models that emit rows outside the window they replace.
-See [RUNBOOK.md](RUNBOOK.md), step 7.
+about ties, volatile values and values Snowflake does not compute exactly, are written by hand
+from those captured values. `fct_edge_delivery_events` is disabled: it is the acceptance case for cursor `delete_insert` models
+that emit rows outside the window they replace. See [RUNBOOK.md](RUNBOOK.md), step 7.
 
 Benchmarks and core measurements leave the area out:
 
@@ -210,6 +216,9 @@ them as expected differences or refusals instead of errors:
 | `TIMESTAMP_LTZ` | `stg_tickets`, `int_ticket_first_response`, `rpt_customer_order_lookup` |
 | `CURRENT_TIMESTAMP()` | `int_promotion_performance`, `int_ticket_sla_breaches`, `rpt_customer_order_lookup` |
 
+In the edge-case area, `int_edge_zoned_texts` (`TIMESTAMP_LTZ`) and `int_edge_ticket_tokens`
+(volatile Python functions, whose values change on every run) carry the tag too.
+
 ## Known limitations
 
 These SQLBuild limitations shape parts of the project; each workaround is a reviewed exception or
@@ -228,6 +237,34 @@ noted here:
 - `SQLCLEAN018` can only take proof from single-column keys. Append-only feeds redeliver rows, so
   their id is unique only together with `_loaded_at` (the `unique_per_delivery` audit), and the
   staging models that keep the latest delivery carry reviewed exceptions.
+- SQLBuild 0.186.2 reports errors on some valid Snowflake SQL, so the edge-case area cannot hold
+  these shapes until compilation accepts them: a reference to an alias defined later in the same
+  `SELECT` or to an enclosing `SELECT`'s alias from a correlated subquery, a qualified positional
+  column (`o.$2`), a `MATCH_RECOGNIZE` alias used as a qualifier, `ARRAY_UNIQUE_AGG`,
+  `BITOR_AGG`, `BITXOR_AGG` and `MINHASH` under `GROUP BY`, the unqualified key of a
+  `NATURAL JOIN`, a timestamp compared with a text column, implicit text and number arguments to
+  `LPAD`, `REPEAT`, `REVERSE`, `LN` and `EXP`, a `DATE` plus a cast `NUMBER`, `::BYTEINT`, `GROUP BY`
+  expressions that differ only in case, an outer aggregate inside a subquery and a `WHERE` over a
+  number. `DATEADD` on a `TIME(3)` is typed `TIME(3)`, where Snowflake returns `TIME(9)`, so
+  `int_edge_clock_arithmetic` casts those results and records Snowflake's type as text.
+- Some shapes need objects DuckShop does not define: fully qualified `schema.table.column` names
+  (model SQL has no intrinsic for its own schema, and unit tests replace references with CTEs),
+  `METADATA$` columns of a stream or `CHANGES` clause, and sequence `NEXTVAL`. SQLBuild's `@udf`
+  has no option for `STRICT` (`RETURNS NULL ON NULL INPUT`), so no function declares it.
+- Snowflake rejects some shapes, so the edge-case area leaves them out: a window frame without
+  `ORDER BY` (such as a running `COUNT_IF`), `CONVERT_TIMEZONE` with a lower-case `'utc'`, and a
+  scalar subquery inside a `CONNECT BY` query (an internal error). `MAX` over `SYSTEM$TYPEOF`
+  values that are then joined on also fails with an internal error, so `int_edge_null_arithmetic`
+  reads one row's type instead.
+- Snowflake answers some shapes in ways worth knowing, and the captured expectations record them:
+  `SYSTEM$TYPEOF(COUNT(x))` does not make a query aggregate; in a `CONNECT BY` query that joins
+  another relation, a column named `level` reads as the walk depth even when qualified, and
+  `CONNECT_BY_ROOT` returns the row's own value; `COUNT` of a `VARIANT` skips JSON null; `MODE` of
+  a number over no rows can return 0; `MEDIAN` above scale 12 is not exact and differs between
+  plans; `JOIN ... USING` types the qualified keys of an inner join as the narrower side's type.
+- SQLBuild 0.186.2 reads the type of a Snowflake source column declared with a precision, such as
+  `TIME(3)` or `TIMESTAMP_NTZ(3)`, without it, and stops the build with a contract mismatch. The
+  `edge__date_texts` columns are declared without a precision and cast in `stg_edge_date_texts`.
 
 ## Compile
 
