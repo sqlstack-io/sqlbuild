@@ -15,6 +15,9 @@ MODEL (
     marketing_opt_in (type BOOLEAN),
     consent_types (type ARRAY),
     birth_year (type INT),
+    preferences (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

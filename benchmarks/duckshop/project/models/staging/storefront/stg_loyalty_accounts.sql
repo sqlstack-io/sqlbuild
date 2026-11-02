@@ -8,6 +8,9 @@ MODEL (
     enrolled_at (type TIMESTAMP_TZ),
     tier_change_count (type INT),
     previous_tier_code (type VARCHAR),
+    tier_history (type ARRAY),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

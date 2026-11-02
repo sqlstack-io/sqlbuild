@@ -9,6 +9,8 @@ MODEL (
     primary_contact_email (type VARCHAR),
     contact_count (type INT),
     payment_terms (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
