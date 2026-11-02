@@ -6,17 +6,22 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from tests.e2e.src.sqlbuild.cli.commands.main.test._test_types import (
     LocalEngineE2ETestCase,
+    LocalFunctionE2ETestCase,
     RealLocalEngineE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.test.helpers import (
     build_local_engine_project_files,
+    build_local_function_project_files,
     build_real_local_engine_project_files,
+    build_real_local_function_project_files,
     read_fake_sqlquack_conversions,
+    read_fake_sqlquack_log,
     write_fake_sqlquack,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
@@ -348,5 +353,118 @@ def test_given_real_sqlquack_when_testing_locally_then_converted_tests_run_on_du
     )
 
     assert result.returncode == 1, result.stdout + result.stderr
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalFunctionE2ETestCase(
+            description="SQL functions are called by bare name and run as macros",
+            arguments=("test", "--local"),
+            expected_stdout_fragments=(
+                "PASS=1  FAIL=0  REFUSED=2  TOTAL=3",
+                "SQLQuack refused the body of project function odd_label: "
+                "no rule converts fn:UNCONVERTIBLE_FN",
+                "project function tag_label is a python function",
+            ),
+            expected_declared=(("IS_COMPLETED", "IS_OPEN"),),
+            expected_bare_calls=("IS_COMPLETED(", "IS_OPEN("),
+            expected_function_bodies=(
+                ("IS_COMPLETED", "order_status = 'completed'"),
+                ("IS_OPEN", "NOT IS_COMPLETED(order_status)"),
+                ("ODD_LABEL", "UNCONVERTIBLE_FN(order_status)"),
+            ),
+        ),
+        LocalFunctionE2ETestCase(
+            description="a test calling a Python function is refused before conversion",
+            arguments=("test", "--local", "--select", "order_tags_are_refused"),
+            expected_stdout_fragments=("PASS=0  FAIL=0  REFUSED=1  TOTAL=1",),
+            expected_declared=(),
+            expected_bare_calls=(),
+            expected_function_bodies=(),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_project_functions_when_testing_locally_then_sqlquack_gets_bare_calls(
+    test_case: LocalFunctionE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="duckshop_local_functions",
+        repo_files=build_local_function_project_files(),
+    )
+    converter_dir: Path = tmp_path / "converter"
+    _ = write_fake_sqlquack(directory=converter_dir, version="0.2.0")
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", *test_case.arguments),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(converter_dir / "sqlquack")},
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    for fragment in test_case.expected_stdout_fragments:
+        assert fragment in result.stdout, result.stdout + result.stderr
+    statements: tuple[dict[str, Any], ...] = read_fake_sqlquack_log(
+        directory=converter_dir, log="statements"
+    )
+    sent_sql: str = "\n".join(statement["sql"] for statement in statements).upper()
+    assert ".IS_" not in sent_sql, sent_sql
+    for call in test_case.expected_bare_calls:
+        assert call in sent_sql, sent_sql
+    declared: tuple[tuple[str, ...], ...] = tuple(
+        sorted(tuple(statement["declared"]) for statement in statements)
+    )
+    assert declared == test_case.expected_declared, statements
+    functions: tuple[dict[str, Any], ...] = read_fake_sqlquack_log(
+        directory=converter_dir, log="functions"
+    )
+    assert (
+        tuple(sorted((call["name"], call["body"].strip()) for call in functions))
+        == test_case.expected_function_bodies
+    ), functions
+
+
+@pytest.mark.skipif(
+    not _REAL_SQLQUACK.with_name(_POLICY_FILE).is_file(),
+    reason="the sqlquack executable, with its policy file beside it, is not installed",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RealLocalEngineE2ETestCase(
+            description="a function test calling a SQL function converts and passes",
+            expected_stdout_fragments=("PASS=1  FAIL=0  TOTAL=1",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_real_sqlquack_when_a_test_calls_a_sql_function_then_it_runs_on_duckdb(
+    test_case: RealLocalEngineE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="duckshop_real_local_functions",
+        repo_files=build_real_local_function_project_files(
+            policy=_REAL_SQLQUACK.with_name(_POLICY_FILE).read_text(encoding="utf-8")
+        ),
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=(
+            "--no-color",
+            "test",
+            "--local",
+            "--select",
+            "sku_family_extracts_leading_letters",
+        ),
+        project_dir=project_dir,
+        env={_SQLQUACK_ENV: str(_REAL_SQLQUACK)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
     for fragment in test_case.expected_stdout_fragments:
         assert fragment in result.stdout, result.stdout + result.stderr

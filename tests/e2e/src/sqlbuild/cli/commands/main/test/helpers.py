@@ -2489,9 +2489,28 @@ arguments = sys.argv[1:]
 if arguments == ["--version"]:
     print("sqlquack VERSION")
     sys.exit(0)
+if arguments[0] == "function":
+    name = arguments[arguments.index("--name") + 1]
+    schema = json.loads(Path(arguments[arguments.index("--schema") + 1]).read_text())
+    body = Path(arguments[-1]).read_text(encoding="utf-8")
+    with Path(__file__).with_name("functions.jsonl").open("a", encoding="utf-8") as calls:
+        calls.write(json.dumps({"name": name, "schema": schema, "body": body}) + "\\n")
+    if "UNCONVERTIBLE_FN" in body.upper():
+        print("sqlquack function: refused: no rule converts fn:UNCONVERTIBLE_FN", file=sys.stderr)
+        sys.exit(1)
+    parameters = [argument[0] for argument in schema["functions"][name]["arguments"]]
+    divergences = {"declared_offset": ["node:cast"]} if "ZONED_AT" in body.upper() else {}
+    print(json.dumps({
+        "parameters": parameters, "body": body, "provenance": {"divergences": divergences},
+    }))
+    sys.exit(0)
 with Path(__file__).with_name("calls.jsonl").open("a", encoding="utf-8") as calls:
     calls.write(json.dumps(arguments) + "\\n")
 text = Path(arguments[-1]).read_text(encoding="utf-8")
+with Path(__file__).with_name("statements.jsonl").open("a", encoding="utf-8") as calls:
+    schema_path = arguments[arguments.index("--schema") + 1] if "--schema" in arguments else None
+    schema = json.loads(Path(schema_path).read_text()) if schema_path else {"functions": {}}
+    calls.write(json.dumps({"sql": text, "declared": sorted(schema["functions"])}) + "\\n")
 sql = text.upper()
 report = {"converted": True, "sql": text, "refusals": [], "assumptions": [], "notes": []}
 if "UNCONVERTIBLE_FN" in sql:
@@ -2558,7 +2577,8 @@ def write_fake_sqlquack(*, directory: Path, version: str, mode: str = "faithful"
     )
     executable.chmod(0o755)
     (directory / "mode").write_text(mode, encoding="utf-8")
-    (directory / "calls.jsonl").write_text("", encoding="utf-8")
+    for log in ("calls.jsonl", "functions.jsonl", "statements.jsonl"):
+        (directory / log).write_text("", encoding="utf-8")
     return executable
 
 
@@ -2567,6 +2587,13 @@ def read_fake_sqlquack_conversions(*, directory: Path) -> tuple[tuple[str, ...],
 
     lines: list[str] = (directory / "calls.jsonl").read_text(encoding="utf-8").splitlines()
     return tuple(tuple(json.loads(line)) for line in lines)
+
+
+def read_fake_sqlquack_log(*, directory: Path, log: str) -> tuple[dict[str, Any], ...]:
+    """Each record the stand-in `sqlquack` wrote to `log`: functions or statements it converted."""
+
+    lines: list[str] = (directory / f"{log}.jsonl").read_text(encoding="utf-8").splitlines()
+    return tuple(json.loads(line) for line in lines)
 
 
 _LOCAL_PROJECT_NAME: str = 'name = "duckshop_local"\nadapter = "snowflake"\n\n'
@@ -2731,5 +2758,116 @@ def build_real_local_engine_project_files(*, policy: str) -> dict[str, str]:
                 "SELECT CAST(column1 AS NUMBER(38,0)) AS order_id, "
                 "CAST(column2 AS VARCHAR) AS label FROM VALUES (1, 'x')"
             ),
+        ),
+    }
+
+
+_FUNCTION_ORDERS: str = (
+    "__source__raw_orders AS (\n"
+    "  SELECT 1 AS order_id, 'completed' AS status, 'gift' AS tag\n"
+    "  UNION ALL SELECT 2, 'cancelled', 'bath'\n"
+    "),\n"
+)
+
+
+def _local_function(*, arguments: str, returns: str, body: str) -> str:
+    return (
+        f"FUNCTION (\n  description 'A test function.',\n  arguments ({arguments}),\n"
+        f"  returns {returns},\n);\n\n{body}\n"
+    )
+
+
+def build_local_function_project_files() -> dict[str, str]:
+    """A Snowflake project whose tests call SQL and Python project functions."""
+
+    return {
+        "sqlbuild_project.toml": _LOCAL_PROJECT_NAME + _LOCAL_CONNECTION + _LOCAL_DEFAULTS,
+        "sqlquack.toml": "schema_version = 1\n",
+        "sources/raw_orders.yml": _local_source(
+            columns=(("order_id", "INTEGER"), ("status", "VARCHAR"), ("tag", "VARCHAR"))
+        ),
+        "functions/sql/is_completed.sql": _local_function(
+            arguments="order_status VARCHAR", returns="BOOLEAN", body="order_status = 'completed'"
+        ),
+        "functions/sql/is_open.sql": _local_function(
+            arguments="order_status VARCHAR",
+            returns="BOOLEAN",
+            body='NOT __udf("is_completed")(order_status)',
+        ),
+        "functions/sql/odd_label.sql": _local_function(
+            arguments="order_status VARCHAR",
+            returns="VARCHAR",
+            body="UNCONVERTIBLE_FN(order_status)",
+        ),
+        "functions/python/tag_label.py": (
+            "from sqlbuild.functions import udf\n\n\n"
+            '@udf(arguments={"tag": "VARCHAR"}, returns="VARCHAR", runtime_version="3.11")\n'
+            "def main(tag: str | None) -> str | None:\n"
+            '    """A tag as a display label."""\n'
+            "    return None if tag is None else tag.capitalize()\n"
+        ),
+        "models/order_flags.sql": _local_model(
+            description="Orders with whether each is completed or open.",
+            select=(
+                'SELECT order_id, __udf("is_completed")(status) AS is_completed, '
+                '__udf("is_open")(status) AS is_open'
+            ),
+        ),
+        "models/order_odd_labels.sql": _local_model(
+            description="Orders with a label no rule converts.",
+            select='SELECT order_id, __udf("odd_label")(status) AS label',
+        ),
+        "models/order_tags.sql": _local_model(
+            description="Orders with a tag label.",
+            select='SELECT order_id, __udf("tag_label")(tag) AS label',
+        ),
+        "tests/unit/test_order_flags.sql": _local_test(
+            name="order_flags_from_functions",
+            orders=_FUNCTION_ORDERS,
+            model="order_flags",
+            expected=(
+                "SELECT 1 AS order_id, TRUE AS is_completed, FALSE AS is_open "
+                "UNION ALL SELECT 2 AS order_id, FALSE AS is_completed, TRUE AS is_open"
+            ),
+        ),
+        "tests/unit/test_order_odd_labels.sql": _local_test(
+            name="order_odd_labels_are_refused",
+            orders=_FUNCTION_ORDERS,
+            model="order_odd_labels",
+            expected="SELECT 1 AS order_id, 'x' AS label",
+        ),
+        "tests/unit/test_order_tags.sql": _local_test(
+            name="order_tags_are_refused",
+            orders=_FUNCTION_ORDERS,
+            model="order_tags",
+            expected="SELECT 1 AS order_id, 'Gift' AS label",
+        ),
+    }
+
+
+def build_real_local_function_project_files(*, policy: str) -> dict[str, str]:
+    """A Snowflake project for the real SQLQuack whose function-mode test calls a SQL function."""
+
+    return {
+        "sqlbuild_project.toml": _LOCAL_PROJECT_NAME + _LOCAL_CONNECTION + _LOCAL_DEFAULTS,
+        "sqlquack.toml": policy,
+        "functions/sql/sku_family.sql": _local_function(
+            arguments="sku VARCHAR",
+            returns="VARCHAR",
+            body="UPPER(REGEXP_SUBSTR(sku, '^[A-Za-z]+'))",
+        ),
+        "tests/unit/functions/sql/test_sku_family.sql": (
+            'TEST (mode udf, name "sku_family_extracts_leading_letters");\n\n'
+            "WITH input_values AS (\n"
+            "  SELECT v.sku FROM VALUES ('DUCK-MAL-01'), ('decoy-teal-1'), ('123-POND'), (NULL)"
+            " AS v(sku)\n),\n"
+            "__udf_actual__ AS (\n"
+            '  SELECT i.sku, __udf("sku_family")(i.sku) AS sku_family FROM input_values AS i\n'
+            "),\n"
+            "__udf_expected__ AS (\n"
+            "  SELECT v.sku::VARCHAR AS sku, v.sku_family::VARCHAR AS sku_family\n"
+            "  FROM VALUES ('DUCK-MAL-01', 'DUCK'), ('decoy-teal-1', 'DECOY'),"
+            " ('123-POND', NULL), (NULL, NULL) AS v(sku, sku_family)\n"
+            ")\n"
         ),
     }

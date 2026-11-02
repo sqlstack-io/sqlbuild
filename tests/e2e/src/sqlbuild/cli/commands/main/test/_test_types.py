@@ -645,3 +645,18 @@ class RealLocalEngineE2ETestCase:
 
     description: str
     expected_stdout_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class LocalFunctionE2ETestCase:
+    """Test case for `sqb test --local` of tests calling project functions, via a stand-in."""
+
+    description: str
+    arguments: tuple[str, ...]
+    expected_stdout_fragments: tuple[str, ...]
+    expected_declared: tuple[tuple[str, ...], ...]
+    """The function names each converted statement's schema declares, sorted."""
+    expected_bare_calls: tuple[str, ...]
+    """Bare function calls the converted statements must contain."""
+    expected_function_bodies: tuple[tuple[str, str], ...]
+    """Each function SQLQuack was asked to convert and the body it was sent, sorted by name."""

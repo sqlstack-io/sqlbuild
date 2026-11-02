@@ -1,27 +1,40 @@
-"""Session-scoped copies of project functions so unit tests call the current definitions."""
+"""Project functions unit tests call: session-scoped copies, or local DuckDB macros."""
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import replace
-from typing import Any
+from typing import Any, cast
 
 from sqlbuild._native import (
     ChainStep,
     CompiledObjectKey,
+    FunctionArgument,
     FunctionPlanEntry,
+    PlanOutput,
     SqlCodeScanner,
     SqlTestAssertionStep,
     SqlTestPlanEntry,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import FunctionDefinition, TemporaryFunction
+from sqlbuild.compiler.compile.types import FunctionLanguage
 from sqlbuild.diagnostics.classes.diagnostic_record_redactor import DiagnosticRecordRedactor
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 from sqlbuild.executor.pipeline.exceptions import TemporaryTestFunctionError
 from sqlbuild.executor.pipeline.models import TemporaryTestFunctions
+from sqlbuild.executor.testing.constants import PLAIN_FUNCTION_NAME
+from sqlbuild.executor.testing.main._convert_project_function import convert_project_function
+from sqlbuild.executor.testing.models import (
+    LocalFunctionUse,
+    LocalProjectFunctions,
+    LocalTestEngine,
+    SqlQuackFunction,
+)
 from sqlbuild.runtime.execution_limits.exceptions import (
     ExecutionDurationLimitError,
     ItemTimeoutError,
@@ -182,6 +195,39 @@ def rewrite_function_calls(
         copied_to = match.end()
     pieces.append(sql[copied_to:])
     return "".join(pieces)
+
+
+def called_targets(
+    *, entry: SqlTestPlanEntry, targets: Iterable[str], syntax: dict[str, object]
+) -> tuple[str, ...]:
+    """The function targets among `targets` a test's SQL code calls, in first-call order."""
+
+    searched: tuple[str, ...] = tuple(targets)
+    if not searched:
+        return ()
+    pattern: re.Pattern[str] = _call_pattern(targets=searched)
+    called: dict[str, None] = {}
+    sql: str
+    for sql in _entry_sql(entry):
+        called.update(
+            (match.group(1), None)
+            for match in _code_matches(pattern=pattern, sql=sql, syntax=syntax)
+        )
+    return tuple(called)
+
+
+def _entry_sql(entry: SqlTestPlanEntry) -> Iterable[str]:
+    step: ChainStep
+    for step in entry.chain:
+        yield step.resolved_sql
+        yield from (sql for sql in (step.expected_cte_sql, step.comparison_body_sql) if sql)
+        yield from (sql for _, sql in (*step.lifted_ctes, *step.expected_lifted_ctes))
+    assertion: SqlTestAssertionStep
+    for assertion in entry.assertions:
+        yield assertion.resolved_sql
+        if assertion.comparison_body_sql:
+            yield assertion.comparison_body_sql
+        yield from (sql for _, sql in assertion.lifted_ctes)
 
 
 def _execute_statements(
@@ -360,3 +406,182 @@ def _rewrite_ctes(
         (name, rewrite_function_calls(sql=sql, replacements=replacements, syntax=syntax))
         for name, sql in ctes
     )
+
+
+def prepare_local_functions(
+    *, plan: PlanOutput, adapter: BaseAdapter, engine: LocalTestEngine
+) -> LocalProjectFunctions:
+    """Convert each scalar project function local tests reach into a macro called by bare name."""
+
+    entries: dict[CompiledObjectKey, FunctionPlanEntry] = {
+        entry.key: entry
+        for entry in plan.function_entries
+        if entry.destination.qualified_name is not None and not entry.return_columns
+    }
+    reached: tuple[CompiledObjectKey, ...] = tuple(
+        key
+        for key in called_function_keys(
+            function_entries=plan.function_entries,
+            keys=_tested_function_keys(plan),
+            adapter=adapter,
+        )
+        if key in entries
+    )
+    if not reached:
+        return LocalProjectFunctions()
+    functions: tuple[FunctionPlanEntry, ...] = tuple(entries[key] for key in reached)
+    refusals: dict[str, str] = _unconvertible_functions(functions)
+    declarations: dict[str, dict[str, object]] = {
+        _target(entry): _declaration(entry) for entry in functions if _target(entry) not in refusals
+    }
+    schema: str = _local_schema(
+        {
+            _bare_name(entry): declarations[_target(entry)]
+            for entry in functions
+            if _target(entry) in declarations
+        }
+    )
+    callees: dict[str, tuple[str, ...]] = {
+        _target(entries[key]): _callee_targets(plan=plan, key=key, entries=entries, adapter=adapter)
+        for key in reached
+    }
+    syntax: dict[str, object] = adapter.sql_lexical_syntax.native_mapping
+    bare_names: dict[str, str] = {}
+    macros: dict[str, str] = {}
+    divergences: dict[str, tuple[str, ...]] = {}
+    entry: FunctionPlanEntry
+    for entry in functions:
+        target: str = _target(entry)
+        if target in refusals:
+            continue
+        refused_callee: str | None = next(
+            (callee for callee in callees[target] if callee != target and callee in refusals),
+            None,
+        )
+        if refused_callee is not None:
+            refusals[target] = (
+                f"project function {entry.name} calls one that cannot run locally: "
+                f"{refusals[refused_callee]}"
+            )
+            continue
+        converted: SqlQuackFunction = convert_project_function(
+            engine=engine,
+            name=_bare_name(entry),
+            schema=schema,
+            body=rewrite_function_calls(sql=entry.body_sql, replacements=bare_names, syntax=syntax),
+        )
+        if converted.refusal is not None:
+            refusals[target] = (
+                f"SQLQuack refused the body of project function {entry.name}: {converted.refusal}"
+            )
+            continue
+        bare_names[target] = _bare_name(entry)
+        macros[target] = (
+            f'CREATE MACRO "{_bare_name(entry)}"({", ".join(converted.parameters)}) '
+            f"AS {converted.body}"
+        )
+        divergences[target] = converted.divergences
+    return LocalProjectFunctions(
+        bare_names=bare_names,
+        macros=macros,
+        divergences=divergences,
+        refusals=refusals,
+        callees=callees,
+        declarations={target: declarations[target] for target in bare_names},
+    )
+
+
+def local_function_use(
+    *, entry: SqlTestPlanEntry, functions: LocalProjectFunctions, syntax: dict[str, object]
+) -> tuple[SqlTestPlanEntry, LocalFunctionUse]:
+    """The test with its project function calls made bare, and what it needs to run locally."""
+
+    called: tuple[str, ...] = called_targets(
+        entry=entry, targets=(*functions.bare_names, *functions.refusals), syntax=syntax
+    )
+    if not called:
+        return entry, LocalFunctionUse()
+    refused: str | None = next((target for target in called if target in functions.refusals), None)
+    if refused is not None:
+        return entry, LocalFunctionUse(refusal=functions.refusals[refused])
+    reached: dict[str, None] = {}
+    divergences: dict[str, None] = {}
+    target: str
+    for target in called:
+        reached.update(dict.fromkeys(functions.callees[target]))
+    for target in reached:
+        divergences.update(dict.fromkeys(functions.divergences[target]))
+    use: LocalFunctionUse = LocalFunctionUse(
+        schema=_local_schema(
+            {functions.bare_names[target]: functions.declarations[target] for target in called}
+        ),
+        setup=tuple(functions.macros[target] for target in reached),
+        assumptions=tuple(divergences),
+    )
+    return rewrite_test_entry(entry=entry, replacements=functions.bare_names, syntax=syntax), use
+
+
+def _tested_function_keys(plan: PlanOutput) -> tuple[CompiledObjectKey, ...]:
+    keys: dict[CompiledObjectKey, None] = {}
+    test: SqlTestPlanEntry
+    for test in plan.test_entries:
+        keys.update(dict.fromkeys(test.function_deps))
+    return tuple(keys)
+
+
+def _callee_targets(
+    *,
+    plan: PlanOutput,
+    key: CompiledObjectKey,
+    entries: dict[CompiledObjectKey, FunctionPlanEntry],
+    adapter: BaseAdapter,
+) -> tuple[str, ...]:
+    reached: tuple[CompiledObjectKey, ...] = called_function_keys(
+        function_entries=plan.function_entries, keys=(key,), adapter=adapter
+    )
+    return tuple(_target(entries[callee]) for callee in reached if callee in entries)
+
+
+def _unconvertible_functions(functions: tuple[FunctionPlanEntry, ...]) -> dict[str, str]:
+    shared: Counter[str] = Counter(_bare_name(entry) for entry in functions)
+    refusals: dict[str, str] = {}
+    entry: FunctionPlanEntry
+    for entry in functions:
+        reason: str | None = _unconvertible(entry=entry, shared=shared[_bare_name(entry)])
+        if reason is not None:
+            refusals[_target(entry)] = f"project function {entry.name} {reason}"
+    return refusals
+
+
+def _unconvertible(*, entry: FunctionPlanEntry, shared: int) -> str | None:
+    if entry.language != FunctionLanguage.SQL:
+        return (
+            f"is a {entry.language} function, which `sqb test --local` cannot run until it "
+            "registers Python functions with SQLQuack's runtime"
+        )
+    if PLAIN_FUNCTION_NAME.match(entry.name) is None:
+        return "has a name SQLQuack's schema cannot declare unquoted"
+    if shared > 1:
+        return "shares its name with another project function, so a bare call would be ambiguous"
+    return None
+
+
+def _declaration(entry: FunctionPlanEntry) -> dict[str, object]:
+    arguments: list[list[str]] = []
+    argument: object
+    for argument in entry.arguments:
+        declared: FunctionArgument = cast(FunctionArgument, argument)
+        arguments.append([declared.name.upper(), declared.type])
+    return {"language": "sql", "arguments": arguments, "returns": entry.returns}
+
+
+def _local_schema(functions: dict[str, dict[str, object]]) -> str:
+    return json.dumps({"relations": {}, "functions": functions}, sort_keys=True)
+
+
+def _target(entry: FunctionPlanEntry) -> str:
+    return str(entry.destination.qualified_name)
+
+
+def _bare_name(entry: FunctionPlanEntry) -> str:
+    return entry.name.upper()

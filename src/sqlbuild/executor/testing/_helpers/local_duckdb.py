@@ -10,8 +10,10 @@ from sqlbuild.executor.testing.constants import LOCAL_DUCKDB_CONNECTION
 from sqlbuild.executor.testing.models import LocalStatementRun
 
 
-def run_converted_statement(*, sql: str, timeout_seconds: float | None) -> LocalStatementRun:
-    """The statement's rows, or the error DuckDB raised; interrupted after `timeout_seconds`."""
+def run_converted_statement(
+    *, sql: str, timeout_seconds: float | None, setup: tuple[str, ...] = ()
+) -> LocalStatementRun:
+    """The statement's rows after `setup`, or the error DuckDB raised; interrupted on time-out."""
 
     adapter: DuckDbAdapter = DuckDbAdapter()
     connection: Any = adapter.connect(dict(LOCAL_DUCKDB_CONNECTION))
@@ -24,6 +26,8 @@ def run_converted_statement(*, sql: str, timeout_seconds: float | None) -> Local
         )
         timer.start()
     try:
+        for statement in setup:
+            _ = adapter.execute(connection=connection, sql=statement)
         cursor: Any = adapter.execute(connection=connection, sql=sql)
         rows: list[Any] = cursor.fetchall()
         columns: tuple[str, ...] = tuple(str(column[0]) for column in cursor.description or ())

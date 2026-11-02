@@ -26,6 +26,9 @@ SQLQUACK_MINIMUM_VERSION: tuple[int, int, int] = (0, 2, 0)
 SQLQUACK_VERSION_PATTERN: re.Pattern[str] = re.compile(r"^sqlquack (\d+)\.(\d+)\.(\d+)$")
 SQLQUACK_VERSION_TIMEOUT_SECONDS: int = 30
 SQLQUACK_CONVERT_TIMEOUT_SECONDS: int = 300
+SQLQUACK_FUNCTION_REFUSED_PREFIX: str = "sqlquack function: refused: "
+SQLQUACK_FUNCTION_FAILED_PREFIX: str = "sqlquack function: failed: "
+PLAIN_FUNCTION_NAME: re.Pattern[str] = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SESSION_NAME_SEPARATOR: str = "="
 LOCAL_SAMPLE_TIMEOUT_SECONDS: int = 30
 LOCAL_PLAN_ACTION: str = "local"

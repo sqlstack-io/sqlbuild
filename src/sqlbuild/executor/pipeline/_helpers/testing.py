@@ -36,6 +36,8 @@ from sqlbuild.executor.pipeline._helpers.temporary_functions import (
     called_function_keys,
     create_temporary_test_functions,
     install_temporary_test_functions,
+    local_function_use,
+    prepare_local_functions,
     rewrite_test_entry,
 )
 from sqlbuild.executor.pipeline.exceptions import TemporaryTestFunctionError
@@ -55,6 +57,8 @@ from sqlbuild.executor.testing.main._execute import execute_sql_test
 from sqlbuild.executor.testing.main._execute_local import execute_local_sql_test
 from sqlbuild.executor.testing.main._local_engine import resolve_local_test_engine
 from sqlbuild.executor.testing.models import (
+    LocalFunctionUse,
+    LocalProjectFunctions,
     LocalTestEngine,
     LocalTestOptions,
     SqlTestExecutionResult,
@@ -642,6 +646,9 @@ def _run_local_test_pipeline(
     engine: LocalTestEngine = resolve_local_test_engine(
         project_dir=project_dir, strict=strict, connection_config=connection_config
     )
+    functions: LocalProjectFunctions = _local_functions(
+        plan=plan, adapter=adapter, engine=engine, callbacks=callbacks
+    )
     if callbacks.on_progress is not None:
         callbacks.on_progress(f"Running tests on local DuckDB: {engine.describe()}")
     worker_count: int = min(max(1, max_concurrency), len(entries))
@@ -655,6 +662,7 @@ def _run_local_test_pipeline(
                     entry=entry,
                     adapter=adapter,
                     engine=engine,
+                    functions=functions,
                     callbacks=callbacks,
                     run_id=run_id,
                     timeouts=timeouts,
@@ -671,11 +679,34 @@ def _run_local_test_pipeline(
     return tuple(results)
 
 
+def _local_functions(
+    *,
+    plan: PlanOutput,
+    adapter: BaseAdapter,
+    engine: LocalTestEngine,
+    callbacks: TestPipelineCallbacks,
+) -> LocalProjectFunctions:
+    if not plan.function_entries:
+        return LocalProjectFunctions()
+    if callbacks.on_progress is not None:
+        callbacks.on_progress("Converting project functions with SQLQuack...")
+    functions: LocalProjectFunctions = prepare_local_functions(
+        plan=plan, adapter=adapter, engine=engine
+    )
+    if callbacks.on_progress is not None:
+        callbacks.on_progress(
+            f"Converted {len(functions.macros)} of "
+            f"{len(functions.macros) + len(functions.refusals)} project functions."
+        )
+    return functions
+
+
 def _execute_local_entry(
     *,
     entry: SqlTestPlanEntry,
     adapter: BaseAdapter,
     engine: LocalTestEngine,
+    functions: LocalProjectFunctions,
     callbacks: TestPipelineCallbacks,
     run_id: str,
     timeouts: RunItemTimeouts,
@@ -694,8 +725,13 @@ def _execute_local_entry(
     ) as lifecycle:
         if callbacks.on_test_start is not None:
             callbacks.on_test_start(entry)
+        local_entry: SqlTestPlanEntry
+        use: LocalFunctionUse
+        local_entry, use = local_function_use(
+            entry=entry, functions=functions, syntax=adapter.sql_lexical_syntax.native_mapping
+        )
         result: SqlTestExecutionResult = execute_local_sql_test(
-            test_entry=entry, adapter=adapter, engine=engine, timeouts=timeouts
+            test_entry=local_entry, adapter=adapter, engine=engine, timeouts=timeouts, functions=use
         )
         if result.outcome != SqlTestOutcome.PASS:
             lifecycle.failed(error_code=result.error_code)

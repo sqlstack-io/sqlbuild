@@ -120,6 +120,46 @@ class SqlQuackConversion:
 
 
 @dataclass(frozen=True)
+class SqlQuackFunction:
+    """A SQL project function SQLQuack converted to a DuckDB macro, or why it refused it."""
+
+    parameters: tuple[str, ...] = ()
+    body: str = ""
+    divergences: tuple[str, ...] = ()
+    refusal: str | None = None
+
+
+@dataclass(frozen=True)
+class LocalProjectFunctions:
+    """The project functions local tests call, by the target compiled SQL calls them through."""
+
+    bare_names: dict[str, str] = field(default_factory=dict)
+    """Each converted function's target and the bare name SQLQuack's schema declares it as."""
+    macros: dict[str, str] = field(default_factory=dict)
+    """Each converted function's target and the DuckDB statement creating its macro."""
+    divergences: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    """Each converted function's target and the divergences its body's conversion relies on."""
+    refusals: dict[str, str] = field(default_factory=dict)
+    """Each function a test cannot call locally, by target, and why."""
+    callees: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    """Each function's target and the targets it reaches, itself included, callees first."""
+    declarations: dict[str, dict[str, object]] = field(default_factory=dict)
+    """Each converted function's target and its signature as SQLQuack's schema file writes it."""
+
+
+@dataclass(frozen=True)
+class LocalFunctionUse:
+    """What one local test needs for the project functions it calls."""
+
+    schema: str | None = None
+    """The schema file declaring the functions the test calls by bare name, as JSON."""
+    setup: tuple[str, ...] = ()
+    """The statements creating the macros of those functions and of the functions they call."""
+    assumptions: tuple[str, ...] = ()
+    refusal: str | None = None
+
+
+@dataclass(frozen=True)
 class LocalStatementRun:
     """The rows one converted statement returned on DuckDB, or its error."""
 

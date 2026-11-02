@@ -9,35 +9,34 @@ import time
 from sqlbuild._native import SqlTestPlanEntry, render_sql_test_comparison_sql
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
-from sqlbuild.executor.testing._helpers.comparison import build_step_results, plan_row_mismatch
-from sqlbuild.executor.testing._helpers.difference_samples import add_difference_samples
+from sqlbuild.executor.testing._helpers.comparison import plan_row_mismatch
 from sqlbuild.executor.testing._helpers.local_converter import (
     convert_statement,
-    run_converted_query,
 )
 from sqlbuild.executor.testing._helpers.local_duckdb import run_converted_statement
 from sqlbuild.executor.testing._helpers.local_results import (
+    compared_result,
     local_timed_out_result,
     refused_message,
     remaining_seconds,
     single_step_result,
+    with_function_assumptions,
+    with_function_setup,
 )
 from sqlbuild.executor.testing._helpers.timeout_policy import sql_test_timeout
 from sqlbuild.executor.testing.constants import (
     GUARD_RAISE_PATTERN,
-    LOCAL_SAMPLE_TIMEOUT_SECONDS,
     LOCAL_TEST_ENGINE_CODE,
     LOCAL_TEST_REFUSED_CODE,
-    SQL_TEST_ASSERTION_FAILED_CODE,
     SQL_TEST_EXECUTION_ERROR_CODE,
     SQLQUACK_CONVERT_TIMEOUT_SECONDS,
 )
 from sqlbuild.executor.testing.models import (
+    LocalFunctionUse,
     LocalStatementRun,
     LocalTestEngine,
     SqlQuackConversion,
     SqlTestExecutionResult,
-    StepResult,
 )
 from sqlbuild.executor.testing.types import SqlTestOutcome
 from sqlbuild.runtime.execution_limits.models import ItemTimeoutPolicy, RunItemTimeouts
@@ -49,11 +48,18 @@ def execute_local_sql_test(
     adapter: BaseAdapter,
     engine: LocalTestEngine,
     timeouts: RunItemTimeouts,
+    functions: LocalFunctionUse | None = None,
 ) -> SqlTestExecutionResult:
     """Convert the test's comparison statement with SQLQuack and judge its rows on DuckDB."""
 
     try:
-        return _judged(test_entry=test_entry, adapter=adapter, engine=engine, timeouts=timeouts)
+        return _judged(
+            test_entry=test_entry,
+            adapter=adapter,
+            engine=engine,
+            timeouts=timeouts,
+            functions=functions or LocalFunctionUse(),
+        )
     except Exception as error:  # noqa: BLE001 - one test's failure never aborts the run
         return single_step_result(
             test_entry=test_entry,
@@ -71,13 +77,15 @@ def _judged(
     adapter: BaseAdapter,
     engine: LocalTestEngine,
     timeouts: RunItemTimeouts,
+    functions: LocalFunctionUse,
 ) -> SqlTestExecutionResult:
-    if engine.session_refusal is not None:
+    refusal: str | None = engine.session_refusal or functions.refusal
+    if refusal is not None:
         return single_step_result(
             test_entry=test_entry,
             outcome=SqlTestOutcome.REFUSED,
             error_code=LOCAL_TEST_REFUSED_CODE,
-            error_message=f"test '{test_entry.name}' was refused: {engine.session_refusal}",
+            error_message=f"test '{test_entry.name}' was refused: {refusal}",
         )
     (comparison_sql,) = render_sql_test_comparison_sql(
         (test_entry,),
@@ -93,6 +101,7 @@ def _judged(
             timeout_seconds=remaining_seconds(
                 policy=policy, started=started, cap=SQLQUACK_CONVERT_TIMEOUT_SECONDS
             ),
+            schema=functions.schema,
         )
     except subprocess.TimeoutExpired:
         if policy is not None and time.monotonic() - started >= policy.seconds:
@@ -120,6 +129,7 @@ def _judged(
             error_code=LOCAL_TEST_REFUSED_CODE,
             error_message=refused_message(test_entry=test_entry, conversion=conversion),
         )
+    conversion = with_function_assumptions(conversion=conversion, functions=functions)
     if engine.strict and conversion.assumptions:
         return single_step_result(
             test_entry=test_entry,
@@ -133,7 +143,10 @@ def _judged(
     remaining: float | None = remaining_seconds(policy=policy, started=started, cap=None)
     if policy is not None and remaining is not None and remaining <= 0:
         return local_timed_out_result(test_entry=test_entry, policy=policy, started=started)
-    run: LocalStatementRun = run_converted_statement(sql=conversion.sql, timeout_seconds=remaining)
+    run: LocalStatementRun = run_converted_statement(
+        sql=conversion.sql, timeout_seconds=remaining, setup=functions.setup
+    )
+    conversion = with_function_setup(conversion=conversion, functions=functions)
     if run.error is not None:
         return _failed_run_result(
             test_entry=test_entry, run=run, conversion=conversion, policy=policy, started=started
@@ -148,37 +161,12 @@ def _judged(
             assumptions=conversion.assumptions,
             local_sql=conversion.sql,
         )
-    step_results: list[StepResult] = add_difference_samples(
-        step_results=build_step_results(list(run.rows)),
+    return compared_result(
         test_entry=test_entry,
         adapter=adapter,
-        connection=None,
-        execute=lambda sql: run_converted_query(
-            engine=engine, sql=sql, timeout_seconds=LOCAL_SAMPLE_TIMEOUT_SECONDS
-        ),
-    )
-    failed: list[str] = [
-        step.model_name for step in step_results if step.outcome == SqlTestOutcome.FAIL
-    ]
-    return SqlTestExecutionResult(
-        test_name=test_entry.name,
-        outcome=SqlTestOutcome.FAIL if failed else SqlTestOutcome.PASS,
-        source_path=test_entry.source_path,
-        block_index=test_entry.block_index,
-        parent_name=test_entry.parent_name,
-        case_name=test_entry.case_name,
-        case_index=test_entry.case_index,
-        case_fingerprint=test_entry.case_fingerprint,
-        parameter_schema=test_entry.parameter_schema,
-        parameter_values=test_entry.parameter_values,
-        step_results=tuple(step_results),
-        error_code=SQL_TEST_ASSERTION_FAILED_CODE if failed else None,
-        error_message=(
-            f"test '{test_entry.name}' failed for models: {', '.join(failed)}" if failed else None
-        ),
-        real_model_count=test_entry.real_model_count,
-        assumptions=conversion.assumptions,
-        local_sql=conversion.sql,
+        engine=engine,
+        functions=functions,
+        outcome=(run, conversion),
     )
 
 
