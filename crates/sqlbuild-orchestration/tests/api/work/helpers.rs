@@ -4,7 +4,7 @@ use crate::store::models::ControlStore;
 
 pub(crate) async fn execute(store: &ControlStore, sql: &str) {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path) = store else {
+        let ControlStore::Sqlite(path, _) = store else {
             unreachable!("SQLite store")
         };
         rusqlite::Connection::open(path)

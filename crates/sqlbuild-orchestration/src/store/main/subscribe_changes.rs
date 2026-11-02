@@ -17,7 +17,7 @@ pub(crate) async fn subscribe_changes(
     ControlError,
 > {
     match store {
-        ControlStore::Sqlite(path) => {
+        ControlStore::Sqlite(path, _) => {
             let path = path.clone();
             Ok((
                 tokio::task::spawn_blocking(move || sqlite_changes(&path)).await??,

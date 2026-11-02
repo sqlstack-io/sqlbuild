@@ -353,6 +353,19 @@
           }
          },
          {
+          "name": "recover-user",
+          "parser": {
+           "prog": "sqb admin recover-user",
+           "description": "Recover an existing installation administrator offline through local control-store ownership. Stop every server and administration process first. Requires exclusive access, records the reason durably and revokes the person's sessions; never reopens bootstrap. Password provisioning is separate.",
+           "groups": [{"title": "positional arguments"}, {"title": "options"}],
+           "actions": [
+            {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+            {"kind": "store", "options": [], "dest": "admin_subject", "metavar": "PRINCIPAL_ID", "required": true, "help": "existing person UUID to enable and restore as installation admin", "group": 0},
+            {"kind": "store", "options": ["--reason"], "dest": "admin_reason", "required": true, "help": "durable explanation for offline recovery", "group": 1}
+           ]
+          }
+         },
+         {
           "name": "issue-location-token",
           "parser": {
            "prog": "sqb admin issue-location-token",

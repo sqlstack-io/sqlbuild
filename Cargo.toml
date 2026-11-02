@@ -68,6 +68,7 @@ argon2 = "0.5.3"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 fensu-policy = "=0.22.0"
+fs4 = "1.1"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 # `sqb` names compute log captures with random ids, as `uuid.uuid4().hex`.
 getrandom = "0.4"

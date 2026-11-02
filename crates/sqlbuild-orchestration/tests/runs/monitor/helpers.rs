@@ -44,7 +44,7 @@ pub(crate) async fn start_run(
 pub(crate) async fn age_heartbeat(store: &ControlStore, run_id: Uuid, seconds: i64) {
     let timestamp = Utc::now() - TimeDelta::seconds(seconds);
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path) = store else {
+        let ControlStore::Sqlite(path, _) = store else {
             unreachable!()
         };
         rusqlite::Connection::open(path)

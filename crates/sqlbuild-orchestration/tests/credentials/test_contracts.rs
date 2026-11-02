@@ -10,6 +10,8 @@ mod test_administrators;
 mod test_contract;
 #[path = "passwords/test_contract.rs"]
 mod test_passwords;
+#[path = "test_recovery.rs"]
+mod test_recovery;
 #[path = "sessions/test_contract.rs"]
 mod test_sessions;
 #[path = "test_types.rs"]

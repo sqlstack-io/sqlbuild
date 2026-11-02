@@ -15,9 +15,10 @@ pub(crate) async fn begin(
     mode: TransactionMode,
 ) -> Result<ControlTransaction, ControlError> {
     let (connection, notifications) = match store {
-        ControlStore::Sqlite(path) => {
+        ControlStore::Sqlite(path, access) => {
             let path = path.clone();
-            let (connection, notifications) = tokio::task::spawn_blocking(move || {
+            let access = access.clone();
+            tokio::task::spawn_blocking(move || {
                 let connection = rusqlite::Connection::open_with_flags(
                     &path,
                     OpenFlags::SQLITE_OPEN_READ_WRITE
@@ -35,10 +36,9 @@ pub(crate) async fn begin(
                 } else {
                     None
                 };
-                Ok::<_, ControlError>((connection, notifications))
+                Ok::<_, ControlError>((Connection::Sqlite(connection, access), notifications))
             })
-            .await??;
-            (Connection::Sqlite(connection), notifications)
+            .await??
         }
         ControlStore::Postgres(pool) => {
             let mut transaction = pool.begin().await?;
