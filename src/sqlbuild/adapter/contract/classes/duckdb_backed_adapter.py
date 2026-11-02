@@ -6,6 +6,7 @@ import importlib.util
 import json
 import logging
 import re
+import time
 from datetime import date, datetime
 from decimal import Decimal
 from importlib.machinery import ModuleSpec
@@ -1075,14 +1076,31 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         return f"'{value}'"
 
     def connect(self, config: dict[str, Any]) -> Any:
-        """Open a DuckDB connection from the resolved connection config."""
+        """Open DuckDB, waiting up to five seconds for another process's database file lock."""
 
         import duckdb
 
         database: str = str(config.get("database", ":memory:"))
-        raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(
-            database=database, read_only=bool(config.get("read_only", False))
-        )
+        deadline: float = time.monotonic() + 5
+        while True:
+            try:
+                raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(
+                    database=database, read_only=bool(config.get("read_only", False))
+                )
+                break
+            except duckdb.IOException as error:
+                if (
+                    not any(
+                        marker in str(error)
+                        for marker in (
+                            ": Conflicting lock is held in ",
+                            "\nFile is already open in ",
+                        )
+                    )
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.05)
         return self._configured_connection(raw_connection=raw_connection, config=config)
 
     def connect_local_replay(self, database: Path) -> Any:
