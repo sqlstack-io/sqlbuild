@@ -13,12 +13,13 @@ use crate::warehouse_metadata::models::{
     WarehouseReconciliationCursor, WarehouseReconciliationPage, WarehouseSyncResponse,
 };
 
+/// A matching receipt proves its records and scan keys committed in the same transaction.
 pub(crate) async fn begin_reconciliation(
     mut transaction: ControlTransaction,
     scope: (&str, Uuid, &str),
     page: &WarehouseReconciliationPage,
     mut batch: Value,
-) -> Result<ControlTransaction, ControlError> {
+) -> Result<(ControlTransaction, bool), ControlError> {
     if page.state_schema.trim().is_empty()
         || page.day.is_some_and(|day| day.succ_opt().is_none())
         || (!page.complete && page.after.is_some())
@@ -76,7 +77,7 @@ pub(crate) async fn begin_reconciliation(
                 "reconciliation page retry changed its content".into(),
             ));
         }
-        return Ok(transaction);
+        return Ok((transaction, true));
     }
     let expected = latest.first().map_or(Some(0), |row| {
         row["page"].as_u64().and_then(|page| page.checked_add(1))
@@ -96,7 +97,7 @@ pub(crate) async fn begin_reconciliation(
         "INSERT INTO sqb_warehouse_scan_pages (scan_id,page,scope_hash,request_hash,complete,received_at) VALUES ($1,$2,$3,$4,$5,$6)",
         vec![Parameter::Id(page.scan_id), Parameter::Integer(i64::from(page.page)), Parameter::Text(scope_hash),
             Parameter::Text(request_hash), Parameter::Boolean(page.complete), Parameter::Time(now)]).await?;
-    Ok(transaction)
+    Ok((transaction, false))
 }
 
 /// Each request visits at most one mirror page, including retained and concurrently received rows.
