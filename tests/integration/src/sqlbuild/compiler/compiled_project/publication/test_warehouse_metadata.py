@@ -50,6 +50,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
     snapshot_api,
     sync_warehouse_history,
     wait_for_generation,
+    wait_for_warehouse_sync_health,
     warehouse_history_page,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -660,6 +661,7 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
             | {"SQLBUILD_LOCATION_TOKEN": api.bearer, "SQLBUILD_METADATA_RECONCILE_SECONDS": "300"},
         ) as location:
             _ = wait_for_generation(api, "development", 1, location, log)
+            observed_health_at: datetime = datetime(1970, 1, 1, tzinfo=UTC)
             for stage in fixture["stages"]:
                 connection = adapter.connect(
                     {test_case.connection_key: str(project / "warehouse.db")}
@@ -700,6 +702,29 @@ def test_given_durable_mirror_when_late_rows_arrive_then_incremental_overlap_pre
                     )
                     time.sleep(0.05)
                 assert test_case.expected_run_id in observed
+                reports: list[dict[str, Any]] = wait_for_warehouse_sync_health(
+                    api, fixture["health"], location, log, after=observed_health_at
+                )
+                sent_counts: dict[str, int] = dict.fromkeys(fixture["health"]["tables"], 0)
+                for report in reports:
+                    sent_counts[report["report"]["health"]["table"]] += report["report"]["health"][
+                        "records_sent"
+                    ]
+                assert sent_counts == dict.fromkeys(
+                    fixture["health"]["tables"], stage["health_records_per_table"]
+                )
+                observed_health_at = max(
+                    datetime.fromisoformat(report["received_at"]) for report in reports
+                )
+            for availability in fixture["availability"]:
+                _ = (project / availability["source"]).rename(project / availability["destination"])
+                reports = wait_for_warehouse_sync_health(
+                    api, availability, location, log, after=observed_health_at
+                )
+                observed_health_at = max(
+                    datetime.fromisoformat(report["received_at"]) for report in reports
+                )
+                assert (project / "warehouse.db").exists() == availability["available"]
 
 
 @pytest.mark.parametrize(

@@ -5,7 +5,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use sqlbuild_orchestration::api::errors::ClientError;
-use sqlbuild_orchestration::platform::models::{LocationWorkClient, LocationWorkPoll};
+use sqlbuild_orchestration::platform::models::{
+    LocationWorkClient, LocationWorkPoll, WarehouseSyncFailure,
+};
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseWatermarkRead,
@@ -15,7 +17,7 @@ use tokio::time::Instant;
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
     acknowledge_metadata_page, deliver_metadata_page, freeze_history_page, history_request,
-    location_result,
+    location_result, metadata_health,
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
@@ -37,6 +39,7 @@ pub(super) async fn sync_location_metadata(
     {
         return Ok(Some(state));
     }
+    let started = Instant::now();
     tokio::pin!(stopped);
     if state.pending.is_none() {
         if !state.watermark_loaded {
@@ -60,7 +63,13 @@ pub(super) async fn sync_location_metadata(
                 };
                 let watermark = match watermark {
                     Ok(watermark) => watermark,
-                    Err(error) => return retry_metadata(state, error),
+                    Err(error) => {
+                        tokio::select! {
+                            result = &mut stopped => { result?; return Ok(None); },
+                            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Watermark))) => {},
+                        }
+                        return retry_metadata(state, error);
+                    }
                 };
                 state.observed_since = watermark.and_then(|time| {
                     time.checked_sub_signed(chrono::Duration::seconds(METADATA_OVERLAP_SECONDS))
@@ -68,16 +77,15 @@ pub(super) async fn sync_location_metadata(
             }
             state.watermark_loaded = true;
         }
-        let Some(page) = read_metadata_page(
-            (options, script),
-            history_request(&state)?,
-            stopped.as_mut(),
-        )
-        .await?
+        let Some(page) = read_metadata_page((options, script), &state, stopped.as_mut()).await?
         else {
             return Ok(None);
         };
         let Some(page) = page else {
+            tokio::select! {
+                result = &mut stopped => { result?; return Ok(None); },
+                () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Read))) => {},
+            }
             state.limit = (state.limit / 2).max(1);
             state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
             drop(write_output(&[(
@@ -101,8 +109,18 @@ pub(super) async fn sync_location_metadata(
     };
     let response = match response {
         Ok(response) => response,
-        Err(error) => return retry_metadata(state, error),
+        Err(error) => {
+            tokio::select! {
+                result = &mut stopped => { result?; return Ok(None); },
+                () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
+            }
+            return retry_metadata(state, error);
+        }
     };
+    tokio::select! {
+        result = &mut stopped => { result?; return Ok(None); },
+        () = metadata_health(&state, (client, poll), (started, None)) => {},
+    }
     acknowledge_metadata_page(state, response).map(Some)
 }
 
@@ -128,12 +146,12 @@ fn retry_metadata(
 /// An outer absence means shutdown; an inner absence is a failed read, never an empty table.
 async fn read_metadata_page(
     (options, script): (&LocationServe, &Path),
-    request: Vec<u8>,
+    state: &LocationMetadataSync,
     stopped: impl Future<Output = Result<(), ControlError>>,
 ) -> Result<Option<Option<WarehouseHistoryPage>>, ControlError> {
     let (mut child, reply) = match location_result::<Option<WarehouseHistoryPage>>(
         (options, script),
-        (request, METADATA_REPLY_BYTES),
+        (history_request(state)?, METADATA_REPLY_BYTES),
     ) {
         Ok(exchange) => exchange,
         Err(_) => return Ok(Some(None)),

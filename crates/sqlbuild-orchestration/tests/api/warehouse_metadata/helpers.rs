@@ -4,7 +4,7 @@ use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::platform::models::LocationWorkClient;
+use crate::platform::models::{LocationHealthReport, LocationWorkClient};
 use crate::store::main::decompress::decompress;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
@@ -479,6 +479,77 @@ pub(crate) async fn fingerprint_history(
             .status(),
         StatusCode::UNAUTHORIZED
     );
+    let health_url = format!(
+        "{}/health",
+        freshness_url
+            .split("/targets/")
+            .next()
+            .expect("location URL")
+    );
+    for failure in [None, Some("watermark"), Some("read"), Some("delivery")] {
+        let report: LocationHealthReport = serde_json::from_value(json!({
+            "event_id":Uuid::now_v7(), "session_id":session_id, "target":"development",
+            "health":{"kind":"warehouse_sync", "generation":1,
+                "location":{"database":null,"schema":"main"},"table":"fingerprints",
+                "failure":failure,"records_sent":17,"elapsed_millis":43},
+        }))
+        .expect("bounded sync health");
+        for applied in [true, false] {
+            assert_eq!(
+                outbound
+                    .report_health(&report)
+                    .await
+                    .expect("report health"),
+                applied
+            );
+        }
+        let observations: Vec<Value> = client
+            .get(&health_url)
+            .bearer_auth(bearer)
+            .send()
+            .await
+            .expect("health read")
+            .error_for_status()
+            .expect("authorized health")
+            .json()
+            .await
+            .expect("health observations");
+        assert_eq!(
+            observations
+                .iter()
+                .filter(|row| row["report"] == json!(report))
+                .count(),
+            1,
+            "exact retries preserve one historical health observation"
+        );
+        let mut invalid = json!(report);
+        invalid["event_id"] = json!(Uuid::now_v7());
+        invalid["health"]["generation"] = json!(2);
+        assert_eq!(
+            client
+                .post(&health_url)
+                .bearer_auth(bearer)
+                .json(&invalid)
+                .send()
+                .await
+                .expect("unpublished sync health")
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        invalid["health"]["generation"] = json!(1);
+        invalid["health"]["failure"] = json!("unbounded exception text");
+        assert_eq!(
+            client
+                .post(&health_url)
+                .bearer_auth(bearer)
+                .json(&invalid)
+                .send()
+                .await
+                .expect("closed failure vocabulary")
+                .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
 }
 
 async fn mirrored_fingerprints(store: &ControlStore) -> Vec<Value> {

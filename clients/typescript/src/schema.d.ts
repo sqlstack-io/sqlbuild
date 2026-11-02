@@ -713,6 +713,18 @@ export interface components {
             healthy: boolean;
             /** @enum {string} */
             kind: "connection";
+        } | {
+            /** Format: int64 */
+            elapsed_millis: number;
+            failure?: null | components["schemas"]["WarehouseSyncFailure"];
+            /** Format: int64 */
+            generation: number;
+            /** @enum {string} */
+            kind: "warehouse_sync";
+            location: components["schemas"]["WarehouseStateLocation"];
+            /** Format: int64 */
+            records_sent: number;
+            table: components["schemas"]["WarehouseHistoryKind"];
         };
         /** @description Receipt time belongs to the server; consumers derive freshness rather than storing availability. */
         LocationHealthObservation: {
@@ -1369,6 +1381,11 @@ export interface components {
             database?: string | null;
             schema: string;
         };
+        /**
+         * @description Closed failure stages keep warehouse errors and credentials out of health observations.
+         * @enum {string}
+         */
+        WarehouseSyncFailure: "watermark" | "read" | "delivery";
         WarehouseSyncResponse: {
             applied: boolean;
             next_reconciliation_after?: null | components["schemas"]["WarehouseReconciliationCursor"];

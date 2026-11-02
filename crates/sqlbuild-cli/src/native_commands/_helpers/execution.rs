@@ -21,6 +21,7 @@ use sqlbuild_orchestration::platform::main::run_platform_sink::run_platform_sink
 use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
+    WarehouseSyncFailure,
 };
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
@@ -32,8 +33,8 @@ use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    WarehouseHistoryPage, WarehouseReconciliationCursor, WarehouseStateLocation,
-    WarehouseSyncResponse,
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseReconciliationCursor,
+    WarehouseStateLocation, WarehouseSyncResponse,
 };
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
@@ -458,6 +459,41 @@ pub(crate) fn acknowledge_metadata_page(
         }
     }
     Ok(state)
+}
+
+/// Operational cost is elapsed IO time, not an estimate of warehouse billing.
+pub(crate) async fn metadata_health(
+    state: &LocationMetadataSync,
+    (client, poll): (&LocationWorkClient, &LocationWorkPoll),
+    (started, failure): (Instant, Option<WarehouseSyncFailure>),
+) {
+    let report = LocationHealthReport {
+        event_id: Uuid::now_v7(),
+        session_id: poll.session_id,
+        target: poll.target.clone(),
+        health: LocationHealth::WarehouseSync {
+            generation: state.generation,
+            location: state.locations[state.index / 2].clone(),
+            table: if state.index.is_multiple_of(2) {
+                WarehouseHistoryKind::Fingerprints
+            } else {
+                WarehouseHistoryKind::SourceFreshness
+            },
+            failure,
+            records_sent: state
+                .pending
+                .as_ref()
+                .and_then(|page| page.body["records"].as_array())
+                .map_or(0, Vec::len) as u64,
+            elapsed_millis: started.elapsed().as_millis() as u64,
+        },
+    };
+    if let Err(error) = client.report_health(&report).await {
+        drop(write_output(&[(
+            Stream::Stderr,
+            &format!("Warehouse synchronization health report failed: {error}\n"),
+        )]));
+    }
 }
 
 /// Health IO remains native even while a user-code child holds its interpreter's GIL.
