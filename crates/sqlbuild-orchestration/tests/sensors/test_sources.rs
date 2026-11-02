@@ -173,6 +173,8 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .await
                 .expect("pre-sensor predecessor");
             for sql in [
+                "DROP TABLE sqb_security_audit_deliveries",
+                "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
                 "DROP INDEX sqb_freshness_source_latest",
                 "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
                 "DELETE FROM recall_events WHERE producer='warehouse' AND event_type='warehouse_source_freshness'",

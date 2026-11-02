@@ -6,12 +6,12 @@ use axum::Router;
 use axum::routing::post;
 use uuid::Uuid;
 
-use crate::platform::_helpers::webhook_delivery::deliver_platform_events;
-use crate::platform::main::connect_platform_webhook::connect_platform_webhook;
-use crate::platform::main::run_platform_sink::run_platform_sink;
 use crate::platform::main::run_watchdog::run_watchdog;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
+use crate::webhooks::_helpers::delivery::deliver_webhook;
+use crate::webhooks::main::{connect_webhook::connect_webhook, run_webhook::run_webhook};
+use crate::webhooks::models::WebhookSource;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::tests::helpers::{
@@ -102,11 +102,12 @@ fn given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_s
                     })
                     .await
             });
-            let sink = connect_platform_webhook(&endpoint).expect("configure webhook");
+            let sink =
+                connect_webhook(&endpoint, WebhookSource::Platform).expect("configure webhook");
             let diagnostic = format!("{sink:?}");
             assert!(!diagnostic.contains("sample-password"));
             assert!(!diagnostic.contains("sample-token"));
-            assert!(deliver_platform_events(store, &sink).await.is_err());
+            assert!(deliver_webhook(store, &sink).await.is_err());
             assert_eq!(
                 state.lock().expect("receiver").requests.len(),
                 1,
@@ -122,15 +123,17 @@ fn given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_s
                 postgres_body: "RAISE EXCEPTION 'test receipt failure'",
             };
             install_fault(store, &fault).await;
-            assert!(deliver_platform_events(store, &sink).await.is_err());
+            assert!(deliver_webhook(store, &sink).await.is_err());
             remove_fault(store, &fault).await;
             let second = second_store(store).await;
-            let restarted = connect_platform_webhook(&endpoint).expect("restart webhook client");
+            let restarted = connect_webhook(&endpoint, WebhookSource::Platform)
+                .expect("restart webhook client");
             let (sink_stop, sink_shutdown) = tokio::sync::watch::channel(false);
             let sink_store = second.clone();
-            let dispatcher = tokio::spawn(async move {
-                run_platform_sink(&sink_store, restarted, sink_shutdown).await
-            });
+            let dispatcher =
+                tokio::spawn(
+                    async move { run_webhook(&sink_store, restarted, sink_shutdown).await },
+                );
             wait_for_webhook(&receiver, &dispatcher, test_case.expected_events + 2).await;
             sink_stop.send(true).expect("stop dispatcher");
             tokio::time::timeout(Duration::from_secs(2), dispatcher)
@@ -140,15 +143,13 @@ fn given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_s
                 .expect("dispatcher stopped");
             // Shutdown may cancel the last receipt after the remote endpoint accepted it.
             assert!(
-                deliver_platform_events(store, &sink)
+                deliver_webhook(store, &sink)
                     .await
                     .expect("reconcile in-flight delivery")
                     <= 1
             );
             assert_eq!(
-                deliver_platform_events(store, &sink)
-                    .await
-                    .expect("durable cursor"),
+                deliver_webhook(store, &sink).await.expect("durable cursor"),
                 0
             );
             {

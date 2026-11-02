@@ -1,7 +1,17 @@
 //! Real durable audit pages retain clock-independent order, live permissions and atomic writes.
 
+use axum::{
+    Json, Router,
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    routing::post,
+};
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU16, Ordering},
+};
 use uuid::Uuid;
 
 use crate::authorization::main::{
@@ -16,7 +26,7 @@ use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
     PrincipalKind, RoleAssignmentRequest,
 };
-use crate::credentials::tests::test_types::AuditTestCase;
+use crate::credentials::tests::test_types::{AuditTestCase, AuditWebhookReceiver};
 use crate::store::errors::ControlError;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
@@ -27,6 +37,9 @@ use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::webhooks::_helpers::delivery::deliver_webhook;
+use crate::webhooks::main::connect_webhook::connect_webhook;
+use crate::webhooks::models::WebhookSource;
 
 #[test]
 fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_and_atomicity_hold()
@@ -124,6 +137,8 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .await
                 .expect("predecessor");
             for sql in [
+                "DROP TABLE sqb_security_audit_deliveries",
+                "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
                 "DROP INDEX sqb_freshness_source_latest",
                 "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
                 "DROP INDEX recall_warehouse_sources",
@@ -377,6 +392,200 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 read_security_audit(&replica, (&context, ordinary_credentials), (0, 100)).await,
                 Err(ControlError::Denied { .. })
             ));
+            close_store(replica).await;
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_committed_security_facts_when_export_retries_then_only_successful_receipts_advance_commit_order()
+ {
+    let test_cases = [
+        AuditTestCase {
+            description: "SQLite durable audit export",
+            backend: Backend::Sqlite,
+            expected_page_length: 100,
+        },
+        AuditTestCase {
+            description: "PostgreSQL durable audit export",
+            backend: Backend::Postgres,
+            expected_page_length: 100,
+        },
+    ];
+    let scenario: Value = serde_json::from_str(
+        &std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../../benchmarks/duckshop/edge_cases/orchestration/security_audit_delivery.json",
+        ))
+        .expect("delivery fixture"),
+    )
+    .expect("delivery scenario");
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend).await.expect("database");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let context = AuditContext {
+                actor: "principal:orders-admin".into(),
+                granting_role: "admin".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: Some("127.0.0.1".parse().expect("peer")),
+            };
+            let mut expected = Vec::new();
+            let mut transaction = begin(store, TransactionMode::Write)
+                .await
+                .expect("audit action");
+            for index in 0..scenario["events"].as_i64().expect("count") {
+                // Deliberately decreasing event clocks must not change delivery order.
+                transaction.now = "2026-01-01T00:00:00Z"
+                    .parse::<DateTime<Utc>>()
+                    .expect("clock")
+                    - chrono::TimeDelta::seconds(index);
+                let id = Uuid::now_v7();
+                expected.push(json!({"storage_id":index+1,"event_id":id,"occurred_at":transaction.now,
+                    "actor":context.actor,"granting_role":context.granting_role,"request_id":context.request_id,
+                    "ip_address":"127.0.0.1","action":scenario["action"],"scope_json":scenario["scope"],
+                    "before_json":scenario["before"],"after_json":scenario["after"]}));
+                transaction = append_audit(
+                    transaction,
+                    &context,
+                    (id, scenario["action"].as_str().expect("action")),
+                    (
+                        scenario["scope"].clone(),
+                        scenario["before"].clone(),
+                        scenario["after"].clone(),
+                    ),
+                )
+                .await
+                .expect("append");
+            }
+            commit(transaction).await.expect("commit source actions");
+            let requests = Arc::new(Mutex::new(Vec::<Value>::new()));
+            let status = Arc::new(AtomicU16::new(503));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("listener");
+            let endpoint = format!(
+                "http://audit:sample-password@{}/audit?token=sample-token",
+                listener.local_addr().expect("address")
+            );
+            let app = Router::new()
+                .route(
+                    "/audit",
+                    post(
+                        |State(AuditWebhookReceiver { requests, status }): State<
+                            AuditWebhookReceiver,
+                        >,
+                         headers: HeaderMap,
+                         Json(event): Json<Value>| async move {
+                            assert_eq!(
+                                headers
+                                    .get("Idempotency-Key")
+                                    .expect("key")
+                                    .to_str()
+                                    .expect("text"),
+                                event["event_id"].as_str().expect("event id")
+                            );
+                            requests.lock().expect("requests").push(event);
+                            (
+                                StatusCode::from_u16(status.load(Ordering::SeqCst))
+                                    .expect("status"),
+                                [(axum::http::header::LOCATION, "/audit")],
+                            )
+                        },
+                    ),
+                )
+                .with_state(AuditWebhookReceiver {
+                    requests: requests.clone(),
+                    status: status.clone(),
+                });
+            let (stop, shutdown) = tokio::sync::oneshot::channel();
+            let server = tokio::spawn(async move {
+                axum::serve(listener, app)
+                    .with_graceful_shutdown(async {
+                        drop(shutdown.await);
+                    })
+                    .await
+            });
+            let sink =
+                connect_webhook(&endpoint, WebhookSource::SecurityAudit).expect("audit sink");
+            assert!(!format!("{sink:?}").contains("sample-password"));
+            assert!(deliver_webhook(store, &sink).await.is_err());
+            assert_eq!(
+                requests.lock().expect("requests").len(),
+                1,
+                "failure stops this page"
+            );
+            status.store(307, Ordering::SeqCst);
+            assert!(
+                deliver_webhook(store, &sink).await.is_err(),
+                "never redirect audit facts"
+            );
+            assert_eq!(requests.lock().expect("requests").len(), 2);
+            status.store(204, Ordering::SeqCst);
+            let fault = TransactionFault {
+                description: "lost security export acknowledgement",
+                table: "sqb_security_audit_deliveries",
+                operation: "INSERT",
+                condition: "",
+                sqlite_body: "SELECT RAISE(ABORT, 'test acknowledgement failure')",
+                postgres_body: "RAISE EXCEPTION 'test acknowledgement failure'",
+            };
+            install_fault(store, &fault).await;
+            assert!(deliver_webhook(store, &sink).await.is_err());
+            remove_fault(store, &fault).await;
+            let replica = second_store(store).await;
+            let restarted =
+                connect_webhook(&endpoint, WebhookSource::SecurityAudit).expect("restart");
+            assert_eq!(
+                deliver_webhook(&replica, &restarted)
+                    .await
+                    .expect("first bounded page"),
+                test_case.expected_page_length,
+                "{}",
+                test_case.description
+            );
+            assert_eq!(
+                deliver_webhook(&replica, &restarted)
+                    .await
+                    .expect("remaining page"),
+                5
+            );
+            assert_eq!(
+                deliver_webhook(&replica, &restarted)
+                    .await
+                    .expect("durable cursor"),
+                0
+            );
+            // Identical endpoint, independent platform stream: security cursor grants no authority.
+            let platform =
+                connect_webhook(&endpoint, WebhookSource::Platform).expect("platform sink");
+            assert_eq!(
+                deliver_webhook(&replica, &platform)
+                    .await
+                    .expect("independent cursor"),
+                0
+            );
+            {
+                let received = requests.lock().expect("requests");
+                assert_eq!(received.len(), expected.len() + 3);
+                assert_eq!(received[0], expected[0]);
+                assert_eq!(received[1], expected[0]);
+                assert_eq!(
+                    received[2], expected[0],
+                    "lost acknowledgement retains full identity"
+                );
+                assert_eq!(
+                    received[3..],
+                    expected,
+                    "every field survives; storage order beats clocks"
+                );
+            }
+            stop.send(()).expect("stop receiver");
+            server
+                .await
+                .expect("receiver task")
+                .expect("receiver stopped");
             close_store(replica).await;
             close_test_store(fixture).await;
         });

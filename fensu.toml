@@ -1578,9 +1578,9 @@ reason = "Browser transport models implement Debug manually to redact passwords 
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
-path = "crates/sqlbuild-orchestration/src/platform/models.rs"
-symbols = ["PlatformWebhook"]
-reason = "PlatformWebhook implements Debug manually to redact its endpoint, which may contain delivery credentials; other models derive Debug."
+path = "crates/sqlbuild-orchestration/src/webhooks/models.rs"
+symbols = ["Webhook"]
+reason = "Webhook implements Debug manually to redact its endpoint, which may contain delivery credentials; other models derive Debug."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"

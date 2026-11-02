@@ -15,9 +15,7 @@ use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, D
 use sqlbuild_orchestration::authorization::main::recover_administrator::recover_administrator;
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
-use sqlbuild_orchestration::platform::main::connect_platform_webhook::connect_platform_webhook;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::run_platform_sink::run_platform_sink;
 use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
@@ -36,6 +34,11 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryKind, WarehouseHistoryPage, WarehouseReconciliationCursor,
     WarehouseStateLocation, WarehouseSyncResponse,
 };
+use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
+use sqlbuild_orchestration::webhooks::main::{
+    connect_webhook::connect_webhook, run_webhook::run_webhook,
+};
+use sqlbuild_orchestration::webhooks::models::{Webhook, WebhookSource};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -176,6 +179,7 @@ fn development_location_role(
         .env("SQLBUILD_LOCATION_TOKEN", "local-development")
         .env_remove("SQLBUILD_CONTROL_DATABASE_URL")
         .env_remove("SQLBUILD_PLATFORM_WEBHOOK_URL")
+        .env_remove(SECURITY_AUDIT_WEBHOOK_VARIABLE)
         .env_remove("SQLBUILD_RUN_TOKEN")
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .stdin(Stdio::null())
@@ -759,15 +763,29 @@ pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
 ) -> Result<(), ControlError> {
-    let sink = match std::env::var(PLATFORM_WEBHOOK_VARIABLE) {
-        Ok(endpoint) => Some(connect_platform_webhook(&endpoint)?),
-        Err(std::env::VarError::NotPresent) => None,
-        Err(_) => {
-            return Err(ControlError::Invalid(
-                "platform webhook configuration must be UTF-8".into(),
-            ));
+    let mut sinks: Vec<(Webhook, &str)> = Vec::new();
+    for (variable, source, label) in [
+        (
+            PLATFORM_WEBHOOK_VARIABLE,
+            WebhookSource::Platform,
+            "Platform",
+        ),
+        (
+            SECURITY_AUDIT_WEBHOOK_VARIABLE,
+            WebhookSource::SecurityAudit,
+            "Security audit",
+        ),
+    ] {
+        match std::env::var(variable) {
+            Ok(endpoint) => sinks.push((connect_webhook(&endpoint, source)?, label)),
+            Err(std::env::VarError::NotPresent) => {}
+            Err(_) => {
+                return Err(ControlError::Invalid(format!(
+                    "{label} webhook configuration must be UTF-8"
+                )));
+            }
         }
-    };
+    }
     drop(write_output(&[(
         Stream::Stderr,
         "Starting platform watchdog...\n",
@@ -781,17 +799,17 @@ pub(crate) fn start_platform_roles(
         Stream::Stderr,
         "Platform watchdog started\n",
     )]));
-    if let Some(sink) = sink {
+    for (sink, label) in sinks {
         drop(write_output(&[(
             Stream::Stderr,
-            "Starting platform webhook...\n",
+            &format!("Starting {label} webhook...\n"),
         )]));
         let sink_store = store.clone();
         let sink_shutdown = shutdown.clone();
-        tasks.spawn(async move { run_platform_sink(&sink_store, sink, sink_shutdown).await });
+        tasks.spawn(async move { run_webhook(&sink_store, sink, sink_shutdown).await });
         drop(write_output(&[(
             Stream::Stderr,
-            "Platform webhook started\n",
+            &format!("{label} webhook started\n"),
         )]));
     }
     Ok(())
