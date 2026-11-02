@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -223,6 +224,85 @@ def test_given_packaged_services_when_redeployed_and_restarted_then_pinned_runs_
                 )[0]
                 == second
             )
+
+            stack.verify_control_store_restore(second)
         finally:
             (tmp_path / "platform-events.json").write_text(json.dumps(events, indent=2))
             stack.close()
+
+
+@pytest.mark.skipif(
+    os.environ.get("SQLBUILD_REQUIRE_COMPOSE_TESTS") != "1",
+    reason="Run make test-compose to build and test the packaged deployment",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ComposeDeploymentTestCase(
+            "Host-owned development source with isolated runtime writes", [[41]]
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_host_owned_source_when_using_the_development_overlay_then_reloaded_workers_can_write_runtime_outputs(
+    tmp_path: Path,
+    test_case: ComposeDeploymentTestCase,
+) -> None:
+    stack: ComposeStack = ComposeStack(tmp_path)
+    stack.environment["SQLBUILD_LOCATION_IMAGE"] = os.environ.get(
+        "SQLBUILD_TEST_LOCATION_IMAGE", "sqlbuild-location:test"
+    )
+    project: Path = tmp_path / "source"
+    shutil.copytree(Path("deploy/project"), project)
+    assert project.stat().st_uid != 10001
+    override: dict[str, Any] = json.loads(stack.override.read_text())
+    override["services"]["location"] = {
+        "volumes": [{"type": "bind", "source": str(project), "target": "/project"}]
+    }
+    stack.override.write_text(json.dumps(override))
+    stack.compose_files.insert(1, Path("deploy/compose.dev.yml").resolve())
+    try:
+        stack.register()
+        stack.compose("up", "-d", "--wait", "server")
+        stack.compose("up", "-d", "--no-deps", "location")
+        first: dict[str, Any] = stack.wait(
+            "SELECT snapshot_id FROM sqb_snapshots WHERE generation=1", timeout=60
+        )[0]
+        cases: dict[str, str] = json.loads(
+            Path(
+                "benchmarks/duckshop/edge_cases/orchestration/container_deployment.json"
+            ).read_text()
+        )
+        (project / "models/orders.sql").write_text(
+            "MODEL (description 'Example orders.', materialized table);\n" + cases["second"] + "\n"
+        )
+        second: dict[str, Any] = stack.wait(
+            "SELECT snapshot_id FROM sqb_snapshots WHERE generation=2", timeout=45
+        )[0]
+        assert second != first
+        stack.wait(
+            f"SELECT run_id FROM sqb_runs WHERE snapshot_id='{second['snapshot_id']}' "
+            "AND origin='schedule' AND status='success'",
+            timeout=100,
+        )
+        warehouse: str = stack.compose(
+            "exec",
+            "-T",
+            "location",
+            "python",
+            "-c",
+            "import duckdb,json; print(json.dumps(duckdb.connect('/warehouse/orders.duckdb',read_only=True).sql('SELECT order_id FROM orders').fetchall()))",
+        )
+        assert json.loads(warehouse) == test_case.expected_warehouse_rows
+        (project / "models/orders.sql").write_text(cases["broken"] + "\n")
+        stack.wait(
+            "SELECT event_id FROM recall_events WHERE event_type='location_health' "
+            "AND payload->'report'->'health'->>'kind'='compile_failed'",
+            timeout=45,
+        )
+        assert stack.query(
+            "SELECT snapshot_id FROM sqb_snapshots "
+            "JOIN sqb_current_snapshots USING(snapshot_id,location_id,target)"
+        ) == [second]
+    finally:
+        stack.close()

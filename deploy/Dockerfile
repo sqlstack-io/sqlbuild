@@ -4,7 +4,8 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 COPY dist/*.whl /wheels/
 RUN python -m pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels \
     && useradd --uid 10001 --create-home sqlbuild \
-    && mkdir /project /warehouse && chown sqlbuild:sqlbuild /project /warehouse
+    && mkdir -p /project/target /project/logs /warehouse \
+    && chown sqlbuild:sqlbuild /project /project/target /project/logs /warehouse
 ENV PYTHONUNBUFFERED=1
 WORKDIR /project
 USER 10001:10001
