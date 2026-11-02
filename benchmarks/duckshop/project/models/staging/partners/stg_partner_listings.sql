@@ -9,6 +9,8 @@ MODEL (
     commission_pct (type NUMBER(5, 2)),
     fulfilled_by_partner (type BOOLEAN),
     terms (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

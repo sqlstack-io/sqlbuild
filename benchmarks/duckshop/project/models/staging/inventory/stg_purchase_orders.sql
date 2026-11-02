@@ -10,6 +10,9 @@ MODEL (
     expected_at (type TIMESTAMP_TZ),
     received_at (type TIMESTAMP_TZ),
     line_count (type INT),
+    lines (type ARRAY),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

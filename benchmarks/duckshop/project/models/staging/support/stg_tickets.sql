@@ -17,6 +17,8 @@ MODEL (
     tag_list (type ARRAY),
     is_vip (type BOOLEAN),
     custom_fields (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
