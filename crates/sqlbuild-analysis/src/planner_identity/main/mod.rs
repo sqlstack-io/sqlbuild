@@ -5,7 +5,5 @@ pub mod function_fingerprint_sql;
 pub mod graph_write_identity_hashes;
 pub mod missing_upstream_message;
 pub mod missing_upstreams;
-pub mod model_local_identity_hash;
-pub mod stable_identity_hash;
 pub mod stale_upstream_warning_message;
 pub mod topological_order;

@@ -22,6 +22,7 @@ use crate::api::_helpers::resources::{
     person_operations::recent_runs,
     person_operations::catalog,
     person_operations::fingerprint,
+    person_operations::node_status,
     password_sessions::login,
     password_sessions::current,
     password_sessions::logout,

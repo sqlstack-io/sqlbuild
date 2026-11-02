@@ -195,6 +195,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/node-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonNodeStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -807,6 +823,22 @@ export interface components {
             /** @enum {string} */
             status: "timed_out";
         };
+        /** @description Local definition identity only, not upstream data or graph currency. */
+        DefinitionEvidence: {
+            local_hash: string;
+            /** @enum {string} */
+            status: "matched";
+        } | {
+            current_local_hash: string;
+            recorded_local_hash: string;
+            /** @enum {string} */
+            status: "changed";
+        } | {
+            current_local_hash?: string | null;
+            reason: string;
+            /** @enum {string} */
+            status: "unavailable";
+        };
         ExternalIdentityResponse: {
             csrf_token: string;
             /** Format: date-time */
@@ -1005,6 +1037,15 @@ export interface components {
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        NodeStatus: {
+            build?: null | components["schemas"]["FingerprintObservation"];
+            definition: components["schemas"]["DefinitionEvidence"];
+            node_key: string;
+            physical: components["schemas"]["PhysicalEvidence"];
+            /** Format: uuid */
+            snapshot_id: string;
+            source_data: components["schemas"]["SourceDataStatus"];
+        };
         OldNameViewsBatch: {
             /** Format: int64 */
             generation: number;
@@ -1072,6 +1113,16 @@ export interface components {
         PasswordSessionResponse: {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
+        };
+        /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
+        PhysicalEvidence: {
+            observation: components["schemas"]["CatalogObservation"];
+            /** @enum {string} */
+            status: "observed";
+        } | {
+            reason: string;
+            /** @enum {string} */
+            status: "unavailable";
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
@@ -1430,6 +1481,11 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
             target: string;
+        };
+        SourceDataStatus: {
+            reason: string;
+            /** @enum {string} */
+            status: "unknown";
         };
         /** @description A bounded page from one registered reader of a published location/target generation. */
         SourceFreshnessBatch: {
@@ -2233,6 +2289,53 @@ export interface operations {
                 };
             };
             /** @description Invalid node */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonNodeStatus: {
+        parameters: {
+            query: {
+                /** @description One exact published node key */
+                node_key: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["NodeStatus"];
+                };
+            };
+            /** @description Invalid node key */
             400: {
                 headers: {
                     [name: string]: unknown;

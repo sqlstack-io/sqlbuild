@@ -122,3 +122,16 @@ void client.GET("/api/control/locations/{location_id}/targets/{target}/fingerpri
 });
 // @ts-expect-error Build evidence does not contain SQL or arbitrary metadata.
 void ({} as components["schemas"]["FingerprintObservation"]).definition;
+void client.GET("/api/control/locations/{location_id}/targets/{target}/node-status", {
+  params: { path: { location_id: "orders-location", target: "development" },
+    query: { node_key: "model:orders" } },
+});
+const sourceData: components["schemas"]["SourceDataStatus"] = {
+  status: "unknown", reason: "consumed-input provenance is not recorded",
+};
+void sourceData;
+// @ts-expect-error Observation times cannot establish consumed-source currency.
+const inferredCurrency: components["schemas"]["SourceDataStatus"] = { status: "behind", reason: "newer observation" };
+void inferredCurrency;
+// @ts-expect-error Node status requires one exact published node.
+void client.GET("/api/control/locations/{location_id}/targets/{target}/node-status", { params: { path: { location_id: "orders-location", target: "development" } } });

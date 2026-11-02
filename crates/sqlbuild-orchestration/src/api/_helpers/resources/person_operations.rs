@@ -19,8 +19,10 @@ use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunReco
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
 use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
+use crate::warehouse_metadata::main::read_person_node_status::read_person_node_status;
 use crate::warehouse_metadata::models::{
-    CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery,
+    CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery, NodeStatus,
+    NodeStatusQuery,
 };
 
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
@@ -156,6 +158,29 @@ pub(crate) async fn fingerprint(
 ) -> Result<Json<Option<FingerprintObservation>>, ApiError> {
     Ok(Json(
         read_person_fingerprint(
+            &store,
+            (&context, session_credentials(&headers)),
+            (location_id, &target, &options),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/node-status", operation_id = "readPersonNodeStatus",
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("node_key" = String, Query, description = "One exact published node key")),
+    responses((status = 200, body = Option<NodeStatus>), (status = 400, description = "Invalid node key"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+pub(crate) async fn node_status(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<NodeStatusQuery>),
+    headers: HeaderMap,
+) -> Result<Json<Option<NodeStatus>>, ApiError> {
+    Ok(Json(
+        read_person_node_status(
             &store,
             (&context, session_credentials(&headers)),
             (location_id, &target, &options),

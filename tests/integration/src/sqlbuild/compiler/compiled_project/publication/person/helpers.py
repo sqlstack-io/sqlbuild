@@ -62,7 +62,12 @@ def person_read(api: SnapshotApi, path: str, *, session: tuple[str, str]) -> Any
 
 
 def wait_for_person_catalog(
-    api: SnapshotApi, session: tuple[str, str], process: Popen[bytes], log: Path
+    api: SnapshotApi,
+    session: tuple[str, str],
+    process: Popen[bytes],
+    log: Path,
+    *,
+    expected_definition_hash: str,
 ) -> None:
     """Wait for an actual worker-built relation through the scoped browser API, not store SQL."""
     path: str = f"/api/control/locations/{api.location_id}/targets/development/catalog?schema=main"
@@ -93,9 +98,9 @@ def wait_for_person_catalog(
         "?node_type=model&node_name=orders&schema=main&name=orders"
     )
     evidence: dict[str, Any] | None = person_read(api, fingerprint_path, session=session)
-    while evidence is None:
+    while evidence is None or evidence["definition_hash"] != expected_definition_hash:
         assert process.poll() is None, log.read_text()
-        assert time.monotonic() < deadline, log.read_text()
+        assert time.monotonic() < deadline, (evidence, log.read_text())
         time.sleep(0.05)
         evidence = person_read(api, fingerprint_path, session=session)
     assert set(evidence) == {
@@ -109,6 +114,19 @@ def wait_for_person_catalog(
     }
     assert all(evidence.values()), evidence
     assert person_read(api, fingerprint_path + "&database=unlisted", session=session) is None
+    status: dict[str, Any] = person_read(
+        api,
+        f"/api/control/locations/{api.location_id}/targets/development/node-status?node_key=model:orders",
+        session=session,
+    )
+    assert status["physical"]["status"] == "observed"
+    assert status["physical"]["observation"] == records["orders"]
+    assert status["definition"]["status"] == "matched", status
+    assert status["build"] == evidence
+    assert status["source_data"] == {
+        "status": "unknown",
+        "reason": "consumed-input provenance is not recorded",
+    }
 
 
 def verify_security_audit(

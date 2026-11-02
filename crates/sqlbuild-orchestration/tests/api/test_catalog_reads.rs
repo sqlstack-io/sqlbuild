@@ -174,7 +174,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             )
             .await
             .expect("scoped viewer");
-            crate::api::tests::fingerprint_reads_helpers::fingerprint_reads(
+            let reader_session = crate::api::tests::fingerprint_reads_helpers::fingerprint_reads(
                 store,
                 credentials,
                 (location, other),
@@ -288,6 +288,12 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 .await,
                 Err(ControlError::Invalid(_))
             ));
+            crate::api::tests::node_status_helpers::node_status_reads(
+                store,
+                credentials,
+                (location, reader_session),
+            )
+            .await;
             assignment.revoke = true;
             assign_builtin_role(
                 store,
@@ -297,6 +303,22 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             )
             .await
             .expect("revoke");
+            assert!(matches!(
+                crate::warehouse_metadata::main::read_person_node_status::read_person_node_status(
+                    store,
+                    credentials,
+                    (
+                        location,
+                        "development",
+                        &crate::warehouse_metadata::models::NodeStatusQuery {
+                            node_key: "model:orders".into()
+                        }
+                    ),
+                    DefaultRole::None,
+                )
+                .await,
+                Err(ControlError::Denied { .. })
+            ));
             let evidence = crate::warehouse_metadata::models::FingerprintQuery {
                 node_type: "model".into(),
                 node_name: "orders".into(),

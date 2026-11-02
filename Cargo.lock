@@ -3683,6 +3683,7 @@ name = "sqlbuild-core"
 version = "0.187.3"
 dependencies = [
  "regex",
+ "serde_json",
  "sha2 0.10.9",
 ]
 
@@ -3744,6 +3745,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sqlbuild-core",
  "sqlbuild-recall",
  "sqlbuild-state",
  "sqlx-core",

@@ -12,6 +12,7 @@ from uuid import uuid4
 import duckdb
 import pytest
 
+from sqlbuild._native import compute_query_hash
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     PersonJourneyTestCase,
     WorkerExecutionTestCase,
@@ -239,7 +240,15 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
                 str(worker.project / "warehouse.duckdb"), read_only=True
             ) as warehouse:
                 assert warehouse.sql(test_case.warehouse_query).fetchall() == [(41,)]
-            wait_for_person_catalog(worker.api, session, location, log)
+            wait_for_person_catalog(
+                worker.api,
+                session,
+                location,
+                log,
+                expected_definition_hash=compute_query_hash(
+                    query_sql=test_case.model_sql.replace("23", "41"), dialect="duckdb"
+                ),
+            )
         assignment["revoke"] = True
         assert person_request(
             worker.api, "/api/admin/roles", body=assignment, session=admin_session
