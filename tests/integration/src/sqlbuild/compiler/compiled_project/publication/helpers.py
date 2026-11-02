@@ -30,6 +30,12 @@ from sqlbuild._native import Fingerprint, write_fingerprint
 from sqlbuild.adapter.discovery.main.resolve_adapter import resolve_adapter
 from sqlbuild.executor.audit_results.main._write import write_audit_result_records
 from sqlbuild.executor.audit_results.models import AuditResultRecord
+from sqlbuild.executor.janitor_events.classes.janitor_event_writer import JanitorEventWriter
+from sqlbuild.executor.janitor_events.main.create_table_sql import (
+    build_janitor_events_create_table_sql,
+)
+from sqlbuild.executor.janitor_events.models import JanitorEventRecord
+from sqlbuild.executor.janitor_events.types import JanitorEventType
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     ClaimedWorker,
     ScheduledWorker,
@@ -137,6 +143,41 @@ def append_audit_history(adapter: Any, connection: Any, fixture: dict[str, Any])
         render_create_table_sql=adapter.render_create_audit_result_table_sql,
         render_create_index_sqls=adapter.render_create_audit_result_index_sqls,
     )
+
+
+def append_janitor_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real chunked archive/delete writes, including repeated write attempts."""
+    data: dict[str, Any] = fixture["record"].copy()
+    del data["state_database"]
+    del data["state_schema"]
+    for key in ("occurred_at", "archived_at"):
+        data[key] = datetime.fromisoformat(data[key])
+    data["event_type"] = JanitorEventType(data["event_type"])
+    record: JanitorEventRecord = JanitorEventRecord(**data)
+    records: list[JanitorEventRecord] = [
+        replace(record, event_id=f"event-{index:03}") for index in range(fixture["source_rows"])
+    ]
+    records[-1] = replace(
+        records[-1],
+        event_type=JanitorEventType.DELETE,
+        occurred_at=datetime.fromisoformat(fixture["later_time"]),
+    )
+    _ = adapter.execute(
+        connection=connection,
+        sql=build_janitor_events_create_table_sql(
+            database=None,
+            schema="main",
+            render_qualified_name=adapter.render_qualified_name,
+            render_framework_type=adapter.render_framework_type,
+        ),
+    )
+    writer: JanitorEventWriter = JanitorEventWriter(
+        execute=adapter.execute,
+        render_qualified_name=adapter.render_qualified_name,
+        run_id=record.run_id,
+    )
+    writer.write(connection=connection, records=tuple(records))
+    writer.write(connection=connection, records=(records[0],) * fixture["duplicate_rows"])
 
 
 def warehouse_history_page(

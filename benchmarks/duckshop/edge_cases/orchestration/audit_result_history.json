@@ -47,5 +47,14 @@
   "duplicate_rows": 105,
   "later_time": "2026-02-03T04:05:06.000001Z",
   "retained_result": "result-103",
+  "kind": "audit_results",
+  "source_key": "result_id",
+  "id_prefix": "result",
+  "page_lengths": [100, 100, 4],
+  "later_index": 100,
+  "later_record": {"occurred_at": "2026-02-03T04:05:06.000001Z"},
+  "last_record": {"result_id": "result-103"},
+  "record_overrides": {},
+  "source_count": 210,
   "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id"
 }

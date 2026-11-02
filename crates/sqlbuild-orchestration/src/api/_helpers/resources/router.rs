@@ -44,6 +44,10 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             post(warehouse_metadata::report_audit_results),
         )
         .route(
+            "/api/locations/{location_id}/targets/{target}/metadata/janitor-events",
+            post(warehouse_metadata::report_janitor_events),
+        )
+        .route(
             "/api/locations/{location_id}/targets/{target}/metadata/watermark",
             post(warehouse_metadata::watermark),
         )

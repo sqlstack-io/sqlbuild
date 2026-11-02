@@ -10,8 +10,8 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    AuditResultsBatch, FingerprintBatch, JanitorEventsBatch, SourceFreshnessBatch,
+    WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -49,6 +49,14 @@ impl LocationWorkClient {
         batch: &AuditResultsBatch,
     ) -> Result<WarehouseSyncResponse, ClientError> {
         self.sync_metadata((target, "audit-results"), batch).await
+    }
+
+    pub async fn sync_janitor_events(
+        &self,
+        target: &str,
+        batch: &JanitorEventsBatch,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.sync_metadata((target, "janitor-events"), batch).await
     }
 
     /// Metadata shares the location's scoped pool, not the scheduler's execution authority.

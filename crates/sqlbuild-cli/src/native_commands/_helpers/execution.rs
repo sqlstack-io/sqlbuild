@@ -424,6 +424,15 @@ pub(crate) async fn deliver_metadata_page(
                 )
                 .await
         }
+        WarehouseHistoryKind::JanitorEvents => {
+            client
+                .sync_janitor_events(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid janitor events batch"))?,
+                )
+                .await
+        }
     }
 }
 

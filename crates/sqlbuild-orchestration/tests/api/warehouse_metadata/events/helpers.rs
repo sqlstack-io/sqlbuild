@@ -1,4 +1,4 @@
-//! External audit facts retain their identities, physical scopes and atomic replay semantics.
+//! Warehouse events retain their identities, physical scopes and atomic replay semantics.
 
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
@@ -11,42 +11,45 @@ use crate::store::main::{
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
-use crate::warehouse_metadata::models::{AuditResultsBatch, WarehouseWatermarkRead};
+use crate::warehouse_metadata::models::{
+    WarehouseHistoryKind, WarehouseSyncResponse, WarehouseWatermarkRead,
+};
 
-pub(crate) async fn audit_history(
+pub(crate) async fn event_history(
     store: &ControlStore,
     outbound: &LocationWorkClient,
     (session_id, preview_session): (Uuid, Uuid),
-    (client, freshness_url, bearer): (&Client, &str, &str),
+    (client, freshness_url, bearer, (kind, fixture_name, source_key)): (
+        &Client,
+        &str,
+        &str,
+        (WarehouseHistoryKind, &str, &str),
+    ),
 ) {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/duckshop/edge_cases/orchestration/audit_result_history.json");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../benchmarks/duckshop/edge_cases/orchestration/{fixture_name}.json"
+    ));
     let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path).expect("fixture"))
-        .expect("audit history");
+        .expect("event history");
     let record = fixture["record"].clone();
     let batch = json!({"session_id": session_id, "generation": 1, "records": [record, record]});
-    let typed: AuditResultsBatch = serde_json::from_value(batch.clone()).expect("audit batch");
+    let url = freshness_url.replace("source-freshness", &kind.as_str().replace('_', "-"));
     for expected in [true, false] {
         assert_eq!(
-            outbound
-                .sync_audit_results("development", &typed)
-                .await
-                .expect("sync")
-                .applied,
+            sync_events((client, &url, bearer), &batch).await.applied,
             expected
         );
     }
-    let before = mirrored_audits(store).await;
+    let before = mirrored_events(store, kind).await;
     assert_eq!(
         before.len(),
         1,
-        "duplicate deterministic result IDs deduplicate"
+        "duplicate deterministic event identities deduplicate"
     );
     assert_eq!(
         before[0]["record_json"], record,
-        "empty external run ID and warehouse text survive"
+        "external run IDs, text and timestamps survive"
     );
-    let url = freshness_url.replace("source-freshness", "audit-results");
     for (field, value, status) in [
         ("generation", json!(2), StatusCode::CONFLICT),
         (
@@ -102,29 +105,22 @@ pub(crate) async fn audit_history(
     scoped["state_schema"] = json!("reporting");
     let mut database = record.clone();
     database["state_database"] = json!("analytics");
-    let scopes: AuditResultsBatch = serde_json::from_value(json!({"session_id":session_id,
-        "generation":1, "records":[scoped,database]}))
-    .expect("physical scopes");
+    let scopes = json!({"session_id":session_id,
+        "generation":1, "records":[scoped,database]});
+    assert!(sync_events((client, &url, bearer), &scopes).await.applied);
+    let preview = json!({"session_id":preview_session,
+        "generation":1, "records":[record]});
     assert!(
-        outbound
-            .sync_audit_results("development", &scopes)
-            .await
-            .expect("scope")
-            .applied
+        sync_events(
+            (client, &url.replace("/development/", "/preview/"), bearer),
+            &preview
+        )
+        .await
+        .applied
     );
-    let preview: AuditResultsBatch = serde_json::from_value(json!({"session_id":preview_session,
-        "generation":1, "records":[record]}))
-    .expect("preview");
-    assert!(
-        outbound
-            .sync_audit_results("preview", &preview)
-            .await
-            .expect("target scope")
-            .applied
-    );
-    assert_eq!(mirrored_audits(store).await.len(), 4);
+    assert_eq!(mirrored_events(store, kind).await.len(), 4);
     let watermark: WarehouseWatermarkRead = serde_json::from_value(json!({"session_id":session_id,
-        "generation":1,"kind":"audit_results","location":{"database":null,"schema":"main"}}))
+        "generation":1,"kind":kind,"location":{"database":null,"schema":"main"}}))
     .expect("watermark");
     assert_eq!(
         json!(
@@ -136,18 +132,18 @@ pub(crate) async fn audit_history(
         record["occurred_at"]
     );
     let fault = TransactionFault {
-        description: "audit page rolls back atomically",
-        table: "sqb_warehouse_audit_results",
+        description: "event page rolls back atomically",
+        table: kind.mirror_table(),
         operation: "INSERT",
         condition: "WHEN NEW.source_event_id='rejected-result'",
         sqlite_body: "SELECT RAISE(ABORT, 'injected audit failure')",
         postgres_body: "RAISE EXCEPTION 'injected audit failure'",
     };
-    let before = mirrored_audits(store).await;
+    let before = mirrored_events(store, kind).await;
     let mut first = record.clone();
-    first["result_id"] = json!("accepted-result");
+    first[source_key] = json!("accepted-result");
     let mut second = record.clone();
-    second["result_id"] = json!("rejected-result");
+    second[source_key] = json!("rejected-result");
     let additional = json!({"session_id":session_id,"generation":1,"records":[first,second]});
     install_fault(store, &fault).await;
     assert_eq!(
@@ -163,46 +159,35 @@ pub(crate) async fn audit_history(
     );
     remove_fault(store, &fault).await;
     assert_eq!(
-        mirrored_audits(store).await,
+        mirrored_events(store, kind).await,
         before,
         "no partial page survives"
     );
     let (transaction, _) = query(
         begin(store, TransactionMode::Write).await.expect("write"),
-        "DELETE FROM sqb_warehouse_audit_results",
+        &format!("DELETE FROM {}", kind.mirror_table()),
         vec![],
     )
     .await
     .expect("empty mirror");
     commit(transaction).await.expect("wipe");
+    assert!(sync_events((client, &url, bearer), &batch).await.applied);
+    assert!(sync_events((client, &url, bearer), &scopes).await.applied);
     assert!(
-        outbound
-            .sync_audit_results("development", &typed)
-            .await
-            .expect("rebuild")
-            .applied
-    );
-    assert!(
-        outbound
-            .sync_audit_results("development", &scopes)
-            .await
-            .expect("rebuild scopes")
-            .applied
-    );
-    assert!(
-        outbound
-            .sync_audit_results("preview", &preview)
-            .await
-            .expect("rebuild target")
-            .applied
+        sync_events(
+            (client, &url.replace("/development/", "/preview/"), bearer),
+            &preview
+        )
+        .await
+        .applied
     );
     assert_eq!(
-        mirrored_audits(store).await,
+        mirrored_events(store, kind).await,
         before,
         "identical facts after rebuild"
     );
     migrate_store(store).await.expect("warm migration");
-    assert_eq!(mirrored_audits(store).await, before);
+    assert_eq!(mirrored_events(store, kind).await, before);
     assert_eq!(
         client
             .post(&url)
@@ -218,14 +203,35 @@ pub(crate) async fn audit_history(
     );
 }
 
-async fn mirrored_audits(store: &ControlStore) -> Vec<Value> {
+async fn mirrored_events(store: &ControlStore, kind: WarehouseHistoryKind) -> Vec<Value> {
     let (transaction, rows) = query(
         begin(store, TransactionMode::Read).await.expect("read"),
-        "SELECT event_id,target,record_json FROM sqb_warehouse_audit_results ORDER BY event_id",
+        &format!(
+            "SELECT event_id,target,record_json FROM {} ORDER BY event_id",
+            kind.mirror_table()
+        ),
         vec![],
     )
     .await
     .expect("mirror");
     commit(transaction).await.expect("close read");
     rows.into_iter().map(|row| json!(row)).collect()
+}
+
+async fn sync_events(
+    (client, url, bearer): (&Client, &str, &str),
+    batch: &Value,
+) -> WarehouseSyncResponse {
+    client
+        .post(url)
+        .bearer_auth(bearer)
+        .json(batch)
+        .send()
+        .await
+        .expect("event sync")
+        .error_for_status()
+        .expect("accepted page")
+        .json()
+        .await
+        .expect("sync response")
 }

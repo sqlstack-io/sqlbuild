@@ -38,8 +38,8 @@ mod test_types;
 mod test_warehouse_metadata;
 #[path = "test_worker.rs"]
 mod test_worker;
-#[path = "warehouse_metadata/audit_results/helpers.rs"]
-mod warehouse_audit_results_helpers;
+#[path = "warehouse_metadata/events/helpers.rs"]
+mod warehouse_events_helpers;
 #[path = "warehouse_metadata/helpers.rs"]
 mod warehouse_metadata_helpers;
 #[path = "warehouse_metadata/reconciliation/helpers.rs"]

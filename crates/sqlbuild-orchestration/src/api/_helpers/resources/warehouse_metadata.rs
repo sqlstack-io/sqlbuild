@@ -10,11 +10,12 @@ use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
 use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
+use crate::warehouse_metadata::main::ingest_janitor_events::ingest_janitor_events;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::main::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, FingerprintBatch, SourceFreshnessBatch, WarehouseSyncResponse,
-    WarehouseWatermarkRead,
+    AuditResultsBatch, FingerprintBatch, JanitorEventsBatch, SourceFreshnessBatch,
+    WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/watermark",
@@ -84,5 +85,22 @@ pub(crate) async fn report_audit_results(
     require_location(&identity, location_id)?;
     Ok(Json(
         ingest_audit_results(&store, (location_id, &target), &batch).await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/janitor-events",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = JanitorEventsBatch,
+    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
+    security(("bearer" = [])))]
+pub(crate) async fn report_janitor_events(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(batch): Json<JanitorEventsBatch>,
+) -> Result<Json<WarehouseSyncResponse>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        ingest_janitor_events(&store, (location_id, &target), &batch).await?,
     ))
 }

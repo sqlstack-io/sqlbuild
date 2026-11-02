@@ -307,6 +307,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/janitor-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_janitor_events"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/source-freshness": {
         parameters: {
             query?: never;
@@ -708,6 +724,14 @@ export interface components {
             /** @description Tables whose insert failed, so their rows were not written, and the first failure. */
             failed: components["schemas"]["Table"][];
             failure?: string | null;
+        };
+        JanitorEventsBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseJanitorRecord"][];
+            /** Format: uuid */
+            session_id: string;
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
@@ -1431,7 +1455,28 @@ export interface components {
          * @description Only immutable history tables support a timestamp watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events";
+        /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
+        WarehouseJanitorRecord: {
+            archive_name: string;
+            archive_qualified_name: string;
+            /** Format: date-time */
+            archived_at: string;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            occurred_at: string;
+            original_name?: string | null;
+            original_qualified_name?: string | null;
+            relation_database?: string | null;
+            relation_schema: string;
+            relation_type?: string | null;
+            run_id: string;
+            /** Format: int64 */
+            schema_version: number;
+            state_database?: string | null;
+            state_schema: string;
+        };
         WarehouseReconciliationCursor: {
             /** Format: uuid */
             event_id: string;
@@ -2213,6 +2258,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["FingerprintBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_janitor_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JanitorEventsBatch"];
             };
         };
         responses: {
