@@ -174,6 +174,12 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             )
             .await
             .expect("scoped viewer");
+            crate::api::tests::fingerprint_reads_helpers::fingerprint_reads(
+                store,
+                credentials,
+                (location, other),
+            )
+            .await;
             let mut actual = Vec::new();
             for _ in 0..2 {
                 let page = read_person_catalog(
@@ -291,6 +297,23 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             )
             .await
             .expect("revoke");
+            let evidence = crate::warehouse_metadata::models::FingerprintQuery {
+                node_type: "model".into(),
+                node_name: "orders".into(),
+                database: None,
+                schema: Some("main".into()),
+                name: Some("orders".into()),
+            };
+            assert!(matches!(
+                crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint(
+                    store,
+                    credentials,
+                    (location, "development", &evidence),
+                    DefaultRole::None,
+                )
+                .await,
+                Err(ControlError::Denied { .. })
+            ));
             assert!(
                 matches!(
                     read_person_catalog(

@@ -548,3 +548,26 @@ pub struct CatalogPage {
     pub records: Vec<CatalogObservation>,
     pub next_after: Option<WarehouseReconciliationCursor>,
 }
+
+/// Exact node and physical destination, not a selector; omitted namespace values match SQL NULL.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FingerprintQuery {
+    pub node_type: String,
+    pub node_name: String,
+    pub database: Option<String>,
+    pub schema: Option<String>,
+    pub name: Option<String>,
+}
+
+/// Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FingerprintObservation {
+    pub event_id: Uuid,
+    pub observed_at: DateTime<Utc>,
+    pub source_event_id: String,
+    pub run_id: String,
+    pub definition_hash: String,
+    pub version_hash: String,
+    pub schema_fingerprint: String,
+}

@@ -79,11 +79,13 @@ pub async fn ingest_fingerprints(
             .await?;
             let inserted;
             (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_warehouse_fingerprints (event_id,location_id,target,source_event_id,observed_at,definition_text_hash,record_json,received_at,state_database,state_schema) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
+            "INSERT INTO sqb_warehouse_fingerprints (event_id,location_id,target,source_event_id,observed_at,definition_text_hash,record_json,received_at,state_database,state_schema,node_type,node_name,target_database,target_schema,target_name) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
             vec![Parameter::Id(event_id), Parameter::Id(location_id), Parameter::Text(target.into()),
                 Parameter::Text(source_event_id), Parameter::Time(record.ts), Parameter::Text(definition_text_hash),
-                Parameter::Json(record_json), Parameter::Time(received_at), Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone())]).await?;
+                Parameter::Json(record_json), Parameter::Time(received_at), Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone()),
+                Parameter::Text(record.node_type.clone()), Parameter::Text(record.node_name.clone()), Parameter::OptionalText(record.target_database.clone()),
+                Parameter::OptionalText(record.target_schema.clone()), Parameter::OptionalText(record.target_name.clone())]).await?;
             applied |= !inserted.is_empty();
         }
     }

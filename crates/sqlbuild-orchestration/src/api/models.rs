@@ -21,6 +21,7 @@ use crate::api::_helpers::resources::{
     person_operations::change_trigger,
     person_operations::recent_runs,
     person_operations::catalog,
+    person_operations::fingerprint,
     password_sessions::login,
     password_sessions::current,
     password_sessions::logout,

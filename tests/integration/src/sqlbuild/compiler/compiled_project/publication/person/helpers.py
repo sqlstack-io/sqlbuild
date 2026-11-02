@@ -88,6 +88,27 @@ def wait_for_person_catalog(
         "records": [],
         "next_after": None,
     }
+    fingerprint_path: str = (
+        f"/api/control/locations/{api.location_id}/targets/development/fingerprint"
+        "?node_type=model&node_name=orders&schema=main&name=orders"
+    )
+    evidence: dict[str, Any] | None = person_read(api, fingerprint_path, session=session)
+    while evidence is None:
+        assert process.poll() is None, log.read_text()
+        assert time.monotonic() < deadline, log.read_text()
+        time.sleep(0.05)
+        evidence = person_read(api, fingerprint_path, session=session)
+    assert set(evidence) == {
+        "event_id",
+        "observed_at",
+        "source_event_id",
+        "run_id",
+        "definition_hash",
+        "version_hash",
+        "schema_fingerprint",
+    }
+    assert all(evidence.values()), evidence
+    assert person_read(api, fingerprint_path + "&database=unlisted", session=session) is None
 
 
 def verify_security_audit(

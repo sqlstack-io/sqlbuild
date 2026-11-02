@@ -169,6 +169,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                         .applied
                 );
             }
+            crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor(store).await;
             let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("pre-sensor predecessor");

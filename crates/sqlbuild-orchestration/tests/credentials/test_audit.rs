@@ -133,6 +133,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .map(|event| (event.occurred_at, event.event_id))
                 .collect::<Vec<_>>();
             expected.sort();
+            crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor(store).await;
             let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("predecessor");

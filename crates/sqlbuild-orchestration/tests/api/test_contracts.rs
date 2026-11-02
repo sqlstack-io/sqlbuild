@@ -2,6 +2,8 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "fingerprint_reads/helpers.rs"]
+mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
 #[path = "oidc/helpers.rs"]

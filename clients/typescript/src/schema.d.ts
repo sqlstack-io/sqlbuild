@@ -179,6 +179,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/fingerprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonFingerprint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -808,6 +824,18 @@ export interface components {
             records: components["schemas"]["WarehouseFingerprintRecord"][];
             /** Format: uuid */
             session_id: string;
+        };
+        /** @description Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence. */
+        FingerprintObservation: {
+            definition_hash: string;
+            /** Format: uuid */
+            event_id: string;
+            /** Format: date-time */
+            observed_at: string;
+            run_id: string;
+            schema_fingerprint: string;
+            source_event_id: string;
+            version_hash: string;
         };
         HeartbeatResponse: {
             cancel_requested: boolean;
@@ -2152,6 +2180,59 @@ export interface operations {
                 };
             };
             /** @description Invalid namespace or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonFingerprint: {
+        parameters: {
+            query: {
+                node_type: string;
+                node_name: string;
+                /** @description Exact destination database; omitted matches SQL NULL */
+                database?: string;
+                /** @description Exact destination schema; omitted matches SQL NULL */
+                schema?: string;
+                /** @description Exact destination name; omitted matches SQL NULL */
+                name?: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["FingerprintObservation"];
+                };
+            };
+            /** @description Invalid node */
             400: {
                 headers: {
                     [name: string]: unknown;
