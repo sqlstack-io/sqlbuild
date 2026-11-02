@@ -14,6 +14,10 @@ MODEL (
     utm_campaign (type VARCHAR),
     device_type (type VARCHAR),
     item_count_hint (type INT),
+    shipping_address_id (type VARCHAR),
+    attributes (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

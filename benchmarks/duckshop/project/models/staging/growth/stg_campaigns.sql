@@ -12,6 +12,8 @@ MODEL (
     target_regions (type ARRAY),
     target_age_min (type INT),
     target_age_max (type INT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
