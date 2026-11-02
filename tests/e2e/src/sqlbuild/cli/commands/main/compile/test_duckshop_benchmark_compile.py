@@ -14,6 +14,7 @@ import pytest
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     BenchmarkCoreCopyCompileTestCase,
     BenchmarkProjectCompileTestCase,
+    BenchmarkProjectTestPlanTestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import REPO_ROOT, run_sqb
 
@@ -66,6 +67,40 @@ def test_given_benchmark_project_when_compiling_then_reports_no_errors_or_warnin
 @pytest.mark.parametrize(
     "test_case",
     [
+        BenchmarkProjectTestPlanTestCase(
+            description="duckshop",
+            project_dir=REPO_ROOT / "benchmarks" / "duckshop" / "project",
+            expected_final_line_prefix="Test plan inspection complete: ",
+            expected_final_line_suffix=" selected, 0 errors.",
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_benchmark_project_when_inspecting_test_plan_then_every_unit_test_plans(
+    test_case: BenchmarkProjectTestPlanTestCase, tmp_path: Path
+) -> None:
+    """Mock fixtures are checked against declared columns only when tests are planned."""
+    project_dir: Path = tmp_path / test_case.description
+    shutil.copytree(
+        test_case.project_dir,
+        project_dir,
+        ignore=shutil.ignore_patterns(*_LOCAL_ONLY_PATHS),
+    )
+
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "test", "--inspect"),
+        project_dir=project_dir,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    final_line: str = result.stdout.strip().splitlines()[-1]
+    assert final_line.startswith(test_case.expected_final_line_prefix), result.stdout
+    assert final_line.endswith(test_case.expected_final_line_suffix), result.stdout
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         BenchmarkCoreCopyCompileTestCase(
             description="duckshop_core",
             copy_script=REPO_ROOT / "benchmarks" / "duckshop" / "scripts" / "core_project.py",
@@ -73,7 +108,7 @@ def test_given_benchmark_project_when_compiling_then_reports_no_errors_or_warnin
             expected_errors=0,
             expected_warnings=0,
             expected_compiled_checksum=(
-                "1ff1d0955ea3839b3c969707fd47ca9a4d7d7216753759d23911836f6ea5879d"
+                "7661e2ad98b33b8230c9df9c6c780e959cb7e18398b14a2cef36e12d19bd0bb6"
             ),
         )
     ],

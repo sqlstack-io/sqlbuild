@@ -162,6 +162,10 @@ earlier ones:
   same results on every run: added SKUs are sorted, the weekday average utilisation is an exact
   decimal sum over a count, the busiest slot of equally busy ones is the earliest, and the top
   exception code of equally frequent ones is the first in alphabetical order.
+- The mocks of `stg_wishlist_items`, `stg_purchase_order_lines` and `int_loyalty_tier_changes` in
+  three unit tests list their columns in the models' declared order, which unit-test planning
+  requires for a `SELECT *` reader. Only compiled tests change; compiled models are the same, so
+  model benchmarks stay comparable.
 
 ## Status
 
