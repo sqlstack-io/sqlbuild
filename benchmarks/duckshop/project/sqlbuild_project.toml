@@ -316,6 +316,22 @@ Snowflake gives them.
 """
 
 [[rules.rule_ignores]]
+rules = ["SQLCLEAN040"]
+paths = ["models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
+reason = """
+The edge case joins the group list with a comma after an explicit join on purpose, and Rules read
+the comma-joined relation as part of the preceding ON condition.
+"""
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN033"]
+paths = ["models/intermediate/edge_cases/int_edge_sku_text_reads.sql"]
+reason = """
+The edge case attaches a comment to a text literal on purpose, the shape that parsers keep as an
+annotated expression.
+"""
+
+[[rules.rule_ignores]]
 rules = ["SQLCLEAN027", "SQLCLEAN028"]
 paths = ["models/intermediate/edge_cases/int_edge_category_walk.sql"]
 reason = """
