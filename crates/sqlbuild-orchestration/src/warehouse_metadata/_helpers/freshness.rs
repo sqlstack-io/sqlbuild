@@ -28,7 +28,9 @@ pub(crate) fn validate_batch(batch: &SourceFreshnessBatch) -> Result<(), Control
         batch.records.iter().any(|record| {
             record.state_database != page.state_database
                 || record.state_schema != page.state_schema
-                || record.observed_at.date_naive() != page.day
+                || page
+                    .day
+                    .is_some_and(|day| record.observed_at.date_naive() != day)
         })
     });
     validate_fields(

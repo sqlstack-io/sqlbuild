@@ -1296,12 +1296,12 @@ export interface components {
             /** Format: date-time */
             observed_at: string;
         };
-        /** @description A complete, ordered key-set scan of one physical state table and UTC observation day. */
+        /** @description A complete, ordered key-set scan of one physical state table, optionally one UTC day. */
         WarehouseReconciliationPage: {
             after?: null | components["schemas"]["WarehouseReconciliationCursor"];
             complete: boolean;
             /** Format: date */
-            day: string;
+            day?: string | null;
             /** Format: int32 */
             page: number;
             /** Format: uuid */

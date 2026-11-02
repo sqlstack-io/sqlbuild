@@ -1,0 +1,6 @@
+{
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 17 AS amount\n",
+  "wide_fingerprint_count": 104,
+  "wide_definition_bytes": 700000,
+  "lifecycle": ["initial import", "empty mirror resync", "warehouse retention reconciliation"]
+}

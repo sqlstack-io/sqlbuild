@@ -50,6 +50,7 @@ pub struct SourceFreshnessRead {
     pub after: Option<[Option<String>; 11]>,
     /// Inclusive time bound, held fixed across pages; independent of the row-key cursor.
     pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
 }
 
 /// Fingerprints remain history here; latest-row selection belongs to the existing planner reader.
@@ -84,7 +85,7 @@ pub struct FingerprintBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
-/// A complete, ordered key-set scan of one physical state table and UTC observation day.
+/// A complete, ordered key-set scan of one physical state table, optionally one UTC day.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WarehouseReconciliationPage {
@@ -92,7 +93,7 @@ pub struct WarehouseReconciliationPage {
     pub page: u32,
     pub state_database: Option<String>,
     pub state_schema: String,
-    pub day: NaiveDate,
+    pub day: Option<NaiveDate>,
     pub complete: bool,
     /// Repeat the identical final page with this mirror cursor until the response has none.
     pub after: Option<WarehouseReconciliationCursor>,
@@ -118,6 +119,7 @@ pub struct FingerprintRead {
     pub location: WarehouseStateLocation,
     pub after: Option<[Option<String>; 13]>,
     pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
 }
 
 /// The private interpreter accepts only these two known state tables, never arbitrary SQL.

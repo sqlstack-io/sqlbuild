@@ -99,11 +99,12 @@ fn read_page(
     request: &WarehouseHistoryRead,
 ) -> PyResult<WarehouseHistoryPage> {
     let freshness_columns = SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name);
-    let (location, after, since, table, columns, timestamp) = match request {
+    let (location, after, since, limit, table, columns, timestamp) = match request {
         WarehouseHistoryRead::SourceFreshness(read) => (
             &read.location,
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
+            read.limit,
             SOURCE_FRESHNESS_TABLE_NAME,
             freshness_columns.as_slice(),
             OBSERVED_AT_COLUMN,
@@ -112,11 +113,18 @@ fn read_page(
             &read.location,
             read.after.as_ref().map(|cursor| cursor.as_slice()),
             read.observed_since,
+            read.limit,
             FINGERPRINT_TABLE_NAME,
             FINGERPRINT_COLUMNS.as_slice(),
             COLUMN_TIMESTAMP,
         ),
     };
+    let limit = limit.unwrap_or(MAX_HISTORY_RECORDS);
+    if limit == 0 || limit > MAX_HISTORY_RECORDS {
+        return Err(PyValueError::new_err(
+            "metadata page limit is outside the supported bounds",
+        ));
+    }
     let database = location.database.as_ref().map_or_else(
         || py.None().into_bound(py),
         |value| PyString::new(py, value).into_any(),
@@ -206,7 +214,7 @@ fn read_page(
             observed_since: observed_since.as_deref(),
             adapter: &adapter_name,
             has_event_id,
-            limit: MAX_HISTORY_RECORDS,
+            limit,
         },
     )
     .map_err(PyValueError::new_err)?;
@@ -217,7 +225,7 @@ fn read_page(
             ("sql", PyString::new(py, &sql).into_any()),
             (
                 "limit",
-                pyo3::IntoPyObjectExt::into_bound_py_any(MAX_HISTORY_RECORDS, py)?,
+                pyo3::IntoPyObjectExt::into_bound_py_any(limit, py)?,
             ),
         ],
     )?;
@@ -246,7 +254,7 @@ fn read_page(
         }
         next_after = Some(cursor);
     }
-    if read_count < MAX_HISTORY_RECORDS {
+    if read_count < limit {
         next_after = None;
     }
     Ok(WarehouseHistoryPage {

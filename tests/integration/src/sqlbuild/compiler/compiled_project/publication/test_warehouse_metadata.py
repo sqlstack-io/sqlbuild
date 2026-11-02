@@ -1,8 +1,13 @@
 """Real warehouse writers, populated predecessors and the isolated read-only history protocol."""
 
+import base64
+import gzip
 import hashlib
 import json
+import os
 import sqlite3
+import sys
+import time
 from contextlib import closing
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -31,6 +36,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
     TYPE_PROOF_FILES,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
+    AutomaticHistoryTestCase,
     CatalogConnectionTestCase,
     FingerprintHistoryTestCase,
     WarehouseHistoryTestCase,
@@ -38,9 +44,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_contended_fingerprints,
     append_retried_fingerprints,
+    location_process,
     open_legacy_warehouse,
     snapshot_api,
     sync_warehouse_history,
+    wait_for_generation,
     warehouse_history_page,
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
@@ -459,6 +467,143 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
                 "sync does not mutate warehouse state"
             )
     assert not (project / ".sqlbuild/control.sqlite3").exists()
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AutomaticHistoryTestCase("DuckDB automatic history", "duckdb", "database", "legacy-run"),
+        AutomaticHistoryTestCase("SQLite automatic history", "sqlite", "path", "legacy-run"),
+        AutomaticHistoryTestCase(
+            "SQLite wide history pages",
+            "sqlite",
+            "path",
+            "legacy-run",
+            wide=True,
+            initial_seconds=30,
+            expected_average_bytes=640_000,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_served_location_when_warehouse_history_changes_then_periodic_read_only_sync_reconciles_without_manual_requests(
+    test_case: AutomaticHistoryTestCase, tmp_path: Path
+) -> None:
+    project: Path = tmp_path / "project"
+    fixture: dict[str, Any] = json.loads(
+        Path(
+            "benchmarks/duckshop/edge_cases/orchestration/automatic_warehouse_history.json"
+        ).read_text()
+    )
+    adapter: Any
+    connection: Any
+    adapter, connection = open_legacy_warehouse(
+        project, test_case.adapter_name, test_case.connection_key
+    )
+    expected_runs: set[str] = {test_case.expected_run_id}
+    definition: str = base64.b64encode(
+        ("SELECT 17 /*" + "x" * fixture["wide_definition_bytes"] + "*/").encode()
+    ).decode()
+    for index in range(fixture["wide_fingerprint_count"] * test_case.wide):
+        expected_runs.add(f"automatic-{index}")
+        _ = adapter.execute(
+            connection=connection,
+            sql=(
+                "INSERT INTO _sqlbuild_fingerprints SELECT node_type,"
+                f"'orders-{index}',target_database,target_schema,target_name,'automatic-{index}',"
+                "definition_hash,version_hash,schema_fingerprint,"
+                f"'{definition}',metadata_json_b64,ts FROM _sqlbuild_fingerprints WHERE run_id='legacy-run'"
+            ),
+        )
+    assert adapter.query(
+        connection=connection,
+        sql="SELECT SUM(LENGTH(definition_b64))*3/4 FROM _sqlbuild_fingerprints",
+        limit=1,
+    ).rows[0][0] >= test_case.expected_average_bytes * len(expected_runs), (
+        "wide fixture exceeds one API request before any synchronization"
+    )
+    adapter.close(connection)
+    (project / "orchestration/orders.py").write_text("")
+    write_files(
+        project_dir=project,
+        files={"models/orders.sql": fixture["model"]},
+    )
+    with snapshot_api(tmp_path / "control") as api:
+        log: Path = tmp_path / "location.log"
+        control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(project),
+                "location",
+                "serve",
+                "--server",
+                api.url,
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        ) as location:
+            _ = wait_for_generation(api, "development", 1, location, log)
+            initial_tables: dict[str, set[str]] = {
+                "sqb_warehouse_fingerprints": expected_runs,
+                "sqb_warehouse_freshness": {test_case.expected_run_id},
+            }
+            for expected_tables, seconds, mirror_sql, warehouse_sql in [
+                (
+                    initial_tables,
+                    test_case.initial_seconds,
+                    "DELETE FROM {table}",
+                    "SELECT 1",
+                ),
+                (initial_tables, 45, "SELECT 1", "DELETE FROM {table}"),
+                ({table: set() for table in initial_tables}, 45, "SELECT 1", "SELECT 1"),
+            ]:
+                deadline: float = time.monotonic() + seconds
+                observed: tuple[int, int] = (-1, -1)
+                expected: tuple[int, int] = (
+                    len(expected_tables["sqb_warehouse_fingerprints"]),
+                    len(expected_tables["sqb_warehouse_freshness"]),
+                )
+                while observed != expected:
+                    assert location.poll() is None, log.read_text()
+                    assert time.monotonic() < deadline, log.read_text()
+                    with closing(sqlite3.connect(control)) as database:
+                        observed = database.execute(
+                            "SELECT (SELECT COUNT(*) FROM sqb_warehouse_fingerprints),"
+                            "(SELECT COUNT(*) FROM sqb_warehouse_freshness)"
+                        ).fetchone()
+                    time.sleep(0.05)
+                with closing(sqlite3.connect(control)) as database:
+                    bodies: list[tuple[bytes]] = database.execute(
+                        "SELECT t.body FROM sqb_warehouse_fingerprints f "
+                        "JOIN sqb_source_texts t ON t.text_hash=f.definition_text_hash"
+                    ).fetchall()
+                    assert sum(len(gzip.decompress(body)) for (body,) in bodies) >= (
+                        test_case.expected_average_bytes
+                        * len(expected_tables["sqb_warehouse_fingerprints"])
+                    )
+                    for table, expected_runs in expected_tables.items():
+                        rows: list[tuple[str]] = database.execute(
+                            f"SELECT record_json FROM {table}"
+                        ).fetchall()
+                        runs: set[str] = {json.loads(row[0])["run_id"] for row in rows}
+                        assert runs == expected_runs
+                        _ = database.execute(mirror_sql.format(table=table))
+                    database.commit()
+                connection = adapter.connect(
+                    {test_case.connection_key: str(project / "warehouse.db")}
+                )
+                for table in ("_sqlbuild_fingerprints", "_sqlbuild_source_freshness"):
+                    _ = adapter.execute(
+                        connection=connection, sql=warehouse_sql.format(table=table)
+                    )
+                adapter.close(connection)
 
 
 @pytest.mark.parametrize(

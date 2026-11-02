@@ -14,6 +14,9 @@ class SnapshotApi(NamedTuple):
     location_id: str
     bearer: str
 
+    def __repr__(self) -> str:
+        return f"SnapshotApi(url={self.url!r}, location_id={self.location_id!r}, bearer=<redacted>)"
+
 
 class ClaimedWorker(NamedTuple):
     run_id: str
@@ -171,6 +174,17 @@ class CatalogConnectionTestCase:
     adapter_name: str
     connection_key: str
     expected_run_id: str
+
+
+@dataclass(frozen=True)
+class AutomaticHistoryTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    expected_run_id: str
+    wide: bool = False
+    initial_seconds: int = 8
+    expected_average_bytes: int = 0
 
 
 @dataclass(frozen=True)

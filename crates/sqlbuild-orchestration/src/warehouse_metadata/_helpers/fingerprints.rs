@@ -29,7 +29,7 @@ pub(crate) fn validate_batch(batch: &FingerprintBatch) -> Result<(), ControlErro
         batch.records.iter().any(|record| {
             record.state_database != page.state_database
                 || record.state_schema != page.state_schema
-                || record.ts.date_naive() != page.day
+                || page.day.is_some_and(|day| record.ts.date_naive() != day)
         })
     });
     validate_fields(

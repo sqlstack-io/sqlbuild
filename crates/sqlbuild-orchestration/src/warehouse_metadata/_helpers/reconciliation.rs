@@ -20,12 +20,12 @@ pub(crate) async fn begin_reconciliation(
     mut batch: Value,
 ) -> Result<ControlTransaction, ControlError> {
     if page.state_schema.trim().is_empty()
-        || page.day.succ_opt().is_none()
+        || page.day.is_some_and(|day| day.succ_opt().is_none())
         || (!page.complete && page.after.is_some())
-        || page
-            .after
-            .as_ref()
-            .is_some_and(|after| after.observed_at.date_naive() != page.day)
+        || page.after.as_ref().is_some_and(|after| {
+            page.day
+                .is_some_and(|day| after.observed_at.date_naive() != day)
+        })
     {
         return Err(ControlError::Invalid(
             "invalid reconciliation namespace, day or continuation".into(),
@@ -118,40 +118,44 @@ pub(crate) async fn finish_reconciliation(
     if !page.complete {
         return Ok((transaction, response));
     }
-    let end = page
-        .day
-        .succ_opt()
-        .ok_or_else(|| ControlError::Invalid("invalid reconciliation day".into()))?;
-    let start = page.day.and_time(NaiveTime::MIN).and_utc();
-    let end = end.and_time(NaiveTime::MIN).and_utc();
     let mut parameters = vec![
         Parameter::Id(location_id),
         Parameter::Text(target.into()),
         Parameter::Text(page.state_schema.clone()),
-        Parameter::Time(
-            page.after
-                .as_ref()
-                .map_or(start, |cursor| cursor.observed_at),
-        ),
-        Parameter::Time(end),
     ];
-    let database = match &page.state_database {
+    let mut bounds = vec![match &page.state_database {
         Some(database) => {
             parameters.push(Parameter::Text(database.clone()));
-            "state_database=$6"
+            format!("state_database=${}", parameters.len())
         }
-        None => "state_database IS NULL",
-    };
-    let lower_bound = if let Some(cursor) = &page.after {
-        parameters.push(Parameter::Id(cursor.event_id));
-        format!("(observed_at,event_id)>($4,${})", parameters.len())
-    } else {
-        "observed_at>=$4".into()
-    };
+        None => "state_database IS NULL".into(),
+    }];
+    if let Some(cursor) = &page.after {
+        let offset = parameters.len();
+        parameters.extend([
+            Parameter::Time(cursor.observed_at),
+            Parameter::Id(cursor.event_id),
+        ]);
+        bounds.push(format!(
+            "(observed_at,event_id)>(${},${})",
+            offset + 1,
+            offset + 2
+        ));
+    } else if let Some(day) = page.day {
+        parameters.push(Parameter::Time(day.and_time(NaiveTime::MIN).and_utc()));
+        bounds.push(format!("observed_at>=${}", parameters.len()));
+    }
+    if let Some(day) = page.day {
+        let end = day
+            .succ_opt()
+            .ok_or_else(|| ControlError::Invalid("invalid reconciliation day".into()))?;
+        parameters.push(Parameter::Time(end.and_time(NaiveTime::MIN).and_utc()));
+        bounds.push(format!("observed_at<${}", parameters.len()));
+    }
     let candidates;
     (transaction, candidates) = query(transaction, &format!(
         "SELECT observed_at,event_id FROM {table} WHERE location_id=$1 AND target=$2 AND state_schema=$3 \
-         AND {lower_bound} AND observed_at<$5 AND {database} ORDER BY observed_at,event_id LIMIT {MAX_HISTORY_RECORDS}"), parameters).await?;
+         AND {} ORDER BY observed_at,event_id LIMIT {MAX_HISTORY_RECORDS}", bounds.join(" AND ")), parameters).await?;
     if candidates.len() == MAX_HISTORY_RECORDS {
         response.next_reconciliation_after = Some(
             serde_json::from_value::<WarehouseReconciliationCursor>(json!(candidates.last()))
