@@ -74,6 +74,13 @@ void sourceCondition;
 // @ts-expect-error Source conditions select sources, not execution event kinds.
 const invalidSourceCondition: components["schemas"]["SensorCondition"] = { kind: "source_new_data", selection: ["source:raw_orders"], kinds: ["success"] };
 void invalidSourceCondition;
+const staleCondition: components["schemas"]["SensorCondition"] = {
+  kind: "source_stale", selection: ["source:raw_orders"], after_seconds: 60,
+};
+void staleCondition;
+// @ts-expect-error Staleness conditions require an explicit age threshold.
+const missingStaleThreshold: components["schemas"]["SensorCondition"] = { kind: "source_stale", selection: ["source:raw_orders"] };
+void missingStaleThreshold;
 // @ts-expect-error Session mutations require the CSRF header.
 void client.POST("/api/auth/logout", {});
 // @ts-expect-error Changing a password also requires the current password.

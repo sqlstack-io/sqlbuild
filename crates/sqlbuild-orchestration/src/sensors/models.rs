@@ -48,6 +48,11 @@ pub enum SensorCondition {
     SourceNewData {
         selection: BTreeSet<String>,
     },
+    SourceStale {
+        selection: BTreeSet<String>,
+        #[schema(value_type = u32, minimum = 1)]
+        after_seconds: NonZeroU32,
+    },
     Custom {
         function: String,
         code_hash: String,

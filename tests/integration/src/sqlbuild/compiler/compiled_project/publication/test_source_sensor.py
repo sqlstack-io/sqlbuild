@@ -47,7 +47,29 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
                     "benchmarks/duckshop/edge_cases/orchestration/source_orders.yml"
                 ).read_text(),
             },
-        )
+        ),
+        WorkerExecutionTestCase(
+            "stale external timestamp versions",
+            "SELECT 73 AS amount",
+            "SELECT amount FROM orders",
+            "success",
+            [(73,)],
+            expected_origin="sensor",
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/stale_orders.py"
+                ).read_text(),
+                "sources/orders.yml": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/managed_orders.yml"
+                ).read_text(),
+                "python/loaders/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/orders_loader.py"
+                ).read_text(),
+                "source_observations.json": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/source_stale_journey.json"
+                ).read_text(),
+            },
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -55,7 +77,12 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     data: dict[str, Any] = json.loads(
-        Path("benchmarks/duckshop/edge_cases/orchestration/source_data_sensor.json").read_text()
+        test_case.files.get(
+            "source_observations.json",
+            Path(
+                "benchmarks/duckshop/edge_cases/orchestration/source_data_sensor.json"
+            ).read_text(),
+        )
     )
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         for phase, (source, count) in enumerate(

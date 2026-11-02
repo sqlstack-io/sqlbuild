@@ -1,19 +1,25 @@
 //! Node conditions consume immutable execution evidence or warehouse source observations.
 
 use std::collections::BTreeSet;
+use std::num::NonZeroU32;
 
+use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::_helpers::transitions::matches_transition;
+use crate::sensors::constants::TIMESTAMP_VALUE_KIND;
 use crate::sensors::models::{
     NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest, SourceSensorEvent,
 };
+use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_metadata::models::WarehouseFreshnessRecord;
 
 pub(crate) async fn consume_node_events(
     transaction: ControlTransaction,
@@ -126,6 +132,114 @@ pub(crate) async fn consume_source_events(
             queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
         run_ids.push(run_id);
     }
+    Ok((transaction, (cursor, run_ids)))
+}
+
+fn stale_version(
+    record: &WarehouseFreshnessRecord,
+    now: DateTime<Utc>,
+    after_seconds: NonZeroU32,
+) -> Result<bool, ControlError> {
+    let Some(version) = record
+        .data_version
+        .as_deref()
+        .filter(|_| record.value_kind == TIMESTAMP_VALUE_KIND)
+    else {
+        return Ok(false);
+    };
+    let instant = DateTime::parse_from_rfc3339(version)
+        .map(|value| value.with_timezone(&Utc))
+        .or_else(|_| {
+            NaiveDateTime::parse_from_str(version, "%Y-%m-%dT%H:%M:%S%.f")
+                .map(|value| value.and_utc())
+        })
+        .map_err(|_| {
+            ControlError::Invalid(
+                "timestamp source freshness version is not an ISO datetime".into(),
+            )
+        })?;
+    Ok(now.signed_duration_since(instant) > TimeDelta::seconds(i64::from(after_seconds.get())))
+}
+
+/// Reevaluate current timestamp age; only page position and idempotent requests are stored.
+pub(crate) async fn consume_stale_sources(
+    transaction: ControlTransaction,
+    evaluation: &SensorEvaluationRequest,
+    selection: &BTreeSet<String>,
+    after_seconds: NonZeroU32,
+) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
+    let mut cursor = evaluation.cursor.clone();
+    let mut remaining = selection
+        .iter()
+        .filter(|key| cursor.custom.as_ref().is_none_or(|after| *key > after));
+    let page: BTreeSet<String> = remaining.by_ref().take(100).cloned().collect();
+    let next = remaining
+        .next()
+        .is_some()
+        .then(|| page.last().cloned())
+        .flatten();
+    let (mut transaction, nodes) =
+        read_snapshot_nodes(transaction, evaluation.snapshot_id, Some(&page)).await?;
+    let mut run_ids: Vec<Uuid> = Vec::new();
+    for (key, node) in nodes {
+        let mut parameters = vec![
+            Parameter::Id(evaluation.location_id),
+            Parameter::Text(evaluation.target.clone()),
+            Parameter::Text(key.replacen("source:", "", 1)),
+        ];
+        let mut predicate = String::new();
+        for (column, value) in [
+            (
+                "target_database",
+                node.definition["namespace"]
+                    .get(0)
+                    .unwrap_or(&node.definition["database"]),
+            ),
+            (
+                "target_schema",
+                node.definition["namespace"]
+                    .get(1)
+                    .unwrap_or(&node.definition["schema"]),
+            ),
+            ("target_name", &node.definition["table"]),
+        ] {
+            if let Some(value) = value.as_str() {
+                parameters.push(Parameter::Text(value.into()));
+                predicate.push_str(&format!(
+                    " AND record_json ->> '{column}'=${}",
+                    parameters.len()
+                ));
+            } else {
+                predicate.push_str(&format!(" AND record_json ->> '{column}' IS NULL"));
+            }
+        }
+        let rows;
+        (transaction, rows) = query(transaction, &format!(
+            "SELECT record_json FROM sqb_warehouse_freshness WHERE location_id=$1 AND target=$2 \
+             AND record_json ->> 'source_name'=$3{predicate} ORDER BY observed_at DESC,event_id DESC LIMIT 1"
+        ), parameters).await?;
+        let Some(row) = rows.first() else { continue };
+        let record: WarehouseFreshnessRecord =
+            serde_json::from_value(row["record_json"].clone())
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        if !stale_version(&record, evaluation.requested_at, after_seconds)? {
+            continue;
+        }
+        let identity = serde_json::to_vec(&(
+            &key,
+            &record.target_database,
+            &record.target_schema,
+            &record.target_name,
+            &record.data_version_hash,
+            after_seconds,
+        ))
+        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let run_id;
+        (transaction, run_id) =
+            queue_sensor_run(transaction, evaluation, &sha256_hex(&identity)).await?;
+        run_ids.push(run_id);
+    }
+    cursor.custom = next;
     Ok((transaction, (cursor, run_ids)))
 }
 

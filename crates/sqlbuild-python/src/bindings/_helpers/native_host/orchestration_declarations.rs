@@ -58,6 +58,8 @@ pub(crate) struct AuthoredSensorCondition {
     pub(crate) executed_successfully: Option<Vec<String>>,
     #[pyo3(default)]
     pub(crate) select: Option<String>,
+    #[pyo3(default, from_py_with = authored_setting)]
+    pub(crate) after_seconds: Value,
 }
 
 #[derive(FromPyObject)]

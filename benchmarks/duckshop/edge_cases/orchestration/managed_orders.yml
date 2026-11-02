@@ -1,0 +1,9 @@
+sources:
+  - name: raw_orders
+    description: Orders inheriting the managed loader namespace.
+    managed: true
+    write_strategy: table
+    table: raw_orders
+    columns:
+      - name: order_id
+        type: BIGINT

@@ -7,9 +7,10 @@ use crate::store::_helpers::migration::{
     ADMINISTRATOR_INITIALIZATION, AUDIT_STORAGE_ORDER, AUTHENTICATION_REVISION,
     DEVELOPMENT_LOCATIONS, EXECUTED_NODES, EXTERNAL_SESSIONS, LOCATION_INSTANCES, LOCATION_WORK,
     NODE_SENSORS, NODE_TRANSITIONS, OIDC_LOGIN_FLOWS, PASSWORD_CREDENTIALS, PASSWORD_SESSIONS,
-    PLATFORM_SINK, RUN_SENSORS, SCHEMA, SENSORS, SOURCE_SENSORS, WAREHOUSE_AUDIT_RESULTS,
-    WAREHOUSE_FINGERPRINTS, WAREHOUSE_FRESHNESS, WAREHOUSE_JANITOR_EVENTS, WAREHOUSE_MICROBATCHES,
-    WAREHOUSE_MIGRATIONS, WAREHOUSE_RECONCILIATION, render, verify_migrations,
+    PLATFORM_SINK, RUN_SENSORS, SCHEMA, SENSORS, SOURCE_SENSORS, SOURCE_STALENESS,
+    WAREHOUSE_AUDIT_RESULTS, WAREHOUSE_FINGERPRINTS, WAREHOUSE_FRESHNESS, WAREHOUSE_JANITOR_EVENTS,
+    WAREHOUSE_MICROBATCHES, WAREHOUSE_MIGRATIONS, WAREHOUSE_RECONCILIATION, render,
+    verify_migrations,
 };
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
@@ -58,6 +59,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         ("warehouse_migrations", WAREHOUSE_MIGRATIONS),
         ("warehouse_microbatches", WAREHOUSE_MICROBATCHES),
         ("source_sensors", SOURCE_SENSORS),
+        ("source_staleness", SOURCE_STALENESS),
     ];
     let mut digests = vec![digest.clone()];
     digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));

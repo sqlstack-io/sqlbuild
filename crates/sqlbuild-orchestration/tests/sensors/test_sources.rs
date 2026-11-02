@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use chrono::{FixedOffset, TimeDelta};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -172,6 +173,8 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .await
                 .expect("pre-sensor predecessor");
             for sql in [
+                "DROP INDEX sqb_freshness_source_latest",
+                "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
                 "DELETE FROM recall_events WHERE producer='warehouse' AND event_type='warehouse_source_freshness'",
                 "DROP INDEX recall_warehouse_sources",
                 "DELETE FROM sqb_schema_migrations WHERE name='source_sensors'",
@@ -372,6 +375,243 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     .filter(|event| event["event_type"] == "warehouse_source_freshness")
                     .count(),
                 source_events
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_queue_each_version_once()
+ {
+    let test_cases = [
+        SensorTestCase {
+            description: "SQLite timestamp age",
+            backend: Backend::Sqlite,
+            expected_runs: 4,
+        },
+        SensorTestCase {
+            description: "PostgreSQL timestamp age",
+            backend: Backend::Postgres,
+            expected_runs: 4,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required store");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            migrate_store(store).await.expect("warm migration");
+            let data: serde_json::Value = serde_json::from_str(
+                &std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                    "../../benchmarks/duckshop/edge_cases/orchestration/source_stale_sensor.json",
+                ))
+                .expect("DuckShop stale-source fixture"),
+            )
+            .expect("fixture");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            let keys: Vec<String> = (0..data["source_count"].as_u64().expect("source count"))
+                .map(|index| format!("source:raw_orders_{index:03}"))
+                .collect();
+            for key in &keys {
+                input.nodes.insert(
+                    key.clone(),
+                    SnapshotNode {
+                        kind: "source".into(),
+                        definition: data["source_definitions"].get(key).cloned().unwrap_or_else(
+                            || json!({"database": null, "schema": "main", "table": "raw_orders"}),
+                        ),
+                        raw_sql: None,
+                        compiled_sql: None,
+                        python_source: None,
+                    },
+                );
+            }
+            input.documents.insert("triggers".into(), json!({"stale_orders": {
+                "description": "Refresh stale timestamp sources", "job_key": "orders",
+                "when": {"kind": "source_stale", "selection": keys, "after_seconds": data["after_seconds"]},
+                "minimum_interval_seconds": 1
+            }}));
+            publish_snapshot(store, &input).await.expect("publish");
+            let session_id = Uuid::now_v7();
+            report_location_health(
+                store,
+                location,
+                &LocationHealthReport {
+                    event_id: Uuid::now_v7(),
+                    session_id,
+                    target: "development".into(),
+                    health: LocationHealth::Heartbeat {},
+                },
+            )
+            .await
+            .expect("registered reader");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("triggers")
+                .remove(0);
+            let first = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                .await
+                .expect("evaluation")
+                .expect("due");
+            let mut records = Vec::new();
+            for (ordinal, case) in data["cases"].as_array().expect("cases").iter().enumerate() {
+                let index = case["index"].as_u64().expect("index");
+                let instant = first.requested_at
+                    - TimeDelta::seconds(case["age_seconds"].as_i64().expect("age"));
+                let version = case["data_version"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| {
+                        instant
+                            .with_timezone(
+                                &FixedOffset::east_opt(
+                                    case["offset_seconds"].as_i64().unwrap_or(0) as i32,
+                                )
+                                .expect("offset"),
+                            )
+                            .format(case["format"].as_str().unwrap_or("%Y-%m-%dT%H:%M:%S%.f%:z"))
+                            .to_string()
+                    });
+                let record = WarehouseFreshnessRecord {
+                    event_id: Some(format!("stale-source-{ordinal:03}")),
+                    state_database: None,
+                    state_schema: "main".into(),
+                    source_name: format!("raw_orders_{index:03}"),
+                    target_database: case["target_database"].as_str().map(str::to_owned),
+                    target_schema: Some(case["target_schema"].as_str().unwrap_or("main").into()),
+                    target_name: Some(case["target_name"].as_str().unwrap_or("raw_orders").into()),
+                    run_id: "external-orders".into(),
+                    strategy: "max_column".into(),
+                    value_kind: case["value_kind"].as_str().unwrap_or("timestamp").into(),
+                    data_version: (!case["null"].as_bool().unwrap_or(false)).then_some(version),
+                    data_version_hash: format!("orders-version-{index}"),
+                    observed_at: first.requested_at
+                        + TimeDelta::microseconds(
+                            case["observed_offset_microseconds"].as_i64().unwrap_or(0),
+                        ),
+                };
+                records.push(record);
+            }
+            let batch = SourceFreshnessBatch {
+                session_id,
+                generation: 1,
+                records,
+                reconciliation: None,
+            };
+            ingest_source_freshness(store, (location, "development"), &batch)
+                .await
+                .expect("mirror observations");
+            let fault = TransactionFault {
+                description: "stale cursor rollback",
+                table: "sqb_sensor_cursor_commits",
+                operation: "INSERT",
+                condition: "",
+                sqlite_body: "SELECT RAISE(ABORT, 'injected stale cursor failure')",
+                postgres_body: "RAISE EXCEPTION 'injected stale cursor failure'",
+            };
+            install_fault(store, &fault).await;
+            assert!(
+                complete_builtin_sensor(store, &lease, &first)
+                    .await
+                    .is_err()
+            );
+            remove_fault(store, &fault).await;
+            assert!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("rollback")
+                    .is_empty()
+            );
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                complete_builtin_sensor(store, &lease, &first),
+            )
+            .await
+            .expect("bounded first page")
+            .expect("complete");
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("first page")
+                    .len(),
+                1,
+                "{}: strict age threshold and current source binding",
+                test_case.description
+            );
+            for page in data["later_pages"].as_array().expect("page outcomes") {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                    .await
+                    .expect("next evaluation")
+                    .expect("due");
+                assert_eq!(
+                    request.cursor.custom.as_deref(),
+                    page["expected_cursor"].as_str(),
+                    "{}",
+                    test_case.description
+                );
+                tokio::time::timeout(
+                    Duration::from_secs(5),
+                    complete_builtin_sensor(store, &lease, &request),
+                )
+                .await
+                .expect("bounded indexed source lookup")
+                .expect("complete");
+                assert_eq!(
+                    list_runs(store, (location, "development"), 100)
+                        .await
+                        .expect("queued runs")
+                        .len(),
+                    page["expected_runs"].as_u64().expect("run count") as usize,
+                    "{}",
+                    test_case.description
+                );
+                assert_eq!(
+                    complete_builtin_sensor(store, &lease, &request)
+                        .await
+                        .expect("lost acknowledgement"),
+                    0
+                );
+            }
+            let (transaction, _) = query(
+                begin(store, TransactionMode::Write)
+                    .await
+                    .expect("clear mirror"),
+                "DELETE FROM sqb_warehouse_freshness",
+                vec![],
+            )
+            .await
+            .expect("delete disposable mirror");
+            commit(transaction).await.expect("commit clear");
+            ingest_source_freshness(store, (location, "development"), &batch)
+                .await
+                .expect("rebuild mirror");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                .await
+                .expect("rebuilt evaluation")
+                .expect("due");
+            complete_builtin_sensor(store, &lease, &request)
+                .await
+                .expect("replay stale conditions");
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("deduplicated requests")
+                    .len(),
+                test_case.expected_runs,
+                "{}",
+                test_case.description
             );
             close_test_store(fixture).await;
         });

@@ -14,6 +14,7 @@ from sqlbuild.orchestration_declarations.models.authoring import (
     Sensor,
     SkipReason,
     SourceNewDataCondition,
+    SourceStaleCondition,
 )
 from sqlbuild.orchestration_declarations.models.authoring import (
     CalendarSchedule as calendar_schedule,
@@ -29,6 +30,9 @@ from sqlbuild.orchestration_declarations.models.authoring import Schedule as sch
 from sqlbuild.orchestration_declarations.models.authoring import Sensor as sensor
 from sqlbuild.orchestration_declarations.models.authoring import (
     SourceNewDataCondition as source_new_data,
+)
+from sqlbuild.orchestration_declarations.models.authoring import (
+    SourceStaleCondition as source_stale,
 )
 from sqlbuild.orchestration_declarations.models.sensor_context import SensorContext
 from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEventKind, RunEventKind
@@ -50,6 +54,7 @@ __all__ = (
     "SensorContext",
     "SkipReason",
     "SourceNewDataCondition",
+    "SourceStaleCondition",
     "calendar_schedule",
     "compile_snapshot",
     "job",
@@ -60,4 +65,5 @@ __all__ = (
     "schedule",
     "sensor",
     "source_new_data",
+    "source_stale",
 )
