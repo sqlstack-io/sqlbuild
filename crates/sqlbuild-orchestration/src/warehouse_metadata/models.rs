@@ -278,7 +278,7 @@ pub struct WarehouseStateLocation {
     pub schema: String,
 }
 
-/// Only immutable history tables support a timestamp watermark.
+/// Catalog observations require full scans; only immutable history supports a watermark.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WarehouseHistoryKind {
@@ -289,10 +289,11 @@ pub enum WarehouseHistoryKind {
     Migrations,
     OldNameViews,
     Microbatches,
+    Catalog,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -300,6 +301,7 @@ impl WarehouseHistoryKind {
         Self::Migrations,
         Self::OldNameViews,
         Self::Microbatches,
+        Self::Catalog,
     ];
 
     #[must_use]
@@ -312,6 +314,7 @@ impl WarehouseHistoryKind {
             Self::Migrations => "migrations",
             Self::OldNameViews => "old_name_views",
             Self::Microbatches => "microbatches",
+            Self::Catalog => "catalog",
         }
     }
 
@@ -325,6 +328,7 @@ impl WarehouseHistoryKind {
             Self::Migrations => "sqb_warehouse_migrations",
             Self::OldNameViews => "sqb_warehouse_old_name_views",
             Self::Microbatches => "sqb_warehouse_microbatches",
+            Self::Catalog => "sqb_warehouse_catalog",
         }
     }
 }
@@ -440,6 +444,7 @@ pub enum WarehouseHistoryRead {
     Migrations(StateEventsRead),
     OldNameViews(StateEventsRead),
     Microbatches(StateEventsRead),
+    Catalog(CatalogRead),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -452,6 +457,7 @@ pub enum WarehouseHistoryRecord {
     Migration(Box<WarehouseMigrationRecord>),
     OldNameView(Box<WarehouseOldNameRecord>),
     Microbatch(Box<WarehouseMicrobatchRecord>),
+    Catalog(WarehouseCatalogRecord),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -480,4 +486,41 @@ pub(crate) struct StateEventsImport<'a> {
     pub invalid_identity: bool,
     pub reconciliation: Option<&'a WarehouseReconciliationPage>,
     pub payload: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseCatalogColumn {
+    pub name: String,
+    pub data_type: String,
+}
+
+/// Physical identity and ordered columns come from the adapter catalog, not fingerprints.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseCatalogRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub name: String,
+    pub relation_type: String,
+    pub columns: Vec<WarehouseCatalogColumn>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseCatalogRecord>,
+    pub reconciliation: WarehouseReconciliationPage,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CatalogRead {
+    pub location: WarehouseStateLocation,
+    pub after: Option<[Option<String>; 1]>,
+    /// Catalog reads reject watermarks; the shared reader envelope supplies null.
+    pub observed_since: Option<DateTime<Utc>>,
+    pub limit: Option<usize>,
 }

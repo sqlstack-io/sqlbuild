@@ -28,6 +28,7 @@ use crate::bindings::_helpers::compiled_project::values::plain_value;
 use crate::bindings::_helpers::fingerprints::latest_rows::row_fingerprint;
 use crate::bindings::_helpers::freshness::state_io::row_record;
 use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
+use crate::bindings::_helpers::native_host::warehouse_catalog::read_catalog;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
@@ -40,6 +41,7 @@ pub(crate) fn read_history(
     request: &WarehouseHistoryRead,
 ) -> PyResult<WarehouseHistoryPage> {
     let location = match request {
+        WarehouseHistoryRead::Catalog(read) => &read.location,
         WarehouseHistoryRead::SourceFreshness(read) => &read.location,
         WarehouseHistoryRead::Fingerprints(read) => &read.location,
         WarehouseHistoryRead::AuditResults(read)
@@ -123,6 +125,9 @@ fn read_page(
     };
     let event_columns: Vec<&str> = event_columns.iter().map(String::as_str).collect();
     let (location, after, since, limit, table, columns, timestamp) = match request {
+        WarehouseHistoryRead::Catalog(read) => {
+            return read_catalog(py, (adapter, connection), read);
+        }
         WarehouseHistoryRead::SourceFreshness(read) => (
             &read.location,
             read.after.as_ref().map(|cursor| cursor.as_slice()),
@@ -367,6 +372,11 @@ fn read_page(
             };
         }
         let observed = match &record {
+            WarehouseHistoryRecord::Catalog(_) => {
+                return Err(PyValueError::new_err(
+                    "catalog does not use timestamp history filtering",
+                ));
+            }
             WarehouseHistoryRecord::SourceFreshness(record) => record.observed_at,
             WarehouseHistoryRecord::Fingerprint(record) => record.ts,
             WarehouseHistoryRecord::AuditResult(record) => record.occurred_at,
@@ -395,6 +405,11 @@ fn decode_record(
     (columns, timestamp): (&[&str], &str),
 ) -> PyResult<WarehouseHistoryRecord> {
     let (location, record) = match request {
+        WarehouseHistoryRead::Catalog(_) => {
+            return Err(PyValueError::new_err(
+                "catalog does not use state-table row decoding",
+            ));
+        }
         WarehouseHistoryRead::SourceFreshness(read) => (&read.location, row_record(row)?),
         WarehouseHistoryRead::Fingerprints(read) => (
             &read.location,

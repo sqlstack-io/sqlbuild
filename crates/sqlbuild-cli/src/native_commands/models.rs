@@ -204,6 +204,10 @@ pub(crate) struct LocationMetadataSync {
 }
 
 impl LocationMetadataSync {
+    pub(crate) fn reconciling(&self) -> bool {
+        self.reconcile || self.kind() == WarehouseHistoryKind::Catalog
+    }
+
     pub(crate) fn kind(&self) -> WarehouseHistoryKind {
         WarehouseHistoryKind::ALL[self.index % WarehouseHistoryKind::ALL.len()]
     }

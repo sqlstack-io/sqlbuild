@@ -67,6 +67,25 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/microba
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const catalogHistory: components["schemas"]["WarehouseHistoryKind"] = "catalog";
+const catalogColumn: components["schemas"]["WarehouseCatalogColumn"] = {
+  name: "order_id", data_type: "INTEGER",
+};
+void catalogHistory;
+void catalogColumn;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/catalog", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: {
+    session_id: "synthetic-session", generation: 1, records: [],
+    reconciliation: {
+      scan_id: "synthetic-scan", page: 0, state_database: null, state_schema: "main",
+      day: null, complete: true, after: null,
+    },
+  },
+});
+// @ts-expect-error Catalog scans must include reconciliation; incremental imports cannot remove relations safely.
+const incompleteCatalog: components["schemas"]["CatalogBatch"] = { session_id: "synthetic-session", generation: 1, records: [] };
+void incompleteCatalog;
 const sourceCondition: components["schemas"]["SensorCondition"] = {
   kind: "source_new_data", selection: ["source:raw_orders"],
 };

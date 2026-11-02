@@ -228,3 +228,18 @@ class InstalledRecoveryTestCase:
     description: str
     executable: str
     expected_rejection: str
+
+
+@dataclass(frozen=True)
+class CatalogInspectionTestCase:
+    description: str
+    adapter_name: str
+    connection_key: str
+    expected_table_type: str
+    expected_view_type: str
+
+
+@dataclass(frozen=True)
+class CatalogBoundaryTestCase:
+    description: str
+    expected_page_delivered: bool
