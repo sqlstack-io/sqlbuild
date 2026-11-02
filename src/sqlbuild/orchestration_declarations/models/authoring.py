@@ -117,6 +117,15 @@ class SourceNewDataCondition:
     kind: Literal["source_new_data"] = field(default="source_new_data", init=False)
 
 
+@dataclass(frozen=True, kw_only=True)
+class SourceStaleCondition:
+    """Match timestamp source versions older than after_seconds, once per version."""
+
+    select: str
+    after_seconds: int
+    kind: Literal["source_stale"] = field(default="source_stale", init=False)
+
+
 @dataclass(frozen=True, eq=False)
 class Sensor:
     """Start a job for each matching event; event identity deduplicates replayed requests."""
@@ -128,6 +137,7 @@ class Sensor:
         | RunEventCondition
         | NodeEventCondition
         | SourceNewDataCondition
+        | SourceStaleCondition
         | None
     ) = field(default=None, kw_only=True)
     run: Job | JobGroup = field(kw_only=True)

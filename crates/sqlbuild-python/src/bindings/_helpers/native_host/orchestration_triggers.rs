@@ -22,7 +22,7 @@ use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, wit
 use crate::bindings::_helpers::discovery::imported_modules::{provider_by_name, provider_usages};
 use crate::bindings::_helpers::discovery::imported_providers::discover_provider_classes;
 use crate::bindings::_helpers::native_host::constants::{
-    CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION,
+    CALENDAR_WINDOW_PARAMETER, SOURCE_NEW_DATA_CONDITION, SOURCE_STALE_CONDITION,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
@@ -279,7 +279,9 @@ pub(crate) fn compile_sensors(
         let condition = match (sensor.when, sensor.function) {
             (Some(when), None) => {
                 let mut condition = json!({"kind": when.kind});
-                if when.kind != SOURCE_NEW_DATA_CONDITION {
+                if when.kind == SOURCE_STALE_CONDITION {
+                    condition["after_seconds"] = when.after_seconds;
+                } else if when.kind != SOURCE_NEW_DATA_CONDITION {
                     condition["kinds"] = json!(when.kinds);
                 }
                 if let Some(job) = when.job {
@@ -333,10 +335,12 @@ fn sensor_nodes(graph: &ProjectGraph, selectors: &[String], field: &str) -> PyRe
             "{field} needs nonempty selectors"
         )));
     }
-    if field == SOURCE_NEW_DATA_CONDITION && nodes.iter().any(|key| !key.starts_with("source:")) {
-        return Err(PyValueError::new_err(
-            "source_new_data must select only source nodes",
-        ));
+    if matches!(field, SOURCE_NEW_DATA_CONDITION | SOURCE_STALE_CONDITION)
+        && nodes.iter().any(|key| !key.starts_with("source:"))
+    {
+        return Err(PyValueError::new_err(format!(
+            "{field} must select only source nodes"
+        )));
     }
     Ok(json!(nodes))
 }

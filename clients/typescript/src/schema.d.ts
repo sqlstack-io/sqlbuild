@@ -1275,6 +1275,12 @@ export interface components {
             kind: "source_new_data";
             selection: string[];
         } | {
+            /** Format: int32 */
+            after_seconds: number;
+            /** @enum {string} */
+            kind: "source_stale";
+            selection: string[];
+        } | {
             code_hash: string;
             function: string;
             /** @enum {string} */

@@ -22,7 +22,8 @@ pub(crate) fn validate_sensors(
                     && !selection.is_empty()
                     && selection.iter().all(|key| input.nodes.contains_key(key))
             }
-            SensorCondition::SourceNewData { selection } => {
+            SensorCondition::SourceNewData { selection }
+            | SensorCondition::SourceStale { selection, .. } => {
                 !selection.is_empty()
                     && selection.iter().all(|key| {
                         input
@@ -55,7 +56,7 @@ pub(crate) fn validate_sensors(
                 && !definitions.groups.contains_key(&sensor.job_key))
         {
             return Err(ControlError::Invalid(format!(
-                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes; node_event must select nonempty snapshot nodes; source_new_data must select nonempty snapshot sources"
+                "sensor {name} needs a description, a known job and nonempty event kinds; executed_successfully must select nonempty source job/group nodes; node_event must select nonempty snapshot nodes; source_new_data and source_stale must select nonempty snapshot sources"
             )));
         }
     }
