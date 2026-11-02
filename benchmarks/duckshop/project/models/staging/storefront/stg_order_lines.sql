@@ -10,6 +10,9 @@ MODEL (
     gross_amount_minor (type INT),
     tax_amount_minor (type INT),
     discount_count (type INT),
+    discounts (type ARRAY),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

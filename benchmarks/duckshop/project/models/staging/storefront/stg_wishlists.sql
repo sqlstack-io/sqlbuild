@@ -6,6 +6,9 @@ MODEL (
     created_at (type TIMESTAMP_TZ),
     is_public (type BOOLEAN),
     item_count (type INT),
+    items (type ARRAY),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

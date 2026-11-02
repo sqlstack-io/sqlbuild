@@ -10,6 +10,9 @@ MODEL (
     eligible_regions (type ARRAY),
     tier_count (type INT),
     max_discount_pct (type NUMBER(5, 2)),
+    rules (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 
