@@ -27,6 +27,13 @@ class CliCaptureOutcomeTestCase:
 
 
 @dataclass(frozen=True)
+class InterruptedCommandTestCase:
+    description: str
+    argv: list[str]
+    expected_error_type: type[BaseException]
+
+
+@dataclass(frozen=True)
 class ProjectCreationRoutingTestCase:
     description: str
     argv: tuple[str, ...]

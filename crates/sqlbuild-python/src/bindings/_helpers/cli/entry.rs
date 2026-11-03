@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
-use pyo3::exceptions::PySystemExit;
+use pyo3::exceptions::{PyKeyboardInterrupt, PySystemExit};
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -33,10 +33,12 @@ use crate::bindings::_helpers::cli::termination::{
     CommandTerminated, TERMINATED_MESSAGE, TerminationHandler, handle_sigterm, interrupting_signal,
     signal_exit_code, terminated, terminated_exit,
 };
+use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::recall::constants::{JSON_FORMAT, RECALL_SETTINGS_CODE};
@@ -570,6 +572,11 @@ fn observed_dispatch<'py>(
         );
     }
     let command: String = invocation.command_name();
+    let _interrupt: Option<InterruptHandler> = if command == COMPILE_COMMAND_NAME {
+        InterruptHandler::install(py)?
+    } else {
+        None
+    };
     drop(take_failure_cause());
     drop(take_cost_status());
     let started: Instant = Instant::now();
@@ -629,6 +636,7 @@ fn observed_dispatch<'py>(
             &invocation.recall,
         ) {
             Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
+            Ok(_) if interrupted() => Err(PyKeyboardInterrupt::new_err(())),
             dispatched => dispatched,
         };
         match dispatched {

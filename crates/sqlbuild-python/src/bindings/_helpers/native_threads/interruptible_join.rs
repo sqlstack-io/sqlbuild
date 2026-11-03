@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use pyo3::prelude::{PyErr, Python};
 
+use crate::bindings::_helpers::native_host::interrupt::check_signals;
+
 /// How often a join checks for pending signals such as Ctrl+C.
 const SIGNAL_POLL_INTERVAL: Duration = Duration::from_millis(5);
 
@@ -21,7 +23,7 @@ pub(crate) fn join_interruptibly<T: Send>(
     interrupt: impl FnOnce(),
 ) -> Joined<T> {
     while !thread.is_finished() {
-        if let Err(signal) = py.check_signals() {
+        if let Err(signal) = check_signals(py) {
             interrupt();
             let _ = py.detach(|| thread.join());
             return Joined::Interrupted(signal);

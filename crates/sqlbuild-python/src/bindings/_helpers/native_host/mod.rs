@@ -4,6 +4,7 @@ pub(crate) mod connections;
 pub(crate) mod constants;
 pub(crate) mod header_projection;
 pub(crate) mod host;
+pub(crate) mod interrupt;
 pub(crate) mod model_lookup;
 pub(crate) mod orchestration_declarations;
 pub(crate) mod orchestration_environment;
