@@ -104,17 +104,15 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
     "test_case",
     [
         WorkerExecutionTestCase(
-            "pre-handshake child survives restart and failed terminal publication retains its claim",
+            "successive supervisor crashes retain a stopped child's claim until publication commits",
             "SELECT 23 AS amount",
             "",
             "failed",
             [],
             launcher="uncooperative",
-            store_setup=(
-                "CREATE TRIGGER reject_terminal BEFORE UPDATE OF status ON sqb_runs "
-                "WHEN NEW.status='failed' "
-                "BEGIN SELECT RAISE(ABORT, 'synthetic terminal publication failure'); END;"
-            ),
+            store_setup=Path(
+                "benchmarks/duckshop/edge_cases/orchestration/local_recovery_publication_fault.sql"
+            ).read_text(),
         )
     ],
     ids=lambda case: case.description,
@@ -128,20 +126,32 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
             worker.api, worker.process, worker.log, pending=frozenset({"queued"})
         )
         assert active["status"] == "launched"
+        tables: tuple[str, ...] = ("sqb_write_claims", "sqb_concurrency_slots", "sqb_run_liveness")
+        with sqlite3.connect(worker.control_store) as control:
+            retained: dict[str, list[tuple[Any, ...]]] = {
+                table: control.execute(f"SELECT * FROM {table}").fetchall() for table in tables
+            }
+            request: tuple[Any, ...] = control.execute(
+                "SELECT request_json FROM sqb_runs"
+            ).fetchone()
+            claim_id: str = control.execute(
+                "SELECT worker_instance FROM sqb_run_liveness"
+            ).fetchone()[0]
+        arguments: list[str] = [
+            str(Path(sys.executable).with_name("sqb")),
+            "scheduler",
+            "--database-env",
+            "SQLBUILD_SCHEDULER_TEST_STORE",
+            "--launchers",
+            str(tmp_path / "launchers.json"),
+        ]
         handle: int = os.pidfd_open(pid)
         try:
             worker.process.kill()
             assert worker.process.wait(timeout=10) == -signal.SIGKILL
             log: Path = tmp_path / "replacement-scheduler.log"
             with location_process(
-                [
-                    str(Path(sys.executable).with_name("sqb")),
-                    "scheduler",
-                    "--database-env",
-                    "SQLBUILD_SCHEDULER_TEST_STORE",
-                    "--launchers",
-                    str(tmp_path / "launchers.json"),
-                ],
+                arguments,
                 log,
                 tmp_path / "replacement-scheduler.stdout",
             ) as process:
@@ -157,12 +167,48 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
                 signal.pidfd_send_signal(handle, signal.SIGKILL)
                 wait_for_log(process, log, "Retrying worker shutdown publication")
                 assert process.poll() is None, log.read_text()
+                assert "Worker launched for run" not in log.read_text()
                 with sqlite3.connect(worker.control_store) as control:
                     assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (
                         1,
                     )
-                    _ = control.execute("DROP TRIGGER reject_terminal")
-                assert process.wait(timeout=10) != 0, log.read_text()
+                    assert {
+                        table: control.execute(f"SELECT * FROM {table}").fetchall()
+                        for table in tables
+                    } == retained
+                    assert control.execute(
+                        "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
+                    ).fetchone() == (0,)
+                process.kill()
+                assert process.wait(timeout=10) == -signal.SIGKILL
+            log = tmp_path / "second-replacement-scheduler.log"
+            with location_process(
+                arguments, log, tmp_path / "second-replacement-scheduler.stdout"
+            ) as process:
+                wait_for_log(process, log, "Worker supervision recovered for run", timeout=45)
+                wait_for_log(process, log, "Retrying worker shutdown publication")
+                assert process.poll() is None, log.read_text()
+                assert "Worker launched for run" not in log.read_text()
+                assert int((worker.project / "worker.pid").read_text()) == pid
+                with sqlite3.connect(worker.control_store) as control:
+                    assert {
+                        table: control.execute(f"SELECT * FROM {table}").fetchall()
+                        for table in tables
+                    } == retained
+                    assert (
+                        control.execute("SELECT request_json FROM sqb_runs").fetchone() == request
+                    )
+                    assert control.execute(
+                        "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
+                    ).fetchone() == (0,)
+                lock: Path = worker.project / ".sqlbuild/workers" / f"{claim_id}.lock"
+                with lock.open("rb") as ownership:
+                    with pytest.raises(BlockingIOError):
+                        fcntl.flock(ownership, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    with sqlite3.connect(worker.control_store) as control:
+                        _ = control.execute("DROP TRIGGER reject_terminal")
+                    assert process.wait(timeout=10) != 0, log.read_text()
+                    fcntl.flock(ownership, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 with sqlite3.connect(worker.control_store) as control:
                     assert control.execute("SELECT status FROM sqb_runs").fetchone() == (
                         test_case.expected_status,
@@ -170,6 +216,18 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
                     assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (
                         0,
                     )
+                    assert control.execute(
+                        "SELECT count(*) FROM sqb_concurrency_slots"
+                    ).fetchone() == (0,)
+                    assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (
+                        0,
+                    )
+                    assert (
+                        control.execute("SELECT request_json FROM sqb_runs").fetchone() == request
+                    )
+                    assert control.execute(
+                        "SELECT count(*) FROM recall_events WHERE event_type='run_claimed'"
+                    ).fetchone() == (1,)
                     assert control.execute(
                         "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
                     ).fetchone() == (1,)
