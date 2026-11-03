@@ -14,6 +14,22 @@ sqb server
 
 Use `sqb server --help` for service, authentication and launcher options.
 
+## Inspect published SQL
+
+Use the person-authenticated API to inspect one exact node in the current successful publication.
+Send a `GET` request to
+`/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql`.
+
+Developer or Admin access must cover the requested location and target. Viewer, Operator and
+the configurable default Viewer role do not grant SQL inspection. The response contains the
+snapshot ID, exact node key, raw SQL and compiled SQL. Missing SQL fields are `null`; an absent
+current publication or node returns JSON `null` after authorization.
+
+SQL inspection does not execute SQL or return Python source, execution artifacts, logs or sample
+data. Every successful inspection records an audit entry without copying SQL into it. If the
+audit cannot be saved, the request fails without returning SQL. Revocation takes effect on the
+next request, including sessions created by [`sqb login`](login.md).
+
 ## Repair control views
 
 Repair snapshot selection, jobs, triggers, runs, node status and the structural catalog from

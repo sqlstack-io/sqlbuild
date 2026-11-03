@@ -15,4 +15,5 @@ pub(crate) struct SessionRoleCase {
     pub(crate) expected_metadata: u16,
     pub(crate) expected_connection: u16,
     pub(crate) expected_job: u16,
+    pub(crate) expected_sql: u16,
 }

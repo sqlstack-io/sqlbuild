@@ -17,6 +17,15 @@ pub struct SnapshotNode {
     pub python_source: Option<String>,
 }
 
+/// SQL inspection never returns Python source, execution artifacts or unrelated node metadata.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NodeSql {
+    pub snapshot_id: Uuid,
+    pub node_key: String,
+    pub raw_sql: Option<String>,
+    pub compiled_sql: Option<String>,
+}
+
 /// A location's successful compile for one target.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SnapshotInput {

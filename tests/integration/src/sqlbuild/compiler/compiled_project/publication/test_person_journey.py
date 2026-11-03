@@ -33,6 +33,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     provision_person,
     verify_compute_transport,
     verify_security_audit,
+    verify_sql_inspection,
     wait_for_person_catalog,
 )
 
@@ -260,6 +261,13 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
             with pytest.raises(HTTPError) as revoked:
                 person_request(worker.api, path, body=body, session=session)
             assert revoked.value.code == 403
+        verify_sql_inspection(
+            worker.api,
+            (admin_session, session),
+            assignment,
+            model,
+            recovered["record"]["snapshot_id"],
+        )
 
 
 @pytest.mark.parametrize(
