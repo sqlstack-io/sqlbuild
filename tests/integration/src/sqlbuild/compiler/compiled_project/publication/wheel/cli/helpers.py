@@ -10,22 +10,26 @@ from pathlib import Path
 from typing import Any
 
 
-def environment() -> dict[str, str]:
+def environment(extra: dict[str, str] | None = None) -> dict[str, str]:
     """Never inherit a real control store into a disposable acceptance run."""
     values: dict[str, str] = os.environ.copy()
     values.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
-    return values
+    return values | (extra or {})
 
 
 def administer(
-    installation: tuple[Path, Path], arguments: list[str], password: str | None = None
+    installation: tuple[Path, Path],
+    arguments: list[str],
+    password: str | None = None,
+    *,
+    extra_environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Password input remains on stdin and is never included in process arguments or logs."""
     binary, root = installation
     return subprocess.run(
         [str(binary), "admin", *arguments],
         cwd=root,
-        env=environment(),
+        env=environment(extra_environment),
         input=password,
         text=True,
         encoding="utf-8",
@@ -42,7 +46,9 @@ def successful(output: subprocess.CompletedProcess[str]) -> dict[str, Any]:
 
 
 @contextmanager
-def serve(installation: tuple[Path, Path]) -> Iterator[str]:
+def serve(
+    installation: tuple[Path, Path], *, extra_environment: dict[str, str] | None = None
+) -> Iterator[str]:
     """Kill and reap the server before returning, on Windows as well as Unix."""
     binary, root = installation
     log: Path = root / "server.log"
@@ -58,7 +64,7 @@ def serve(installation: tuple[Path, Path]) -> Iterator[str]:
                 "https://control.example.com",
             ],
             cwd=root,
-            env=environment(),
+            env=environment(extra_environment),
             stdout=subprocess.DEVNULL,
             stderr=stderr,
         )
