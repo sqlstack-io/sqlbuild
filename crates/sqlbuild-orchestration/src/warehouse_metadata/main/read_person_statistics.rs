@@ -8,13 +8,13 @@ use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::_helpers::person_reads::begin_view;
 use crate::warehouse_metadata::_helpers::statistics::read_statistics_page;
-use crate::warehouse_metadata::models::{StatisticsPage, StatisticsQuery};
+use crate::warehouse_metadata::models::{StatisticsPage, StatisticsQuery, StatisticsRetention};
 
 pub async fn read_person_statistics(
     store: &ControlStore,
     (context, credentials): (&AuditContext, (&str, &str)),
     (location_id, target, options): (Uuid, &str, &StatisticsQuery),
-    default_role: DefaultRole,
+    (default_role, retention): (DefaultRole, StatisticsRetention),
 ) -> Result<StatisticsPage, ControlError> {
     let transaction = begin_view(
         store,
@@ -29,7 +29,7 @@ pub async fn read_person_statistics(
     )
     .await?;
     let (transaction, page) =
-        read_statistics_page(transaction, (location_id, target), options).await?;
+        read_statistics_page(transaction, (location_id, target), (options, retention)).await?;
     commit(transaction).await?;
     Ok(page)
 }

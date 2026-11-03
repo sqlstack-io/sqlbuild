@@ -79,7 +79,7 @@ pub(crate) async fn statistics_reads(
             store,
             credentials,
             (location, "development", &options),
-            DefaultRole::None,
+            (DefaultRole::None, Default::default()),
         )
         .await
         .expect("page");
@@ -139,7 +139,7 @@ pub(crate) async fn statistics_reads(
                 store,
                 credentials,
                 (location, "development", &options),
-                DefaultRole::None
+                (DefaultRole::None, Default::default())
             )
             .await
             .expect("exact scope")
@@ -156,7 +156,7 @@ pub(crate) async fn statistics_reads(
         store,
         credentials,
         (location, "development", &options),
-        DefaultRole::None,
+        (DefaultRole::None, Default::default()),
     )
     .await
     .expect("first wins");
@@ -167,7 +167,7 @@ pub(crate) async fn statistics_reads(
                 store,
                 credentials,
                 (scope.0, scope.1, &options),
-                DefaultRole::None
+                (DefaultRole::None, Default::default())
             )
             .await,
             Err(ControlError::Denied { .. })
@@ -179,7 +179,7 @@ pub(crate) async fn statistics_reads(
             store,
             credentials,
             (location, "development", &options),
-            DefaultRole::None
+            (DefaultRole::None, Default::default())
         )
         .await,
         Err(ControlError::Invalid(_))

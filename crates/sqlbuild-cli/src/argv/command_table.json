@@ -1145,6 +1145,17 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--statistics-retention-days"
+        ],
+        "dest": "control_statistics_retention_days",
+        "default": 90,
+        "type": "int",
+        "help": "days of hourly warehouse statistics to keep; older samples are hidden and then deleted (default: 90)",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",

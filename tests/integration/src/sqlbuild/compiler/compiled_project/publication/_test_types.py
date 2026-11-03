@@ -259,6 +259,20 @@ class StatisticsRecoveryTestCase:
 
 
 @dataclass(frozen=True)
+class StatisticsHorizonTestCase:
+    description: str
+    server_arguments: tuple[str, ...]
+    expected_relations: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class StatisticsHorizonRejectionTestCase:
+    description: str
+    days: str
+    expected_error: str
+
+
+@dataclass(frozen=True)
 class DenialMetadataTestCase:
     description: str
     expected_denial_count: int

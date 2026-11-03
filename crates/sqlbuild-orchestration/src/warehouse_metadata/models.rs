@@ -1,8 +1,11 @@
 //! Existing warehouse state rows, with their physical state-table provenance.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::store::errors::ControlError;
+use crate::warehouse_metadata::constants::DEFAULT_STATISTICS_RETENTION_DAYS;
 
 /// Preserve observations, not an inferred latest version, age status or run outcome.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -706,4 +709,33 @@ pub struct StatisticsObservation {
 pub struct StatisticsPage {
     pub records: Vec<StatisticsObservation>,
     pub next_after: Option<WarehouseReconciliationCursor>,
+}
+
+/// Installation configuration: expired samples are hidden on read before bounded pruning removes them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StatisticsRetention {
+    days: u16,
+}
+
+impl StatisticsRetention {
+    pub fn days(days: u16) -> Result<Self, ControlError> {
+        if days == 0 {
+            return Err(ControlError::Invalid(
+                "statistics retention must keep at least one day".into(),
+            ));
+        }
+        Ok(Self { days })
+    }
+
+    pub(crate) fn cutoff(self, now: DateTime<Utc>) -> DateTime<Utc> {
+        now - Duration::days(i64::from(self.days))
+    }
+}
+
+impl Default for StatisticsRetention {
+    fn default() -> Self {
+        Self {
+            days: DEFAULT_STATISTICS_RETENTION_DAYS,
+        }
+    }
 }

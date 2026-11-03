@@ -1006,3 +1006,45 @@ def append_contended_fingerprints(
             )
         finally:
             blocker.rollback()
+
+
+def run_statistics_retention(directory: Path, arguments: tuple[str, ...]) -> str:
+    """Run one installed server until its first retention pass, returning its stderr."""
+    log: Path = directory / "server.log"
+    environment: dict[str, str] = os.environ.copy()
+    environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
+    with log.open("wb") as stderr:
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "server",
+                "--port",
+                "0",
+                "--no-scheduler",
+                *arguments,
+            ],
+            cwd=directory,
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=stderr,
+        )
+        try:
+            _ = api_address(process, log)
+            deadline: float = time.monotonic() + 10
+            while "sentinel_expired" in statistics_relations(directory):
+                assert process.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, "retention did not run at startup"
+                time.sleep(0.05)
+        finally:
+            process.terminate()
+            _ = process.wait(timeout=10)
+    return log.read_text()
+
+
+def statistics_relations(directory: Path) -> tuple[str, ...]:
+    """Read the retained sample relations directly, oldest first."""
+    with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
+        rows: list[tuple[str]] = connection.execute(
+            "SELECT relation_name FROM sqb_warehouse_statistics ORDER BY observed_at"
+        ).fetchall()
+    return tuple(name for (name,) in rows)

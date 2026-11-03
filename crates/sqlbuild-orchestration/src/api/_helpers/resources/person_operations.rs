@@ -23,7 +23,7 @@ use crate::warehouse_metadata::main::read_person_node_status::read_person_node_s
 use crate::warehouse_metadata::main::read_person_statistics::read_person_statistics;
 use crate::warehouse_metadata::models::{
     CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery, NodeStatus,
-    NodeStatusQuery, StatisticsPage, StatisticsQuery,
+    NodeStatusQuery, StatisticsPage, StatisticsQuery, StatisticsRetention,
 };
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/statistics", operation_id = "readPersonStatistics",
@@ -37,7 +37,10 @@ use crate::warehouse_metadata::models::{
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn statistics(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(default_role): Extension<DefaultRole>,
+    (Extension(default_role), Extension(retention)): (
+        Extension<DefaultRole>,
+        Extension<StatisticsRetention>,
+    ),
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<StatisticsQuery>),
     headers: HeaderMap,
 ) -> Result<Json<StatisticsPage>, ApiError> {
@@ -46,7 +49,7 @@ pub(crate) async fn statistics(
             &store,
             (&context, session_credentials(&headers)),
             (location_id, &target, &options),
-            default_role,
+            (default_role, retention),
         )
         .await?,
     ))

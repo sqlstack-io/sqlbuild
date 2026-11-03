@@ -8,7 +8,7 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use crate::argv::models::{Namespace, Stream};
-use crate::native_commands::_helpers::decision::{control_address, control_authentication, flag};
+use crate::native_commands::_helpers::decision::{control_address, control_api_settings, flag};
 use crate::native_commands::_helpers::execution::{
     open_control_store, open_control_workers, start_platform_roles, supervise_control_roles,
 };
@@ -27,7 +27,7 @@ pub(crate) async fn run_control(
     standalone: bool,
 ) -> Result<(), ControlError> {
     let address = control_address(namespace, standalone)?;
-    let authentication = control_authentication(namespace)?;
+    let (authentication, retention) = control_api_settings(namespace)?;
     let store = open_control_store(namespace).await?;
     let (workers, images) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
@@ -43,7 +43,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            (authentication, images),
+            (authentication, images, retention),
             (
                 move || {
                     drop(write_output(&[(

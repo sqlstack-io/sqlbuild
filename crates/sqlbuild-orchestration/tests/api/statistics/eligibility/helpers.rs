@@ -60,7 +60,7 @@ pub(crate) async fn statistics_eligibility(
         store,
         credentials,
         (location, "development", &options),
-        DefaultRole::None,
+        (DefaultRole::None, Default::default()),
     )
     .await
     .expect("unknown rows and zero bytes remain distinct");

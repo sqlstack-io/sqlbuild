@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -11,10 +11,10 @@ use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 use crate::store::types::Row;
 use crate::warehouse_metadata::_helpers::ingestion::scoped_event_id;
-use crate::warehouse_metadata::constants::{MAX_HISTORY_RECORDS, STATISTICS_RETENTION_DAYS};
+use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
-    StatisticsObservation, StatisticsPage, StatisticsQuery, WarehouseCatalogRecord,
-    WarehouseReconciliationCursor,
+    StatisticsObservation, StatisticsPage, StatisticsQuery, StatisticsRetention,
+    WarehouseCatalogRecord, WarehouseReconciliationCursor,
 };
 
 pub(crate) fn statistics_event_id(
@@ -30,9 +30,12 @@ pub(crate) fn statistics_event_id(
 }
 
 /// Expiration is bounded global cleanup, never a lifecycle status or warehouse write.
-pub(crate) async fn prune_statistics(store: &ControlStore) -> Result<usize, ControlError> {
+pub(crate) async fn prune_statistics(
+    store: &ControlStore,
+    retention: StatisticsRetention,
+) -> Result<usize, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let cutoff = transaction.now - Duration::days(STATISTICS_RETENTION_DAYS);
+    let cutoff = retention.cutoff(transaction.now);
     let (transaction, rows) = query(transaction,
         "DELETE FROM sqb_warehouse_statistics WHERE event_id IN (SELECT event_id FROM sqb_warehouse_statistics \
          WHERE observed_at<$1 ORDER BY observed_at,event_id LIMIT $2) RETURNING event_id",
@@ -100,7 +103,7 @@ pub(crate) async fn eligible_names(
 pub(crate) async fn read_statistics_page(
     transaction: ControlTransaction,
     (location_id, target): (Uuid, &str),
-    options: &StatisticsQuery,
+    (options, retention): (&StatisticsQuery, StatisticsRetention),
 ) -> Result<(ControlTransaction, StatisticsPage), ControlError> {
     if options.schema.trim().is_empty()
         || options.name.trim().is_empty()
@@ -114,7 +117,7 @@ pub(crate) async fn read_statistics_page(
         .limit
         .unwrap_or(MAX_HISTORY_RECORDS as u32)
         .clamp(1, MAX_HISTORY_RECORDS as u32) as usize;
-    let cutoff = transaction.now - Duration::days(STATISTICS_RETENTION_DAYS);
+    let cutoff = retention.cutoff(transaction.now);
     let mut parameters = vec![
         Parameter::Id(location_id),
         Parameter::Text(target.into()),

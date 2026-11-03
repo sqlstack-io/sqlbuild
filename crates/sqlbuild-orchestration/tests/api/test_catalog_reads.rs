@@ -326,7 +326,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                             limit: None,
                         }
                     ),
-                    DefaultRole::None,
+                    (DefaultRole::None, Default::default()),
                 )
                 .await,
                 Err(ControlError::Denied { .. })

@@ -11,6 +11,7 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::warehouse_metadata::models::StatisticsRetention;
 use uuid::Uuid;
 
 use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
@@ -260,9 +261,24 @@ pub(crate) fn control_address(
     Ok(Some(SocketAddr::new(host, port)))
 }
 
-pub(crate) fn control_authentication(
+/// API settings are validated together before any store is opened.
+pub(crate) fn control_api_settings(
     namespace: &Namespace,
-) -> Result<ApiAuthentication, ControlError> {
+) -> Result<(ApiAuthentication, StatisticsRetention), ControlError> {
+    let retention = match namespace.get("control_statistics_retention_days") {
+        Some(Value::Int(value)) => {
+            StatisticsRetention::days(value.parse::<u16>().map_err(|_| {
+                ControlError::Invalid(
+                    "--statistics-retention-days must be between 1 and 65535".into(),
+                )
+            })?)?
+        }
+        _ => StatisticsRetention::default(),
+    };
+    Ok((control_authentication(namespace)?, retention))
+}
+
+fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, ControlError> {
     Ok(ApiAuthentication {
         password_origin: text(namespace, "control_password_origin"),
         default_role: serde_json::from_value(json!(

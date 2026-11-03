@@ -112,7 +112,7 @@ pub(crate) async fn run_development_roles(
         (ApiAuthentication {
             development_scope: Some(scope),
             ..ApiAuthentication::default()
-        }, Vec::new()),
+        }, Vec::new(), Default::default()),
         (move || {
             drop(write_output(&[(Stream::Stderr, &format!(
                 "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",

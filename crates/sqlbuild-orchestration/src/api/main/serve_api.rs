@@ -12,11 +12,16 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::run_statistics_retention::run_statistics_retention;
+use crate::warehouse_metadata::models::StatisticsRetention;
 
 pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
-    (authentication, images): (ApiAuthentication, Vec<DockerImageSource>),
+    (authentication, images, retention): (
+        ApiAuthentication,
+        Vec<DockerImageSource>,
+        StatisticsRetention,
+    ),
     (ready, shutdown): (
         impl FnOnce() + Send + 'static,
         impl Future<Output = ()> + Send + 'static,
@@ -35,6 +40,7 @@ pub async fn serve_api(
     let application = router(&store, feed)
         .merge(authentication_routes)
         .layer(Extension(std::sync::Arc::new(images)))
+        .layer(Extension(retention))
         .route(
             "/api/openapi.json",
             get(|| async { Json(openapi_document()) }),
@@ -53,7 +59,7 @@ pub async fn serve_api(
     tokio::select! {
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
-        result = run_statistics_retention(&store) => result,
+        result = run_statistics_retention(&store, retention) => result,
     }
 }
 
