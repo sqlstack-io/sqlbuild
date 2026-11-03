@@ -4,7 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::main::deny_authorization::deny;
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AdministratorAuthentication, AuditContext};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;

@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime};
 
-use sqlbuild_orchestration::credentials::main::create_location::create_location;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
+use sqlbuild_orchestration::credentials::main::locations::create_location::create_location;
+use sqlbuild_orchestration::credentials::main::tokens::issue_token::issue_token;
+use sqlbuild_orchestration::credentials::main::tokens::revoke_token::revoke_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope, IssuedToken};
 use sqlbuild_orchestration::runs::main::change_run::change_run;
 use sqlbuild_orchestration::runs::main::claim_next_run::claim_next_run;

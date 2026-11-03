@@ -275,3 +275,17 @@ class ProjectionReplayTestCase:
     description: str
     open_store: Callable[[tuple[Path, Path]], AbstractContextManager[ProjectionStore]]
     expected_progress_facts: int
+
+
+@dataclass(frozen=True)
+class CliLoginTestCase:
+    description: str
+    authentication: str
+    expected_person_name: str
+
+
+@dataclass(frozen=True)
+class CliCleanupTestCase:
+    description: str
+    server: str
+    expected_exit: int

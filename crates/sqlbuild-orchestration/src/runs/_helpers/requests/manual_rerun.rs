@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};

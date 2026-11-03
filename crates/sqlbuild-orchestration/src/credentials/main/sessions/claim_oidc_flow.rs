@@ -5,7 +5,7 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::credentials::_helpers::secrets::secret_matches;
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, StoredOidcFlow};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};

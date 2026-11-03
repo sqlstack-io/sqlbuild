@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::credentials::_helpers::passwords::hash_password;
 use crate::credentials::constants::{MAX_PASSWORD_BYTES, MIN_PASSWORD_CHARACTERS};
-use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::main::revoke_session::revoke_session;
+use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::sessions::revoke_session::revoke_session;
 use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

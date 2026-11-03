@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQLBuild CLI sign-in</title>
+<style>
+body { margin: 0; background: #f6f7f9; color: #202733; font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 30rem; margin: 8vh auto; padding: 2rem; background: white; border: 1px solid #dbe0e7; border-radius: .75rem; }
+h1 { margin-top: 0; font-size: 1.5rem; }
+label { display: block; margin-top: 1rem; }
+input { display: block; box-sizing: border-box; width: 100%; padding: .7rem; border: 1px solid #9ca8b8; border-radius: .3rem; font: inherit; }
+button, a { font: inherit; }
+button { margin: 1rem .5rem 0 0; padding: .65rem 1rem; background: #174ec6; color: white; border: 1px solid #174ec6; border-radius: .3rem; cursor: pointer; }
+button.secondary { background: white; color: #202733; border-color: #9ca8b8; }
+button:disabled { opacity: .55; cursor: wait; }
+:focus-visible { outline: 3px solid #99baff; outline-offset: 3px; }
+code { display: block; margin: 1rem 0; padding: .75rem; background: #f0f3f8; font-size: 1.35rem; letter-spacing: .15em; text-align: center; }
+#account { overflow-wrap: anywhere; font-size: .9rem; }
+#message { min-height: 1.5rem; }
+@media (max-width: 36rem) { main { margin: 1rem; padding: 1.25rem; } }
+[hidden] { display: none !important; }
+</style>
+<script src="/auth/cli.js" defer></script>
+</head>
+<body data-method="__LOGIN_METHOD__">
+<main>
+<h1>Sign in to SQLBuild CLI</h1>
+<p>Only continue if you started <strong>sqb login</strong> yourself. Compare this code with your terminal:</p>
+<code id="code" aria-label="Verification code">—</code>
+<p id="message" role="status" aria-live="polite">Checking your sign-in…</p>
+<form id="password" hidden>
+<label for="username">Username</label><input id="username" name="username" autocomplete="username" required>
+<label for="password-value">Password</label><input id="password-value" name="password" type="password" autocomplete="current-password" required>
+<button type="submit">Sign in</button>
+</form>
+<button id="sso" hidden>Sign in with SSO</button>
+<button id="proxy" hidden>Continue with your organization</button>
+<section id="confirmation" hidden>
+<p id="account"></p>
+<p>The CLI will use your existing permissions for a bounded session. This does not create an API token or grant access.</p>
+<button id="approve">Authorize CLI</button>
+<button id="cancel" class="secondary">Cancel</button>
+</section>
+<noscript>JavaScript is required to confirm this CLI sign-in.</noscript>
+</main>
+</body>
+</html>

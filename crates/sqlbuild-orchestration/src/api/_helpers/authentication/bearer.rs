@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::api::models::{DevelopmentScope, ReadResource};
-use crate::credentials::main::authenticate_token::authenticate_token;
+use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};

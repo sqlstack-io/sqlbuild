@@ -27,6 +27,16 @@ pub fn openapi_document() -> utoipa::openapi::OpenApi {
         .components
         .get_or_insert_with(Default::default)
         .add_security_scheme(
+            "cliSession",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "Authorization",
+                "Session <credential> from sqb login; never combine with Cookie. Writes also require x-sqb-csrf.",
+            ))),
+        );
+    document
+        .components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(
             "proxy",
             SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
                 PROXY_USER_HEADER,

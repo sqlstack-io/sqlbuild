@@ -8,7 +8,9 @@ use uuid::Uuid;
 use crate::api::models::{ApiAuthentication, AuthenticationDenial, PasswordSessionResponse};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::PasswordApiTestCase;
-use crate::credentials::main::{create_principal::create_principal, set_password::set_password};
+use crate::credentials::main::{
+    identities::create_principal::create_principal, sessions::set_password::set_password,
+};
 use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority, PrincipalKind};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,

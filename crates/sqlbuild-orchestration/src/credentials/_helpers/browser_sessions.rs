@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::credentials::_helpers::secrets::new_bearer;
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, IssuedSession, SessionIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;

@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::authorization::_helpers::administrators::grant_installation_admin;
 use crate::authorization::main::deny_authorization::deny;
-use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::main::revoke_session::revoke_session;
+use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::sessions::revoke_session::revoke_session;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};

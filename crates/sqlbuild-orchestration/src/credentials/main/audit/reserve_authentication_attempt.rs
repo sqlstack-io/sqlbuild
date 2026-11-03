@@ -5,7 +5,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::constants::{LOGIN_PEER_LIMIT, LOGIN_USER_LIMIT, LOGIN_WINDOW_SECONDS};
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, AuthenticationAttempt};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

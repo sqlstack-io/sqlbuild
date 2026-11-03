@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
 use crate::declarations::_helpers::operator_state::apply_operator_change;
 use crate::declarations::models::{EditableTriggerState, TriggerChangeRequest};

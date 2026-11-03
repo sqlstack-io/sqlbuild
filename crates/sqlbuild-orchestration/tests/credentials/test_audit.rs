@@ -19,8 +19,8 @@ use crate::authorization::main::{
     read_security_audit::read_security_audit,
 };
 use crate::credentials::main::{
-    append_audit::append_audit, create_principal::create_principal, login_password::login_password,
-    set_password::set_password,
+    audit::append_audit::append_audit, identities::create_principal::create_principal,
+    sessions::login_password::login_password, sessions::set_password::set_password,
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,

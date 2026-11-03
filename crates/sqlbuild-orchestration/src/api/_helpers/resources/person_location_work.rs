@@ -22,7 +22,7 @@ use crate::store::models::ControlStore;
     request_body = ConnectionTestRequest,
     responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
-    security(("session" = [])))]
+    security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target)): Path<(Uuid, String)>,
@@ -50,7 +50,7 @@ pub(crate) async fn request(
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("request_id" = Uuid, Path),
         ("x-sqb-csrf" = String, Header)),
     responses((status = 200, body = Option<LocationWorkRecord>), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn result(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target, request_id)): Path<(Uuid, String, Uuid)>,

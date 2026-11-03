@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::api::errors::ClientError;
-use crate::credentials::main::issue_token::issue_token;
-use crate::credentials::main::revoke_token::revoke_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
+use crate::credentials::main::tokens::revoke_token::revoke_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::runs::main::change_run::change_run;
 use crate::runs::main::claim_next_run::claim_next_run;
@@ -113,6 +113,19 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             assert_eq!(
                 openapi["components"]["securitySchemes"]["bearer"]["scheme"],
                 "bearer"
+            );
+            assert_eq!(
+                openapi["components"]["securitySchemes"]["cliSession"]["name"],
+                "Authorization"
+            );
+            assert_eq!(
+                openapi["paths"]["/api/control/runs"]["post"]["security"],
+                json!([{"session": []}, {"cliSession": []}])
+            );
+            assert_eq!(
+                openapi["paths"]["/api/auth/cli/approve"]["post"]["security"],
+                json!([{"session": []}]),
+                "browser authorization cannot use a CLI session header"
             );
             assert!(openapi["components"]["schemas"]["SnapshotInput"].is_object());
             assert!(openapi["components"]["schemas"]["RunChangeRequest"].is_object());

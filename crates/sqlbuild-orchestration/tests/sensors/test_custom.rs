@@ -7,7 +7,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::tests::helpers::{start_api, stop_api};
-use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;

@@ -47,7 +47,13 @@ def successful(output: subprocess.CompletedProcess[str]) -> dict[str, Any]:
 
 @contextmanager
 def serve(
-    installation: tuple[Path, Path], *, extra_environment: dict[str, str] | None = None
+    installation: tuple[Path, Path],
+    *,
+    extra_environment: dict[str, str] | None = None,
+    authentication_arguments: tuple[str, ...] = (
+        "--password-origin",
+        "https://control.example.com",
+    ),
 ) -> Iterator[str]:
     """Kill and reap the server before returning, on Windows as well as Unix."""
     binary, root = installation
@@ -60,8 +66,7 @@ def serve(
                 "--port",
                 "0",
                 "--no-scheduler",
-                "--password-origin",
-                "https://control.example.com",
+                *authentication_arguments,
             ],
             cwd=root,
             env=environment(extra_environment),

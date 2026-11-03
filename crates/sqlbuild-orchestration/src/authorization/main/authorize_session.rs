@@ -3,7 +3,7 @@
 use serde_json::json;
 
 use crate::authorization::main::deny_authorization::deny;
-use crate::credentials::main::authenticate_session_in::authenticate_session_in;
+use crate::credentials::main::sessions::authenticate_session_in::authenticate_session_in;
 use crate::credentials::models::{
     Action, AuditContext, BuiltinRole, DefaultRole, PermissionScope, SessionAccess,
 };

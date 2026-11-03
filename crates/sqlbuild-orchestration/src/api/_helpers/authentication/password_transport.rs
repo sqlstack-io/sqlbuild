@@ -10,41 +10,15 @@ use axum::{Extension, Json};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::api::constants::{
-    HTTPS_SCHEME, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER, ROOT_PATH,
-};
+use crate::api::constants::{PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER};
 use crate::api::errors::ApiError;
 use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
-use crate::credentials::main::authenticate_session::authenticate_session;
-use crate::credentials::main::record_authentication_denial::record_authentication_denial;
+use crate::credentials::main::audit::record_authentication_denial::record_authentication_denial;
+use crate::credentials::main::sessions::authenticate_session::authenticate_session;
 use crate::credentials::models::{AuditContext, IssuedSession, SessionAccess};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
-
-pub(crate) fn parse_origin(value: &str, mechanism: &str) -> Result<BrowserOrigin, ControlError> {
-    let error = || {
-        ControlError::Invalid(format!(
-            "{mechanism} authentication requires an HTTPS origin without credentials, path, query or fragment"
-        ))
-    };
-    let url = reqwest::Url::parse(value).map_err(|_| {
-        ControlError::Invalid(format!(
-            "{mechanism} authentication requires an HTTPS origin"
-        ))
-    })?;
-    if url.scheme() != HTTPS_SCHEME
-        || url.host().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.path() != ROOT_PATH
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        return Err(error());
-    }
-    Ok(BrowserOrigin(url.origin().ascii_serialization()))
-}
 
 pub(crate) async fn guard(
     State(store): State<ControlStore>,
@@ -110,12 +84,8 @@ pub(crate) async fn authenticate(
             csrf: single_header(request.headers(), PASSWORD_CSRF_HEADER).unwrap_or_default(),
         }
     };
-    let identity = authenticate_session(
-        &store,
-        browser_cookie(request.headers(), PASSWORD_COOKIE).unwrap_or_default(),
-        access,
-    )
-    .await?;
+    let identity =
+        authenticate_session(&store, session_credentials(request.headers()).0, access).await?;
     let Some(identity) = identity else {
         return deny(&store, &context, "invalid_session_or_csrf").await;
     };
@@ -136,8 +106,18 @@ pub(crate) fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'
 }
 
 pub(crate) fn session_credentials(headers: &HeaderMap) -> (&str, &str) {
+    let cookie = browser_cookie(headers, PASSWORD_COOKIE);
+    let authorization = if headers.contains_key(header::AUTHORIZATION) {
+        if headers.contains_key(header::COOKIE) {
+            return ("", "");
+        }
+        single_header(headers, header::AUTHORIZATION.as_str())
+            .and_then(|value| value.strip_prefix("Session "))
+    } else {
+        cookie
+    };
     (
-        browser_cookie(headers, PASSWORD_COOKIE).unwrap_or_default(),
+        authorization.unwrap_or_default(),
         single_header(headers, PASSWORD_CSRF_HEADER).unwrap_or_default(),
     )
 }

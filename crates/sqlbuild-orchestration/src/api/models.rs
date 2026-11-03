@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api::_helpers::authentication::oidc;
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::trusted_proxy;
+use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changes, location_health, location_work, person_location_work,
     person_operations, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
@@ -30,6 +30,9 @@ use crate::api::_helpers::resources::{
     password_sessions::current,
     password_sessions::logout,
     password_sessions::change_password,
+    cli_login::start,
+    cli_login::approve,
+    cli_login::claim,
     trusted_proxy::identity,
     oidc::login,
     oidc::callback,
@@ -244,6 +247,67 @@ impl std::fmt::Debug for PasswordChangeRequest {
 pub struct PasswordSessionResponse {
     pub identity: crate::credentials::models::SessionIdentity,
     pub csrf_token: String,
+}
+
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CliLoginStartRequest {
+    pub(crate) client_hash: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum BrowserLoginMethod {
+    Password,
+    Oidc,
+    Proxy,
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CliLoginApprovalRequest {
+    pub(crate) browser_code: String,
+    pub(crate) approve: bool,
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CliLoginClaimRequest {
+    pub(crate) flow_id: uuid::Uuid,
+    pub(crate) client_secret: String,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct CliLoginSessionResponse {
+    pub(crate) identity: crate::credentials::models::SessionIdentity,
+    pub(crate) bearer: String,
+    pub(crate) csrf_token: String,
+}
+
+impl std::fmt::Debug for CliLoginApprovalRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CliLoginApprovalRequest")
+            .field("approve", &self.approve)
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for CliLoginClaimRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CliLoginClaimRequest")
+            .field("flow_id", &self.flow_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for CliLoginSessionResponse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CliLoginSessionResponse")
+            .field("identity", &self.identity)
+            .finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for PasswordSessionResponse {

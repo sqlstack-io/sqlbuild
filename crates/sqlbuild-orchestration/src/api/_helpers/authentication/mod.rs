@@ -1,4 +1,5 @@
 pub(crate) mod bearer;
+pub(crate) mod cli_login;
 pub(crate) mod configure;
 pub(crate) mod oidc;
 pub(crate) mod oidc_provider;

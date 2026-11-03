@@ -1,7 +1,7 @@
 //! Read authentication and mutations share the same live session/version checks.
 
 use crate::credentials::_helpers::secrets::bearer_id;
-use crate::credentials::main::authenticate_session_in::authenticate_session_in as authenticate;
+use crate::credentials::main::sessions::authenticate_session_in::authenticate_session_in as authenticate;
 use crate::credentials::models::{SessionAccess, SessionIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};

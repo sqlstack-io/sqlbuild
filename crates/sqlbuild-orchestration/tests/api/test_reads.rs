@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use crate::credentials::main::create_principal::create_principal;
-use crate::credentials::main::issue_token::issue_token;
-use crate::credentials::main::revoke_token::revoke_token;
+use crate::credentials::main::identities::create_principal::create_principal;
+use crate::credentials::main::tokens::issue_token::issue_token;
+use crate::credentials::main::tokens::revoke_token::revoke_token;
 use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;

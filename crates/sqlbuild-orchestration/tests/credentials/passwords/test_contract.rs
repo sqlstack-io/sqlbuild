@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::credentials::main::{
-    create_principal::create_principal, set_password::set_password,
-    verify_password::verify_password,
+    identities::create_principal::create_principal, sessions::set_password::set_password,
+    sessions::verify_password::verify_password,
 };
 use crate::credentials::models::{AuditContext, PasswordAuthority, PrincipalKind};
 use crate::credentials::tests::helpers::authentication_revision;

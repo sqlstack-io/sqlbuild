@@ -15,7 +15,7 @@ use crate::store::models::ControlStore;
     params(("after" = Option<i64>, Query, description = "Exclusive storage-order cursor; pre-upgrade facts are ordered by timestamp and event ID"), ("limit" = Option<u32>, Query)),
     responses((status = 200, body = Vec<SecurityAuditEvent>), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
-    security(("session" = [])))]
+    security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn read(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Query(options): Query<ReadAuditQuery>,

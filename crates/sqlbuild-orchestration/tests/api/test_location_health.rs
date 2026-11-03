@@ -1,4 +1,4 @@
-use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::platform::main::report_remote_location_health::report_remote_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};

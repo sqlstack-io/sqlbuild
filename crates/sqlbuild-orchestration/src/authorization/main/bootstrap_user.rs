@@ -4,8 +4,8 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::administrators::grant_installation_admin;
-use crate::credentials::main::append_audit::append_audit;
-use crate::credentials::main::insert_principal::insert_principal;
+use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::identities::insert_principal::insert_principal;
 use crate::credentials::models::{AuditContext, PrincipalKind};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

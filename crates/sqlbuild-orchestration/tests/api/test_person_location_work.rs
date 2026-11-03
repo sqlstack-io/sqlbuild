@@ -7,7 +7,8 @@ use crate::authorization::main::{
     assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
 };
 use crate::credentials::main::{
-    create_principal::create_principal, login_password::login_password, set_password::set_password,
+    identities::create_principal::create_principal, sessions::login_password::login_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,

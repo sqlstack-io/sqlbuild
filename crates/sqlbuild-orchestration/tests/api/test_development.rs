@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::api::models::{ApiAuthentication, DevelopmentScope};
-use crate::credentials::main::development_location::development_location;
+use crate::credentials::main::locations::development_location::development_location;
 use crate::credentials::models::AuditContext;
 use crate::declarations::main::{
     change_trigger::change_trigger, list_triggers::list_triggers,

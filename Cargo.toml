@@ -75,6 +75,7 @@ getrandom = "0.4"
 globset = "0.4"
 # Windows only: tells NTFS junctions, which Python walks as directories, from symbolic links.
 junction = { version = "2.1.0", default-features = false }
+keyring = { version = "3.6.3", default-features = false }
 # Python loads the extension with dlopen, so mimalloc must not use initial-exec TLS.
 mimalloc = { version = "0.1", default-features = false, features = ["local_dynamic_tls"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }

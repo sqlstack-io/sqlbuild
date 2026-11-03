@@ -30,6 +30,8 @@ mod statistics_retention;
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
 mod test_changes;
+#[path = "test_cli_login.rs"]
+mod test_cli_login;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "test_development.rs"]
