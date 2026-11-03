@@ -1,4 +1,4 @@
-"""One disposable database per native suite; Rust fixtures isolate their own schemas."""
+"""One disposable PostgreSQL server per suite; Rust fixtures isolate their own databases."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ def run_native_tests(argv: list[str] | None = None) -> int:
     print("Starting disposable PostgreSQL for native integration tests...", flush=True)
     try:
         with PostgresContainer(POSTGRES_IMAGE, driver=None) as postgres:
-            print("PostgreSQL ready. Running native tests with isolated schemas...", flush=True)
+            print("PostgreSQL ready. Running native tests with isolated databases...", flush=True)
             result: subprocess.CompletedProcess[bytes] = subprocess.run(
                 ["cargo", "test", *arguments],
                 env=os.environ
