@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -265,6 +267,60 @@ def test_given_seeded_edit_series_when_compiling_each_edit_then_deltas_match_ful
 @pytest.mark.parametrize(
     "test_case",
     [
+        DeltaCompileSeriesTestCase(
+            description="cache mode diagnostic control",
+            seed=16,
+            steps=1,
+            json_output=True,
+            adapter=_UNTYPED_ADAPTER,
+            expected_minimum_deltas=1,
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cache_mode_mismatch_when_comparing_then_keeps_actual_cli_evidence(
+    tmp_path: Path,
+    test_case: DeltaCompileSeriesTestCase,
+) -> None:
+    project_dir: Path = tmp_path / "orders"
+    destination: Path = tmp_path / "private-evidence"
+    write_delta_compile_project(project_dir=project_dir, model_count=30, adapter=test_case.adapter)
+
+    series: DeltaCompileSeries = run_delta_compile_series(
+        project_dir=project_dir,
+        seed=test_case.seed,
+        steps=test_case.steps,
+        compile_project=partial(
+            run_delta_compile, project_dir=project_dir, args=_JSON_COMPILE, env={}
+        ),
+        compile_in_full=partial(run_full_compile, args=(*_JSON_COMPILE, "--no-cache")),
+        diagnostics_dir=destination,
+        case=test_case.description,
+    )
+
+    assert series.deltas >= test_case.expected_minimum_deltas
+    assert len(series.unexpected) == 1
+    assert "stderr differs from a full compile" in series.unexpected[0]
+    directory: Path = destination / "failure-00"
+    manifest: dict[str, Any] = json.loads((directory / "manifest.json").read_text())
+    assert manifest["runs"]["delta"]["returncode"] == manifest["runs"]["full"]["returncode"] == 0
+    assert (
+        manifest["runs"]["delta"]["semantic_json_sha256"]
+        == manifest["runs"]["full"]["semantic_json_sha256"]
+    )
+    assert manifest["runs"]["full"]["command"][-3:] == ["compile", "--json", "--no-cache"]
+    assert "SQL test planning  START" in (directory / "full.stderr").read_text()
+    assert "SQL test planning  START" not in (directory / "delta.stderr").read_text()
+    delta: dict[str, Any] = json.loads((directory / "delta.artifacts.json").read_text())["files"]
+    full: dict[str, Any] = json.loads((directory / "full.artifacts.json").read_text())["files"]
+    assert {path: state["sha256"] for path, state in delta.items()} == {
+        path: state["sha256"] for path, state in full.items()
+    }
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         DeltaCompileSeriesTestCase(description="text_report", seed=15, json_output=False, steps=12),
         DeltaCompileSeriesTestCase(
             description="partial_checks_json_report",
@@ -291,6 +347,8 @@ def test_given_seeded_edit_series_when_compiling_each_edit_then_output_matches_f
         steps=test_case.steps,
         compile_project=partial(run_delta_compile, project_dir=project_dir, args=args, env={}),
         compile_in_full=partial(run_full_compile, args=args),
+        diagnostics_dir=tmp_path / "private-comparison-evidence",
+        case=test_case.description,
     )
 
     assert series.unexpected == test_case.expected_unexpected_outcomes, series.steps

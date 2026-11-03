@@ -25,6 +25,8 @@ class DeltaCompileOutcome:
     returncode: int
     stdout: str
     stderr: str
+    command: tuple[str, ...] = ()
+    environment: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
