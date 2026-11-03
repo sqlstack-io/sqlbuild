@@ -121,6 +121,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                     .status,
                 RunStatus::Running
             );
+            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             let launch_failed = RunChangeRequest {
                 event_id: Uuid::now_v7(),
                 change: RunChange::LaunchFailed {
@@ -560,6 +561,7 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 .expect("claim following run")
                 .expect("released capacity");
             assert_eq!(following.request.run_id, Uuid::from_u128(2));
+            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             close_test_store(fixture).await;
         });
     }
@@ -719,6 +721,7 @@ fn given_unclaimed_work_when_an_operator_cancels_then_a_terminal_fact_prevents_l
                 events[2]["payload"]["change"]["change"]["actor"],
                 "test-operator"
             );
+            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             close_test_store(fixture).await;
         });
     }

@@ -1,0 +1,13 @@
+{
+  "snapshot_damage": [
+    "DELETE FROM sqb_current_snapshots",
+    "UPDATE sqb_job_nodes SET node_key=node_key || '_damaged'",
+    "UPDATE sqb_jobs SET definition_json='{}',overlap_policy='allow'",
+    "INSERT INTO sqb_jobs SELECT location_id,'unpublished',job_key,snapshot_id,kind,definition_json,overlap_policy FROM sqb_jobs WHERE job_key='orders' LIMIT 1",
+    "INSERT INTO sqb_job_nodes SELECT location_id,target,job_key,'extra_node' FROM sqb_jobs WHERE target='unpublished'"
+  ],
+  "run_damage": [
+    "DELETE FROM sqb_run_nodes",
+    "UPDATE sqb_runs SET status='queued',node_counts_json='{}',request_json='{}',priority=-99,status_reason='damaged',started_at=NULL,ended_at=NULL,cancel_requested_at=NULL,last_event_storage_id=0"
+  ]
+}

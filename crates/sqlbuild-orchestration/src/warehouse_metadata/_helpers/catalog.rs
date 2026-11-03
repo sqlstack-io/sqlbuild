@@ -7,12 +7,15 @@ use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
-use crate::store::main::query::query;
-use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
+use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
+use crate::store::models::{
+    Change, ControlEvent, ControlStore, ControlTransaction, Parameter, TransactionMode,
+};
 use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
-    CatalogBatch, CatalogObservation, CatalogPage, CatalogQuery, WarehouseReconciliationCursor,
+    CatalogBatch, CatalogObservation, CatalogPage, CatalogQuery, CatalogReplayRow,
+    WarehouseCatalogRecord, WarehouseReconciliationCursor,
 };
 
 pub(crate) fn validate_catalog(batch: &CatalogBatch) -> Result<(), ControlError> {
@@ -70,6 +73,23 @@ pub(crate) async fn append_catalog_fact(
             "catalog observation conflicts with a durable fact".into(),
         ));
     }
+    Ok(transaction)
+}
+
+pub(crate) async fn project_catalog_record(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+    relation_id: Uuid,
+    record: &WarehouseCatalogRecord,
+) -> Result<ControlTransaction, ControlError> {
+    let now = transaction.now;
+    let (transaction, _) = query(transaction,
+        "INSERT INTO sqb_warehouse_catalog (event_id,location_id,target,state_database,state_schema,observed_at,record_json,received_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$6) ON CONFLICT (event_id) DO UPDATE SET \
+         observed_at=excluded.observed_at,record_json=excluded.record_json,received_at=excluded.received_at",
+        vec![Parameter::Id(relation_id), Parameter::Id(location_id), Parameter::Text(target.into()),
+            Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone()),
+            Parameter::Time(now), Parameter::Json(json!(record))]).await?;
     Ok(transaction)
 }
 
@@ -142,4 +162,57 @@ pub(crate) async fn read_catalog_page(
             next_after,
         },
     ))
+}
+
+/// Internal replay owner; scan receipts, reader sessions and authoritative facts are preserved.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "awaiting the complete rebuild command")
+)]
+pub(crate) async fn rebuild_catalog_projection(store: &ControlStore) -> Result<(), ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    let (mut transaction, _) =
+        query(transaction, "DELETE FROM sqb_warehouse_catalog", vec![]).await?;
+    let mut after = 0;
+    loop {
+        let rows;
+        (transaction, rows) = query(transaction,
+            "SELECT storage_id,event_schema_version AS schema_version,occurred_at,payload FROM recall_events \
+             WHERE producer='warehouse' AND event_type='warehouse_catalog_changed' AND storage_id>$1 \
+             ORDER BY storage_id LIMIT 100", vec![Parameter::Integer(after)]).await?;
+        if rows.is_empty() {
+            break;
+        }
+        for row in rows {
+            let row: CatalogReplayRow = decode_row(row)?;
+            if row.schema_version != 1 {
+                return Err(ControlError::Invalid(
+                    "cannot replay an unsupported catalog fact schema".into(),
+                ));
+            }
+            after = row.storage_id;
+            transaction.now = row.occurred_at;
+            let fact = row.payload;
+            if fact.present {
+                transaction = project_catalog_record(
+                    transaction,
+                    (fact.location_id, &fact.target),
+                    fact.relation_id,
+                    &fact.record,
+                )
+                .await?;
+            } else {
+                (transaction, _) = query(
+                    transaction,
+                    "DELETE FROM sqb_warehouse_catalog WHERE event_id=$1",
+                    vec![Parameter::Id(fact.relation_id)],
+                )
+                .await?;
+            }
+            transaction
+                .changes
+                .insert(Change::NodeStatus(fact.location_id, fact.target));
+        }
+    }
+    commit(transaction).await
 }

@@ -8,6 +8,8 @@ pub(crate) mod fault_types;
 pub(crate) mod helpers;
 #[path = "leases/helpers.rs"]
 pub(crate) mod lease_helpers;
+#[path = "logical_state/helpers.rs"]
+pub(crate) mod logical_state;
 #[path = "replicas/helpers.rs"]
 pub(crate) mod replica_helpers;
 #[path = "helpers.rs"]

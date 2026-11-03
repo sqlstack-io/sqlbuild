@@ -9,6 +9,9 @@ use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
+use crate::store::tests::replica_helpers::second_store;
+use crate::store::tests::store_helpers::close_store;
+use crate::warehouse_metadata::_helpers::catalog::rebuild_catalog_projection;
 use crate::warehouse_metadata::models::CatalogBatch;
 
 pub(crate) async fn catalog_history(
@@ -42,6 +45,7 @@ pub(crate) async fn catalog_history(
     );
     let initial = evidence(store).await;
     assert_eq!(initial["facts"].as_array().expect("facts").len(), 1);
+    crate::api::tests::warehouse_catalog_replay::catalog_replay_contract(store).await;
     for (field, value, status) in [
         ("generation", json!(2), StatusCode::CONFLICT),
         (
@@ -107,16 +111,53 @@ pub(crate) async fn catalog_history(
             "fact, projection and receipt roll back together"
         );
     }
-    assert_eq!(
-        post((client, &url, bearer), &batch, StatusCode::OK).await["applied"],
-        true
+    let replica = second_store(store).await;
+    let transaction = begin(store, TransactionMode::Write)
+        .await
+        .expect("held catalog writer");
+    let repair_store = replica.clone();
+    let mut repair = tokio::spawn(async move { rebuild_catalog_projection(&repair_store).await });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut repair)
+            .await
+            .is_err()
     );
+    let publisher = outbound.clone();
+    let typed: CatalogBatch = serde_json::from_value(batch.clone()).expect("changed catalog batch");
+    let mut publication =
+        tokio::spawn(async move { publisher.sync_catalog("development", &typed).await });
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut publication)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        evidence(&replica).await,
+        initial,
+        "reader retains the previous committed cut"
+    );
+    commit(transaction).await.expect("release catalog writer");
+    tokio::time::timeout(std::time::Duration::from_secs(20), repair)
+        .await
+        .expect("catalog replay deadline")
+        .expect("join replay")
+        .expect("serialized replay");
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_secs(20), publication)
+            .await
+            .expect("catalog publication deadline")
+            .expect("join publication")
+            .expect("serialized publication")
+            .applied
+    );
+    close_store(replica).await;
     let changed = evidence(store).await;
     assert_eq!(changed["facts"].as_array().expect("facts").len(), 2);
     assert_eq!(
         changed["current"][0]["record_json"]["columns"][1]["data_type"],
         "INTEGER"
     );
+    crate::api::tests::warehouse_catalog_replay::catalog_replay_contract(store).await;
     let mut obsolete: Vec<Value> = Vec::new();
     for index in 0..205 {
         let mut item = record.clone();
@@ -189,6 +230,7 @@ pub(crate) async fn catalog_history(
         removed,
         "committed final-page replay appends no facts"
     );
+    crate::api::tests::warehouse_catalog_replay::catalog_replay_contract(store).await;
 }
 
 async fn post(

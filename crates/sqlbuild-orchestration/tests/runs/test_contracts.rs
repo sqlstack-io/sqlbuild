@@ -4,6 +4,8 @@ mod claim_helpers;
 pub(crate) mod helpers;
 #[path = "monitor/helpers.rs"]
 mod monitor_helpers;
+#[path = "replay/helpers.rs"]
+pub(crate) mod replay_helpers;
 #[path = "termination/helpers.rs"]
 pub(crate) mod terminal_helpers;
 #[path = "test_checks.rs"]
@@ -24,6 +26,8 @@ mod test_lifecycle;
 mod test_monitor;
 #[path = "test_permissions.rs"]
 mod test_permissions;
+#[path = "test_replay.rs"]
+mod test_replay;
 #[path = "test_requests.rs"]
 mod test_requests;
 #[path = "test_reruns.rs"]
