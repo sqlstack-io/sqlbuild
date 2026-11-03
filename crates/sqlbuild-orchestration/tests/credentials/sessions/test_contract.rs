@@ -6,10 +6,11 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::credentials::main::{
-    authenticate_session::authenticate_session, authenticate_token::authenticate_token,
-    create_principal::create_principal, login_password::login_password,
-    reserve_authentication_attempt::reserve_authentication_attempt, revoke_session::revoke_session,
-    set_password::set_password, verify_password::verify_password,
+    audit::reserve_authentication_attempt::reserve_authentication_attempt,
+    identities::create_principal::create_principal,
+    sessions::authenticate_session::authenticate_session, sessions::login_password::login_password,
+    sessions::revoke_session::revoke_session, sessions::set_password::set_password,
+    sessions::verify_password::verify_password, tokens::authenticate_token::authenticate_token,
 };
 use crate::credentials::models::{
     AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, PrincipalKind,

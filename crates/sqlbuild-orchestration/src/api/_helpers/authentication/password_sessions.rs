@@ -7,17 +7,20 @@ use axum::routing::{get, post};
 use axum::{Extension, Json, Router, middleware};
 
 use crate::api::_helpers::authentication::password_transport::{
-    authenticate, deny, guard, parse_origin, session_cookies, set_cookie,
+    authenticate, deny, guard, session_cookies, set_cookie,
 };
 use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE};
 use crate::api::errors::ApiError;
+use crate::api::main::parse_origin::parse_origin;
 use crate::api::models::{
-    AuthenticationDenial, PasswordChangeRequest, PasswordLoginRequest, PasswordSessionResponse,
+    AuthenticationDenial, BrowserLoginMethod, BrowserOrigin, PasswordChangeRequest,
+    PasswordLoginRequest, PasswordSessionResponse,
 };
 use crate::credentials::constants::LOGIN_WINDOW_SECONDS;
 use crate::credentials::main::{
-    login_password::login_password, reserve_authentication_attempt::reserve_authentication_attempt,
-    revoke_session::revoke_session, set_password::set_password, verify_password::verify_password,
+    audit::reserve_authentication_attempt::reserve_authentication_attempt,
+    sessions::login_password::login_password, sessions::revoke_session::revoke_session,
+    sessions::set_password::set_password, sessions::verify_password::verify_password,
 };
 use crate::credentials::models::{
     AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, SessionIdentity,
@@ -30,6 +33,7 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
     Router::new()
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
+        .route("/api/auth/cli/approve", post(super::cli_login::approve))
         .route(
             "/api/control/audit",
             get(crate::api::_helpers::resources::audit::read),
@@ -97,7 +101,7 @@ pub(crate) fn router(
     let Some(origin) = origin else {
         return Ok(Router::new());
     };
-    let origin = parse_origin(&origin, "password")?;
+    let origin = BrowserOrigin(parse_origin(&origin, "password")?);
     let protected = protected(store).merge(
         Router::new()
             .route("/api/auth/password", post(change_password))
@@ -105,6 +109,7 @@ pub(crate) fn router(
     );
     Ok(protected
         .route("/api/auth/password/login", post(login))
+        .merge(super::cli_login::router(BrowserLoginMethod::Password))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
         .layer(Extension(origin)))
@@ -159,7 +164,7 @@ pub(crate) async fn login(
 
 #[utoipa::path(get, path = "/api/auth/session", operation_id = "currentSession",
     responses((status = 200, body = SessionIdentity), (status = 401, body = AuthenticationDenial)),
-    security(("session" = [])))]
+    security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn current(
     Extension(identity): Extension<SessionIdentity>,
 ) -> Json<SessionIdentity> {
@@ -169,7 +174,7 @@ pub(crate) async fn current(
 #[utoipa::path(post, path = "/api/auth/logout", operation_id = "logoutSession",
     params(("x-sqb-csrf" = String, Header, description = "Session CSRF token")),
     responses((status = 204), (status = 401, body = AuthenticationDenial)),
-    security(("session" = [])))]
+    security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn logout(
     State(store): State<ControlStore>,
     Extension(context): Extension<AuditContext>,
@@ -189,7 +194,7 @@ pub(crate) async fn logout(
     params(("x-sqb-csrf" = String, Header, description = "Session CSRF token")),
     request_body = PasswordChangeRequest,
     responses((status = 204), (status = 401, body = AuthenticationDenial)),
-    security(("session" = [])))]
+    security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn change_password(
     State(store): State<ControlStore>,
     Extension(context): Extension<AuditContext>,

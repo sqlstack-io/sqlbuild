@@ -2,7 +2,7 @@
 
 use serde_json::json;
 
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::runs::_helpers::lifecycle::changes::{
     check_launch_claim, validate_authority, validate_change, validate_retry,
 };

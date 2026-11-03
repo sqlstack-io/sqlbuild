@@ -9,9 +9,10 @@ use crate::authorization::main::{
     bootstrap_user::bootstrap_user, recover_administrator::recover_administrator,
 };
 use crate::credentials::main::{
-    authenticate_bound_person::authenticate_bound_person,
-    authenticate_session::authenticate_session, create_principal::create_principal,
-    login_password::login_password, set_password::set_password,
+    identities::create_principal::create_principal,
+    sessions::authenticate_bound_person::authenticate_bound_person,
+    sessions::authenticate_session::authenticate_session, sessions::login_password::login_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{
     AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, PrincipalKind,

@@ -1,4 +1,4 @@
-//! Person operations use browser authentication, never the machine-resource bearer router.
+//! Person operations use person sessions, never the machine-resource bearer router.
 
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
@@ -34,7 +34,7 @@ use crate::warehouse_metadata::models::{
         ("after_event_id" = Option<Uuid>, Query), ("limit" = Option<u32>, Query)),
     responses((status = 200, body = StatisticsPage), (status = 400, description = "Invalid relation or cursor"),
         (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn statistics(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
@@ -55,7 +55,7 @@ pub(crate) async fn statistics(
 #[utoipa::path(post, path = "/api/control/runs", operation_id = "requestJobRun",
     params(("x-sqb-csrf" = String, Header)), request_body = JobRunRequest,
     responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     headers: HeaderMap,
@@ -74,7 +74,7 @@ pub(crate) async fn request_job(
 #[utoipa::path(post, path = "/api/control/runs/cancel", operation_id = "cancelPersonRun",
     params(("x-sqb-csrf" = String, Header)), request_body = CancelRunRequest,
     responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn cancel_run(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     headers: HeaderMap,
@@ -89,7 +89,7 @@ pub(crate) async fn cancel_run(
 #[utoipa::path(post, path = "/api/control/runs/rerun", operation_id = "rerunPersonRun",
     params(("x-sqb-csrf" = String, Header)), request_body = RerunRequest,
     responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn rerun(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     headers: HeaderMap,
@@ -108,7 +108,7 @@ pub(crate) async fn rerun(
 #[utoipa::path(post, path = "/api/control/triggers", operation_id = "changeTrigger",
     params(("x-sqb-csrf" = String, Header)), request_body = TriggerChangeRequest,
     responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn change_trigger(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     headers: HeaderMap,
@@ -123,7 +123,7 @@ pub(crate) async fn change_trigger(
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs", operation_id = "listPersonRuns",
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("limit" = Option<u32>, Query)),
     responses((status = 200, body = Vec<RunRecord>), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn recent_runs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
@@ -150,7 +150,7 @@ pub(crate) async fn recent_runs(
         ("limit" = Option<u32>, Query, description = "Page size; defaults to 100, clamped to 1..100")),
     responses((status = 200, body = CatalogPage), (status = 400, description = "Invalid namespace or cursor"),
         (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn catalog(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
@@ -176,7 +176,7 @@ pub(crate) async fn catalog(
         ("name" = Option<String>, Query, description = "Exact destination name; omitted matches SQL NULL")),
     responses((status = 200, body = Option<FingerprintObservation>), (status = 400, description = "Invalid node"),
         (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn fingerprint(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
@@ -199,7 +199,7 @@ pub(crate) async fn fingerprint(
         ("node_key" = String, Query, description = "One exact published node key")),
     responses((status = 200, body = Option<NodeStatus>), (status = 400, description = "Invalid node key"),
         (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn node_status(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,

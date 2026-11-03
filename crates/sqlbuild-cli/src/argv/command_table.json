@@ -79,6 +79,34 @@
    "group": 0,
    "parsers": [
     {
+     "name": "login",
+     "parser": {
+      "prog": "sqb login",
+      "description": "Sign in through your browser, or verify a saved live CLI session. Credentials stay in your user credential store, never in the project or terminal output.",
+      "groups": [{"title": "positional arguments"}, {"title": "options"}],
+      "actions": [
+       {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+       {"kind": "store", "dest": "login_action", "nargs": "?", "choices": ["status"], "help": "verify the saved credential with the live server", "group": 0},
+       {"kind": "store", "options": ["--server"], "dest": "login_server", "required": true, "help": "HTTPS SQLBuild server origin", "group": 1},
+       {"kind": "store", "options": ["--ca-cert"], "dest": "login_ca", "help": "additional trusted PEM CA certificate", "group": 1},
+       {"kind": "store_true", "options": ["--no-browser"], "dest": "login_no_browser", "nargs": 0, "const": true, "default": false, "help": "print the confirmation URL without opening a browser", "group": 1}
+      ]
+     }
+    },
+    {
+     "name": "logout",
+     "parser": {
+      "prog": "sqb logout",
+      "description": "Revoke the saved CLI session and remove local credentials. Remote failures are reported, never silently treated as successful revocation.",
+      "groups": [{"title": "positional arguments"}, {"title": "options"}],
+      "actions": [
+       {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+       {"kind": "store", "options": ["--server"], "dest": "login_server", "required": true, "help": "HTTPS SQLBuild server origin", "group": 1},
+       {"kind": "store", "options": ["--ca-cert"], "dest": "login_ca", "help": "additional trusted PEM CA certificate", "group": 1}
+      ]
+     }
+    },
+    {
      "name": "dev",
      "parser": {
       "prog": "sqb dev",
@@ -8701,6 +8729,8 @@
     }
    ],
    "choices_help": [
+    {"dest": "login", "metavar": "login", "help": "sign in through a browser or verify a saved CLI session"},
+    {"dest": "logout", "metavar": "logout", "help": "revoke the CLI session and remove local credentials"},
     {
      "dest": "dev",
      "metavar": "dev",

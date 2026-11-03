@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::credentials::_helpers::scopes::{scope_is_active, scope_parameters};
 use crate::credentials::_helpers::secrets::new_bearer;
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, CredentialScope, IssuedToken, TokenIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;

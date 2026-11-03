@@ -105,3 +105,9 @@ pub(crate) struct OidcThrottleTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_allowed: usize,
 }
+
+pub(crate) struct CliLoginTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_exchanges: usize,
+}

@@ -11,7 +11,7 @@ use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::oidc_helpers::{callback, login, start_provider, stop_provider};
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault};
 use crate::api::tests::test_types::{OidcApiTestCase, OidcThrottleTestCase};
-use crate::credentials::main::create_principal::create_principal;
+use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, PrincipalKind};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,

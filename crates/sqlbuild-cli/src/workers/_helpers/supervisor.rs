@@ -5,7 +5,7 @@ use std::process::{ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
 use chrono::{TimeDelta, Utc};
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
+use sqlbuild_orchestration::credentials::main::tokens::issue_token::issue_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, CredentialScope};
 use sqlbuild_orchestration::runs::main::advance_groups::advance_groups;
 use sqlbuild_orchestration::runs::main::change_run::change_run;

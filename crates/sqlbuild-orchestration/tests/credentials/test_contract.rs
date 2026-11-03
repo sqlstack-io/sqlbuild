@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::credentials::main::authenticate_token::authenticate_token;
-use crate::credentials::main::create_location::create_location;
-use crate::credentials::main::create_principal::create_principal;
-use crate::credentials::main::issue_token::issue_token;
-use crate::credentials::main::revoke_token::revoke_token;
-use crate::credentials::main::rotate_token::rotate_token;
+use crate::credentials::main::identities::create_principal::create_principal;
+use crate::credentials::main::locations::create_location::create_location;
+use crate::credentials::main::tokens::authenticate_token::authenticate_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
+use crate::credentials::main::tokens::revoke_token::revoke_token;
+use crate::credentials::main::tokens::rotate_token::rotate_token;
 use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
 use crate::runs::main::claim_next_run::claim_next_run;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;

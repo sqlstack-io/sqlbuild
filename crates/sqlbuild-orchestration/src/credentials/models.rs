@@ -192,6 +192,34 @@ pub struct IssuedSession {
     pub csrf: String,
 }
 
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct StartedLogin {
+    pub(crate) browser_code: String,
+    pub(crate) expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug)]
+pub(crate) enum ClaimedLogin {
+    Pending,
+    Unavailable,
+    Authenticated(IssuedSession),
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredLogin {
+    pub(crate) client_hash: String,
+    pub(crate) session_id: Option<Uuid>,
+}
+
+impl std::fmt::Debug for StartedLogin {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("StartedLogin")
+            .field("expires_at", &self.expires_at)
+            .finish_non_exhaustive()
+    }
+}
+
 impl std::fmt::Debug for IssuedSession {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -241,6 +269,7 @@ pub(crate) struct StoredOidcFlow {
 pub(crate) struct StoredSession {
     #[serde(flatten)]
     pub(crate) identity: SessionIdentity,
+    pub(crate) credential_id: Option<Uuid>,
     pub(crate) secret_hash: String,
     pub(crate) csrf_hash: String,
 }

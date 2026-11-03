@@ -2,12 +2,12 @@
 
 use serde_json::{Value, json};
 use sqlbuild_orchestration::authorization::main::bootstrap_user::bootstrap_user;
-use sqlbuild_orchestration::credentials::main::create_location::create_location;
-use sqlbuild_orchestration::credentials::main::create_principal::create_principal;
-use sqlbuild_orchestration::credentials::main::issue_token::issue_token;
-use sqlbuild_orchestration::credentials::main::revoke_token::revoke_token;
-use sqlbuild_orchestration::credentials::main::rotate_token::rotate_token;
-use sqlbuild_orchestration::credentials::main::set_password::set_password;
+use sqlbuild_orchestration::credentials::main::identities::create_principal::create_principal;
+use sqlbuild_orchestration::credentials::main::locations::create_location::create_location;
+use sqlbuild_orchestration::credentials::main::sessions::set_password::set_password;
+use sqlbuild_orchestration::credentials::main::tokens::issue_token::issue_token;
+use sqlbuild_orchestration::credentials::main::tokens::revoke_token::revoke_token;
+use sqlbuild_orchestration::credentials::main::tokens::rotate_token::rotate_token;
 use sqlbuild_orchestration::credentials::models::{AuditContext, PasswordAuthority};
 use sqlbuild_orchestration::declarations::main::change_trigger::change_trigger;
 use sqlbuild_orchestration::declarations::models::TriggerChangeRequest;

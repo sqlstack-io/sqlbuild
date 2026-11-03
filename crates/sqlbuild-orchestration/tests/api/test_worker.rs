@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::runs::main::change_run::change_run;
 use crate::runs::main::claim_next_run::claim_next_run;

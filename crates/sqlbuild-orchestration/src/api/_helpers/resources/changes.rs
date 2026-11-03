@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::api::_helpers::authentication::bearer::{bearer, require_location};
 use crate::api::errors::ApiError;
 use crate::api::models::{ChangeFeed, ChangeNotice, ChangeStream};
-use crate::credentials::main::authenticate_token::authenticate_token;
+use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::models::{CredentialScope, TokenIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::listen_changes::listen_changes;

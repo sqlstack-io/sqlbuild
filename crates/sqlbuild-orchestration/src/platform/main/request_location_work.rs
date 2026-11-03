@@ -4,7 +4,7 @@ use chrono::Duration;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
 use crate::platform::_helpers::connection_tests::authorize_connection_test;
 use crate::platform::main::read_location_work::read_location_work;

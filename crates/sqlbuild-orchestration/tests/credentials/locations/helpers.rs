@@ -10,7 +10,7 @@ pub(crate) async fn create_location(
     name: &str,
     actor: &str,
 ) -> Result<Uuid, ControlError> {
-    crate::credentials::main::create_location::create_location(
+    crate::credentials::main::locations::create_location::create_location(
         store,
         name,
         &AuditContext {

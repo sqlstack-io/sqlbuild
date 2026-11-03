@@ -19,7 +19,7 @@ use crate::store::models::ControlStore;
     params(("principal_id" = Uuid, Path), ("x-sqb-csrf" = String, Header, description = "Session CSRF token")),
     request_body = AdministratorChange,
     responses((status = 200, body = MutationResponse), (status = 401, body = crate::api::models::AuthenticationDenial),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn change(
     (State(store), Extension(context), Extension(authentication)): (
         State<ControlStore>,
@@ -44,7 +44,7 @@ pub(crate) async fn change(
 #[utoipa::path(post, path = "/api/admin/roles", operation_id = "assignBuiltinRole",
     params(("x-sqb-csrf" = String, Header)), request_body = RoleAssignmentRequest,
     responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = [])))]
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn assign(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(authentication): Extension<AdministratorAuthentication>,

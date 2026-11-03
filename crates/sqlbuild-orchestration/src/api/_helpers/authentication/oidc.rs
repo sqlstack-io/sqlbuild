@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::{Extension, Router, middleware};
@@ -17,13 +17,13 @@ use crate::api::_helpers::authentication::{oidc_provider, password_sessions};
 use crate::api::constants::OIDC_FLOW_COOKIE;
 use crate::api::errors::ApiError;
 use crate::api::models::{
-    AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse, OidcAuthentication,
-    OidcCallback, OidcRuntime,
+    AuthenticationDenial, BrowserLoginMethod, BrowserOrigin, ExternalIdentityResponse,
+    OidcAuthentication, OidcCallback, OidcRuntime,
 };
 use crate::credentials::constants::OIDC_FLOW_SECONDS;
-use crate::credentials::main::authenticate_bound_person::authenticate_bound_person;
-use crate::credentials::main::reserve_authentication_attempt::reserve_authentication_attempt;
-use crate::credentials::main::{
+use crate::credentials::main::audit::reserve_authentication_attempt::reserve_authentication_attempt;
+use crate::credentials::main::sessions::authenticate_bound_person::authenticate_bound_person;
+use crate::credentials::main::sessions::{
     claim_oidc_flow::claim_oidc_flow, create_oidc_flow::create_oidc_flow,
 };
 use crate::credentials::models::{
@@ -45,6 +45,7 @@ pub(crate) async fn router(
         .route("/api/auth/oidc/login", get(login))
         .route("/api/auth/oidc/callback", get(callback))
         .merge(password_sessions::protected(store))
+        .merge(super::cli_login::router(BrowserLoginMethod::Oidc))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
         .layer(Extension(BrowserOrigin(runtime.settings.origin.clone())))
         .layer(Extension(Arc::new(runtime))))
@@ -147,6 +148,22 @@ pub(crate) async fn callback(
         },
         Err(_) => deny(&store, &context, "invalid_oidc_identity").await?,
     };
+    if browser_cookie(&headers, "__Host-sqb-cli-return") == Some("1") {
+        set_cookie(
+            &mut response,
+            ("__Host-sqb-cli-return", ""),
+            0,
+            (false, "Lax"),
+        )?;
+        if response.status().is_success() {
+            *response.status_mut() = StatusCode::SEE_OTHER;
+            response.headers_mut().insert(
+                header::LOCATION,
+                header::HeaderValue::from_static("/auth/cli"),
+            );
+            *response.body_mut() = axum::body::Body::empty();
+        }
+    }
     set_cookie(&mut response, (OIDC_FLOW_COOKIE, ""), 0, (true, "Lax"))?;
     Ok(response)
 }

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::api::models::{ApiAuthentication, AuthenticationDenial, TrustedProxyAuthentication};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ProxyApiTestCase;
-use crate::credentials::main::create_principal::create_principal;
+use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{AuditContext, PrincipalKind};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,

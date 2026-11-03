@@ -1,5 +1,5 @@
 use crate::api::errors::ClientError;
-use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::platform::main::connect_location_work::connect_location_work;
 use crate::platform::main::location_work::location_work;

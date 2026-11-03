@@ -1,0 +1,6 @@
+{
+  "origin": "https://control.example.com",
+  "password": "orders-browser-password",
+  "replacement": "orders-replacement-password",
+  "client_secret": "synthetic-cli-exchange-capability-not-a-real-credential"
+}

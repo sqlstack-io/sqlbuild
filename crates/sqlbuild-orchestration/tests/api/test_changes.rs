@@ -12,7 +12,7 @@ use crate::api::tests::changes_helpers::{
 };
 use crate::api::tests::helpers::{read_json, start_api, stop_api};
 use crate::api::tests::test_types::ChangesTestCase;
-use crate::credentials::main::{issue_token::issue_token, revoke_token::revoke_token};
+use crate::credentials::main::tokens::{issue_token::issue_token, revoke_token::revoke_token};
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::{change_trigger::change_trigger, list_triggers::list_triggers};

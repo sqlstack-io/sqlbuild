@@ -4,15 +4,17 @@ use std::sync::Arc;
 
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::password_transport::{
-    deny, external_session, guard, parse_origin, single_header,
+    deny, external_session, guard, single_header,
 };
 use crate::api::constants::PROXY_USER_HEADER;
 use crate::api::errors::ApiError;
+use crate::api::main::parse_origin::parse_origin;
 use crate::api::models::{
-    AuthenticationDenial, ExternalIdentityResponse, TrustedProxyAuthentication,
+    AuthenticationDenial, BrowserLoginMethod, BrowserOrigin, ExternalIdentityResponse,
+    TrustedProxyAuthentication,
 };
-use crate::credentials::main::authenticate_bound_person::authenticate_bound_person;
-use crate::credentials::main::reserve_authentication_attempt::reserve_authentication_attempt;
+use crate::credentials::main::audit::reserve_authentication_attempt::reserve_authentication_attempt;
+use crate::credentials::main::sessions::authenticate_bound_person::authenticate_bound_person;
 use crate::credentials::models::{AuditContext, AuthenticationAttempt, ExternalIdentityMechanism};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -29,7 +31,7 @@ pub(crate) fn router(
     let Some(mut settings) = settings else {
         return Ok(Router::new());
     };
-    let origin = parse_origin(&settings.origin, "trusted-proxy")?;
+    let origin = BrowserOrigin(parse_origin(&settings.origin, "trusted-proxy")?);
     if settings.trusted_peers.is_empty() {
         return Err(ControlError::Invalid(
             "trusted-proxy authentication requires explicit trusted peer IP addresses".into(),
@@ -55,6 +57,7 @@ pub(crate) fn router(
     Ok(Router::new()
         .route("/api/auth/proxy", get(identity))
         .merge(password_sessions::protected(store))
+        .merge(super::cli_login::router(BrowserLoginMethod::Proxy))
         .layer(middleware::from_fn_with_state(store.clone(), guard))
         .layer(Extension(origin))
         .layer(Extension(Arc::new(settings))))

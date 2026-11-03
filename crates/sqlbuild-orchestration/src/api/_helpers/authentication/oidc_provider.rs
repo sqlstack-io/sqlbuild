@@ -9,15 +9,15 @@ use openidconnect::{
 };
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
-use crate::api::_helpers::authentication::password_transport::parse_origin;
 use crate::api::constants::{HTTPS_SCHEME, OIDC_RESPONSE_BYTES};
+use crate::api::main::parse_origin::parse_origin;
 use crate::api::models::{OidcAuthentication, OidcRuntime};
 use crate::api::types::OidcClient;
 use crate::credentials::models::StoredOidcFlow;
 use crate::store::errors::ControlError;
 
 pub(crate) fn configure(mut settings: OidcAuthentication) -> Result<OidcRuntime, ControlError> {
-    settings.origin = parse_origin(&settings.origin, "OIDC")?.0;
+    settings.origin = parse_origin(&settings.origin, "OIDC")?;
     let issuer = https_url(&settings.issuer)?;
     if issuer.query().is_some() || issuer.fragment().is_some() {
         return Err(ControlError::Invalid(

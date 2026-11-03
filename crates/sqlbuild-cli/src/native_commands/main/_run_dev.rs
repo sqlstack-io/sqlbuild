@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use sqlbuild_orchestration::api::models::DevelopmentScope;
-use sqlbuild_orchestration::credentials::main::development_location::development_location;
+use sqlbuild_orchestration::credentials::main::locations::development_location::development_location;
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
 use sqlbuild_orchestration::store::errors::ControlError;

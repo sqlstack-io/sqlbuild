@@ -1,7 +1,7 @@
 //! Create one-use browser-bound PKCE attempts with durable audit evidence.
 
 use crate::credentials::constants::OIDC_FLOW_SECONDS;
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, OidcFlowStart};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

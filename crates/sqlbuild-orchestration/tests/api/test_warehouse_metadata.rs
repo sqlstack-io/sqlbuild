@@ -8,7 +8,7 @@ use uuid::Uuid;
 use crate::api::tests::changes_helpers::{connect, expect_topics};
 use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::test_types::WarehouseMetadataTestCase;
-use crate::credentials::main::issue_token::issue_token;
+use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::connect_location_work::connect_location_work;

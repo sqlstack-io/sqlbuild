@@ -1530,6 +1530,11 @@ rule = "FFR601"
 path = "src/sqlbuild/executor/run/_helpers/materializations/microbatch.py"
 reason = "Microbatch execution is one ordered failure-sensitive lifecycle; splitting reconciliation, DML, completion publication, and aggregate gates would hide the required phase ordering across module boundaries."
 
+[[targets.python.rule_exceptions]]
+rule = "FFT104"
+path = "tests/integration/src/sqlbuild/compiler/compiled_project/publication/login/helpers.py"
+reason = "The disposable HTTPS gateway and OIDC provider dispatch real HTTP protocol messages and authentication transports; assertions in the parametrized installed journey remain branch-free."
+
 [targets.rust]
 analyzer = "rust"
 roots = ["crates"]
@@ -1567,14 +1572,20 @@ reason = "CompactAnalysisJob holds a prepared analysis closure, which cannot imp
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/credentials/models.rs"
-symbols = ["IssuedToken", "IssuedSession"]
-reason = "Issued credentials implement Debug manually to redact bearer and CSRF secrets; deriving Debug would expose them."
+symbols = ["IssuedToken", "IssuedSession", "StartedLogin"]
+reason = "Issued credentials and handoffs implement Debug manually to redact bearer, CSRF and approval secrets; deriving Debug would expose them."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"
 path = "crates/sqlbuild-orchestration/src/api/models.rs"
-symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordSessionResponse", "ExternalIdentityResponse"]
+symbols = ["PasswordLoginRequest", "PasswordChangeRequest", "PasswordSessionResponse", "ExternalIdentityResponse", "CliLoginApprovalRequest", "CliLoginClaimRequest", "CliLoginSessionResponse"]
 reason = "Browser transport models implement Debug manually to redact passwords and CSRF secrets; other models derive Debug."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSS201"
+path = "crates/sqlbuild-cli/src/person_login/models.rs"
+symbols = ["PersonCredential", "LoginFlow"]
+reason = "Person credential and handoff models implement Debug manually to redact bearer, CSRF and approval secrets."
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSS201"

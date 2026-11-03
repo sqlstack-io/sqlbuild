@@ -4,9 +4,9 @@ use uuid::Uuid;
 
 use crate::credentials::_helpers::password_sessions::issue_session;
 use crate::credentials::constants::{LOGIN_USERNAME_BYTES, MAX_PASSWORD_BYTES};
-use crate::credentials::main::record_authentication_denial::record_authentication_denial;
-use crate::credentials::main::reserve_authentication_attempt::reserve_authentication_attempt;
-use crate::credentials::main::verify_password::verify_password;
+use crate::credentials::main::audit::record_authentication_denial::record_authentication_denial;
+use crate::credentials::main::audit::reserve_authentication_attempt::reserve_authentication_attempt;
+use crate::credentials::main::sessions::verify_password::verify_password;
 use crate::credentials::models::{AuditContext, AuthenticationAttempt, PasswordLogin};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};

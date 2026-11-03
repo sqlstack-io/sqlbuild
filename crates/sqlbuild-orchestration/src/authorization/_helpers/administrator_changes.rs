@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::authorization::_helpers::administrators::{
     deny_change, grant_installation_admin, remaining_administrator,
 };
-use crate::credentials::main::append_audit::append_audit;
+use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AdministratorAuthentication, AdministratorChange, AuditContext};
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};

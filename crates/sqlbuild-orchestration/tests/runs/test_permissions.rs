@@ -8,7 +8,8 @@ use crate::authorization::main::{
     change_administrator::change_administrator,
 };
 use crate::credentials::main::{
-    create_principal::create_principal, login_password::login_password, set_password::set_password,
+    identities::create_principal::create_principal, sessions::login_password::login_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole, DefaultRole,
