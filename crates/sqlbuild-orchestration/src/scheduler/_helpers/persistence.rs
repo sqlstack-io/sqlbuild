@@ -2,10 +2,11 @@
 
 use serde_json::json;
 
-use crate::runs::main::job_write_set::job_write_set;
+use crate::declarations::main::record_trigger_progress::record_trigger_progress;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
+use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -73,8 +74,16 @@ pub(crate) async fn persist_ticks(
             transaction = queue_run(transaction, &request).await?;
         }
     }
-    (transaction, _) = query(transaction,
-        "UPDATE sqb_trigger_state SET last_tick_for=$1, next_due_at=$2, updated_at=$3 WHERE trigger_id=$4",
+    let changed;
+    (transaction, changed) = query(transaction,
+        "UPDATE sqb_trigger_state SET last_tick_for=$1, next_due_at=$2, updated_at=$3 WHERE trigger_id=$4 \
+         AND (last_tick_for IS DISTINCT FROM $1 OR next_due_at IS DISTINCT FROM $2) RETURNING trigger_id",
         vec![Parameter::OptionalTime(plan.last_tick_for), Parameter::OptionalTime(plan.next_due_at), Parameter::Time(now), Parameter::Id(trigger.trigger_id)]).await?;
+    if !changed.is_empty() {
+        transaction = record_trigger_progress(transaction, trigger.trigger_id).await?;
+        transaction
+            .changes
+            .insert(Change::Trigger(trigger.trigger_id));
+    }
     Ok(transaction)
 }

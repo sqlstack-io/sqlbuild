@@ -1,18 +1,14 @@
-//! Reconstruct run metadata and node outcomes on one serialized, atomic source cut.
+//! Reconstruct run and node projections within the caller's serialized source cut.
 
 use crate::runs::_helpers::lifecycle::replay::replay_run_event;
 use crate::runs::models::RunReplayRow;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::main::{decode_row::decode_row, query::query};
+use crate::store::models::{ControlTransaction, Parameter};
 
-/// Internal owner only; liveness, claims, tokens, requests, audits and Recall remain untouched.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "awaiting the complete rebuild command")
-)]
-pub(crate) async fn rebuild_run_projections(store: &ControlStore) -> Result<(), ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
+pub(crate) async fn replay_run_projections(
+    transaction: ControlTransaction,
+) -> Result<ControlTransaction, ControlError> {
     let (mut transaction, unsupported) = query(transaction,
         "SELECT r.run_id FROM sqb_runs r WHERE NOT EXISTS (SELECT 1 FROM recall_events e \
          WHERE e.producer='scheduler' AND e.event_type='run_queued' AND e.run_id=CAST(r.run_id AS TEXT) \
@@ -38,5 +34,5 @@ pub(crate) async fn rebuild_run_projections(store: &ControlStore) -> Result<(), 
             transaction = replay_run_event(transaction, row).await?;
         }
     }
-    commit(transaction).await
+    Ok(transaction)
 }

@@ -7,15 +7,20 @@ use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
-use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
-use crate::store::models::{
-    Change, ControlEvent, ControlStore, ControlTransaction, Parameter, TransactionMode,
+use crate::store::main::query::query;
+use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
+#[cfg(test)]
+use crate::store::{
+    main::{begin::begin, commit::commit},
+    models::{ControlStore, TransactionMode},
 };
 use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
+#[cfg(test)]
+use crate::warehouse_metadata::main::rebuild_catalog::replay_catalog_projection;
 use crate::warehouse_metadata::models::{
-    CatalogBatch, CatalogObservation, CatalogPage, CatalogQuery, CatalogReplayRow,
-    WarehouseCatalogRecord, WarehouseReconciliationCursor,
+    CatalogBatch, CatalogObservation, CatalogPage, CatalogQuery, WarehouseCatalogRecord,
+    WarehouseReconciliationCursor,
 };
 
 pub(crate) fn validate_catalog(batch: &CatalogBatch) -> Result<(), ControlError> {
@@ -165,54 +170,8 @@ pub(crate) async fn read_catalog_page(
 }
 
 /// Internal replay owner; scan receipts, reader sessions and authoritative facts are preserved.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "awaiting the complete rebuild command")
-)]
+#[cfg(test)]
 pub(crate) async fn rebuild_catalog_projection(store: &ControlStore) -> Result<(), ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (mut transaction, _) =
-        query(transaction, "DELETE FROM sqb_warehouse_catalog", vec![]).await?;
-    let mut after = 0;
-    loop {
-        let rows;
-        (transaction, rows) = query(transaction,
-            "SELECT storage_id,event_schema_version AS schema_version,occurred_at,payload FROM recall_events \
-             WHERE producer='warehouse' AND event_type='warehouse_catalog_changed' AND storage_id>$1 \
-             ORDER BY storage_id LIMIT 100", vec![Parameter::Integer(after)]).await?;
-        if rows.is_empty() {
-            break;
-        }
-        for row in rows {
-            let row: CatalogReplayRow = decode_row(row)?;
-            if row.schema_version != 1 {
-                return Err(ControlError::Invalid(
-                    "cannot replay an unsupported catalog fact schema".into(),
-                ));
-            }
-            after = row.storage_id;
-            transaction.now = row.occurred_at;
-            let fact = row.payload;
-            if fact.present {
-                transaction = project_catalog_record(
-                    transaction,
-                    (fact.location_id, &fact.target),
-                    fact.relation_id,
-                    &fact.record,
-                )
-                .await?;
-            } else {
-                (transaction, _) = query(
-                    transaction,
-                    "DELETE FROM sqb_warehouse_catalog WHERE event_id=$1",
-                    vec![Parameter::Id(fact.relation_id)],
-                )
-                .await?;
-            }
-            transaction
-                .changes
-                .insert(Change::NodeStatus(fact.location_id, fact.target));
-        }
-    }
-    commit(transaction).await
+    commit(replay_catalog_projection(transaction).await?).await
 }

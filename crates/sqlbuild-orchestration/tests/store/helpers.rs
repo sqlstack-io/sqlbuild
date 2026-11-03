@@ -92,6 +92,8 @@ pub(crate) async fn reconstruct_fingerprint_predecessor(store: &ControlStore) {
         .await
         .expect("fingerprint predecessor");
     for sql in [
+        "DROP TABLE sqb_trigger_progress",
+        "DELETE FROM sqb_schema_migrations WHERE name='trigger_progress'",
         "DROP INDEX sqb_observed_node_cursor",
         "DROP INDEX sqb_observed_node_identity",
         "DROP INDEX sqb_observed_node_decisive",

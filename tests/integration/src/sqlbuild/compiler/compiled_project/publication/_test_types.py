@@ -262,3 +262,16 @@ class StatisticsRecoveryTestCase:
 class DenialMetadataTestCase:
     description: str
     expected_denial_count: int
+
+
+class ProjectionStore(NamedTuple):
+    environment: dict[str, str]
+    connection: Any
+    table_query: str
+
+
+@dataclass(frozen=True)
+class ProjectionReplayTestCase:
+    description: str
+    open_store: Callable[[tuple[Path, Path]], AbstractContextManager[ProjectionStore]]
+    expected_progress_facts: int

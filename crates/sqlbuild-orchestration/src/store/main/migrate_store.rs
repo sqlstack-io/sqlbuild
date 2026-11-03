@@ -1,17 +1,9 @@
 //! Forward-only migration under the same lock used by all other control-plane writes.
 
-use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::store::_helpers::migration::{
-    ADMINISTRATOR_INITIALIZATION, AUDIT_STORAGE_ORDER, AUTHENTICATION_REVISION, CHECK_OBSERVATIONS,
-    DEVELOPMENT_LOCATIONS, EXECUTED_NODES, EXTERNAL_SESSIONS, FINGERPRINT_LOOKUP,
-    LOCATION_INSTANCES, LOCATION_WORK, NODE_SENSORS, NODE_TRANSITIONS, OIDC_LOGIN_FLOWS,
-    PASSWORD_CREDENTIALS, PASSWORD_SESSIONS, PLATFORM_SINK, RUN_SENSORS, SCHEMA,
-    SECURITY_AUDIT_SINK, SENSORS, SOURCE_SENSORS, SOURCE_STALENESS, WAREHOUSE_AUDIT_RESULTS,
-    WAREHOUSE_CATALOG, WAREHOUSE_FINGERPRINTS, WAREHOUSE_FRESHNESS, WAREHOUSE_JANITOR_EVENTS,
-    WAREHOUSE_MICROBATCHES, WAREHOUSE_MIGRATIONS, WAREHOUSE_RECONCILIATION, WAREHOUSE_STATISTICS,
-    render, verify_migrations,
+    ADDITIONS, SCHEMA, SOURCE_SENSORS, migration_digests, render, verify_migrations,
 };
 use crate::store::_helpers::recall_schema::recall_schema;
 use crate::store::errors::ControlError;
@@ -34,41 +26,7 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     )
     .await?;
     let recall_statements = recall_schema(store);
-    let digest = sha256_hex(format!("{SCHEMA}\n{}", recall_statements.join(";\n")).as_bytes());
-    let additions = [
-        ("location_instances", LOCATION_INSTANCES),
-        ("location_work", LOCATION_WORK),
-        ("platform_sink", PLATFORM_SINK),
-        ("sensors", SENSORS),
-        ("run_sensors", RUN_SENSORS),
-        ("executed_nodes", EXECUTED_NODES),
-        ("node_sensors", NODE_SENSORS),
-        ("warehouse_freshness", WAREHOUSE_FRESHNESS),
-        ("warehouse_fingerprints", WAREHOUSE_FINGERPRINTS),
-        ("development_locations", DEVELOPMENT_LOCATIONS),
-        ("node_transitions", NODE_TRANSITIONS),
-        ("password_credentials", PASSWORD_CREDENTIALS),
-        ("password_sessions", PASSWORD_SESSIONS),
-        ("authentication_revision", AUTHENTICATION_REVISION),
-        ("oidc_login_flows", OIDC_LOGIN_FLOWS),
-        ("administrator_initialization", ADMINISTRATOR_INITIALIZATION),
-        ("external_sessions", EXTERNAL_SESSIONS),
-        ("warehouse_reconciliation", WAREHOUSE_RECONCILIATION),
-        ("audit_storage_order", AUDIT_STORAGE_ORDER),
-        ("warehouse_audit_results", WAREHOUSE_AUDIT_RESULTS),
-        ("warehouse_janitor_events", WAREHOUSE_JANITOR_EVENTS),
-        ("warehouse_migrations", WAREHOUSE_MIGRATIONS),
-        ("warehouse_microbatches", WAREHOUSE_MICROBATCHES),
-        ("source_sensors", SOURCE_SENSORS),
-        ("source_staleness", SOURCE_STALENESS),
-        ("security_audit_sink", SECURITY_AUDIT_SINK),
-        ("warehouse_catalog", WAREHOUSE_CATALOG),
-        ("fingerprint_lookup", FINGERPRINT_LOOKUP),
-        ("warehouse_statistics", WAREHOUSE_STATISTICS),
-        ("check_observations", CHECK_OBSERVATIONS),
-    ];
-    let mut digests = vec![digest.clone()];
-    digests.extend(additions.iter().map(|(_, sql)| sha256_hex(sql.as_bytes())));
+    let digests = migration_digests(store);
     let current = verify_migrations(&rows, &digests)?;
     if rows.is_empty() {
         for statement in SCHEMA
@@ -88,9 +46,9 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
         (transaction, _) = query(transaction,
             "INSERT INTO sqb_schema_migrations (version, name, checksum, min_server_version, applied_at) \
              VALUES (1, 'control_store', $1, $2, $3)",
-            vec![Parameter::Text(digest), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
+            vec![Parameter::Text(digests[0].clone()), Parameter::Text(current.to_string()), Parameter::Time(now)]).await?;
     }
-    for (index, (name, sql)) in additions.into_iter().enumerate() {
+    for (index, &(name, sql)) in ADDITIONS.iter().enumerate() {
         if index + 1 < rows.len() {
             continue;
         }

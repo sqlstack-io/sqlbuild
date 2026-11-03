@@ -3,6 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::_helpers::trigger_state::{retain_calendar_ticks, trigger_timing};
+use crate::declarations::main::record_trigger_progress::record_trigger_progress;
 use crate::declarations::models::{Definitions, PreviousTriggerState};
 use crate::sensors::main::publish_sensors::publish_sensors;
 use crate::snapshots::models::SnapshotRecord;
@@ -58,6 +59,23 @@ pub(crate) async fn publish_projections(
             "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at, updated_at) VALUES ($1,$2,$3,$4,$5) \
              ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at, updated_at=excluded.updated_at",
             vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next), Parameter::Time(snapshot.published_at)]).await?;
+    }
+    let mut cursor = None;
+    loop {
+        let rows;
+        (transaction, rows) = query(transaction,
+            "SELECT trigger_id FROM sqb_triggers WHERE location_id=$1 AND target=$2 \
+             AND ($3 IS NULL OR trigger_id>$3) AND (snapshot_id=$4 OR removed_in_snapshot_id=$4) ORDER BY trigger_id LIMIT 100",
+            vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::OptionalId(cursor), Parameter::Id(snapshot.snapshot_id)]).await?;
+        if rows.is_empty() {
+            break;
+        }
+        for row in rows {
+            let id: Uuid = serde_json::from_value(row["trigger_id"].clone())
+                .map_err(|error| ControlError::Schema(error.to_string()))?;
+            transaction = record_trigger_progress(transaction, id).await?;
+            cursor = Some(id);
+        }
     }
     Ok(transaction)
 }

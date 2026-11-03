@@ -2,8 +2,8 @@
 
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;
-use crate::runs::main::job_write_set::job_write_set;
 use crate::runs::models::{JobRunRequest, RunKind, RunOrigin, RunRequest};
+use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};

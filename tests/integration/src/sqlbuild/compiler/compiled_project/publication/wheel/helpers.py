@@ -21,6 +21,19 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.
 )
 
 
+def logical_table_state(connection: Any, tables: list[str]) -> dict[str, str]:
+    """Hash complete logical rows and multiplicity without exposing stored credentials."""
+    state: dict[str, str] = {}
+    for table in tables:
+        rows: list[str] = [
+            json.dumps(row, sort_keys=True, default=str)
+            for row in connection.execute(f'SELECT * FROM "{table}"').fetchall()
+        ]
+        state[table] = hashlib.sha256(json.dumps(sorted(rows)).encode()).hexdigest()
+    connection.commit()
+    return state
+
+
 def postgres_recovery_state(connection: Any) -> dict[str, str]:
     """Compare every retained security row without logging credential hashes."""
     tables: tuple[str, ...] = (

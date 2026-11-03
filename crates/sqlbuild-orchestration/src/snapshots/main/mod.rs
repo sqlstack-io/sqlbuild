@@ -1,6 +1,7 @@
 pub(super) mod _publish_snapshot;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
+pub(crate) mod job_write_set;
 pub mod next_remote_generation;
 pub(crate) mod publish_development_snapshot;
 pub mod publish_remote_snapshot;
@@ -8,4 +9,5 @@ pub mod publish_snapshot;
 pub(crate) mod read_current_record;
 pub(crate) mod read_snapshot_documents;
 pub(crate) mod read_snapshot_nodes;
+pub(crate) mod rebuild_projections;
 pub mod verify_execution;

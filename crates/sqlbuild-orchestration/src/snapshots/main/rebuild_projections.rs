@@ -1,18 +1,14 @@
-//! Restore current publication pointers and jobs without republishing or touching trigger state.
+//! Replay current publication pointers and jobs without republishing or changing trigger state.
 
 use crate::declarations::main::rebuild_jobs::rebuild_jobs;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, query::query};
-use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
+use crate::store::main::{decode_row::decode_row, query::query};
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
-/// Internal replay owner; current pointers and jobs change, never trigger history.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "awaiting the complete rebuild command")
-)]
-pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result<(), ControlError> {
-    let mut transaction = begin(store, TransactionMode::Write).await?;
+pub(crate) async fn replay_snapshot_projections(
+    mut transaction: ControlTransaction,
+) -> Result<ControlTransaction, ControlError> {
     let mut cursor = None;
     loop {
         let (after, parameters) = cursor.as_ref().map_or_else(
@@ -58,5 +54,5 @@ pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result
             &format!("DELETE FROM {table} WHERE NOT EXISTS (SELECT 1 FROM sqb_snapshots s WHERE s.location_id={table}.location_id AND s.target={table}.target)"),
             vec![]).await?;
     }
-    commit(transaction).await
+    Ok(transaction)
 }
