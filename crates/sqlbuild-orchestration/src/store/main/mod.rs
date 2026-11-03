@@ -15,3 +15,4 @@ pub mod read_recall_view;
 pub(crate) mod refresh_clock;
 pub(crate) mod store_source_text;
 pub(crate) mod subscribe_changes;
+pub(crate) mod verify_store;

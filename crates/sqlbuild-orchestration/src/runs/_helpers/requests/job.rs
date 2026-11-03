@@ -5,8 +5,8 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::declarations::main::frozen_definitions::frozen_definitions;
-use crate::runs::main::job_write_set::job_write_set;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
+use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlTransaction;
 

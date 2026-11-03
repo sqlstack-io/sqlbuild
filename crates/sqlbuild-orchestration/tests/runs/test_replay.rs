@@ -3,12 +3,11 @@
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::lifecycle::change_run::change_run_in;
-use crate::runs::_helpers::lifecycle::rebuild::rebuild_run_projections;
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunStatus};
 use crate::runs::tests::helpers::{queue, request, snapshot};
-use crate::runs::tests::replay_helpers::run_replay_contract;
+use crate::runs::tests::replay_helpers::{rebuild_run_projections, run_replay_contract};
 use crate::runs::tests::test_types::RunReplayTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::{

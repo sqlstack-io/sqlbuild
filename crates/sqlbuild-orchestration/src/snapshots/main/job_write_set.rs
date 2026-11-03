@@ -1,4 +1,4 @@
-//! Resolve physical writers from the pinned snapshot and its published job membership.
+//! Resolve a job's physical writers from its pinned snapshot.
 
 use std::collections::BTreeSet;
 

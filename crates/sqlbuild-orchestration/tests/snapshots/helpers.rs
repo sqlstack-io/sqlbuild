@@ -4,11 +4,12 @@ use std::collections::BTreeMap;
 
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::main::rebuild_projections::replay_snapshot_projections;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
-use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::open_store::open_store;
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
+use crate::store::models::{ControlStore, TransactionMode};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -19,6 +20,11 @@ use crate::store::tests::store_helpers::{
     close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor,
 };
 use crate::store::tests::store_test_types::Backend;
+
+pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result<(), ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    commit(replay_snapshot_projections(transaction).await?).await
+}
 
 pub(super) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {

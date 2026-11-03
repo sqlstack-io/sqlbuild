@@ -5,10 +5,9 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
-use crate::snapshots::_helpers::rebuild::rebuild_snapshot_projections;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::snapshots::tests::helpers::{damage, snapshot};
+use crate::snapshots::tests::helpers::{damage, rebuild_snapshot_projections, snapshot};
 use crate::snapshots::tests::test_types::SnapshotTestCase;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,

@@ -113,6 +113,29 @@ pub struct TriggerRecord {
     pub next_due_at: Option<DateTime<Utc>>,
 }
 
+/// Recorded only by live transition owners, never seeded from a legacy projection during replay.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TriggerProjection {
+    pub(crate) trigger_id: uuid::Uuid,
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) kind: String,
+    pub(crate) name: String,
+    pub(crate) job_key: String,
+    pub(crate) definition_json: TriggerDeclaration,
+    pub(crate) snapshot_id: uuid::Uuid,
+    pub(crate) removed_in_snapshot_id: Option<uuid::Uuid>,
+    pub(crate) status: TriggerStatus,
+    pub(crate) status_override: Option<TriggerStatus>,
+    pub(crate) started_at: DateTime<Utc>,
+    pub(crate) cursor_json: Option<serde_json::Value>,
+    pub(crate) last_tick_for: Option<DateTime<Utc>>,
+    pub(crate) next_due_at: Option<DateTime<Utc>>,
+    pub(crate) consecutive_failures: i64,
+    pub(crate) updated_at: DateTime<Utc>,
+}
+
 /// Operator changes are immutable facts; clearing an override restores the published code default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]

@@ -4,10 +4,9 @@ use sqlbuild_orchestration::api::main::openapi_document::openapi_document;
 
 use crate::argv::models::{Namespace, Stream};
 use crate::native_commands::_helpers::decision::{flag, text};
-use crate::native_commands::_helpers::execution::run_administration;
+use crate::native_commands::_helpers::execution::run_control_action;
 use crate::native_commands::_helpers::terminal::{finish_lost_stdout, write_output};
 use crate::native_commands::constants::{ADMIN_COMMAND, SCHEDULER_COMMAND, SERVER_COMMAND};
-use crate::native_commands::main::_run_control::run_control;
 
 pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
     let command = text(namespace, "command")?;
@@ -47,24 +46,26 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
         }
     };
     let admin = command == ADMIN_COMMAND;
-    let role = if admin { "administration" } else { "service" };
-    let result = runtime.block_on(async {
-        if admin {
-            run_administration(namespace).await.map(Some)
-        } else {
-            run_control(namespace, command == SCHEDULER_COMMAND)
-                .await
-                .map(|()| None)
-        }
-    });
+    let rebuild = command == SERVER_COMMAND
+        && text(namespace, "server_action").as_deref() == Some("rebuild-projections");
+    let role = if admin {
+        "administration"
+    } else if rebuild {
+        "projection rebuild"
+    } else {
+        "service"
+    };
+    let result = runtime.block_on(run_control_action(namespace, &command));
     Some(match result {
         Ok(output) => {
             let lost =
                 output.and_then(|value| write_output(&[(Stream::Stdout, &format!("{value}\n"))]));
-            if admin && lost.is_some() {
+            if (admin || rebuild) && lost.is_some() {
                 drop(write_output(&[(
                     Stream::Stderr,
-                    "Control administration JSON result delivery failed; changes may already be committed\n",
+                    &format!(
+                        "Control {role} JSON result delivery failed; changes may already be committed\n"
+                    ),
                 )]));
                 return Some(1);
             }
@@ -72,6 +73,8 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
             if exit_code == 0 {
                 let message = if admin {
                     "Control administration completed successfully\n"
+                } else if rebuild {
+                    "Control projections rebuilt successfully\n"
                 } else {
                     "Control service stopped successfully\n"
                 };

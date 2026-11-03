@@ -1,11 +1,17 @@
 //! Full-state acceptance keeps protected live ownership and source facts non-vacuous.
 
-use crate::runs::_helpers::lifecycle::rebuild::rebuild_run_projections;
+use crate::runs::main::replay_projections::replay_run_projections;
+use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::logical_state::logical_state;
+
+pub(crate) async fn rebuild_run_projections(store: &ControlStore) -> Result<(), ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    commit(replay_run_projections(transaction).await?).await
+}
 
 pub(crate) async fn run_replay_contract(store: &ControlStore) {
     let expected = logical_state(store).await;

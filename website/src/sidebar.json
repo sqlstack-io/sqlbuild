@@ -200,6 +200,7 @@
 			"docs/cli/init",
 			"docs/cli/playground",
 			"docs/cli/skills",
+			"docs/cli/server",
 			"docs/cli/compile",
 			"docs/cli/format",
 			"docs/cli/contract",

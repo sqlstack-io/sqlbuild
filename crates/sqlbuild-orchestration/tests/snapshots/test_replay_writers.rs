@@ -1,7 +1,7 @@
 //! Replay and normal publication share the writer fence while readers keep a consistent cut.
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::snapshots::_helpers::rebuild::rebuild_snapshot_projections;
+use crate::platform::main::rebuild_projections::rebuild_projections;
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::tests::helpers::snapshot;
@@ -62,7 +62,7 @@ fn given_concurrent_publication_when_replaying_then_readers_and_writers_keep_one
             let repair_store = replica.clone();
             let mut repair = tokio::spawn(async move {
                 ready.send(()).expect("repair ready");
-                rebuild_snapshot_projections(&repair_store).await
+                rebuild_projections(&repair_store).await
             });
             started.await.expect("repair started");
             assert!(
@@ -118,9 +118,7 @@ fn given_concurrent_publication_when_replaying_then_readers_and_writers_keep_one
                 "Current"
             );
             let final_state = logical_state(&replica).await;
-            rebuild_snapshot_projections(store)
-                .await
-                .expect("replay newest cut");
+            rebuild_projections(store).await.expect("replay newest cut");
             assert_eq!(logical_state(&replica).await, final_state);
             close_store(replica).await;
             close_test_store(fixture).await;
