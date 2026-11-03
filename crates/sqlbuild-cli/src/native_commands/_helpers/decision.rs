@@ -265,14 +265,13 @@ pub(crate) fn control_address(
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
 ) -> Result<(ApiAuthentication, StatisticsRetention), ControlError> {
+    let out_of_range =
+        || ControlError::Invalid("--statistics-retention-days must be between 1 and 65535".into());
     let retention = match namespace.get("control_statistics_retention_days") {
-        Some(Value::Int(value)) => {
-            StatisticsRetention::days(value.parse::<u16>().map_err(|_| {
-                ControlError::Invalid(
-                    "--statistics-retention-days must be between 1 and 65535".into(),
-                )
-            })?)?
-        }
+        Some(Value::Int(value)) => value
+            .parse::<u16>()
+            .map_err(|_| out_of_range())
+            .and_then(|days| StatisticsRetention::days(days).map_err(|_| out_of_range()))?,
         _ => StatisticsRetention::default(),
     };
     Ok((control_authentication(namespace)?, retention))

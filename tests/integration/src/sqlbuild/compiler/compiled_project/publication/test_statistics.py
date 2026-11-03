@@ -169,7 +169,7 @@ def test_given_configured_statistics_horizon_when_server_starts_then_older_sampl
     "test_case",
     [
         StatisticsHorizonRejectionTestCase(
-            "Zero days", "0", "statistics retention must keep at least one day"
+            "Zero days", "0", "--statistics-retention-days must be between 1 and 65535"
         ),
         StatisticsHorizonRejectionTestCase(
             "Beyond the supported range",
