@@ -32,6 +32,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/cli/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approveCliLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/cli/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["claimCliLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/cli/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["startCliLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/logout": {
         parameters: {
             query?: never;
@@ -235,6 +283,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonNodeStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonNodeSql"];
         put?: never;
         post?: never;
         delete?: never;
@@ -872,6 +936,23 @@ export interface components {
         ChangeNotice: {
             topic: string;
         };
+        CliLoginApprovalRequest: {
+            approve: boolean;
+            browser_code: string;
+        };
+        CliLoginClaimRequest: {
+            client_secret: string;
+            /** Format: uuid */
+            flow_id: string;
+        };
+        CliLoginSessionResponse: {
+            bearer: string;
+            csrf_token: string;
+            identity: components["schemas"]["SessionIdentity"];
+        };
+        CliLoginStartRequest: {
+            client_hash: string;
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -1127,6 +1208,14 @@ export interface components {
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        /** @description SQL inspection never returns Python source, execution artifacts or unrelated node metadata. */
+        NodeSql: {
+            compiled_sql?: string | null;
+            node_key: string;
+            raw_sql?: string | null;
+            /** Format: uuid */
+            snapshot_id: string;
+        };
         NodeStatus: {
             build?: null | components["schemas"]["FingerprintObservation"];
             definition: components["schemas"]["DefinitionEvidence"];
@@ -1594,6 +1683,11 @@ export interface components {
             records: components["schemas"]["WarehouseFreshnessRecord"][];
             /** Format: uuid */
             session_id: string;
+        };
+        StartedLogin: {
+            browser_code: string;
+            /** Format: date-time */
+            expires_at: string;
         };
         StatisticsBatch: {
             /** Format: int64 */
@@ -2082,6 +2176,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    approveCliLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CliLoginApprovalRequest"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    claimCliLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CliLoginClaimRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CliLoginSessionResponse"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
+                };
+            };
+        };
+    };
+    startCliLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CliLoginStartRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedLogin"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationDenial"];
                 };
             };
         };
@@ -2579,6 +2770,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonNodeSql: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["NodeSql"];
+                };
             };
             /** @description Session rejected */
             401: {

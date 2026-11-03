@@ -29,6 +29,7 @@ use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::models::SnapshotNode;
 use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::replica_helpers::second_store;
@@ -92,6 +93,43 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let mut input = snapshot(location);
             input.documents.get_mut("triggers").expect("triggers")["health_orders"]["when"] =
                 json!({"kind":"custom", "function":"orders_ready", "code_hash":"orders_v1"});
+            let sql_input: Value = serde_json::from_str(
+                &std::fs::read_to_string(
+                    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../benchmarks/duckshop/edge_cases/orchestration/node_sql.json"),
+                )
+                .expect("SQL fixture"),
+            )
+            .expect("SQL inputs");
+            let orders = input.nodes.get_mut("orders").expect("orders node");
+            orders.raw_sql = Some(sql_input["raw_sql"].as_str().expect("raw SQL").into());
+            orders.compiled_sql = Some(
+                sql_input["compiled_sql"]
+                    .as_str()
+                    .expect("compiled SQL")
+                    .into(),
+            );
+            orders.python_source = Some(
+                sql_input["python_source"]
+                    .as_str()
+                    .expect("Python source")
+                    .into(),
+            );
+            input.nodes.insert(
+                "udf:orders".into(),
+                SnapshotNode {
+                    kind: "udf".into(),
+                    definition: json!({"name":"orders", "arguments":[], "returns":"INTEGER"}),
+                    raw_sql: None,
+                    compiled_sql: Some(
+                        sql_input["function_sql"]
+                            .as_str()
+                            .expect("function SQL")
+                            .into(),
+                    ),
+                    python_source: None,
+                },
+            );
             let published = publish_snapshot(store, &input).await.expect("publication");
             assert_eq!(
                 published.generation, test_case.expected_generation,
@@ -131,6 +169,8 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let path =
                 format!("/api/control/locations/{location}/targets/development/connection-tests");
             let metadata = format!("/api/control/locations/{location}/targets/development/runs");
+            let sql_path =
+                format!("/api/control/locations/{location}/targets/development/nodes/orders/sql");
             let inputs: Value = serde_json::from_str(&std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../benchmarks/duckshop/edge_cases/orchestration/administrator_lifecycle.json")).expect("DuckShop matrix")).expect("JSON");
             let roles: Vec<SessionRoleCase> =
                 serde_json::from_value(inputs["session_roles"].clone())
@@ -196,6 +236,48 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         role_case.expected_metadata == StatusCode::OK.as_u16()
                     );
                     assert!(!page.to_string().contains("select 1 as id"));
+                    let sql = request(
+                        &provider.client,
+                        session,
+                        (Method::GET, &sql_path),
+                        (&Value::Null, ""),
+                    )
+                    .await;
+                    assert_eq!(sql.status().as_u16(), role_case.expected_sql);
+                    assert_eq!(sql.headers()["cache-control"], "no-store");
+                    let sql: Value = sql.json().await.expect("SQL response");
+                    for (key, expected) in [
+                        ("snapshot_id", json!(published.snapshot_id)),
+                        ("node_key", json!("orders")),
+                        ("raw_sql", sql_input["raw_sql"].clone()),
+                        ("compiled_sql", sql_input["compiled_sql"].clone()),
+                    ] {
+                        assert_eq!(
+                            sql.get(key),
+                            [None, Some(&expected)][usize::from(role_case.expected_sql == 200)]
+                        );
+                    }
+                    assert_eq!(
+                        sql.get("decision_id").is_some(),
+                        role_case.expected_sql != 200
+                    );
+                    assert!(sql.get("python_source").is_none());
+                    let unpublished = request(
+                        &provider.client,
+                        session,
+                        (Method::GET, &sql_path.replace("development", "preview")),
+                        (&Value::Null, ""),
+                    )
+                    .await;
+                    assert_eq!(unpublished.status().as_u16(), role_case.expected_sql);
+                    assert_eq!(
+                        unpublished
+                            .json::<Value>()
+                            .await
+                            .expect("unpublished scope")
+                            .is_null(),
+                        role_case.expected_sql == 200
+                    );
                     let job = json!({"run_id":Uuid::now_v7(), "location_id":location, "target":"development", "job_key":"orders", "reason":"Refresh orders", "priority":0});
                     assert_eq!(
                         request(
@@ -279,6 +361,17 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         request(
                             &provider.client,
                             session,
+                            (Method::GET, &sql_path),
+                            (&Value::Null, "")
+                        )
+                        .await
+                        .status(),
+                        StatusCode::FORBIDDEN
+                    );
+                    assert_eq!(
+                        request(
+                            &provider.client,
+                            session,
                             (Method::POST, &path),
                             (&last_request, &session.csrf)
                         )
@@ -334,6 +427,13 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             )
             .await
             .expect("scoped developer");
+            crate::api::tests::node_sql_helpers::node_sql_boundaries(
+                store,
+                (&provider.client, &sessions[0]),
+                (location, published.snapshot_id),
+                (&input, &sql_input),
+            )
+            .await;
             for session in &sessions {
                 let result = request(
                     &provider.client,

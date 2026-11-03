@@ -12,7 +12,9 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
+import duckdb
 import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
@@ -208,6 +210,44 @@ def verify_security_audit(
     with pytest.raises(HTTPError) as audit_rejected:
         person_read(api, "/api/control/audit", session=ordinary)
     assert audit_rejected.value.code == 403
+
+
+def verify_sql_inspection(
+    api: SnapshotApi,
+    sessions: tuple[tuple[str, str], tuple[str, str]],
+    assignment: dict[str, Any],
+    model: Path,
+    snapshot_id: str,
+) -> None:
+    """Inspect actual published SQL under a live scoped role, then revoke that role."""
+    administrator, session = sessions
+    path: str = (
+        f"/api/control/locations/{api.location_id}/targets/development/nodes/model:orders/sql"
+    )
+    assignment = assignment | {"role": "developer", "revoke": False}
+    assert person_request(api, "/api/admin/roles", body=assignment, session=administrator) == {
+        "applied": True
+    }
+    sql: dict[str, Any] = person_read(api, path, session=session)
+    assert set(sql) == {"snapshot_id", "node_key", "raw_sql", "compiled_sql"}
+    assert sql["snapshot_id"] == snapshot_id
+    assert sql["node_key"] == "model:orders"
+    assert sql["raw_sql"] == model.read_text()
+    with duckdb.connect() as inspection:
+        assert inspection.sql(sql["compiled_sql"]).fetchall() == [(41,)]
+    for wrong_scope in [
+        path.replace("development", "preview"),
+        path.replace(api.location_id, str(uuid4())),
+    ]:
+        with pytest.raises(HTTPError) as denied:
+            person_read(api, wrong_scope, session=session)
+        assert denied.value.code == 403
+    assert person_request(
+        api, "/api/admin/roles", body=assignment | {"revoke": True}, session=administrator
+    ) == {"applied": True}
+    with pytest.raises(HTTPError) as revoked:
+        person_read(api, path, session=session)
+    assert revoked.value.code == 403
 
 
 def person_request(
