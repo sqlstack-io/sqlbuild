@@ -110,6 +110,12 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
             "failed",
             [],
             launcher="uncooperative",
+            concurrency_limits={"orders_limit": 1},
+            files={
+                "orchestration/orders.py": Path(
+                    "benchmarks/duckshop/edge_cases/orchestration/local_recovery_orders.py"
+                ).read_text(),
+            },
             store_setup=Path(
                 "benchmarks/duckshop/edge_cases/orchestration/local_recovery_publication_fault.sql"
             ).read_text(),
@@ -128,6 +134,9 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
         assert active["status"] == "launched"
         tables: tuple[str, ...] = ("sqb_write_claims", "sqb_concurrency_slots", "sqb_run_liveness")
         with sqlite3.connect(worker.control_store) as control:
+            assert control.execute(
+                "SELECT group_key, run_id FROM sqb_concurrency_slots"
+            ).fetchall() == [("orders_limit", active["run_id"])]
             retained: dict[str, list[tuple[Any, ...]]] = {
                 table: control.execute(f"SELECT * FROM {table}").fetchall() for table in tables
             }
