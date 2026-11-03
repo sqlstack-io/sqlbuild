@@ -1,5 +1,7 @@
 """Bootstrap, authenticate, lose authority, recover offline and authenticate again."""
 
+import hashlib
+import json
 import sqlite3
 import subprocess
 import sys
@@ -17,6 +19,32 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.
     serve,
     successful,
 )
+
+
+def postgres_recovery_state(connection: Any) -> dict[str, str]:
+    """Compare every retained security row without logging credential hashes."""
+    tables: tuple[str, ...] = (
+        "sqb_principals",
+        "sqb_role_assignments",
+        "sqb_password_credentials",
+        "sqb_password_sessions",
+        "sqb_external_sessions",
+        "sqb_authentication_revision",
+        "sqb_security_audit",
+        "sqb_admin_initialization",
+        "sqb_installation",
+    )
+    return {
+        table: hashlib.sha256(
+            json.dumps(
+                connection.execute(
+                    f"SELECT to_jsonb(state) FROM {table} AS state ORDER BY to_jsonb(state)::text"
+                ).fetchall(),
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        for table in tables
+    }
 
 
 def verify_recovery(binary: Path) -> str:
