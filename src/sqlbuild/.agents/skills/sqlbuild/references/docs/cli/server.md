@@ -14,6 +14,22 @@ sqb server
 
 Use `sqb server --help` for service, authentication and launcher options.
 
+## Set retention
+
+Set how long the server keeps hourly warehouse statistics:
+
+```bash
+sqb server --statistics-retention-days 30
+```
+
+| Data | Option | Default | Range |
+| --- | --- | --- | --- |
+| Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
+
+Samples older than the horizon disappear from statistics reads at once and are then deleted in the
+background. An invalid value stops the server before it opens the control database. Servers that
+share one control database delete at the shortest horizon among them, so give them the same value.
+
 ## Inspect published SQL
 
 Sign in with [`sqb login`](login.md), then inspect one exact node in the current
