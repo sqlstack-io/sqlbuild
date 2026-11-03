@@ -6,8 +6,8 @@ use crate::api::_helpers::authentication::oidc;
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::resources::{
-    administrators, audit, changes, location_health, location_work, person_operations, run_reads,
-    runs, snapshots, trigger_reads, warehouse_metadata,
+    administrators, audit, changes, location_health, location_work, person_location_work,
+    person_operations, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -24,6 +24,8 @@ use crate::api::_helpers::resources::{
     person_operations::statistics,
     person_operations::fingerprint,
     person_operations::node_status,
+    person_location_work::request,
+    person_location_work::result,
     password_sessions::login,
     password_sessions::current,
     password_sessions::logout,

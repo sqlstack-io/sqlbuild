@@ -4,6 +4,7 @@ pub mod connect_location_work;
 pub mod location_health;
 pub mod location_work;
 pub(crate) mod read_location_work;
+pub mod read_person_connection_test;
 pub(crate) mod read_platform_events;
 pub mod report_location_health;
 pub mod report_remote_location_health;

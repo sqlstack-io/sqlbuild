@@ -85,6 +85,13 @@ pub struct LocationWorkRequest {
     pub work: LocationWork,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectionTestRequest {
+    pub request_id: Uuid,
+    pub reason: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LocationWorkPoll {

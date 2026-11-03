@@ -5,6 +5,13 @@
   "recovery_reason": "restore access after loss of the final administrator",
   "disabled_person_sequence": ["assign", "disable", "revoke", "enable", "deny_run"],
   "run_control_sequence": ["request", "cancel", "confirm_stopped", "rerun_frozen", "retry", "revoke", "deny_retry"],
+  "connection_test_roles": [
+    {"role": null, "allowed": false},
+    {"role": "viewer", "allowed": false},
+    {"role": "operator", "allowed": false},
+    {"role": "admin", "allowed": true},
+    {"role": "developer", "allowed": true}
+  ],
   "job_settings": [
     {"full_refresh": false},
     {"full_refresh": true},

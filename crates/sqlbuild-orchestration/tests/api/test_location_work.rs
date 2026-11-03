@@ -86,7 +86,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                 work: LocationWork::CheckConnection {},
             };
             assert!(
-                request_location_work(store, &audit, &request)
+                request_location_work(store, (&audit, None), &request)
                     .await
                     .is_err(),
                 "unpublished target"
@@ -99,7 +99,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                 ..audit.clone()
             };
             assert!(
-                request_location_work(store, &invalid_audit, &request)
+                request_location_work(store, (&invalid_audit, None), &request)
                     .await
                     .is_err()
             );
@@ -110,7 +110,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                     .is_none()
             );
             assert!(
-                request_location_work(store, &audit, &request)
+                request_location_work(store, (&audit, None), &request)
                     .await
                     .expect("enqueue")
             );
@@ -121,7 +121,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             input.generation = 2;
             publish_snapshot(store, &input).await.expect("republish");
             assert!(
-                !request_location_work(store, &audit, &request)
+                !request_location_work(store, (&audit, None), &request)
                     .await
                     .expect("retry after redeploy")
             );
@@ -136,7 +136,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                 ..request.clone()
             };
             assert!(
-                request_location_work(store, &audit, &changed)
+                request_location_work(store, (&audit, None), &changed)
                     .await
                     .is_err()
             );
@@ -145,7 +145,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                 ..audit.clone()
             };
             assert!(
-                request_location_work(store, &changed_actor, &request)
+                request_location_work(store, (&changed_actor, None), &request)
                     .await
                     .is_err()
             );
@@ -295,7 +295,7 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
                 request_id: Uuid::now_v7(),
                 ..request
             };
-            request_location_work(store, &audit, &next)
+            request_location_work(store, (&audit, None), &next)
                 .await
                 .expect("another request");
             execute(

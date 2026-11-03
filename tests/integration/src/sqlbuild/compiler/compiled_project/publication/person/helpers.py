@@ -202,3 +202,30 @@ def person_login(api: SnapshotApi, name: str) -> tuple[str, str]:
         cookies: SimpleCookie[str] = SimpleCookie("\n".join(response.headers.get_all("Set-Cookie")))
         cookie: str = "__Host-sqb-session=" + cookies["__Host-sqb-session"].value
         return cookie, json.load(response)["csrf_token"]
+
+
+def verify_connection_test_transport(
+    api: SnapshotApi, path: str, body: dict[str, Any], administrator: tuple[str, str]
+) -> None:
+    """Neither machine credentials, missing CSRF nor caller-supplied work cross the person API."""
+    for credentials in [("", ""), (administrator[0], "wrong-csrf")]:
+        with pytest.raises(HTTPError) as denied:
+            person_request(api, path, body=body, session=credentials)
+        assert denied.value.code == 401
+    with pytest.raises(HTTPError) as denied:
+        person_read(api, path + "/" + body["request_id"], session=(administrator[0], "wrong-csrf"))
+    assert denied.value.code == 403
+    with pytest.raises(HTTPError) as denied:
+        urlopen(
+            Request(
+                api.url + path,
+                data=json.dumps(body).encode(),
+                headers=person_headers(("", "")) | {"Authorization": "Bearer " + api.bearer},
+            ),
+            timeout=5,
+        )
+    assert denied.value.code == 401
+    for extra in [{"actor": "forged"}, {"work": {"kind": "evaluate_sensor"}}]:
+        with pytest.raises(HTTPError) as denied:
+            person_request(api, path, body=body | extra, session=administrator)
+        assert denied.value.code == 422

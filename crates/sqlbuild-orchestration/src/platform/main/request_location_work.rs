@@ -1,4 +1,4 @@
-//! Only trusted store owners enqueue named work; retries preserve the original generation/deadline.
+//! Named work requires a trusted owner or live person authority; retries preserve the original pin.
 
 use chrono::Duration;
 use serde_json::json;
@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::credentials::main::append_audit::append_audit;
 use crate::credentials::models::AuditContext;
+use crate::platform::_helpers::connection_tests::authorize_connection_test;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::models::{LocationWork, LocationWorkRequest};
 use crate::store::errors::ControlError;
@@ -16,7 +17,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn request_location_work(
     store: &ControlStore,
-    context: &AuditContext,
+    (context, credentials): (&AuditContext, Option<(&str, &str)>),
     request: &LocationWorkRequest,
 ) -> Result<bool, ControlError> {
     if matches!(request.work, LocationWork::EvaluateSensor { .. }) {
@@ -32,7 +33,12 @@ pub async fn request_location_work(
             "location work needs a target, reason and trusted actor".into(),
         ));
     }
-    let transaction = begin(store, TransactionMode::Write).await?;
+    let (transaction, context) = authorize_connection_test(
+        begin(store, TransactionMode::Write).await?,
+        (context, credentials),
+        (request.location_id, &request.target),
+    )
+    .await?;
     let (transaction, previous) = read_location_work(transaction, request.request_id).await?;
     if let Some(previous) = previous {
         if previous.record.request_json != *request || previous.record.requested_by != context.actor
@@ -68,7 +74,7 @@ pub async fn request_location_work(
     commit(
         append_audit(
             transaction,
-            context,
+            &context,
             (
                 Uuid::new_v5(&request.request_id, b"location-work-requested"),
                 "location.work_requested",
