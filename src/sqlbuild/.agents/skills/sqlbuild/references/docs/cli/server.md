@@ -16,8 +16,22 @@ Use `sqb server --help` for service, authentication and launcher options.
 
 ## Inspect published SQL
 
-Use the person-authenticated API to inspect one exact node in the current successful publication.
-Send a `GET` request to
+Sign in with [`sqb login`](login.md), then inspect one exact node in the current
+successful publication:
+
+```bash
+sqb control sql model:orders \
+  --server https://control.example.com \
+  --location-id "$LOCATION_ID" \
+  --target development
+```
+
+The command uses your saved person session and prints JSON. It does not load a local project
+or open a warehouse connection. Use `--ca-cert PATH` for an additional trusted PEM certificate.
+The node key is exact: `model:orders+` does not expand a selector. Progress and failures go to
+stderr; a failed request prints no SQL to stdout. Permission denials include their decision ID.
+
+The equivalent person-authenticated API is a `GET` request to
 `/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql`.
 
 Developer or Admin access must cover the requested location and target. Viewer, Operator and

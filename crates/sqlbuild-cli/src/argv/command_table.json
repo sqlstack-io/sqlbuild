@@ -79,6 +79,23 @@
    "group": 0,
    "parsers": [
     {
+     "name": "control",
+     "parser": {
+      "prog": "sqb control",
+      "description": "Read one exact node's current published SQL using your saved sqb login session. Results are JSON; progress goes to stderr. No project or warehouse connection is opened.",
+      "groups": [{"title": "positional arguments"}, {"title": "options"}],
+      "actions": [
+       {"kind": "help", "options": ["-h", "--help"], "dest": "help", "nargs": 0, "default": {"suppress": true}, "help": "show this help message and exit", "group": 1},
+       {"kind": "store", "dest": "person_action", "choices": ["sql"], "help": "inspect published raw and compiled SQL", "group": 0},
+       {"kind": "store", "dest": "person_node", "help": "exact published node key, for example model:orders (not a selector)", "group": 0},
+       {"kind": "store", "options": ["--server"], "dest": "login_server", "required": true, "help": "HTTPS SQLBuild server origin used by sqb login", "group": 1},
+       {"kind": "store", "options": ["--ca-cert"], "dest": "login_ca", "help": "additional trusted PEM CA certificate", "group": 1},
+       {"kind": "store", "options": ["--location-id"], "dest": "person_location", "required": true, "help": "published location UUID", "group": 1},
+       {"kind": "store", "options": ["--target"], "dest": "target", "required": true, "help": "exact published target", "group": 1}
+      ]
+     }
+    },
+    {
      "name": "login",
      "parser": {
       "prog": "sqb login",
@@ -8729,6 +8746,7 @@
     }
    ],
    "choices_help": [
+    {"dest": "control", "metavar": "control", "help": "inspect published SQL with your saved person session"},
     {"dest": "login", "metavar": "login", "help": "sign in through a browser or verify a saved CLI session"},
     {"dest": "logout", "metavar": "logout", "help": "revoke the CLI session and remove local credentials"},
     {

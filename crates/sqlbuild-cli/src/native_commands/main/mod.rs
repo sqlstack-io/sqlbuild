@@ -13,3 +13,4 @@ pub(crate) mod run_control_invocation;
 pub(crate) mod run_location_invocation;
 pub(crate) mod run_login_invocation;
 pub mod run_native_invocation;
+pub(crate) mod run_person_invocation;

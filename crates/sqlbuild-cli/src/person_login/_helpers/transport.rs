@@ -4,7 +4,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use reqwest::header::{AUTHORIZATION, HeaderValue};
+use sqlbuild_orchestration::api::models::ApiErrorBody;
 use sqlbuild_orchestration::credentials::models::SessionIdentity;
+use sqlbuild_orchestration::snapshots::models::NodeSql;
+use uuid::Uuid;
 
 use crate::person_login::constants::REQUEST_SECONDS;
 use crate::person_login::models::{PersonClient, PersonCredential};
@@ -98,4 +101,57 @@ pub(crate) async fn revoke(
             "remote session revocation could not be confirmed",
         ))
     }
+}
+
+pub(crate) async fn node_sql(
+    client: &PersonClient,
+    credential: &PersonCredential,
+    (location, target, node): (Uuid, &str, &str),
+) -> Result<Option<NodeSql>, std::io::Error> {
+    let mut url = reqwest::Url::parse(&client.origin).map_err(std::io::Error::other)?;
+    url.path_segments_mut()
+        .map_err(|()| std::io::Error::other("invalid server origin"))?
+        .pop_if_empty()
+        .extend([
+            "api",
+            "control",
+            "locations",
+            &location.to_string(),
+            "targets",
+            target,
+            "nodes",
+            node,
+            "sql",
+        ]);
+    let response = authorized(client, reqwest::Method::GET, url.path(), credential)?
+        .send()
+        .await
+        .map_err(|_| std::io::Error::other("could not read published SQL from the server"))?;
+    let status = response.status();
+    if !status.is_success() {
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err(std::io::Error::other(
+                "CLI session is unavailable or revoked; run sqb login again",
+            ));
+        }
+        let decision = response
+            .json::<ApiErrorBody>()
+            .await
+            .map_err(|_| {
+                std::io::Error::other(format!(
+                    "SQL inspection rejected (HTTP {}); invalid error response",
+                    status.as_u16()
+                ))
+            })?
+            .decision_id;
+        return Err(std::io::Error::other(format!(
+            "SQL inspection rejected (HTTP {}{})",
+            status.as_u16(),
+            decision.map_or_else(String::new, |id| format!("; decision {id}"))
+        )));
+    }
+    response
+        .json()
+        .await
+        .map_err(|_| std::io::Error::other("server returned an invalid SQL inspection result"))
 }
