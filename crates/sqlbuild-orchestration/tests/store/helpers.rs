@@ -40,10 +40,22 @@ pub(crate) async fn open_test_store(backend: Backend) -> Option<TestStore> {
         .await
         .expect("connect to test PostgreSQL");
     let schema = format!("sqb_test_{}", Uuid::now_v7().simple());
-    sqlx_core::query::query(&format!("CREATE SCHEMA {schema}"))
+    // Writer advisory locks are database-wide, so schemas alone do not isolate contracts.
+    sqlx_core::query::query(&format!("CREATE DATABASE {schema} TEMPLATE template0"))
         .execute(&admin)
         .await
+        .expect("create isolated test database");
+    let mut isolated_url = reqwest::Url::parse(&url).expect("test PostgreSQL URL");
+    isolated_url.set_path(&schema);
+    let url = isolated_url.as_str();
+    let setup = sqlx_postgres::PgPool::connect(url)
+        .await
+        .expect("connect to isolated test database");
+    sqlx_core::query::query(&format!("CREATE SCHEMA {schema}"))
+        .execute(&setup)
+        .await
         .expect("create isolated test schema");
+    setup.close().await;
     let separator = ['?', '&'][usize::from(url.contains('?'))];
     let store = open_store(&format!("{url}{separator}options=-csearch_path%3D{schema}"))
         .await
@@ -60,10 +72,10 @@ pub(crate) async fn close_test_store(test_store: TestStore) {
     let Some((admin, schema)) = test_store.postgres else {
         return;
     };
-    sqlx_core::query::query(&format!("DROP SCHEMA {schema} CASCADE"))
+    sqlx_core::query::query(&format!("DROP DATABASE {schema}"))
         .execute(&admin)
         .await
-        .expect("remove isolated test schema");
+        .expect("remove isolated test database");
     admin.close().await;
     drop(test_store.directory);
 }

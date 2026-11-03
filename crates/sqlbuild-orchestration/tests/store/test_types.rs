@@ -1,4 +1,4 @@
-//! Store fixtures retain their isolated SQLite directory or PostgreSQL schema until cleanup.
+//! Store fixtures retain their isolated SQLite directory or PostgreSQL database until cleanup.
 
 use crate::store::models::ControlStore;
 
