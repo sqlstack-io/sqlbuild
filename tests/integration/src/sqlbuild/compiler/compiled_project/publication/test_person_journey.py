@@ -31,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
     person_read,
     person_request,
     provision_person,
+    verify_compute_transport,
     verify_security_audit,
     wait_for_person_catalog,
 )
@@ -131,9 +132,7 @@ def test_given_an_initialized_installation_when_people_run_and_reload_then_permi
         assert person_request(
             worker.api, "/api/admin/roles", body=assignment, session=admin_session
         ) == {"applied": True}
-        metadata: list[dict[str, Any]] = person_read(worker.api, runs_path, session=session)
-        assert metadata[0]["run_id"] == scheduled["run_id"]
-        assert not ({"sql", "compiled_sql", "output", "rows", "evidence"} & metadata[0].keys())
+        verify_compute_transport(worker.api, session, scheduled["run_id"])
         for path, body in [
             ("/api/control/runs", request),
             ("/api/control/runs/cancel", cancellation),

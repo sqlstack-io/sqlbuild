@@ -14,6 +14,10 @@ mod oidc_helpers;
 mod oidc_test_types;
 #[path = "output/helpers.rs"]
 mod output_helpers;
+#[path = "person_sessions/helpers.rs"]
+mod person_sessions_helpers;
+#[path = "person_sessions/test_types.rs"]
+mod person_sessions_test_types;
 #[path = "recall/helpers.rs"]
 mod recall_helpers;
 #[path = "statistics/eligibility/helpers.rs"]
@@ -42,6 +46,8 @@ mod test_oidc;
 mod test_passwords;
 #[path = "test_person_location_work.rs"]
 mod test_person_location_work;
+#[path = "test_person_sessions.rs"]
+mod test_person_sessions;
 #[path = "test_proxy.rs"]
 mod test_proxy;
 #[path = "test_reads.rs"]
