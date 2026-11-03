@@ -512,6 +512,24 @@ pub struct WarehouseCatalogRecord {
     pub columns: Vec<WarehouseCatalogColumn>,
 }
 
+/// Payload of the retained structural-change fact, including authoritative removals.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CatalogProjectionFact {
+    pub location_id: Uuid,
+    pub target: String,
+    pub relation_id: Uuid,
+    pub record: WarehouseCatalogRecord,
+    pub present: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CatalogReplayRow {
+    pub storage_id: i64,
+    pub schema_version: i64,
+    pub occurred_at: DateTime<Utc>,
+    pub payload: CatalogProjectionFact,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CatalogBatch {

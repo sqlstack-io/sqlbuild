@@ -6,7 +6,9 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlStore, Parameter};
-use crate::warehouse_metadata::_helpers::catalog::{append_catalog_fact, validate_catalog};
+use crate::warehouse_metadata::_helpers::catalog::{
+    append_catalog_fact, project_catalog_record, validate_catalog,
+};
 use crate::warehouse_metadata::_helpers::ingestion::{
     begin_ingestion, commit_ingestion, scoped_event_id,
 };
@@ -63,14 +65,7 @@ pub async fn ingest_catalog(
                 (record_json.clone(), true),
             )
             .await?;
-            let now = transaction.now;
-            (transaction, _) = query(transaction,
-                "INSERT INTO sqb_warehouse_catalog (event_id,location_id,target,state_database,state_schema,observed_at,record_json,received_at) \
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$6) ON CONFLICT (event_id) DO UPDATE SET \
-                 observed_at=excluded.observed_at,record_json=excluded.record_json,received_at=excluded.received_at",
-                vec![Parameter::Id(relation_id), Parameter::Id(scope.0), Parameter::Text(scope.1.into()),
-                    Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone()),
-                    Parameter::Time(now), Parameter::Json(record_json)]).await?;
+            transaction = project_catalog_record(transaction, scope, relation_id, record).await?;
             applied = true;
         }
     }

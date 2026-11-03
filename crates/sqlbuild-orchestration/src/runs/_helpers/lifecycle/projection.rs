@@ -12,32 +12,63 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
 pub(crate) async fn project_change(
+    transaction: ControlTransaction,
+    request: &RunChangeRequest,
+    state: &ChangingRun,
+) -> Result<ControlTransaction, ControlError> {
+    if matches!(
+        request.change,
+        RunChange::CheckStarted { .. } | RunChange::CheckFinished { .. }
+    ) {
+        return check_execution_history(transaction, request).await;
+    }
+    let mut transaction = project_run_state(transaction, request, state).await?;
+    if let RunChange::Launched { container_id } = &request.change {
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_run_liveness SET container_id=$1 WHERE run_id=$2",
+            vec![
+                Parameter::OptionalText(container_id.clone()),
+                Parameter::Id(request.run_id),
+            ],
+        )
+        .await?;
+    }
+    if matches!(request.change, RunChange::Finished { .. }) {
+        for table in [
+            "sqb_write_claims",
+            "sqb_concurrency_slots",
+            "sqb_run_liveness",
+        ] {
+            (transaction, _) = query(
+                transaction,
+                &format!("DELETE FROM {table} WHERE run_id=$1"),
+                vec![Parameter::Id(request.run_id)],
+            )
+            .await?;
+        }
+    }
+    Ok(transaction)
+}
+
+/// Reconstruct derived status only, without releasing or recreating live physical ownership.
+pub(crate) async fn project_run_state(
     mut transaction: ControlTransaction,
     request: &RunChangeRequest,
     state: &ChangingRun,
 ) -> Result<ControlTransaction, ControlError> {
     let now = transaction.now;
     match &request.change {
-        RunChange::LaunchFailed { .. } => {}
-        RunChange::CheckStarted { .. } | RunChange::CheckFinished { .. } => {
-            return check_execution_history(transaction, request).await;
-        }
+        RunChange::LaunchFailed { .. }
+        | RunChange::CheckStarted { .. }
+        | RunChange::CheckFinished { .. } => {}
         RunChange::NodeStarted { .. } | RunChange::NodeFinished { .. } => {
             return project_node(transaction, request, &state.node_counts_json).await;
         }
-        RunChange::Launched { container_id } => {
+        RunChange::Launched { .. } => {
             (transaction, _) = query(transaction,
                 "UPDATE sqb_runs SET status=CASE WHEN status='queued' THEN 'launched' ELSE status END, launched_at=COALESCE(launched_at,$1) WHERE run_id=$2",
                 vec![Parameter::Time(now), Parameter::Id(request.run_id)]).await?;
-            (transaction, _) = query(
-                transaction,
-                "UPDATE sqb_run_liveness SET container_id=$1 WHERE run_id=$2",
-                vec![
-                    Parameter::OptionalText(container_id.clone()),
-                    Parameter::Id(request.run_id),
-                ],
-            )
-            .await?;
         }
         RunChange::Started => {
             (transaction, _) = query(transaction,
@@ -102,18 +133,6 @@ pub(crate) async fn project_change(
                 ],
             )
             .await?;
-            for table in [
-                "sqb_write_claims",
-                "sqb_concurrency_slots",
-                "sqb_run_liveness",
-            ] {
-                (transaction, _) = query(
-                    transaction,
-                    &format!("DELETE FROM {table} WHERE run_id=$1"),
-                    vec![Parameter::Id(request.run_id)],
-                )
-                .await?;
-            }
         }
     }
     Ok(transaction)

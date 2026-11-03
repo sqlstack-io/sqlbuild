@@ -448,3 +448,14 @@ pub struct RunObservation {
     pub last_heartbeat_at: Option<DateTime<Utc>>,
     pub observed_at: DateTime<Utc>,
 }
+
+/// Retained causal order and original timestamps, never reconstructed from wall-clock sorting.
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunReplayRow {
+    pub storage_id: i64,
+    pub schema_version: i64,
+    pub occurred_at: DateTime<Utc>,
+    pub event_type: String,
+    pub run_id: Uuid,
+    pub payload: serde_json::Value,
+}

@@ -4,5 +4,9 @@
 mod contract;
 #[path = "helpers.rs"]
 mod helpers;
+#[path = "test_replay.rs"]
+mod replay;
+#[path = "test_replay_writers.rs"]
+mod replay_writers;
 #[path = "test_types.rs"]
 mod test_types;

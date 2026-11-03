@@ -253,6 +253,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                 BTreeMap::from([("success".into(), 1)])
             );
             assert_eq!(runs[0].selection_json, claim.request.selection);
+            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             close_test_store(fixture).await;
         });
     }

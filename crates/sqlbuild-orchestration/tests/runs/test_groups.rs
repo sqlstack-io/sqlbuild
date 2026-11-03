@@ -416,6 +416,7 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
                 runs.iter().all(|run| run.status == RunStatus::Success),
                 "{runs:?}"
             );
+            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             completed.push(test_case.description);
             close_test_store(fixture).await;
         });

@@ -62,7 +62,7 @@ pub(crate) async fn publish_projections(
     Ok(transaction)
 }
 
-async fn publish_jobs(
+pub(crate) async fn publish_jobs(
     mut transaction: ControlTransaction,
     snapshot: &SnapshotRecord,
     definitions: &Definitions,

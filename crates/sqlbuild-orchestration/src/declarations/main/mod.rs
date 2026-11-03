@@ -6,4 +6,5 @@ pub mod list_trigger_events;
 pub mod list_triggers;
 pub mod pause_development_triggers;
 pub(crate) mod publish_definitions;
+pub(crate) mod rebuild_jobs;
 pub mod snapshot_definitions;

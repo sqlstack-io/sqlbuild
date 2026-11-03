@@ -7,5 +7,8 @@ pub(in crate::runs) mod nodes;
 pub(in crate::runs) mod output;
 pub(in crate::runs) mod projection;
 pub(in crate::runs) mod publish_change;
+pub(in crate::runs) mod queued;
 pub(in crate::runs) mod reads;
+pub(in crate::runs) mod rebuild;
 pub(in crate::runs) mod recall;
+pub(in crate::runs) mod replay;
