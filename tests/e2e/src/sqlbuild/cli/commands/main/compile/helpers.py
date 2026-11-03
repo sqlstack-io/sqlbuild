@@ -5318,7 +5318,11 @@ def run_delta_compile(
         project_dir=project_dir, args=args, env={REUSE_DISABLE_ENV_VAR: "0", **env}
     )
     return DeltaCompileOutcome(
-        returncode=result.returncode, stdout=result.stdout, stderr=result.stderr
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        command=tuple(result.args),
+        environment=tuple(sorted({REUSE_DISABLE_ENV_VAR: "0", **env}.items())),
     )
 
 

@@ -393,8 +393,23 @@ jobs:
               f"{os.environ.get('PYTEST_XDIST_AUTO_NUM_WORKERS', '<unset>')}"
           )
           PY
+      - name: Validate diagnostic encryption recipient
+        if: matrix.target == 'test-e2e-duckdb-cli'
+        run: openssl x509 -in .github/diagnostics-recipient.pem -noout
       - name: Run DuckDB E2E shard
+        env:
+          SQLBUILD_COMPARISON_ENCRYPTED_DIR: ${{ matrix.target == 'test-e2e-duckdb-cli' && format('{0}/comparison-encrypted', runner.temp) || '' }}
+          SQLBUILD_COMPARISON_RECIPIENT: ${{ github.workspace }}/.github/diagnostics-recipient.pem
         run: make ${{ matrix.target }}
+      - name: Retain encrypted comparison failures
+        if: failure() && matrix.target == 'test-e2e-duckdb-cli'
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/comparison-encrypted/failure-*/failure.cms
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
 
   compiler_differential:
     name: Compiler golden outputs
