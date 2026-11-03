@@ -79,7 +79,7 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             Ok(json!({"run_id": request.run_id, "applied": applied}))
         }
         ControlAdmin::RequestLocationWork(request) => {
-            let applied = request_location_work(&store, &context, &request).await?;
+            let applied = request_location_work(&store, (&context, None), &request).await?;
             Ok(json!({"request_id": request.request_id, "applied": applied}))
         }
         ControlAdmin::LocationWork(request_id) => {

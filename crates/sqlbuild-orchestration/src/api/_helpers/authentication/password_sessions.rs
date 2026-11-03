@@ -59,6 +59,14 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             post(crate::api::_helpers::resources::person_operations::change_trigger),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/connection-tests",
+            post(crate::api::_helpers::resources::person_location_work::request),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}",
+            get(crate::api::_helpers::resources::person_location_work::result),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )

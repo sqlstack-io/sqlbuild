@@ -40,6 +40,8 @@ mod test_location_work;
 mod test_oidc;
 #[path = "test_passwords.rs"]
 mod test_passwords;
+#[path = "test_person_location_work.rs"]
+mod test_person_location_work;
 #[path = "test_proxy.rs"]
 mod test_proxy;
 #[path = "test_reads.rs"]

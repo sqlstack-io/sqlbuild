@@ -1,0 +1,31 @@
+//! Connection-test submission and reads share live action authority under the store lock.
+
+use uuid::Uuid;
+
+use crate::authorization::main::authorize_session::authorize_session;
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::store::errors::ControlError;
+use crate::store::models::ControlTransaction;
+
+/// No credentials means a trusted direct-store owner, never an HTTP-supplied role.
+pub(crate) async fn authorize_connection_test(
+    transaction: ControlTransaction,
+    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, AuditContext), ControlError> {
+    let Some(credentials) = credentials else {
+        return Ok((transaction, context.clone()));
+    };
+    authorize_session(
+        transaction,
+        (context, credentials),
+        &PermissionScope {
+            action: Action::ConnectionTest,
+            location_id: Some(location_id),
+            target: Some(target.into()),
+            nodes: Default::default(),
+        },
+        DefaultRole::None,
+    )
+    .await
+}
