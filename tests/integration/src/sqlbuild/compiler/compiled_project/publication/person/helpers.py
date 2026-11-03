@@ -10,6 +10,7 @@ from pathlib import Path
 from subprocess import Popen
 from typing import Any
 from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import pytest
@@ -59,6 +60,39 @@ def person_headers(session: tuple[str, str]) -> dict[str, str]:
 def person_read(api: SnapshotApi, path: str, *, session: tuple[str, str]) -> Any:
     with urlopen(Request(api.url + path, headers=person_headers(session)), timeout=5) as response:
         return json.load(response)
+
+
+def verify_compute_transport(api: SnapshotApi, session: tuple[str, str], run_id: str) -> None:
+    """Real retained SQL/output are readable by the location, never by a browser cookie alone."""
+    metadata: list[dict[str, Any]] = person_read(
+        api, f"/api/control/locations/{api.location_id}/targets/development/runs", session=session
+    )
+    assert metadata[0]["run_id"] == run_id
+    assert not ({"sql", "compiled_sql", "output", "rows", "evidence"} & metadata[0].keys())
+    path: str = f"/api/locations/{api.location_id}/targets/development/runs/{run_id}"
+    headers: dict[str, str] = {"Authorization": "Bearer " + api.bearer}
+    with urlopen(Request(api.url + path + "/invocations", headers=headers), timeout=5) as response:
+        invocations: list[dict[str, Any]] = json.load(response)
+    assert any(row["invocation_id"].startswith("worker/") for row in invocations)
+    for view in ["artifacts", "output_tail"]:
+        evidence: list[dict[str, Any]] = []
+        for invocation in invocations:
+            endpoint: str = (
+                path
+                + "/recall/"
+                + view
+                + "?"
+                + urlencode({"invocation": invocation["invocation_id"]})
+            )
+            with urlopen(Request(api.url + endpoint, headers=headers), timeout=5) as response:
+                evidence.extend(json.load(response))
+            with pytest.raises(HTTPError) as rejected:
+                person_read(api, endpoint, session=session)
+            assert rejected.value.code == 401
+        assert evidence, view
+        assert any(
+            row["invocation_id"].startswith("worker/") and row["text"] for row in evidence
+        ), view
 
 
 def wait_for_person_catalog(
