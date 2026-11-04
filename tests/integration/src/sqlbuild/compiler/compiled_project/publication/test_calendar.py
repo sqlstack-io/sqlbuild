@@ -275,7 +275,7 @@ def test_given_a_published_calendar_when_a_real_worker_compiles_then_it_does_not
         | {
             "orchestration/orders.py": (
                 "from pathlib import Path\nfrom sqlbuild.orchestration import calendar_schedule, job, schedule\n"
-                "orders = job('orders', description='Order reporting.', select='orders', schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                "orders = job('orders', description='Order reporting.', select='orders', schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                 "@calendar_schedule(job=orders, description='Upcoming deliveries.', horizon='1d', timezone='UTC')\n"
                 "def deliveries(window):\n"
                 f"    marker = Path({str(evaluated)!r})\n"

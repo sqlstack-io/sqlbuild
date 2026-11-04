@@ -156,7 +156,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 'marts = job("marts", description="Build independent marts.", select="orders totals")\n'
                 'annual_orders = job_group("annual_orders", description="Stage then build marts.", '
                 "jobs=[marts, staging], "
-                'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
+                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
                 'starts_at="2000-01-01T00:00:00Z"))\n'
             ),
         }
@@ -231,10 +231,10 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                     "concurrency_groups=('orders_limit',))\n"
                     "annual_orders = job_group('annual_orders', description='Orders group.', jobs=[orders], "
                     "concurrency_groups=('orders_limit',), "
-                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                     "annual_inventory = job_group('annual_inventory', description='Inventory group.', "
                     "jobs=[inventory], concurrency_groups=('inventory_limit',), "
-                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                 ),
             },
             store_setup=(
@@ -437,7 +437,7 @@ def test_given_a_retained_baseline_when_starting_a_worker_then_verification_and_
                     "from sqlbuild.orchestration import job, schedule\n"
                     "annual_orders = job('annual_orders', select='orders', description='Build orders.', "
                     "settings={'vars': {'batch': 23}, 'reload': True, 'run_tests': False}, "
-                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', "
+                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', "
                     "starts_at='2000-01-01T00:00:00Z'))\n"
                 ),
             },
@@ -719,7 +719,7 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
                     "from sqlbuild.orchestration import RunEventKind, job, job_group, run_event, schedule, sensor\n"
                     "source = job('source_orders', select='orders', description='Source orders.')\n"
                     "source_group = job_group('source_group', description='Source group.', jobs=[source], "
-                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                     "annual_orders = job('annual_orders', select='orders', description='Refresh orders.', settings={'reload': True})\n"
                     "on_group = sensor('on_group', description='Refresh after group completion.', "
                     "when=run_event(job=source_group, kinds=[RunEventKind.COMPLETED, RunEventKind.SUCCESS], executed_successfully=('orders',)), "
@@ -774,7 +774,7 @@ def test_given_a_real_group_completion_when_a_run_sensor_matches_then_one_destin
                     "from sqlbuild.orchestration import NodeEventKind, job, job_group, node_event, schedule, sensor\n"
                     "source = job('source_orders', select='orders', description='Source orders.')\n"
                     "source_group = job_group('source_group', description='Source group.', jobs=[source], "
-                    "schedule=schedule(cron='0 0 1 1 *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
+                    "schedule=schedule(cron='0 0 * * *', timezone='UTC', starts_at='2000-01-01T00:00:00Z'))\n"
                     "annual_orders = job('annual_orders', select='stg_orders', description='Refresh staging.', settings={'reload': True})\n"
                     "on_node = sensor('on_node', description='React to actual orders rebuilds.', "
                     "when=node_event(select='orders', kinds=[NodeEventKind.SUCCESS]), "
@@ -858,7 +858,7 @@ def test_given_an_executing_scheduled_worker_when_cancelled_then_the_statement_s
                     "orders = job('orders', description='Long query.', select='orders')\n"
                     "totals = job('totals', description='Waiting query.', select='totals')\n"
                     "annual_orders = job_group('annual_orders', description='Cancellable group.', "
-                    "jobs=[totals, orders], schedule=schedule(cron='0 0 1 1 *', timezone='UTC', "
+                    "jobs=[totals, orders], schedule=schedule(cron='0 0 * * *', timezone='UTC', "
                     "starts_at='2000-01-01T00:00:00Z'))\n"
                 ),
             },

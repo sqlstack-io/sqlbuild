@@ -637,7 +637,7 @@ def scheduled_worker(
                 "    assert 'SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL' not in os.environ\n"
                 'annual_orders = job("annual_orders", select="orders", '
                 'description="Build orders.", '
-                'schedule=schedule(cron="0 0 1 1 *", timezone="UTC", '
+                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
                 'starts_at="2000-01-01T00:00:00Z"))\n'
             ),
         }
