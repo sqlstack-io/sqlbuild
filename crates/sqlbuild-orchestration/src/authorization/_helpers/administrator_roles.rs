@@ -8,7 +8,7 @@ use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{
     AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole,
-    RoleAssignmentRequest,
+    RoleAssignmentRequest, RoleKey,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
@@ -30,7 +30,14 @@ pub(crate) async fn assign_role_in(
             "role target requires a location and a nonempty name".into(),
         ));
     }
-    if request.role == BuiltinRole::Admin {
+    if let RoleKey::Custom(key) = &request.role
+        && (key.trim().is_empty() || request.location_id.is_none())
+    {
+        return Err(ControlError::Invalid(
+            "custom role assignment requires a location and a nonempty role key".into(),
+        ));
+    }
+    if request.role == RoleKey::Builtin(BuiltinRole::Admin) {
         if request.location_id.is_some() || request.target.is_some() {
             return deny(
                 transaction,
@@ -55,6 +62,21 @@ pub(crate) async fn assign_role_in(
         )
         .await;
     }
+    let transaction = if let RoleKey::Custom(key) = &request.role
+        && !request.revoke
+    {
+        let (transaction, published) = query(transaction,
+            "SELECT role_key FROM sqb_role_definition_versions WHERE location_id=$1 AND role_key=$2 AND ($3 IS NULL OR target=$3) LIMIT 1",
+            vec![Parameter::OptionalId(request.location_id), Parameter::Text(key.clone()), Parameter::OptionalText(request.target.clone())]).await?;
+        if published.is_empty() {
+            return Err(ControlError::Invalid(format!(
+                "role {key} is neither a built-in role nor a custom role this location has published"
+            )));
+        }
+        transaction
+    } else {
+        transaction
+    };
     let (transaction, people) = query(transaction, "SELECT principal_id,disabled_at FROM sqb_principals WHERE principal_id=$1 AND kind='person'",
         vec![Parameter::Id(request.principal_id)]).await?;
     if people
@@ -77,11 +99,11 @@ async fn assign_scoped_role(
     context: &AuditContext,
     request: &RoleAssignmentRequest,
 ) -> Result<bool, ControlError> {
-    let role = serde_json::to_value(request.role)
+    let role = serde_json::to_value(&request.role)
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let key = serde_json::to_string(&(
         request.principal_id,
-        request.role,
+        &request.role,
         request.location_id,
         &request.target,
     ))

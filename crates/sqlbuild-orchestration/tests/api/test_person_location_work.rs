@@ -88,7 +88,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 .expect("publish");
             let assignment = RoleAssignmentRequest {
                 principal_id: person,
-                role: BuiltinRole::Developer,
+                role: BuiltinRole::Developer.into(),
                 location_id: Some(location),
                 target: Some("development".into()),
                 revoke: false,

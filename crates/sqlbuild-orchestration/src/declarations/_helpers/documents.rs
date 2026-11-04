@@ -27,6 +27,7 @@ pub(crate) fn decode_definitions(
     let mut definitions = Definitions {
         jobs: document(documents, "jobs")?,
         groups: document(documents, "groups")?,
+        roles: documents.get("roles").cloned(),
         ..Definitions::default()
     };
     for (name, value) in document::<Value>(documents, "triggers")? {

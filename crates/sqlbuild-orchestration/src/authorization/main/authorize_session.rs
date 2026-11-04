@@ -2,6 +2,7 @@
 
 use serde_json::json;
 
+use crate::authorization::_helpers::custom_roles::grants_allow;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::sessions::authenticate_session_in::authenticate_session_in;
 use crate::credentials::models::{
@@ -70,13 +71,16 @@ pub(crate) async fn authorize_session(
         .await;
     };
     let (transaction, rows) = query(transaction,
-        "SELECT role_key,location_id,target FROM sqb_role_assignments WHERE principal_id=$1 AND revoked_at IS NULL ORDER BY role_key",
-        vec![Parameter::Id(identity.principal_id)]).await?;
+        "SELECT a.role_key,a.location_id,a.target,e.resolved_grants_json FROM sqb_role_assignments a \
+         LEFT JOIN sqb_effective_roles e ON e.location_id=a.location_id AND e.role_key=a.role_key AND e.target=$2 \
+         WHERE a.principal_id=$1 AND a.revoked_at IS NULL ORDER BY a.role_key",
+        vec![Parameter::Id(identity.principal_id), Parameter::OptionalText(scope.target.clone())]).await?;
     for row in rows {
-        let Ok(role) = serde_json::from_value::<BuiltinRole>(row["role_key"].clone()) else {
-            continue;
-        };
-        if role_allows(role, scope.action)
+        let allowed = serde_json::from_value::<BuiltinRole>(row["role_key"].clone()).map_or_else(
+            |_| grants_allow(&row["resolved_grants_json"], scope.action),
+            |role| role_allows(role, scope.action),
+        );
+        if allowed
             && (row["location_id"].is_null() || row["location_id"] == json!(scope.location_id))
             && (row["target"].is_null() || row["target"] == json!(scope.target))
         {

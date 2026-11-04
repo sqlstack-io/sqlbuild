@@ -4,6 +4,8 @@
 pub(crate) mod helpers;
 #[path = "locations/helpers.rs"]
 pub(crate) mod location_helpers;
+#[path = "roles/helpers.rs"]
+pub(crate) mod role_helpers;
 #[path = "test_administrators.rs"]
 mod test_administrators;
 #[path = "test_audit.rs"]
@@ -12,6 +14,8 @@ mod test_audit;
 mod test_audit_retention;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "test_custom_roles.rs"]
+mod test_custom_roles;
 #[path = "passwords/test_contract.rs"]
 mod test_passwords;
 #[path = "test_recovery.rs"]

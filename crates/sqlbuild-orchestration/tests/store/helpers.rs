@@ -92,6 +92,7 @@ pub(crate) async fn reconstruct_fingerprint_predecessor(store: &ControlStore) {
         .await
         .expect("fingerprint predecessor");
     for sql in [
+        "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
         "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
         "DROP TABLE sqb_cli_login_flows",
         "DELETE FROM sqb_schema_migrations WHERE name='cli_login_flows'",

@@ -162,7 +162,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             ));
             let mut assignment = RoleAssignmentRequest {
                 principal_id: person,
-                role: BuiltinRole::Viewer,
+                role: BuiltinRole::Viewer.into(),
                 location_id: Some(location),
                 target: Some("development".into()),
                 revoke: false,

@@ -94,6 +94,7 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                 .expect("populated predecessor");
             for sql in [
                 "DROP TABLE sqb_external_sessions",
+                "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
                 "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
                 "DELETE FROM sqb_schema_migrations WHERE name='external_sessions'",
             ] {

@@ -92,6 +92,7 @@ pub struct Definitions {
     pub groups: BTreeMap<String, GroupDefinition>,
     pub triggers: BTreeMap<String, TriggerDefinition>,
     pub sensors: BTreeMap<String, SensorDefinition>,
+    pub roles: Option<serde_json::Value>,
 }
 
 /// Legacy schedule documents retain their stored shape; sensors add a distinct condition shape.

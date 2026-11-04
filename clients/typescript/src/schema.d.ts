@@ -16,6 +16,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/role-activations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestRoleActivation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/role-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["decideRoleApproval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/roles": {
         parameters: {
             query?: never;
@@ -1350,15 +1382,41 @@ export interface components {
             /** Format: uuid */
             source_run_id: string;
         };
+        /** @description The recorded activation request and the exact definition it asks to activate. */
+        RoleActivation: {
+            definition_digest: string;
+            /** Format: uuid */
+            request_id: string;
+        };
+        /** @description Asks for a widened custom role definition of the current snapshot to take effect. */
+        RoleActivationRequest: {
+            /** Format: uuid */
+            location_id: string;
+            reason: string;
+            role_key: string;
+            target: string;
+        };
+        /** @description An administrator's decision on an activation request; self-approval must be confirmed. */
+        RoleApproval: {
+            confirm_self_approval?: boolean;
+            decision: components["schemas"]["RoleDecision"];
+            reason: string;
+            /** Format: uuid */
+            request_id: string;
+        };
         RoleAssignmentRequest: {
             /** Format: uuid */
             location_id?: string | null;
             /** Format: uuid */
             principal_id: string;
             revoke?: boolean;
-            role: components["schemas"]["BuiltinRole"];
+            role: components["schemas"]["RoleKey"];
             target?: string | null;
         };
+        /** @enum {string} */
+        RoleDecision: "approved" | "rejected";
+        /** @description A built-in role by name, or a custom role a location publishes and an administrator approves. */
+        RoleKey: components["schemas"]["BuiltinRole"] | string;
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -2129,6 +2187,86 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    requestRoleActivation: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleActivationRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleActivation"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    decideRoleApproval: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleApproval"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             403: {
                 headers: {

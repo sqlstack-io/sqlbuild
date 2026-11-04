@@ -185,7 +185,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         (&context, (&admin_session.bearer, &admin_session.csrf)),
                         &RoleAssignmentRequest {
                             principal_id: person,
-                            role,
+                            role: role.into(),
                             location_id: None,
                             target: None,
                             revoke: false,
@@ -346,7 +346,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         (&context, (&admin_session.bearer, &admin_session.csrf)),
                         &RoleAssignmentRequest {
                             principal_id: person,
-                            role,
+                            role: role.into(),
                             location_id: None,
                             target: None,
                             revoke: true,
@@ -418,7 +418,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 (&context, (&admin_session.bearer, &admin_session.csrf)),
                 &RoleAssignmentRequest {
                     principal_id: person,
-                    role: crate::credentials::models::BuiltinRole::Developer,
+                    role: crate::credentials::models::BuiltinRole::Developer.into(),
                     location_id: Some(location),
                     target: Some("development".into()),
                     revoke: false,

@@ -150,7 +150,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     );
                     let assignment = RoleAssignmentRequest {
                         principal_id: person,
-                        role: test_case.role,
+                        role: test_case.role.into(),
                         location_id: None,
                         target: None,
                         revoke: false,

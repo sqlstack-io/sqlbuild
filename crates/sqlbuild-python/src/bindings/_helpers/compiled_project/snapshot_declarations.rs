@@ -201,6 +201,7 @@ pub(crate) fn compile_declarations(
         groups,
         triggers,
         sensors,
+        ..
     } = compile_sensors(
         py,
         (project_dir, &input, graph),

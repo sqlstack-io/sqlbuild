@@ -36,6 +36,8 @@ mod test_changes;
 mod test_cli_login;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "test_custom_roles.rs"]
+mod test_custom_roles;
 #[path = "test_development.rs"]
 mod test_development;
 #[path = "test_external_sessions.rs"]

@@ -111,3 +111,9 @@ pub(crate) struct CliLoginTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_exchanges: usize,
 }
+
+pub(crate) struct CustomRoleApiTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_statuses: [u16; 5],
+}

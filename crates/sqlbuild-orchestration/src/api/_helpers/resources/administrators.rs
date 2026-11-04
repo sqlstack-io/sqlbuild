@@ -10,8 +10,11 @@ use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::change_administrator::change_administrator;
+use crate::authorization::main::decide_role_approval::decide_role_approval;
+use crate::authorization::main::request_role_activation::request_role_activation;
 use crate::credentials::models::{
-    AdministratorAuthentication, AdministratorChange, AuditContext, RoleAssignmentRequest,
+    AdministratorAuthentication, AdministratorChange, AuditContext, RoleActivation,
+    RoleActivationRequest, RoleApproval, RoleAssignmentRequest,
 };
 use crate::store::models::ControlStore;
 
@@ -59,5 +62,35 @@ pub(crate) async fn assign(
             &authentication,
         )
         .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/admin/role-activations", operation_id = "requestRoleActivation",
+    params(("x-sqb-csrf" = String, Header)), request_body = RoleActivationRequest,
+    responses((status = 200, body = RoleActivation), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn request_activation(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(request): Json<RoleActivationRequest>,
+) -> Result<Json<RoleActivation>, ApiError> {
+    Ok(Json(
+        request_role_activation(&store, (&context, session_credentials(&headers)), &request)
+            .await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/admin/role-approvals", operation_id = "decideRoleApproval",
+    params(("x-sqb-csrf" = String, Header)), request_body = RoleApproval,
+    responses((status = 200, body = MutationResponse), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn decide(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    headers: HeaderMap,
+    Json(approval): Json<RoleApproval>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: decide_role_approval(&store, (&context, session_credentials(&headers)), &approval)
+            .await?,
     }))
 }
