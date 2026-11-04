@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::authorization::_helpers::custom_roles::set_effective_role;
 use crate::authorization::main::compile_roles::compile_roles;
