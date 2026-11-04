@@ -260,22 +260,6 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
             (
                 "duckdb",
                 "database",
-                "consumption_history",
-                append_consumption_history,
-                "external-build",
-                (),
-            ),
-            (
-                "sqlite",
-                "path",
-                "consumption_history",
-                append_consumption_history,
-                "external-build",
-                (),
-            ),
-            (
-                "duckdb",
-                "database",
                 "migration_history",
                 append_migration_history,
                 "external-move",

@@ -13,6 +13,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
     DUCKDB_CHANGED,
     SQLITE_CHANGED,
+    add_changed_function_calls,
     apply_changed_step,
     changed_build_steps,
     kill_changed_build_mid_write,
@@ -21,6 +22,8 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
 )
 
 EVERY_MODEL: frozenset[str] = frozenset({"stg_orders", "stg_customers", "customer_orders"})
+# Functions deploy on every build; `--changed` decides models and seeds only.
+FUNCTIONS: frozenset[str] = frozenset({"udf__order_key", "table_fn__customer_order_keys"})
 EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str]], ...] = (
     ("first --changed build", EVERY_MODEL),
     ("nothing changed", frozenset()),
@@ -53,6 +56,38 @@ def test_given_input_changes_when_building_with_changed_then_exactly_their_consu
     for step in changed_build_steps(test_case.warehouse):
         apply_changed_step(project_dir, test_case.warehouse, step)
         observed.append((step.description, run_changed_build(project_dir, step.arguments)))
+
+    assert tuple(observed) == test_case.expected_ran
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedBuildE2ETestCase(
+            description="duckdb",
+            warehouse=DUCKDB_CHANGED,
+            expected_ran=(
+                ("first --changed build", EVERY_MODEL | {"first_customer_order_keys"}),
+                ("nothing changed", frozenset()),
+                (
+                    "a new order",
+                    frozenset({"stg_orders", "customer_orders", "first_customer_order_keys"}),
+                ),
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_models_calling_functions_when_building_with_changed_then_only_changed_inputs_run(
+    test_case: ChangedBuildE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=test_case.warehouse)
+    add_changed_function_calls(project_dir)
+    observed: list[tuple[str, frozenset[str]]] = []
+    for step in changed_build_steps(test_case.warehouse)[: len(test_case.expected_ran)]:
+        apply_changed_step(project_dir, test_case.warehouse, step)
+        ran: frozenset[str] = run_changed_build(project_dir, step.arguments)
+        observed.append((step.description, ran - FUNCTIONS))
 
     assert tuple(observed) == test_case.expected_ran
 

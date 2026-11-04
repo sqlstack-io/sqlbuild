@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
 use crate::bindings::_helpers::analysis::relation_names::{
@@ -10,6 +11,9 @@ use crate::bindings::_helpers::analysis::relation_names::{
 };
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads, seed_reads};
 use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
+
+/// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
+const FUNCTION_CALLS: [&str; 2] = ["__udf", "__table_fn"];
 
 /// The relations each model, seed and source names, by node key or source name.
 pub(crate) struct Locations {
@@ -122,6 +126,12 @@ pub(crate) fn model_reads_undeclared(
     dialect: Option<&str>,
 ) -> PyResult<bool> {
     let sql: String = model_reads::query_sql(model)?.extract()?;
+    let sql: String = FUNCTION_CALLS.iter().fold(sql, |sql, function| {
+        replace_reference_calls(&sql, function, |_| {
+            Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
+        })
+        .unwrap_or_else(|never| match never {})
+    });
     let Some((relations, temporary)) = extract_sql_relation_names(model.py(), &sql, dialect)?
     else {
         return Ok(true);
