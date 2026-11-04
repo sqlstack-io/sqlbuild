@@ -273,6 +273,13 @@ class AuditHorizonTestCase:
 
 
 @dataclass(frozen=True)
+class RetentionRejectionTestCase:
+    description: str
+    arguments: tuple[str, ...]
+    expected_error: str
+
+
+@dataclass(frozen=True)
 class StatisticsHorizonRejectionTestCase:
     description: str
     days: str

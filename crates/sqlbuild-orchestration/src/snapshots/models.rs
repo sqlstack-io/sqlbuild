@@ -93,3 +93,32 @@ pub(crate) struct PreparedSnapshot {
     pub(crate) documents: BTreeMap<String, (String, Vec<u8>)>,
     pub(crate) manifest_digest: String,
 }
+
+/// Installation configuration: how many recent publications to keep per location and target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SnapshotRetention {
+    count: u16,
+}
+
+impl SnapshotRetention {
+    pub fn count(count: u16) -> Result<Self, crate::store::errors::ControlError> {
+        if count == 0 {
+            return Err(crate::store::errors::ControlError::Invalid(
+                "snapshot retention must keep at least one snapshot".into(),
+            ));
+        }
+        Ok(Self { count })
+    }
+
+    pub(crate) fn kept(self) -> i64 {
+        i64::from(self.count)
+    }
+}
+
+impl Default for SnapshotRetention {
+    fn default() -> Self {
+        Self {
+            count: crate::snapshots::constants::DEFAULT_SNAPSHOT_RETENTION_COUNT,
+        }
+    }
+}

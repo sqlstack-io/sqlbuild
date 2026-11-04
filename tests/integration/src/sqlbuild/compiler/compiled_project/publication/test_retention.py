@@ -1,4 +1,4 @@
-"""The installed server expires security audit rows only after every configured sink has them."""
+"""The installed server validates retention settings and expires audit rows only once delivered."""
 
 import hashlib
 import json
@@ -15,7 +15,7 @@ import pytest
 
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_types import (
     AuditHorizonTestCase,
-    StatisticsHorizonRejectionTestCase,
+    RetentionRejectionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     audit_actions,
@@ -87,31 +87,31 @@ def test_given_expired_audit_rows_when_server_runs_then_only_delivered_rows_are_
 @pytest.mark.parametrize(
     "test_case",
     [
-        StatisticsHorizonRejectionTestCase(
-            "Zero days", "0", "--audit-retention-days must be between 1 and 65535"
-        ),
-        StatisticsHorizonRejectionTestCase(
-            "Beyond the supported range",
-            "65536",
+        RetentionRejectionTestCase(
+            "Zero audit days",
+            ("--audit-retention-days", "0"),
             "--audit-retention-days must be between 1 and 65535",
+        ),
+        RetentionRejectionTestCase(
+            "Audit days beyond the supported range",
+            ("--audit-retention-days", "65536"),
+            "--audit-retention-days must be between 1 and 65535",
+        ),
+        RetentionRejectionTestCase(
+            "Zero snapshots",
+            ("--snapshot-retention-count", "0"),
+            "--snapshot-retention-count must be between 1 and 65535",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_invalid_audit_horizon_when_server_starts_then_it_refuses_before_storage(
-    test_case: StatisticsHorizonRejectionTestCase, tmp_path: Path
+def test_given_invalid_retention_when_server_starts_then_it_refuses_before_storage(
+    test_case: RetentionRejectionTestCase, tmp_path: Path
 ) -> None:
     environment: dict[str, str] = os.environ.copy()
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
     result: subprocess.CompletedProcess[str] = subprocess.run(
-        [
-            str(Path(sys.executable).with_name("sqb")),
-            "server",
-            "--port",
-            "0",
-            "--audit-retention-days",
-            test_case.days,
-        ],
+        [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", *test_case.arguments],
         cwd=tmp_path,
         env=environment,
         capture_output=True,

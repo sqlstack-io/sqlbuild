@@ -11,4 +11,5 @@ pub mod read_person_node_sql;
 pub(crate) mod read_snapshot_documents;
 pub(crate) mod read_snapshot_nodes;
 pub(crate) mod rebuild_projections;
+pub mod run_snapshot_retention;
 pub mod verify_execution;

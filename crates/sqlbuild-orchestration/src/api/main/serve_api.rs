@@ -7,6 +7,8 @@ use crate::api::_helpers::authentication::{bearer::local_request, configure::con
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource};
+use crate::snapshots::main::run_snapshot_retention::run_snapshot_retention;
+use crate::snapshots::models::SnapshotRetention;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
@@ -17,10 +19,10 @@ use crate::warehouse_metadata::models::StatisticsRetention;
 pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
-    (authentication, images, retention): (
+    (authentication, images, (retention, snapshots)): (
         ApiAuthentication,
         Vec<DockerImageSource>,
-        StatisticsRetention,
+        (StatisticsRetention, SnapshotRetention),
     ),
     (ready, shutdown): (
         impl FnOnce() + Send + 'static,
@@ -60,6 +62,7 @@ pub async fn serve_api(
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
         result = run_statistics_retention(&store, retention) => result,
+        result = run_snapshot_retention(&store, snapshots) => result,
     }
 }
 

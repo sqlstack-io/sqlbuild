@@ -20,3 +20,10 @@ pub(super) struct RecoveryTestCase {
     pub(super) description: &'static str,
     pub(super) expected_generation: i64,
 }
+
+#[derive(Debug)]
+pub(super) struct SnapshotRetentionTestCase {
+    pub(super) description: &'static str,
+    pub(super) backend: Backend,
+    pub(super) expected_generations: &'static [i64],
+}

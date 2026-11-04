@@ -10,6 +10,7 @@ use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScop
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
+use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::warehouse_metadata::models::StatisticsRetention;
 use uuid::Uuid;
@@ -264,25 +265,38 @@ pub(crate) fn control_address(
 /// API settings are validated together before any store is opened.
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
-) -> Result<(ApiAuthentication, (StatisticsRetention, AuditRetention)), ControlError> {
-    let statistics = match retention_days(namespace, "statistics")? {
+) -> Result<
+    (
+        ApiAuthentication,
+        (StatisticsRetention, AuditRetention, SnapshotRetention),
+    ),
+    ControlError,
+> {
+    let statistics = match retention_setting(namespace, "statistics-retention-days")? {
         Some(days) => StatisticsRetention::days(days)?,
         None => StatisticsRetention::default(),
     };
-    let audit = match retention_days(namespace, "audit")? {
+    let audit = match retention_setting(namespace, "audit-retention-days")? {
         Some(days) => AuditRetention::days(days)?,
         None => AuditRetention::default(),
     };
-    Ok((control_authentication(namespace)?, (statistics, audit)))
+    let snapshots = match retention_setting(namespace, "snapshot-retention-count")? {
+        Some(count) => SnapshotRetention::count(count)?,
+        None => SnapshotRetention::default(),
+    };
+    Ok((
+        control_authentication(namespace)?,
+        (statistics, audit, snapshots),
+    ))
 }
 
 /// Zero and out-of-range values name the flag before any type-specific check runs.
-fn retention_days(namespace: &Namespace, kind: &str) -> Result<Option<u16>, ControlError> {
-    match namespace.get(&format!("control_{kind}_retention_days")) {
+fn retention_setting(namespace: &Namespace, flag: &str) -> Result<Option<u16>, ControlError> {
+    match namespace.get(&format!("control_{}", flag.replace('-', "_"))) {
         Some(Value::Int(value)) => match value.parse::<u16>() {
-            Ok(days) if days > 0 => Ok(Some(days)),
+            Ok(setting) if setting > 0 => Ok(Some(setting)),
             _ => Err(ControlError::Invalid(format!(
-                "--{kind}-retention-days must be between 1 and 65535"
+                "--{flag} must be between 1 and 65535"
             ))),
         },
         _ => Ok(None),

@@ -1,0 +1,8 @@
+{
+  "description": "Twelve publications with distinct SQL; a run pins the first. Collection keeps the newest ten plus the pinned one, then a one-snapshot horizon keeps only the newest and the pinned one.",
+  "publications": 12,
+  "keep": 10,
+  "expected_collected": 1,
+  "shorter_keep": 1,
+  "expected_after_shorter": [1, 12]
+}

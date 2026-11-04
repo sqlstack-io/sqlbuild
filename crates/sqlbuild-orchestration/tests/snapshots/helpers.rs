@@ -354,3 +354,41 @@ pub(super) async fn damage(store: &ControlStore) {
     }
     commit(transaction).await.expect("damage commits");
 }
+
+/// Retained generations for one location and target, and counts that expose orphaned content.
+pub(super) async fn retained_snapshot_state(store: &ControlStore, location_id: Uuid) -> Vec<i64> {
+    let transaction = begin(store, TransactionMode::Read)
+        .await
+        .expect("snapshot state");
+    let (transaction, rows) = crate::store::main::query::query(
+        transaction,
+        "SELECT generation FROM sqb_snapshots WHERE location_id=$1 ORDER BY generation",
+        vec![crate::store::models::Parameter::Id(location_id)],
+    )
+    .await
+    .expect("generations");
+    commit(transaction).await.expect("snapshot state read");
+    rows.iter()
+        .map(|row| row["generation"].as_i64().expect("generation"))
+        .collect()
+}
+
+/// Source texts, unreferenced source texts and trigger progress facts.
+pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64, i64) {
+    let transaction = begin(store, TransactionMode::Read)
+        .await
+        .expect("retention counts");
+    let (transaction, rows) = crate::store::main::query::query(
+        transaction,
+        "SELECT (SELECT COUNT(*) FROM sqb_source_texts) AS texts, \
+         (SELECT COUNT(*) FROM sqb_source_texts t WHERE NOT EXISTS \
+            (SELECT 1 FROM sqb_snapshot_sources s WHERE s.text_hash=t.text_hash)) AS orphans, \
+         (SELECT COUNT(*) FROM sqb_trigger_progress) AS progress",
+        vec![],
+    )
+    .await
+    .expect("counts");
+    commit(transaction).await.expect("retention counts read");
+    let count = |name: &str| rows[0][name].as_i64().expect("count");
+    (count("texts"), count("orphans"), count("progress"))
+}

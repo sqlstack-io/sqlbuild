@@ -15,16 +15,17 @@ Use `sqb server --help` for service, authentication and launcher options.
 
 ## Set retention
 
-Set how long the server keeps hourly warehouse statistics and security audit records:
+Set how much history the server keeps:
 
 ```bash
-sqb server --statistics-retention-days 30 --audit-retention-days 730
+sqb server --statistics-retention-days 30 --audit-retention-days 730 --snapshot-retention-count 20
 ```
 
 | Data | Option | Default | Range |
 | --- | --- | --- | --- |
 | Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
 | Security audit records | `--audit-retention-days` | `400` | `1`–`65535` |
+| Published snapshots per location and target | `--snapshot-retention-count` | `10` | `1`–`65535` |
 | Skipped and covered schedule ticks | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
@@ -40,6 +41,11 @@ A security audit record older than the horizon is deleted only when it is no lon
 Records kept past the horizon for these reasons are reported on stderr as
 `Security audit retention: retained past horizon: N` whenever the count changes. A growing count
 usually means the audit webhook is failing.
+
+The server keeps the newest published snapshots for each location and target. It deletes an older
+snapshot only when no retained run, job, trigger, trigger change or location request uses it, and
+deletes its node definitions and SQL text when no other snapshot shares them. Repeating or
+interrupting this cleanup is safe.
 
 The scheduler deletes skipped and covered ticks older than 30 days. It keeps each trigger's latest
 tick and every tick that started a run. It also never creates a tick more than 30 days old: a new

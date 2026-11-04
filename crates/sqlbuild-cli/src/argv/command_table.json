@@ -1167,6 +1167,17 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--snapshot-retention-count"
+        ],
+        "dest": "control_snapshot_retention_count",
+        "default": 10,
+        "type": "int",
+        "help": "published snapshots to keep per location and target; older snapshots are deleted unless a run, trigger, job or other retained record still references them (default: 10)",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",
