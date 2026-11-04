@@ -8,10 +8,12 @@ use crate::authorization::_helpers::custom_roles::set_effective_role;
 use crate::authorization::main::compile_roles::compile_roles;
 use crate::credentials::models::{Action, RoleAssignmentRequest, RoleGrant, RoleKey};
 use crate::credentials::tests::role_helpers::{
-    SUPPORT_ROLE, activate, assign, authorize_member, developer_grants, orders_grant,
-    publish_support_role, role_changes, role_fixture, try_request,
+    SUPPORT_ROLE, activate, assign, authorize_member, developer_grants, member_listings,
+    member_trigger_change, orders_grant, publish_customers_trigger, publish_support_role,
+    role_changes, role_fixture, try_request,
 };
 use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
+use crate::declarations::models::TriggerChange;
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -323,6 +325,146 @@ fn given_removal_and_rewrite_in_one_publish_when_widening_waits_then_the_removal
                     .map_err(String::as_str),
                 Ok(SUPPORT_ROLE),
                 "{}: approval adds the new coverage",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_trigger_actions_are_denied()
+ {
+    let test_cases = [
+        ProjectRoleTestCase {
+            description: "SQLite authorizes trigger overrides on the job's write set",
+            backend: Backend::Sqlite,
+            expected_before: Err(
+                "missing trigger.toggle on nodes customers; all requested nodes denied",
+            ),
+            expected_after: Err(
+                "missing sensor.reset_cursor on nodes customers; all requested nodes denied",
+            ),
+        },
+        ProjectRoleTestCase {
+            description: "PostgreSQL authorizes trigger overrides on the job's write set",
+            backend: Backend::Postgres,
+            expected_before: Err(
+                "missing trigger.toggle on nodes customers; all requested nodes denied",
+            ),
+            expected_after: Err(
+                "missing sensor.reset_cursor on nodes customers; all requested nodes denied",
+            ),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store, 2).await;
+            activate(store, &roles).await;
+            let grants = |nodes: &[&str]| {
+                json!([orders_grant(
+                    json!(["view", "trigger.toggle", "sensor.reset_cursor"]),
+                    nodes
+                )])
+            };
+            publish_customers_trigger(store, roles.location_id, (2, grants(&["orders"]))).await;
+            activate(store, &roles).await;
+            assert_eq!(
+                member_trigger_change(store, &roles, TriggerChange::Pause)
+                    .await
+                    .map(|_| SUPPORT_ROLE)
+                    .as_ref()
+                    .map(|role| *role)
+                    .map_err(String::as_str),
+                test_case.expected_before,
+                "{}: an orders-only grant cannot pause a customers-only trigger",
+                test_case.description
+            );
+            assert_eq!(
+                member_trigger_change(store, &roles, TriggerChange::ResetCursor)
+                    .await
+                    .map(|_| SUPPORT_ROLE)
+                    .as_ref()
+                    .map(|role| *role)
+                    .map_err(String::as_str),
+                test_case.expected_after,
+                "{}: nor reset its cursor",
+                test_case.description
+            );
+            publish_customers_trigger(
+                store,
+                roles.location_id,
+                (3, grants(&["customers", "orders"])),
+            )
+            .await;
+            assert_eq!(
+                member_trigger_change(store, &roles, TriggerChange::Pause).await,
+                Ok(true),
+                "{}: coverage of the job's write set allows the pause",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_view_grant_on_part_of_the_location_when_listing_then_each_listing_is_denied_until_full_coverage()
+ {
+    let test_cases = [
+        ProjectRoleTestCase {
+            description: "SQLite location listings need view on every node",
+            backend: Backend::Sqlite,
+            expected_before: Err(
+                "missing view on nodes customers, inventory, products; all requested nodes denied",
+            ),
+            expected_after: Ok(SUPPORT_ROLE),
+        },
+        ProjectRoleTestCase {
+            description: "PostgreSQL location listings need view on every node",
+            backend: Backend::Postgres,
+            expected_before: Err(
+                "missing view on nodes customers, inventory, products; all requested nodes denied",
+            ),
+            expected_after: Ok(SUPPORT_ROLE),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store, 2).await;
+            activate(store, &roles).await;
+            assert_eq!(
+                member_listings(store, &roles).await,
+                vec![test_case.expected_before.map(|_| ()).map_err(str::to_owned); 3],
+                "{}: catalog, statistics and runs are denied, not filtered",
+                test_case.description
+            );
+            publish_support_role(
+                store,
+                roles.location_id,
+                (
+                    2,
+                    json!([orders_grant(
+                        json!(["view"]),
+                        &["customers", "inventory", "orders", "products"]
+                    )]),
+                ),
+            )
+            .await;
+            assert_eq!(
+                member_listings(store, &roles).await,
+                vec![test_case.expected_after.map(|_| ()).map_err(str::to_owned); 3],
+                "{}: full coverage allows every listing",
                 test_case.description
             );
             close_test_store(fixture).await;

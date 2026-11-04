@@ -111,6 +111,8 @@ permissions = ["view.evidence"]
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `location.manage`, `user.manage`, `role.assign`, `token.manage` and `audit.view` are rejected |
 | Runs | `job.run`, `run.adhoc`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes |
+| Triggers | `trigger.toggle` and `sensor.reset_cursor` need the permission on every node the trigger's job writes |
+| Listings | The catalog, statistics and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
 
 Assign a project role with `POST /api/admin/roles`, using the role key as `role`. A first

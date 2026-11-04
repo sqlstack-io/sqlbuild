@@ -1,4 +1,5 @@
 pub mod assign_builtin_role;
+pub(crate) mod authorize_listing;
 pub(crate) mod authorize_session;
 pub mod bootstrap_user;
 pub mod change_administrator;

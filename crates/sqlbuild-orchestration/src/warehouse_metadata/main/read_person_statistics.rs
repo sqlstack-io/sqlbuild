@@ -2,11 +2,11 @@
 
 use uuid::Uuid;
 
-use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::errors::ControlError;
-use crate::store::main::commit::commit;
-use crate::store::models::ControlStore;
-use crate::warehouse_metadata::_helpers::person_reads::begin_view;
+use crate::store::main::{begin::begin, commit::commit};
+use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::_helpers::statistics::read_statistics_page;
 use crate::warehouse_metadata::models::{StatisticsPage, StatisticsQuery, StatisticsRetention};
 
@@ -16,15 +16,10 @@ pub async fn read_person_statistics(
     (location_id, target, options): (Uuid, &str, &StatisticsQuery),
     (default_role, retention): (DefaultRole, StatisticsRetention),
 ) -> Result<StatisticsPage, ControlError> {
-    let transaction = begin_view(
-        store,
+    let (transaction, _) = authorize_listing(
+        begin(store, TransactionMode::Write).await?,
         (context, credentials),
-        &PermissionScope {
-            action: Action::View,
-            location_id: Some(location_id),
-            target: Some(target.into()),
-            nodes: Default::default(),
-        },
+        (location_id, target),
         default_role,
     )
     .await?;

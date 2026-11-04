@@ -2,8 +2,8 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
-use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::_helpers::lifecycle::reads::list_runs_in;
 use crate::runs::models::RunRecord;
 use crate::store::errors::ControlError;
@@ -16,15 +16,10 @@ pub async fn list_person_runs(
     (location_id, target, limit): (Uuid, &str, u32),
     default_role: DefaultRole,
 ) -> Result<Vec<RunRecord>, ControlError> {
-    let (transaction, _) = authorize_session(
+    let (transaction, _) = authorize_listing(
         begin(store, TransactionMode::Write).await?,
         (context, credentials),
-        &PermissionScope {
-            action: Action::View,
-            location_id: Some(location_id),
-            target: Some(target.into()),
-            nodes: Default::default(),
-        },
+        (location_id, target),
         default_role,
     )
     .await?;
