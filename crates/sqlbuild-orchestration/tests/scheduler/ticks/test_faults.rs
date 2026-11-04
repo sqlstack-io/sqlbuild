@@ -1,6 +1,8 @@
 //! Two schedulers under random crashes, faults, failovers and frozen leaders tick every due time once.
 
-use crate::scheduler::tests::contracts::ticks::helpers::fault_run;
+use std::collections::BTreeMap;
+
+use crate::scheduler::tests::contracts::ticks::helpers::{fault_run, tick_faults};
 use crate::scheduler::tests::contracts::ticks::test_types::{
     FaultAnomalies, SchedulerFaultTestCase,
 };
@@ -15,18 +17,21 @@ fn given_two_schedulers_under_random_faults_failovers_and_frozen_leaders_when_re
             description: "SQLite two-scheduler fault injection",
             backend: Backend::Sqlite,
             expected_anomalies: FaultAnomalies::default(),
+            expected_points_without_a_crash: 0,
         },
         SchedulerFaultTestCase {
             description: "PostgreSQL two-scheduler fault injection",
             backend: Backend::Postgres,
             expected_anomalies: FaultAnomalies::default(),
+            expected_points_without_a_crash: 0,
         },
     ];
     let seeds: u64 = std::env::var("SQB_SCHEDULER_FAULT_SEEDS")
         .ok()
         .and_then(|value| value.parse().ok())
-        .unwrap_or(3);
+        .unwrap_or(5);
     for test_case in test_cases {
+        let mut crashes: BTreeMap<&'static str, usize> = BTreeMap::new();
         for seed in 0..seeds {
             let Some((anomalies, counts)) = run(fault_run(test_case.backend, seed, 60)) else {
                 return;
@@ -37,6 +42,22 @@ fn given_two_schedulers_under_random_faults_failovers_and_frozen_leaders_when_re
                 "{} seed {seed}",
                 test_case.description
             );
+            for (point, count) in counts {
+                *crashes.entry(point).or_default() += count;
+            }
         }
+        // Every crash point inside the tick transaction must actually fire across the seeds run.
+        let unexercised: Vec<&str> = tick_faults()
+            .iter()
+            .map(|fault| fault.description)
+            .filter(|point| crashes.get(point).copied().unwrap_or_default() == 0)
+            .collect();
+        println!("{} crashes per point: {crashes:?}", test_case.description);
+        assert_eq!(
+            unexercised.len(),
+            test_case.expected_points_without_a_crash,
+            "{}: {unexercised:?}",
+            test_case.description
+        );
     }
 }

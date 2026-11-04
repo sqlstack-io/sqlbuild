@@ -509,7 +509,7 @@ pub(crate) async fn fault_run(
     let started = Utc::now()
         .duration_trunc(TimeDelta::minutes(1))
         .expect("minute")
-        - TimeDelta::minutes(20)
+        - TimeDelta::minutes(120)
         + TimeDelta::milliseconds(250);
     set_trigger_state(store, trigger_id,
         "UPDATE sqb_trigger_state SET started_at=$1, last_tick_for=NULL, next_due_at=$1 WHERE trigger_id=$2",
@@ -570,6 +570,7 @@ pub(crate) async fn fault_run(
                 Err(ControlError::Fenced)
             ));
         }
+        *counts.entry(fault.description).or_default() += left_crashed + right_crashed;
         for (name, count) in [
             ("restarts", usize::from(step.restart.is_some())),
             ("lease expiries", usize::from(step.expire)),
@@ -587,7 +588,7 @@ pub(crate) async fn fault_run(
     // Recovery: faults are gone and leadership lapses; one survivor drains whatever is still due.
     expire_lease(store).await;
     let mut survivor = SchedulerState::new(Uuid::now_v7());
-    for _ in 0..20 {
+    for _ in 0..60 {
         survivor = scheduler_cycle(&second, survivor)
             .await
             .expect("recovery")

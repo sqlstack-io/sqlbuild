@@ -1,4 +1,4 @@
-//! Regression bounds for tick-to-queued latency and catch-up once a stopped leader's lease lapses.
+//! Regression bounds for tick-to-queued latency and a waiting standby's catch-up after a lease lapses.
 
 use chrono::{DurationRound, SecondsFormat, TimeDelta, Utc};
 use serde_json::json;
@@ -24,15 +24,17 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             description: "SQLite scheduler latency",
             backend: Backend::Sqlite,
             expected_queued_ticks: 3,
+            expected_ticks_after_failover: 5,
             expected_max_tick_to_queued: TimeDelta::milliseconds(500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(500),
+            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
         SchedulerLatencyTestCase {
             description: "PostgreSQL scheduler latency",
             backend: Backend::Postgres,
             expected_queued_ticks: 3,
+            expected_ticks_after_failover: 5,
             expected_max_tick_to_queued: TimeDelta::milliseconds(500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(500),
+            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
     ];
     for test_case in test_cases {
@@ -87,17 +89,28 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 test_case.description
             );
             // The first leader stopped without releasing its lease while two more times fell due.
+            // A standby is already polling when that lease lapses, so its own retry wait counts.
             tokio::time::sleep((at(10) - Utc::now()).to_std().unwrap_or_default()).await;
             let second = second_store(store).await;
-            expire_lease(store).await;
-            let available = Utc::now();
-            let ticks = run_scheduler_until(&second, trigger_id, at(13)).await;
+            let lapse = async {
+                tokio::time::sleep((at(11) - Utc::now()).to_std().unwrap_or_default()).await;
+                expire_lease(store).await;
+                Utc::now()
+            };
+            let (ticks, available) =
+                tokio::join!(run_scheduler_until(&second, trigger_id, at(14)), lapse);
             let queued = queued_times(store, location).await;
+            assert_eq!(
+                ticks.len(),
+                test_case.expected_ticks_after_failover,
+                "{}: the standby ticks both overdue times",
+                test_case.description
+            );
             let latest = ticks
                 .iter()
-                .max_by_key(|tick| tick.scheduled_for)
+                .find(|tick| tick.scheduled_for == at(9))
                 .and_then(|tick| tick.run_id)
-                .expect("latest overdue time requested");
+                .expect("the latest overdue time is requested");
             let catch_up = queued[&latest] - available;
             println!("{} failover catch-up: {catch_up:?}", test_case.description);
             assert!(
