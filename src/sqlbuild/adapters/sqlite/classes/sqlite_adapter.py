@@ -42,6 +42,7 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -164,7 +165,7 @@ _TRUE_SEED_VALUES: frozenset[str] = frozenset({"true", "t", "yes", "y", "1"})
 _FALSE_SEED_VALUES: frozenset[str] = frozenset({"false", "f", "no", "n", "0"})
 
 
-class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class SqliteAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """SQLite adapter: one database file, SQLBuild schemas stored as `schema__name` tables."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.SQLITE.value
@@ -987,6 +988,9 @@ class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         """Render UTC now as ISO-8601 text with milliseconds, the adapter's timestamp form."""
 
         return "strftime('%Y-%m-%d %H:%M:%f', 'now')"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "strftime('%Y-%m-%dT%H:%M:%f', 'now')"
 
     def create_table_as(
         self,

@@ -6,14 +6,16 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from sqlbuild._native import ModelPlanEntry
+    from sqlbuild._native import ModelPlanEntry, SeedPlanEntry
 
 from sqlbuild.executor.scheduling.types import ExecutionStatus as ExecutionStatus
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind as ExecutionResourceKind
 
 
-class BeforeModelMaterializeCallback(Protocol):
-    def __call__(self, *, entry: ModelPlanEntry, connection: Any) -> None: ...
+class BeforeNodeWriteCallback(Protocol):
+    """Called before a model or seed changes its relation; raising fails that node."""
+
+    def __call__(self, *, entry: ModelPlanEntry | SeedPlanEntry, connection: Any) -> None: ...
 
 
 class BuildStatus(StrEnum):

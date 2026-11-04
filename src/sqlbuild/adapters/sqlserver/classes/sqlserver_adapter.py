@@ -37,6 +37,7 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -130,7 +131,7 @@ def _render_tsql_distinct_condition(*, left: str, right: str) -> str:
     )
 
 
-class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """Microsoft SQL Server adapter backed by pymssql."""
 
     def get_columns_for_relations(
@@ -526,6 +527,46 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             f"CREATE INDEX {index_name} ON {table_name} "
             "(source_name, target_database, target_schema, target_name, "
             "observed_at DESC, run_id DESC)",
+        )
+
+
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        create_sql: str = (
+            super()
+            .render_create_consumption_table_sql(database=database, schema=schema)
+            .replace("CREATE TABLE IF NOT EXISTS ", "CREATE TABLE ", 1)
+        )
+        for column in ("target_schema", "target_name"):
+            create_sql = create_sql.replace(f"{column} NVARCHAR(MAX)", f"{column} NVARCHAR(450)")
+        return self._create_table_if_missing_sql(
+            create_sql=create_sql,
+            database=database,
+            schema=schema,
+            table_name=CONSUMPTION_TABLE_NAME,
+        )
+
+    def render_create_consumption_index_sqls(
+        self, *, database: str | None, schema: str
+    ) -> tuple[str, ...]:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        table_name: str | None = self.render_qualified_name(
+            database=database, schema=schema, name=CONSUMPTION_TABLE_NAME
+        )
+        if table_name is None:
+            return ()
+        index_name: str = "_sqlbuild_consumption_relation_idx"
+        escaped_table_name: str = table_name.replace("'", "''")
+        return (
+            "IF NOT EXISTS ("
+            "SELECT 1 FROM sys.indexes "
+            f"WHERE name = '{index_name}' "
+            f"AND object_id = OBJECT_ID(N'{escaped_table_name}')"
+            ") "
+            f"CREATE INDEX {index_name} ON {table_name} "
+            "(target_schema, target_name, recorded_at)",
         )
 
     def render_insert_source_freshness_records_sql(
@@ -2245,6 +2286,9 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "SYSUTCDATETIME()"
 
     def render_delete_insert(
         self,

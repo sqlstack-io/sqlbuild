@@ -341,6 +341,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
 
+    def render_current_utc_timestamp(self) -> str:
+        return "CAST(get_current_timestamp() AT TIME ZONE 'UTC' AS TIMESTAMP)"
+
     def drop_view(
         self,
         *,

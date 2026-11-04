@@ -243,6 +243,7 @@ const BUILD_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("no_color", FieldDefault::False),
         FieldSpec::new("fail_fast", FieldDefault::False),
         FieldSpec::new("full_refresh", FieldDefault::False),
+        FieldSpec::new("changed", FieldDefault::False),
         FieldSpec::new("load_sources", FieldDefault::None),
         FieldSpec::new("reload_sources", FieldDefault::False),
         FieldSpec::new("include_python", FieldDefault::True),

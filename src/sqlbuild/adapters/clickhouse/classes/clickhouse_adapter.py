@@ -30,6 +30,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _validate_rectangular_typed_array,
 )
 from sqlbuild.adapter.contract.classes.historical_snapshot_sql import render_is_distinct_from
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -153,7 +154,7 @@ _NOT_NULL_COLUMN_PATTERN: re.Pattern[str] = re.compile(
 )
 
 
-class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class ClickHouseAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """ClickHouse adapter that builds tables aside and rewrites whole partitions."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.CLICKHOUSE.value
@@ -672,6 +673,9 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         )
 
     def render_current_timestamp(self) -> str:
+        return "now64(6, 'UTC')"
+
+    def render_current_utc_timestamp(self) -> str:
         return "now64(6, 'UTC')"
 
     def normalize_row_diff_numeric_type(self, column_type: str) -> str | None:
@@ -1915,6 +1919,12 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     def render_create_source_freshness_table_sql(self, *, database: str | None, schema: str) -> str:
         return _state_table_ddl(
             super().render_create_source_freshness_table_sql(database=database, schema=schema)
+        )
+
+
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        return _state_table_ddl(
+            super().render_create_consumption_table_sql(database=database, schema=schema)
         )
 
     def render_create_node_result_table_sql(self, *, database: str | None, schema: str) -> str:

@@ -35,6 +35,7 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -140,7 +141,7 @@ from sqlbuild.diagnostics.main.log_sql import log_sql
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """Databricks adapter backed by databricks-sql-connector."""
 
     def get_columns_for_relations(
@@ -850,6 +851,9 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "current_timestamp()"
 
     def sql_analysis_dialect(self) -> str | None:
         """Return the SQL analysis dialect name for this adapter, if any."""

@@ -37,6 +37,7 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -121,7 +122,7 @@ from sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended import
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """PostgreSQL adapter backed by psycopg."""
 
     def get_columns_for_relations(
@@ -977,6 +978,9 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
 
+    def render_current_utc_timestamp(self) -> str:
+        return "(now() AT TIME ZONE 'UTC')"
+
     def create_table_as(
         self,
         *,
@@ -1704,6 +1708,22 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             f"{index_name} ON {table_name} ("
             "source_name, target_database, target_schema, target_name, "
             "observed_at DESC, run_id DESC)",
+        )
+
+
+    def render_create_consumption_index_sqls(
+        self, *, database: str | None, schema: str
+    ) -> tuple[str, ...]:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        table_name: str | None = self.render_qualified_name(
+            database=database, schema=schema, name=CONSUMPTION_TABLE_NAME
+        )
+        if table_name is None:
+            return ()
+        return (
+            "CREATE INDEX IF NOT EXISTS _sqlbuild_consumption_relation_idx "
+            f"ON {table_name} (target_schema, target_name, recorded_at)",
         )
 
     def render_insert_source_freshness_records_sql(
