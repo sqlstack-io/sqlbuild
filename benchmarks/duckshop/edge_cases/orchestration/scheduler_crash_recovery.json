@@ -1,0 +1,9 @@
+{
+  "description": "Three minutely cron jobs with queue overlap and bounded all catch-up start ten hours back. Two installed schedulers drain the backlog while being SIGKILLed at seeded random moments; every lapse of a killed leader's lease is simulated. After a final uninterrupted scheduler, every due minute of every trigger has exactly one tick, one queued run and one request event.",
+  "jobs": ["orders", "customers", "inventory"],
+  "backlog_minutes": 600,
+  "max_catch_up": 1,
+  "rounds": 16,
+  "seed": 912,
+  "max_kill_delay_ms": 600
+}

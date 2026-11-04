@@ -317,3 +317,11 @@ class CliCleanupTestCase:
     description: str
     server: str
     expected_exit: int
+
+
+@dataclass(frozen=True)
+class SchedulerCrashTestCase:
+    description: str
+    fixture: str
+    expected_anomalies: dict[str, int]
+    expected_minimum_kills: int

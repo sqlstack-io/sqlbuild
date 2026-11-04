@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
+import random
 import secrets
 import signal
 import sqlite3
@@ -1065,3 +1067,157 @@ def statistics_relations(directory: Path) -> tuple[str, ...]:
             "SELECT relation_name FROM sqb_warehouse_statistics ORDER BY observed_at"
         ).fetchall()
     return tuple(name for (name,) in rows)
+
+
+def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[str, int]:
+    """SIGKILL real schedulers while they drain a backlog; return breaches and the kill count."""
+    project: Path = directory / "project"
+    start: datetime = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
+        minutes=fixture["backlog_minutes"]
+    )
+    declarations: str = "".join(
+        f'{name} = job("{name}", select="orders", description="Build {name}.", overlap="queue", '
+        f'schedule=schedule(cron="* * * * *", timezone="UTC", catch_up="all", '
+        f"max_catch_up={fixture['max_catch_up']}))\n"
+        for name in fixture["jobs"]
+    )
+    write_files(
+        project_dir=project,
+        files={
+            "sqlbuild_project.toml": (
+                'name = "orders"\nadapter = "duckdb"\n'
+                '[connections.local]\ndatabase = "warehouse.duckdb"\n'
+                '[targets.development]\nschema = "main"\n'
+            ),
+            "models/orders.sql": (
+                "MODEL (description 'Orders.', materialized table);\nSELECT 1 AS order_id\n"
+            ),
+            "orchestration/orders.py": "from sqlbuild.orchestration import job, schedule\n"
+            + declarations,
+        },
+    )
+    executable: str = str(Path(sys.executable).with_name("sqb"))
+    control_store: Path = directory / "control/.sqlbuild/control.sqlite3"
+    environment: dict[str, str] = os.environ | {
+        "SQLBUILD_SCHEDULER_TEST_STORE": f"sqlite://{control_store}"
+    }
+    for name in ("SQLBUILD_PLATFORM_WEBHOOK_URL", "SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL"):
+        _ = environment.pop(name, None)
+    with snapshot_api(directory / "control") as api:
+        published: subprocess.CompletedProcess[str] = subprocess.run(
+            [
+                executable,
+                "location",
+                "publish",
+                "--project-dir",
+                str(project),
+                "--location-id",
+                api.location_id,
+                "--target",
+                "development",
+                "--server",
+                api.url,
+                "--generation",
+                "1",
+            ],
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert published.returncode == 0, published.stderr
+    # The triggers were published hours ago, so a backlog of minutes is due when schedulers start.
+    with closing(sqlite3.connect(control_store)) as control, control:
+        _ = control.execute(
+            "UPDATE sqb_trigger_state SET started_at=?, next_due_at=?, last_tick_for=NULL",
+            (start.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),) * 2,
+        )
+    choices: random.Random = random.Random(fixture["seed"])
+    command: list[str] = [
+        executable,
+        "scheduler",
+        "--database-env",
+        "SQLBUILD_SCHEDULER_TEST_STORE",
+    ]
+    kills: int = 0
+    for round_index in range(fixture["rounds"]):
+        processes: list[subprocess.Popen[bytes]] = [
+            subprocess.Popen(
+                command,
+                env=environment,
+                stdout=subprocess.DEVNULL,
+                stderr=(directory / f"scheduler-{round_index}-{index}.log").open("wb"),
+            )
+            for index in range(2)
+        ]
+        time.sleep(choices.uniform(0.05, fixture["max_kill_delay_ms"] / 1000))
+        for process in processes:
+            process.kill()
+            kills += int(process.wait(timeout=10) == -signal.SIGKILL)
+        # A killed holder's lease would lapse after its TTL; lapse it now instead of waiting.
+        with closing(sqlite3.connect(control_store, timeout=30)) as control, control:
+            _ = control.execute(
+                "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'"
+            )
+    settled: datetime = datetime.now(UTC)
+    with closing(sqlite3.connect(control_store, timeout=30)) as control:
+        (interrupted,) = control.execute("SELECT count(*) FROM sqb_ticks").fetchone()
+    with location_process(
+        command, directory / "survivor.log", directory / "survivor.stdout", env=environment
+    ):
+        deadline: float = time.monotonic() + 60
+        pending: int = 1
+        while pending and time.monotonic() < deadline:
+            time.sleep(0.5)
+            with closing(sqlite3.connect(control_store, timeout=30)) as control:
+                (pending,) = control.execute(
+                    "SELECT count(*) FROM sqb_trigger_state "
+                    "WHERE last_tick_for IS NULL OR last_tick_for<?",
+                    (settled.replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),),
+                ).fetchone()
+    with closing(sqlite3.connect(control_store)) as control:
+        ticks: list[tuple[str, str, str | None]] = control.execute(
+            "SELECT trigger_id, scheduled_for, run_id FROM sqb_ticks"
+        ).fetchall()
+        runs: set[str] = {run for (run,) in control.execute("SELECT run_id FROM sqb_runs")}
+        (requested,) = control.execute(
+            "SELECT count(*) FROM recall_events WHERE event_type='run_requested'"
+        ).fetchone()
+        (triggers,) = control.execute("SELECT count(*) FROM sqb_trigger_state").fetchone()
+        duplicate_rejected: bool = True
+        with suppress(sqlite3.IntegrityError):
+            _ = control.execute(
+                "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, "
+                "outcome, run_id, covered_by_run_id, details_json) "
+                "SELECT ?, trigger_id, scheduled_for, evaluated_at, epoch, 'skipped', NULL, NULL, "
+                "'{}' FROM sqb_ticks LIMIT 1",
+                (str(uuid4()),),
+            )
+            duplicate_rejected = False
+    minutes: list[datetime] = [
+        start + timedelta(minutes=offset) for offset in range(fixture["backlog_minutes"] + 1)
+    ]
+    expected: set[tuple[str, datetime]] = set(
+        itertools.product({tick[0] for tick in ticks}, minutes)
+    )
+    observed: list[tuple[str, datetime]] = [
+        (trigger, datetime.fromisoformat(scheduled)) for trigger, scheduled, _ in ticks
+    ]
+    tick_runs: set[str | None] = {run for _, _, run in ticks} - {None}
+    return {
+        "triggers_without_ticks": triggers - len({tick[0] for tick in ticks}),
+        "duplicate_ticks": len(observed) - len(set(observed)),
+        "missing_ticks": len(expected - set(observed)),
+        "off_schedule_ticks": sum(
+            minute.second != 0 or minute.microsecond != 0 or minute < start
+            for _, minute in observed
+        ),
+        "runs_without_exactly_one_tick": len(runs ^ tick_runs)
+        + sum(run is None for _, _, run in ticks),
+        "request_event_mismatch": abs(requested - len(ticks)),
+        "accepted_duplicate_ticks": int(not duplicate_rejected),
+        "kills": kills,
+        "ticks_before_survivor": interrupted,
+        "ticks": len(ticks),
+    }

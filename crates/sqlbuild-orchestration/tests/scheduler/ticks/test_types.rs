@@ -92,3 +92,12 @@ pub(crate) struct SchedulerLatencyTestCase {
     pub(crate) expected_max_tick_to_queued: chrono::TimeDelta,
     pub(crate) expected_max_failover_catch_up: chrono::TimeDelta,
 }
+
+pub(crate) struct SchedulerUpgradeTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_follower_ticks: usize,
+    pub(crate) expected_duplicate_minutes: usize,
+    pub(crate) expected_missing_minutes: usize,
+    pub(crate) expected_runs_per_tick: usize,
+}
