@@ -24,15 +24,15 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             description: "SQLite scheduler latency",
             backend: Backend::Sqlite,
             expected_queued_ticks: 3,
-            expected_max_tick_to_queued: TimeDelta::milliseconds(1_500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
+            expected_max_tick_to_queued: TimeDelta::milliseconds(500),
+            expected_max_failover_catch_up: TimeDelta::milliseconds(500),
         },
         SchedulerLatencyTestCase {
             description: "PostgreSQL scheduler latency",
             backend: Backend::Postgres,
             expected_queued_ticks: 3,
-            expected_max_tick_to_queued: TimeDelta::milliseconds(1_500),
-            expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
+            expected_max_tick_to_queued: TimeDelta::milliseconds(500),
+            expected_max_failover_catch_up: TimeDelta::milliseconds(500),
         },
     ];
     for test_case in test_cases {
