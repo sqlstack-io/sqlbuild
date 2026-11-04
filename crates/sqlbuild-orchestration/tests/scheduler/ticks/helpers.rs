@@ -413,3 +413,30 @@ pub(crate) async fn append_covered_tick(
     .expect("append covered tick");
     commit(transaction).await.expect("commit covered tick");
 }
+
+/// Rewrite one trigger-state column the way an earlier build or a past start would have left it.
+pub(crate) async fn set_trigger_state(
+    store: &ControlStore,
+    trigger_id: Uuid,
+    sql: &str,
+    time: DateTime<Utc>,
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("state");
+    let (transaction, _) = query(
+        transaction,
+        sql,
+        vec![Parameter::Time(time), Parameter::Id(trigger_id)],
+    )
+    .await
+    .expect("rewrite trigger state");
+    commit(transaction).await.expect("commit state");
+}
+
+pub(crate) async fn tick_times(store: &ControlStore, trigger_id: Uuid) -> Vec<DateTime<Utc>> {
+    list_ticks(store, trigger_id, 1000)
+        .await
+        .expect("ticks")
+        .into_iter()
+        .map(|tick| tick.scheduled_for)
+        .collect()
+}

@@ -78,6 +78,20 @@ fn given_cron_and_iana_time_zone_when_crossing_dst_then_utc_ticks_follow_the_exp
             after: "2026-03-08T06:17:00Z",
             expected_next: "2026-03-09T06:17:00Z",
         },
+        CronTestCase {
+            description: "a first tick after a sub-second trigger start lands on the whole second",
+            expression: "0 0 * * *",
+            timezone: "UTC",
+            after: "2026-07-26T23:59:59.999999Z",
+            expected_next: "2026-07-27T00:00:00Z",
+        },
+        CronTestCase {
+            description: "a sub-second cursor past its occurrence does not repeat that occurrence",
+            expression: "0 0 * * *",
+            timezone: "UTC",
+            after: "2026-07-27T00:00:00.999999Z",
+            expected_next: "2026-07-28T00:00:00Z",
+        },
     ];
     for test_case in test_cases {
         let schedule =
@@ -87,7 +101,7 @@ fn given_cron_and_iana_time_zone_when_crossing_dst_then_utc_ticks_follow_the_exp
             .to_utc();
         let observed = next_cron_time(&schedule, after).expect("next cron time exists");
         assert_eq!(
-            observed.to_rfc3339_opts(SecondsFormat::Secs, true),
+            observed.to_rfc3339_opts(SecondsFormat::AutoSi, true),
             test_case.expected_next,
             "{}",
             test_case.description
@@ -141,6 +155,13 @@ fn given_a_latest_tick_search_when_crossing_folds_and_gaps_then_it_agrees_with_f
             at: "2011-12-30T10:00:00Z",
             expected_previous: "2011-12-30T10:00:00Z",
         },
+        PreviousCronTestCase {
+            description: "a sub-second search time finds the whole-second occurrence",
+            expression: "0 0 * * *",
+            timezone: "UTC",
+            at: "2026-07-27T00:00:00.5Z",
+            expected_previous: "2026-07-27T00:00:00Z",
+        },
     ];
     for test_case in test_cases {
         let cron = parse_cron(test_case.expression, test_case.timezone).expect("valid cron");
@@ -149,7 +170,7 @@ fn given_a_latest_tick_search_when_crossing_folds_and_gaps_then_it_agrees_with_f
             .to_utc();
         let previous = previous_cron_time(&cron, at).expect("previous scheduled instant");
         assert_eq!(
-            previous.to_rfc3339_opts(SecondsFormat::Secs, true),
+            previous.to_rfc3339_opts(SecondsFormat::AutoSi, true),
             test_case.expected_previous,
             "{}",
             test_case.description

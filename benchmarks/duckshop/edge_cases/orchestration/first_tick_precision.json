@@ -1,0 +1,7 @@
+{
+  "description": "A minutely cron trigger whose recorded start has a sub-second fraction ticks on whole minutes only. A cursor left just past its occurrence by an earlier build resumes without ticking that occurrence again.",
+  "expression": "* * * * *",
+  "start_minutes_ago": 5,
+  "start_fraction_microseconds": 123456,
+  "legacy_cursor_fraction_microseconds": 999999
+}

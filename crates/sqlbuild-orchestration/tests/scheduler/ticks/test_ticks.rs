@@ -4,6 +4,8 @@ pub(crate) mod helpers;
 mod test_contract;
 #[path = "test_loop.rs"]
 mod test_loop;
+#[path = "test_precision.rs"]
+mod test_precision;
 #[path = "test_progress.rs"]
 mod test_progress;
 #[path = "test_retention.rs"]

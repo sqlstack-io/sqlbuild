@@ -48,3 +48,11 @@ pub(crate) struct LatestCatchUpTestCase {
     pub(crate) catch_up: serde_json::Value,
     pub(crate) expected_ticks: usize,
 }
+
+pub(crate) struct FirstTickPrecisionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_first_tick_minutes_after_start: i64,
+    pub(crate) expected_fractional_ticks: usize,
+    pub(crate) expected_repeated_occurrences: usize,
+}
