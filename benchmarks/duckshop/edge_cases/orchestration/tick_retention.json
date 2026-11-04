@@ -1,6 +1,11 @@
 {
-  "description": "Covered ticks age past the tick horizon and are pruned; the requested tick and the latest covered tick stay; the operator then resets the cursor.",
+  "description": "A backlog of covered ticks ages past the tick horizon. One cleanup pass stops at its batch cap and the next pass finishes; the requested tick and the latest covered tick stay; the operator then resets the cursor.",
   "shift_days": 40,
+  "backlog_ticks": 1000,
+  "expected_first_pass": 1000,
   "expected_pruned": 2,
-  "expected_survivors": ["covered", "requested"]
+  "expected_survivors": [
+    "covered",
+    "requested"
+  ]
 }

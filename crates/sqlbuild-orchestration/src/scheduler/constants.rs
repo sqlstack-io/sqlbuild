@@ -9,4 +9,6 @@ pub const MAX_TICKS_PER_BATCH: usize = 10_000;
 /// Skipped and covered ticks older than this are deleted, and no tick older than it is created.
 pub(crate) const TICK_RETENTION_DAYS: i64 = 30;
 pub(crate) const TICK_RETENTION_BATCH: usize = 100;
+/// Batches per cleanup pass; a longer backlog resumes next cycle, after the lease renews.
+pub(crate) const TICK_RETENTION_BATCHES_PER_PASS: usize = 10;
 pub(crate) const TICK_RETENTION_INTERVAL_SECONDS: u64 = 60;

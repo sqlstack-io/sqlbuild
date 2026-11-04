@@ -82,9 +82,23 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 ]
             );
             let later = calendar_time(2) + TimeDelta::hours(1);
+            let backlog = case["backlog_ticks"].as_i64().expect("backlog");
+            for second in 1..=backlog {
+                append_covered_tick(
+                    store,
+                    trigger_id,
+                    calendar_time(2) + TimeDelta::seconds(second),
+                )
+                .await;
+            }
             append_covered_tick(store, trigger_id, later).await;
             assert_eq!(prune_ticks(store, &lease).await.expect("recent ticks"), 0);
             shift_schedule(store, trigger_id, shift).await;
+            assert_eq!(
+                prune_ticks(store, &lease).await.expect("bounded pass") as u64,
+                case["expected_first_pass"].as_u64().expect("first pass"),
+                "one pass stops at its batch cap so the lease renews before the rest"
+            );
             assert_eq!(
                 prune_ticks(store, &lease).await.expect("prune") as u64,
                 case["expected_pruned"].as_u64().expect("pruned")

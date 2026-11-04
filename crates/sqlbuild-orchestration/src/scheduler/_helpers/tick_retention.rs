@@ -6,7 +6,8 @@ use chrono::{DateTime, TimeDelta, Utc};
 use uuid::Uuid;
 
 use crate::scheduler::constants::{
-    TICK_RETENTION_BATCH, TICK_RETENTION_DAYS, TICK_RETENTION_INTERVAL_SECONDS,
+    TICK_RETENTION_BATCH, TICK_RETENTION_BATCHES_PER_PASS, TICK_RETENTION_DAYS,
+    TICK_RETENTION_INTERVAL_SECONDS,
 };
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
@@ -28,7 +29,7 @@ pub(crate) fn evaluation_start(
     Ok(start.max(now - TimeDelta::days(TICK_RETENTION_DAYS)))
 }
 
-/// Run the leader's tick cleanup at most once per interval; returns when it last ran.
+/// Run the leader's tick cleanup at most once per interval; a capped pass runs again next cycle.
 pub(crate) async fn prune_ticks_when_due(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -38,19 +39,25 @@ pub(crate) async fn prune_ticks_when_due(
     match pruned_at {
         Some(at) if at.elapsed() < interval => Ok(Some(at)),
         _ => {
-            prune_ticks(store, lease).await?;
-            Ok(Some(Instant::now()))
+            let deleted = prune_ticks(store, lease).await?;
+            Ok(
+                if deleted == TICK_RETENTION_BATCH * TICK_RETENTION_BATCHES_PER_PASS {
+                    pruned_at
+                } else {
+                    Some(Instant::now())
+                },
+            )
         }
     }
 }
 
-/// Requested, failed and deferred ticks stay; so does any tick a run row points at.
+/// One bounded pass; requested, failed and deferred ticks stay, as does any tick a run points at.
 pub(crate) async fn prune_ticks(
     store: &ControlStore,
     lease: &SchedulerLease,
 ) -> Result<usize, ControlError> {
     let mut deleted = 0;
-    loop {
+    for _ in 0..TICK_RETENTION_BATCHES_PER_PASS {
         let mut transaction =
             check_lease(begin(store, TransactionMode::Write).await?, lease).await?;
         let cutoff = transaction.now - TimeDelta::days(TICK_RETENTION_DAYS);
@@ -76,7 +83,8 @@ pub(crate) async fn prune_ticks(
         commit(check_lease(transaction, lease).await?).await?;
         deleted += rows.len();
         if rows.len() < TICK_RETENTION_BATCH {
-            return Ok(deleted);
+            break;
         }
     }
+    Ok(deleted)
 }
