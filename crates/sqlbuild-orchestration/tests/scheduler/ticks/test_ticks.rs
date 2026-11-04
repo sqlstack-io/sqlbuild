@@ -2,6 +2,8 @@
 pub(crate) mod helpers;
 #[path = "test_contract.rs"]
 mod test_contract;
+#[path = "test_faults.rs"]
+mod test_faults;
 #[path = "test_loop.rs"]
 mod test_loop;
 #[path = "test_precision.rs"]

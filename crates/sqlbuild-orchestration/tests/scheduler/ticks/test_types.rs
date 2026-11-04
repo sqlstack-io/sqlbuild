@@ -56,3 +56,29 @@ pub(crate) struct FirstTickPrecisionTestCase {
     pub(crate) expected_fractional_ticks: usize,
     pub(crate) expected_repeated_occurrences: usize,
 }
+
+/// Every way a randomized fault run can break the exactly-once contract; all zero when it holds.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub(crate) struct FaultAnomalies {
+    pub(crate) duplicate_ticks: usize,
+    pub(crate) missing_ticks: usize,
+    pub(crate) off_schedule_ticks: usize,
+    pub(crate) runs_without_exactly_one_tick: usize,
+    pub(crate) request_event_mismatch: usize,
+    pub(crate) unfenced_stale_writes: usize,
+    pub(crate) accepted_duplicate_ticks: usize,
+}
+
+pub(crate) struct SchedulerFaultTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_anomalies: FaultAnomalies,
+}
+
+/// One randomized step: who restarts, whether the lease lapses, which fault is armed, who cycles.
+pub(crate) struct FaultStep {
+    pub(crate) restart: Option<usize>,
+    pub(crate) expire: bool,
+    pub(crate) fault: usize,
+    pub(crate) cycles: [bool; 2],
+}

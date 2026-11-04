@@ -59,3 +59,11 @@ pub(super) struct SimulationTestCase {
     pub(super) catch_up: CatchUp,
     pub(super) expected_success: bool,
 }
+
+pub(super) struct CronSimulationTestCase {
+    pub(super) description: &'static str,
+    pub(super) expression: &'static str,
+    pub(super) wall_times: &'static [(u32, u32)],
+    pub(super) catch_up: CatchUp,
+    pub(super) expected_success: bool,
+}
