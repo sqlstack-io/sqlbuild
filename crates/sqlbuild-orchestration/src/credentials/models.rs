@@ -87,7 +87,9 @@ impl Default for AuditRetention {
 }
 
 /// Closed permission vocabulary; unknown actions fail deserialization.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
 pub enum Action {
     #[serde(rename = "view")]
     View,
@@ -150,19 +152,37 @@ impl From<BuiltinRole> for RoleKey {
     }
 }
 
-/// One custom role entry of a published `roles` document; only non-administrative actions.
-#[derive(Clone, Debug, Deserialize)]
+/// One grant of a project role: node selectors, their permissions, and each selector's nodes.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct RoleDefinition {
-    pub(crate) description: String,
-    pub(crate) actions: Vec<Action>,
+pub struct RoleGrant {
+    pub nodes: std::collections::BTreeSet<String>,
+    pub permissions: std::collections::BTreeSet<Action>,
+    #[serde(default)]
+    pub resolved_nodes: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
 }
 
-/// A validated custom role definition with its content digest and granted action names.
+/// One project role of a `roles.toml` file or a published `roles` document.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleDefinition {
+    pub description: String,
+    pub grants: Vec<RoleGrant>,
+}
+
+/// The reviewed project-root `roles.toml` file.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RolesFile {
+    #[serde(default)]
+    pub(crate) roles: std::collections::BTreeMap<String, RoleDefinition>,
+}
+
+/// A validated custom role definition with its selector digest and resolved grants.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PublishedRole {
     pub(crate) digest: String,
-    pub(crate) grants: std::collections::BTreeSet<String>,
+    pub(crate) grants: Vec<RoleGrant>,
     pub(crate) definition: serde_json::Value,
 }
 

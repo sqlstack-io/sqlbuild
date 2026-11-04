@@ -1,4 +1,4 @@
-//! Published custom roles narrow at once; a widened definition waits for an administrator approval.
+//! Reviewed role selectors and permissions narrow at once and widen only by approval; coverage follows snapshots.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -6,11 +6,14 @@ use serde_json::{Value, json};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::credentials::models::{Action, PublishedRole, RoleDefinition};
+use crate::credentials::models::{
+    Action, PermissionScope, PublishedRole, RoleDefinition, RoleGrant,
+};
 use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
+use crate::store::types::Row;
 
 const ADMINISTRATIVE: [Action; 5] = [
     Action::LocationManage,
@@ -29,6 +32,18 @@ fn action_name(action: Action) -> Result<String, ControlError> {
     }
 }
 
+fn valid_grant(grant: &RoleGrant) -> bool {
+    let blank_selector = grant
+        .nodes
+        .iter()
+        .any(|selector| selector.trim().is_empty());
+    let administrative = grant
+        .permissions
+        .iter()
+        .any(|action| ADMINISTRATIVE.contains(action));
+    !grant.nodes.is_empty() && !blank_selector && !grant.permissions.is_empty() && !administrative
+}
+
 pub(crate) fn decode_roles(
     document: Option<&Value>,
 ) -> Result<BTreeMap<String, PublishedRole>, ControlError> {
@@ -44,20 +59,29 @@ pub(crate) fn decode_roles(
         if key.trim().is_empty()
             || BUILTIN.contains(&key.to_lowercase().as_str())
             || definition.description.trim().is_empty()
-            || definition
-                .actions
-                .iter()
-                .any(|action| ADMINISTRATIVE.contains(action))
+            || definition.grants.is_empty()
+            || !definition.grants.iter().all(valid_grant)
         {
             return Err(ControlError::Invalid(format!(
-                "role {key} needs a description, a key that is not a built-in role, and only non-administrative actions"
+                "role {key} needs a description, a key that is not a built-in role, and grants of node selectors with only non-administrative permissions"
             )));
         }
-        let mut grants: BTreeSet<String> = BTreeSet::new();
-        for action in definition.actions {
-            grants.insert(action_name(action)?);
+        let mut grants: Vec<RoleGrant> = definition.grants;
+        grants.sort();
+        grants.dedup();
+        let mut selectors: BTreeSet<(Vec<String>, Vec<String>)> = BTreeSet::new();
+        for grant in &grants {
+            let permissions = grant
+                .permissions
+                .iter()
+                .map(|action| action_name(*action))
+                .collect::<Result<Vec<_>, _>>()?;
+            selectors.insert((grant.nodes.iter().cloned().collect(), permissions));
         }
-        let definition = json!({"description": definition.description, "actions": grants});
+        let definition = json!({
+            "description": definition.description,
+            "grants": selectors.iter().map(|(nodes, permissions)| json!({"nodes": nodes, "permissions": permissions})).collect::<Vec<_>>(),
+        });
         let digest = sha256_hex(definition.to_string().as_bytes());
         published.insert(
             key,
@@ -71,16 +95,121 @@ pub(crate) fn decode_roles(
     Ok(published)
 }
 
-pub(crate) fn decode_grants(value: &Value) -> Result<BTreeSet<String>, ControlError> {
+pub(crate) fn decode_grants(value: &Value) -> Result<Vec<RoleGrant>, ControlError> {
     serde_json::from_str(value.as_str().unwrap_or("[]"))
         .map_err(|error| ControlError::Schema(format!("effective role grants: {error}")))
 }
 
-pub(crate) fn grants_allow(value: &Value, action: Action) -> bool {
-    match (decode_grants(value), action_name(action)) {
-        (Ok(grants), Ok(name)) => grants.contains(&name),
-        _ => false,
+/// Nodes on which these effective grants allow the action; a grant that resolved to none gives nothing.
+pub(crate) fn granted_nodes(value: &Value, action: Action) -> BTreeSet<String> {
+    let mut nodes: BTreeSet<String> = BTreeSet::new();
+    for grant in decode_grants(value).unwrap_or_default() {
+        if !grant.permissions.contains(&action) {
+            continue;
+        }
+        for selector in &grant.nodes {
+            nodes.extend(
+                grant
+                    .resolved_nodes
+                    .get(selector)
+                    .cloned()
+                    .unwrap_or_default(),
+            );
+        }
     }
+    nodes
+}
+
+fn pairs(grants: &[RoleGrant]) -> BTreeSet<(&str, Action)> {
+    let mut pairs: BTreeSet<(&str, Action)> = BTreeSet::new();
+    for grant in grants {
+        for selector in &grant.nodes {
+            for action in &grant.permissions {
+                pairs.insert((selector.as_str(), *action));
+            }
+        }
+    }
+    pairs
+}
+
+/// Custom roles whose effective grants add coverage, and requested nodes none covers; built-ins have no grants.
+pub(crate) fn custom_coverage(
+    rows: &[&Row],
+    scope: &PermissionScope,
+) -> (Vec<String>, Vec<String>) {
+    let mut covered: BTreeSet<String> = BTreeSet::new();
+    let mut granting: Vec<String> = Vec::new();
+    for row in rows {
+        let role_key = row["role_key"].as_str().unwrap_or_default();
+        let nodes = granted_nodes(&row["resolved_grants_json"], scope.action);
+        let adds = if scope.nodes.is_empty() {
+            !nodes.is_empty() && granting.is_empty()
+        } else {
+            scope
+                .nodes
+                .iter()
+                .any(|node| nodes.contains(node) && !covered.contains(node))
+        };
+        if !adds {
+            continue;
+        }
+        if !granting.iter().any(|key| key == role_key) {
+            granting.push(role_key.into());
+        }
+        covered.extend(nodes.into_iter().filter(|node| scope.nodes.contains(node)));
+    }
+    let missing: Vec<String> = scope.nodes.difference(&covered).cloned().collect();
+    (granting, missing)
+}
+
+/// A denial names at most twenty uncovered nodes so the audited reason stays bounded.
+pub(crate) fn denial_reason(action: Action, missing: &[String]) -> Result<String, ControlError> {
+    if missing.is_empty() {
+        return Ok("missing permission in this scope; all requested nodes denied".into());
+    }
+    let listed: Vec<&str> = missing.iter().take(20).map(String::as_str).collect();
+    let more = missing.len() - listed.len();
+    let suffix = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    Ok(format!(
+        "missing {} on nodes {}{suffix}; all requested nodes denied",
+        action_name(action)?,
+        listed.join(", ")
+    ))
+}
+
+/// Provably narrowing: every published (selector, permission) pair is already effective.
+pub(crate) fn narrows(published: &[RoleGrant], effective: &[RoleGrant]) -> bool {
+    pairs(published).is_subset(&pairs(effective))
+}
+
+/// Effective pairs the publication still contains, one grant per selector with its resolution now.
+pub(crate) fn retained_grants(published: &[RoleGrant], effective: &[RoleGrant]) -> Vec<RoleGrant> {
+    let kept: BTreeSet<(&str, Action)> = pairs(published)
+        .intersection(&pairs(effective))
+        .copied()
+        .collect();
+    let mut grants: BTreeMap<&str, RoleGrant> = BTreeMap::new();
+    for (selector, action) in kept {
+        let resolved = published
+            .iter()
+            .find_map(|grant| grant.resolved_nodes.get(selector))
+            .cloned()
+            .unwrap_or_default();
+        grants
+            .entry(selector)
+            .or_insert_with(|| RoleGrant {
+                nodes: BTreeSet::from([selector.to_owned()]),
+                permissions: BTreeSet::new(),
+                resolved_nodes: BTreeMap::from([(selector.to_owned(), resolved)]),
+            })
+            .permissions
+            .insert(action);
+    }
+    grants.into_values().collect()
 }
 
 /// The effective digest and grants of one custom role, if any definition is in effect.
@@ -88,7 +217,7 @@ pub(crate) async fn effective_role(
     transaction: ControlTransaction,
     (location_id, target): (Uuid, &str),
     role_key: &str,
-) -> Result<(ControlTransaction, Option<(String, BTreeSet<String>)>), ControlError> {
+) -> Result<(ControlTransaction, Option<(String, Vec<RoleGrant>)>), ControlError> {
     let (transaction, rows) = query(transaction,
         "SELECT definition_digest,resolved_grants_json FROM sqb_effective_roles WHERE location_id=$1 AND target=$2 AND role_key=$3",
         vec![Parameter::Id(location_id), Parameter::Text(target.into()), Parameter::Text(role_key.into())]).await?;
@@ -136,7 +265,7 @@ pub(crate) async fn current_role(
 pub(crate) async fn set_effective_role(
     mut transaction: ControlTransaction,
     (location_id, target, role_key): (Uuid, &str, &str),
-    (digest, grants): (&str, &BTreeSet<String>),
+    (digest, grants): (&str, &[RoleGrant]),
 ) -> Result<ControlTransaction, ControlError> {
     let grants =
         serde_json::to_string(grants).map_err(|error| ControlError::Invalid(error.to_string()))?;

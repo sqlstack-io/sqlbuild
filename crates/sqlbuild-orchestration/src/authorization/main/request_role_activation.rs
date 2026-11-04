@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::_helpers::custom_roles::{current_role, effective_role};
+use crate::authorization::_helpers::custom_roles::{current_role, effective_role, narrows};
 use crate::authorization::main::authorize_session::authorize_session;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{
@@ -46,7 +46,7 @@ pub async fn request_role_activation(
     let (transaction, effective) = effective_role(transaction, scope, &request.role_key).await?;
     if effective
         .as_ref()
-        .is_some_and(|(_, grants)| role.grants.is_subset(grants))
+        .is_some_and(|(_, grants)| narrows(&role.grants, grants))
     {
         return Err(ControlError::Invalid(format!(
             "role {} does not widen its effective definition; narrowing applies on publish",

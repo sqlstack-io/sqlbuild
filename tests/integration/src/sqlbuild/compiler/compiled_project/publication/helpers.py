@@ -1221,3 +1221,55 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
         "ticks_before_survivor": interrupted,
         "ticks": len(ticks),
     }
+
+
+def publish_generation(
+    project: Path, api: SnapshotApi, generation: int
+) -> subprocess.CompletedProcess[str]:
+    """Publish one generation of a project through the installed location command."""
+    return subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "location",
+            "publish",
+            "--project-dir",
+            str(project),
+            "--location-id",
+            api.location_id,
+            "--target",
+            "development",
+            "--server",
+            api.url,
+            "--generation",
+            str(generation),
+        ],
+        env=os.environ | {"SQLBUILD_LOCATION_TOKEN": api.bearer},
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+
+
+def read_person_sql(api: SnapshotApi, session: tuple[str, str], node: str) -> tuple[int, str]:
+    """A person's view.sql read of one node: the node key on success, else the denial."""
+    path: str = f"/api/control/locations/{api.location_id}/targets/development/nodes/{node}/sql"
+    headers: dict[str, str] = {
+        "Host": "control.example.com",
+        "Origin": "https://control.example.com",
+        "Cookie": session[0],
+        "x-sqb-csrf": session[1],
+    }
+    try:
+        with urlopen(Request(api.url + path, headers=headers), timeout=5) as response:
+            return 200, json.load(response)["node_key"]
+    except HTTPError as denied:
+        return denied.code, json.load(denied)["error"].split("; decision ")[0]
+
+
+def tagged_model(name: str, tags: str) -> str:
+    """A table model with these tags."""
+    return (
+        f"MODEL (description 'Synthetic {name}.', materialized table, tags [{tags}]);\n"
+        "select 1 as id\n"
+    )

@@ -18,6 +18,8 @@ mod test_contract;
 mod test_custom_roles;
 #[path = "passwords/test_contract.rs"]
 mod test_passwords;
+#[path = "test_project_roles.rs"]
+mod test_project_roles;
 #[path = "test_recovery.rs"]
 mod test_recovery;
 #[path = "sessions/test_contract.rs"]

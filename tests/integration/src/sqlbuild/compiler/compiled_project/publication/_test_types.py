@@ -325,3 +325,11 @@ class SchedulerCrashTestCase:
     fixture: str
     expected_anomalies: dict[str, int]
     expected_minimum_kills: int
+
+
+@dataclass(frozen=True)
+class ProjectRolesTestCase:
+    description: str
+    roles_file: str
+    expected_warning: str
+    expected_denial: str

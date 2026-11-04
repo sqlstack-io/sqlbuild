@@ -2,6 +2,7 @@ pub mod assign_builtin_role;
 pub(crate) mod authorize_session;
 pub mod bootstrap_user;
 pub mod change_administrator;
+pub mod compile_roles;
 pub mod decide_role_approval;
 pub(crate) mod deny_authorization;
 pub(crate) mod publish_custom_roles;

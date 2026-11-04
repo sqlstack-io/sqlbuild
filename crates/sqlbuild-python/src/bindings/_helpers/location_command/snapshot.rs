@@ -17,6 +17,7 @@ use crate::bindings::_helpers::compiled_project::snapshot_declarations::{
 };
 use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
+use crate::bindings::_helpers::compiled_project::snapshot_roles::compile_project_roles;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
 use crate::bindings::_helpers::native_host::orchestration_declarations::collect_declarations;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
@@ -67,9 +68,9 @@ pub(crate) fn build_orchestration_snapshot(
         Some(declarations) => declarations,
         None => discover_declarations(py, &project_dir)?,
     };
+    let graph = project.lineage_graph(py)?;
     if !declarations.is_empty() {
         let authored = collect_declarations(py, declarations)?;
-        let graph = project.lineage_graph(py)?;
         input = compile_declarations(
             py,
             input,
@@ -77,6 +78,7 @@ pub(crate) fn build_orchestration_snapshot(
             authored,
         )?;
     }
+    input = compile_project_roles(py, input, (&project_dir, graph.bind(py).get().graph()))?;
     input.nodes = identity_nodes(project.into_pyobject(py)?.as_any(), input.nodes)?;
     Ok(NativeOrchestrationSnapshot { input })
 }

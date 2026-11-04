@@ -1,11 +1,9 @@
-//! Record each published custom role; narrowing and removal apply now, widening waits for approval.
-
-use std::collections::BTreeSet;
+//! Record each published custom role; removed pairs and selector coverage apply now, additions wait.
 
 use serde_json::Value;
 
 use crate::authorization::_helpers::custom_roles::{
-    decode_roles, effective_role, set_effective_role,
+    decode_roles, effective_role, narrows, retained_grants, set_effective_role,
 };
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
@@ -55,21 +53,15 @@ pub(crate) async fn publish_custom_roles(
         let Some((digest, grants)) = effective else {
             continue;
         };
-        if role.grants.is_subset(&grants) {
-            if digest != role.digest || grants != role.grants {
-                transaction = set_effective_role(
-                    transaction,
-                    (scope.0, scope.1, key),
-                    (&role.digest, &role.grants),
-                )
-                .await?;
-            }
-            continue;
-        }
-        let narrowed: BTreeSet<String> = grants.intersection(&role.grants).cloned().collect();
-        if narrowed != grants {
+        let next = retained_grants(&role.grants, &grants);
+        let next_digest = if narrows(&role.grants, &grants) {
+            role.digest.as_str()
+        } else {
+            digest.as_str()
+        };
+        if next != grants || next_digest != digest {
             transaction =
-                set_effective_role(transaction, (scope.0, scope.1, key), (&digest, &narrowed))
+                set_effective_role(transaction, (scope.0, scope.1, key), (next_digest, &next))
                     .await?;
         }
     }

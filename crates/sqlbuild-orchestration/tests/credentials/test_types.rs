@@ -55,3 +55,16 @@ pub(crate) struct RoleFixture {
     pub(crate) member: crate::credentials::models::IssuedSession,
     pub(crate) member_id: uuid::Uuid,
 }
+
+pub(crate) struct ProjectRoleTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_before: Result<&'static str, &'static str>,
+    pub(crate) expected_after: Result<&'static str, &'static str>,
+}
+
+pub(crate) struct RolesFileTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) text: &'static str,
+    pub(crate) expected_compiled: Result<(Value, Vec<&'static str>), &'static str>,
+}

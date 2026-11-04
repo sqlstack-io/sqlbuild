@@ -59,7 +59,7 @@ pub(crate) fn credentials(session: &IssuedSession) -> (&str, &str) {
     (session.bearer.as_str(), session.csrf.as_str())
 }
 
-async fn assign(
+pub(crate) async fn assign(
     store: &ControlStore,
     fixture: (&AuditContext, &IssuedSession),
     request: RoleAssignmentRequest,
@@ -76,17 +76,27 @@ async fn assign(
     );
 }
 
-/// Publish one generation whose `roles` document grants the support role these actions.
+/// One grant over the `tag:orders` selector, resolved to these snapshot nodes.
+pub(crate) fn orders_grant(permissions: Value, resolved_nodes: &[&str]) -> Value {
+    json!({"nodes": ["tag:orders"], "permissions": permissions, "resolved_nodes": {"tag:orders": resolved_nodes}})
+}
+
+/// Ad-hoc and SQL permissions over one selector, resolved to these snapshot nodes.
+pub(crate) fn developer_grants(selector: &str, resolved_nodes: &[&str]) -> Value {
+    json!([{"nodes": [selector], "permissions": ["run.adhoc", "view.sql"], "resolved_nodes": {selector: resolved_nodes}}])
+}
+
+/// Publish one generation whose `roles` document gives the support role these grants.
 pub(crate) async fn publish_support_role(
     store: &ControlStore,
     location_id: Uuid,
-    (generation, actions): (i64, Value),
+    (generation, grants): (i64, Value),
 ) {
     let mut input = snapshot(location_id);
     input.generation = generation;
     input.documents.insert(
         "roles".into(),
-        json!({SUPPORT_ROLE: {"description": "Answer order questions", "actions": actions}}),
+        json!({SUPPORT_ROLE: {"description": "Answer order questions", "grants": grants}}),
     );
     publish_snapshot(store, &input)
         .await
@@ -132,7 +142,12 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     let location_id = create_location(store, "orders", "orders-admin")
         .await
         .expect("location");
-    publish_support_role(store, location_id, (1, json!(["view"]))).await;
+    publish_support_role(
+        store,
+        location_id,
+        (1, json!([orders_grant(json!(["view"]), &["orders"])])),
+    )
+    .await;
     assign(
         store,
         (&context, &sessions[0]),
@@ -154,17 +169,17 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     }
 }
 
-/// The role that grants the member this action in the fixture location, or `None` when denied.
-pub(crate) async fn granting_role(
+/// The role that grants the member this action on these nodes, or the denial reason.
+pub(crate) async fn authorize_member(
     store: &ControlStore,
     fixture: &RoleFixture,
-    action: Action,
-) -> Option<String> {
+    (action, nodes): (Action, &[&str]),
+) -> Result<String, String> {
     let scope = PermissionScope {
         action,
         location_id: Some(fixture.location_id),
         target: Some("development".into()),
-        nodes: Default::default(),
+        nodes: nodes.iter().map(|node| (*node).into()).collect(),
     };
     let decision = authorize_session(
         begin(store, TransactionMode::Write).await.expect("begin"),
@@ -180,7 +195,26 @@ pub(crate) async fn granting_role(
             .is_none_or(|error| matches!(error, ControlError::Denied { .. })),
         "authorization either grants or denies"
     );
-    decision.ok().map(|(_, context)| context.granting_role)
+    decision
+        .map(|(_, context)| context.granting_role)
+        .map_err(|error| {
+            let reason = error.to_string();
+            let reason = reason.trim_start_matches("control-plane operation denied: ");
+            reason
+                .split("; decision ")
+                .next()
+                .unwrap_or_default()
+                .to_owned()
+        })
+}
+
+/// The role that grants the member this location-scoped action, or `None` when denied.
+pub(crate) async fn granting_role(
+    store: &ControlStore,
+    fixture: &RoleFixture,
+    action: Action,
+) -> Option<String> {
+    authorize_member(store, fixture, (action, &[])).await.ok()
 }
 
 /// Role approval audit facts in commit order: action and recorded outcome.
@@ -205,11 +239,11 @@ pub(crate) async fn role_audit(store: &ControlStore) -> Vec<(String, Value)> {
         .collect()
 }
 
-pub(crate) async fn request(
+pub(crate) async fn try_request(
     store: &ControlStore,
     fixture: &RoleFixture,
     requester: usize,
-) -> RoleActivation {
+) -> Result<RoleActivation, ControlError> {
     request_role_activation(
         store,
         (
@@ -224,7 +258,26 @@ pub(crate) async fn request(
         },
     )
     .await
-    .expect("activation request")
+}
+
+pub(crate) async fn request(
+    store: &ControlStore,
+    fixture: &RoleFixture,
+    requester: usize,
+) -> RoleActivation {
+    try_request(store, fixture, requester)
+        .await
+        .expect("activation request")
+}
+
+/// Request and approve the support role's current definition through a second administrator.
+pub(crate) async fn activate(store: &ControlStore, fixture: &RoleFixture) {
+    let activation = request(store, fixture, 0).await;
+    assert!(
+        approve(store, fixture, (1, &activation, false))
+            .await
+            .expect("approve")
+    );
 }
 
 pub(crate) async fn approve(

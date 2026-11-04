@@ -76,7 +76,8 @@ stderr; a failed request prints no SQL to stdout. Permission denials include the
 The equivalent person-authenticated API is a `GET` request to
 `/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql`.
 
-Developer or Admin access must cover the requested location and target. Viewer, Operator and
+Developer or Admin access must cover the requested location and target, or a
+[project role](#define-project-roles) must grant `view.sql` on the node. Viewer, Operator and
 the configurable default Viewer role do not grant SQL inspection. The response contains the
 snapshot ID, exact node key, raw SQL and compiled SQL. Missing SQL fields are `null`; an absent
 current publication or node returns JSON `null` after authorization.
@@ -85,6 +86,39 @@ SQL inspection does not execute SQL or return Python source, execution artifacts
 data. Every successful inspection records an audit entry without copying SQL into it. If the
 audit cannot be saved, the request fails without returning SQL. Revocation takes effect on the
 next request, including sessions created by [`sqb login`](/docs/cli/login/).
+
+## Define project roles
+
+Put project roles in `roles.toml` at the project root. `sqb location publish` resolves each
+grant's node selectors against the published project:
+
+```toml
+[roles.orders_support]
+description = "Answer order questions"
+
+[[roles.orders_support.grants]]
+nodes = ["tag:orders"]
+permissions = ["view.sql", "run.adhoc"]
+
+[[roles.orders_support.grants]]
+nodes = ["tag:orders,tag:pii"]
+permissions = ["view.evidence"]
+```
+
+| Rule | Behaviour |
+| --- | --- |
+| Selectors | Same grammar as a job's `select`; an unknown tag or name fails publication |
+| No matching nodes | Publication succeeds with a warning; the grant gives nothing |
+| Permissions | Any non-administrative action; `location.manage`, `user.manage`, `role.assign`, `token.manage` and `audit.view` are rejected |
+| Runs | `job.run`, `run.adhoc`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes |
+| Several roles | Grants add up across a person's roles |
+
+Assign a project role with `POST /api/admin/roles`, using the role key as `role`. A first
+definition, and any publication that adds a selector and permission pair, takes effect only after
+an administrator requests it with `POST /api/admin/role-activations` and another administrator
+approves it with `POST /api/admin/role-approvals`. A sole administrator must confirm a
+self-approval. Removed pairs stop applying on publish. An unchanged selector covers new
+matching nodes on publish without approval. A denial lists the nodes the request was missing.
 
 ## Repair control views
 

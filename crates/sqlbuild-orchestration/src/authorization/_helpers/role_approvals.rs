@@ -4,7 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::authorization::_helpers::custom_roles::{
-    current_role, effective_role, set_effective_role,
+    current_role, effective_role, retained_grants, set_effective_role,
 };
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, RoleApproval, RoleDecision};
@@ -81,7 +81,7 @@ pub(crate) async fn record_decision(
         transaction = set_effective_role(
             transaction,
             (location_id, target, role_key),
-            (digest, &role.grants),
+            (digest, &retained_grants(&role.grants, &role.grants)),
         )
         .await?;
     }

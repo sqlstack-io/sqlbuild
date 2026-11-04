@@ -1,0 +1,11 @@
+# Project roles: one grant follows tag coverage across publications; one intersection selects nothing yet.
+[roles.orders_support]
+description = "Answer order questions"
+
+[[roles.orders_support.grants]]
+nodes = ["tag:support"]
+permissions = ["view.sql"]
+
+[[roles.orders_support.grants]]
+nodes = ["tag:support,tag:pii"]
+permissions = ["view.evidence"]

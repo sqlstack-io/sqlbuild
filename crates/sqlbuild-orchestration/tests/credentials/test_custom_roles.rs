@@ -4,7 +4,8 @@ use serde_json::json;
 
 use crate::credentials::models::Action;
 use crate::credentials::tests::role_helpers::{
-    SUPPORT_ROLE, approve, granting_role, publish_support_role, request, role_audit, role_fixture,
+    SUPPORT_ROLE, approve, granting_role, orders_grant, publish_support_role, request, role_audit,
+    role_fixture,
 };
 use crate::credentials::tests::test_types::CustomRoleTestCase;
 use crate::store::errors::ControlError;
@@ -44,7 +45,15 @@ fn given_widened_custom_role_when_unapproved_then_new_grants_stay_refused() {
             approve(store, &roles, (1, &activation, false))
                 .await
                 .expect("first approval");
-            publish_support_role(store, roles.location_id, (2, json!(["view", "job.run"]))).await;
+            publish_support_role(
+                store,
+                roles.location_id,
+                (
+                    2,
+                    json!([orders_grant(json!(["view", "job.run"]), &["orders"])]),
+                ),
+            )
+            .await;
             assert_eq!(
                 granting_role(store, &roles, Action::JobRun)
                     .await

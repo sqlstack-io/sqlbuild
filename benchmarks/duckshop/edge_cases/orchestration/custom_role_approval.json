@@ -1,10 +1,10 @@
 {
-  "description": "A support role is published, approved by another administrator, widened, republished in a different action order, approved, then narrowed. Widening waits for approval; reordering keeps the same definition; narrowing applies on publish.",
+  "description": "A support role is published, approved by another administrator, widened, republished in a different permission order, approved, then narrowed. Widening waits for approval; reordering keeps the same definition; narrowing applies on publish.",
   "publications": [
-    ["view"],
-    ["view", "job.run"],
-    ["job.run", "view"],
-    ["job.run"]
+    [{"nodes": ["tag:orders"], "permissions": ["view"], "resolved_nodes": {"tag:orders": ["orders"]}}],
+    [{"nodes": ["tag:orders"], "permissions": ["view", "job.run"], "resolved_nodes": {"tag:orders": ["orders"]}}],
+    [{"nodes": ["tag:orders"], "permissions": ["job.run", "view"], "resolved_nodes": {"tag:orders": ["orders"]}}],
+    [{"nodes": ["tag:orders"], "permissions": ["job.run"], "resolved_nodes": {"tag:orders": ["orders"]}}]
   ],
   "expected_after_narrowing": {"view": null, "job.run": "orders_support"}
 }
