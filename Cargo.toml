@@ -55,7 +55,10 @@ python-boundary = "sqlbuild-python"
 polyglot-floor = "sqlbuild-analysis"
 
 [workspace.package]
-version = "0.187.3"
+# Fixed on purpose: a crate's version is part of its Cargo build identity, so a shared release
+# version would recompile every crate after each release. The release version lives in the
+# sqlbuild-cli and sqlbuild-python manifests; see crates/README.md.
+version = "0.0.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false

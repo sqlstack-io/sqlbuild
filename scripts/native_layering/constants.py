@@ -13,3 +13,6 @@ PYPROJECT_LOCK_SOURCE: dict[str, str] = {"editable": "."}
 RELEASE_MANIFEST: str = ".release-please-manifest.json"
 RELEASE_MANIFEST_PACKAGE: str = "."
 CLI_DISTRIBUTION_PIN_PREFIX: str = "sqlbuild-cli=="
+CRATES_DIRECTORY: str = "crates"
+RELEASE_CRATES: tuple[str, ...] = ("sqlbuild-cli", "sqlbuild-python")
+PACKAGE_VERSION_VARIABLE: str = "CARGO_PKG_VERSION"

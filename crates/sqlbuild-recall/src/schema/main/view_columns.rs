@@ -13,6 +13,7 @@ pub fn view_columns() -> Result<BTreeMap<&'static str, BTreeSet<String>>, String
         database: None,
         retention_days: 1,
         cluster: None,
+        producer_version: String::new(),
     };
     connection
         .execute_batch(&ddl_script(Dialect::Sqlite, &options))
