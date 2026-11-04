@@ -67,6 +67,14 @@ void client.POST("/api/locations/{location_id}/targets/{target}/metadata/microba
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: { session_id: "synthetic-session", generation: 1, records: [] },
 });
+const consumptionHistory: components["schemas"]["WarehouseHistoryKind"] = "consumption";
+const startedInput: components["schemas"]["WarehouseConsumptionRecord"]["input_version"] = null;
+void consumptionHistory;
+void startedInput;
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata/consumption", {
+  params: { path: { location_id: "synthetic-location", target: "development" } },
+  body: { session_id: "synthetic-session", generation: 1, records: [] },
+});
 const catalogHistory: components["schemas"]["WarehouseHistoryKind"] = "catalog";
 const catalogColumn: components["schemas"]["WarehouseCatalogColumn"] = {
   name: "order_id", data_type: "INTEGER",

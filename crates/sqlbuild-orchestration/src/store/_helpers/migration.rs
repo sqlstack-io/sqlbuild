@@ -44,6 +44,7 @@ pub(crate) const TRIGGER_PROGRESS: &str = include_str!("../trigger_progress.sql"
 pub(crate) const CLI_LOGIN_FLOWS: &str = include_str!("../cli_login_flows.sql");
 pub(crate) const RETENTION_INDEXES: &str = include_str!("../retention_indexes.sql");
 pub(crate) const CUSTOM_ROLES: &str = include_str!("../custom_roles.sql");
+pub(crate) const WAREHOUSE_CONSUMPTION: &str = include_str!("../warehouse_consumption.sql");
 
 pub(crate) const ADDITIONS: &[(&str, &str)] = &[
     ("location_instances", LOCATION_INSTANCES),
@@ -80,6 +81,7 @@ pub(crate) const ADDITIONS: &[(&str, &str)] = &[
     ("cli_login_flows", CLI_LOGIN_FLOWS),
     ("retention_indexes", RETENTION_INDEXES),
     ("custom_roles", CUSTOM_ROLES),
+    ("warehouse_consumption", WAREHOUSE_CONSUMPTION),
 ];
 
 pub(crate) fn migration_digests(store: &ControlStore) -> Vec<String> {

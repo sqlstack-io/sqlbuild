@@ -499,6 +499,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/locations/{location_id}/targets/{target}/metadata/consumption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["report_consumption"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/locations/{location_id}/targets/{target}/metadata/fingerprints": {
         parameters: {
             query?: never;
@@ -996,6 +1012,14 @@ export interface components {
             reason: string;
             /** Format: uuid */
             request_id: string;
+        };
+        ConsumptionBatch: {
+            /** Format: int64 */
+            generation: number;
+            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
+            records: components["schemas"]["WarehouseConsumptionRecord"][];
+            /** Format: uuid */
+            session_id: string;
         };
         /** @description The current successful snapshot, read with a consistent generation and change set. */
         CurrentSnapshot: {
@@ -1929,6 +1953,28 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
+        /** @description What one execution consumed, as history; `--changed` reads the warehouse table, never this mirror. */
+        WarehouseConsumptionRecord: {
+            event_id: string;
+            execution_id: string;
+            /** Format: int64 */
+            input_count: number;
+            input_kind?: string | null;
+            input_name?: string | null;
+            input_version?: string | null;
+            node_name: string;
+            node_type: string;
+            phase: string;
+            /** Format: date-time */
+            recorded_at: string;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_database?: string | null;
+            target_name: string;
+            target_schema: string;
+            version_hash: string;
+        };
         /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
         WarehouseFingerprintRecord: {
             definition: string;
@@ -1969,7 +2015,7 @@ export interface components {
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
-        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog" | "statistics";
+        WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "consumption" | "catalog" | "statistics";
         /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
         WarehouseJanitorRecord: {
             archive_name: string;
@@ -3430,6 +3476,54 @@ export interface operations {
             };
             /** @description Reader generation fenced */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    report_consumption: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumptionBatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseSyncResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Invalid credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Location not authorized */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

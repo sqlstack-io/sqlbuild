@@ -1,7 +1,9 @@
 //! The consumption table through the adapter, and the connection and callbacks a recording build holds.
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use pyo3::exceptions::PyValueError;
+use std::sync::Mutex;
+
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyInt, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -391,27 +393,38 @@ fn execution_chunks(rows: &[ConsumptionAppend]) -> Vec<&[ConsumptionAppend]> {
     chunks
 }
 
-/// The adapter and the connection one recording build appends through.
+/// One build's consumption I/O, connected only per phase so loaders can lock file warehouses.
 pub(crate) struct ConsumptionConnection {
     adapter: Py<PyAny>,
-    connection: Py<PyAny>,
+    connection_config: Py<PyAny>,
+    connection: Mutex<Option<Py<PyAny>>>,
 }
 
 impl ConsumptionConnection {
-    pub(crate) fn open(
-        adapter: &Bound<'_, PyAny>,
-        connection_config: &Bound<'_, PyAny>,
-    ) -> PyResult<Self> {
-        let connection: Bound<'_, PyAny> =
-            native_field(adapter, "connect")?.call1((connection_config,))?;
-        Ok(Self {
+    pub(crate) fn new(adapter: &Bound<'_, PyAny>, connection_config: &Bound<'_, PyAny>) -> Self {
+        Self {
             adapter: adapter.clone().unbind(),
-            connection: connection.unbind(),
-        })
+            connection_config: connection_config.clone().unbind(),
+            connection: Mutex::new(None),
+        }
+    }
+
+    fn connected<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let mut open = self
+            .connection
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("consumption connection lock poisoned"))?;
+        if let Some(connection) = open.as_ref() {
+            return Ok(connection.bind(py).clone());
+        }
+        let connection: Bound<'py, PyAny> = native_field(self.adapter.bind(py), "connect")?
+            .call1((self.connection_config.bind(py),))?;
+        *open = Some(connection.clone().unbind());
+        Ok(connection)
     }
 
     pub(crate) fn ensure_table(&self, py: Python<'_>, location: &Location) -> PyResult<()> {
-        ensure_table(self.adapter.bind(py), self.connection.bind(py), location)
+        ensure_table(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
     pub(crate) fn read_recent(
@@ -419,7 +432,7 @@ impl ConsumptionConnection {
         py: Python<'_>,
         location: &Location,
     ) -> PyResult<Vec<ConsumptionRow>> {
-        read_recent(self.adapter.bind(py), self.connection.bind(py), location)
+        read_recent(self.adapter.bind(py), &self.connected(py)?, location)
     }
 
     pub(crate) fn append(
@@ -428,16 +441,19 @@ impl ConsumptionConnection {
         location: &Location,
         rows: &[ConsumptionAppend],
     ) -> PyResult<()> {
-        append(
-            self.adapter.bind(py),
-            self.connection.bind(py),
-            location,
-            rows,
-        )
+        append(self.adapter.bind(py), &self.connected(py)?, location, rows)
     }
 
+    /// Close the connection if one is open; the next operation connects again.
     pub(crate) fn close(&self, py: Python<'_>) -> PyResult<()> {
-        native_field(self.adapter.bind(py), "close")?.call1((self.connection.bind(py),))?;
+        let open: Option<Py<PyAny>> = self
+            .connection
+            .lock()
+            .map_err(|_| PyRuntimeError::new_err("consumption connection lock poisoned"))?
+            .take();
+        if let Some(connection) = open {
+            native_field(self.adapter.bind(py), "close")?.call1((connection.bind(py),))?;
+        }
         Ok(())
     }
 }

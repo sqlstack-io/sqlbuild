@@ -271,6 +271,39 @@ pub struct MicrobatchesBatch {
     pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
+/// What one execution consumed, as history; `--changed` reads the warehouse table, never this mirror.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WarehouseConsumptionRecord {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub execution_id: String,
+    pub phase: String,
+    pub run_id: String,
+    pub node_type: String,
+    pub node_name: String,
+    pub target_database: Option<String>,
+    pub target_schema: String,
+    pub target_name: String,
+    pub version_hash: String,
+    pub input_count: i64,
+    pub input_kind: Option<String>,
+    pub input_name: Option<String>,
+    pub input_version: Option<String>,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConsumptionBatch {
+    pub session_id: Uuid,
+    pub generation: i64,
+    pub records: Vec<WarehouseConsumptionRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<WarehouseReconciliationPage>,
+}
+
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -292,12 +325,13 @@ pub enum WarehouseHistoryKind {
     Migrations,
     OldNameViews,
     Microbatches,
+    Consumption,
     Catalog,
     Statistics,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -305,6 +339,7 @@ impl WarehouseHistoryKind {
         Self::Migrations,
         Self::OldNameViews,
         Self::Microbatches,
+        Self::Consumption,
         Self::Catalog,
         Self::Statistics,
     ];
@@ -319,6 +354,7 @@ impl WarehouseHistoryKind {
             Self::Migrations => "migrations",
             Self::OldNameViews => "old_name_views",
             Self::Microbatches => "microbatches",
+            Self::Consumption => "consumption",
             Self::Catalog => "catalog",
             Self::Statistics => "statistics",
         }
@@ -334,6 +370,7 @@ impl WarehouseHistoryKind {
             Self::Migrations => "sqb_warehouse_migrations",
             Self::OldNameViews => "sqb_warehouse_old_name_views",
             Self::Microbatches => "sqb_warehouse_microbatches",
+            Self::Consumption => "sqb_warehouse_consumption",
             Self::Catalog => "sqb_warehouse_catalog",
             Self::Statistics => "sqb_warehouse_statistics",
         }
@@ -451,6 +488,7 @@ pub enum WarehouseHistoryRead {
     Migrations(StateEventsRead),
     OldNameViews(StateEventsRead),
     Microbatches(StateEventsRead),
+    Consumption(StateEventsRead),
     Catalog(CatalogRead),
     Statistics(StatisticsRead),
 }
@@ -465,6 +503,7 @@ pub enum WarehouseHistoryRecord {
     Migration(Box<WarehouseMigrationRecord>),
     OldNameView(Box<WarehouseOldNameRecord>),
     Microbatch(Box<WarehouseMicrobatchRecord>),
+    Consumption(Box<WarehouseConsumptionRecord>),
     Catalog(WarehouseCatalogRecord),
     Statistics(WarehouseStatisticsRecord),
 }

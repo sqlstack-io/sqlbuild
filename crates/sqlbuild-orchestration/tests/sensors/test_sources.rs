@@ -175,6 +175,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .expect("pre-sensor predecessor");
             for sql in [
                 "DROP TABLE sqb_warehouse_catalog",
+                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_consumption'",
                 "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
                 "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
                 "DELETE FROM sqb_schema_migrations WHERE name='warehouse_catalog'",

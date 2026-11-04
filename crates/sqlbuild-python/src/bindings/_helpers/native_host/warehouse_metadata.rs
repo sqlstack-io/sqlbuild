@@ -8,12 +8,15 @@ use sqlbuild_analysis::fingerprint_storage::constants::{COLUMN_TIMESTAMP, FINGER
 use sqlbuild_config::command_connection::constants::{
     DUCKDB_ADAPTER, DUCKDB_MEMORY_DATABASE, LOCAL_DATABASE_PATH_KEYS,
 };
-use sqlbuild_core::constants::{FINGERPRINT_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME};
+use sqlbuild_core::constants::{
+    CONSUMPTION_TABLE_NAME, FINGERPRINT_TABLE_NAME, SOURCE_FRESHNESS_TABLE_NAME,
+};
 use sqlbuild_core::models::SqlValue;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
     WarehouseHistoryPage, WarehouseHistoryRead, WarehouseHistoryRecord, WarehouseStateLocation,
 };
+use sqlbuild_state::consumption::constants::{CONSUMPTION_COLUMN_TYPES, RECORDED_AT_COLUMN};
 use sqlbuild_state::events::constants::{MIGRATION_COLUMNS, OLD_NAME_VIEW_COLUMNS};
 use sqlbuild_state::freshness::constants::{
     OBSERVED_AT_COLUMN, SOURCE_FRESHNESS_COLUMN_TYPES, SQLITE_ADAPTER,
@@ -50,7 +53,8 @@ pub(crate) fn read_history(
         | WarehouseHistoryRead::JanitorEvents(read)
         | WarehouseHistoryRead::Migrations(read)
         | WarehouseHistoryRead::OldNameViews(read)
-        | WarehouseHistoryRead::Microbatches(read) => &read.location,
+        | WarehouseHistoryRead::Microbatches(read)
+        | WarehouseHistoryRead::Consumption(read) => &read.location,
     };
     if location.schema.trim().is_empty() {
         return Err(PyValueError::new_err(
@@ -110,6 +114,7 @@ fn read_page(
     request: &WarehouseHistoryRead,
 ) -> PyResult<WarehouseHistoryPage> {
     let freshness_columns = SOURCE_FRESHNESS_COLUMN_TYPES.map(|(name, _)| name);
+    let consumption_columns = CONSUMPTION_COLUMN_TYPES.map(|(name, _)| name);
     let event_columns: Vec<String> = match request {
         WarehouseHistoryRead::AuditResults(_) => py
             .import("sqlbuild.executor.audit_results.constants")?
@@ -196,6 +201,15 @@ fn read_page(
             event_columns.as_slice(),
             "created_at",
         ),
+        WarehouseHistoryRead::Consumption(read) => (
+            &read.location,
+            read.after.as_ref().map(|cursor| cursor.as_slice()),
+            read.observed_since,
+            read.limit,
+            CONSUMPTION_TABLE_NAME,
+            consumption_columns.as_slice(),
+            RECORDED_AT_COLUMN,
+        ),
     };
     let limit = limit.unwrap_or(MAX_HISTORY_RECORDS);
     if limit == 0 || limit > MAX_HISTORY_RECORDS {
@@ -269,6 +283,7 @@ fn read_page(
         WarehouseHistoryRead::Migrations(_)
         | WarehouseHistoryRead::OldNameViews(_)
         | WarehouseHistoryRead::Microbatches(_) => Some(&["event_id", "created_at"]),
+        WarehouseHistoryRead::Consumption(_) => Some(&["event_id", RECORDED_AT_COLUMN]),
         _ => None,
     };
     let mut cursor_indexes: Vec<usize> = columns
@@ -389,6 +404,7 @@ fn read_page(
             WarehouseHistoryRecord::Migration(record) => record.created_at,
             WarehouseHistoryRecord::OldNameView(record) => record.created_at,
             WarehouseHistoryRecord::Microbatch(record) => record.created_at,
+            WarehouseHistoryRecord::Consumption(record) => record.recorded_at,
         };
         if since.is_none_or(|since| observed >= since) {
             records.push(record);
@@ -427,7 +443,9 @@ fn decode_record(
                 qualified,
             )?,
         ),
-        WarehouseHistoryRead::AuditResults(read) | WarehouseHistoryRead::Migrations(read) => {
+        WarehouseHistoryRead::AuditResults(read)
+        | WarehouseHistoryRead::Migrations(read)
+        | WarehouseHistoryRead::Consumption(read) => {
             return decode_event_record(&read.location, row, (columns, &[timestamp]));
         }
         WarehouseHistoryRead::JanitorEvents(read) => {

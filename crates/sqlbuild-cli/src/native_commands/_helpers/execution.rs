@@ -521,6 +521,15 @@ pub(crate) async fn deliver_metadata_page(
                 )
                 .await
         }
+        WarehouseHistoryKind::Consumption => {
+            client
+                .sync_consumption(
+                    target,
+                    &serde_json::from_value(body.clone())
+                        .map_err(|_| ClientError::Configuration("invalid consumption batch"))?,
+                )
+                .await
+        }
     }
 }
 

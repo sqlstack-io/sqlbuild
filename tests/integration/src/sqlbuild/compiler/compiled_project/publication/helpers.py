@@ -217,6 +217,32 @@ def append_microbatch_history(adapter: Any, connection: Any, fixture: dict[str, 
     assert repeated.inserted == 0
 
 
+def append_consumption_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
+    """Real consumption DDL with duplicated physical appends, as an ambiguous retry leaves."""
+    _ = adapter.execute(
+        connection=connection,
+        sql=adapter.render_create_consumption_table_sql(database=None, schema="main"),
+    )
+    columns: tuple[str, ...] = tuple(fixture["record"])[2:]
+    rows: list[dict[str, Any]] = [
+        fixture["record"]
+        | {"event_id": f"{fixture['id_prefix']}-{index:03}"}
+        | fixture["record_overrides"].get(f"{fixture['id_prefix']}-{index:03}", {})
+        for index in range(fixture["source_rows"])
+    ] + [fixture["record"]] * fixture["duplicate_rows"]
+    literals: dict[type, Callable[[Any], str]] = {
+        type(None): lambda _value: "NULL",
+        int: str,
+        str: lambda value: "'" + value.removesuffix("Z").replace("'", "''") + "'",
+    }
+    for row in rows:
+        _ = adapter.execute(
+            connection=connection,
+            sql=f"INSERT INTO _sqlbuild_consumption ({', '.join(columns)}) VALUES "
+            f"({', '.join(literals[type(row[column])](row[column]) for column in columns)})",
+        )
+
+
 def append_migration_history(adapter: Any, connection: Any, fixture: dict[str, Any]) -> None:
     """Real model-move facts, including idempotent duplicate attempts."""
     data: dict[str, Any] = migration_history_data(fixture, ("origin", "destination"))

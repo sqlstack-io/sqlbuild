@@ -10,6 +10,7 @@ use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
 use crate::warehouse_metadata::main::ingest_catalog::ingest_catalog;
+use crate::warehouse_metadata::main::ingest_consumption::ingest_consumption;
 use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
 use crate::warehouse_metadata::main::ingest_janitor_events::ingest_janitor_events;
 use crate::warehouse_metadata::main::ingest_microbatches::ingest_microbatches;
@@ -20,9 +21,9 @@ use crate::warehouse_metadata::main::ingest_statistics::ingest_statistics;
 use crate::warehouse_metadata::main::read_statistics_due::read_statistics_due;
 use crate::warehouse_metadata::main::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, CatalogBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch,
-    MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, StatisticsBatch, StatisticsDueRead,
-    StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    AuditResultsBatch, CatalogBatch, ConsumptionBatch, FingerprintBatch, JanitorEventsBatch,
+    MicrobatchesBatch, MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, StatisticsBatch,
+    StatisticsDueRead, StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/statistics-due",
@@ -211,5 +212,22 @@ pub(crate) async fn report_microbatches(
     require_location(&identity, location_id)?;
     Ok(Json(
         ingest_microbatches(&store, (location_id, &target), &batch).await?,
+    ))
+}
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/consumption",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = ConsumptionBatch,
+    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
+    security(("bearer" = [])))]
+pub(crate) async fn report_consumption(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(batch): Json<ConsumptionBatch>,
+) -> Result<Json<WarehouseSyncResponse>, ApiError> {
+    require_location(&identity, location_id)?;
+    Ok(Json(
+        ingest_consumption(&store, (location_id, &target), &batch).await?,
     ))
 }

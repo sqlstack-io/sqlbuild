@@ -1,6 +1,10 @@
 """Scheduled jobs with `changed` run only models whose consumed inputs changed, on DuckDB and SQLite."""
 
+import os
+import sqlite3
+import sys
 import time
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -13,6 +17,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     changed_job_files,
     duckdb_rows,
+    location_process,
     request_job_run,
     scheduled_worker,
     sqlite_rows,
@@ -112,5 +117,43 @@ def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_con
                 )
             )
             recorded |= started
+        warehouse_events: set[str] = {
+            row[0]
+            for row in test_case.execute(
+                warehouse, f"SELECT event_id FROM {test_case.consumption_table}"
+            )
+        }
+        log: Path = tmp_path / "location.log"
+        with location_process(
+            [
+                str(Path(sys.executable).with_name("sqb")),
+                "--project-dir",
+                str(worker.project),
+                "location",
+                "serve",
+                "--server",
+                worker.api.url,
+                "--location-id",
+                worker.api.location_id,
+                "--target",
+                "development",
+            ],
+            log,
+            tmp_path / "location.stdout",
+            env=os.environ | {"SQLBUILD_LOCATION_TOKEN": worker.api.bearer},
+        ) as location:
+            deadline: float = time.monotonic() + 45
+            mirrored: set[str] = set()
+            while mirrored != warehouse_events:
+                assert location.poll() is None, log.read_text()
+                assert time.monotonic() < deadline, (warehouse_events - mirrored, log.read_text())
+                with closing(sqlite3.connect(worker.control_store)) as control:
+                    mirrored = {
+                        row[0]
+                        for row in control.execute(
+                            "SELECT source_event_id FROM sqb_warehouse_consumption"
+                        )
+                    }
+                time.sleep(0.2)
 
     assert tuple(observed) == test_case.expected_runs

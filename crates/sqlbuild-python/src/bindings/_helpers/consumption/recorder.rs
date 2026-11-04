@@ -123,7 +123,9 @@ impl ConsumptionRecorder {
 
     /// The recording after appending every pending row; a failure is reported, and its executions run again.
     fn flushed(&self, py: Python<'_>, mut recording: Recording) -> Recording {
-        for (location, rows) in std::mem::take(&mut recording.pending) {
+        let pending = std::mem::take(&mut recording.pending);
+        let wrote: bool = !pending.is_empty();
+        for (location, rows) in pending {
             let created: bool = !recording.tables.insert(location.clone());
             let written: PyResult<()> = (if created {
                 Ok(())
@@ -138,12 +140,17 @@ impl ConsumptionRecorder {
                 ));
             }
         }
+        if wrote && let Err(error) = self.connection.close(py) {
+            recording.warnings.push(format!(
+                "could not close the consumed-input connection: {error}"
+            ));
+        }
         recording.pending_executions = 0;
         recording.last_flush = Instant::now();
         recording
     }
 
-    /// Queue the seeds whose error audits passed, flush everything and close the connection.
+    /// Queue the seeds whose error audits passed and flush everything.
     pub(crate) fn finish(
         &self,
         py: Python<'_>,
@@ -165,10 +172,7 @@ impl ConsumptionRecorder {
             }
         }
         *recording = self.flushed(py, std::mem::take(&mut *recording));
-        let closed = self.connection.close(py);
-        let warnings: Vec<String> = std::mem::take(&mut recording.warnings);
-        closed?;
-        Ok(warnings)
+        Ok(std::mem::take(&mut recording.warnings))
     }
 }
 
@@ -268,7 +272,7 @@ pub(crate) fn prepare<'py>(
 ) -> PyResult<Prepared<'py>> {
     let py: Python<'py> = plan.py();
     let facts: BuildFacts = build_facts((plan, project), (changed, full_refresh))?;
-    let connection = ConsumptionConnection::open(adapter, connection_config)?;
+    let connection = ConsumptionConnection::new(adapter, connection_config);
     let mut warnings: Vec<String> = Vec::new();
     let mut rows: Vec<ConsumptionRow> = Vec::new();
     for location in read_locations(&facts, changed) {
@@ -341,6 +345,7 @@ pub(crate) fn prepare<'py>(
             }
         }
     }
+    connection.close(py)?;
     let recorder = ConsumptionRecorder {
         connection,
         run_id,

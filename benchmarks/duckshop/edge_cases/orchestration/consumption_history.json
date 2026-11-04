@@ -1,0 +1,70 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "event_id": "consumption-000",
+    "execution_id": "0190a1b2-0000-7000-8000-000000000001",
+    "phase": "succeeded",
+    "run_id": "external-build",
+    "node_type": "model",
+    "node_name": "customer_orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "customer_orders_🧾",
+    "version_hash": "customer-orders-version",
+    "input_count": 2,
+    "input_kind": "source",
+    "input_name": "shop.orders",
+    "input_version": "load 'orders' 🧾 #7",
+    "recorded_at": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 3,
+  "later_time": "2026-02-03T04:05:06.001Z",
+  "retained_result": "consumption-103",
+  "kind": "consumption",
+  "source_key": "event_id",
+  "timestamp_key": "recorded_at",
+  "id_prefix": "consumption",
+  "page_lengths": [
+    100,
+    7
+  ],
+  "later_index": 106,
+  "later_record": {
+    "event_id": "consumption-103",
+    "phase": "started",
+    "execution_id": "0190a1b2-0000-7000-8000-000000000002",
+    "input_kind": null,
+    "input_name": null,
+    "input_version": null,
+    "recorded_at": "2026-02-03T04:05:06.001Z"
+  },
+  "last_record": {
+    "event_id": "consumption-103",
+    "phase": "started",
+    "execution_id": "0190a1b2-0000-7000-8000-000000000002",
+    "input_kind": null,
+    "input_name": null,
+    "input_version": null,
+    "recorded_at": "2026-02-03T04:05:06.001Z"
+  },
+  "record_overrides": {
+    "consumption-102": {
+      "input_kind": "node",
+      "input_name": "model.stg_customers",
+      "input_version": "0190a1b2-0000-7000-8000-0000000000aa"
+    },
+    "consumption-103": {
+      "event_id": "consumption-103",
+      "phase": "started",
+      "execution_id": "0190a1b2-0000-7000-8000-000000000002",
+      "input_kind": null,
+      "input_name": null,
+      "input_version": null,
+      "recorded_at": "2026-02-03T04:05:06.001Z"
+    }
+  },
+  "source_count": 107,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id"
+}

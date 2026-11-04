@@ -44,6 +44,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_audit_history,
+    append_consumption_history,
     append_contended_fingerprints,
     append_janitor_history,
     append_legacy_history,
@@ -103,6 +104,22 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
             # SQLite has no supported concurrent-microbatch coordination writer.
             ("duckdb", "database", "microbatch_history", append_microbatch_history, "", ()),
+            (
+                "duckdb",
+                "database",
+                "consumption_history",
+                append_consumption_history,
+                "external-build",
+                (),
+            ),
+            (
+                "sqlite",
+                "path",
+                "consumption_history",
+                append_consumption_history,
+                "external-build",
+                (),
+            ),
             (
                 "duckdb",
                 "database",
@@ -240,6 +257,22 @@ def test_given_external_state_events_when_reading_pages_then_identities_text_and
             ),
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
             ("duckdb", "database", "microbatch_history", append_microbatch_history, "", ()),
+            (
+                "duckdb",
+                "database",
+                "consumption_history",
+                append_consumption_history,
+                "external-build",
+                (),
+            ),
+            (
+                "sqlite",
+                "path",
+                "consumption_history",
+                append_consumption_history,
+                "external-build",
+                (),
+            ),
             (
                 "duckdb",
                 "database",
