@@ -6,7 +6,7 @@ use crate::consumption::constants::EVENT_NAMESPACE;
 use crate::consumption::models::ConsumedInput;
 
 /// SHA-256 of `(execution_id, phase, input_kind, input_name, input_version)`, so a retried append repeats it.
-pub fn event_id(execution_id: &str, phase: &str, input: Option<&ConsumedInput>) -> String {
+pub(crate) fn event_id(execution_id: &str, phase: &str, input: Option<&ConsumedInput>) -> String {
     let identity = serde_json::json!([
         EVENT_NAMESPACE,
         execution_id,

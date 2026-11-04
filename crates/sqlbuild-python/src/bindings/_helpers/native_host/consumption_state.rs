@@ -1,12 +1,13 @@
-//! Consumption table DDL, recent-execution reads and chunked appends through adapter callbacks.
+//! The consumption table through the adapter, and the connection and callbacks a recording build holds.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyFrozenSet, PyInt, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
 use sqlbuild_state::consumption::constants::{
     CONSUMPTION_COLUMN_TYPES, INTEGER_STATE_VALUE_TYPE, NULLABLE_COLUMNS, RECENT_EXECUTIONS,
-    RECORDED_AT_COLUMN,
 };
 use sqlbuild_state::consumption::main::prune_executions_sql::prune_executions_sql;
 use sqlbuild_state::consumption::main::recent_executions_sql::recent_executions_sql;
@@ -16,15 +17,17 @@ use sqlbuild_state::consumption::models::{
 use sqlbuild_state::freshness::constants::STRING_STATE_VALUE_TYPE;
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported};
+use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
-use crate::bindings::_helpers::freshness::support::presumed_utc_datetime;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::state_rows::state_tables::state_table_create_sql;
-use crate::bindings::_helpers::state_rows::timestamps::date_time_typed;
 
 /// Rows per `INSERT`; SQL Server accepts at most 1,000 rows in one `VALUES` list.
 const ROWS_PER_STATEMENT: usize = 500;
+/// Warehouse timestamp texts with a UTC offset, as drivers render aware values.
+const OFFSET_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f%:z", "%Y-%m-%d %H:%M:%S%.f%:z"];
+/// Warehouse timestamp texts without an offset, which the consumption table stores as UTC.
+const NAIVE_TIME_FORMATS: [&str; 2] = ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S%.f"];
 
 /// One destination schema of the consumption table.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -156,14 +159,19 @@ fn execute<'py>(
     )
 }
 
-/// Create the table and its indexes in `location` when missing.
-pub(crate) fn ensure_table(
+/// Create the schema, table and indexes in `location`; `started` rows precede schema preparation.
+fn ensure_table(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
     location: &Location,
 ) -> PyResult<()> {
     let py: Python<'_> = adapter.py();
     let keywords = location.keywords(py);
+    for statement in
+        call_with(&native_field(adapter, "render_create_schema")?, &keywords)?.try_iter()?
+    {
+        execute(adapter, connection, &statement?.extract::<String>()?)?;
+    }
     let create: String = call_with(
         &native_field(adapter, "render_create_consumption_table_sql")?,
         &keywords,
@@ -197,7 +205,7 @@ fn table_exists(
 }
 
 /// Rows of the newest executions per relation in `location`; none when the table is missing.
-pub(crate) fn read_recent(
+fn read_recent(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
     location: &Location,
@@ -213,8 +221,7 @@ pub(crate) fn read_recent(
         connection,
         &recent_executions_sql(&table, RECENT_EXECUTIONS),
     )?;
-    result
-        .call_method0("fetchall")?
+    call_with(&native_field(&result, "fetchall")?, &[])?
         .try_iter()?
         .map(|row| read_row(&row?))
         .collect()
@@ -231,21 +238,23 @@ fn required_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
     Ok(optional_text(value)?.unwrap_or_default())
 }
 
-/// Microseconds since the epoch of a warehouse timestamp, naive values read as UTC.
+/// Microseconds since the epoch of a warehouse timestamp's text, naive values read as UTC.
 fn epoch_micros(value: &Bound<'_, PyAny>) -> PyResult<i64> {
-    let py: Python<'_> = value.py();
-    let moment: Bound<'_, PyAny> = if date_time_typed(value)? {
-        value.clone()
-    } else {
-        imported(py, "datetime", "datetime")?.call_method1("fromisoformat", (value.str()?,))?
-    };
-    let utc: Bound<'_, PyAny> = presumed_utc_datetime(&moment)?;
-    let epoch: Bound<'_, PyAny> = imported(py, "datetime", "datetime")?
-        .call_method1("fromtimestamp", (0, imported(py, "datetime", "UTC")?))?;
-    let micros: Bound<'_, PyAny> = imported(py, "datetime", "timedelta")?.call1((0, 0, 1))?;
-    utc.call_method1("__sub__", (epoch,))?
-        .call_method1("__floordiv__", (micros,))?
-        .extract()
+    let text: String = value.str()?.extract()?;
+    let text: &str = text.trim();
+    for format in OFFSET_TIME_FORMATS {
+        if let Ok(moment) = DateTime::parse_from_str(text, format) {
+            return Ok(moment.with_timezone(&Utc).timestamp_micros());
+        }
+    }
+    for format in NAIVE_TIME_FORMATS {
+        if let Ok(naive) = NaiveDateTime::parse_from_str(text, format) {
+            return Ok(naive.and_utc().timestamp_micros());
+        }
+    }
+    Err(PyValueError::new_err(format!(
+        "unreadable consumption time {text:?}"
+    )))
 }
 
 fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
@@ -326,7 +335,7 @@ fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyRe
 }
 
 /// Append `rows` to `location`'s table in statements of whole executions where they fit.
-pub(crate) fn append(
+fn append(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
     location: &Location,
@@ -336,14 +345,12 @@ pub(crate) fn append(
     let Some(table) = table_of(adapter, location)? else {
         return Ok(());
     };
-    let recorded_at: String = adapter
-        .call_method0("render_current_utc_timestamp")?
-        .extract()?;
+    let recorded_at: String =
+        call_with(&native_field(adapter, "render_current_utc_timestamp")?, &[])?.extract()?;
     let columns: Vec<&str> = CONSUMPTION_COLUMN_TYPES
         .iter()
         .map(|(column, _)| *column)
         .collect();
-    debug_assert_eq!(columns.last(), Some(&RECORDED_AT_COLUMN));
     for chunk in execution_chunks(rows) {
         let cells: Vec<Vec<String>> = chunk
             .iter()
@@ -382,6 +389,81 @@ fn execution_chunks(rows: &[ConsumptionAppend]) -> Vec<&[ConsumptionAppend]> {
         chunks.push(&rows[start..]);
     }
     chunks
+}
+
+/// The adapter and the connection one recording build appends through.
+pub(crate) struct ConsumptionConnection {
+    adapter: Py<PyAny>,
+    connection: Py<PyAny>,
+}
+
+impl ConsumptionConnection {
+    pub(crate) fn open(
+        adapter: &Bound<'_, PyAny>,
+        connection_config: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let connection: Bound<'_, PyAny> =
+            native_field(adapter, "connect")?.call1((connection_config,))?;
+        Ok(Self {
+            adapter: adapter.clone().unbind(),
+            connection: connection.unbind(),
+        })
+    }
+
+    pub(crate) fn ensure_table(&self, py: Python<'_>, location: &Location) -> PyResult<()> {
+        ensure_table(self.adapter.bind(py), self.connection.bind(py), location)
+    }
+
+    pub(crate) fn read_recent(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+    ) -> PyResult<Vec<ConsumptionRow>> {
+        read_recent(self.adapter.bind(py), self.connection.bind(py), location)
+    }
+
+    pub(crate) fn append(
+        &self,
+        py: Python<'_>,
+        location: &Location,
+        rows: &[ConsumptionAppend],
+    ) -> PyResult<()> {
+        append(
+            self.adapter.bind(py),
+            self.connection.bind(py),
+            location,
+            rows,
+        )
+    }
+
+    pub(crate) fn close(&self, py: Python<'_>) -> PyResult<()> {
+        native_field(self.adapter.bind(py), "close")?.call1((self.connection.bind(py),))?;
+        Ok(())
+    }
+}
+
+/// The build's own node-completion callback, which the recorder forwards every result to.
+pub(crate) struct NodeCompleteHook(Py<PyAny>);
+
+impl NodeCompleteHook {
+    pub(crate) fn new(callback: &Bound<'_, PyAny>) -> Self {
+        Self(callback.clone().unbind())
+    }
+
+    pub(crate) fn forward(&self, result: &Bound<'_, PyAny>) -> PyResult<()> {
+        self.0.bind(result.py()).call1((result,))?;
+        Ok(())
+    }
+}
+
+/// The recorder's `on_node_complete` and `before_node_write` methods, as build callbacks.
+pub(crate) fn recorder_callbacks<'py>(
+    recorder: &Bound<'py, PyAny>,
+) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
+    Ok((
+        recorder.getattr("on_node_complete")?,
+        recorder.getattr("before_node_write")?,
+    ))
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

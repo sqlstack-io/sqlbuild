@@ -8,8 +8,8 @@ from decimal import Decimal
 from typing import Any, ClassVar
 from urllib.parse import urlencode
 
-from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBackedAdapter
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
+from sqlbuild.adapter.contract.classes.duckdb_backed_adapter import DuckDbBackedAdapter
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.types import BuiltinAdapter, LoaderLogicalType

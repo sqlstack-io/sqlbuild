@@ -8,11 +8,11 @@ use crate::bindings::_helpers::cli::{
 };
 use crate::bindings::_helpers::{
     audit_command, build_command, build_progress, change_selection, check, clone, command_runtime,
-    compute_logs, consumption, contract_command, cost_command, cost_report, cost_telemetry,
-    dbt_command, dbt_events, dbt_interop, debug_command, diff_report, event_exporting,
-    execution_history, format_command, freshness, init_command, janitor, load, output_capture,
-    plan_command, presentation_text, query_command, recall, result_output, review_command,
-    scenario_command, seed_command, sql_test_command, workspace_commands,
+    compute_logs, contract_command, cost_command, cost_report, cost_telemetry, dbt_command,
+    dbt_events, dbt_interop, debug_command, diff_report, event_exporting, execution_history,
+    format_command, freshness, init_command, janitor, load, output_capture, plan_command,
+    presentation_text, query_command, recall, result_output, review_command, scenario_command,
+    seed_command, sql_test_command, workspace_commands,
 };
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -28,7 +28,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     janitor::registration::register(module)?;
     plan_command::registration::register(module)?;
     freshness::registration::register(module)?;
-    consumption::state_io::register(module)?;
+    crate::bindings::_helpers::native_host::consumption_state::register(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;
     execution_history::registration::register(module)?;

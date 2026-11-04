@@ -1,7 +1,7 @@
 //! The rows appended after a model or seed's write succeeded.
 
+use crate::consumption::_helpers::event_id::event_id;
 use crate::consumption::constants::SUCCEEDED_PHASE;
-use crate::consumption::main::event_id::event_id;
 use crate::consumption::models::{ConsumedInput, ConsumptionAppend, NodeFacts};
 
 /// One `succeeded` row per consumed input, or one input-less row when there are none.

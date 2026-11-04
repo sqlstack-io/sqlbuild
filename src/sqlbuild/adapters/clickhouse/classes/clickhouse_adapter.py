@@ -29,8 +29,8 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _typed_scalar_payload,
     _validate_rectangular_typed_array,
 )
-from sqlbuild.adapter.contract.classes.historical_snapshot_sql import render_is_distinct_from
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
+from sqlbuild.adapter.contract.classes.historical_snapshot_sql import render_is_distinct_from
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -1920,7 +1920,6 @@ class ClickHouseAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
         return _state_table_ddl(
             super().render_create_source_freshness_table_sql(database=database, schema=schema)
         )
-
 
     def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
         return _state_table_ddl(

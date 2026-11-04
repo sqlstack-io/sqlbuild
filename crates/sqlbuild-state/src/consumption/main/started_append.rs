@@ -1,8 +1,8 @@
 //! The row appended before a model or seed writes.
 
 use crate::consumption::_helpers::decision::input_key;
+use crate::consumption::_helpers::event_id::event_id;
 use crate::consumption::constants::STARTED_PHASE;
-use crate::consumption::main::event_id::event_id;
 use crate::consumption::models::{ConsumptionAppend, NodeFacts};
 
 /// The `started` row of one execution of `node`; its input count is the node's distinct direct inputs.

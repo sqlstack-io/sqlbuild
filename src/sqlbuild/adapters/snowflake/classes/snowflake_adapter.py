@@ -29,6 +29,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_ansi_typed_scalar,
     _render_typed_value_list,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -38,7 +39,6 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
-from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -649,7 +649,6 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> tuple[str, ...]:
         del database, schema
         return ()
-
 
     def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
         return self._with_state_table_retention(

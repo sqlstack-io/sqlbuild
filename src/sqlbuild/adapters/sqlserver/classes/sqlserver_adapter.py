@@ -28,6 +28,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_typed_value_list,
     _typed_scalar_payload,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -37,7 +38,6 @@ from sqlbuild.adapter.contract.classes.historical_snapshot_sql import (
 from sqlbuild.adapter.contract.classes.historical_timestamp_snapshot_sql import (
     HistoricalTimestampSnapshotSql,
 )
-from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
@@ -528,7 +528,6 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
             "(source_name, target_database, target_schema, target_name, "
             "observed_at DESC, run_id DESC)",
         )
-
 
     def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
         from sqlbuild._native import CONSUMPTION_TABLE_NAME

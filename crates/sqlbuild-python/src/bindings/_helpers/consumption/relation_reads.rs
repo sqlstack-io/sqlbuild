@@ -9,7 +9,7 @@ use crate::bindings::_helpers::analysis::relation_names::{
     RelationRow, extract_sql_relation_names,
 };
 use crate::bindings::_helpers::compiled_views::{model_reads, project_reads, seed_reads};
-use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
 
 /// The relations each model, seed and source names, by node key or source name.
 pub(crate) struct Locations {
@@ -57,7 +57,7 @@ impl Locations {
         }
         let mut sources: HashMap<String, (Option<String>, Option<String>, String)> = HashMap::new();
         for map in ["source_map", "source_read_map"] {
-            for item in native_field(plan, map)?.call_method0("items")?.try_iter()? {
+            for item in mapping_items(&native_field(plan, map)?)?.try_iter()? {
                 let (name, entry): (String, Bound<'_, PyAny>) = item?.extract()?;
                 let table: String =
                     optional(native_field(&entry, "table")?)?.unwrap_or_else(|| name.clone());
@@ -126,11 +126,14 @@ pub(crate) fn model_reads_undeclared(
     else {
         return Ok(true);
     };
-    Ok(relations.iter().any(|relation| {
-        !temporary
+    for relation in &relations {
+        let created: bool = temporary
             .iter()
-            .any(|created| created.eq_ignore_ascii_case(&relation.0))
-            && !own.is_some_and(|own| names(relation, own))
-            && !inputs.iter().any(|input| locations.allows(input, relation))
-    }))
+            .any(|created| created.eq_ignore_ascii_case(&relation.0));
+        let declared: bool = inputs.iter().any(|input| locations.allows(input, relation));
+        if !created && !own.is_some_and(|own| names(relation, own)) && !declared {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }

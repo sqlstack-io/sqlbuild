@@ -38,6 +38,7 @@ use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
 use crate::bindings::_helpers::freshness::publication::append_freshness_records;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
+use crate::bindings::_helpers::native_host::consumption_state::recorder_callbacks;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
@@ -387,6 +388,7 @@ pub(crate) fn execute_build_plan<'py>(
     )?;
     report_changed_decision(context, &prepared)?;
     let recorder: &Bound<'py, ConsumptionRecorder> = &prepared.recorder;
+    let (on_node_complete, before_node_write) = recorder_callbacks(recorder.as_any())?;
     let connection: &Bound<'py, PyAny> = &preparation.connection_progress;
     let build_callbacks: Bound<'py, PyAny> = call_with(
         &host::entry(py, ExecutorHost::BuildCallbacks)?,
@@ -396,8 +398,8 @@ pub(crate) fn execute_build_plan<'py>(
                 "on_node_start",
                 keyword_relay(native_field(callbacks, "on_node_start")?, &NODE_START)?,
             ),
-            ("on_node_complete", recorder.getattr("on_node_complete")?),
-            ("before_node_write", recorder.getattr("before_node_write")?),
+            ("on_node_complete", on_node_complete),
+            ("before_node_write", before_node_write),
             (
                 "on_sub_progress",
                 native_field(callbacks, "on_sub_progress")?,
@@ -497,6 +499,14 @@ fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) 
     let Some(decision) = &prepared.decision else {
         return Ok(());
     };
+    if let Some(worker) = &context.worker {
+        let skipped: Vec<String> = decision
+            .skipped
+            .iter()
+            .map(|key| format!("{}:{}", key.kind, key.name))
+            .collect();
+        worker.unchanged(context.py(), &skipped)?;
+    }
     emit(
         &context.stream,
         &format!(

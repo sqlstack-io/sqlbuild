@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use pyo3::exceptions::PyRuntimeError;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::{pyclass, pymethods};
 use sqlbuild_state::consumption::constants::RECENT_EXECUTIONS;
 use sqlbuild_state::consumption::main::changed_run_set::changed_run_set;
@@ -20,8 +20,8 @@ use sqlbuild_state::consumption::models::{
 use uuid::Uuid;
 
 use crate::bindings::_helpers::consumption::facts::{BuildFacts, build_facts};
-use crate::bindings::_helpers::consumption::state_io::{
-    Location, append, ensure_table, read_recent,
+use crate::bindings::_helpers::native_host::consumption_state::{
+    ConsumptionConnection, Location, NodeCompleteHook,
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 
@@ -33,6 +33,7 @@ const MODEL_RESULT: &str = "model_name";
 const SEED_RESULT: &str = "seed_name";
 const SUCCESS: &str = "success";
 const ERROR_OUTCOME: &str = "error";
+const SEED_KIND: &str = "seed";
 
 /// The mutable side of one build's recording.
 struct Recording {
@@ -44,17 +45,29 @@ struct Recording {
     warnings: Vec<String>,
 }
 
+impl Default for Recording {
+    fn default() -> Self {
+        Self {
+            pending: BTreeMap::new(),
+            pending_executions: 0,
+            pending_seeds: Vec::new(),
+            tables: BTreeSet::new(),
+            last_flush: Instant::now(),
+            warnings: Vec::new(),
+        }
+    }
+}
+
 /// Appends `started` rows before a build and `succeeded` rows as its models and seeds complete.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct ConsumptionRecorder {
-    adapter: Py<PyAny>,
-    connection: Py<PyAny>,
+    connection: ConsumptionConnection,
     run_id: String,
     nodes: HashMap<NodeKey, NodeFacts>,
     history: ConsumptionHistory,
     executions: HashMap<NodeKey, String>,
     failed_start: HashMap<NodeKey, String>,
-    base_on_node_complete: Py<PyAny>,
+    base_on_node_complete: NodeCompleteHook,
     recording: Mutex<Recording>,
 }
 
@@ -86,36 +99,38 @@ impl ConsumptionRecorder {
             .map_err(|_| PyRuntimeError::new_err("consumption recorder state is poisoned"))
     }
 
-    /// Queue the succeeded rows of one execution that wrote its relation.
-    fn queue(&self, recording: &mut Recording, key: &NodeKey) {
+    /// The succeeded rows of one execution that wrote its relation, with their schema.
+    fn succeeded(&self, key: &NodeKey) -> Option<(Location, Vec<ConsumptionAppend>)> {
         let (Some(node), Some(execution_id)) = (self.nodes.get(key), self.executions.get(key))
         else {
-            return;
+            return None;
         };
         let inputs = consumed_inputs(node, (&self.nodes, &self.history), &self.executions);
-        recording
-            .pending
-            .entry(Location::of(&node.relation))
-            .or_default()
-            .extend(succeeded_appends(
-                node,
-                (execution_id, &self.run_id),
-                &inputs,
-            ));
-        recording.pending_executions += 1;
+        Some((
+            Location::of(&node.relation),
+            succeeded_appends(node, (execution_id, &self.run_id), &inputs),
+        ))
     }
 
-    /// Append every pending row; a failure is reported once, and its executions simply run again.
-    fn flush(&self, py: Python<'_>, recording: &mut Recording) {
-        let adapter: &Bound<'_, PyAny> = self.adapter.bind(py);
-        let connection: &Bound<'_, PyAny> = self.connection.bind(py);
+    /// The recording with `key`'s succeeded rows queued.
+    fn queued(&self, mut recording: Recording, key: &NodeKey) -> Recording {
+        if let Some((location, rows)) = self.succeeded(key) {
+            recording.pending.entry(location).or_default().extend(rows);
+            recording.pending_executions += 1;
+        }
+        recording
+    }
+
+    /// The recording after appending every pending row; a failure is reported, and its executions run again.
+    fn flushed(&self, py: Python<'_>, mut recording: Recording) -> Recording {
         for (location, rows) in std::mem::take(&mut recording.pending) {
-            let written: PyResult<()> = (|| {
-                if recording.tables.insert(location.clone()) {
-                    ensure_table(adapter, connection, &location)?;
-                }
-                append(adapter, connection, &location, &rows)
-            })();
+            let created: bool = !recording.tables.insert(location.clone());
+            let written: PyResult<()> = (if created {
+                Ok(())
+            } else {
+                self.connection.ensure_table(py, &location)
+            })
+            .and_then(|()| self.connection.append(py, &location, &rows));
             if let Err(error) = written {
                 recording.warnings.push(format!(
                     "could not record consumed inputs in schema {}: {error}; those models and seeds run again under --changed",
@@ -125,6 +140,7 @@ impl ConsumptionRecorder {
         }
         recording.pending_executions = 0;
         recording.last_flush = Instant::now();
+        recording
     }
 
     /// Queue the seeds whose error audits passed, flush everything and close the connection.
@@ -145,12 +161,11 @@ impl ConsumptionRecorder {
         let mut recording = self.lock()?;
         for seed in std::mem::take(&mut recording.pending_seeds) {
             if !failed_audits.contains(&seed.name) {
-                self.queue(&mut recording, &seed);
+                *recording = self.queued(std::mem::take(&mut *recording), &seed);
             }
         }
-        self.flush(py, &mut recording);
-        let adapter: &Bound<'_, PyAny> = self.adapter.bind(py);
-        let closed = adapter.call_method1("close", (self.connection.bind(py),));
+        *recording = self.flushed(py, std::mem::take(&mut *recording));
+        let closed = self.connection.close(py);
         let warnings: Vec<String> = std::mem::take(&mut recording.warnings);
         closed?;
         Ok(warnings)
@@ -161,7 +176,7 @@ impl ConsumptionRecorder {
 impl ConsumptionRecorder {
     /// Forward a finished node, then queue a successful model, or a seed until its audits are known.
     fn on_node_complete(&self, py: Python<'_>, node_result: Bound<'_, PyAny>) -> PyResult<()> {
-        self.base_on_node_complete.bind(py).call1((&node_result,))?;
+        self.base_on_node_complete.forward(&node_result)?;
         let Some((kind, name)) = kind_of(&node_result)? else {
             return Ok(());
         };
@@ -173,15 +188,15 @@ impl ConsumptionRecorder {
             name,
         };
         let mut recording = self.lock()?;
-        if kind == "seed" {
+        if kind == SEED_KIND {
             recording.pending_seeds.push(key);
             return Ok(());
         }
-        self.queue(&mut recording, &key);
+        *recording = self.queued(std::mem::take(&mut *recording), &key);
         if recording.pending_executions >= FLUSH_EXECUTIONS
             || recording.last_flush.elapsed() >= FLUSH_INTERVAL
         {
-            self.flush(py, &mut recording);
+            *recording = self.flushed(py, std::mem::take(&mut *recording));
         }
         Ok(())
     }
@@ -213,8 +228,7 @@ impl ConsumptionRecorder {
     }
 }
 
-/// The locations whose records this build reads: all of them under `--changed`, else the
-/// relations of unselected upstreams whose last execution the selected nodes record.
+/// Schemas to read records from: all under `--changed`, else those of unselected upstreams.
 fn read_locations(facts: &BuildFacts, changed: bool) -> BTreeSet<Location> {
     let by_key: HashMap<&NodeKey, &NodeFacts> =
         facts.nodes.iter().map(|node| (&node.key, node)).collect();
@@ -254,11 +268,11 @@ pub(crate) fn prepare<'py>(
 ) -> PyResult<Prepared<'py>> {
     let py: Python<'py> = plan.py();
     let facts: BuildFacts = build_facts((plan, project), (changed, full_refresh))?;
-    let connection: Bound<'py, PyAny> = adapter.call_method1("connect", (connection_config,))?;
+    let connection = ConsumptionConnection::open(adapter, connection_config)?;
     let mut warnings: Vec<String> = Vec::new();
     let mut rows: Vec<ConsumptionRow> = Vec::new();
     for location in read_locations(&facts, changed) {
-        match read_recent(adapter, &connection, &location) {
+        match connection.read_recent(py, &location) {
             Ok(read) => rows.extend(read),
             Err(error) => warnings.push(format!(
                 "could not read consumed inputs in schema {}: {error}; its models and seeds count as changed",
@@ -312,8 +326,9 @@ pub(crate) fn prepare<'py>(
     let mut failed_start: HashMap<NodeKey, String> = HashMap::new();
     let mut tables: BTreeSet<Location> = BTreeSet::new();
     for (location, rows) in started {
-        let written: PyResult<()> = ensure_table(adapter, &connection, &location)
-            .and_then(|()| append(adapter, &connection, &location, &rows));
+        let written: PyResult<()> = connection
+            .ensure_table(py, &location)
+            .and_then(|()| connection.append(py, &location, &rows));
         match written {
             Ok(()) => {
                 tables.insert(location);
@@ -327,21 +342,16 @@ pub(crate) fn prepare<'py>(
         }
     }
     let recorder = ConsumptionRecorder {
-        adapter: adapter.clone().unbind(),
-        connection: connection.unbind(),
+        connection,
         run_id,
         nodes,
         history,
         executions,
         failed_start,
-        base_on_node_complete: base_on_node_complete.unbind(),
+        base_on_node_complete: NodeCompleteHook::new(&base_on_node_complete),
         recording: Mutex::new(Recording {
-            pending: BTreeMap::new(),
-            pending_executions: 0,
-            pending_seeds: Vec::new(),
             tables,
-            last_flush: Instant::now(),
-            warnings: Vec::new(),
+            ..Recording::default()
         }),
     };
     Ok(Prepared {
