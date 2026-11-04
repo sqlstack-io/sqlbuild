@@ -118,7 +118,8 @@ definition, and any publication that adds a selector and permission pair, takes 
 an administrator requests it with `POST /api/admin/role-activations` and another administrator
 approves it with `POST /api/admin/role-approvals`. A sole administrator must confirm a
 self-approval. Removed pairs stop applying on publish. An unchanged selector covers new
-matching nodes on publish without approval. A denial lists the nodes the request was missing.
+matching nodes on publish without approval. Either change appears in the publication's change
+list as `role:<key>`. A denial lists the nodes the request was missing.
 
 ## Repair control views
 

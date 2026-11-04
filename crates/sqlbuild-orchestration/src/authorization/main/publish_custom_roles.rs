@@ -1,9 +1,10 @@
-//! Record each published custom role; removed pairs and selector coverage apply now, additions wait.
+//! Record each published custom role; removals and coverage apply now and enter the change feed; additions wait.
 
 use serde_json::Value;
 
 use crate::authorization::_helpers::custom_roles::{
-    decode_roles, effective_role, narrows, retained_grants, set_effective_role,
+    decode_grants, decode_roles, effective_role, narrows, record_role_change, retained_grants,
+    set_effective_role,
 };
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
@@ -20,15 +21,22 @@ pub(crate) async fn publish_custom_roles(
     let rows;
     (transaction, rows) = query(
         transaction,
-        "SELECT role_key FROM sqb_effective_roles WHERE location_id=$1 AND target=$2",
+        "SELECT role_key,resolved_grants_json FROM sqb_effective_roles WHERE location_id=$1 AND target=$2",
         vec![Parameter::Id(scope.0), Parameter::Text(scope.1.into())],
     )
     .await?;
-    for key in rows
+    for row in rows
         .iter()
-        .filter_map(|row| row["role_key"].as_str())
-        .filter(|key| !roles.contains_key(*key))
+        .filter(|row| !roles.contains_key(row["role_key"].as_str().unwrap_or_default()))
     {
+        let key = row["role_key"].as_str().unwrap_or_default();
+        let before = decode_grants(&row["resolved_grants_json"])?;
+        transaction = record_role_change(
+            transaction,
+            (record.snapshot_id, key),
+            (Some(&before), None),
+        )
+        .await?;
         (transaction, _) = query(
             transaction,
             "DELETE FROM sqb_effective_roles WHERE location_id=$1 AND target=$2 AND role_key=$3",
@@ -59,6 +67,14 @@ pub(crate) async fn publish_custom_roles(
         } else {
             digest.as_str()
         };
+        if next != grants {
+            transaction = record_role_change(
+                transaction,
+                (record.snapshot_id, key),
+                (Some(&grants), Some(&next)),
+            )
+            .await?;
+        }
         if next != grants || next_digest != digest {
             transaction =
                 set_effective_role(transaction, (scope.0, scope.1, key), (next_digest, &next))

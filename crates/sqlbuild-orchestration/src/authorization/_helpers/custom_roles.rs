@@ -262,6 +262,45 @@ pub(crate) async fn current_role(
     ))
 }
 
+fn grants_digest(grants: Option<&[RoleGrant]>) -> Result<Option<String>, ControlError> {
+    let Some(grants) = grants else {
+        return Ok(None);
+    };
+    let text =
+        serde_json::to_string(grants).map_err(|error| ControlError::Invalid(error.to_string()))?;
+    Ok(Some(sha256_hex(text.as_bytes())))
+}
+
+/// Append an effective role's coverage change to the snapshot's change feed, after its node changes.
+pub(crate) async fn record_role_change(
+    transaction: ControlTransaction,
+    (snapshot_id, role_key): (Uuid, &str),
+    (before, after): (Option<&[RoleGrant]>, Option<&[RoleGrant]>),
+) -> Result<ControlTransaction, ControlError> {
+    let kind = if after.is_some() {
+        "changed"
+    } else {
+        "removed"
+    };
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT COALESCE(MAX(change_seq) + 1, 0) AS next FROM sqb_snapshot_changes WHERE snapshot_id=$1",
+        vec![Parameter::Id(snapshot_id)],
+    )
+    .await?;
+    let sequence = rows
+        .first()
+        .and_then(|row| row["next"].as_i64())
+        .unwrap_or_default();
+    let (transaction, _) = query(transaction,
+        "INSERT INTO sqb_snapshot_changes (snapshot_id, change_seq, change_kind, subject_key, before_hash, after_hash) \
+         VALUES ($1,$2,$3,$4,$5,$6)",
+        vec![Parameter::Id(snapshot_id), Parameter::Integer(sequence), Parameter::Text(kind.into()),
+            Parameter::Text(format!("role:{role_key}")), Parameter::OptionalText(grants_digest(before)?),
+            Parameter::OptionalText(grants_digest(after)?)]).await?;
+    Ok(transaction)
+}
+
 pub(crate) async fn set_effective_role(
     mut transaction: ControlTransaction,
     (location_id, target, role_key): (Uuid, &str, &str),

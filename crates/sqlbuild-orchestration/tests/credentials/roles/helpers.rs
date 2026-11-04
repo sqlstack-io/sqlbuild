@@ -217,6 +217,28 @@ pub(crate) async fn granting_role(
     authorize_member(store, fixture, (action, &[])).await.ok()
 }
 
+/// Custom role entries of the snapshot change feed, by publication generation.
+pub(crate) async fn role_changes(store: &ControlStore) -> Vec<(i64, String)> {
+    let transaction = begin(store, TransactionMode::Read).await.expect("read");
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT s.generation, c.change_kind FROM sqb_snapshot_changes c JOIN sqb_snapshots s ON s.snapshot_id=c.snapshot_id \
+         WHERE c.subject_key='role:orders_support' ORDER BY s.generation, c.change_seq",
+        vec![],
+    )
+    .await
+    .expect("role changes");
+    commit(transaction).await.expect("commit");
+    rows.iter()
+        .map(|row| {
+            (
+                row["generation"].as_i64().unwrap_or_default(),
+                row["change_kind"].as_str().unwrap_or_default().into(),
+            )
+        })
+        .collect()
+}
+
 /// Role approval audit facts in commit order: action and recorded outcome.
 pub(crate) async fn role_audit(store: &ControlStore) -> Vec<(String, Value)> {
     let transaction = begin(store, TransactionMode::Read).await.expect("read");

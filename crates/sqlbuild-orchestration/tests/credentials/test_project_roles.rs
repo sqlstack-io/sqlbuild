@@ -9,7 +9,7 @@ use crate::authorization::main::compile_roles::compile_roles;
 use crate::credentials::models::{Action, RoleAssignmentRequest, RoleGrant, RoleKey};
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, activate, assign, authorize_member, developer_grants, orders_grant,
-    publish_support_role, role_fixture, try_request,
+    publish_support_role, role_changes, role_fixture, try_request,
 };
 use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
 use crate::runs::tests::helpers::snapshot;
@@ -90,6 +90,12 @@ fn given_approved_selector_when_it_matches_more_nodes_then_coverage_grows_withou
                     Err(ControlError::Invalid(_))
                 ),
                 "{}: coverage growth is not a widening to approve",
+                test_case.description
+            );
+            assert_eq!(
+                role_changes(store).await,
+                [(2, "changed".to_owned()), (3, "changed".to_owned())],
+                "{}: the dropped view grant and the grown coverage enter the change feed",
                 test_case.description
             );
             close_test_store(fixture).await;
