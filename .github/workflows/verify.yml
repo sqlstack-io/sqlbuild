@@ -87,7 +87,7 @@ jobs:
               changed_any=true
               case "${path}" in
                 .release-please-manifest.json|CHANGELOG.md) ;;
-                Cargo.toml|Cargo.lock|pyproject.toml|uv.lock)
+                crates/sqlbuild-cli/Cargo.toml|crates/sqlbuild-python/Cargo.toml|Cargo.lock|pyproject.toml|uv.lock)
                   diff="$(git diff -U0 --text --no-color --no-renames "${BASE_SHA}...${HEAD_SHA}" -- "${path}")" \
                     || return 1
                   offending="$(awk '/^@@/ { hunk = 1; next } hunk && /^[-+]/' <<< "${diff}" \

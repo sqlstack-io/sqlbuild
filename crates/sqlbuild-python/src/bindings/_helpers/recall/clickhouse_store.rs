@@ -74,6 +74,7 @@ impl ClickHouseLocation {
                 database: Some(database.to_owned()),
                 retention_days: retention,
                 cluster: None,
+                producer_version: env!("CARGO_PKG_VERSION").to_owned(),
             },
         }
     }

@@ -348,6 +348,7 @@ fn permission_notice(
         database,
         retention_days: settings.retention_days,
         cluster: None,
+        producer_version: env!("CARGO_PKG_VERSION").to_owned(),
     };
     let database_missing: bool = options
         .database

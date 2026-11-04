@@ -494,6 +494,7 @@ pub(crate) fn core_release_store(path: &std::path::Path) {
         database: None,
         retention_days: 30,
         cluster: None,
+        producer_version: "9.8.7".to_owned(),
     };
     std::fs::create_dir_all(path.parent().expect("the store has a directory"))
         .expect("the store directory can be created");

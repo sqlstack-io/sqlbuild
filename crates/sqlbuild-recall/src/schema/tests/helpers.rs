@@ -14,6 +14,7 @@ pub(crate) fn options(cluster: Option<&str>) -> DdlOptions {
         database: Some("observability".to_owned()),
         retention_days: 14,
         cluster: cluster.map(str::to_owned),
+        producer_version: "9.8.7".to_owned(),
     }
 }
 
