@@ -473,6 +473,83 @@ fn given_view_grant_on_part_of_the_location_when_listing_then_each_listing_is_de
 }
 
 #[test]
+fn given_role_removed_from_code_when_its_assignment_remains_then_it_grants_nothing() {
+    let test_cases = [
+        ProjectRoleTestCase {
+            description: "SQLite stale assignment grants nothing",
+            backend: Backend::Sqlite,
+            expected_before: Ok(SUPPORT_ROLE),
+            expected_after: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
+        },
+        ProjectRoleTestCase {
+            description: "PostgreSQL stale assignment grants nothing",
+            backend: Backend::Postgres,
+            expected_before: Ok(SUPPORT_ROLE),
+            expected_after: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store, 2).await;
+            activate(store, &roles).await;
+            publish_support_role(
+                store,
+                roles.location_id,
+                (2, developer_grants("tag:orders", &["orders"])),
+            )
+            .await;
+            activate(store, &roles).await;
+            let adhoc = (Action::RunAdhoc, ["orders"].as_slice());
+            assert_eq!(
+                authorize_member(store, &roles, adhoc)
+                    .await
+                    .as_deref()
+                    .map_err(String::as_str),
+                test_case.expected_before,
+                "{}: the approved role grants ad-hoc runs",
+                test_case.description
+            );
+            let mut input = snapshot(roles.location_id);
+            input.generation = 3;
+            input.documents.insert("roles".into(), json!({}));
+            publish_snapshot(store, &input)
+                .await
+                .expect("publish without roles");
+            assert_eq!(
+                authorize_member(store, &roles, adhoc)
+                    .await
+                    .as_deref()
+                    .map_err(String::as_str),
+                test_case.expected_after,
+                "{}: the removed role's assignment grants nothing on nodes",
+                test_case.description
+            );
+            assert_eq!(
+                authorize_member(store, &roles, (Action::View, &[]))
+                    .await
+                    .as_deref()
+                    .map_err(String::as_str),
+                Err("missing permission in this scope; all requested nodes denied"),
+                "{}: nor location-wide",
+                test_case.description
+            );
+            assert_eq!(
+                role_changes(store).await.last(),
+                Some(&(3, "removed".to_owned())),
+                "{}: the removal enters the change feed",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
 fn given_two_custom_roles_when_each_covers_part_of_a_run_then_their_union_authorizes_it() {
     let test_cases = [
         ProjectRoleTestCase {
