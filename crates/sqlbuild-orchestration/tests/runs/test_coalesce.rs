@@ -5,6 +5,7 @@ use crate::runs::main::claim_next_run::claim_next_run;
 use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::models::TickDecision;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, evaluate_trigger};
+use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use serde_json::json;
@@ -46,8 +47,8 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
                 "jobs".into(),
                 json!({"orders": {"description": "Build orders", "selection": ["orders"]}}),
             );
-            input.documents.insert("triggers".into(), json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": "2020-01-01T00:00:00Z",
-                "schedule": {"kind": "calendar", "times": ["2020-01-01T00:00:00Z"], "refresh_at": "2030-01-01T00:00:00Z"}}}));
+            input.documents.insert("triggers".into(), json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": calendar_text(0),
+                "schedule": {"kind": "calendar", "times": [calendar_text(0)], "refresh_at": "2030-01-01T00:00:00Z"}}}));
             let published = publish_snapshot(store, &input)
                 .await
                 .expect("first calendar publication");
@@ -69,7 +70,7 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
             assert_eq!(claim.request.snapshot_id, published.snapshot_id);
             input.generation = 2;
             input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
-                json!(["2020-01-01T00:00:00Z", "2020-01-02T00:00:00Z"]);
+                json!([calendar_text(0), calendar_text(1)]);
             publish_snapshot(store, &input)
                 .await
                 .expect("refresh calendar");
@@ -84,11 +85,7 @@ fn given_coalescing_triggers_when_a_previous_run_has_been_claimed_then_new_ticks
             assert_ne!(waiting, claim.request.run_id);
             input.generation = 3;
             input.documents.get_mut("triggers").expect("triggers")["daily_orders"]["schedule"]["times"] =
-                json!([
-                    "2020-01-01T00:00:00Z",
-                    "2020-01-02T00:00:00Z",
-                    "2020-01-03T00:00:00Z"
-                ]);
+                json!([calendar_text(0), calendar_text(1), calendar_text(2)]);
             publish_snapshot(store, &input)
                 .await
                 .expect("next calendar refresh");

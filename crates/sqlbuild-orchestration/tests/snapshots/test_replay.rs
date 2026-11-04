@@ -1,5 +1,6 @@
 //! Current pointers and jobs recover from retained facts, independently of trigger replay.
 
+use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -54,8 +55,8 @@ fn given_corrupt_snapshot_projections_when_replayed_then_full_state_is_restored(
                 }),
             );
             input.documents.insert("triggers".into(), json!({
-                "daily":{"description":"Daily","job_key":"orders","starts_at":"2020-01-01T00:00:00Z",
-                    "schedule":{"kind":"calendar","times":["2020-01-01T00:00:00Z","2030-01-01T00:00:00Z"],"refresh_at":"2029-01-01T00:00:00Z"}}
+                "daily":{"description":"Daily","job_key":"orders","starts_at":calendar_text(0),
+                    "schedule":{"kind":"calendar","times":[calendar_text(0),"2030-01-01T00:00:00Z"],"refresh_at":"2029-01-01T00:00:00Z"}}
             }));
             publish_snapshot(store, &input)
                 .await

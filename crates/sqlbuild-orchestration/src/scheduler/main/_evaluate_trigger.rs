@@ -1,11 +1,11 @@
 //! Fence, decide and publish using one serialized transaction and its database clock.
 
-use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
 use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::_helpers::persistence::persist_ticks;
+use crate::scheduler::_helpers::tick_retention::evaluation_start;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickPlan, TickState};
@@ -42,12 +42,7 @@ pub(crate) async fn evaluate_trigger(
         return Ok(None);
     }
     let now = transaction.now;
-    let from = trigger.last_tick_for.unwrap_or(
-        trigger
-            .started_at
-            .checked_sub_signed(TimeDelta::microseconds(1))
-            .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
-    );
+    let from = evaluation_start((trigger.last_tick_for, trigger.started_at), now)?;
     let (due_times, continuation) = expand_schedule(&trigger.definition_json, from, now)?;
     let (transaction, rows) = query(transaction,
         "SELECT r.run_id FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \

@@ -1,6 +1,9 @@
 //! Trigger and failure fixtures exercise the scheduler's transactional tick boundary.
 
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
+
+use chrono::{DateTime, DurationRound, SecondsFormat, TimeDelta, Utc};
 
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::runs::main::list_runs::list_runs;
@@ -12,7 +15,8 @@ use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -24,6 +28,20 @@ use crate::store::tests::lease_helpers::expire_lease;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
+
+/// Calendar fixtures stay inside the tick-retention horizon: day 0 is midnight three days ago.
+pub(crate) fn calendar_time(day: i64) -> DateTime<Utc> {
+    static BASE: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
+        (Utc::now() - TimeDelta::days(3))
+            .duration_trunc(TimeDelta::days(1))
+            .expect("calendar base")
+    });
+    *BASE + TimeDelta::days(day)
+}
+
+pub(crate) fn calendar_text(day: i64) -> String {
+    calendar_time(day).to_rfc3339_opts(SecondsFormat::Secs, true)
+}
 
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {
@@ -53,8 +71,8 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
             ),
             (
                 "triggers".into(),
-                json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": "2020-01-01T00:00:00Z",
-                "schedule": {"kind": "calendar", "times": ["2020-01-01T00:00:00Z", "2020-01-02T00:00:00Z", "2020-01-03T00:00:00Z", "2030-01-01T00:00:00Z"], "refresh_at": "2029-01-01T00:00:00Z"}}}),
+                json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": calendar_text(0),
+                "schedule": {"kind": "calendar", "times": [calendar_text(0), calendar_text(1), calendar_text(2), "2030-01-01T00:00:00Z"], "refresh_at": "2029-01-01T00:00:00Z"}}}),
             ),
         ]),
     }
@@ -287,4 +305,111 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
     close_store(second).await;
     close_test_store(fixture).await;
     Some(counts)
+}
+
+/// Test-only clock skew: move a trigger's past calendar, cursor and ticks back by `days`.
+pub(crate) async fn shift_schedule(store: &ControlStore, trigger_id: Uuid, days: i64) {
+    let shift = |value: &mut Value| {
+        let time: DateTime<Utc> = serde_json::from_value(value.clone()).expect("calendar time");
+        *value = json!(time - TimeDelta::days(days));
+    };
+    let past = |value: &&mut Value| {
+        serde_json::from_value::<DateTime<Utc>>((*value).clone()).expect("calendar time")
+            < Utc::now()
+    };
+    let transaction = begin(store, TransactionMode::Write).await.expect("shift");
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT definition_json FROM sqb_triggers WHERE trigger_id=$1",
+        vec![Parameter::Id(trigger_id)],
+    )
+    .await
+    .expect("trigger definition");
+    let mut definition = rows[0]["definition_json"].clone();
+    shift(&mut definition["starts_at"]);
+    for time in definition["schedule"]["times"]
+        .as_array_mut()
+        .expect("calendar times")
+        .iter_mut()
+        .filter(past)
+    {
+        shift(time);
+    }
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_triggers SET definition_json=$1 WHERE trigger_id=$2",
+        vec![Parameter::Json(definition), Parameter::Id(trigger_id)],
+    )
+    .await
+    .expect("shift calendar");
+    let (transaction, ticks) = query(
+        transaction,
+        "SELECT tick_id, scheduled_for FROM sqb_ticks WHERE trigger_id=$1",
+        vec![Parameter::Id(trigger_id)],
+    )
+    .await
+    .expect("ticks");
+    let mut transaction = transaction;
+    for tick in ticks {
+        let mut time = tick["scheduled_for"].clone();
+        shift(&mut time);
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_ticks SET scheduled_for=$1 WHERE tick_id=$2",
+            vec![
+                Parameter::Time(serde_json::from_value(time).expect("tick time")),
+                Parameter::Id(serde_json::from_value(tick["tick_id"].clone()).expect("tick")),
+            ],
+        )
+        .await
+        .expect("shift tick");
+    }
+    let (transaction, state) = query(
+        transaction,
+        "SELECT started_at, last_tick_for FROM sqb_trigger_state WHERE trigger_id=$1",
+        vec![Parameter::Id(trigger_id)],
+    )
+    .await
+    .expect("trigger state");
+    let started: DateTime<Utc> =
+        serde_json::from_value(state[0]["started_at"].clone()).expect("start");
+    let last: Option<DateTime<Utc>> =
+        serde_json::from_value(state[0]["last_tick_for"].clone()).expect("cursor");
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_trigger_state SET started_at=$1, last_tick_for=$2 WHERE trigger_id=$3",
+        vec![
+            Parameter::Time(started - TimeDelta::days(days)),
+            Parameter::OptionalTime(last.map(|time| time - TimeDelta::days(days))),
+            Parameter::Id(trigger_id),
+        ],
+    )
+    .await
+    .expect("shift state");
+    commit(transaction).await.expect("commit shift");
+}
+
+/// A later covered tick, as if another due time arrived while the requested run still waited.
+pub(crate) async fn append_covered_tick(
+    store: &ControlStore,
+    trigger_id: Uuid,
+    scheduled_for: DateTime<Utc>,
+) {
+    let transaction = begin(store, TransactionMode::Write)
+        .await
+        .expect("covered tick");
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, \
+         run_id, covered_by_run_id, details_json) SELECT $1, trigger_id, $2, evaluated_at, epoch, \
+         'covered', NULL, run_id, details_json FROM sqb_ticks WHERE trigger_id=$3 AND outcome='requested'",
+        vec![
+            Parameter::Id(Uuid::now_v7()),
+            Parameter::Time(scheduled_for),
+            Parameter::Id(trigger_id),
+        ],
+    )
+    .await
+    .expect("append covered tick");
+    commit(transaction).await.expect("commit covered tick");
 }

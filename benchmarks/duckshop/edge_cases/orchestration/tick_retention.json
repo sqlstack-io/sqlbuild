@@ -1,0 +1,6 @@
+{
+  "description": "Covered ticks age past the tick horizon and are pruned; the requested tick and the latest covered tick stay; the operator then resets the cursor.",
+  "shift_days": 40,
+  "expected_pruned": 2,
+  "expected_survivors": ["covered", "requested"]
+}

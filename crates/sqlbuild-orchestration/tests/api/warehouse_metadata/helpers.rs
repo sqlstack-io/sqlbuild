@@ -51,7 +51,7 @@ pub(crate) async fn fingerprint_history(
         .expect("predecessor table set");
     let (transaction, _) = query(
         transaction,
-        "DELETE FROM sqb_schema_migrations WHERE name IN ('warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions','authentication_revision','oidc_login_flows','administrator_initialization','external_sessions')",
+        "DELETE FROM sqb_schema_migrations WHERE name IN ('retention_indexes','warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions','authentication_revision','oidc_login_flows','administrator_initialization','external_sessions')",
         vec![],
     )
     .await

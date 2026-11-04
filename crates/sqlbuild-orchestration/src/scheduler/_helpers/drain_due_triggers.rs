@@ -1,5 +1,8 @@
 //! Drain a bounded due-trigger page, renewing the lease between persisted evaluations.
 
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::scheduler::_helpers::drain_sensors::drain_sensors;
@@ -37,4 +40,26 @@ pub(crate) async fn drain_due_triggers(
     let (lease, sensor_evaluations) = drain_sensors(store, lease).await?;
     cycle.evaluated += sensor_evaluations;
     Ok((lease, cycle))
+}
+
+/// Shorten the cycle wait to the next running trigger's due time, never below zero.
+pub(crate) async fn wait_for_next_due(
+    store: &ControlStore,
+    wait_for: Duration,
+) -> Result<Duration, ControlError> {
+    let transaction = begin(store, TransactionMode::Read).await?;
+    let now = transaction.now;
+    let (transaction, rows) = query(transaction,
+        "SELECT MIN(s.next_due_at) AS next_due_at FROM sqb_trigger_state s JOIN sqb_triggers t ON t.trigger_id=s.trigger_id \
+         JOIN sqb_locations l ON l.location_id=t.location_id \
+         WHERE s.status='running' AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL", vec![]).await?;
+    let next: Option<DateTime<Utc>> = serde_json::from_value(rows[0]["next_due_at"].clone())
+        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+    commit(transaction).await?;
+    Ok(next.map_or(wait_for, |next| {
+        (next - now)
+            .to_std()
+            .unwrap_or(Duration::ZERO)
+            .min(wait_for)
+    }))
 }

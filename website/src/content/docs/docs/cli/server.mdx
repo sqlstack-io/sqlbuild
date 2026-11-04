@@ -25,6 +25,7 @@ sqb server --statistics-retention-days 30 --audit-retention-days 730
 | --- | --- | --- | --- |
 | Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
 | Security audit records | `--audit-retention-days` | `400` | `1`–`65535` |
+| Skipped and covered schedule ticks | None | 30 days | Fixed |
 
 Statistics samples older than the horizon disappear from statistics reads at once and are then
 deleted in the background.
@@ -39,6 +40,11 @@ A security audit record older than the horizon is deleted only when it is no lon
 Records kept past the horizon for these reasons are reported on stderr as
 `Security audit retention: retained past horizon: N` whenever the count changes. A growing count
 usually means the audit webhook is failing.
+
+The scheduler deletes skipped and covered ticks older than 30 days. It keeps each trigger's latest
+tick and every tick that started a run. It also never creates a tick more than 30 days old: a new
+schedule, a resumed trigger or a cursor reset catches up from 30 days ago at most, so deleted
+ticks never come back.
 
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit

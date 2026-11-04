@@ -35,3 +35,9 @@ impl crate::scheduler::types::RunLauncher for IdleLauncher {
         Ok(())
     }
 }
+
+pub(crate) struct TickRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_survivors: usize,
+}

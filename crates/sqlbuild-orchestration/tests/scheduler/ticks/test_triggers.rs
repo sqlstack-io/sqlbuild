@@ -12,7 +12,9 @@ use crate::store::main::migrate_store::migrate_store;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::scheduler::tests::contracts::ticks::helpers::{snapshot, trigger_audits};
+use crate::scheduler::tests::contracts::ticks::helpers::{
+    calendar_text, calendar_time, snapshot, trigger_audits,
+};
 use crate::scheduler::tests::contracts::ticks::test_types::{
     TickTransactionTestCase, TransactionFault, TriggerControlsTestCase,
 };
@@ -178,9 +180,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                     .status,
                 TriggerStatus::Paused
             );
-            let time = chrono::DateTime::parse_from_rfc3339("2020-01-02T00:00:00Z")
-                .expect("cursor")
-                .to_utc();
+            let time = calendar_time(1);
             let cursor = TriggerChangeRequest {
                 event_id: Uuid::now_v7(),
                 change: TriggerChange::SetCursor { time },
@@ -237,10 +237,7 @@ fn given_operator_changes_when_retried_and_republished_then_facts_and_effective_
                 .iter()
                 .find(|row| row["event_id"] == reset_cursor.event_id.to_string())
                 .expect("cursor reset audit");
-            assert_eq!(
-                cleared["before_json"]["last_tick_for"],
-                "2020-01-02T00:00:00Z"
-            );
+            assert_eq!(cleared["before_json"]["last_tick_for"], calendar_text(1));
             assert!(cleared["after_json"]["last_tick_for"].is_null());
             assert_eq!(cleared["after_json"]["reason"], "maintenance");
             close_test_store(fixture).await;
@@ -310,18 +307,15 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
             assert_eq!(
                 serde_json::to_value(&trigger.definition_json).expect("calendar")["schedule"]["times"],
                 json!([
-                    "2020-01-01T00:00:00Z",
-                    "2020-01-02T00:00:00Z",
-                    "2020-01-03T00:00:00Z",
+                    calendar_text(0),
+                    calendar_text(1),
+                    calendar_text(2),
                     "2031-01-01T00:00:00Z"
                 ]),
                 "{}",
                 test_case.description
             );
-            assert_eq!(
-                trigger.next_due_at,
-                Some("2020-01-01T00:00:00Z".parse().expect("due"))
-            );
+            assert_eq!(trigger.next_due_at, Some(calendar_time(0)));
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("election")

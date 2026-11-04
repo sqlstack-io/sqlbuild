@@ -1,5 +1,6 @@
 //! Real SQLite broadcast and PostgreSQL LISTEN/NOTIFY feed independent HTTP observers.
 
+use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -72,8 +73,8 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             .expect("location token");
             let mut input = snapshot(location_id);
             input.documents.insert("jobs".into(), json!({"orders": {"description":"Build orders", "selection":["orders"], "overlap":"allow"}}));
-            input.documents.insert("triggers".into(), json!({"daily_orders": {"description":"Refresh orders", "job_key":"orders", "starts_at":"2020-01-01T00:00:00Z",
-                "schedule":{"kind":"calendar", "times":["2020-01-01T00:00:00Z","2030-01-01T00:00:00Z"], "refresh_at":"2029-01-01T00:00:00Z"}}}));
+            input.documents.insert("triggers".into(), json!({"daily_orders": {"description":"Refresh orders", "job_key":"orders", "starts_at":calendar_text(0),
+                "schedule":{"kind":"calendar", "times":[calendar_text(0),"2030-01-01T00:00:00Z"], "refresh_at":"2029-01-01T00:00:00Z"}}}));
             publish_snapshot(store, &input)
                 .await
                 .expect("initial snapshot");

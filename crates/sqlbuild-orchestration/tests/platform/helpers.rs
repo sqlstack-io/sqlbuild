@@ -1,3 +1,4 @@
+use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
@@ -33,17 +34,17 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
             format!("daily_orders_{index}"),
             json!({
                 "description": "Refresh orders", "job_key": "orders",
-                "starts_at": "2020-01-01T00:00:00Z",
-                "schedule": {"kind": "calendar", "times": ["2020-01-01T00:00:00Z", future],
-                    "refresh_at": "2020-01-01T00:00:00Z"}
+                "starts_at": calendar_text(0),
+                "schedule": {"kind": "calendar", "times": [calendar_text(0), future],
+                    "refresh_at": calendar_text(0)}
             }),
         );
     }
     for (name, status) in [("expired_orders", "running"), ("paused_orders", "paused")] {
         triggers.insert(name.into(), json!({
             "description": "Refresh orders", "job_key": "orders", "default_status": status,
-            "starts_at": "2020-01-01T00:00:00Z",
-            "schedule": {"kind": "calendar", "times": ["2020-01-01T00:00:00Z"], "refresh_at": "2020-01-01T00:00:00Z"}
+            "starts_at": calendar_text(0),
+            "schedule": {"kind": "calendar", "times": [calendar_text(0)], "refresh_at": calendar_text(0)}
         }));
     }
     triggers.insert(

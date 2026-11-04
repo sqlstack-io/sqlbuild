@@ -1,5 +1,6 @@
 //! Real HTTP reads keep both location and target scope, including guessed nested resource IDs.
 
+use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -70,8 +71,8 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 "jobs".into(),
                 json!({"orders": {"description": "Build orders", "selection": ["orders"]}}),
             );
-            input.documents.insert("triggers".into(), json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": "2020-01-01T00:00:00Z",
-                "schedule": {"kind": "calendar", "times": ["2020-01-01T00:00:00Z", "2020-01-02T00:00:00Z", "2020-01-03T00:00:00Z", "2030-01-01T00:00:00Z"], "refresh_at": "2029-01-01T00:00:00Z"}}}));
+            input.documents.insert("triggers".into(), json!({"daily_orders": {"description": "Refresh orders", "job_key": "orders", "starts_at": calendar_text(0),
+                "schedule": {"kind": "calendar", "times": [calendar_text(0), calendar_text(1), calendar_text(2), "2030-01-01T00:00:00Z"], "refresh_at": "2029-01-01T00:00:00Z"}}}));
             let published = publish_snapshot(store, &input)
                 .await
                 .expect("publish declarations");
@@ -337,7 +338,7 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                 test_case.expected_ticks
             );
             assert_eq!(ticks[0]["outcome"], "requested");
-            assert_eq!(ticks[0]["scheduled_for"], "2020-01-03T00:00:00Z");
+            assert_eq!(ticks[0]["scheduled_for"], calendar_text(2));
             assert_eq!(ticks[1]["outcome"], "covered");
             for path in [&run_path, &event_path, &tick_path, &invocation_path] {
                 assert_eq!(

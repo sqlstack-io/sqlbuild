@@ -19,6 +19,7 @@ pub struct SchedulerLease {
 pub struct SchedulerState {
     pub(crate) holder: Uuid,
     pub(crate) lease: Option<SchedulerLease>,
+    pub(crate) pruned_at: Option<std::time::Instant>,
 }
 
 impl SchedulerState {
@@ -27,6 +28,7 @@ impl SchedulerState {
         Self {
             holder,
             lease: None,
+            pruned_at: None,
         }
     }
 }

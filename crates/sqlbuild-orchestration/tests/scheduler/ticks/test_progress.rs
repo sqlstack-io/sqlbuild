@@ -10,7 +10,7 @@ use crate::declarations::main::{change_trigger::change_trigger, list_triggers::l
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
 use crate::platform::main::rebuild_projections::rebuild_projections;
 use crate::scheduler::main::{_acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger};
-use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
+use crate::scheduler::tests::contracts::ticks::helpers::{calendar_text, calendar_time, snapshot};
 use crate::scheduler::tests::contracts::ticks::test_types::TriggerControlsTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::{
@@ -83,10 +83,7 @@ fn given_reset_existing_ticks_when_progress_is_replayed_then_cursor_and_due_time
                 .expect("reset state")
                 .remove(0);
             assert!(reset.last_tick_for.is_none());
-            assert_eq!(
-                reset.next_due_at.expect("first due").to_rfc3339(),
-                "2020-01-01T00:00:00+00:00"
-            );
+            assert_eq!(reset.next_due_at.expect("first due"), calendar_time(0));
             let fault = TransactionFault {
                 description: "progress publication failure",
                 table: "sqb_trigger_progress",
@@ -114,8 +111,8 @@ fn given_reset_existing_ticks_when_progress_is_replayed_then_cursor_and_due_time
                 .await
                 .expect("advanced state");
             assert_eq!(
-                expected[0].last_tick_for.expect("last due").to_rfc3339(),
-                "2020-01-03T00:00:00+00:00"
+                expected[0].last_tick_for.expect("last due"),
+                calendar_time(2)
             );
             assert_eq!(
                 expected[0].next_due_at.expect("future due").to_rfc3339(),
@@ -140,7 +137,7 @@ fn given_reset_existing_ticks_when_progress_is_replayed_then_cursor_and_due_time
             assert_eq!(facts[2]["projection_json"]["last_tick_for"], json!(null));
             assert_eq!(
                 facts[3]["projection_json"]["last_tick_for"],
-                json!("2020-01-03T00:00:00Z")
+                json!(calendar_text(2))
             );
             commit(transaction).await.expect("source cut complete");
             let mut transaction = begin(store, TransactionMode::Write)
