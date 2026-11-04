@@ -22,6 +22,8 @@ pub const PYTHON_INIT_MODULE_STEM: &str = "__init__";
 pub const FINGERPRINT_TABLE_NAME: &str = "_sqlbuild_fingerprints";
 /// State table of observed source freshness.
 pub const SOURCE_FRESHNESS_TABLE_NAME: &str = "_sqlbuild_source_freshness";
+/// State table of the inputs each model and seed execution consumed.
+pub const CONSUMPTION_TABLE_NAME: &str = "_sqlbuild_consumption";
 /// State table of model migration events.
 pub const MIGRATION_TABLE_NAME: &str = "_sqlbuild_migrations";
 /// State table of column migration events.
