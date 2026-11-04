@@ -11,7 +11,8 @@ use crate::scheduler::main::_acquire_lease::acquire_lease;
 use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::main::list_ticks::list_ticks;
-use crate::scheduler::models::{SchedulerLease, SchedulerState, TickOutcome};
+use crate::scheduler::main::run_scheduler::run_scheduler;
+use crate::scheduler::models::{SchedulerLease, SchedulerState, TickOutcome, TickRecord};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
@@ -23,7 +24,7 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::scheduler::tests::contracts::ticks::test_types::{
-    FaultAnomalies, FaultStep, TransactionFault,
+    FaultAnomalies, FaultStep, IdleLauncher, TransactionFault,
 };
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::helpers::read_recall_events;
@@ -640,4 +641,41 @@ pub(crate) async fn fault_run(
     close_store(second).await;
     close_test_store(fixture).await;
     Some((anomalies, counts))
+}
+
+/// Run one real scheduler loop until `deadline`, then stop it and return the trigger's ticks.
+pub(crate) async fn run_scheduler_until(
+    store: &ControlStore,
+    trigger_id: Uuid,
+    deadline: DateTime<Utc>,
+) -> Vec<TickRecord> {
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    let (_changed, changes) = tokio::sync::watch::channel(());
+    let stopping = async {
+        tokio::time::sleep((deadline - Utc::now()).to_std().unwrap_or_default()).await;
+        stop.send(true).expect("stop scheduler");
+    };
+    let (finished, ()) = tokio::join!(
+        run_scheduler(
+            store,
+            SchedulerState::new(Uuid::now_v7()),
+            (shutdown, changes),
+            IdleLauncher
+        ),
+        stopping
+    );
+    finished.expect("scheduler loop");
+    list_ticks(store, trigger_id, 100).await.expect("ticks")
+}
+
+pub(crate) async fn queued_times(
+    store: &ControlStore,
+    location: Uuid,
+) -> BTreeMap<Uuid, DateTime<Utc>> {
+    list_runs(store, (location, "development"), 100)
+        .await
+        .expect("runs")
+        .into_iter()
+        .map(|run| (run.run_id, run.queued_at))
+        .collect()
 }

@@ -4,6 +4,8 @@ pub(crate) mod helpers;
 mod test_contract;
 #[path = "test_faults.rs"]
 mod test_faults;
+#[path = "test_latency.rs"]
+mod test_latency;
 #[path = "test_loop.rs"]
 mod test_loop;
 #[path = "test_precision.rs"]
