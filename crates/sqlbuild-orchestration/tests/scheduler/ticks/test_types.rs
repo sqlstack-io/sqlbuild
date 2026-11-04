@@ -41,3 +41,10 @@ pub(crate) struct TickRetentionTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_survivors: usize,
 }
+
+pub(crate) struct LatestCatchUpTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) catch_up: serde_json::Value,
+    pub(crate) expected_ticks: usize,
+}

@@ -1,6 +1,6 @@
 //! Bound cron backlog work without losing omitted times or requesting an obsolete latest run.
 
-use std::ops::Bound::{Excluded, Unbounded};
+use std::ops::Bound::{Excluded, Included, Unbounded};
 
 use chrono::{DateTime, Utc};
 
@@ -55,4 +55,20 @@ pub(crate) fn expand_schedule(
         ));
     }
     Ok((due, Some(continuation)))
+}
+
+/// The newest occurrence at or before `now`, found without expanding the history before it.
+pub(crate) fn latest_occurrence(
+    trigger: &TriggerDefinition,
+    now: DateTime<Utc>,
+) -> Result<Option<DateTime<Utc>>, ControlError> {
+    match &trigger.schedule {
+        Schedule::Cron {
+            expression,
+            timezone,
+        } => previous_cron_time(&parse_cron(expression, timezone)?, now).map(Some),
+        Schedule::Calendar { times, .. } => {
+            Ok(times.range((Unbounded, Included(now))).next_back().copied())
+        }
+    }
 }

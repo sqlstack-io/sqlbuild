@@ -42,7 +42,7 @@ pub(crate) async fn evaluate_trigger(
         return Ok(None);
     }
     let now = transaction.now;
-    let from = evaluation_start((trigger.last_tick_for, trigger.started_at), now)?;
+    let (transaction, from) = evaluation_start(transaction, &trigger, now).await?;
     let (due_times, continuation) = expand_schedule(&trigger.definition_json, from, now)?;
     let (transaction, rows) = query(transaction,
         "SELECT r.run_id FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \

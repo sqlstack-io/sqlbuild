@@ -1,5 +1,5 @@
 {
-  "description": "A backlog of covered ticks ages past the tick horizon. One cleanup pass stops at its batch cap and the next pass finishes; the requested tick and the latest covered tick stay; the operator then resets the cursor.",
+  "description": "A backlog of covered ticks ages past the tick horizon. One cleanup pass stops at its batch cap and the next pass finishes; the requested tick and the latest covered tick stay; the operator then resets the cursor. A yearly schedule starting years back whose latest occurrence is older than the horizon still gets exactly one latest catch-up tick and nothing older; bounded catch-up keeps the horizon.",
   "shift_days": 40,
   "backlog_ticks": 1000,
   "expected_first_pass": 1000,
@@ -7,5 +7,7 @@
   "expected_survivors": [
     "covered",
     "requested"
-  ]
+  ],
+  "yearly_starts_at": "2015-01-01T00:00:00Z",
+  "yearly_latest_days_ago": 100
 }

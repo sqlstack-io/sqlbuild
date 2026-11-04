@@ -1,12 +1,14 @@
 //! Expired skipped/covered ticks go; a cursor reset never recreates history older than the horizon.
 
-use chrono::{TimeDelta, Utc};
+use chrono::{Datelike, DurationRound, TimeDelta, Utc};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::{change_trigger::change_trigger, list_triggers::list_triggers};
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
+use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::_helpers::tick_retention::prune_ticks;
 use crate::scheduler::main::{
     _acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger, list_ticks::list_ticks,
@@ -15,7 +17,9 @@ use crate::scheduler::models::TickOutcome;
 use crate::scheduler::tests::contracts::ticks::helpers::{
     append_covered_tick, calendar_time, shift_schedule, snapshot,
 };
-use crate::scheduler::tests::contracts::ticks::test_types::TickRetentionTestCase;
+use crate::scheduler::tests::contracts::ticks::test_types::{
+    LatestCatchUpTestCase, TickRetentionTestCase,
+};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
@@ -163,6 +167,117 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 Some("2030-01-01T00:00:00Z".parse().expect("future"))
             );
             assert!(ticks.iter().all(|tick| tick.scheduled_for < Utc::now()));
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_only_its_latest_occurrence()
+ {
+    let test_cases = [
+        LatestCatchUpTestCase {
+            description: "SQLite latest catch-up ticks an occurrence older than the horizon",
+            backend: Backend::Sqlite,
+            catch_up: json!("latest"),
+            expected_ticks: 1,
+        },
+        LatestCatchUpTestCase {
+            description: "PostgreSQL latest catch-up ticks an occurrence older than the horizon",
+            backend: Backend::Postgres,
+            catch_up: json!("latest"),
+            expected_ticks: 1,
+        },
+        LatestCatchUpTestCase {
+            description: "bounded catch-up keeps the horizon clamp",
+            backend: Backend::Sqlite,
+            catch_up: json!({"all": {"max_runs": 5}}),
+            expected_ticks: 0,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../benchmarks/duckshop/edge_cases/orchestration/tick_retention.json");
+            let case: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(path).expect("tick fixture"))
+                    .expect("tick case");
+            // A yearly date (day 28 at most) well past the horizon, so its latest occurrence is older than it.
+            let days_ago = case["yearly_latest_days_ago"].as_i64().expect("days ago");
+            let past = Utc::now() - TimeDelta::days(days_ago);
+            let latest = past
+                .with_day(past.day().min(28))
+                .expect("day every year has")
+                .duration_trunc(TimeDelta::days(1))
+                .expect("midnight");
+            let mut input = snapshot(location);
+            input.documents.insert(
+                "triggers".into(),
+                json!({"yearly_orders": {"description": "Yearly orders", "job_key": "orders",
+                    "starts_at": case["yearly_starts_at"], "catch_up": test_case.catch_up,
+                    "schedule": {"kind": "cron", "expression": format!("0 0 {} {} *", latest.day(), latest.month()), "timezone": "UTC"}}}),
+            );
+            publish_snapshot(store, &input).await.expect("publication");
+            let trigger_id = list_triggers(store, location, "development")
+                .await
+                .expect("trigger")[0]
+                .trigger_id;
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("election")
+                .expect("lease");
+            for _ in 0..2 {
+                evaluate_trigger(store, &lease, trigger_id)
+                    .await
+                    .expect("catch up")
+                    .expect("trigger");
+            }
+            let ticks: Vec<_> = list_ticks(store, trigger_id, 10)
+                .await
+                .expect("ticks")
+                .into_iter()
+                .map(|tick| (tick.scheduled_for, tick.outcome))
+                .collect();
+            assert_eq!(
+                ticks.len(),
+                test_case.expected_ticks,
+                "{}",
+                test_case.description
+            );
+            assert!(
+                ticks
+                    .iter()
+                    .all(|tick| *tick == (latest, TickOutcome::Requested)),
+                "only the latest occurrence is ticked: {}",
+                test_case.description
+            );
+            let runs = list_runs(store, (location, "development"), 10)
+                .await
+                .expect("runs");
+            assert_eq!(
+                runs.len(),
+                test_case.expected_ticks,
+                "{}",
+                test_case.description
+            );
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("trigger")
+                .remove(0);
+            assert_eq!(
+                trigger.next_due_at,
+                Some(latest.with_year(latest.year() + 1).expect("next year")),
+                "{}",
+                test_case.description
+            );
             close_test_store(fixture).await;
         });
     }
