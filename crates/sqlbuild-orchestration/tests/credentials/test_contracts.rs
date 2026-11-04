@@ -8,6 +8,8 @@ pub(crate) mod location_helpers;
 mod test_administrators;
 #[path = "test_audit.rs"]
 mod test_audit;
+#[path = "test_audit_retention.rs"]
+mod test_audit_retention;
 #[path = "test_contract.rs"]
 mod test_contract;
 #[path = "passwords/test_contract.rs"]

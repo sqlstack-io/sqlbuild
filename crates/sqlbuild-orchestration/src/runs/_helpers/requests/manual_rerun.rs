@@ -8,6 +8,7 @@ use crate::credentials::models::{Action, AuditContext};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
+use crate::runs::constants::RERUN_AUDIT_TAG;
 use crate::runs::models::{RerunRequest, RunRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -53,7 +54,7 @@ pub(crate) async fn request_rerun_in(
             "rerun needs an actor, granting role and reason".into(),
         ));
     }
-    let event_id = Uuid::new_v5(&request.run_id, b"rerun-request");
+    let event_id = Uuid::new_v5(&request.run_id, RERUN_AUDIT_TAG);
     let (transaction, retry) = request_retry(
         transaction,
         &context,

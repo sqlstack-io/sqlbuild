@@ -15,19 +15,34 @@ Use `sqb server --help` for service, authentication and launcher options.
 
 ## Set retention
 
-Set how long the server keeps hourly warehouse statistics:
+Set how long the server keeps hourly warehouse statistics and security audit records:
 
 ```bash
-sqb server --statistics-retention-days 30
+sqb server --statistics-retention-days 30 --audit-retention-days 730
 ```
 
 | Data | Option | Default | Range |
 | --- | --- | --- | --- |
 | Hourly warehouse statistics | `--statistics-retention-days` | `90` | `1`–`65535` |
+| Security audit records | `--audit-retention-days` | `400` | `1`–`65535` |
 
-Samples older than the horizon disappear from statistics reads at once and are then deleted in the
-background. An invalid value stops the server before it opens the control database. Servers that
-share one control database delete at the shortest horizon among them, so give them the same value.
+Statistics samples older than the horizon disappear from statistics reads at once and are then
+deleted in the background.
+
+A security audit record older than the horizon is deleted only when it is no longer needed:
+
+- The webhook in `SQLBUILD_SECURITY_AUDIT_WEBHOOK_URL`, if set, has received it.
+- No retained run's retry depends on it. A manual job or rerun request keeps its record while
+  the run exists.
+- It is not the newest record, so audit page cursors never see a reused position.
+
+Records kept past the horizon for these reasons are reported on stderr as
+`Security audit retention: retained past horizon: N` whenever the count changes. A growing count
+usually means the audit webhook is failing.
+
+An invalid value stops the server before it opens the control database. Servers that share one
+control database delete at the shortest horizon among them and count only their own audit
+webhook, so give them the same values and webhook.
 
 ## Inspect published SQL
 

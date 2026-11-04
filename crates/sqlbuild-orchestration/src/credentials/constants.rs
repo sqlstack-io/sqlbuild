@@ -15,3 +15,6 @@ pub(crate) const LOGIN_PEER_LIMIT: u64 = 20;
 pub(crate) const LOGIN_USERNAME_BYTES: usize = 256;
 /// A noncredential PHC output makes missing-user checks perform the same Argon2id work.
 pub(crate) const DUMMY_PASSWORD_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+pub(crate) const DEFAULT_AUDIT_RETENTION_DAYS: u16 = 400;
+pub(crate) const AUDIT_RETENTION_BATCH: usize = 100;

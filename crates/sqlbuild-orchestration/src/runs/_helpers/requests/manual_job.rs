@@ -8,6 +8,7 @@ use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
+use crate::runs::constants::MANUAL_JOB_AUDIT_TAG;
 use crate::runs::main::frozen_job_request::frozen_job_request;
 use crate::runs::models::{JobRunRequest, RunWindow};
 use crate::store::errors::ControlError;
@@ -52,7 +53,7 @@ pub(crate) async fn request_job_run_in(
             "backfill window start must not follow end".into(),
         ));
     }
-    let event_id = Uuid::new_v5(&request.run_id, b"manual-job-request");
+    let event_id = Uuid::new_v5(&request.run_id, MANUAL_JOB_AUDIT_TAG);
     let (transaction, retry) = request_retry(
         transaction,
         &context,

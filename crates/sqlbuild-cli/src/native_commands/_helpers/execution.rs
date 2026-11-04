@@ -13,7 +13,8 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
 use sqlbuild_orchestration::authorization::main::recover_administrator::recover_administrator;
-use sqlbuild_orchestration::credentials::models::AuditContext;
+use sqlbuild_orchestration::credentials::main::audit::run_audit_retention::run_audit_retention;
+use sqlbuild_orchestration::credentials::models::{AuditContext, AuditRetention};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::rebuild_projections::rebuild_projections;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -120,7 +121,7 @@ pub(crate) async fn run_development_roles(
             ))]));
         }, development_stopped(shutdown.clone())),
     ));
-    start_platform_roles(&mut tasks, (&store, &shutdown))?;
+    start_platform_roles(&mut tasks, (&store, &shutdown), AuditRetention::default())?;
     tasks.spawn(development_location_role(
         (&project, &executable),
         (location_id, &target),
@@ -821,6 +822,7 @@ fn location_child(options: &LocationServe, script: &Path) -> Command {
 pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
+    audit: AuditRetention,
 ) -> Result<(), ControlError> {
     let mut sinks: Vec<(Webhook, &str)> = Vec::new();
     for (variable, source, label) in [
@@ -858,6 +860,23 @@ pub(crate) fn start_platform_roles(
         Stream::Stderr,
         "Platform watchdog started\n",
     )]));
+    let audit_store = store.clone();
+    let audit_shutdown = shutdown.clone();
+    let audit_sinks: Vec<Webhook> = sinks.iter().map(|(sink, _)| sink.clone()).collect();
+    tasks.spawn(async move {
+        let report = |retained: i64| {
+            drop(write_output(&[(
+                Stream::Stderr,
+                &format!("Security audit retention: retained past horizon: {retained}\n"),
+            )]));
+        };
+        run_audit_retention(
+            &audit_store,
+            (audit, &audit_sinks),
+            (report, audit_shutdown),
+        )
+        .await
+    });
     for (sink, label) in sinks {
         drop(write_output(&[(
             Stream::Stderr,

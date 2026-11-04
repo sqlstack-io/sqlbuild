@@ -34,3 +34,9 @@ pub(crate) struct AuditWebhookReceiver {
     pub(crate) requests: Arc<Mutex<Vec<Value>>>,
     pub(crate) status: Arc<AtomicU16>,
 }
+
+pub(crate) struct AuditRetentionTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_retained: i64,
+}

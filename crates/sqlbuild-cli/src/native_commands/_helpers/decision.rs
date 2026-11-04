@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::api::models::ApiAuthentication;
-use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope, PrincipalKind};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
@@ -264,17 +264,29 @@ pub(crate) fn control_address(
 /// API settings are validated together before any store is opened.
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
-) -> Result<(ApiAuthentication, StatisticsRetention), ControlError> {
-    let out_of_range =
-        || ControlError::Invalid("--statistics-retention-days must be between 1 and 65535".into());
-    let retention = match namespace.get("control_statistics_retention_days") {
-        Some(Value::Int(value)) => value
-            .parse::<u16>()
-            .map_err(|_| out_of_range())
-            .and_then(|days| StatisticsRetention::days(days).map_err(|_| out_of_range()))?,
-        _ => StatisticsRetention::default(),
+) -> Result<(ApiAuthentication, (StatisticsRetention, AuditRetention)), ControlError> {
+    let statistics = match retention_days(namespace, "statistics")? {
+        Some(days) => StatisticsRetention::days(days)?,
+        None => StatisticsRetention::default(),
     };
-    Ok((control_authentication(namespace)?, retention))
+    let audit = match retention_days(namespace, "audit")? {
+        Some(days) => AuditRetention::days(days)?,
+        None => AuditRetention::default(),
+    };
+    Ok((control_authentication(namespace)?, (statistics, audit)))
+}
+
+/// Zero and out-of-range values name the flag before any type-specific check runs.
+fn retention_days(namespace: &Namespace, kind: &str) -> Result<Option<u16>, ControlError> {
+    match namespace.get(&format!("control_{kind}_retention_days")) {
+        Some(Value::Int(value)) => match value.parse::<u16>() {
+            Ok(days) if days > 0 => Ok(Some(days)),
+            _ => Err(ControlError::Invalid(format!(
+                "--{kind}-retention-days must be between 1 and 65535"
+            ))),
+        },
+        _ => Ok(None),
+    }
 }
 
 fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, ControlError> {

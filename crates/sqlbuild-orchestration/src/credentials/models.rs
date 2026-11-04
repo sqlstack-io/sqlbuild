@@ -6,6 +6,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::credentials::constants::DEFAULT_AUDIT_RETENTION_DAYS;
+use crate::store::errors::ControlError;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PrincipalKind {
@@ -52,6 +55,35 @@ pub struct SecurityAuditEvent {
     pub scope_json: serde_json::Value,
     pub before_json: serde_json::Value,
     pub after_json: serde_json::Value,
+}
+
+/// Installation configuration: rows past the horizon stay until every sink and retry lookup is done.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AuditRetention {
+    days: u16,
+}
+
+impl AuditRetention {
+    pub fn days(days: u16) -> Result<Self, ControlError> {
+        if days == 0 {
+            return Err(ControlError::Invalid(
+                "audit retention must keep at least one day".into(),
+            ));
+        }
+        Ok(Self { days })
+    }
+
+    pub(crate) fn cutoff(self, now: DateTime<Utc>) -> DateTime<Utc> {
+        now - chrono::Duration::days(i64::from(self.days))
+    }
+}
+
+impl Default for AuditRetention {
+    fn default() -> Self {
+        Self {
+            days: DEFAULT_AUDIT_RETENTION_DAYS,
+        }
+    }
 }
 
 /// Closed permission vocabulary; unknown actions fail deserialization.

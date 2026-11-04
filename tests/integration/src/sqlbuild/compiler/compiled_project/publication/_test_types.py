@@ -266,6 +266,13 @@ class StatisticsHorizonTestCase:
 
 
 @dataclass(frozen=True)
+class AuditHorizonTestCase:
+    description: str
+    fixture: str
+    expected_retained: int
+
+
+@dataclass(frozen=True)
 class StatisticsHorizonRejectionTestCase:
     description: str
     days: str

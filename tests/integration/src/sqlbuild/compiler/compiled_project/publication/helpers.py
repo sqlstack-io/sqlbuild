@@ -1010,19 +1010,27 @@ def append_contended_fingerprints(
 
 def run_statistics_retention(directory: Path, arguments: tuple[str, ...]) -> str:
     """Run one installed server until its first retention pass, returning its stderr."""
+    return run_server_until(
+        directory,
+        ("--no-scheduler", *arguments),
+        lambda _: "sentinel_expired" not in statistics_relations(directory),
+    )
+
+
+def run_server_until(
+    directory: Path,
+    arguments: tuple[str, ...],
+    finished: Callable[[str], bool],
+    environment_overrides: dict[str, str] | None = None,
+) -> str:
+    """Run one installed server until its stderr or store satisfies `finished`, returning stderr."""
     log: Path = directory / "server.log"
     environment: dict[str, str] = os.environ.copy()
     environment.pop("SQLBUILD_CONTROL_DATABASE_URL", None)
+    environment.update(environment_overrides or {})
     with log.open("wb") as stderr:
         process: subprocess.Popen[bytes] = subprocess.Popen(
-            [
-                str(Path(sys.executable).with_name("sqb")),
-                "server",
-                "--port",
-                "0",
-                "--no-scheduler",
-                *arguments,
-            ],
+            [str(Path(sys.executable).with_name("sqb")), "server", "--port", "0", *arguments],
             cwd=directory,
             env=environment,
             stdout=subprocess.DEVNULL,
@@ -1031,14 +1039,23 @@ def run_statistics_retention(directory: Path, arguments: tuple[str, ...]) -> str
         try:
             _ = api_address(process, log)
             deadline: float = time.monotonic() + 10
-            while "sentinel_expired" in statistics_relations(directory):
+            while not finished(log.read_text()):
                 assert process.poll() is None, log.read_text()
-                assert time.monotonic() < deadline, "retention did not run at startup"
+                assert time.monotonic() < deadline, "server did not reach the expected state"
                 time.sleep(0.05)
         finally:
             process.terminate()
             _ = process.wait(timeout=10)
     return log.read_text()
+
+
+def audit_actions(directory: Path) -> tuple[str, ...]:
+    """Read the synthetic retention fixture's audit actions directly, in storage order."""
+    with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
+        rows: list[tuple[str]] = connection.execute(
+            "SELECT action FROM sqb_security_audit WHERE action LIKE 'orders.%' ORDER BY storage_id"
+        ).fetchall()
+    return tuple(action for (action,) in rows)
 
 
 def statistics_relations(directory: Path) -> tuple[str, ...]:

@@ -1,4 +1,5 @@
 pub(crate) mod active_session;
+pub(crate) mod audit_retention;
 pub(crate) mod browser_sessions;
 pub(crate) mod locations;
 pub(crate) mod password_sessions;

@@ -27,7 +27,7 @@ pub(crate) async fn run_control(
     standalone: bool,
 ) -> Result<(), ControlError> {
     let address = control_address(namespace, standalone)?;
-    let (authentication, retention) = control_api_settings(namespace)?;
+    let (authentication, (statistics, audit)) = control_api_settings(namespace)?;
     let store = open_control_store(namespace).await?;
     let (workers, images) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
@@ -43,7 +43,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            (authentication, images, retention),
+            (authentication, images, statistics),
             (
                 move || {
                     drop(write_output(&[(
@@ -54,7 +54,7 @@ pub(crate) async fn run_control(
                 stopped(shutdown.clone()),
             ),
         ));
-        start_platform_roles(&mut tasks, (&store, &shutdown))?;
+        start_platform_roles(&mut tasks, (&store, &shutdown), audit)?;
     }
     if standalone || !flag(namespace, "control_no_scheduler") {
         drop(write_output(&[(Stream::Stderr, "Starting scheduler...\n")]));

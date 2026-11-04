@@ -1156,6 +1156,17 @@
        },
        {
         "kind": "store",
+        "options": [
+         "--audit-retention-days"
+        ],
+        "dest": "control_audit_retention_days",
+        "default": 400,
+        "type": "int",
+        "help": "days of security audit records to keep; older records are deleted once every configured audit webhook has received them and no retained run's retry needs them (default: 400)",
+        "group": 1
+       },
+       {
+        "kind": "store",
         "options": ["--trusted-proxy-config"],
         "dest": "control_trusted_proxy_config",
         "help": "JSON origin, trusted_peers and explicit subject-to-person identities; proxy must replace X-SQB-User and terminate HTTPS; no provisioning or grants",
