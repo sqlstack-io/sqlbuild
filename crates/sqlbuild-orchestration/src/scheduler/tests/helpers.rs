@@ -21,7 +21,6 @@ pub(super) fn time(second: i64) -> DateTime<Utc> {
 pub(super) fn state(test_case: &TickTestCase) -> TickState {
     TickState {
         trigger_id: Uuid::from_u128(19),
-        enabled: test_case.enabled,
         last_tick_for: test_case.last_second.map(time),
         due_times: test_case
             .due_seconds
@@ -53,7 +52,6 @@ fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>) -> TestCaseResult 
     let expected: BTreeSet<i64> = due.iter().copied().collect();
     let mut state = TickState {
         trigger_id: Uuid::from_u128(19),
-        enabled: true,
         last_tick_for: None,
         due_times: due.into_iter().map(time).collect(),
         waiting_run: None,
@@ -181,7 +179,6 @@ fn exercise_cron_history(
         let plan = plan_ticks(
             &TickState {
                 trigger_id: Uuid::from_u128(23),
-                enabled: true,
                 last_tick_for,
                 due_times,
                 continuation,

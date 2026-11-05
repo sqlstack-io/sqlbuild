@@ -13,7 +13,6 @@ pub(super) struct SensorFairnessTestCase {
 #[derive(Debug)]
 pub(super) struct TickTestCase {
     pub(super) description: &'static str,
-    pub(super) enabled: bool,
     pub(super) due_seconds: Vec<i64>,
     pub(super) last_second: Option<i64>,
     pub(super) now_second: i64,

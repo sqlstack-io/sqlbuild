@@ -681,7 +681,7 @@ pub(crate) async fn fault_run(
         .expect("duplicate");
     let duplicate = query(transaction,
         "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
-         VALUES ($1,$2,$3,$3,1,'skipped',NULL,NULL)",
+         VALUES ($1,$2,$3,$3,1,'covered',NULL,NULL)",
         vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(first)]).await;
     anomalies.accepted_duplicate_ticks = usize::from(duplicate.is_ok());
     counts.insert("ticks", ticks.len());

@@ -901,8 +901,8 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             ),
         )
         _ = connection.execute(
-            "INSERT INTO sqb_run_nodes (run_id,node_key,attempt,status,writes) "
-            "VALUES (?,'model:orders',1,'pending',TRUE)",
+            "INSERT INTO sqb_run_nodes (run_id,node_key,status,writes) "
+            "VALUES (?,'model:orders','pending',TRUE)",
             (run_id,),
         )
         _ = connection.execute(

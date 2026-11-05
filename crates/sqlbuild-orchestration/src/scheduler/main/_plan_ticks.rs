@@ -14,13 +14,6 @@ pub(in crate::scheduler) fn plan_ticks(
     state: &TickState,
     now: DateTime<Utc>,
 ) -> Result<TickPlan, ControlError> {
-    if !state.enabled {
-        return Ok(TickPlan {
-            actions: vec![],
-            last_tick_for: state.last_tick_for,
-            next_due_at: None,
-        });
-    }
     if state.due_times.len() > MAX_TICKS_PER_BATCH {
         return Err(ControlError::Invalid(
             "schedule expansion exceeds the bounded tick batch".into(),

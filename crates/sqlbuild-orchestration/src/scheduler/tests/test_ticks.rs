@@ -7,7 +7,6 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
     let test_cases = [
         TickTestCase {
             description: "latest catch-up covers earlier ticks and deduplicates calendar entries",
-            enabled: true,
             due_seconds: vec![30, 10, 20, 10, 40],
             last_second: None,
             now_second: 30,
@@ -19,7 +18,6 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
         },
         TickTestCase {
             description: "coalesced ticks are covered by the already waiting run",
-            enabled: true,
             due_seconds: vec![10, 20, 30, 40],
             last_second: Some(10),
             now_second: 30,
@@ -31,7 +29,6 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
         },
         TickTestCase {
             description: "a backward clock jump cannot move the durable cursor backward",
-            enabled: true,
             due_seconds: vec![10, 20, 30, 40],
             last_second: Some(30),
             now_second: 20,
@@ -40,18 +37,6 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
             expected_covered: vec![],
             expected_last: Some(30),
             expected_next: Some(40),
-        },
-        TickTestCase {
-            description: "pause retains the cursor and does not advertise an overdue next tick",
-            enabled: false,
-            due_seconds: vec![10, 20, 30],
-            last_second: Some(10),
-            now_second: 30,
-            active: false,
-            expected_requests: vec![],
-            expected_covered: vec![],
-            expected_last: Some(10),
-            expected_next: None,
         },
     ];
     for test_case in test_cases {

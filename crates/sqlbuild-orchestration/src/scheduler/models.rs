@@ -53,7 +53,6 @@ pub struct CronSchedule {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickState {
     pub trigger_id: Uuid,
-    pub enabled: bool,
     pub last_tick_for: Option<DateTime<Utc>>,
     pub due_times: Vec<DateTime<Utc>>,
     /// First omitted time in a bounded expansion; never advance the cursor past an unrecorded tick.
@@ -103,9 +102,7 @@ pub(crate) struct DueTrigger {
 #[serde(rename_all = "snake_case")]
 pub enum TickOutcome {
     Requested,
-    Skipped,
     Covered,
-    Failed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -118,5 +115,4 @@ pub struct TickRecord {
     pub outcome: TickOutcome,
     pub run_id: Option<Uuid>,
     pub covered_by_run_id: Option<Uuid>,
-    pub reason: Option<String>,
 }

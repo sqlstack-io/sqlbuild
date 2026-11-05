@@ -26,8 +26,11 @@ pub(crate) async fn check_execution_history(
     }
     let (transaction, previous) = query(
         transaction,
-        "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key=$2 AND attempt=1 AND kind='check'",
-        vec![Parameter::Id(request.run_id), Parameter::Text(node_key.clone())],
+        "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key=$2 AND kind='check'",
+        vec![
+            Parameter::Id(request.run_id),
+            Parameter::Text(node_key.clone()),
+        ],
     )
     .await?;
     let previous = previous.first().and_then(|row| row["status"].as_str());
@@ -45,8 +48,8 @@ pub(crate) async fn check_execution_history(
     let status = outcome.map_or(NODE_RUNNING, |outcome| outcome.as_str());
     let (transaction, _) = query(
         transaction,
-        "INSERT INTO sqb_run_nodes (run_id, node_key, attempt, status, writes, started_at, ended_at, kind) \
-         VALUES ($1,$2,1,$3,FALSE,$4,$5,'check') ON CONFLICT (run_id, node_key, attempt) \
+        "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes, started_at, ended_at, kind) \
+         VALUES ($1,$2,$3,FALSE,$4,$5,'check') ON CONFLICT (run_id, node_key) \
          DO UPDATE SET status=excluded.status, ended_at=excluded.ended_at",
         vec![
             Parameter::Id(request.run_id),

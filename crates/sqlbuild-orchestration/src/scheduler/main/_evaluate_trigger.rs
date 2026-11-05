@@ -66,7 +66,6 @@ pub(crate) async fn evaluate_trigger(
     let plan = plan_ticks(
         &TickState {
             trigger_id,
-            enabled: true,
             last_tick_for: trigger.last_tick_for,
             due_times,
             continuation,

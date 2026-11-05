@@ -62,7 +62,6 @@ pub enum RunEventKind {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunEventKind {
@@ -76,7 +75,6 @@ impl RunEventKind {
                 | (Self::Partial, RunOutcome::Partial)
                 | (Self::Failed, RunOutcome::Failed)
                 | (Self::Cancelled, RunOutcome::Cancelled)
-                | (Self::PresumedFailed, RunOutcome::PresumedFailed)
         )
     }
 }

@@ -56,7 +56,7 @@ pub(crate) async fn publish_change(
     if let Some((node_key, _)) = request.change.finished_node() {
         (transaction, _) = query(
             transaction,
-            "UPDATE sqb_run_nodes SET finished_storage_id=$1 WHERE run_id=$2 AND node_key=$3 AND attempt=1",
+            "UPDATE sqb_run_nodes SET finished_storage_id=$1 WHERE run_id=$2 AND node_key=$3",
             vec![
                 Parameter::Integer(cursor),
                 Parameter::Id(request.run_id),
