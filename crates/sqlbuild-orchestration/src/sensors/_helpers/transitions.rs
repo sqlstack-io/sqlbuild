@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use crate::runs::models::NodeOutcome;
-use crate::sensors::models::{NodeEventKind, SensorEvaluationRequest};
+use crate::sensors::models::{NodeEventKind, NodeSensorEvent, SensorEvaluationRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -11,9 +11,10 @@ use crate::store::models::{ControlTransaction, Parameter};
 pub(crate) async fn matches_transition(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
-    (node_key, outcome, storage_id): (&str, NodeOutcome, i64),
+    node: &NodeSensorEvent,
     kinds: &BTreeSet<NodeEventKind>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
+    let outcome = node.status;
     if outcome == NodeOutcome::Success && kinds.contains(&NodeEventKind::Success) {
         return Ok((transaction, true));
     }
@@ -27,24 +28,13 @@ pub(crate) async fn matches_transition(
     }
     let (transaction, rows) = query(
         transaction,
-        "SELECT e.payload -> 'change' -> 'change' ->> 'outcome' AS outcome \
-         FROM recall_events e JOIN sqb_runs r ON e.run_id=CAST(r.run_id AS TEXT) \
-         WHERE e.producer='scheduler' AND e.event_type IN ('run_node_finished','run_check_finished') \
-         AND e.invocation_id='scheduler/' || e.run_id AND e.storage_id<$1 \
-         AND (e.payload -> 'change' -> 'change' ->> 'node_key')=$2 \
-         AND (e.payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed') \
-         AND r.location_id=$3 AND r.target=$4 AND r.kind<>'group' \
-         AND EXISTS (SELECT 1 FROM recall_events s \
-             WHERE s.invocation_id=e.invocation_id AND s.run_id=e.run_id \
-             AND s.producer='scheduler' AND s.event_type=CASE WHEN e.event_type='run_check_finished' \
-                 THEN 'run_check_started' ELSE 'run_node_started' END \
-             AND s.storage_id<e.storage_id \
-             AND (s.payload -> 'change' ->> 'claim_id')=(e.payload -> 'change' ->> 'claim_id') \
-             AND (s.payload -> 'change' -> 'change' ->> 'node_key')=$2) \
-         ORDER BY e.storage_id DESC LIMIT 1",
+        "SELECT n.status FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE n.node_key=$1 AND n.finished_storage_id<$2 AND n.status IN ('success','failed') \
+         AND n.started_at IS NOT NULL AND r.location_id=$3 AND r.target=$4 AND r.kind<>'group' \
+         ORDER BY n.finished_storage_id DESC LIMIT 1",
         vec![
-            Parameter::Integer(storage_id),
-            Parameter::Text(node_key.into()),
+            Parameter::Text(node.node_key.clone()),
+            Parameter::Integer(node.finished_storage_id),
             Parameter::Id(evaluation.location_id),
             Parameter::Text(evaluation.target.clone()),
         ],
@@ -52,6 +42,6 @@ pub(crate) async fn matches_transition(
     .await?;
     let failed = rows
         .first()
-        .is_some_and(|row| row["outcome"] == NodeOutcome::Failed.as_str());
+        .is_some_and(|row| row["status"] == NodeOutcome::Failed.as_str());
     Ok((transaction, (outcome == NodeOutcome::Success) == failed))
 }

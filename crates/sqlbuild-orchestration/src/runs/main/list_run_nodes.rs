@@ -18,7 +18,7 @@ pub async fn list_run_nodes(
     let transaction = begin(store, TransactionMode::Read).await?;
     let (transaction, rows) = query(transaction,
         "SELECT node_key, attempt, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
-         FROM sqb_run_nodes WHERE run_id=$1 ORDER BY node_key, attempt",
+         FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key, attempt",
         vec![Parameter::Id(run_id)]).await?;
     let nodes = rows
         .into_iter()
