@@ -9,7 +9,6 @@ use crate::credentials::models::{AuditContext, AuditRetention};
 use crate::credentials::tests::helpers::{acknowledge_audit, age_audit, audit_rows};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::test_types::AuditRetentionTestCase;
-use crate::runs::constants::MANUAL_JOB_AUDIT_TAG;
 use crate::runs::main::request_job_run::request_job_run;
 use crate::runs::models::JobRunRequest;
 use crate::runs::tests::helpers::snapshot;
@@ -20,17 +19,17 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_expired_audit_rows_when_pruned_then_undelivered_and_retry_referenced_rows_survive() {
+fn given_expired_audit_rows_when_pruned_then_undelivered_rows_survive_and_retries_still_match() {
     let test_cases = [
         AuditRetentionTestCase {
-            description: "SQLite keeps undelivered, retry-referenced and newest rows",
+            description: "SQLite keeps undelivered and newest rows",
             backend: Backend::Sqlite,
-            expected_retained: 3,
+            expected_retained: 2,
         },
         AuditRetentionTestCase {
-            description: "PostgreSQL keeps undelivered, retry-referenced and newest rows",
+            description: "PostgreSQL keeps undelivered and newest rows",
             backend: Backend::Postgres,
-            expected_retained: 3,
+            expected_retained: 2,
         },
     ];
     for test_case in test_cases {
@@ -58,24 +57,20 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_and_retry_referenced_ro
                 }}),
             );
             publish_snapshot(store, &input).await.expect("publish job");
-            let delivered = Uuid::now_v7();
-            let missing_run = Uuid::now_v7();
-            let orphaned = Uuid::new_v5(&missing_run, MANUAL_JOB_AUDIT_TAG);
-            for (event_id, scope) in [
-                (delivered, json!({"location_id": location_id})),
-                (orphaned, json!({"run_id": missing_run})),
-            ] {
-                let transaction = begin(store, TransactionMode::Write).await.expect("begin");
-                let transaction = append_audit(
-                    transaction,
-                    &context,
-                    (event_id, "audit.retention_fixture"),
-                    (scope, json!(null), json!({"recorded": true})),
-                )
-                .await
-                .expect("append");
-                commit(transaction).await.expect("commit");
-            }
+            let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+            let transaction = append_audit(
+                transaction,
+                &context,
+                (Uuid::now_v7(), "audit.retention_fixture"),
+                (
+                    json!({"location_id": location_id}),
+                    json!(null),
+                    json!({"recorded": true}),
+                ),
+            )
+            .await
+            .expect("append");
+            commit(transaction).await.expect("commit");
             let request = JobRunRequest {
                 run_id: Uuid::now_v7(),
                 location_id,
@@ -90,9 +85,8 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_and_retry_referenced_ro
                     .await
                     .expect("request")
             );
-            let referenced = Uuid::new_v5(&request.run_id, MANUAL_JOB_AUDIT_TAG);
             let (rows, _) = audit_rows(store).await;
-            let through = rows.last().expect("referenced row").1;
+            let through = rows.last().expect("job request row").1;
             let undelivered = Uuid::now_v7();
             let newest = Uuid::now_v7();
             for event_id in [undelivered, newest] {
@@ -135,15 +129,15 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_and_retry_referenced_ro
                 "{}",
                 test_case.description
             );
-            assert_eq!(deleted, total - 3);
+            assert_eq!(deleted, total - 2);
             let (remaining, deliveries) = audit_rows(store).await;
             let ids: Vec<Uuid> = remaining.iter().map(|(id, _)| *id).collect();
-            assert_eq!(ids, [referenced, undelivered, newest]);
-            assert_eq!(deliveries, 1, "only the retained row's delivery remains");
+            assert_eq!(ids, [undelivered, newest]);
+            assert_eq!(deliveries, 0, "deliveries of pruned rows go with them");
             assert!(
                 !request_job_run(store, &context, &request)
                     .await
-                    .expect("retry still finds its original request")
+                    .expect("retry still finds its original request after the audit is pruned")
             );
             let transaction = begin(store, TransactionMode::Write).await.expect("begin");
             let transaction = append_audit(
