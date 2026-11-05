@@ -91,7 +91,13 @@ pub(crate) struct GroupAdmissionTestCase {
     pub(crate) limits: &'static [(&'static str, u32)],
     pub(crate) parents: &'static [AdmissionParent],
     pub(crate) expected_running: usize,
-    pub(crate) reductions: &'static [&'static [(&'static str, u32)]],
+}
+
+pub(crate) struct GroupChildLimitTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_claimed_together: usize,
+    pub(crate) expected_jobs: BTreeSet<&'static str>,
 }
 
 pub(crate) struct GroupQueueTestCase {

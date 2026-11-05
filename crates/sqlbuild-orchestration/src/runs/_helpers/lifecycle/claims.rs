@@ -13,7 +13,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Occupied slots above a lowered limit still count against the run's concurrency group.
+/// Occupied slots above a lowered limit still count; group children use a parent's slot one at a time.
 pub(crate) async fn reserve_claims(
     mut transaction: ControlTransaction,
     request: &RunRequest,
@@ -39,6 +39,21 @@ pub(crate) async fn reserve_claims(
             return Ok((transaction, false));
         }
     }
+    let mut siblings_hold: BTreeSet<String> = BTreeSet::new();
+    if let Some(parent_id) = request.parent_run_id {
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT request_json FROM sqb_runs WHERE parent_run_id=$1 AND run_id<>$2 AND worker_instance IS NOT NULL",
+            vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)],
+        )
+        .await?;
+        for row in rows {
+            let sibling: RunRequest = serde_json::from_value(row["request_json"].clone())
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+            siblings_hold.extend(sibling.concurrency_groups);
+        }
+    }
     let now = transaction.now;
     for node in &request.write_set {
         let inserted;
@@ -60,6 +75,9 @@ pub(crate) async fn reserve_claims(
             )
             .await?;
             if !inherited.is_empty() {
+                if siblings_hold.contains(group) {
+                    return Ok((transaction, false));
+                }
                 continue;
             }
         }

@@ -19,8 +19,8 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::claim_helpers::{slot_counts, succeed};
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::test_types::{
-    AdmissionParent, GroupAdmissionTestCase, GroupQueueTestCase, MixedAdmissionTestCase,
-    RunLifecycleTestCase,
+    AdmissionParent, GroupAdmissionTestCase, GroupChildLimitTestCase, GroupQueueTestCase,
+    MixedAdmissionTestCase, RunLifecycleTestCase,
 };
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
@@ -137,6 +137,111 @@ fn given_mixed_physical_and_parent_waiters_when_admitting_then_priority_and_queu
 }
 
 #[test]
+fn given_group_children_sharing_a_limit_of_one_when_claiming_then_they_run_one_at_a_time() {
+    let test_cases = [
+        GroupChildLimitTestCase {
+            description: "SQLite children share the group's warehouse slot in turn",
+            backend: Backend::Sqlite,
+            expected_claimed_together: 1,
+            expected_jobs: BTreeSet::from(["load_customers", "load_inventory"]),
+        },
+        GroupChildLimitTestCase {
+            description: "PostgreSQL children share the group's warehouse slot in turn",
+            backend: Backend::Postgres,
+            expected_claimed_together: 1,
+            expected_jobs: BTreeSet::from(["load_customers", "load_inventory"]),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let actor = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../benchmarks/duckshop/edge_cases/orchestration/group_shared_limit.json");
+            let case: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(path).expect("DuckShop group"))
+                    .expect("group case");
+            input.documents.insert("jobs".into(), case["jobs"].clone());
+            input
+                .documents
+                .insert("groups".into(), case["groups"].clone());
+            publish_snapshot(store, &input).await.expect("publish");
+            request_job_run(
+                store,
+                &actor,
+                &JobRunRequest {
+                    run_id: Uuid::now_v7(),
+                    location_id: location,
+                    target: "development".into(),
+                    job_key: "daily".into(),
+                    reason: "Load the warehouse once".into(),
+                    priority: 1,
+                    window: None,
+                },
+            )
+            .await
+            .expect("queue group");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let limits = BTreeMap::from([("warehouse".to_owned(), NonZeroU32::MIN)]);
+            let dispatch = RunDispatch::from(Some((location, "development")));
+            advance_groups(store, &lease, (&limits, dispatch))
+                .await
+                .expect("admit group");
+            let mut first = Vec::new();
+            for _ in 0..3 {
+                first.extend(
+                    claim_next_run(store, &lease, &limits, dispatch)
+                        .await
+                        .expect("claim"),
+                );
+            }
+            assert_eq!(
+                first.len(),
+                test_case.expected_claimed_together,
+                "{}: one child holds the warehouse slot",
+                test_case.description
+            );
+            assert_eq!(
+                slot_counts(store).await,
+                BTreeMap::from([("warehouse".to_owned(), 1)])
+            );
+            succeed(store, &first[0]).await;
+            first.extend(
+                claim_next_run(store, &lease, &limits, dispatch)
+                    .await
+                    .expect("claim after finish"),
+            );
+            assert_eq!(
+                first
+                    .iter()
+                    .map(|claim| claim.request.job_key.as_deref().unwrap_or_default())
+                    .collect::<BTreeSet<_>>(),
+                test_case.expected_jobs,
+                "{}: the other child runs once the slot is free",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
 fn given_an_unserved_queued_group_when_dispatching_an_eligible_scope_then_unknown_child_limits_do_not_block_it()
  {
     let test_cases = [
@@ -240,7 +345,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
  {
     let test_cases = [
         GroupAdmissionTestCase {
-            description: "capacity two permits both sides of a cycle",
+            description: "capacity two admits both groups with every child limit",
             limits: &[("orders_limit", 2), ("inventory_limit", 2)],
             parents: &[
                 AdmissionParent {
@@ -253,10 +358,9 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 },
             ],
             expected_running: 2,
-            reductions: &[&[("orders_limit", 1), ("inventory_limit", 1)]],
         },
         GroupAdmissionTestCase {
-            description: "asymmetric capacity still has a safe completion order",
+            description: "a group waits while another holds the limit its child needs",
             limits: &[("orders_limit", 2), ("inventory_limit", 1)],
             parents: &[
                 AdmissionParent {
@@ -268,11 +372,10 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                     children: &[&["orders_limit"]],
                 },
             ],
-            expected_running: 2,
-            reductions: &[],
+            expected_running: 1,
         },
         GroupAdmissionTestCase {
-            description: "three-way cycle leaves one parent waiting",
+            description: "a three-way cycle admits one group at a time",
             limits: &[
                 ("orders_limit", 1),
                 ("inventory_limit", 1),
@@ -292,11 +395,10 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                     children: &[&["orders_limit"]],
                 },
             ],
-            expected_running: 2,
-            reductions: &[],
+            expected_running: 1,
         },
         GroupAdmissionTestCase {
-            description: "a free first stage does not conceal a later cycle",
+            description: "a later stage's limit is taken before the first stage runs",
             limits: &[("orders_limit", 1), ("inventory_limit", 1)],
             parents: &[
                 AdmissionParent {
@@ -309,10 +411,9 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 },
             ],
             expected_running: 1,
-            reductions: &[],
         },
         GroupAdmissionTestCase {
-            description: "a persistently blocked child lets its parent's peer drain shared limits",
+            description: "a group holding every child limit excludes its peer until it finishes",
             limits: &[
                 ("orders_limit", 1),
                 ("inventory_limit", 1),
@@ -328,11 +429,10 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                     children: &[&["products_limit"]],
                 },
             ],
-            expected_running: 2,
-            reductions: &[],
+            expected_running: 1,
         },
         GroupAdmissionTestCase {
-            description: "multiple parent limits do not hoist independent child limits",
+            description: "a group's child limits are taken with its own limits",
             limits: &[
                 ("orders_limit", 1),
                 ("inventory_limit", 1),
@@ -353,8 +453,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                     children: &[&["orders_limit"]],
                 },
             ],
-            expected_running: 2,
-            reductions: &[],
+            expected_running: 1,
         },
     ];
     for test_case in test_cases {
@@ -398,7 +497,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 }
                 input.documents.insert("jobs".into(), json!(jobs));
                 input.documents.insert("groups".into(), json!(groups));
-                let published = publish_snapshot(store, &input)
+                publish_snapshot(store, &input)
                     .await
                     .expect("publish groups");
                 let lease = acquire_lease(store, Uuid::now_v7())
@@ -421,7 +520,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                         store,
                         &actor,
                         &JobRunRequest {
-                            // Higher-priority arrivals exercise safety, not only an older waiter's priority barrier.
+                            // Higher-priority arrivals contend with groups that already hold their limits.
                             run_id: Uuid::from_u128(1000 - index as u128),
                             location_id: location,
                             target: "development".into(),
@@ -438,7 +537,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                         advance_groups(&replica, &lease, (&limits, scope))
                     );
                     first.expect("first scheduler admits higher-priority arrival");
-                    second.expect("replica cannot admit an unsafe arrival");
+                    second.expect("replica admits only within limits");
                 }
                 for _ in 0..test_case.parents.len() {
                     let (first, second) = tokio::join!(
@@ -458,38 +557,6 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                     "{} {backend:?}",
                     test_case.description
                 );
-                let before = slot_counts(store).await;
-                for reduction in test_case.reductions {
-                    let reduced = reduction
-                        .iter()
-                        .map(|(key, count)| {
-                            (
-                                (*key).into(),
-                                NonZeroU32::new(*count).expect("positive reduction"),
-                            )
-                        })
-                        .collect();
-                    assert!(
-                        claim_next_run(&replica, &lease, &reduced, Some(scope))
-                            .await
-                            .expect("unsafe parent state must not fail physical dispatch")
-                            .is_none()
-                    );
-                    assert_eq!(
-                        slot_counts(store).await,
-                        before,
-                        "blocked work cannot mutate claims"
-                    );
-                    let unrelated =
-                        request((location, published.snapshot_id), 777, 1, &["products"]);
-                    queue(store, &unrelated).await;
-                    let claim = claim_next_run(&replica, &lease, &reduced, Some(scope))
-                        .await
-                        .expect("unrelated recovery progress")
-                        .expect("unrelated work still dispatches");
-                    assert_eq!(claim.request.run_id, unrelated.run_id);
-                    succeed(store, &claim).await;
-                }
                 for iteration in 0..child_count {
                     let owner = [store, &replica][iteration % 2];
                     for _ in 0..test_case.parents.len() {
@@ -521,10 +588,7 @@ fn given_capacity_and_multistage_cycles_when_replicas_admit_and_resume_groups_th
                 let finished = list_runs(&replica, scope, 100)
                     .await
                     .expect("finished groups");
-                assert_eq!(
-                    finished.len(),
-                    test_case.parents.len() + child_count + test_case.reductions.len()
-                );
+                assert_eq!(finished.len(), test_case.parents.len() + child_count);
                 assert!(
                     finished.iter().all(|run| run.status == RunStatus::Success),
                     "{} {finished:?}",

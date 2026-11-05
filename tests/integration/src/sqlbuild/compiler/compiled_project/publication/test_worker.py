@@ -247,7 +247,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
     ],
     ids=lambda case: case.description,
 )
-def test_given_opposing_group_limits_when_scheduled_then_both_real_workers_finish_without_hoisting_limits(
+def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_limit_and_both_finish(
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
@@ -264,9 +264,9 @@ def test_given_opposing_group_limits_when_scheduled_then_both_real_workers_finis
                 "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key ORDER BY r.job_key"
             ).fetchall() == [
                 ("annual_inventory", "inventory_limit", 1),
+                ("annual_inventory", "orders_limit", 1),
+                ("annual_orders", "inventory_limit", 1),
                 ("annual_orders", "orders_limit", 1),
-                ("inventory_job", "orders_limit", 1),
-                ("orders_job", "inventory_limit", 1),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE status='success'"
