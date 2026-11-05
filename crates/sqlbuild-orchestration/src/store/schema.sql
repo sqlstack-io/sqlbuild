@@ -139,10 +139,9 @@ CREATE TABLE sqb_ticks (
     scheduled_for {time} NOT NULL,
     evaluated_at {time} NOT NULL,
     epoch BIGINT NOT NULL,
-    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'skipped', 'covered', 'failed')),
+    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'covered')),
     run_id {uuid},
     covered_by_run_id {uuid},
-    reason TEXT,
     UNIQUE (trigger_id, scheduled_for)
 );
 CREATE INDEX sqb_ticks_trigger_time ON sqb_ticks(trigger_id, scheduled_for);
@@ -166,7 +165,7 @@ CREATE TABLE sqb_runs (
     request_json {json} NOT NULL,
     write_set_digest TEXT NOT NULL,
     rewrite_history BOOLEAN NOT NULL DEFAULT FALSE,
-    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled', 'presumed_failed')),
+    status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled')),
     status_reason TEXT,
     queued_at {time} NOT NULL,
     launched_at {time},
@@ -186,7 +185,6 @@ CREATE INDEX sqb_runs_active ON sqb_runs(location_id, target, job_key) WHERE sta
 CREATE TABLE sqb_run_nodes (
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
     node_key TEXT NOT NULL,
-    attempt BIGINT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'success', 'warn', 'failed', 'skipped', 'cancelled')),
     writes BOOLEAN NOT NULL,
     started_at {time},
@@ -196,7 +194,7 @@ CREATE TABLE sqb_run_nodes (
     skipped_because_of TEXT,
     kind TEXT NOT NULL DEFAULT 'node' CHECK (kind IN ('node', 'check')),
     finished_storage_id BIGINT,
-    PRIMARY KEY (run_id, node_key, attempt)
+    PRIMARY KEY (run_id, node_key)
 );
 CREATE INDEX sqb_run_nodes_node ON sqb_run_nodes(node_key, run_id);
 CREATE INDEX sqb_run_nodes_finished ON sqb_run_nodes(finished_storage_id)
@@ -316,7 +314,7 @@ CREATE TABLE sqb_run_requests (
     PRIMARY KEY (trigger_id, run_key)
 );
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
-WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'presumed_failed');
+WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled');
 CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
 CREATE TABLE sqb_warehouse_freshness (
     event_id {uuid} PRIMARY KEY,
@@ -557,7 +555,7 @@ CREATE TABLE sqb_cli_login_flows (
 );
 CREATE INDEX sqb_cli_login_expiry ON sqb_cli_login_flows(expires_at);
 CREATE INDEX IF NOT EXISTS sqb_runs_tick ON sqb_runs(tick_id);
-CREATE INDEX IF NOT EXISTS sqb_ticks_expiry ON sqb_ticks(scheduled_for) WHERE outcome IN ('skipped', 'covered');
+CREATE INDEX IF NOT EXISTS sqb_ticks_expiry ON sqb_ticks(scheduled_for) WHERE outcome = 'covered';
 CREATE INDEX IF NOT EXISTS sqb_runs_snapshot ON sqb_runs(snapshot_id);
 CREATE INDEX IF NOT EXISTS sqb_snapshot_nodes_hash ON sqb_snapshot_nodes(node_hash);
 CREATE INDEX IF NOT EXISTS sqb_snapshot_sources_hash ON sqb_snapshot_sources(text_hash);

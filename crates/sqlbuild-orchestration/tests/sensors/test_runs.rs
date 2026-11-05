@@ -38,12 +38,12 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
         SensorTestCase {
             description: "SQLite terminal outcome sensor recovery",
             backend: Backend::Sqlite,
-            expected_runs: 106,
+            expected_runs: 104,
         },
         SensorTestCase {
             description: "PostgreSQL terminal outcome sensor recovery",
             backend: Backend::Postgres,
-            expected_runs: 106,
+            expected_runs: 104,
         },
     ];
     for test_case in test_cases {
@@ -77,7 +77,6 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 "partial",
                 "failed",
                 "cancelled",
-                "presumed_failed",
             ];
             let mut sensors = serde_json::Map::new();
             for job_key in ["orders", "daily_orders"] {
@@ -136,11 +135,6 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     "cancelled",
                     RunOutcome::Cancelled,
                     [NodeOutcome::Cancelled, NodeOutcome::Cancelled],
-                ),
-                (
-                    "presumed_failed",
-                    RunOutcome::PresumedFailed,
-                    [NodeOutcome::Failed, NodeOutcome::Failed],
                 ),
             ];
             for (selector, outcome, nodes) in outcomes {

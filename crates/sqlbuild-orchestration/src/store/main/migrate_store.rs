@@ -15,15 +15,15 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
     let mut transaction = begin(store, TransactionMode::Write).await?;
     (transaction, _) = query(transaction, &render(store,
         "CREATE TABLE IF NOT EXISTS sqb_schema_version (singleton BIGINT PRIMARY KEY CHECK (singleton = 1), \
-         checksum TEXT NOT NULL, min_server_version TEXT NOT NULL, applied_at {time} NOT NULL)"), vec![]).await?;
+         checksum TEXT NOT NULL, applied_at {time} NOT NULL)"), vec![]).await?;
     let (mut transaction, rows) = query(
         transaction,
-        "SELECT checksum, min_server_version FROM sqb_schema_version",
+        "SELECT checksum FROM sqb_schema_version",
         vec![],
     )
     .await?;
     let digest = schema_digest(store);
-    let current = verify_schema(&rows, &digest)?;
+    verify_schema(&rows, &digest)?;
     if rows.is_empty() {
         for statement in recall_schema(store) {
             (transaction, _) = query(transaction, &statement, vec![]).await?;
@@ -41,13 +41,8 @@ pub async fn migrate_store(store: &ControlStore) -> Result<(), ControlError> {
             vec![Parameter::Id(Uuid::now_v7()), Parameter::Time(now)]).await?;
         (transaction, _) = query(
             transaction,
-            "INSERT INTO sqb_schema_version (singleton, checksum, min_server_version, applied_at) \
-             VALUES (1, $1, $2, $3)",
-            vec![
-                Parameter::Text(digest),
-                Parameter::Text(current.to_string()),
-                Parameter::Time(now),
-            ],
+            "INSERT INTO sqb_schema_version (singleton, checksum, applied_at) VALUES (1, $1, $2)",
+            vec![Parameter::Text(digest), Parameter::Time(now)],
         )
         .await?;
     }

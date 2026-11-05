@@ -19,7 +19,6 @@ getrandom.workspace = true
 openidconnect.workspace = true
 reqwest.workspace = true
 rusqlite.workspace = true
-semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlbuild-core.workspace = true

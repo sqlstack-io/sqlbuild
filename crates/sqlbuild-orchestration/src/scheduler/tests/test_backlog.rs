@@ -42,7 +42,6 @@ fn given_a_backlog_larger_than_two_batches_when_drained_then_latest_is_current_a
             let plan = plan_ticks(
                 &TickState {
                     trigger_id: Uuid::from_u128(19),
-                    enabled: true,
                     last_tick_for: cursor,
                     due_times,
                     continuation,

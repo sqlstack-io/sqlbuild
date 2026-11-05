@@ -60,7 +60,6 @@ pub enum RunStatus {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunStatus {
@@ -190,7 +189,6 @@ impl NodeOutcome {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunNodeRecord {
     pub node_key: String,
-    pub attempt: i64,
     pub status: String,
     pub started_at: Option<DateTime<Utc>>,
     pub ended_at: Option<DateTime<Utc>>,
@@ -234,7 +232,6 @@ pub enum RunOutcome {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunOutcome {
@@ -246,7 +243,6 @@ impl RunOutcome {
             Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
-            Self::PresumedFailed => "presumed_failed",
         }
     }
 }

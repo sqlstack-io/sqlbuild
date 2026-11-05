@@ -279,16 +279,10 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let recovered = publish_snapshot(&store, &input)
         .await
         .expect("retry publication");
-    for case in [
-        SchemaRejectionCase {
-            description: "minimum server version is newer",
-            update_sql: "UPDATE sqb_schema_version SET min_server_version='9999.0.0'",
-        },
-        SchemaRejectionCase {
-            description: "schema checksum changed",
-            update_sql: "UPDATE sqb_schema_version SET min_server_version='0.0.0', checksum='different'",
-        },
-    ] {
+    for case in [SchemaRejectionCase {
+        description: "schema checksum changed",
+        update_sql: "UPDATE sqb_schema_version SET checksum='different'",
+    }] {
         connection
             .execute_batch(case.update_sql)
             .expect("apply synthetic schema incompatibility");

@@ -89,7 +89,7 @@ pub(crate) async fn prune_ticks(
         (transaction, rows) = query(
             transaction,
             "DELETE FROM sqb_ticks WHERE tick_id IN (SELECT k.tick_id FROM sqb_ticks k \
-             WHERE k.outcome IN ('skipped','covered') AND k.scheduled_for<$1 \
+             WHERE k.outcome='covered' AND k.scheduled_for<$1 \
              AND k.scheduled_for<(SELECT MAX(l.scheduled_for) FROM sqb_ticks l WHERE l.trigger_id=k.trigger_id) \
              AND NOT EXISTS (SELECT 1 FROM sqb_runs r WHERE r.tick_id=k.tick_id) \
              ORDER BY k.scheduled_for, k.tick_id LIMIT $2) RETURNING trigger_id",

@@ -1236,7 +1236,7 @@ export interface components {
             request: components["schemas"]["RunRequest"];
         };
         /** @enum {string} */
-        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
         /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
@@ -1253,8 +1253,6 @@ export interface components {
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
         RunNodeRecord: {
-            /** Format: int64 */
-            attempt: number;
             /** Format: date-time */
             ended_at?: string | null;
             error_code?: string | null;
@@ -1272,7 +1270,7 @@ export interface components {
          * @description Terminal outcomes cannot be confused with a request to change an active status.
          * @enum {string}
          */
-        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
         RunRecord: {
             /** Format: date-time */
             ended_at?: string | null;
@@ -1333,7 +1331,7 @@ export interface components {
             write_set: string[];
         };
         /** @enum {string} */
-        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled" | "presumed_failed";
+        RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
         /** @description Inclusive typed CLI cursor bounds; the native planner derives exclusive execution ends. */
         RunWindow: {
             /** Format: date-time */
@@ -1518,7 +1516,7 @@ export interface components {
          */
         Table: "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts";
         /** @enum {string} */
-        TickOutcome: "requested" | "skipped" | "covered" | "failed";
+        TickOutcome: "requested" | "covered";
         TickRecord: {
             /** Format: uuid */
             covered_by_run_id?: string | null;
@@ -1527,7 +1525,6 @@ export interface components {
             /** Format: date-time */
             evaluated_at: string;
             outcome: components["schemas"]["TickOutcome"];
-            reason?: string | null;
             /** Format: uuid */
             run_id?: string | null;
             /** Format: date-time */
