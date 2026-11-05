@@ -129,7 +129,7 @@ pub(crate) fn router(
         .route("/api/auth/password/login", post(login))
         .merge(super::cli_login::router(BrowserLoginMethod::Password))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
-        .layer(middleware::from_fn_with_state(store.clone(), guard))
+        .layer(middleware::from_fn(guard))
         .layer(Extension(origin)))
 }
 
@@ -226,12 +226,12 @@ pub(crate) async fn change_password(
     )
     .await?;
     if !allowed {
-        return deny(&store, &context, "reauthentication_throttled").await;
+        return deny(&context);
     }
     let Some(proof) =
         verify_password(&store, identity.principal_id, &request.current_password).await?
     else {
-        return deny(&store, &context, "invalid_current_password").await;
+        return deny(&context);
     };
     set_password(
         &store,
