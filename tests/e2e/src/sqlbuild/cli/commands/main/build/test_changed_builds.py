@@ -127,6 +127,7 @@ def test_given_models_calling_functions_when_building_with_changed_then_only_cha
             expected_ran=(
                 ("nothing changed", frozenset({"unqualified_customer_reader"})),
                 ("customers redefined", frozenset({"customers", "unqualified_customer_reader"})),
+                ("customers settled", frozenset({"unqualified_customer_reader"})),
             ),
         )
     ],
@@ -148,6 +149,9 @@ def test_given_an_unqualified_name_matching_two_relations_when_building_with_cha
         encoding="utf-8",
     )
     redefined: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    # Nothing orders the reader after the undeclared `customers`, so it may read it before the
+    # rebuild; it runs on every `--changed` build, so the next one reads the settled model.
+    settled: frozenset[str] = run_changed_build(project_dir, ("--changed",))
     modelled: list[tuple[object, ...]] = test_case.warehouse.execute(
         project_dir / test_case.warehouse.warehouse_file,
         "SELECT modelled FROM main.unqualified_customer_reader",
@@ -156,6 +160,7 @@ def test_given_an_unqualified_name_matching_two_relations_when_building_with_cha
     assert (
         ("nothing changed", nothing_changed),
         ("customers redefined", redefined),
+        ("customers settled", settled),
     ) == test_case.expected_ran
     assert modelled == [(0,)]
 
