@@ -160,7 +160,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     "concurrent self-removal leaves one administrator"
                 );
                 let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("inspect remaining admins"),
-                    "SELECT COUNT(*) AS count FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) WHERE a.role_key='admin' AND a.revoked_at IS NULL AND p.disabled_at IS NULL",vec![]).await.expect("count remaining admins");
+                    "SELECT COUNT(*) AS count FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) WHERE a.role_key='admin' AND p.disabled_at IS NULL",vec![]).await.expect("count remaining admins");
                 assert_eq!(rows[0]["count"], json!(1));
                 commit(transaction)
                     .await

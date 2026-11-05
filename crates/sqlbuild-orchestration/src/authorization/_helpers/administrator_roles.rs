@@ -110,13 +110,16 @@ async fn assign_scoped_role(
     ))
     .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let assignment_id = Uuid::now_v7();
-    let now = transaction.now;
     let (mut transaction, changed) = if request.revoke {
-        query(transaction, "UPDATE sqb_role_assignments SET revoked_at=$1,revoked_by=$2,active_key=NULL WHERE active_key=$3 RETURNING assignment_id",
-            vec![Parameter::Time(now),Parameter::Text(context.actor.clone()),Parameter::Text(key)]).await?
+        query(
+            transaction,
+            "DELETE FROM sqb_role_assignments WHERE active_key=$1 RETURNING assignment_id",
+            vec![Parameter::Text(key)],
+        )
+        .await?
     } else {
-        query(transaction, "INSERT INTO sqb_role_assignments (assignment_id,principal_id,role_key,location_id,target,source,granted_by,granted_at,active_key) VALUES ($1,$2,$3,$4,$5,'manual',$6,$7,$8) ON CONFLICT (active_key) DO NOTHING RETURNING assignment_id",
-            vec![Parameter::Id(assignment_id),Parameter::Id(request.principal_id),Parameter::Text(role.as_str().unwrap_or_default().into()),Parameter::OptionalId(request.location_id),Parameter::OptionalText(request.target.clone()),Parameter::Text(context.actor.clone()),Parameter::Time(now),Parameter::Text(key)]).await?
+        query(transaction, "INSERT INTO sqb_role_assignments (assignment_id,principal_id,role_key,location_id,target,active_key) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (active_key) DO NOTHING RETURNING assignment_id",
+            vec![Parameter::Id(assignment_id),Parameter::Id(request.principal_id),Parameter::Text(role.as_str().unwrap_or_default().into()),Parameter::OptionalId(request.location_id),Parameter::OptionalText(request.target.clone()),Parameter::Text(key)]).await?
     };
     let applied = !changed.is_empty();
     if applied {

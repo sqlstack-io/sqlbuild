@@ -94,8 +94,13 @@ fn given_lost_administrator_access_when_grant_admin_runs_online_then_authority_a
             )
             .await
             .expect("disable administrator");
-            let now = transaction.now;
-            let (transaction, _) = query(transaction, "UPDATE sqb_role_assignments SET revoked_at=$1,active_key=NULL WHERE principal_id=$2", vec![Parameter::Time(now), Parameter::Id(principal)]).await.expect("lose administrator assignment");
+            let (transaction, _) = query(
+                transaction,
+                "DELETE FROM sqb_role_assignments WHERE principal_id=$1",
+                vec![Parameter::Id(principal)],
+            )
+            .await
+            .expect("lose administrator assignment");
             commit(transaction).await.expect("commit simulated loss");
             let revision = security_event_count(&fixture.store)
                 .await
@@ -127,7 +132,7 @@ fn given_lost_administrator_access_when_grant_admin_runs_online_then_authority_a
                     revision
                 );
                 let (transaction, rows) = query(begin(&fixture.store, TransactionMode::Read).await.expect("inspect rollback"),
-                    "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL) AS disabled, (SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL) AS roles, (SELECT COUNT(*) FROM sqb_sessions WHERE revoked_at IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted') AS recovered", vec![]).await.expect("rollback counts");
+                    "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL) AS disabled, (SELECT COUNT(*) FROM sqb_role_assignments) AS roles, (SELECT COUNT(*) FROM sqb_sessions WHERE revoked_at IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted') AS recovered", vec![]).await.expect("rollback counts");
                 assert_eq!(
                     serde_json::to_value(&rows[0]).expect("row"),
                     json!({"disabled":1,"roles":0,"sessions":2,"recovered":0})

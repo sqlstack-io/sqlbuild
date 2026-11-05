@@ -16,27 +16,41 @@ use crate::store::models::{ControlTransaction, Parameter};
 pub(crate) async fn request_retry(
     transaction: ControlTransaction,
     context: &AuditContext,
-    (run_id, event_id, request): (Uuid, Uuid, &serde_json::Value),
+    (run_id, request): (Uuid, &serde_json::Value),
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let (transaction, previous) = query(
         transaction,
-        "SELECT a.actor, a.after_json FROM sqb_runs r LEFT JOIN sqb_security_audit a ON a.event_id=$1 WHERE r.run_id=$2",
-        vec![Parameter::Id(event_id), Parameter::Id(run_id)],
-    ).await?;
+        "SELECT authored_json FROM sqb_runs WHERE run_id=$1",
+        vec![Parameter::Id(run_id)],
+    )
+    .await?;
     let Some(previous) = previous.first() else {
         return Ok((transaction, false));
     };
-    if previous.get("actor") != Some(&json!(context.actor))
-        || previous
-            .get("after_json")
-            .and_then(|after| after.get("request"))
-            != Some(request)
-    {
+    if previous["authored_json"] != json!({"actor": context.actor, "request": request}) {
         return Err(ControlError::Invalid(
             "run ID already has different request content".into(),
         ));
     }
     Ok((transaction, true))
+}
+
+/// Keep who asked for a manual run and exactly what they sent, for retries of the same run ID.
+pub(crate) async fn record_authored(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (run_id, request): (Uuid, &serde_json::Value),
+) -> Result<ControlTransaction, ControlError> {
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_runs SET authored_json=$1 WHERE run_id=$2",
+        vec![
+            Parameter::Json(json!({"actor": context.actor, "request": request})),
+            Parameter::Id(run_id),
+        ],
+    )
+    .await?;
+    Ok(transaction)
 }
 
 pub(crate) async fn publish_request(

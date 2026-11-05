@@ -147,6 +147,7 @@ CREATE TABLE sqb_runs (
     priority BIGINT NOT NULL DEFAULT 0,
     selection_json {json} NOT NULL,
     request_json {json} NOT NULL,
+    authored_json {json},
     write_set_digest TEXT NOT NULL,
     rewrite_history BOOLEAN NOT NULL DEFAULT FALSE,
     status TEXT NOT NULL CHECK (status IN ('queued', 'launched', 'running', 'unresponsive', 'success', 'warn', 'partial', 'failed', 'cancelled')),
@@ -382,12 +383,7 @@ CREATE TABLE sqb_role_assignments (
     role_key TEXT NOT NULL,
     location_id {uuid} REFERENCES sqb_locations(location_id),
     target TEXT,
-    source TEXT NOT NULL,
-    granted_by TEXT NOT NULL,
-    granted_at {time} NOT NULL,
-    revoked_by TEXT,
-    revoked_at {time},
-    active_key TEXT UNIQUE
+    active_key TEXT NOT NULL UNIQUE
 );
 CREATE INDEX sqb_role_assignments_principal ON sqb_role_assignments(principal_id);
 CREATE INDEX sqb_fingerprints_namespace ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);

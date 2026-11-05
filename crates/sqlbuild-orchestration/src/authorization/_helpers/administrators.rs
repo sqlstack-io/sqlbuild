@@ -28,13 +28,17 @@ pub(crate) async fn grant_installation_admin(
         ));
     }
     let assignment_id = Uuid::now_v7();
-    let now = transaction.now;
-    let (mut transaction, rows) = query(transaction,
-        "INSERT INTO sqb_role_assignments (assignment_id,principal_id,role_key,source,granted_by,granted_at,active_key) \
-         VALUES ($1,$2,'admin',$3,$4,$5,$6) ON CONFLICT (active_key) DO NOTHING RETURNING assignment_id",
-        vec![Parameter::Id(assignment_id), Parameter::Id(principal_id), Parameter::Text(source.into()),
-            Parameter::Text(context.actor.clone()), Parameter::Time(now),
-            Parameter::Text(format!("{principal_id}:admin:installation"))]).await?;
+    let (mut transaction, rows) = query(
+        transaction,
+        "INSERT INTO sqb_role_assignments (assignment_id,principal_id,role_key,active_key) \
+         VALUES ($1,$2,'admin',$3) ON CONFLICT (active_key) DO NOTHING RETURNING assignment_id",
+        vec![
+            Parameter::Id(assignment_id),
+            Parameter::Id(principal_id),
+            Parameter::Text(format!("{principal_id}:admin:installation")),
+        ],
+    )
+    .await?;
     let applied = !rows.is_empty();
     if applied {
         transaction = append_audit(
@@ -60,7 +64,7 @@ pub(crate) async fn remaining_administrator(
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let (transaction, rows) = query(transaction,
         "SELECT COUNT(*) AS administrators FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
-         WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL AND a.revoked_at IS NULL \
+         WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL \
          AND p.disabled_at IS NULL AND p.principal_id<>$1",
         vec![Parameter::Id(principal_id)]).await?;
     Ok((

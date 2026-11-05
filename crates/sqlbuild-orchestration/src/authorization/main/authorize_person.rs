@@ -62,7 +62,7 @@ pub(crate) async fn authorize_person(
     let (transaction, rows) = query(transaction,
         "SELECT a.role_key,a.location_id,a.target,e.resolved_grants_json FROM sqb_role_assignments a \
          LEFT JOIN sqb_effective_roles e ON e.location_id=a.location_id AND e.role_key=a.role_key AND e.target=$2 \
-         WHERE a.principal_id=$1 AND a.revoked_at IS NULL ORDER BY a.role_key",
+         WHERE a.principal_id=$1 ORDER BY a.role_key",
         vec![Parameter::Id(principal_id), Parameter::OptionalText(scope.target.clone())]).await?;
     for row in rows {
         let allowed = serde_json::from_value::<BuiltinRole>(row["role_key"].clone()).map_or_else(

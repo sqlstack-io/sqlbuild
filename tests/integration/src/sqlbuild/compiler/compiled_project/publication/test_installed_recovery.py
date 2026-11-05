@@ -75,7 +75,7 @@ def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_per
     )
     state_sql: str = (
         "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL),"
-        "(SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL),"
+        "(SELECT COUNT(*) FROM sqb_role_assignments),"
         "(SELECT COUNT(*) FROM sqb_sessions WHERE revoked_at IS NULL),"
         "(SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted')"
     )
@@ -116,8 +116,7 @@ def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_per
                     (principal,),
                 )
                 control.execute(
-                    "UPDATE sqb_role_assignments SET revoked_at=now(),active_key=NULL "
-                    "WHERE principal_id=%s",
+                    "DELETE FROM sqb_role_assignments WHERE principal_id=%s",
                     (principal,),
                 )
                 assert control.execute(state_sql).fetchone() == (1, 0, 2, 0)

@@ -28,7 +28,7 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         let ordinary = administer(&control,&["create-principal","orders-reader"]);
         assert_eq!(first["role"],"admin");
         let connection = rusqlite::Connection::open(control.directory.path().join(".sqlbuild/control.sqlite3")).expect("inspect initialization");
-        let (count,id): (i64,String) = connection.query_row("SELECT COUNT(*),MIN(principal_id) FROM sqb_role_assignments WHERE role_key='admin' AND revoked_at IS NULL",[],|row| Ok((row.get(0)?,row.get(1)?))).expect("initial administrator membership");
+        let (count,id): (i64,String) = connection.query_row("SELECT COUNT(*),MIN(principal_id) FROM sqb_role_assignments WHERE role_key='admin'",[],|row| Ok((row.get(0)?,row.get(1)?))).expect("initial administrator membership");
         assert_eq!(count,test_case.expected_administrators,"{}",test_case.description);
         assert_eq!(id,first["principal_id"].as_str().expect("initial administrator UUID"));
         assert_ne!(id,ordinary["principal_id"].as_str().expect("ordinary person UUID"));
