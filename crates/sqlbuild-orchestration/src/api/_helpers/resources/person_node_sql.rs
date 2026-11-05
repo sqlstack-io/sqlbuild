@@ -1,13 +1,12 @@
 //! SQL-only inspection uses live person grants, not the machine snapshot endpoint.
 
 use axum::extract::{Path, State};
-use axum::http::HeaderMap;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::password_transport::session_credentials;
 use crate::api::errors::ApiError;
 use crate::credentials::models::AuditContext;
+use crate::credentials::models::SessionIdentity;
 use crate::snapshots::main::read_person_node_sql::read_person_node_sql;
 use crate::snapshots::models::NodeSql;
 use crate::store::models::ControlStore;
@@ -19,12 +18,12 @@ use crate::store::models::ControlStore;
 pub(crate) async fn read(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target, node_key)): Path<(Uuid, String, String)>,
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<Option<NodeSql>>, ApiError> {
     Ok(Json(
         read_person_node_sql(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, &node_key),
         )
         .await?,

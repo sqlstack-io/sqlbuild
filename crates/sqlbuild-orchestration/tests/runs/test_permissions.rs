@@ -118,7 +118,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         };
                         sessions.push(session);
                     }
-                    let credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+                    let credentials = sessions[1].identity.principal_id;
                     let location_id = create_location(store, "orders", "test-owner")
                         .await
                         .expect("location");
@@ -157,10 +157,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     assert!(
                         assign_builtin_role(
                             store,
-                            (
-                                &context,
-                                (sessions[0].bearer.as_str(), sessions[0].csrf.as_str())
-                            ),
+                            (&context, sessions[0].identity.principal_id),
                             &assignment
                         )
                         .await
@@ -290,15 +287,6 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                                 "denial must be authorization, not invalid input"
                             );
                         }
-                        assert!(matches!(
-                            request_rerun(
-                                store,
-                                (&context, Some((credentials.0, "wrong-csrf"))),
-                                &rerun
-                            )
-                            .await,
-                            Err(ControlError::Denied { .. })
-                        ));
                         reruns.push(rerun);
                     }
                     let mut adhoc = crate::runs::tests::helpers::request(
@@ -315,10 +303,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         .expect("owner requests ad-hoc execution");
                     cancel_person_run(
                         store,
-                        (
-                            &context,
-                            (sessions[0].bearer.as_str(), sessions[0].csrf.as_str()),
-                        ),
+                        (&context, sessions[0].identity.principal_id),
                         &CancelRunRequest {
                             run_id: adhoc.run_id,
                             event_id: Uuid::now_v7(),
@@ -357,13 +342,11 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             + usize::from(can_rerun_adhoc),
                         "owner sources plus allowed manual/rerun jobs and expanded groups only"
                     );
-                    let administrator_credentials =
-                        (sessions[0].bearer.as_str(), sessions[0].csrf.as_str());
+                    let administrator_credentials = sessions[0].identity.principal_id;
                     assert!(
                         change_administrator(
                             store,
-                            &context,
-                            administrator_credentials,
+                            (&context, administrator_credentials),
                             (person, AdministratorChange::Disable),
                         )
                         .await
@@ -384,8 +367,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     assert!(
                         change_administrator(
                             store,
-                            &context,
-                            administrator_credentials,
+                            (&context, administrator_credentials),
                             (person, AdministratorChange::Enable),
                         )
                         .await

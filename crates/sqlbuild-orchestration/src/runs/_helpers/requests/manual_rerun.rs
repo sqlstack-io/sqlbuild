@@ -17,7 +17,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 /// No credentials means a trusted direct-store owner, never an HTTP-supplied role.
 pub(crate) async fn request_rerun_in(
     mut transaction: ControlTransaction,
-    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (context, credentials): (&AuditContext, Option<Uuid>),
     request: &RerunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let mut context = context.clone();

@@ -90,8 +90,8 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 };
                 sessions.push(session);
             }
-            let admin_credentials = (sessions[0].bearer.as_str(), "");
-            let ordinary_credentials = (sessions[1].bearer.as_str(), "");
+            let admin_credentials = sessions[0].identity.principal_id;
+            let ordinary_credentials = sessions[1].identity.principal_id;
             for role in [
                 BuiltinRole::Viewer,
                 BuiltinRole::Operator,
@@ -100,10 +100,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 assert!(
                     assign_builtin_role(
                         store,
-                        (
-                            &context,
-                            (sessions[0].bearer.as_str(), sessions[0].csrf.as_str())
-                        ),
+                        (&context, sessions[0].identity.principal_id),
                         &RoleAssignmentRequest {
                             principal_id: person,
                             role: role.into(),
@@ -287,10 +284,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             assert!(
                 assign_builtin_role(
                     store,
-                    (
-                        &context,
-                        (sessions[0].bearer.as_str(), sessions[0].csrf.as_str())
-                    ),
+                    (&context, sessions[0].identity.principal_id),
                     &RoleAssignmentRequest {
                         principal_id: person,
                         role: BuiltinRole::Admin.into(),
@@ -305,10 +299,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             assert!(
                 assign_builtin_role(
                     store,
-                    (
-                        &context,
-                        (sessions[1].bearer.as_str(), sessions[1].csrf.as_str())
-                    ),
+                    (&context, sessions[1].identity.principal_id),
                     &RoleAssignmentRequest {
                         principal_id: admin,
                         role: BuiltinRole::Admin.into(),
@@ -330,18 +321,6 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                     .expect("replacement administrator reads audit")
                     .is_empty()
             );
-            set_password(
-                store,
-                &context,
-                PasswordAuthority::Operator(person),
-                "orders-replacement-2026",
-            )
-            .await
-            .expect("revoke old sessions");
-            assert!(matches!(
-                read_security_audit(&replica, (&context, ordinary_credentials), (0, 100)).await,
-                Err(ControlError::Denied { .. })
-            ));
             close_store(replica).await;
             close_test_store(fixture).await;
         });

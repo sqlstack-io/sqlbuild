@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
@@ -16,7 +16,7 @@ use crate::store::models::ControlTransaction;
 
 pub(crate) async fn request_job_run_in(
     mut transaction: ControlTransaction,
-    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (context, credentials): (&AuditContext, Option<Uuid>),
     request: &JobRunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let mut context = context.clone();
@@ -27,7 +27,7 @@ pub(crate) async fn request_job_run_in(
         nodes: Default::default(),
     };
     if let Some(credentials) = credentials {
-        (transaction, context) = authorize_session(
+        (transaction, context) = authorize_person(
             transaction,
             (&context, credentials),
             &scope,

@@ -1,6 +1,8 @@
 //! Person authority covers the effective frozen execution, including sensitive group children.
 
-use crate::authorization::main::authorize_session::authorize_session;
+use uuid::Uuid;
+
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::job::frozen_group_children;
 use crate::runs::models::{RunKind, RunRequest};
@@ -9,7 +11,7 @@ use crate::store::models::ControlTransaction;
 
 pub(crate) async fn authorize_execution(
     mut transaction: ControlTransaction,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (request, action): (&RunRequest, Action),
 ) -> Result<(ControlTransaction, AuditContext), ControlError> {
     let mut executions = vec![request.clone()];
@@ -25,7 +27,7 @@ pub(crate) async fn authorize_execution(
             .flat_map(|run| run.write_set.iter().cloned())
             .collect(),
     };
-    let (mut transaction, mut context) = authorize_session(
+    let (mut transaction, mut context) = authorize_person(
         transaction,
         (context, credentials),
         &scope,
@@ -34,7 +36,7 @@ pub(crate) async fn authorize_execution(
     .await?;
     if action == Action::RunRerun && request.kind == RunKind::Adhoc {
         scope.action = Action::RunAdhoc;
-        (transaction, context) = authorize_session(
+        (transaction, context) = authorize_person(
             transaction,
             (&context, credentials),
             &scope,
@@ -58,7 +60,7 @@ pub(crate) async fn authorize_execution(
             }))
     {
         scope.action = Action::RunRewriteHistory;
-        (transaction, context) = authorize_session(
+        (transaction, context) = authorize_person(
             transaction,
             (&context, credentials),
             &scope,

@@ -14,7 +14,7 @@ use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery, Statisti
 
 pub(crate) async fn statistics_retention(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     data: &Value,
 ) {
@@ -91,7 +91,7 @@ pub(crate) async fn statistics_retention(
 /// A shorter installation horizon hides and then deletes samples the default would keep.
 async fn configured_retention(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     data: &Value,
 ) {

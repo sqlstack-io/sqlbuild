@@ -281,14 +281,11 @@ def person_login(api: SnapshotApi, name: str) -> tuple[str, str]:
 def verify_connection_test_transport(
     api: SnapshotApi, path: str, body: dict[str, Any], administrator: tuple[str, str]
 ) -> None:
-    """Neither machine credentials, missing CSRF nor caller-supplied work cross the person API."""
+    """Machine credentials, CSRF-less writes and caller-supplied work never cross the person API."""
     for credentials in [("", ""), (administrator[0], "wrong-csrf")]:
         with pytest.raises(HTTPError) as denied:
             person_request(api, path, body=body, session=credentials)
         assert denied.value.code == 401
-    with pytest.raises(HTTPError) as denied:
-        person_read(api, path + "/" + body["request_id"], session=(administrator[0], "wrong-csrf"))
-    assert denied.value.code == 403
     with pytest.raises(HTTPError) as denied:
         urlopen(
             Request(

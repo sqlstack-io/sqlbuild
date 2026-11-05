@@ -1,6 +1,5 @@
 pub(crate) mod authenticate_bound_person;
 pub mod authenticate_session;
-pub(crate) mod authenticate_session_in;
 pub(crate) mod claim_oidc_flow;
 pub(crate) mod create_oidc_flow;
 pub mod login_password;

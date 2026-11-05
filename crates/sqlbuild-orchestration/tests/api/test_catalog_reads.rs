@@ -140,7 +140,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                     }
                 }
             }
-            let credentials = (&context, (sessions[1].bearer.as_str(), ""));
+            let credentials = (&context, sessions[1].identity.principal_id);
             let mut options = CatalogQuery {
                 database: None,
                 schema: "main".into(),
@@ -167,7 +167,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             };
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
             )
             .await
@@ -301,7 +301,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             assignment.revoke = true;
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
             )
             .await

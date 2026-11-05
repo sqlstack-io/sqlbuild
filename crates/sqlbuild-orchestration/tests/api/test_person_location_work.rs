@@ -77,7 +77,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 };
                 sessions.push(session);
             }
-            let credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+            let credentials = sessions[1].identity.principal_id;
             let location = create_location(store, "orders", "test-owner")
                 .await
                 .expect("location");
@@ -93,7 +93,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             };
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
             )
             .await
@@ -143,7 +143,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 assert!(
                     read_person_connection_test(
                         store,
-                        (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                        (&context, sessions[0].identity.principal_id),
                         (other, target, request.request_id)
                     )
                     .await
@@ -153,7 +153,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             }
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &RoleAssignmentRequest {
                     revoke: true,
                     ..assignment
