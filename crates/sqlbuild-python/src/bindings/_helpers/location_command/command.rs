@@ -24,10 +24,11 @@ use crate::bindings::_helpers::location_command::constants::{EXECUTE_ACTION, PUB
 use crate::bindings::_helpers::location_command::runtime::run_runtime;
 use crate::bindings::_helpers::location_command::snapshot::build_orchestration_snapshot;
 use crate::bindings::_helpers::location_command::worker::execute_worker;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
-use crate::bindings::_helpers::recall::console::{write_stderr, write_text};
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field;
@@ -301,7 +302,7 @@ pub(crate) fn run_location<'py>(
         let (record, _, _) = publish_location(py, &arguments)?;
         let output = serde_json::to_string(&record)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        write_text(py, "stdout", &format!("{output}\n")).map_err(|error| {
+        write_console(py, "stdout", &format!("{output}\n")).map_err(|error| {
             PyValueError::new_err(format!(
                 "Snapshot {} was published, but result delivery failed: {error}",
                 record.snapshot_id

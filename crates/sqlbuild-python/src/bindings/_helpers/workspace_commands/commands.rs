@@ -22,8 +22,8 @@ use sqlbuild_host::entries::models::FacadeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
-use crate::bindings::_helpers::recall::console::write_text;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -172,7 +172,7 @@ pub(crate) fn run_skills_command(
     for path in written {
         text.push_str(&format!("  {}\n", path.display()));
     }
-    write_text(py, "stdout", &text)?;
+    write_console(py, "stdout", &text)?;
     Ok(0)
 }
 
@@ -204,7 +204,7 @@ pub(crate) fn run_playground_command(py: Python<'_>, request: &Bound<'_, PyAny>)
         &skill_request(py, playground_project_dir(&target_dir, &template))?,
     )?;
     let use_color: bool = stdout_supports_color(py)?;
-    write_text(
+    write_console(
         py,
         "stdout",
         &playground_summary(&display_path, &template, CliStyle { use_color }),
