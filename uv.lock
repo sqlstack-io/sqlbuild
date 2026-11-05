@@ -1343,31 +1343,31 @@ wheels = [
 
 [[package]]
 name = "fensu"
-version = "0.28.0"
+version = "0.28.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fensu-cli" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/69/a132ffc407be97a0fdcfa052cb8b49408091db748e6afe0f7a6c77e6fa7d/fensu-0.28.0.tar.gz", hash = "sha256:11bcea3207f7fd92babc200f40d074e3da789ee11e7fc7024575a415de7c1176", size = 538990, upload-time = "2026-10-27T00:39:16.19Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8f/3d/d5b4fb0ad09426dae015af2817ba8416d2ea974a0c4a6ebea63112f90b1b/fensu-0.28.3.tar.gz", hash = "sha256:a7fc87cb60eaef964b4e980d19bd6de9c95cecc75c019d8b0058e02b6751f4b5", size = 539031, upload-time = "2026-11-01T09:41:23.715Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/59/e9/7434bd0565d54ff58796105728b3ccc8b838c7200997184978e6ebfdec4d/fensu-0.28.0-cp312-abi3-macosx_10_12_x86_64.whl", hash = "sha256:29df31aff900d20b0c845940af0cd91eead55e158a2511e682e3e887a22dada8", size = 4154207, upload-time = "2026-10-27T00:38:52.311Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/d8/e0875b269515d9a75643d5488bdc6f70a4b6c346995f12ce07304a3610f7/fensu-0.28.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:33a6d8b7d2f734c48f48087462c0e5a1ff94535c0e27e6a4820bc10303ff3653", size = 4004243, upload-time = "2026-10-27T00:38:54.994Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/05/b87c0ca5cf3f724517d6958f1ebd68948f9399306bd6d6814783635bad9a/fensu-0.28.0-cp312-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:de07b3fee5d908d2a766ca136753c8040d6fe25a1346d9b3b5a98483fc23d874", size = 4230192, upload-time = "2026-10-27T00:38:57.321Z" },
-    { url = "https://files.pythonhosted.org/packages/cb/d2/fdfc7fd322c3497c53c22754a33433e33678a6de84832fd41add09481a21/fensu-0.28.0-cp312-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f44293a2da6bf4558d00eb4f859b28f3fb69d396dad1c25ac466a92a7d1dd734", size = 4307267, upload-time = "2026-10-27T00:38:59.679Z" },
-    { url = "https://files.pythonhosted.org/packages/56/c0/2ab2c2c1af4ddd1b45c750679bd9f0b777d7eca3c0e00a233c991aaa13e7/fensu-0.28.0-cp312-abi3-win_amd64.whl", hash = "sha256:ffa88f1d259a1830d513ae930ff856d5b5e4941ba433889dea04d3db5753f281", size = 3977828, upload-time = "2026-10-27T00:39:01.761Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/a7/9493fbcf3158ae009651d19c7289855e8ef571dfaf5c7c77154a8a6a4a21/fensu-0.28.3-cp312-abi3-macosx_10_12_x86_64.whl", hash = "sha256:e3e3896f173d2bb676fe04defdd4ebdf4db38aee3ee6e57d7a5a297df32d7c5c", size = 4154274, upload-time = "2026-11-01T09:41:03.614Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/71/20fdb7147e268c5dbd9eae0fc9dd99641e416f9e75e8fd067ac089f6db78/fensu-0.28.3-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:d74db7466b2ddd533413d2daf4c704aa4acbcae61e2a0edba2564a4910666707", size = 4004309, upload-time = "2026-11-01T09:41:05.719Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/4c/40b01d8e46ff3464eb503529e00ad23eddd2ffbd605282618672d0aff45f/fensu-0.28.3-cp312-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:da5843aa40c7d6398a95b340b3c60d4360b5feddac34960663ee84aec09df8ef", size = 4230261, upload-time = "2026-11-01T09:41:07.481Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/7a/243cccd83531c3c86c660b993e77a7014c65d1d3f20c07e45b067dba81cf/fensu-0.28.3-cp312-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:52e1623e614f101c5ada2eda59548ff441b7efe4228813e69bc0f0ef9b3fbca6", size = 4307334, upload-time = "2026-11-01T09:41:09.938Z" },
+    { url = "https://files.pythonhosted.org/packages/88/a3/38dbb50d5079a1a5fcaf62bcdd582c12a53609c575a747cb2461e83ddfcf/fensu-0.28.3-cp312-abi3-win_amd64.whl", hash = "sha256:a39c407725ea4d92123414bdbe9f80d5db0b7a412af49082a87378203c9ecb04", size = 3977904, upload-time = "2026-11-01T09:41:11.672Z" },
 ]
 
 [[package]]
 name = "fensu-cli"
-version = "0.28.0"
+version = "0.28.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/79/d9/f347f514fb224f6a1f4ca6e616ac49b573f9dceba4ff8d9efcd334f48bea/fensu_cli-0.28.0.tar.gz", hash = "sha256:1feb379ed92e193cbd4d28ab3d7729798b88120aaee2f59fd7f341519b6ee945", size = 765638, upload-time = "2026-10-27T00:39:17.752Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/17/3d0953c33387caa0a6becc9bb02210d4a020eaaf73ef07bdc0c8f8952562/fensu_cli-0.28.3.tar.gz", hash = "sha256:3ba38bedc88a9e6db8563f638aa6ba8649a3e5750de176e22a7b35561d14bd9e", size = 766571, upload-time = "2026-11-01T09:41:25.271Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3b/b3/57f1de89e1cb7534b0ef6415822c8982a247b9d2efe8d2fddd85e35389c8/fensu_cli-0.28.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:13ecc7a224a4b32eef19456f21659e682e636ef53f305919aa57cae27c8e3fec", size = 7978247, upload-time = "2026-10-27T00:39:04.644Z" },
-    { url = "https://files.pythonhosted.org/packages/ff/ff/2e887d727f82c61ea7cb6773429b61d4711b93f7f94814eb9a7e891384dc/fensu_cli-0.28.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:149e5e22c8895c0a3ed3956b30e693e78df7dfb67ce8e0c5682b84c77e811e7e", size = 7490546, upload-time = "2026-10-27T00:39:07.384Z" },
-    { url = "https://files.pythonhosted.org/packages/76/4e/daa4c2d70e5b0398382f84c846aacc4a937c4d00b3938d00a67351b0f212/fensu_cli-0.28.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:99932d17956bb10da1ac677867567b504a961d0565fcda730c1e682434244113", size = 7570220, upload-time = "2026-10-27T00:39:09.852Z" },
-    { url = "https://files.pythonhosted.org/packages/f4/f9/c9e1095c507da3a53b3e7bf3f7c95f75824429ea45a72cb2c7af67a605f7/fensu_cli-0.28.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ee51c5d6d0d5fa0b36c0f70d3d6fde429793b643f0075cdfdf3fc8b8d73e3ccb", size = 8086364, upload-time = "2026-10-27T00:39:12.052Z" },
-    { url = "https://files.pythonhosted.org/packages/9c/89/ece32e452d2b4ade243dd66a2612619be7400f6acf59f854ce674bb78e30/fensu_cli-0.28.0-py3-none-win_amd64.whl", hash = "sha256:acca6ac39cbe0614d3a8e4ce7c2c12cc5fd3c800fc4c66b5484c54dc19ef4a66", size = 7700477, upload-time = "2026-10-27T00:39:14.15Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/bb/09753cc0584c21af1d76eca7c9a6ea5e2d876d71c079c5505dda93742f3d/fensu_cli-0.28.3-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:5179b032074f4ff5097950c0c0b063fd872cffcd23a4bf8a89c71ab0d3d8074b", size = 7963143, upload-time = "2026-11-01T09:41:13.908Z" },
+    { url = "https://files.pythonhosted.org/packages/47/59/663fb61d56172bfb053375e8623a23db389b746052fb00dd087cf6c1a76b/fensu_cli-0.28.3-py3-none-macosx_11_0_arm64.whl", hash = "sha256:41077b9ec6e2eb46405af809d1010b26519c8928d4264137ca4c6d47ce81d2e1", size = 7479791, upload-time = "2026-11-01T09:41:16.253Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/7c/1a03bd25bc2a231ca03478ba3dfd8f21c909eae564c3df751a8982222beb/fensu_cli-0.28.3-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ac929d598046846c18eae62c8b75a9a49e9b6bbcadb46bd413a5da96ef6453e2", size = 7854377, upload-time = "2026-11-01T09:41:18.109Z" },
+    { url = "https://files.pythonhosted.org/packages/17/5e/8395e4bd4e9e4d282a0949e42e721101127fb30f45cb71d6e5af05329051/fensu_cli-0.28.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9ce453889008381184a416acaf274ffa4a46c7cb96ad4397de264816bb10626a", size = 8316670, upload-time = "2026-11-01T09:41:20.045Z" },
+    { url = "https://files.pythonhosted.org/packages/89/40/6e3831cd39b16f163916b36c03010754c1cfb58583fd737517bd544751d5/fensu_cli-0.28.3-py3-none-win_amd64.whl", hash = "sha256:66ec08187a6dcc43392244ba4b7349ee29e8da63fbe7110114468f07a000d577", size = 7710605, upload-time = "2026-11-01T09:41:22.073Z" },
 ]
 
 [[package]]
@@ -4346,7 +4346,7 @@ dev = [
     { name = "dbt-snowflake", specifier = "==1.12.0b1" },
     { name = "dbt-sqlserver", specifier = ">=1.9.0,<1.11" },
     { name = "dlt", extras = ["duckdb", "filesystem", "sql-database"], specifier = ">=1.28.0,<2" },
-    { name = "fensu", specifier = ">=0.28.0" },
+    { name = "fensu", specifier = ">=0.28.3" },
     { name = "ingestr", specifier = ">=1.1.73" },
     { name = "jsonschema", specifier = ">=4.23.0" },
     { name = "maturin", specifier = ">=1.9,<2" },
