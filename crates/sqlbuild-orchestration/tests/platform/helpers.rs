@@ -210,3 +210,14 @@ pub(crate) async fn publish_platform_impostor(store: &ControlStore, identity: (U
     assert_eq!(result.delivered, [(Table::Events, 1)]);
     assert!(result.conflicts.is_empty());
 }
+
+/// Every platform fact still stored after retention, in storage order.
+pub(crate) async fn retained_platform_facts(store: &ControlStore) -> Vec<Observation> {
+    read_recall_events(store, 0, 1000)
+        .await
+        .expect("read retained facts")
+        .into_iter()
+        .filter(|row| row["producer"] == "platform")
+        .map(|row| serde_json::from_value(json!(row)).expect("typed platform event"))
+        .collect()
+}

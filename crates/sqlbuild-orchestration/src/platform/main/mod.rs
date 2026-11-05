@@ -10,4 +10,4 @@ pub mod report_location_health;
 pub mod report_remote_location_health;
 pub mod request_location_work;
 pub(crate) mod require_instance;
-pub mod run_watchdog;
+pub mod run_maintenance;

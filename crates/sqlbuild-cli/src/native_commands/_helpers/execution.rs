@@ -13,11 +13,10 @@ use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
 use sqlbuild_orchestration::authorization::main::recover_administrator::recover_administrator;
-use sqlbuild_orchestration::credentials::main::audit::run_audit_retention::run_audit_retention;
 use sqlbuild_orchestration::credentials::models::{AuditContext, AuditRetention};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
+use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
@@ -25,6 +24,7 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
+use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::begin_offline_recovery::begin_offline_recovery;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
@@ -32,8 +32,9 @@ use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
-    WarehouseReconciliationCursor, WarehouseStateLocation, WarehouseSyncResponse,
+    StatisticsDueRead, StatisticsRead, StatisticsRetention, WarehouseHistoryKind,
+    WarehouseHistoryPage, WarehouseReconciliationCursor, WarehouseStateLocation,
+    WarehouseSyncResponse,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -118,7 +119,7 @@ pub(crate) async fn run_development_roles(
             ))]));
         }, development_stopped(shutdown.clone())),
     ));
-    start_platform_roles(&mut tasks, (&store, &shutdown), AuditRetention::default())?;
+    start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
     tasks.spawn(development_location_role(
         (&project, &executable),
         (location_id, &target),
@@ -819,7 +820,7 @@ fn location_child(options: &LocationServe, script: &Path) -> Command {
 pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
-    audit: AuditRetention,
+    retention: (AuditRetention, StatisticsRetention, SnapshotRetention),
 ) -> Result<(), ControlError> {
     let mut sinks: Vec<(Webhook, &str)> = Vec::new();
     for (variable, source, label) in [
@@ -846,19 +847,10 @@ pub(crate) fn start_platform_roles(
     }
     drop(write_output(&[(
         Stream::Stderr,
-        "Starting platform watchdog...\n",
+        "Starting platform maintenance...\n",
     )]));
-    let watchdog_store = store.clone();
-    let watchdog_shutdown = shutdown.clone();
-    tasks.spawn(
-        async move { run_watchdog(&watchdog_store, Uuid::now_v7(), watchdog_shutdown).await },
-    );
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Platform watchdog started\n",
-    )]));
-    let audit_store = store.clone();
-    let audit_shutdown = shutdown.clone();
+    let maintenance_store = store.clone();
+    let maintenance_shutdown = shutdown.clone();
     let audit_sinks: Vec<Webhook> = sinks.iter().map(|(sink, _)| sink.clone()).collect();
     tasks.spawn(async move {
         let report = |retained: i64| {
@@ -867,13 +859,17 @@ pub(crate) fn start_platform_roles(
                 &format!("Security audit retention: retained past horizon: {retained}\n"),
             )]));
         };
-        run_audit_retention(
-            &audit_store,
-            (audit, &audit_sinks),
-            (report, audit_shutdown),
+        run_maintenance(
+            (&maintenance_store, Uuid::now_v7()),
+            (retention, &audit_sinks),
+            (report, maintenance_shutdown),
         )
         .await
     });
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Platform maintenance started\n",
+    )]));
     for (sink, label) in sinks {
         drop(write_output(&[(
             Stream::Stderr,

@@ -2,44 +2,13 @@
 
 use uuid::Uuid;
 
-use crate::snapshots::constants::{CONTENT_HASH_CHUNK, SNAPSHOT_RETENTION_BATCH};
+use crate::snapshots::constants::{
+    CONTENT, CONTENT_HASH_CHUNK, EXPIRED_SNAPSHOTS, SNAPSHOT_RETENTION_BATCH,
+};
 use crate::snapshots::models::SnapshotRetention;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
-
-/// Beyond the newest generations, any retained reference keeps a snapshot.
-const EXPIRED_SNAPSHOTS: &str = "SELECT s.snapshot_id FROM sqb_snapshots s \
-    WHERE (SELECT COUNT(*) FROM sqb_snapshots newer WHERE newer.location_id=s.location_id \
-        AND newer.target=s.target AND newer.generation>s.generation)>=$1 \
-    AND NOT EXISTS (SELECT 1 FROM sqb_current_snapshots c WHERE c.snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_runs r WHERE r.snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_jobs j WHERE j.snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_triggers t WHERE t.snapshot_id=s.snapshot_id \
-        OR t.removed_in_snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_trigger_state_events e WHERE e.snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_location_work w WHERE w.snapshot_id=s.snapshot_id) \
-    ORDER BY s.published_at, s.snapshot_id LIMIT $2";
-
-/// Content-addressed bodies of the expiring snapshots, removed once nothing else references them.
-const CONTENT: [((&str, &str), &str, &str); 3] = [
-    (
-        ("sqb_snapshot_nodes", "node_hash"),
-        "sqb_node_definitions",
-        "",
-    ),
-    (
-        ("sqb_snapshot_sources", "text_hash"),
-        "sqb_source_texts",
-        " AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_fingerprints f \
-         WHERE f.definition_text_hash=sqb_source_texts.text_hash)",
-    ),
-    (
-        ("sqb_snapshot_documents", "document_hash"),
-        "sqb_documents",
-        "",
-    ),
-];
 
 /// Batches commit independently; a repeated or interrupted pass finds only what is still expired.
 pub(crate) async fn prune_snapshots(
