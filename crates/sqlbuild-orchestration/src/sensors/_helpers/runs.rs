@@ -66,10 +66,7 @@ async fn matching_executions(
             break;
         }
         let mut parameters: Vec<Parameter> = eligible.iter().copied().map(Parameter::Id).collect();
-        let run_parameters = (1..=parameters.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let run_parameters = Parameter::placeholders(1..=parameters.len());
         let node_parameters = (parameters.len() + 1..=parameters.len() + chunk.len())
             .map(|index| format!("${index}"))
             .collect::<Vec<_>>()

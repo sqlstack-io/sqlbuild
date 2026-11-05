@@ -41,10 +41,6 @@ pub async fn ingest_old_name_views(
                             "migration_event_id",
                             Parameter::Text(record.migration_event_id.clone()),
                         ),
-                        (
-                            "destination_model",
-                            Parameter::Text(record.destination_model.clone()),
-                        ),
                         ("event_type", Parameter::Text(record.event_type.clone())),
                     ],
                     record_json: json!(record),

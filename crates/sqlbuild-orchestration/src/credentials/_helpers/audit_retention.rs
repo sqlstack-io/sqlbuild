@@ -52,10 +52,7 @@ pub(crate) async fn prune_audit_batch(
         .collect();
     let mut transaction = transaction;
     if !expired.is_empty() {
-        let placeholders = (1..=expired.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let placeholders = Parameter::placeholders(1..=expired.len());
         for table in ["sqb_security_audit_deliveries", "sqb_security_audit"] {
             (transaction, _) = query(
                 transaction,

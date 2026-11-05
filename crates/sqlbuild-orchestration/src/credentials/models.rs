@@ -172,6 +172,18 @@ pub(crate) struct PermissionScope {
     pub(crate) nodes: std::collections::BTreeSet<String>,
 }
 
+impl PermissionScope {
+    /// An action on every node, installation-wide or within one location target.
+    pub(crate) fn action(action: Action, target: Option<(Uuid, &str)>) -> Self {
+        Self {
+            action,
+            location_id: target.map(|(location_id, _)| location_id),
+            target: target.map(|(_, target)| target.into()),
+            nodes: Default::default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RoleAssignmentRequest {

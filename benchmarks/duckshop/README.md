@@ -119,10 +119,13 @@ project and does not change it:
 - raw `edge__*` sources in `sources/edge_cases.yml`, loaded by `python/loaders/edge_cases.py` from
   fixed rows that `data_scale` does not change, so core data and core expectations stay the same;
 - Python functions in `functions/python/edge_*.py`, tagged `edge_case`, and their tests in
-  `tests/unit/functions/python/test_edge_*.sql`.
+  `tests/unit/functions/python/test_edge_*.sql`;
+- a SQL table function, `functions/sql/edge_basket_lines_for.sql`, and a JavaScript function,
+  `edge_running_peaks`, that a pre-hook of `int_edge_basket_running_peaks` creates
+  (`models/intermediate/edge_cases/_sqlbuild/_hooks/sql/`) and SQLBuild does not declare.
 
-It has 72 models (12 staging, 50 intermediate, 10 marts), 5 Python functions, 97 unit tests and 4
-scenarios, in eight groups:
+It has 160 models (13 staging, 133 intermediate, 14 marts), 5 Python functions, a SQL table
+function, a hook-created JavaScript function, 185 unit tests and 4 scenarios, in nine groups:
 
 | Group | Covers |
 |-------|--------|
@@ -134,6 +137,7 @@ scenarios, in eight groups:
 | Lineage and analysis | clauses whose columns decide rows without being output (`WHERE`, `QUALIFY`, `GROUP BY` by position and `ALL`, `ORDER BY` under `LIMIT`, `EXISTS`, a `FLATTEN` input, `ROLLUP` by position, `EXCEPT` under `LIMIT`); `RIGHT JOIN ... USING`, `NATURAL JOIN`, a `USING` key under a later outer join, and unmatched `ASOF JOIN` rows; `CONNECT BY` beside a column named `level`; a recursive CTE without `RECURSIVE` whose columns shift per iteration; `LAST_DAY` with a date part; positional columns and the names Snowflake gives unaliased expressions; `TEXT(5)` and widened `COUNT` contracts |
 | Python functions | volatile tokens and numbers from a column, a constant and no argument, and `DIV0` of a volatile call beside look-alike names, checked by assertions that hold for any values; a handler answering NULL input without `STRICT`; Python `None` as JSON null, and datetimes, Decimals and integers past 2^53 handed to `VARIANT` and `FLOAT` results |
 | Scenarios and lifecycle | typed values across model boundaries; `VARIANT` expected output; a star under a lower-case contract and a quoted camelCase export; a snapshot keyed and compared on quoted camelCase columns; a cursor-window incremental model over far-apart fixture loads; a change log merged across two loads, checked against a full rebuild |
+| Translation refusals | one model per construct that translation tools refuse or guard, most putting a construct refused only under strict checking before one refused by default, so a model shows both: `FLOAT` values through sums, averages, running totals, arrays, objects, `HASH`, `TO_CHAR` and `::NUMBER(38, 10)`; `VARIANT` dates, decimals and XML; `ARRAY_AGG` without `WITHIN GROUP`, sparse arrays and `ARRAY(NUMBER)` casts; `REDUCE`, `FILTER` and `TRANSFORM` lambdas; patterns and `REGEXP_REPLACE` replacements built from columns, and lazy patterns; `TRY_TO_DATE` with a format from a column; zoned literals, `CONVERT_TIMEZONE` from `CURRENT_TIMESTAMP`, `SEQ8`, `GENERATOR` with an expression `ROWCOUNT`; `PIVOT`, `ANY_VALUE`, `IGNORE NULLS` around `IFF`, unaliased columns read by Snowflake's name, `UNION` branches whose column is always NULL; `TO_NUMBER`, `TO_DECIMAL` and `TRY_BASE64_DECODE_BINARY`; an open (uncontracted) source `edge__supplier_notes`, the table function and the hook-created function. `rpt_edge_case_model_keys` and `rpt_edge_case_array_model_keys` read every model in the group, so a refusal there also refuses a downstream model |
 
 Unit-test expectations in the edge-case area are captured on Snowflake under the `edge` target's
 pinned session, rather than derived by hand; scenario expectations, and the assertions in tests
@@ -158,6 +162,10 @@ earlier ones:
   same results on every run: added SKUs are sorted, the weekday average utilisation is an exact
   decimal sum over a count, the busiest slot of equally busy ones is the earliest, and the top
   exception code of equally frequent ones is the first in alphabetical order.
+- The mocks of `stg_wishlist_items`, `stg_purchase_order_lines` and `int_loyalty_tier_changes` in
+  three unit tests list their columns in the models' declared order, which unit-test planning
+  requires for a `SELECT *` reader. Only compiled tests change; compiled models are the same, so
+  model benchmarks stay comparable.
 
 ## Status
 
@@ -200,7 +208,7 @@ The edge-case area, verified on Snowflake with SQLBuild built after 0.185.0 on t
 | Step | Result |
 |------|--------|
 | `sqb build --select tag:edge_case` | Passes; the disabled model is skipped |
-| `sqb test --select tag:edge_case` | 62 of 62 pass |
+| `sqb test --select tag:edge_case` | 62 of 62 pass; with SQLBuild 0.187.0, 185 of 185 pass |
 | `sqb scenario test --select edge_cases` | 4 of 4 pass |
 | Two-load replay of the delivery change log | The merged status equals the full rebuild after each load |
 

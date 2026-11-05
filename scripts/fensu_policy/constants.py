@@ -364,3 +364,115 @@ NATIVE_TEST_PATCH_BUDGETS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
     default=(),
     description="`path=count` budgets for test files that still patch the native module.",
 )
+BRACE_CLOSE: str = "}"
+BRACE_OPEN: str = "{"
+BRACKET_CLOSE: str = "]"
+BRACKET_OPEN: str = "["
+CONTROL_STORE_SCHEMA_PATHS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="schema_paths",
+    default=(),
+    description="Repository-relative directories whose *.sql files create control-store state.",
+)
+LIST_SEPARATOR: str = ","
+PARENTHESIS_CLOSE: str = ")"
+PARENTHESIS_OPEN: str = "("
+REMOVED_CODE: str = "\0"
+RUST_ATTRIBUTE_PATTERN: str = r"#\s*\["
+RUST_BARE_WORD_PATTERN: str = r"(?<![:\w])([A-Za-z_]\w*)\b(?!\s*::)"
+RUST_ENUM_PATTERN: str = r"\benum\s+(?P<name>[A-Za-z_]\w*)\s*(?:<[^{;]*>)?\s*(?:where\b[^{;]*)?\{"
+RUST_FROM_ATTRIBUTE_PATTERN: str = r"#\s*\[\s*from\s*\]"
+RUST_IMPL_HEADER_PATTERN: str = r"\bimpl\b[^{;]*\{"
+RUST_LINE_CONTINUATION: str = r"\\\n\s*"
+RUST_LITERAL_PATTERN: str = (
+    r"//[^\n]*"
+    r"|/\*.*?\*/"
+    r"|(?P<raw>b?r(?P<hashes>#*)\"(?P<raw_body>.*?)\"(?P=hashes))"
+    r"|(?P<plain>b?\"(?P<plain_body>(?:\\.|[^\"\\])*)\")"
+    r"|'(?:\\u\{[0-9a-fA-F]+\}|\\.|[^\\'\n])'"
+)
+RUST_MACRO_INVOCATION_PATTERN: str = r"\b[A-Za-z_]\w*!\s*\{"
+RUST_PATH_PAIR_PATTERN: str = r"(?=\b([A-Za-z_]\w*)\s*::\s*([A-Za-z_]\w*)\b)"
+RUST_SELF_PATH_PATTERN: str = r"\bSelf\s*::\s*([A-Za-z_]\w*)\b"
+RUST_SIMPLE_ESCAPES: dict[str, str] = {
+    "n": "\n",
+    "t": "\t",
+    "r": "\r",
+    "0": "\0",
+    "\\": "\\",
+    '"': '"',
+    "'": "'",
+}
+RUST_TEST_FILE_NAME: str = "tests.rs"
+RUST_TEST_MODULE_PATTERN: str = (
+    r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+\w+\s*\{"
+)
+RUST_TEST_PATH_SEGMENTS: frozenset[str] = frozenset({"tests", "benches", "examples"})
+RUST_VARIANT_IMPORT_PATTERN: str = r"\b([A-Za-z_]\w*)\s*::\s*(?:\*|\{)"
+SQL_ADD_COLUMN_PATTERN: str = (
+    r"\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?\"?(\w+)\"?\s+ADD\s+(?:COLUMN\s+)?"
+    r"(?:IF\s+NOT\s+EXISTS\s+)?\"?(\w+)\"?"
+)
+SQL_ASSIGNMENT: str = "="
+SQL_COLUMN_CONSTRAINT_WORDS: frozenset[str] = frozenset(
+    {"constraint", "primary", "unique", "foreign", "check", "exclude", "like"}
+)
+SQL_COMMENT_PATTERN: str = r"--[^\n]*|/\*.*?\*/"
+SQL_CONFLICT_TARGET_WORDS: frozenset[tuple[str, str]] = frozenset({("conflict", "on")})
+SQL_CREATE_TABLE_PATTERN: str = (
+    r"\bCREATE\s+(?:UNLOGGED\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?\"?(\w+)\"?\s*\("
+)
+SQL_DDL_PREFIX_PATTERN: str = r"\s*(?:CREATE|ALTER|DROP|COMMENT|GRANT|REVOKE)\b"
+SQL_DELETE_WORD: str = "delete"
+SQL_EXCLUDED_QUALIFIER: str = "excluded"
+SQL_FILE_PATTERN: str = "*.sql"
+SQL_FRAGMENT_MARKERS: frozenset[str] = frozenset({"=", ",", "is", "in"})
+SQL_FROM_WORD: str = "from"
+SQL_NEUTRAL_WORDS: frozenset[str] = frozenset(
+    {"and", "or", "not", "is", "null", "in", "as", "asc", "desc", "true", "false"}
+)
+SQL_QUALIFIER: str = "."
+SQL_READ_WORDS: frozenset[str] = frozenset(
+    {"select", "from", "join", "on", "where", "group", "order", "having", "returning", "using"}
+)
+SQL_SET_WORD: str = "set"
+SQL_STAR: str = "*"
+SQL_STAR_PREDECESSORS: frozenset[str] = frozenset({"select", ",", "."})
+SQL_STATEMENT_SEPARATOR: str = ";"
+SQL_TOKEN_PATTERN: str = r"\"[^\"]*\"|'(?:[^']|'')*'|[A-Za-z_]\w*|[(),.*=]"
+SQL_VIEW_PREFIX_PATTERN: str = r"\s*CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\b"
+SQL_WORD_PATTERN: str = r"[A-Za-z_]\w*"
+SQL_WRITE_WORDS: frozenset[str] = frozenset(
+    {"insert", "into", "values", "update", "set", "delete", "conflict", "do"}
+)
+REASON_SEPARATOR: str = "="
+RUST_LOOKBEHIND: int = 16
+RUST_MATCHES_MACRO_PATTERN: str = r"\bmatches!\s*\("
+RUST_PATTERN_FOLLOWER_PATTERN: str = r"\s*(?:=>|\|(?!\|)|if\b|==|!=|=(?![=>]))"
+RUST_PATTERN_LEADER_PATTERN: str = r"(?:(?<!\|)\|(?!\|)|\blet|==|!=)\s*$"
+RUST_QUALIFIED_VARIANT_PATTERN: str = r"\b([A-Za-z_]\w*)\s*::\s*([A-Za-z_]\w*)\b(?!\s*::)"
+RUST_SELF: str = "Self"
+RUST_TABLE_ITEM_PATTERN: str = (
+    r"(?m)^[ \t]*(?:pub(?:\([^)]*\))?\s+)?"
+    r"(?:use\b|(?:const|static)\s+(?:mut\s+)?[A-Z_][A-Z0-9_]*\s*:)"
+)
+VARIANT_CONSTRUCTION_REQUIRED: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="construction_required",
+    default=(),
+    description=(
+        "`Enum=reason` entries whose variants count only where code constructs them as a value, "
+        "not in tables, patterns or comparisons."
+    ),
+)
+VARIANT_EXCEPTIONS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="exceptions",
+    default=(),
+    description=(
+        "`Enum=reason` or `Enum::Variant=reason` entries for variants built outside Rust code."
+    ),
+)
+CONTROL_STORE_ALLOWED: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="allowed",
+    default=(),
+    description="`table.column=reason` entries for state read outside production code.",
+)
+POLICY_CONFIG_FILE: str = "fensu.toml"

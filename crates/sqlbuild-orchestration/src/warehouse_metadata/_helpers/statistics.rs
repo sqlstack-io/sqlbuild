@@ -8,9 +8,11 @@ use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
+use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 use crate::warehouse_metadata::_helpers::ingestion::scoped_event_id;
+use crate::warehouse_metadata::_helpers::mirror_pages::page_tail;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
     StatisticsObservation, StatisticsPage, StatisticsQuery, StatisticsRetention,
@@ -52,10 +54,7 @@ pub(crate) async fn eligible_names(
     }
     let mut committed: BTreeSet<Uuid> = BTreeSet::new();
     if !candidates.is_empty() {
-        let placeholders = (1..=candidates.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let placeholders = Parameter::placeholders(1..=candidates.len());
         let found;
         (transaction, found) = query(
             transaction,
@@ -103,47 +102,31 @@ pub(crate) async fn read_statistics_page(
         .unwrap_or(MAX_HISTORY_RECORDS as u32)
         .clamp(1, MAX_HISTORY_RECORDS as u32) as usize;
     let cutoff = retention.cutoff(transaction.now);
-    let mut parameters = vec![
+    let parameters = vec![
         Parameter::Id(location_id),
         Parameter::Text(target.into()),
         Parameter::Text(options.schema.clone()),
         Parameter::Text(options.name.clone()),
         Parameter::Time(cutoff),
     ];
-    let database = if let Some(database) = &options.database {
-        parameters.push(Parameter::Text(database.clone()));
-        "state_database=$6"
-    } else {
-        "state_database IS NULL"
-    };
-    let mut after = String::new();
-    if let (Some(time), Some(id)) = (options.after_observed_at, options.after_event_id) {
-        let offset = parameters.len();
-        parameters.extend([Parameter::Time(time), Parameter::Id(id)]);
-        after = format!(
-            " AND (observed_at,event_id)>(${},${})",
-            offset + 1,
-            offset + 2
-        );
-    }
-    parameters.push(Parameter::Integer(limit as i64));
-    let (transaction, rows) = query(transaction,
+    let (parameters, tail) = page_tail(
+        parameters,
+        options.database.as_ref(),
+        (options.after_observed_at, options.after_event_id),
+        limit,
+    );
+    let (transaction, records) = query_records(transaction,
         &format!("SELECT event_id,record_json AS record FROM sqb_warehouse_statistics \
-            WHERE location_id=$1 AND target=$2 AND state_schema=$3 AND relation_name=$4 AND observed_at>=$5 \
-            AND {database}{after} ORDER BY observed_at,event_id LIMIT ${}", parameters.len()), parameters).await?;
-    let more = rows.len() == limit;
-    let records: Vec<StatisticsObservation> = rows
-        .into_iter()
-        .map(|row| serde_json::from_value(json!(row)))
-        .collect::<Result<_, _>>()
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let next_after =
-        more.then(|| records.last())
-            .flatten()
-            .map(|observation| WarehouseMirrorCursor {
-                observed_at: observation.record.observed_at,
-                event_id: observation.event_id,
-            });
+            WHERE location_id=$1 AND target=$2 AND state_schema=$3 AND relation_name=$4 AND observed_at>=$5{tail}"),
+        parameters).await?;
+    let records: Vec<StatisticsObservation> = records;
+    let next_after = (records.len() == limit)
+        .then(|| records.last())
+        .flatten()
+        .map(|observation| WarehouseMirrorCursor {
+            observed_at: observation.record.observed_at,
+            event_id: observation.event_id,
+        });
     Ok((
         transaction,
         StatisticsPage {

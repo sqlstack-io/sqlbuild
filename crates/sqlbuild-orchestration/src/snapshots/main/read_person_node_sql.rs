@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::snapshots::_helpers::reading::attach_sources;
@@ -11,8 +11,8 @@ use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::NodeSql;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::main::{commit::commit, query::query};
+use crate::store::models::{ControlStore, Parameter};
 
 pub async fn read_person_node_sql(
     store: &ControlStore,
@@ -25,13 +25,8 @@ pub async fn read_person_node_sql(
         target: Some(target.into()),
         nodes: [node_key.into()].into(),
     };
-    let (transaction, context) = authorize_person(
-        begin(store, TransactionMode::Write).await?,
-        credentials,
-        &scope,
-        DefaultRole::None,
-    )
-    .await?;
+    let (transaction, context) =
+        begin_authorized(store, credentials, &scope, DefaultRole::None).await?;
     let (mut transaction, record) = read_current_record(transaction, (location_id, target)).await?;
     let mut result = None;
     if let Some(record) = record {

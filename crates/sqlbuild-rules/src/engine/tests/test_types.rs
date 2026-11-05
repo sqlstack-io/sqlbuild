@@ -105,7 +105,6 @@ pub(crate) struct ThresholdEvaluationTestCase {
 
 pub(crate) struct BuildIdentityTestCase {
     pub(crate) description: &'static str,
-    pub(crate) expected_prefix: &'static str,
     pub(crate) expected_hash_length: usize,
 }
 

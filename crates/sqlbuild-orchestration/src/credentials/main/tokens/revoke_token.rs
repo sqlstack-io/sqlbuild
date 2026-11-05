@@ -5,9 +5,8 @@ use uuid::Uuid;
 use crate::credentials::_helpers::tokens::revoke;
 use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
-use crate::store::main::commit::commit;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::main::write::write;
+use crate::store::models::ControlStore;
 
 /// Repeating a revocation does not create a second audit entry or rewrite its actor.
 pub async fn revoke_token(
@@ -15,8 +14,5 @@ pub async fn revoke_token(
     context: &AuditContext,
     token_id: Uuid,
 ) -> Result<bool, ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, revoked) = revoke(transaction, context, token_id).await?;
-    commit(transaction).await?;
-    Ok(revoked)
+    write(store, |transaction| revoke(transaction, context, token_id)).await
 }

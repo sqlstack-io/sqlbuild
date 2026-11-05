@@ -3,6 +3,8 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyBytes;
 
+use crate::bindings::_helpers::native_host::host::write_console;
+
 /// Write `data` unchanged to stdout's binary buffer after flushing pending text.
 pub(crate) fn write_stdout_bytes(py: Python<'_>, data: &[u8]) -> PyResult<()> {
     let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
@@ -15,8 +17,5 @@ pub(crate) fn write_stdout_bytes(py: Python<'_>, data: &[u8]) -> PyResult<()> {
 
 /// Write `text` to stderr and flush it.
 pub(crate) fn write_stderr(py: Python<'_>, text: &str) -> PyResult<()> {
-    let stderr: Bound<'_, PyAny> = py.import("sys")?.getattr("stderr")?;
-    stderr.call_method1("write", (text,))?;
-    stderr.call_method0("flush")?;
-    Ok(())
+    write_console(py, "stderr", text)
 }

@@ -54,9 +54,9 @@ in `[workspace.metadata.native-layers]` in the workspace `Cargo.toml`, and
 - any crate other than `sqlbuild-python` reaches `pyo3`, directly or through another package;
 - a crate below `sqlbuild-analysis` reaches polyglot.
 
-The same check fails when the workspace version, the `pyproject.toml` version and
-`.release-please-manifest.json` disagree, or when a workspace crate's `Cargo.lock` entry carries a
-version other than its manifest's, because the version is part of the build identity.
+The same check fails when the `sqlbuild-cli` and `sqlbuild-python` versions, the `pyproject.toml`
+version and `.release-please-manifest.json` disagree, or when a workspace crate's `Cargo.lock`
+entry carries a version other than its manifest's.
 
 `fensu check` applies the Rust structure rules inside each crate: other crates use items through
 `main/` entry points, `models.rs`, `types.rs` and `constants.rs`, not through `_helpers/`.
@@ -232,5 +232,8 @@ not implemented by the page reader.
   `cargo test -p <crate>` or for all crates with `cargo test --workspace`.
 - The build identity (`sqlbuild._native.BUILD_IDENTITY`) hashes the sources of every crate in
   this directory, so editing any crate invalidates the native caches keyed on it.
-- maturin builds `crates/sqlbuild-python`; the release version lives in
-  `[workspace.package]` and is shared by every crate.
+- maturin builds `crates/sqlbuild-python`; the release version lives in the `sqlbuild-cli` and
+  `sqlbuild-python` manifests. Every other crate inherits the fixed `[workspace.package]` version,
+  because a crate's version is part of its Cargo build identity: a shared release version would
+  recompile every crate after each release. Read the release version from those two crates, not
+  from `CARGO_PKG_VERSION` in a lower crate.

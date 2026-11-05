@@ -482,6 +482,7 @@ def test_given_any_data_scale_when_building_edge_rows_then_they_are_fixed(scale:
         "edge__amount_checks": _edge_cases.amount_checks(),
         "edge__variant_values": _edge_cases.variant_values(),
         "edge__category_links": _edge_cases.category_links(),
+        "edge__supplier_notes": _edge_cases.supplier_notes(),
     }
 
     assert {name: _digest(rows) for name, rows in rebuilt.items()} == {

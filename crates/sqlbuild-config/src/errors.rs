@@ -9,10 +9,6 @@ pub enum ConfigErrorKind {
     Construct,
     /// The document uses a feature the native reader leaves to Python.
     Unsupported,
-    /// A required file does not exist.
-    Missing,
-    /// A field SQLBuild reads has the wrong type or an invalid value.
-    InvalidField,
 }
 
 /// A configuration failure, at its one-based line and column where known.

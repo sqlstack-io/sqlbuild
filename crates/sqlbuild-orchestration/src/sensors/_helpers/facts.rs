@@ -38,15 +38,10 @@ pub(crate) async fn commit_cursor(
     trigger_id: Uuid,
     cursor: &SensorCursor,
 ) -> Result<ControlTransaction, ControlError> {
-    let now = transaction.now;
     let (transaction, _) = query(
         transaction,
-        "UPDATE sqb_trigger_state SET cursor_json=$1,updated_at=$2 WHERE trigger_id=$3",
-        vec![
-            Parameter::Json(json!(cursor)),
-            Parameter::Time(now),
-            Parameter::Id(trigger_id),
-        ],
+        "UPDATE sqb_trigger_state SET cursor_json=$1 WHERE trigger_id=$2",
+        vec![Parameter::Json(json!(cursor)), Parameter::Id(trigger_id)],
     )
     .await?;
     Ok(transaction)

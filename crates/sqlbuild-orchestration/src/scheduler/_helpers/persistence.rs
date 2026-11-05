@@ -72,9 +72,9 @@ pub(crate) async fn persist_ticks(
     }
     let changed;
     (transaction, changed) = query(transaction,
-        "UPDATE sqb_trigger_state SET last_tick_for=$1, next_due_at=$2, updated_at=$3 WHERE trigger_id=$4 \
+        "UPDATE sqb_trigger_state SET last_tick_for=$1, next_due_at=$2 WHERE trigger_id=$3 \
          AND (last_tick_for IS DISTINCT FROM $1 OR next_due_at IS DISTINCT FROM $2) RETURNING trigger_id",
-        vec![Parameter::OptionalTime(plan.last_tick_for), Parameter::OptionalTime(plan.next_due_at), Parameter::Time(now), Parameter::Id(trigger.trigger_id)]).await?;
+        vec![Parameter::OptionalTime(plan.last_tick_for), Parameter::OptionalTime(plan.next_due_at), Parameter::Id(trigger.trigger_id)]).await?;
     if !changed.is_empty() {
         transaction
             .changes

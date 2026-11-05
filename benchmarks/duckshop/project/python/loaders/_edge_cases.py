@@ -704,6 +704,23 @@ def category_links() -> Rows:
     ]
 
 
+def supplier_notes() -> Rows:
+    notes = [
+        ("SN-1", "SUP-PINTAIL", "Restock teal decoys before April"),
+        ("SN-2", "SUP-EIDER", None),
+        ("SN-3", None, "Bath ducks ship in pairs"),
+    ]
+    return [
+        {
+            "note_id": note,
+            "supplier_code": supplier,
+            "note_text": text,
+            "_loaded_at": _at("2026-03-06 00:00:00"),
+        }
+        for note, supplier, text in notes
+    ]
+
+
 DELIVERY_BATCH_VAR = "edge_delivery_batch"
 """Project variable naming the last delivery-update load to include; "2" (all loads) by default."""
 
@@ -762,4 +779,5 @@ TABLES: dict[str, Rows] = {
     "edge__amount_checks": amount_checks(),
     "edge__variant_values": variant_values(),
     "edge__category_links": category_links(),
+    "edge__supplier_notes": supplier_notes(),
 }

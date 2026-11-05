@@ -111,3 +111,13 @@ pub(crate) enum Parameter {
     Time(DateTime<Utc>),
     OptionalTime(Option<DateTime<Utc>>),
 }
+
+impl Parameter {
+    /// Numbered placeholders for the parameters at these positions, such as an IN list.
+    pub(crate) fn placeholders(positions: std::ops::RangeInclusive<usize>) -> String {
+        positions
+            .map(|index| format!("${index}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}

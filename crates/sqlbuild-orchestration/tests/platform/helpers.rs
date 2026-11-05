@@ -63,7 +63,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
         git_author: None,
         image_id: None,
         environment_hash: "orders-watchdog-environment".into(),
-        sqb_version: env!("CARGO_PKG_VERSION").into(),
+        sqb_version: "1.0.0".into(),
         nodes: BTreeMap::from([(
             "orders".into(),
             SnapshotNode {

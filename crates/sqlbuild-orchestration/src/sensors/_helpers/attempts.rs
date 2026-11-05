@@ -5,24 +5,21 @@ use uuid::Uuid;
 
 use crate::sensors::models::{DueSensor, SensorEvaluationFact};
 use crate::store::errors::ControlError;
-use crate::store::main::decode_row::decode_row;
 use crate::store::main::query::query;
+use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
 
 pub(crate) async fn read_sensor(
     transaction: ControlTransaction,
     trigger_id: Uuid,
 ) -> Result<(ControlTransaction, Option<DueSensor>), ControlError> {
-    let (transaction, rows) = query(transaction,
+    let (transaction, records) = query_records(transaction,
         "SELECT t.trigger_id,t.location_id,t.target,t.snapshot_id,t.definition_json,s.status \
          FROM sqb_triggers t JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id \
          JOIN sqb_locations l ON l.location_id=t.location_id WHERE t.trigger_id=$1 AND t.kind='sensor' \
          AND t.removed_in_snapshot_id IS NULL AND l.archived_at IS NULL",
         vec![Parameter::Id(trigger_id)]).await?;
-    Ok((
-        transaction,
-        rows.into_iter().next().map(decode_row).transpose()?,
-    ))
+    Ok((transaction, records.into_iter().next()))
 }
 
 pub(crate) async fn last_attempt(
@@ -51,16 +48,11 @@ pub(crate) async fn defer_sensor(
     trigger_id: Uuid,
     next: DateTime<Utc>,
 ) -> Result<ControlTransaction, ControlError> {
-    let now = transaction.now;
     let (transaction, _) = query(
         transaction,
-        "UPDATE sqb_trigger_state SET next_due_at=$1,updated_at=$2 WHERE trigger_id=$3 \
+        "UPDATE sqb_trigger_state SET next_due_at=$1 WHERE trigger_id=$2 \
          AND next_due_at IS DISTINCT FROM $1",
-        vec![
-            Parameter::Time(next),
-            Parameter::Time(now),
-            Parameter::Id(trigger_id),
-        ],
+        vec![Parameter::Time(next), Parameter::Id(trigger_id)],
     )
     .await?;
     Ok(transaction)

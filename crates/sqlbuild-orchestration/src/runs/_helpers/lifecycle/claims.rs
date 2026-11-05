@@ -51,13 +51,19 @@ pub(crate) async fn reserve_claims(
             siblings_hold.extend(sibling.concurrency_groups);
         }
     }
-    let now = transaction.now;
     for node in &request.write_set {
         let inserted;
-        (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_write_claims (target, node_key, run_id, claimed_at) VALUES ($1,$2,$3,$4) \
+        (transaction, inserted) = query(
+            transaction,
+            "INSERT INTO sqb_write_claims (target, node_key, run_id) VALUES ($1,$2,$3) \
              ON CONFLICT (target, node_key) DO NOTHING RETURNING node_key",
-            vec![Parameter::Text(request.target.clone()), Parameter::Text(node.clone()), Parameter::Id(request.run_id), Parameter::Time(now)]).await?;
+            vec![
+                Parameter::Text(request.target.clone()),
+                Parameter::Text(node.clone()),
+                Parameter::Id(request.run_id),
+            ],
+        )
+        .await?;
         if inserted.is_empty() {
             return Ok((transaction, false));
         }
@@ -104,10 +110,17 @@ pub(crate) async fn reserve_claims(
                 ControlError::Invalid("concurrency slot accounting is inconsistent".into())
             })?;
         let inserted;
-        (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id, claimed_at) VALUES ($1,$2,$3,$4) \
+        (transaction, inserted) = query(
+            transaction,
+            "INSERT INTO sqb_concurrency_slots (group_key, slot, run_id) VALUES ($1,$2,$3) \
              ON CONFLICT (group_key, slot) DO NOTHING RETURNING slot",
-            vec![Parameter::Text(group.clone()), Parameter::Integer(slot), Parameter::Id(request.run_id), Parameter::Time(now)]).await?;
+            vec![
+                Parameter::Text(group.clone()),
+                Parameter::Integer(slot),
+                Parameter::Id(request.run_id),
+            ],
+        )
+        .await?;
         if inserted.is_empty() {
             return Ok((transaction, false));
         }

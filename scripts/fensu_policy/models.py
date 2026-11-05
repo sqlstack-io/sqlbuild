@@ -46,3 +46,32 @@ class LayerPlan:
         if source == target:
             return False
         return self.ranks[target] >= self.ranks[source]
+
+
+@dataclass(frozen=True)
+class StateDefinition:
+    """One control-store table, or one of its columns when `column` is set."""
+
+    path: str
+    line: int
+    table: str
+    column: str | None = None
+
+
+@dataclass(frozen=True)
+class StateReads:
+    """Tables and `(table, column)` pairs that production SQL reads."""
+
+    tables: set[str]
+    columns: set[tuple[str, str]]
+
+
+@dataclass(frozen=True)
+class EnumVariant:
+    """One Rust enum variant and the offsets of its enum's body in the declaring file."""
+
+    path: str
+    line: int
+    enum: str
+    variant: str
+    body: tuple[int, int]

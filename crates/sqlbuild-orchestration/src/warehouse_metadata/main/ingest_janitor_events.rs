@@ -32,18 +32,7 @@ pub async fn ingest_janitor_events(
                         schema: record.state_schema.clone(),
                     },
                     observed_at: record.occurred_at,
-                    columns: vec![
-                        ("event_type", Parameter::Text(record.event_type.clone())),
-                        (
-                            "relation_database",
-                            Parameter::OptionalText(record.relation_database.clone()),
-                        ),
-                        (
-                            "relation_schema",
-                            Parameter::Text(record.relation_schema.clone()),
-                        ),
-                        ("archive_name", Parameter::Text(record.archive_name.clone())),
-                    ],
+                    columns: vec![("event_type", Parameter::Text(record.event_type.clone()))],
                     record_json: json!(record),
                 })
                 .collect(),

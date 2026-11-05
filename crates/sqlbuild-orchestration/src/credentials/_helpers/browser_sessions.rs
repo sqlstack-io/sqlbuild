@@ -13,6 +13,31 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// A live person gets a session; a password sign-in also needs its password version to be current.
+pub(crate) async fn issue_live_session(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (principal_id, credential_id): (Uuid, Option<Uuid>),
+    granting_role: &str,
+) -> Result<(ControlTransaction, Option<(AuditContext, IssuedSession)>), ControlError> {
+    let (transaction, rows) = query(transaction,
+        "SELECT p.principal_id FROM sqb_principals p LEFT JOIN sqb_password_credentials c \
+         ON c.principal_id=p.principal_id AND c.credential_id=$2 \
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL AND ($2 IS NULL OR c.credential_id IS NOT NULL)",
+        vec![Parameter::Id(principal_id), Parameter::OptionalId(credential_id)]).await?;
+    if rows.is_empty() {
+        return Ok((transaction, None));
+    }
+    let context = AuditContext {
+        actor: format!("principal:{principal_id}"),
+        granting_role: granting_role.into(),
+        ..context.clone()
+    };
+    let (transaction, session) =
+        issue_session(transaction, &context, (principal_id, credential_id)).await?;
+    Ok((transaction, Some((context, session))))
+}
+
 pub(crate) async fn issue_session(
     transaction: ControlTransaction,
     context: &AuditContext,

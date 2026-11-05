@@ -42,8 +42,8 @@ pub(crate) async fn location_heartbeat(
     }
     let now = transaction.now;
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_location_instances (instance_id, location_id, target, connected_at, last_seen_at, health_json) \
-         VALUES ($1, $2, $3, $4, $4, $5) ON CONFLICT (instance_id) DO UPDATE SET last_seen_at=$4, health_json=$5",
+        "INSERT INTO sqb_location_instances (instance_id, location_id, target, last_seen_at, health_json) \
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (instance_id) DO UPDATE SET last_seen_at=$4, health_json=$5",
         vec![Parameter::Id(report.session_id), Parameter::Id(location_id), Parameter::Text(report.target.clone()),
              Parameter::Time(now), Parameter::Json(json!(report))]).await?;
     Ok((transaction, true))

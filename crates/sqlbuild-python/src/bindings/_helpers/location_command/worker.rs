@@ -19,7 +19,8 @@ use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, wareho
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
-use crate::bindings::_helpers::native_host::host::{entry, write_console};
+use crate::bindings::_helpers::native_host::host::entry;
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::fields::{field, replaced};
 
@@ -125,7 +126,7 @@ pub(super) fn execute_worker<'py>(
     arguments: &KeywordArguments<'py>,
     (bearer, identity, recall): (&str, (String, String), Option<&InvocationRecall>),
 ) -> PyResult<i32> {
-    write_console(py, "stderr", "Verifying frozen run inputs...\n")?;
+    write_stderr(py, "Verifying frozen run inputs...\n")?;
     let owner = Bound::new(
         py,
         NativeOrchestrationWorker::start(
@@ -146,19 +147,14 @@ pub(super) fn execute_worker<'py>(
     }
     let result = (|| {
         if !worker.has_work() {
-            write_console(
+            write_stderr(
                 py,
-                "stderr",
                 "Run inputs verified. All selected nodes are blocked by upstream failures.\n",
             )?;
             return Ok(0);
         }
         let (request, scope) = build_request(py, discovered, arguments, &owner)?;
-        write_console(
-            py,
-            "stderr",
-            "Run inputs verified. Executing frozen selection...\n",
-        )?;
+        write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
         within(&scope, |_| run_cancellable(py, &worker, &request))
     })();
     let code = result.as_ref().copied().unwrap_or(1);

@@ -15,12 +15,15 @@ database = "<database>"
 schema = "<schema>"
 
 # The edge-case area's target (RUNBOOK.md, step 7). Use a different schema from targets.dev.
+# database and schema repeat the target's, so the session's current schema is the target schema.
 [connections.edge]
 account = "<account-identifier>"
 user = "<user>"
 authenticator = "<authenticator>"
 role = "<role>"
 warehouse = "<warehouse>"
+database = "<database>"
+schema = "<edge-schema>"
 
 [targets.edge]
 connection = "edge"

@@ -41,6 +41,7 @@ use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::constants::{JSON_FORMAT, RECALL_SETTINGS_CODE};
 use crate::bindings::_helpers::recall::events::escaped_text;
 use crate::bindings::_helpers::recall::session::{
@@ -912,9 +913,8 @@ fn execute_parsed_invocation<'py>(
             Err(_) => 1,
         };
         let outcome = worker.finish(py, i32::try_from(code).unwrap_or(1))?;
-        host::write_console(
+        write_stderr(
             py,
-            "stderr",
             &format!("Worker execution completed: {}\n", outcome.as_str()),
         )?;
         if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {

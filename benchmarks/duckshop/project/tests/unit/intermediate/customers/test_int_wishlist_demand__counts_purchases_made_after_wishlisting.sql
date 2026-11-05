@@ -2,25 +2,25 @@ TEST (name "int_wishlist_demand__counts_purchases_made_after_wishlisting");
 
 WITH __ref__stg_wishlist_items AS (
   SELECT
+    'W1#1' AS wishlist_item_key,
     'W1' AS wishlist_id,
     'C1' AS customer_id,
-    'W1#1' AS wishlist_item_key,
     'DUCK-1' AS sku,
     '2026-03-01 00:00:00 +00:00'::TIMESTAMPTZ AS added_at,
     NULL AS item_position
   UNION ALL
   SELECT
+    'W2#1',
     'W2',
     'C1',
-    'W2#1',
     'DUCK-1',
     '2026-03-02 00:00:00 +00:00'::TIMESTAMPTZ,
     NULL
   UNION ALL
   SELECT
+    'W3#1',
     'W3',
     'C2',
-    'W3#1',
     'DUCK-1',
     '2026-03-05 00:00:00 +00:00'::TIMESTAMPTZ,
     NULL

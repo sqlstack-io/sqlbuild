@@ -64,8 +64,8 @@ pub(crate) async fn publish_snapshot_with_defaults(
     };
     (transaction, _) = query(transaction,
         "INSERT INTO sqb_snapshots (snapshot_id, location_id, target, generation, git_revision, git_dirty, git_author, image_id, \
-         environment_hash, sqb_version, snapshot_schema_version, manifest_digest, published_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1,$11,$12)", vec![
+         environment_hash, sqb_version, manifest_digest, published_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", vec![
             Parameter::Id(record.snapshot_id), Parameter::Id(input.location_id), Parameter::Text(input.target.clone()),
             Parameter::Integer(input.generation), Parameter::OptionalText(input.git_revision.clone()), Parameter::Boolean(input.git_dirty),
             Parameter::OptionalText(input.git_author.clone()), Parameter::OptionalText(input.image_id.clone()),
@@ -82,11 +82,17 @@ pub(crate) async fn publish_snapshot_with_defaults(
             vec![Parameter::Id(record.snapshot_id), Parameter::Text(kind), Parameter::Text(hash)]).await?;
     }
     transaction = store_changes(transaction, record.snapshot_id, &previous, &hashes).await?;
-    (transaction, _) = query(transaction,
-        "INSERT INTO sqb_current_snapshots (location_id, target, snapshot_id, since) VALUES ($1,$2,$3,$4) \
-         ON CONFLICT (location_id, target) DO UPDATE SET snapshot_id=excluded.snapshot_id, since=excluded.since",
-        vec![Parameter::Id(input.location_id), Parameter::Text(input.target.clone()),
-            Parameter::Id(record.snapshot_id), Parameter::Time(record.published_at)]).await?;
+    (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_current_snapshots (location_id, target, snapshot_id) VALUES ($1,$2,$3) \
+         ON CONFLICT (location_id, target) DO UPDATE SET snapshot_id=excluded.snapshot_id",
+        vec![
+            Parameter::Id(input.location_id),
+            Parameter::Text(input.target.clone()),
+            Parameter::Id(record.snapshot_id),
+        ],
+    )
+    .await?;
     transaction =
         publish_definitions(transaction, &record, definitions, pause_new_triggers).await?;
     transaction

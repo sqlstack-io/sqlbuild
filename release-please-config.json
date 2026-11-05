@@ -67,8 +67,13 @@
       "extra-files": [
         {
           "type": "toml",
-          "path": "Cargo.toml",
-          "jsonpath": "$.workspace.package.version"
+          "path": "crates/sqlbuild-cli/Cargo.toml",
+          "jsonpath": "$.package.version"
+        },
+        {
+          "type": "toml",
+          "path": "crates/sqlbuild-python/Cargo.toml",
+          "jsonpath": "$.package.version"
         },
         {
           "type": "toml",

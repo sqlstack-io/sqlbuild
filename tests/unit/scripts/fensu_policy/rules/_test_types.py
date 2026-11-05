@@ -57,3 +57,33 @@ class NativeLayeringTestCase:
     path: str
     source: str
     expected_lines: list[int] | None
+
+
+@dataclass(frozen=True)
+class UnreadStateTestCase:
+    description: str
+    schema: str
+    rust: str
+    expected_unread: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
+class EnumVariantTestCase:
+    description: str
+    files: tuple[tuple[str, str], ...]
+    expected_unnamed: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class StrictVariantTestCase:
+    description: str
+    source: str
+    expected_unnamed: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReasonedEntriesTestCase:
+    description: str
+    entries: tuple[str, ...]
+    expected_kept: tuple[object, ...]
+    expected_problem_count: int

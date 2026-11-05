@@ -28,13 +28,14 @@ use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::ids::RecordId;
 
 fn status(py: Python<'_>, message: &str) -> PyResult<()> {
-    write_console(py, "stderr", &format!("{message}\n"))
+    write_stderr(py, &format!("{message}\n"))
 }
 
 /// Git is optional in deployed images; absent metadata is not fabricated from the last publication.

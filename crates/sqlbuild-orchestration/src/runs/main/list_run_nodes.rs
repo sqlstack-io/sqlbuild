@@ -4,26 +4,16 @@ use uuid::Uuid;
 
 use crate::runs::models::RunNodeRecord;
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
-use crate::store::main::commit::commit;
-use crate::store::main::decode_row::decode_row;
-use crate::store::main::query::query;
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::main::read_records::read_records;
+use crate::store::models::{ControlStore, Parameter};
 
 /// The API authorizes visibility of the run before reading its nodes.
 pub async fn list_run_nodes(
     store: &ControlStore,
     run_id: Uuid,
 ) -> Result<Vec<RunNodeRecord>, ControlError> {
-    let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, rows) = query(transaction,
+    read_records(store,
         "SELECT node_key, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
          FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
-        vec![Parameter::Id(run_id)]).await?;
-    let nodes = rows
-        .into_iter()
-        .map(decode_row)
-        .collect::<Result<Vec<_>, _>>()?;
-    commit(transaction).await?;
-    Ok(nodes)
+        vec![Parameter::Id(run_id)]).await
 }

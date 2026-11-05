@@ -33,7 +33,6 @@ CREATE TABLE sqb_snapshots (
     image_id TEXT,
     environment_hash TEXT NOT NULL,
     sqb_version TEXT NOT NULL,
-    snapshot_schema_version BIGINT NOT NULL,
     manifest_digest TEXT NOT NULL,
     published_at {time} NOT NULL,
     UNIQUE (location_id, target, generation),
@@ -65,7 +64,6 @@ CREATE TABLE sqb_current_snapshots (
     location_id {uuid} NOT NULL,
     target TEXT NOT NULL,
     snapshot_id {uuid} NOT NULL,
-    since {time} NOT NULL,
     PRIMARY KEY (location_id, target),
     FOREIGN KEY (location_id, target, snapshot_id)
         REFERENCES sqb_snapshots(location_id, target, snapshot_id)
@@ -113,8 +111,7 @@ CREATE TABLE sqb_trigger_state (
     started_at {time} NOT NULL,
     cursor_json {json},
     last_tick_for {time},
-    next_due_at {time},
-    updated_at {time} NOT NULL
+    next_due_at {time}
 );
 CREATE INDEX sqb_trigger_state_due ON sqb_trigger_state(next_due_at) WHERE status = 'running';
 CREATE TABLE sqb_ticks (
@@ -190,7 +187,6 @@ CREATE TABLE sqb_write_claims (
     target TEXT NOT NULL,
     node_key TEXT NOT NULL,
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
-    claimed_at {time} NOT NULL,
     PRIMARY KEY (target, node_key)
 );
 CREATE INDEX sqb_write_claims_run ON sqb_write_claims(run_id);
@@ -198,7 +194,6 @@ CREATE TABLE sqb_concurrency_slots (
     group_key TEXT NOT NULL,
     slot BIGINT NOT NULL CHECK (slot > 0),
     run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
-    claimed_at {time} NOT NULL,
     PRIMARY KEY (group_key, slot),
     UNIQUE (group_key, run_id)
 );
@@ -214,14 +209,13 @@ CREATE TABLE sqb_access_tokens (
     secret_hash TEXT NOT NULL,
     location_id {uuid} REFERENCES sqb_locations(location_id),
     run_id {uuid} REFERENCES sqb_runs(run_id),
-    claim_id {uuid},
     scope_json {json} NOT NULL,
     created_at {time} NOT NULL,
     expires_at {time} NOT NULL,
     revoked_at {time},
     CHECK (
-        (location_id IS NOT NULL AND run_id IS NULL AND claim_id IS NULL)
-        OR (location_id IS NULL AND run_id IS NOT NULL AND claim_id IS NOT NULL)
+        (location_id IS NOT NULL AND run_id IS NULL)
+        OR (location_id IS NULL AND run_id IS NOT NULL)
     )
 );
 CREATE INDEX sqb_access_tokens_location ON sqb_access_tokens(location_id);
@@ -246,7 +240,6 @@ CREATE TABLE sqb_location_instances (
     instance_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    connected_at {time} NOT NULL,
     last_seen_at {time} NOT NULL,
     health_json {json} NOT NULL
 );
@@ -300,7 +293,6 @@ CREATE TABLE sqb_warehouse_freshness (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
@@ -386,7 +378,6 @@ CREATE TABLE sqb_warehouse_audit_results (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     state_database TEXT,
     state_schema TEXT NOT NULL,
@@ -401,14 +392,10 @@ CREATE TABLE sqb_warehouse_janitor_events (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     state_database TEXT,
     state_schema TEXT NOT NULL,
     event_type TEXT NOT NULL,
-    relation_database TEXT,
-    relation_schema TEXT NOT NULL,
-    archive_name TEXT NOT NULL,
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
     scan_id {uuid}
@@ -418,7 +405,6 @@ CREATE TABLE sqb_warehouse_migrations (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     state_database TEXT,
     state_schema TEXT NOT NULL,
@@ -434,13 +420,11 @@ CREATE TABLE sqb_warehouse_old_name_views (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     state_database TEXT,
     state_schema TEXT NOT NULL,
     target_name TEXT,
     migration_event_id TEXT NOT NULL,
-    destination_model TEXT NOT NULL,
     event_type TEXT NOT NULL,
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
@@ -451,7 +435,6 @@ CREATE TABLE sqb_warehouse_microbatches (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
     target TEXT NOT NULL,
-    source_event_id TEXT NOT NULL,
     observed_at {time} NOT NULL,
     state_database TEXT,
     state_schema TEXT NOT NULL,
@@ -459,11 +442,8 @@ CREATE TABLE sqb_warehouse_microbatches (
     target_name TEXT NOT NULL,
     scope_kind TEXT NOT NULL,
     scope_key TEXT NOT NULL,
-    physical_generation_id TEXT NOT NULL,
     record_type TEXT NOT NULL,
-    origin_run_id TEXT NOT NULL,
     execution_run_id TEXT NOT NULL,
-    replay_requirement_id TEXT,
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
     scan_id {uuid}

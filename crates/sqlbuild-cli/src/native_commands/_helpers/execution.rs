@@ -29,6 +29,7 @@ use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
+use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
@@ -799,6 +800,7 @@ pub(crate) async fn open_control_store(
     namespace: &Namespace,
 ) -> Result<ControlStore, ControlError> {
     let url = control_database(namespace)?;
+    set_release_version(env!("CARGO_PKG_VERSION"));
     drop(write_output(&[(
         Stream::Stderr,
         "Opening control store...\n",

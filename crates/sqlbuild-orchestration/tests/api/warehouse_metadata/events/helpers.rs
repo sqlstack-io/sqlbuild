@@ -136,7 +136,7 @@ pub(crate) async fn event_history(
         description: "event page rolls back atomically",
         table: kind.mirror_table(),
         operation: "INSERT",
-        condition: "WHEN NEW.source_event_id='rejected-result'",
+        condition: "WHEN 'rejected-result' IN (NEW.record_json ->> 'event_id', NEW.record_json ->> 'result_id')",
         sqlite_body: "SELECT RAISE(ABORT, 'injected audit failure')",
         postgres_body: "RAISE EXCEPTION 'injected audit failure'",
     };

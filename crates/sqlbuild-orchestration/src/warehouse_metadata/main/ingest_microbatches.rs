@@ -37,22 +37,10 @@ pub async fn ingest_microbatches(
                         ("target_name", Parameter::Text(record.target_name.clone())),
                         ("scope_kind", Parameter::Text(record.scope_kind.clone())),
                         ("scope_key", Parameter::Text(record.scope_key.clone())),
-                        (
-                            "physical_generation_id",
-                            Parameter::Text(record.physical_generation_id.clone()),
-                        ),
                         ("record_type", Parameter::Text(record.record_type.clone())),
-                        (
-                            "origin_run_id",
-                            Parameter::Text(record.origin_run_id.clone()),
-                        ),
                         (
                             "execution_run_id",
                             Parameter::Text(record.execution_run_id.clone()),
-                        ),
-                        (
-                            "replay_requirement_id",
-                            Parameter::OptionalText(record.replay_requirement_id.clone()),
                         ),
                     ],
                     record_json: json!(record),
