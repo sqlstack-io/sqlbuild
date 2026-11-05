@@ -2,7 +2,6 @@
 
 use serde_json::json;
 
-use crate::declarations::main::record_trigger_progress::record_trigger_progress;
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
@@ -80,7 +79,6 @@ pub(crate) async fn persist_ticks(
          AND (last_tick_for IS DISTINCT FROM $1 OR next_due_at IS DISTINCT FROM $2) RETURNING trigger_id",
         vec![Parameter::OptionalTime(plan.last_tick_for), Parameter::OptionalTime(plan.next_due_at), Parameter::Time(now), Parameter::Id(trigger.trigger_id)]).await?;
     if !changed.is_empty() {
-        transaction = record_trigger_progress(transaction, trigger.trigger_id).await?;
         transaction
             .changes
             .insert(Change::Trigger(trigger.trigger_id));

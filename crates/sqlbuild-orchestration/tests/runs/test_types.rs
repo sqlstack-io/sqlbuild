@@ -108,9 +108,3 @@ pub(crate) struct MixedAdmissionTestCase {
     pub(crate) parent_priority: i64,
     pub(crate) expected_selections: [&'static str; 2],
 }
-
-pub(crate) struct RunReplayTestCase {
-    pub(crate) description: &'static str,
-    pub(crate) backend: Backend,
-    pub(crate) expected_runs: usize,
-}

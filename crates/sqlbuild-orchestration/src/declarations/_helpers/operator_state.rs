@@ -3,7 +3,6 @@
 use serde_json::{Value, json};
 
 use crate::declarations::_helpers::trigger_state::trigger_timing;
-use crate::declarations::main::record_trigger_progress::record_trigger_progress;
 use crate::declarations::models::{
     EditableTriggerState, TriggerChange, TriggerChangeRequest, TriggerDeclaration, TriggerStatus,
 };
@@ -74,15 +73,12 @@ pub(crate) async fn apply_operator_change(
         });
     }
     let now = transaction.now;
-    let (mut transaction, changed) = query(transaction,
+    let (mut transaction, _) = query(transaction,
         "UPDATE sqb_trigger_state SET status=$1, status_override=$2, last_tick_for=$3, next_due_at=$4, updated_at=$5 WHERE trigger_id=$6 \
          AND (status IS DISTINCT FROM $1 OR status_override IS DISTINCT FROM $2 OR last_tick_for IS DISTINCT FROM $3 \
          OR next_due_at IS DISTINCT FROM $4) RETURNING trigger_id",
         vec![Parameter::Text(status.as_str().into()), Parameter::OptionalText(state.status_override.map(|value| value.as_str().into())), Parameter::OptionalTime(state.last_tick_for),
             Parameter::OptionalTime(next), Parameter::Time(now), Parameter::Id(request.trigger_id)]).await?;
-    if !changed.is_empty() {
-        transaction = record_trigger_progress(transaction, request.trigger_id).await?;
-    }
     transaction
         .changes
         .insert(Change::Trigger(request.trigger_id));

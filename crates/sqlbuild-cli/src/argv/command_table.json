@@ -1083,14 +1083,6 @@
        },
        {
         "kind": "store",
-        "dest": "server_action",
-        "nargs": "?",
-        "choices": ["rebuild-projections"],
-        "help": "repair derived control projections atomically from retained facts in an initialized store",
-        "group": 0
-       },
-       {
-        "kind": "store",
         "options": [
          "--database-env"
         ],

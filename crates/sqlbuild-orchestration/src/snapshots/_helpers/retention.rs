@@ -8,7 +8,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
-/// Beyond the newest generations, any retained reference keeps a snapshot; superseded progress goes.
+/// Beyond the newest generations, any retained reference keeps a snapshot.
 const EXPIRED_SNAPSHOTS: &str = "SELECT s.snapshot_id FROM sqb_snapshots s \
     WHERE (SELECT COUNT(*) FROM sqb_snapshots newer WHERE newer.location_id=s.location_id \
         AND newer.target=s.target AND newer.generation>s.generation)>=$1 \
@@ -19,9 +19,6 @@ const EXPIRED_SNAPSHOTS: &str = "SELECT s.snapshot_id FROM sqb_snapshots s \
         OR t.removed_in_snapshot_id=s.snapshot_id) \
     AND NOT EXISTS (SELECT 1 FROM sqb_trigger_state_events e WHERE e.snapshot_id=s.snapshot_id) \
     AND NOT EXISTS (SELECT 1 FROM sqb_location_work w WHERE w.snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_trigger_progress p WHERE p.snapshot_id=s.snapshot_id \
-        AND NOT EXISTS (SELECT 1 FROM sqb_trigger_progress newer WHERE newer.trigger_id=p.trigger_id \
-            AND newer.storage_id>p.storage_id)) \
     ORDER BY s.published_at, s.snapshot_id LIMIT $2";
 
 /// Content-addressed bodies of the expiring snapshots, removed once nothing else references them.
@@ -105,7 +102,6 @@ async fn delete_snapshots(
         );
     }
     for table in [
-        "sqb_trigger_progress",
         "sqb_snapshot_sources",
         "sqb_snapshot_nodes",
         "sqb_snapshot_documents",

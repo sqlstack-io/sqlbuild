@@ -6,7 +6,6 @@ pub mod location_work;
 pub(crate) mod read_location_work;
 pub mod read_person_connection_test;
 pub(crate) mod read_platform_events;
-pub mod rebuild_projections;
 pub mod report_location_health;
 pub mod report_remote_location_health;
 pub mod request_location_work;

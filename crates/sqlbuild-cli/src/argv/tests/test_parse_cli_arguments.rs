@@ -56,17 +56,6 @@ fn given_accepted_arguments_when_parsing_then_attributes_hold_the_parsed_values(
             expected_value: Value::Str("none".into()),
         },
         ParsedValueTestCase {
-            description: "projection repair selects maintenance instead of starting server roles",
-            argv: &[
-                "server",
-                "rebuild-projections",
-                "--database-env",
-                "SQLBUILD_TEST_CONTROL_DATABASE_URL",
-            ],
-            attribute: "server_action",
-            expected_value: Value::Str("rebuild-projections".into()),
-        },
-        ParsedValueTestCase {
             description: "viewer metadata access requires an explicit server option",
             argv: &["server", "--default-role", "viewer"],
             attribute: "control_default_role",

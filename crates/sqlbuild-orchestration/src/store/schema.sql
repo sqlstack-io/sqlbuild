@@ -597,14 +597,6 @@ CREATE INDEX sqb_observed_node_decisive ON recall_events(
     (payload -> 'change' -> 'change' ->> 'node_key'), storage_id DESC
 ) WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished')
 AND (payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed');
-CREATE TABLE sqb_trigger_progress (
-    storage_id BIGINT PRIMARY KEY,
-    trigger_id {uuid} NOT NULL,
-    snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    schema_version BIGINT NOT NULL,
-    projection_json {json} NOT NULL
-);
-CREATE INDEX sqb_trigger_progress_latest ON sqb_trigger_progress(trigger_id, storage_id);
 CREATE TABLE sqb_cli_login_flows (
     flow_id {uuid} PRIMARY KEY,
     client_hash TEXT NOT NULL,
@@ -616,7 +608,6 @@ CREATE INDEX sqb_cli_login_expiry ON sqb_cli_login_flows(expires_at);
 CREATE INDEX IF NOT EXISTS sqb_runs_tick ON sqb_runs(tick_id);
 CREATE INDEX IF NOT EXISTS sqb_ticks_expiry ON sqb_ticks(scheduled_for) WHERE outcome IN ('skipped', 'covered');
 CREATE INDEX IF NOT EXISTS sqb_runs_snapshot ON sqb_runs(snapshot_id);
-CREATE INDEX IF NOT EXISTS sqb_trigger_progress_snapshot ON sqb_trigger_progress(snapshot_id);
 CREATE INDEX IF NOT EXISTS sqb_snapshot_nodes_hash ON sqb_snapshot_nodes(node_hash);
 CREATE INDEX IF NOT EXISTS sqb_snapshot_sources_hash ON sqb_snapshot_sources(text_hash);
 CREATE INDEX IF NOT EXISTS sqb_snapshot_documents_hash ON sqb_snapshot_documents(document_hash);

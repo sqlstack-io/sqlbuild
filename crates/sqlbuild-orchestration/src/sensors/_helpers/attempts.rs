@@ -3,7 +3,6 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use crate::declarations::main::record_trigger_progress::record_trigger_progress;
 use crate::sensors::models::{DueSensor, SensorEvaluationFact};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -52,10 +51,10 @@ pub(crate) async fn defer_sensor(
     next: DateTime<Utc>,
 ) -> Result<ControlTransaction, ControlError> {
     let now = transaction.now;
-    let (transaction, changed) = query(
+    let (transaction, _) = query(
         transaction,
         "UPDATE sqb_trigger_state SET next_due_at=$1,updated_at=$2 WHERE trigger_id=$3 \
-         AND next_due_at IS DISTINCT FROM $1 RETURNING trigger_id",
+         AND next_due_at IS DISTINCT FROM $1",
         vec![
             Parameter::Time(next),
             Parameter::Time(now),
@@ -63,9 +62,5 @@ pub(crate) async fn defer_sensor(
         ],
     )
     .await?;
-    if changed.is_empty() {
-        Ok(transaction)
-    } else {
-        record_trigger_progress(transaction, trigger_id).await
-    }
+    Ok(transaction)
 }

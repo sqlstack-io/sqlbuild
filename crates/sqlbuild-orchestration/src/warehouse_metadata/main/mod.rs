@@ -13,5 +13,4 @@ pub mod read_person_node_status;
 pub mod read_person_statistics;
 pub mod read_statistics_due;
 pub mod read_watermark;
-pub(crate) mod rebuild_catalog;
 pub mod run_statistics_retention;

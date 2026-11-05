@@ -16,7 +16,6 @@ use sqlbuild_orchestration::authorization::main::recover_administrator::recover_
 use sqlbuild_orchestration::credentials::main::audit::run_audit_retention::run_audit_retention;
 use sqlbuild_orchestration::credentials::models::{AuditContext, AuditRetention};
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
-use sqlbuild_orchestration::platform::main::rebuild_projections::rebuild_projections;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
 use sqlbuild_orchestration::platform::models::{
@@ -67,8 +66,7 @@ use crate::native_commands::_helpers::terminal::{
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS,
-    METADATA_RECONCILE_SECONDS, SCHEDULER_COMMAND, SERVER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
-    UNKNOWN_COMMAND,
+    METADATA_RECONCILE_SECONDS, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -900,17 +898,6 @@ pub(crate) async fn run_control_action(
 ) -> Result<Option<serde_json::Value>, ControlError> {
     if command == ADMIN_COMMAND {
         return run_administration(namespace).await.map(Some);
-    }
-    if command == SERVER_COMMAND
-        && text(namespace, "server_action").as_deref() == Some("rebuild-projections")
-    {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Rebuilding control projections...\n",
-        )]));
-        let store = open_store(&control_database(namespace)?).await?;
-        rebuild_projections(&store).await?;
-        return Ok(Some(json!({"rebuilt":true})));
     }
     run_control(namespace, command == SCHEDULER_COMMAND)
         .await

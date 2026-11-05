@@ -9,15 +9,8 @@ use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;
 use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
-#[cfg(test)]
-use crate::store::{
-    main::{begin::begin, commit::commit},
-    models::{ControlStore, TransactionMode},
-};
 use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
-#[cfg(test)]
-use crate::warehouse_metadata::main::rebuild_catalog::replay_catalog_projection;
 use crate::warehouse_metadata::models::{
     CatalogBatch, CatalogObservation, CatalogPage, CatalogQuery, WarehouseCatalogRecord,
     WarehouseReconciliationCursor,
@@ -167,11 +160,4 @@ pub(crate) async fn read_catalog_page(
             next_after,
         },
     ))
-}
-
-/// Internal replay owner; scan receipts, reader sessions and authoritative facts are preserved.
-#[cfg(test)]
-pub(crate) async fn rebuild_catalog_projection(store: &ControlStore) -> Result<(), ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    commit(replay_catalog_projection(transaction).await?).await
 }

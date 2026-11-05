@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::snapshots::main::rebuild_projections::replay_snapshot_projections;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::open_store::open_store;
@@ -18,11 +17,6 @@ use crate::snapshots::tests::test_types::SchemaRejectionCase;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
-
-pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result<(), ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    commit(replay_snapshot_projections(transaction).await?).await
-}
 
 pub(super) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {
@@ -307,29 +301,6 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     recovered.generation
 }
 
-pub(super) async fn damage(store: &ControlStore) {
-    use crate::store::main::{begin::begin, commit::commit, query::query};
-    use crate::store::models::TransactionMode;
-
-    let mut transaction = begin(store, TransactionMode::Write)
-        .await
-        .expect("damage cut");
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/duckshop/edge_cases/orchestration/projection_replay.json");
-    let fixture: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(path).expect("projection replay fixture"))
-            .expect("projection replay fixture");
-    for sql in fixture["snapshot_damage"]
-        .as_array()
-        .expect("snapshot damage")
-    {
-        (transaction, _) = query(transaction, sql.as_str().expect("damage SQL"), vec![])
-            .await
-            .expect("projection damage");
-    }
-    commit(transaction).await.expect("damage commits");
-}
-
 /// Retained generations for one location and target, and counts that expose orphaned content.
 pub(super) async fn retained_snapshot_state(store: &ControlStore, location_id: Uuid) -> Vec<i64> {
     let transaction = begin(store, TransactionMode::Read)
@@ -348,8 +319,8 @@ pub(super) async fn retained_snapshot_state(store: &ControlStore, location_id: U
         .collect()
 }
 
-/// Source texts, unreferenced source texts and trigger progress facts.
-pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64, i64) {
+/// Source texts and unreferenced source texts.
+pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64) {
     let transaction = begin(store, TransactionMode::Read)
         .await
         .expect("retention counts");
@@ -357,13 +328,12 @@ pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64, i64) {
         transaction,
         "SELECT (SELECT COUNT(*) FROM sqb_source_texts) AS texts, \
          (SELECT COUNT(*) FROM sqb_source_texts t WHERE NOT EXISTS \
-            (SELECT 1 FROM sqb_snapshot_sources s WHERE s.text_hash=t.text_hash)) AS orphans, \
-         (SELECT COUNT(*) FROM sqb_trigger_progress) AS progress",
+            (SELECT 1 FROM sqb_snapshot_sources s WHERE s.text_hash=t.text_hash)) AS orphans",
         vec![],
     )
     .await
     .expect("counts");
     commit(transaction).await.expect("retention counts read");
     let count = |name: &str| rows[0][name].as_i64().expect("count");
-    (count("texts"), count("orphans"), count("progress"))
+    (count("texts"), count("orphans"))
 }
