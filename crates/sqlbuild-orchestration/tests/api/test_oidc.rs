@@ -307,7 +307,7 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             assert_eq!(machine.status(), StatusCode::UNAUTHORIZED);
             let transaction = begin(store, TransactionMode::Read).await.expect("evidence");
             let (transaction, rows) = query(transaction,
-                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
+                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_sessions WHERE credential_id IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
                 vec![]).await.expect("no provisioning");
             assert_eq!(
                 json!(rows[0]),

@@ -40,8 +40,7 @@ def postgres_recovery_state(connection: Any) -> dict[str, str]:
         "sqb_principals",
         "sqb_role_assignments",
         "sqb_password_credentials",
-        "sqb_password_sessions",
-        "sqb_external_sessions",
+        "sqb_sessions",
         "sqb_security_audit",
         "sqb_admin_initialization",
         "sqb_installation",
@@ -95,7 +94,7 @@ def verify_recovery(binary: Path) -> str:
                 "SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'"
             ).fetchone() == (1,)
             assert control.execute(
-                "SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL"
+                "SELECT COUNT(*) FROM sqb_sessions WHERE revoked_at IS NULL"
             ).fetchone() == (0,)
         print(
             "grant-admin committed one audit while serving; bootstrap stayed closed; "

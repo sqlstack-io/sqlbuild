@@ -13,14 +13,11 @@ pub(crate) async fn active_session(
 ) -> Result<(ControlTransaction, Option<StoredSession>), ControlError> {
     let now = transaction.now;
     let (transaction, rows) = query(transaction,
-        "SELECT s.session_id,s.principal_id,s.expires_at,s.secret_hash,s.csrf_hash,s.credential_id FROM (\
-         SELECT s.session_id,s.principal_id,s.expires_at,s.secret_hash,s.csrf_hash,s.revoked_at,s.credential_id \
-         FROM sqb_password_sessions s JOIN sqb_password_credentials c \
-         ON c.principal_id=s.principal_id AND c.credential_id=s.credential_id \
-         UNION ALL SELECT session_id,principal_id,expires_at,secret_hash,csrf_hash,revoked_at,NULL AS credential_id FROM sqb_external_sessions\
-         ) s JOIN sqb_principals p ON p.principal_id=s.principal_id \
+        "SELECT s.session_id,s.principal_id,s.expires_at,s.secret_hash,s.csrf_hash,s.credential_id \
+         FROM sqb_sessions s JOIN sqb_principals p ON p.principal_id=s.principal_id \
+         LEFT JOIN sqb_password_credentials c ON c.principal_id=s.principal_id AND c.credential_id=s.credential_id \
          WHERE s.session_id=$1 AND s.revoked_at IS NULL AND s.expires_at>$2 \
-         AND p.disabled_at IS NULL",
+         AND p.disabled_at IS NULL AND (s.credential_id IS NULL OR c.credential_id IS NOT NULL)",
         vec![Parameter::Id(id), Parameter::Time(now)]).await?;
     Ok((
         transaction,

@@ -167,7 +167,7 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 begin(store, TransactionMode::Read)
                     .await
                     .expect("inspect sessions"),
-                "SELECT secret_hash, csrf_hash FROM sqb_password_sessions",
+                "SELECT secret_hash, csrf_hash FROM sqb_sessions",
                 vec![],
             )
             .await
@@ -207,7 +207,7 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 begin(store, TransactionMode::Read)
                     .await
                     .expect("inspect rollback"),
-                "SELECT session_id FROM sqb_password_sessions WHERE principal_id=$1",
+                "SELECT session_id FROM sqb_sessions WHERE principal_id=$1",
                 vec![Parameter::Id(customer)],
             )
             .await
@@ -353,7 +353,7 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
             let expired = transaction.now - Duration::seconds(1);
             let (transaction, _) = query(
                 transaction,
-                "UPDATE sqb_password_sessions SET expires_at=$1 WHERE session_id=$2",
+                "UPDATE sqb_sessions SET expires_at=$1 WHERE session_id=$2",
                 vec![
                     Parameter::Time(expired),
                     Parameter::Id(session.identity.session_id),
@@ -372,7 +372,7 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 begin(store, TransactionMode::Read)
                     .await
                     .expect("session history"),
-                "SELECT revoked_at FROM sqb_password_sessions WHERE session_id=$1",
+                "SELECT revoked_at FROM sqb_sessions WHERE session_id=$1",
                 vec![Parameter::Id(customer_session.identity.session_id)],
             )
             .await

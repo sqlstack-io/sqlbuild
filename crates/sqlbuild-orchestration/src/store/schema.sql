@@ -362,17 +362,17 @@ CREATE TABLE sqb_password_credentials (
     password_hash TEXT NOT NULL,
     changed_at {time} NOT NULL
 );
-CREATE TABLE sqb_password_sessions (
+CREATE TABLE sqb_sessions (
     session_id {uuid} PRIMARY KEY,
     principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
-    credential_id {uuid} NOT NULL,
+    credential_id {uuid},
     secret_hash TEXT NOT NULL,
     csrf_hash TEXT NOT NULL,
     created_at {time} NOT NULL,
     expires_at {time} NOT NULL,
     revoked_at {time}
 );
-CREATE INDEX sqb_password_sessions_person ON sqb_password_sessions(principal_id);
+CREATE INDEX sqb_sessions_person ON sqb_sessions(principal_id);
 CREATE TABLE sqb_password_login_attempts (
     attempt_id {uuid} PRIMARY KEY,
     identity_key TEXT NOT NULL,
@@ -411,16 +411,6 @@ CREATE TABLE sqb_role_assignments (
     active_key TEXT UNIQUE
 );
 CREATE INDEX sqb_role_assignments_principal ON sqb_role_assignments(principal_id);
-CREATE TABLE sqb_external_sessions (
-    session_id {uuid} PRIMARY KEY,
-    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
-    secret_hash TEXT NOT NULL,
-    csrf_hash TEXT NOT NULL,
-    created_at {time} NOT NULL,
-    expires_at {time} NOT NULL,
-    revoked_at {time}
-);
-CREATE INDEX sqb_external_sessions_person ON sqb_external_sessions(principal_id);
 CREATE INDEX sqb_fingerprints_namespace ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_freshness_namespace ON sqb_warehouse_freshness (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE UNIQUE INDEX sqb_security_audit_storage_id ON sqb_security_audit(storage_id);

@@ -326,7 +326,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 assert_eq!(row["granting_role"], "trusted-proxy");
                 assert_eq!(row["ip_address"], "127.0.0.1");
             }
-            let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning or personal tokens");
+            let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning or personal tokens");
             assert_eq!(
                 json!(rows[0]),
                 json!({"principals": 1, "sessions": test_case.expected_authentications, "tokens": 0})

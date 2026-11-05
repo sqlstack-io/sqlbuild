@@ -256,7 +256,7 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                 begin(store, TransactionMode::Read)
                     .await
                     .expect("inspect sessions"),
-                "SELECT session_id,created_at,expires_at FROM sqb_external_sessions",
+                "SELECT session_id,created_at,expires_at FROM sqb_sessions WHERE credential_id IS NULL",
                 vec![],
             )
             .await
@@ -285,7 +285,7 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                 begin(store, TransactionMode::Write)
                     .await
                     .expect("expire session"),
-                "UPDATE sqb_external_sessions SET expires_at=created_at WHERE session_id=$1",
+                "UPDATE sqb_sessions SET expires_at=created_at WHERE session_id=$1",
                 vec![Parameter::Id(sessions[0].2)],
             )
             .await
