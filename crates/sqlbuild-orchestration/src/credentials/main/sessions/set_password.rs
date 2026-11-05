@@ -50,7 +50,7 @@ pub async fn set_password(
         let sessions;
         (transaction, sessions) = query(
             transaction,
-            "SELECT session_id FROM sqb_password_sessions WHERE session_id=$1 AND principal_id=$2 \
+            "SELECT session_id FROM sqb_sessions WHERE session_id=$1 AND principal_id=$2 \
              AND credential_id=$3 AND revoked_at IS NULL AND expires_at>$4",
             vec![
                 Parameter::Id(session_id),
