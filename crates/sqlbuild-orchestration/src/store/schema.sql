@@ -94,14 +94,6 @@ CREATE TABLE sqb_jobs (
     definition_json {json} NOT NULL,
     PRIMARY KEY (location_id, target, job_key)
 );
-CREATE TABLE sqb_job_nodes (
-    location_id {uuid} NOT NULL,
-    target TEXT NOT NULL,
-    job_key TEXT NOT NULL,
-    node_key TEXT NOT NULL,
-    PRIMARY KEY (location_id, target, job_key, node_key),
-    FOREIGN KEY (location_id, target, job_key) REFERENCES sqb_jobs(location_id, target, job_key)
-);
 CREATE TABLE sqb_triggers (
     trigger_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -125,14 +117,6 @@ CREATE TABLE sqb_trigger_state (
     updated_at {time} NOT NULL
 );
 CREATE INDEX sqb_trigger_state_due ON sqb_trigger_state(next_due_at) WHERE status = 'running';
-CREATE TABLE sqb_trigger_state_events (
-    event_id {uuid} PRIMARY KEY,
-    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
-    occurred_at {time} NOT NULL,
-    snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
-    request_json {json} NOT NULL
-);
-CREATE INDEX sqb_trigger_state_events_time ON sqb_trigger_state_events(trigger_id, occurred_at, event_id);
 CREATE TABLE sqb_ticks (
     tick_id {uuid} PRIMARY KEY,
     trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
@@ -255,6 +239,8 @@ CREATE TABLE sqb_security_audit (
     storage_id BIGINT
 );
 CREATE INDEX sqb_security_audit_time ON sqb_security_audit(occurred_at, event_id);
+CREATE INDEX sqb_security_audit_trigger ON sqb_security_audit((scope_json ->> 'trigger_id'), occurred_at, event_id)
+WHERE action = 'trigger.changed';
 CREATE TABLE sqb_location_instances (
     instance_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -390,11 +376,6 @@ CREATE TABLE sqb_oidc_login_flows (
     expires_at {time} NOT NULL
 );
 CREATE INDEX sqb_oidc_login_flows_expiry ON sqb_oidc_login_flows(expires_at);
-CREATE TABLE sqb_admin_initialization (
-    singleton BIGINT PRIMARY KEY CHECK (singleton=1),
-    principal_id {uuid} NOT NULL,
-    initialized_at {time} NOT NULL
-);
 CREATE TABLE sqb_role_assignments (
     assignment_id {uuid} PRIMARY KEY,
     principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),

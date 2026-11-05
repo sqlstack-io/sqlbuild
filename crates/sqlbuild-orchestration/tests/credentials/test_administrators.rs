@@ -237,10 +237,10 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         .is_err()
                 );
                 remove_fault(store, &fault).await;
-                let (transaction,rows) = query(begin(store,TransactionMode::Read).await.expect("inspect rollback"),"SELECT (SELECT COUNT(*) FROM sqb_principals) AS people, (SELECT COUNT(*) FROM sqb_admin_initialization) AS initialized, (SELECT COUNT(*) FROM sqb_role_assignments) AS assignments",vec![]).await.expect("count rolled back bootstrap");
+                let (transaction,rows) = query(begin(store,TransactionMode::Read).await.expect("inspect rollback"),"SELECT (SELECT COUNT(*) FROM sqb_principals) AS people, (SELECT COUNT(*) FROM sqb_role_assignments) AS assignments",vec![]).await.expect("count rolled back bootstrap");
                 assert_eq!(
                     serde_json::to_value(&rows[0]).expect("serializable row"),
-                    json!({"people":0,"initialized":0,"assignments":0})
+                    json!({"people":0,"assignments":0})
                 );
                 assert_eq!(
                     rows[0]["assignments"],

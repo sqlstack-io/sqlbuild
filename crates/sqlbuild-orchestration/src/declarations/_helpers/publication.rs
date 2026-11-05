@@ -67,17 +67,15 @@ pub(crate) async fn publish_jobs(
     snapshot: &SnapshotRecord,
     definitions: &Definitions,
 ) -> Result<ControlTransaction, ControlError> {
-    for table in ["sqb_job_nodes", "sqb_jobs"] {
-        (transaction, _) = query(
-            transaction,
-            &format!("DELETE FROM {table} WHERE location_id=$1 AND target=$2"),
-            vec![
-                Parameter::Id(snapshot.location_id),
-                Parameter::Text(snapshot.target.clone()),
-            ],
-        )
-        .await?;
-    }
+    (transaction, _) = query(
+        transaction,
+        "DELETE FROM sqb_jobs WHERE location_id=$1 AND target=$2",
+        vec![
+            Parameter::Id(snapshot.location_id),
+            Parameter::Text(snapshot.target.clone()),
+        ],
+    )
+    .await?;
     let jobs = definitions
         .jobs
         .iter()
@@ -95,11 +93,6 @@ pub(crate) async fn publish_jobs(
             "INSERT INTO sqb_jobs (location_id, target, job_key, snapshot_id, kind, definition_json) VALUES ($1,$2,$3,$4,$6,$5)",
             vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()),
                 Parameter::Id(snapshot.snapshot_id), Parameter::Json(definition), Parameter::Text(kind.into())]).await?;
-        for node in &job.selection {
-            (transaction, _) = query(transaction,
-                "INSERT INTO sqb_job_nodes (location_id, target, job_key, node_key) VALUES ($1,$2,$3,$4)",
-                vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()), Parameter::Text(node.clone())]).await?;
-        }
     }
     Ok(transaction)
 }

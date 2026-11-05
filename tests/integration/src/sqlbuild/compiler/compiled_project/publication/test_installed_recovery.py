@@ -131,8 +131,7 @@ def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_per
                 assert after is not None
                 assert after == (0, 1, 1, 1)
                 retained_after: dict[str, str] = postgres_recovery_state(control)
-                for table in ("sqb_installation", "sqb_admin_initialization"):
-                    assert retained_after[table] == retained_before[table]
+                assert retained_after["sqb_installation"] == retained_before["sqb_installation"]
                 audit: Any = control.execute(
                     "SELECT scope_json FROM sqb_security_audit WHERE action='admin.granted'"
                 ).fetchone()
