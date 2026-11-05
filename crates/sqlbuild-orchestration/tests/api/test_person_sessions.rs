@@ -17,7 +17,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, PasswordAuthority, PasswordLogin, PrincipalKind,
+    AdministratorAuthentication, AuditContext, PasswordAuthority, PasswordLogin,
     RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
@@ -66,10 +66,9 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("administrator");
-            let person =
-                create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-person")
+                .await
+                .expect("person");
             for id in [admin, person] {
                 set_password(
                     store,

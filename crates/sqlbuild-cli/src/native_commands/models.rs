@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
-use sqlbuild_orchestration::credentials::models::{CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::credentials::models::CredentialScope;
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
@@ -19,7 +19,7 @@ use crate::native_commands::types::LocationPublication;
 /// Privileged local operations require direct ownership of the control database.
 pub(crate) enum ControlAdmin {
     CreateLocation(String),
-    CreatePrincipal(String, PrincipalKind),
+    CreatePrincipal(String),
     BootstrapUser(String),
     IssueToken(CredentialScope, DateTime<Utc>),
     RevokeToken(Uuid),

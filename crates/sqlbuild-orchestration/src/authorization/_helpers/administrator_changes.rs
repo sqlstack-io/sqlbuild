@@ -21,7 +21,7 @@ pub(crate) async fn apply_change(
     let (mut transaction, rows) = query(transaction,
         "SELECT p.disabled_at,a.assignment_id FROM sqb_principals p LEFT JOIN sqb_role_assignments a \
          ON p.principal_id=a.principal_id AND a.role_key='admin' AND a.location_id IS NULL \
-         AND a.target IS NULL AND a.revoked_at IS NULL WHERE p.principal_id=$1 AND p.kind='person'",
+         AND a.target IS NULL AND a.revoked_at IS NULL WHERE p.principal_id=$1",
         vec![Parameter::Id(principal_id)]).await?;
     let Some(person) = rows.first() else {
         return deny_change(

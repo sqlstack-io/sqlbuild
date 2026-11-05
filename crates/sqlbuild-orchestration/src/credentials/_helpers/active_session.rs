@@ -20,7 +20,7 @@ pub(crate) async fn active_session(
          UNION ALL SELECT session_id,principal_id,expires_at,secret_hash,csrf_hash,revoked_at,NULL AS credential_id FROM sqb_external_sessions\
          ) s JOIN sqb_principals p ON p.principal_id=s.principal_id \
          WHERE s.session_id=$1 AND s.revoked_at IS NULL AND s.expires_at>$2 \
-         AND p.kind='person' AND p.disabled_at IS NULL",
+         AND p.disabled_at IS NULL",
         vec![Parameter::Id(id), Parameter::Time(now)]).await?;
     Ok((
         transaction,

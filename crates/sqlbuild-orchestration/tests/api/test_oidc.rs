@@ -12,7 +12,7 @@ use crate::api::tests::oidc_helpers::{callback, login, start_provider, stop_prov
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault};
 use crate::api::tests::test_types::{OidcApiTestCase, OidcThrottleTestCase};
 use crate::credentials::main::identities::create_principal::create_principal;
-use crate::credentials::models::{AuditContext, PrincipalKind};
+use crate::credentials::models::AuditContext;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -58,17 +58,9 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person =
-                create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                    .await
-                    .expect("person");
-            let service = create_principal(
-                store,
-                &context,
-                ("orders-service", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("service");
+            let person = create_principal(store, &context, "orders-person")
+                .await
+                .expect("person");
             let settings = OidcAuthentication {
                 origin: inputs["origin"].as_str().expect("origin").into(),
                 issuer: provider.state.issuer.clone(),
@@ -77,7 +69,6 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                 certificate_authority: Some(provider.authority.clone()),
                 identities: BTreeMap::from([
                     ("orders-person".into(), person),
-                    ("orders-service".into(), service),
                     ("absent-person".into(), Uuid::now_v7()),
                 ]),
             };
@@ -320,7 +311,7 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                 vec![]).await.expect("no provisioning");
             assert_eq!(
                 json!(rows[0]),
-                json!({"principals":2,"sessions":test_case.expected_authentications,"tokens":0,"authentications":test_case.expected_authentications}),
+                json!({"principals":1,"sessions":test_case.expected_authentications,"tokens":0,"authentications":test_case.expected_authentications}),
                 "{}",
                 test_case.description
             );

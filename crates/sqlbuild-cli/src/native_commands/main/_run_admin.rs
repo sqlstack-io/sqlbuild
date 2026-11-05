@@ -44,9 +44,9 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             let id = create_location(&store, &name, &context).await?;
             Ok(json!({"location_id": id, "name": name}))
         }
-        ControlAdmin::CreatePrincipal(name, kind) => {
-            let id = create_principal(&store, &context, (&name, kind)).await?;
-            Ok(json!({"principal_id": id, "name": name, "kind": kind}))
+        ControlAdmin::CreatePrincipal(name) => {
+            let id = create_principal(&store, &context, &name).await?;
+            Ok(json!({"principal_id": id, "name": name}))
         }
         ControlAdmin::IssueToken(scope, expires_at) => {
             let token = issue_token(&store, &context, scope, expires_at).await?;

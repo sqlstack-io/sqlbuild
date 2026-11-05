@@ -14,7 +14,7 @@ pub(crate) async fn issue_session(
     let transaction = begin(store, TransactionMode::Write).await?;
     let (transaction, rows) = query(transaction,
         "SELECT p.principal_id FROM sqb_principals p JOIN sqb_password_credentials c ON p.principal_id=c.principal_id \
-         WHERE p.principal_id=$1 AND c.credential_id=$2 AND p.kind='person' AND p.disabled_at IS NULL",
+         WHERE p.principal_id=$1 AND c.credential_id=$2 AND p.disabled_at IS NULL",
         vec![Parameter::Id(proof.principal_id), Parameter::Id(proof.credential_id)]).await?;
     if rows.is_empty() {
         commit(transaction).await?;

@@ -14,7 +14,7 @@ use crate::credentials::main::{
     identities::create_principal::create_principal, locations::create_location::create_location,
     sessions::set_password::set_password, sessions::verify_password::verify_password,
 };
-use crate::credentials::models::{AuditContext, PasswordAuthority, PrincipalKind};
+use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -63,18 +63,15 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
             let first = bootstrap_user(store, &context, first_subject)
                 .await
                 .expect("first admin");
-            let second = create_principal(store, &context, (second_subject, PrincipalKind::Person))
+            let second = create_principal(store, &context, second_subject)
                 .await
                 .expect("second person");
             let unbound = create_principal(
                 store,
                 &context,
-                (
-                    people["unbound_password_person"]
-                        .as_str()
-                        .expect("unbound password person"),
-                    PrincipalKind::Person,
-                ),
+                people["unbound_password_person"]
+                    .as_str()
+                    .expect("unbound password person"),
             )
             .await
             .expect("unbound person");

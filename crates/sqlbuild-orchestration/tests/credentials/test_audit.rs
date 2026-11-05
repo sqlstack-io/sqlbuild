@@ -24,7 +24,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
-    PrincipalKind, RoleAssignmentRequest,
+    RoleAssignmentRequest,
 };
 use crate::credentials::tests::test_types::{AuditTestCase, AuditWebhookReceiver};
 use crate::store::errors::ControlError;
@@ -69,10 +69,9 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("bootstrap");
-            let person =
-                create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-person")
+                .await
+                .expect("person");
             let mut sessions = Vec::new();
             for (principal, name) in [(admin, "orders-admin"), (person, "orders-person")] {
                 set_password(
@@ -243,7 +242,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             };
             install_fault(store, &fault).await;
             assert!(
-                create_principal(store, &context, ("orders-rollback", PrincipalKind::Person))
+                create_principal(store, &context, "orders-rollback")
                     .await
                     .is_err()
             );
@@ -254,7 +253,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                     .expect("failed audit did not publish")
                     .is_empty()
             );
-            create_principal(store, &context, ("orders-rollback", PrincipalKind::Person))
+            create_principal(store, &context, "orders-rollback")
                 .await
                 .expect("failed principal did not persist");
             let after = read_security_audit(store, (&context, admin_credentials), (cursor, 100))
@@ -264,16 +263,8 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             assert_eq!(after[0].storage_id, cursor + 1);
             let cursor = after[0].storage_id;
             let (left, right) = tokio::join!(
-                create_principal(
-                    store,
-                    &context,
-                    ("orders-concurrent", PrincipalKind::Person)
-                ),
-                create_principal(
-                    &replica,
-                    &context,
-                    ("customers-concurrent", PrincipalKind::Person)
-                ),
+                create_principal(store, &context, "orders-concurrent"),
+                create_principal(&replica, &context, "customers-concurrent"),
             );
             assert_ne!(
                 left.expect("first concurrent append"),

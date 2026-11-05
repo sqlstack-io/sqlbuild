@@ -15,8 +15,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, PrincipalKind,
-    SessionAccess,
+    AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, SessionAccess,
 };
 use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorRecoveryTestCase;
@@ -66,13 +65,9 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
             let reason = inputs["recovery_reason"].as_str().expect("recovery reason");
             let name = inputs["first_person"].as_str().expect("person name");
             let password = inputs["password"].as_str().expect("password");
-            let ordinary = create_principal(
-                &fixture.store,
-                &context,
-                ("customers-reader", PrincipalKind::Person),
-            )
-            .await
-            .expect("ordinary person");
+            let ordinary = create_principal(&fixture.store, &context, "customers-reader")
+                .await
+                .expect("ordinary person");
             close_store(fixture.store).await;
             assert!(
                 recover_administrator(

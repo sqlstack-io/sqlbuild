@@ -132,7 +132,6 @@ fn given_owner_provisioned_passwords_when_a_standalone_server_authenticates_then
         let url = api_ready(&mut control).await;
         let person = administer(&control, &["create-principal", "orders-reader"]);
         let principal = person["principal_id"].as_str().expect("person identity");
-        let service = administer(&control, &["create-principal", "orders-service", "--kind", "service_account"]);
         let password = test_case.password;
         let invalid_inputs = [Vec::new(), b"short\n".to_vec(), vec![b'x'; 5000], vec![0xff, b'\n']];
         for input in invalid_inputs {
@@ -140,10 +139,6 @@ fn given_owner_provisioned_passwords_when_a_standalone_server_authenticates_then
             assert!(!output.status.success(), "invalid stdin must not set a password");
             assert!(output.stdout.is_empty());
         }
-        let rejected = invoke_password(&control, service["principal_id"].as_str().expect("service identity"), password.as_bytes());
-        assert!(!rejected.status.success());
-        assert!(rejected.stdout.is_empty());
-        assert!(!String::from_utf8_lossy(&rejected.stderr).contains(password));
 
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().expect("HTTP client");
         let login = |password: &str| client.post(format!("{url}/api/auth/password/login"))

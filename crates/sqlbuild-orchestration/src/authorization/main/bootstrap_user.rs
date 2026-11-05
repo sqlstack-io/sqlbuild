@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::authorization::_helpers::administrators::grant_installation_admin;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::main::identities::insert_principal::insert_principal;
-use crate::credentials::models::{AuditContext, PrincipalKind};
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -27,8 +27,7 @@ pub async fn bootstrap_user(
             "administrator initialization already occurred; bootstrap is closed".into(),
         ));
     }
-    let (transaction, principal_id) =
-        insert_principal(transaction, context, (name, PrincipalKind::Person)).await?;
+    let (transaction, principal_id) = insert_principal(transaction, context, name).await?;
     let now = transaction.now;
     let (transaction, _) = query(transaction,
         "INSERT INTO sqb_admin_initialization (singleton,principal_id,initialized_at) VALUES (1,$1,$2)",

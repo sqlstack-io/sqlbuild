@@ -17,9 +17,12 @@ pub(crate) async fn authenticate_bound_person(
     mechanism: ExternalIdentityMechanism,
 ) -> Result<Option<IssuedSession>, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, rows) = query(transaction,
-        "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 AND kind='person' AND disabled_at IS NULL",
-        vec![Parameter::Id(principal_id)]).await?;
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 AND disabled_at IS NULL",
+        vec![Parameter::Id(principal_id)],
+    )
+    .await?;
     if rows.is_empty() {
         commit(transaction).await?;
         return Ok(None);

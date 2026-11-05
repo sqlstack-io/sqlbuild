@@ -13,7 +13,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole, DefaultRole,
-    PasswordAuthority, PasswordLogin, PrincipalKind, RoleAssignmentRequest,
+    PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
@@ -96,10 +96,9 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     let admin = bootstrap_user(store, &context, "orders-admin")
                         .await
                         .expect("bootstrap");
-                    let person =
-                        create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                            .await
-                            .expect("role-free person");
+                    let person = create_principal(store, &context, "orders-person")
+                        .await
+                        .expect("role-free person");
                     let mut sessions = Vec::new();
                     for (id, name) in [(admin, "orders-admin"), (person, "orders-person")] {
                         set_password(

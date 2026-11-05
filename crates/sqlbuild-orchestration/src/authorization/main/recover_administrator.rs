@@ -39,7 +39,7 @@ pub async fn recover_administrator(
     }
     let (transaction, people) = query(
         transaction,
-        "SELECT disabled_at FROM sqb_principals WHERE principal_id=$1 AND kind='person'",
+        "SELECT disabled_at FROM sqb_principals WHERE principal_id=$1",
         vec![Parameter::Id(principal_id)],
     )
     .await?;

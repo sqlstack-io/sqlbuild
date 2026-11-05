@@ -12,13 +12,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
 
-const ADMINISTRATIVE: [Action; 5] = [
-    Action::LocationManage,
-    Action::UserManage,
-    Action::RoleAssign,
-    Action::TokenManage,
-    Action::AuditView,
-];
+const ADMINISTRATIVE: [Action; 3] = [Action::UserManage, Action::RoleAssign, Action::AuditView];
 
 const BUILTIN: [&str; 4] = ["viewer", "operator", "developer", "admin"];
 

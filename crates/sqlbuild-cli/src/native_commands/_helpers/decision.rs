@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use sqlbuild_orchestration::api::models::ApiAuthentication;
-use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
@@ -69,11 +69,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
         if value.trim().is_empty() {
             return Err(ControlError::Invalid("principal name is required".into()));
         }
-        let kind = match text(namespace, "admin_principal_kind").as_deref() {
-            Some("service_account") => PrincipalKind::ServiceAccount,
-            _ => PrincipalKind::Person,
-        };
-        return Ok(ControlAdmin::CreatePrincipal(value, kind));
+        return Ok(ControlAdmin::CreatePrincipal(value));
     }
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
@@ -216,7 +212,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                 reason,
             })
         }
-        Some("issue-location-token" | "issue-principal-token") => {
+        Some("issue-location-token") => {
             let expiry = DateTime::parse_from_rfc3339(
                 &text(namespace, "admin_expires_at").unwrap_or_default(),
             )
@@ -227,11 +223,10 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     "token expiry must be in the future".into(),
                 ));
             }
-            let scope = match action.as_deref() {
-                Some("issue-principal-token") => CredentialScope::Principal { principal_id: id },
-                _ => CredentialScope::Location { location_id: id },
-            };
-            Ok(ControlAdmin::IssueToken(scope, expiry))
+            Ok(ControlAdmin::IssueToken(
+                CredentialScope::Location { location_id: id },
+                expiry,
+            ))
         }
         Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
         Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),

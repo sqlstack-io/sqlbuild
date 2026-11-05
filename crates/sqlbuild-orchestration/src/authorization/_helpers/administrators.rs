@@ -16,9 +16,12 @@ pub(crate) async fn grant_installation_admin(
     principal_id: Uuid,
     source: &str,
 ) -> Result<(ControlTransaction, bool), ControlError> {
-    let (transaction, people) = query(transaction,
-        "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 AND kind='person' AND disabled_at IS NULL",
-        vec![Parameter::Id(principal_id)]).await?;
+    let (transaction, people) = query(
+        transaction,
+        "SELECT principal_id FROM sqb_principals WHERE principal_id=$1 AND disabled_at IS NULL",
+        vec![Parameter::Id(principal_id)],
+    )
+    .await?;
     if people.is_empty() {
         return Err(ControlError::Invalid(
             "administrator must be an active person".into(),
@@ -59,7 +62,7 @@ pub(crate) async fn remaining_administrator(
         "SELECT a.principal_id,c.credential_id FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
          LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id \
          WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL AND a.revoked_at IS NULL \
-         AND p.kind='person' AND p.disabled_at IS NULL AND p.principal_id<>$1",
+         AND p.disabled_at IS NULL AND p.principal_id<>$1",
         vec![Parameter::Id(principal_id)]).await?;
     for person in rows {
         let usable = match authentication {

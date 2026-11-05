@@ -958,12 +958,6 @@ export interface components {
             next_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
             records: components["schemas"]["CatalogObservation"][];
         };
-        CatchUp: "latest" | {
-            /** @description Process the oldest bounded batch; later due times remain due for the next transaction. */
-            all: {
-                max_runs: number;
-            };
-        };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
             topic: string;
@@ -1311,8 +1305,6 @@ export interface components {
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
-        /** @enum {string} */
-        Overlap: "coalesce" | "queue" | "allow";
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -1557,7 +1549,6 @@ export interface components {
             /** Format: uuid */
             location_id: string;
             origin: components["schemas"]["RunOrigin"];
-            overlap: components["schemas"]["Overlap"];
             /** Format: uuid */
             parent_run_id?: string | null;
             /** Format: int64 */
@@ -1663,15 +1654,13 @@ export interface components {
             kind: "custom";
         };
         SensorDefinition: {
-            default_status?: components["schemas"]["SensorStatus"];
+            default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
             /** Format: int32 */
             minimum_interval_seconds: number;
             when: components["schemas"]["SensorCondition"];
         };
-        /** @enum {string} */
-        SensorStatus: "running" | "stopped";
         SessionIdentity: {
             /** Format: date-time */
             expires_at: string;
@@ -1787,7 +1776,7 @@ export interface components {
          */
         Table: "invocations" | "output" | "events" | "diagnostics" | "artifacts" | "artifact_refs" | "heartbeats" | "delivery" | "meta" | "conflicts";
         /** @enum {string} */
-        TickOutcome: "requested" | "skipped" | "covered" | "failed" | "deferred";
+        TickOutcome: "requested" | "skipped" | "covered" | "failed";
         TickRecord: {
             /** Format: uuid */
             covered_by_run_id?: string | null;
@@ -1844,7 +1833,6 @@ export interface components {
         /** @description Legacy schedule documents retain their stored shape; sensors add a distinct condition shape. */
         TriggerDeclaration: components["schemas"]["TriggerDefinition"] | components["schemas"]["SensorDefinition"];
         TriggerDefinition: {
-            catch_up?: components["schemas"]["CatchUp"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
