@@ -1,7 +1,5 @@
 //! Compound scheduler return values.
 
-use chrono::{DateTime, Utc};
-
 use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
@@ -20,6 +18,3 @@ pub trait RunLauncher {
         lease: Option<&SchedulerLease>,
     ) -> impl Future<Output = Result<(), ControlError>> + Send;
 }
-
-/// Expanded wall-clock times and the first omitted time, if the batch was bounded.
-pub(crate) type ScheduleExpansion = (Vec<DateTime<Utc>>, Option<DateTime<Utc>>);

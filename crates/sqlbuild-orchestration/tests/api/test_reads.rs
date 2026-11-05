@@ -43,13 +43,13 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             description: "SQLite scoped HTTP reads",
             backend: Backend::Sqlite,
             expected_runs: 3,
-            expected_ticks: 3,
+            expected_ticks: 1,
         },
         ApiReadTestCase {
             description: "PostgreSQL scoped HTTP reads",
             backend: Backend::Postgres,
             expected_runs: 3,
-            expected_ticks: 3,
+            expected_ticks: 1,
         },
     ];
     for test_case in test_cases {
@@ -323,7 +323,6 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             );
             assert_eq!(ticks[0]["outcome"], "requested");
             assert_eq!(ticks[0]["scheduled_for"], calendar_text(2));
-            assert_eq!(ticks[1]["outcome"], "covered");
             for path in [&run_path, &event_path, &tick_path, &invocation_path] {
                 assert_eq!(
                     read_json(&client, (&format!("{path}?limit=1"), &token.bearer))

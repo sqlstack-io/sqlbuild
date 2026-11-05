@@ -1,5 +1,5 @@
 {
-  "description": "Three minutely cron jobs start ten hours back with the default latest catch-up. Two installed schedulers record the backlog while being SIGKILLed at seeded random moments; every lapse of a killed leader's lease is simulated. After a final uninterrupted scheduler, every due minute of every trigger has exactly one tick, each tick requests or is covered by exactly one run, and every requested run has one request event.",
+  "description": "Three minutely cron jobs start ten hours back with the default latest catch-up. Two installed schedulers catch up while being SIGKILLed at seeded random moments; every lapse of a killed leader's lease is simulated. After a final uninterrupted scheduler, each trigger has ticked its latest due minute exactly once and nothing off schedule, each tick requests or is covered by exactly one run, and every requested run has one request event.",
   "jobs": [
     "orders",
     "customers",

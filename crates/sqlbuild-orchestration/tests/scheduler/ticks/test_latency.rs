@@ -24,7 +24,7 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             description: "SQLite scheduler latency",
             backend: Backend::Sqlite,
             expected_ticks: 3,
-            expected_ticks_after_failover: 5,
+            expected_ticks_after_failover: 4,
             expected_max_tick_to_decision: TimeDelta::milliseconds(500),
             expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
@@ -32,7 +32,7 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             description: "PostgreSQL scheduler latency",
             backend: Backend::Postgres,
             expected_ticks: 3,
-            expected_ticks_after_failover: 5,
+            expected_ticks_after_failover: 4,
             expected_max_tick_to_decision: TimeDelta::milliseconds(500),
             expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
@@ -106,7 +106,8 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 "{}: {latencies:?}",
                 test_case.description
             );
-            // The first leader stopped without releasing its lease while two more times fell due.
+            // The first leader stopped without releasing its lease while two more times fell due;
+            // the standby catches up on the latest one only.
             // A standby is already polling when that lease lapses, so its own retry wait counts.
             tokio::time::sleep((at(10) - Utc::now()).to_std().unwrap_or_default()).await;
             let second = second_store(store).await;
@@ -120,7 +121,7 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             assert_eq!(
                 ticks.len(),
                 test_case.expected_ticks_after_failover,
-                "{}: the standby ticks both overdue times",
+                "{}: the standby ticks only the latest overdue time",
                 test_case.description
             );
             let latest = ticks

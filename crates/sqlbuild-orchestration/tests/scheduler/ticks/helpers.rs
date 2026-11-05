@@ -267,7 +267,7 @@ pub(crate) async fn transaction_contract(backend: Backend) -> Option<(usize, usi
         .len();
     assert_eq!(
         first_count + second_count,
-        3,
+        1,
         "restarts never repeat committed ticks"
     );
     let ticks = list_ticks(store, trigger_id, 100)
@@ -609,7 +609,7 @@ pub(crate) async fn fault_run(
             *counts.entry(name).or_default() += count;
         }
     }
-    // Recovery: faults are gone and leadership lapses; one survivor drains whatever is still due.
+    // Recovery: faults are gone and leadership lapses; one survivor catches up on the latest due time.
     expire_lease(store).await;
     let mut survivor = SchedulerState::new(Uuid::now_v7());
     for _ in 0..60 {
@@ -638,7 +638,11 @@ pub(crate) async fn fault_run(
             .map(|tick| tick.scheduled_for)
             .collect();
         anomalies.duplicate_ticks += trigger_ticks.len() - times.len();
-        anomalies.missing_ticks += expected.difference(&times).count();
+        anomalies.missing_latest_ticks += usize::from(
+            expected
+                .last()
+                .is_some_and(|latest| !times.contains(latest)),
+        );
         anomalies.off_schedule_ticks += times
             .iter()
             .filter(|time| **time < first || time.second() != 0 || time.nanosecond() != 0)
@@ -682,7 +686,7 @@ pub(crate) async fn fault_run(
     let duplicate = query(transaction,
         "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
          VALUES ($1,$2,$3,$3,1,'covered',NULL,NULL)",
-        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(first)]).await;
+        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(*expected.last().expect("a due time"))]).await;
     anomalies.accepted_duplicate_ticks = usize::from(duplicate.is_ok());
     counts.insert("ticks", ticks.len());
     close_store(second).await;

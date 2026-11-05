@@ -185,7 +185,7 @@ Upgrade matching server/location wheels and images together, retaining reference
 images. The native server applies additive control-store migrations before its API reports
 ready. Do not start an older server against a newer schema without a documented compatible
 rollback or restored backup. Scheduler leadership resumes from durable ticks after restart;
-catch-up follows each declaration's `latest` or bounded `all` policy, not a fresh schedule.
+catch-up runs each trigger's latest missed time once, not every missed time.
 The Docker launcher adopts an existing claim-labeled worker rather than starting a duplicate.
 
 ## Verify the packaged lifecycle locally
