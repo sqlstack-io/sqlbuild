@@ -1,4 +1,4 @@
-//! Expired skipped/covered ticks go; a cursor reset never recreates history older than the horizon.
+//! Expired covered ticks go; a cursor reset replays only the latest occurrence and recreates nothing.
 
 use chrono::{Datelike, DurationRound, TimeDelta, Utc};
 use serde_json::json;
@@ -12,6 +12,7 @@ use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::_helpers::tick_retention::prune_ticks;
 use crate::scheduler::main::{
     _acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger, list_ticks::list_ticks,
+    renew_lease::renew_lease,
 };
 use crate::scheduler::models::TickOutcome;
 use crate::scheduler::tests::contracts::ticks::helpers::{
@@ -79,11 +80,8 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .collect();
             assert_eq!(
                 outcomes,
-                [
-                    TickOutcome::Covered,
-                    TickOutcome::Covered,
-                    TickOutcome::Requested
-                ]
+                [TickOutcome::Requested],
+                "catch-up records only the latest missed time"
             );
             let later = calendar_time(2) + TimeDelta::hours(1);
             let backlog = case["backlog_ticks"].as_i64().expect("backlog");
@@ -96,6 +94,9 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await;
             }
             append_covered_tick(store, trigger_id, later).await;
+            // Inserting the backlog one tick at a time can outlast the lease on a slow
+            // machine; the scheduler renews between passes, so the test does too.
+            let lease = renew_lease(store, &lease).await.expect("renew");
             assert_eq!(prune_ticks(store, &lease).await.expect("recent ticks"), 0);
             shift_schedule(store, trigger_id, shift).await;
             assert_eq!(
@@ -152,16 +153,28 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await
                 .expect("re-evaluate")
                 .expect("trigger");
-            assert!(plan.actions.is_empty(), "no tick older than the horizon");
+            let replayed = calendar_time(2) - TimeDelta::days(shift);
+            assert_eq!(
+                plan.actions
+                    .iter()
+                    .map(|action| action.scheduled_for)
+                    .collect::<Vec<_>>(),
+                [replayed],
+                "a reset replays only the latest occurrence"
+            );
             let ticks = list_ticks(store, trigger_id, 10)
                 .await
                 .expect("after reset");
-            assert_eq!(ticks.len(), test_case.expected_survivors);
+            assert_eq!(
+                ticks.len(),
+                test_case.expected_survivors,
+                "the replayed tick already exists, so nothing is recreated"
+            );
             let trigger = list_triggers(store, location, "development")
                 .await
                 .expect("trigger")
                 .remove(0);
-            assert!(trigger.last_tick_for.is_none());
+            assert_eq!(trigger.last_tick_for, Some(replayed));
             assert_eq!(
                 trigger.next_due_at,
                 Some("2030-01-01T00:00:00Z".parse().expect("future"))
@@ -179,20 +192,12 @@ fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_
         LatestCatchUpTestCase {
             description: "SQLite latest catch-up ticks an occurrence older than the horizon",
             backend: Backend::Sqlite,
-            catch_up: json!("latest"),
             expected_ticks: 1,
         },
         LatestCatchUpTestCase {
             description: "PostgreSQL latest catch-up ticks an occurrence older than the horizon",
             backend: Backend::Postgres,
-            catch_up: json!("latest"),
             expected_ticks: 1,
-        },
-        LatestCatchUpTestCase {
-            description: "bounded catch-up keeps the horizon clamp",
-            backend: Backend::Sqlite,
-            catch_up: json!({"all": {"max_runs": 5}}),
-            expected_ticks: 0,
         },
     ];
     for test_case in test_cases {
@@ -222,7 +227,7 @@ fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_
             input.documents.insert(
                 "triggers".into(),
                 json!({"yearly_orders": {"description": "Yearly orders", "job_key": "orders",
-                    "starts_at": case["yearly_starts_at"], "catch_up": test_case.catch_up,
+                    "starts_at": case["yearly_starts_at"],
                     "schedule": {"kind": "cron", "expression": format!("0 0 {} {} *", latest.day(), latest.month()), "timezone": "UTC"}}}),
             );
             publish_snapshot(store, &input).await.expect("publication");
