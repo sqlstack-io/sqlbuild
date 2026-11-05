@@ -8,9 +8,7 @@ CREATE TABLE sqb_locations (
     name TEXT NOT NULL UNIQUE,
     created_by TEXT NOT NULL,
     created_at {time} NOT NULL,
-    archived_at {time},
-    broken_deploy_policy TEXT NOT NULL DEFAULT 'fallback'
-        CHECK (broken_deploy_policy IN ('fallback', 'queue'))
+    archived_at {time}
 );
 CREATE TABLE sqb_source_texts (
     text_hash TEXT PRIMARY KEY,
@@ -125,7 +123,6 @@ CREATE TABLE sqb_trigger_state (
     cursor_json {json},
     last_tick_for {time},
     next_due_at {time},
-    consecutive_failures BIGINT NOT NULL DEFAULT 0,
     updated_at {time} NOT NULL
 );
 CREATE INDEX sqb_trigger_state_due ON sqb_trigger_state(next_due_at) WHERE status = 'running';
@@ -143,11 +140,10 @@ CREATE TABLE sqb_ticks (
     scheduled_for {time} NOT NULL,
     evaluated_at {time} NOT NULL,
     epoch BIGINT NOT NULL,
-    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'skipped', 'covered', 'failed', 'deferred')),
+    outcome TEXT NOT NULL CHECK (outcome IN ('requested', 'skipped', 'covered', 'failed')),
     run_id {uuid},
     covered_by_run_id {uuid},
     reason TEXT,
-    details_json {json} NOT NULL,
     UNIQUE (trigger_id, scheduled_for)
 );
 CREATE INDEX sqb_ticks_trigger_time ON sqb_ticks(trigger_id, scheduled_for);
@@ -399,11 +395,6 @@ CREATE TABLE sqb_password_login_attempts (
 CREATE INDEX sqb_password_login_user_time ON sqb_password_login_attempts(identity_key, attempted_at);
 CREATE INDEX sqb_password_login_peer_time ON sqb_password_login_attempts(peer_address, attempted_at);
 CREATE INDEX sqb_password_login_time ON sqb_password_login_attempts(attempted_at);
-CREATE TABLE sqb_authentication_revision (
-    singleton BIGINT PRIMARY KEY CHECK (singleton = 1),
-    revision BIGINT NOT NULL CHECK (revision >= 0)
-);
-INSERT INTO sqb_authentication_revision (singleton, revision) VALUES (1, 0);
 CREATE TABLE sqb_oidc_login_flows (
     flow_id {uuid} PRIMARY KEY,
     configuration_id TEXT NOT NULL,

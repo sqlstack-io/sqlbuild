@@ -8,11 +8,11 @@ use crate::scheduler::types::RunLauncher;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
-/// Notifications shorten the wait; durable database state, not receipt of a notification, drives work.
+/// Durable database state drives work; shutdown interrupts the wait.
 pub async fn run_scheduler(
     store: &ControlStore,
     mut state: SchedulerState,
-    (mut shutdown, mut changes): (watch::Receiver<bool>, watch::Receiver<()>),
+    mut shutdown: watch::Receiver<bool>,
     mut launcher: impl RunLauncher,
 ) -> Result<(), ControlError> {
     let mut last_lease = None;
@@ -24,7 +24,6 @@ pub async fn run_scheduler(
             launcher.poll(store, state.lease.as_ref()).await?;
             tokio::select! {
                 _ = tokio::time::sleep(cycle.wait_for.min(std::time::Duration::from_secs(1))) => {},
-                result = changes.changed() => { if result.is_err() { break; } },
                 result = shutdown.changed() => { if result.is_err() { break; } },
             }
         }

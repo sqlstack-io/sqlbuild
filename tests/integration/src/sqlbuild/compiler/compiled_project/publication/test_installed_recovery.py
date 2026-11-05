@@ -77,8 +77,7 @@ def test_given_postgres_servers_when_offline_recovery_fails_then_retry_revokes_o
         "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL),"
         "(SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL),"
         "(SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL),"
-        "(SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered'),"
-        "(SELECT revision FROM sqb_authentication_revision WHERE singleton=1)"
+        "(SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered')"
     )
     with PostgresContainer(POSTGRES_IMAGE, driver=None) as postgres:
         url: str = postgres.get_connection_url()
@@ -134,7 +133,7 @@ def test_given_postgres_servers_when_offline_recovery_fails_then_retry_revokes_o
             )
             before: Any = control.execute(state_sql).fetchone()
             assert before is not None
-            assert before[:4] == (1, 0, 2, 0)
+            assert before == (1, 0, 2, 0)
             retained_before: dict[str, str] = postgres_recovery_state(control)
         rejected = administer(installation, recovery, extra_environment=extra)
         assert rejected.returncode != 0 and not rejected.stdout
@@ -152,8 +151,7 @@ def test_given_postgres_servers_when_offline_recovery_fails_then_retry_revokes_o
         with psycopg.connect(url) as control:
             after: Any = control.execute(state_sql).fetchone()
             assert after is not None
-            assert after[:4] == (0, 1, 1, 1)
-            assert after[4] > before[4]
+            assert after == (0, 1, 1, 1)
             assert control.execute("SELECT COUNT(*) FROM sqb_admin_initialization").fetchone() == (
                 1,
             )

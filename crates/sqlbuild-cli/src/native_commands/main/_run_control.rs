@@ -31,7 +31,6 @@ pub(crate) async fn run_control(
     let store = open_control_store(namespace).await?;
     let (workers, images) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
-    let (_changes, changes) = watch::channel(());
     let mut tasks = tokio::task::JoinSet::new();
     if let Some(address) = address {
         drop(write_output(&[(
@@ -63,7 +62,7 @@ pub(crate) async fn run_control(
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
-                (shutdown, changes),
+                shutdown,
                 workers,
             )
             .await

@@ -142,7 +142,7 @@ class Sensor:
     ) = field(default=None, kw_only=True)
     run: Job | JobGroup = field(kw_only=True)
     minimum_interval_seconds: int = field(default=30, kw_only=True)
-    default_status: Literal["running", "stopped"] = field(default="running", kw_only=True)
+    default_status: Literal["running", "paused"] = field(default="running", kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
     function: Callable[..., Iterable[RunRequest] | SkipReason] | None = field(
         default=None, repr=False, kw_only=True

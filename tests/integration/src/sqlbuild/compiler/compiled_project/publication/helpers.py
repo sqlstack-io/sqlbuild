@@ -1189,9 +1189,9 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
         with suppress(sqlite3.IntegrityError):
             _ = control.execute(
                 "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, "
-                "outcome, run_id, covered_by_run_id, details_json) "
-                "SELECT ?, trigger_id, scheduled_for, evaluated_at, epoch, 'skipped', NULL, NULL, "
-                "'{}' FROM sqb_ticks LIMIT 1",
+                "outcome, run_id, covered_by_run_id) "
+                "SELECT ?, trigger_id, scheduled_for, evaluated_at, epoch, 'skipped', NULL, NULL "
+                "FROM sqb_ticks LIMIT 1",
                 (str(uuid4()),),
             )
             duplicate_rejected = False

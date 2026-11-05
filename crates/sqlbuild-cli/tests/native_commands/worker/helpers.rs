@@ -152,13 +152,12 @@ pub(crate) async fn claim_worker_run(
     drop(connection);
     let (lease_sender, lease_receiver) = tokio::sync::oneshot::channel();
     let (shutdown, signal) = tokio::sync::watch::channel(false);
-    let (_changes, changes) = tokio::sync::watch::channel(());
     tokio::time::timeout(
         Duration::from_secs(5),
         run_scheduler(
             &store,
             SchedulerState::new(Uuid::now_v7()),
-            (signal, changes),
+            signal,
             LeaseCapture {
                 lease: Some(lease_sender),
                 shutdown,

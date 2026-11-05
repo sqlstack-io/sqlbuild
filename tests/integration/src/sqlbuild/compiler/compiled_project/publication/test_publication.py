@@ -135,7 +135,7 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         assert scheduled["definition_json"]["default_status"] == "paused"
         assert scheduled["definition_json"]["catch_up"] == {"all": {"max_runs": 3}}
         assert by_name["edge_platform_orders"]["status"] == "paused"
-        assert by_name["edge_platform_orders"]["definition_json"]["default_status"] == "stopped"
+        assert by_name["edge_platform_orders"]["definition_json"]["default_status"] == "paused"
         assert by_name["edge_platform_orders"]["definition_json"]["when"] == {
             "kind": "platform_event",
             "kinds": ["tick_overdue", "location_broken", "launch_failed"],

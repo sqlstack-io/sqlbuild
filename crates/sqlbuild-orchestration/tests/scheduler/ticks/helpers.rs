@@ -410,8 +410,8 @@ pub(crate) async fn append_covered_tick(
     let (transaction, _) = query(
         transaction,
         "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, \
-         run_id, covered_by_run_id, details_json) SELECT $1, trigger_id, $2, evaluated_at, epoch, \
-         'covered', NULL, run_id, details_json FROM sqb_ticks WHERE trigger_id=$3 AND outcome='requested'",
+         run_id, covered_by_run_id) SELECT $1, trigger_id, $2, evaluated_at, epoch, \
+         'covered', NULL, run_id FROM sqb_ticks WHERE trigger_id=$3 AND outcome='requested'",
         vec![
             Parameter::Id(Uuid::now_v7()),
             Parameter::Time(scheduled_for),
@@ -634,9 +634,9 @@ pub(crate) async fn fault_run(
         .await
         .expect("duplicate");
     let duplicate = query(transaction,
-        "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id, details_json) \
-         VALUES ($1,$2,$3,$3,1,'skipped',NULL,NULL,$4)",
-        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(first), Parameter::Json(json!({}))]).await;
+        "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
+         VALUES ($1,$2,$3,$3,1,'skipped',NULL,NULL)",
+        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(first)]).await;
     anomalies.accepted_duplicate_ticks = usize::from(duplicate.is_ok());
     counts.insert("ticks", ticks.len());
     close_store(second).await;
@@ -651,7 +651,6 @@ pub(crate) async fn run_scheduler_until(
     deadline: DateTime<Utc>,
 ) -> Vec<TickRecord> {
     let (stop, shutdown) = tokio::sync::watch::channel(false);
-    let (_changed, changes) = tokio::sync::watch::channel(());
     let stopping = async {
         tokio::time::sleep((deadline - Utc::now()).to_std().unwrap_or_default()).await;
         stop.send(true).expect("stop scheduler");
@@ -660,7 +659,7 @@ pub(crate) async fn run_scheduler_until(
         run_scheduler(
             store,
             SchedulerState::new(Uuid::now_v7()),
-            (shutdown, changes),
+            shutdown,
             IdleLauncher
         ),
         stopping

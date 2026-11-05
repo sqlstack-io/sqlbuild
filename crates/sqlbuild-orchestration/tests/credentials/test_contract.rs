@@ -14,7 +14,7 @@ use crate::store::main::migrate_store::migrate_store;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
-use crate::credentials::tests::helpers::{authentication_revision, location_state, stored_hashes};
+use crate::credentials::tests::helpers::{location_state, security_event_count, stored_hashes};
 use crate::credentials::tests::test_types::{CredentialTestCase, TransactionFault};
 use crate::runs::tests::helpers::{queue, request, snapshot};
 use crate::runs::tests::terminal_helpers::finish;
@@ -49,7 +49,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
             migrate_store(store).await.expect("migrate");
             let replica = second_store(store).await;
             assert_eq!(
-                authentication_revision(&replica)
+                security_event_count(&replica)
                     .await
                     .expect("initial revision"),
                 0
@@ -129,12 +129,6 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 sqlite_body: "SELECT RAISE(ABORT,'injected audit failure')",
                 postgres_body: "RAISE EXCEPTION 'injected audit failure'",
             };
-            let revision_fault = TransactionFault {
-                description: "authentication revision failure",
-                table: "sqb_authentication_revision",
-                operation: "UPDATE",
-                ..fault
-            };
             let insertion_fault = TransactionFault {
                 description: "replacement issuance failure",
                 table: "sqb_access_tokens",
@@ -204,16 +198,11 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                             .is_none()
                     );
                 }
-                let revision = authentication_revision(&replica)
+                let revision = security_event_count(&replica)
                     .await
                     .expect("before rotation");
                 let count = stored_hashes(store).await.len();
-                for failure in [
-                    &fault,
-                    &insertion_fault,
-                    &rotation_audit_fault,
-                    &revision_fault,
-                ] {
+                for failure in [&fault, &insertion_fault, &rotation_audit_fault] {
                     install_fault(store, failure).await;
                     assert!(
                         rotate_token(store, &context, issued.identity.token_id)
@@ -229,7 +218,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                     );
                     assert_eq!(stored_hashes(&replica).await.len(), count);
                     assert_eq!(
-                        authentication_revision(&replica)
+                        security_event_count(&replica)
                             .await
                             .expect("rollback revision"),
                         revision
@@ -262,29 +251,26 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                     Some(rotated.identity.clone())
                 );
                 assert_eq!(stored_hashes(&replica).await.len(), count + 1);
-                assert_eq!(
-                    authentication_revision(&replica)
-                        .await
-                        .expect("one committed rotation"),
-                    revision + 1
-                );
                 let (transaction, audits) = query(begin(store, TransactionMode::Read).await.expect("read audit"),
                     "SELECT before_json, after_json FROM sqb_security_audit WHERE action='token.rotated'", vec![]).await.expect("rotation audit");
                 commit(transaction).await.expect("audit read");
-                let audit = audits
+                let linked = audits
                     .iter()
-                    .find(|audit| {
+                    .filter(|audit| {
                         audit["before_json"]["token_id"]
                             == serde_json::json!(issued.identity.token_id)
                     })
-                    .expect("linked rotation history");
+                    .collect::<Vec<_>>();
+                assert_eq!(linked.len(), 1, "one committed rotation");
+                let audit = linked[0];
                 assert_eq!(audit["before_json"], serde_json::json!(issued.identity));
                 assert_eq!(audit["after_json"], serde_json::json!(rotated.identity));
                 let issued = rotated;
-                let revision = authentication_revision(&replica)
+                let revision = security_event_count(&replica)
                     .await
                     .expect("before revocation");
-                for failure in [&fault, &revision_fault] {
+                {
+                    let failure = &fault;
                     install_fault(store, failure).await;
                     assert!(
                         revoke_token(store, &context, issued.identity.token_id)
@@ -299,7 +285,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                             .is_some()
                     );
                     assert_eq!(
-                        authentication_revision(&replica)
+                        security_event_count(&replica)
                             .await
                             .expect("rollback revision"),
                         revision
@@ -311,7 +297,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                         .expect("revoke")
                 );
                 assert_eq!(
-                    authentication_revision(&replica)
+                    security_event_count(&replica)
                         .await
                         .expect("committed revision"),
                     revision + 1
@@ -322,7 +308,7 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                         .expect("retry revoke")
                 );
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("idempotent revision"),
                     revision + 1

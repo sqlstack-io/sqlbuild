@@ -42,7 +42,6 @@ def postgres_recovery_state(connection: Any) -> dict[str, str]:
         "sqb_password_credentials",
         "sqb_password_sessions",
         "sqb_external_sessions",
-        "sqb_authentication_revision",
         "sqb_security_audit",
         "sqb_admin_initialization",
         "sqb_installation",
