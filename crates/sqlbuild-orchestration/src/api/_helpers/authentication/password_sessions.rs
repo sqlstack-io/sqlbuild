@@ -114,11 +114,8 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
 
 pub(crate) fn router(
     store: &ControlStore,
-    origin: Option<String>,
+    origin: String,
 ) -> Result<Router<ControlStore>, ControlError> {
-    let Some(origin) = origin else {
-        return Ok(Router::new());
-    };
     let origin = BrowserOrigin(parse_origin(&origin, "password")?);
     let protected = protected(store).merge(
         Router::new()

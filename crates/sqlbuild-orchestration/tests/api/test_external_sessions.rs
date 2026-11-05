@@ -6,7 +6,7 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, TrustedProxyAuthentication};
+use crate::api::models::{ApiAuthentication, HumanLogin, TrustedProxyAuthentication};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ExternalSessionTestCase;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
@@ -71,7 +71,7 @@ fn given_proxy_people_when_administrators_and_roles_change_then_live_authority_h
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    trusted_proxy: Some(settings.clone()),
+                    login: HumanLogin::TrustedProxy(settings.clone()),
                     ..Default::default()
                 },
             )
@@ -79,7 +79,7 @@ fn given_proxy_people_when_administrators_and_roles_change_then_live_authority_h
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    trusted_proxy: Some(settings),
+                    login: HumanLogin::TrustedProxy(settings),
                     ..Default::default()
                 },
             )

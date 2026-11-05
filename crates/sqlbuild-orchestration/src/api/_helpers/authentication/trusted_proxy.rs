@@ -21,11 +21,8 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub(crate) fn router(
     store: &ControlStore,
-    settings: Option<TrustedProxyAuthentication>,
+    mut settings: TrustedProxyAuthentication,
 ) -> Result<Router<ControlStore>, ControlError> {
-    let Some(mut settings) = settings else {
-        return Ok(Router::new());
-    };
     let origin = BrowserOrigin(parse_origin(&settings.origin, "trusted-proxy")?);
     if settings.trusted_peers.is_empty() {
         return Err(ControlError::Invalid(

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
-use sqlbuild_orchestration::api::models::ApiAuthentication;
+use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin};
 use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
@@ -301,21 +301,38 @@ fn retention_setting(namespace: &Namespace, flag: &str) -> Result<Option<u16>, C
 }
 
 fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, ControlError> {
+    let password = text(namespace, "control_password_origin");
+    let proxy = authentication_settings(
+        text(namespace, "control_trusted_proxy_config"),
+        ("trusted-proxy", "origin, trusted_peers and identities"),
+    )?;
+    let oidc = authentication_settings(
+        text(namespace, "control_oidc_config"),
+        ("OIDC", "origin, issuer, client_id and identities"),
+    )?;
+    let login = match (password, proxy, oidc) {
+        (None, None, None) => HumanLogin::None,
+        (Some(origin), None, None) => HumanLogin::Password(origin),
+        (None, Some(settings), None) => HumanLogin::TrustedProxy(settings),
+        (None, None, Some(settings)) => HumanLogin::Oidc(settings),
+        (_, Some(_), _) => {
+            return Err(ControlError::Invalid(
+                "trusted-proxy authentication cannot be combined with other human authentication modes".into(),
+            ));
+        }
+        _ => {
+            return Err(ControlError::Invalid(
+                "OIDC authentication cannot be combined with other human authentication modes"
+                    .into(),
+            ));
+        }
+    };
     Ok(ApiAuthentication {
-        password_origin: text(namespace, "control_password_origin"),
+        login,
         default_role: serde_json::from_value(json!(
             text(namespace, "control_default_role").unwrap_or_else(|| "none".into())
         ))
         .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
-        trusted_proxy: authentication_settings(
-            text(namespace, "control_trusted_proxy_config"),
-            ("trusted-proxy", "origin, trusted_peers and identities"),
-        )?,
-        oidc: authentication_settings(
-            text(namespace, "control_oidc_config"),
-            ("OIDC", "origin, issuer, client_id and identities"),
-        )?,
-        ..ApiAuthentication::default()
     })
 }
 
