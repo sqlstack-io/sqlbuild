@@ -51,7 +51,6 @@ pub enum SqlFileRole {
     Hook,
     Function,
     Schema,
-    Yaml,
 }
 
 /// One requested rename or move.
