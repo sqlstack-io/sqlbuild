@@ -129,12 +129,20 @@ pub struct DevelopmentScope {
     pub triggers: bool,
 }
 
+/// The one way people sign in to this server, if any.
+#[derive(Debug, Default)]
+pub enum HumanLogin {
+    #[default]
+    None,
+    Development(DevelopmentScope),
+    Password(String),
+    TrustedProxy(TrustedProxyAuthentication),
+    Oidc(OidcAuthentication),
+}
+
 #[derive(Debug, Default)]
 pub struct ApiAuthentication {
-    pub development_scope: Option<DevelopmentScope>,
-    pub password_origin: Option<String>,
-    pub trusted_proxy: Option<TrustedProxyAuthentication>,
-    pub oidc: Option<OidcAuthentication>,
+    pub login: HumanLogin,
     pub default_role: crate::credentials::models::DefaultRole,
 }
 

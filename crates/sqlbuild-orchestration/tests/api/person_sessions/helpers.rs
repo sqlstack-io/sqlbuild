@@ -6,7 +6,9 @@ use reqwest::{Client, Method, Response, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, OidcAuthentication, TrustedProxyAuthentication};
+use crate::api::models::{
+    ApiAuthentication, HumanLogin, OidcAuthentication, TrustedProxyAuthentication,
+};
 use crate::api::tests::helpers::start_api_with_authentication;
 use crate::api::tests::oidc_helpers::{callback, login};
 use crate::api::tests::oidc_test_types::TestProvider;
@@ -23,7 +25,7 @@ pub(crate) async fn browser_sessions(
     let password = start_api_with_authentication(
         store,
         ApiAuthentication {
-            password_origin: Some(origin.into()),
+            login: HumanLogin::Password(origin.into()),
             ..Default::default()
         },
     )
@@ -31,7 +33,7 @@ pub(crate) async fn browser_sessions(
     let proxy = start_api_with_authentication(
         store,
         ApiAuthentication {
-            trusted_proxy: Some(TrustedProxyAuthentication {
+            login: HumanLogin::TrustedProxy(TrustedProxyAuthentication {
                 origin: origin.into(),
                 trusted_peers: BTreeSet::from(["127.0.0.1".parse().expect("socket peer")]),
                 identities: BTreeMap::from([("orders-person".into(), person)]),
@@ -43,7 +45,7 @@ pub(crate) async fn browser_sessions(
     let oidc = start_api_with_authentication(
         store,
         ApiAuthentication {
-            oidc: Some(OidcAuthentication {
+            login: HumanLogin::Oidc(OidcAuthentication {
                 origin: origin.into(),
                 issuer: provider.state.issuer.clone(),
                 client_id: "orders-control".into(),

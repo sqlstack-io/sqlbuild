@@ -6,7 +6,7 @@ use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, OidcAuthentication};
+use crate::api::models::{ApiAuthentication, HumanLogin, OidcAuthentication};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::oidc_helpers::{callback, login, start_provider, stop_provider};
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault};
@@ -75,7 +75,7 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    oidc: Some(settings.clone()),
+                    login: HumanLogin::Oidc(settings.clone()),
                     ..Default::default()
                 },
             )
@@ -83,7 +83,7 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    oidc: Some(settings),
+                    login: HumanLogin::Oidc(settings),
                     ..Default::default()
                 },
             )
@@ -358,7 +358,7 @@ fn given_oidc_login_attempts_when_alternating_replicas_then_the_peer_limit_is_sh
             let api = start_api_with_authentication(
                 &fixture.store,
                 ApiAuthentication {
-                    oidc: Some(settings.clone()),
+                    login: HumanLogin::Oidc(settings.clone()),
                     ..Default::default()
                 },
             )
@@ -366,7 +366,7 @@ fn given_oidc_login_attempts_when_alternating_replicas_then_the_peer_limit_is_sh
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    oidc: Some(settings),
+                    login: HumanLogin::Oidc(settings),
                     ..Default::default()
                 },
             )

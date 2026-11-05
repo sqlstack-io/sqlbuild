@@ -32,11 +32,8 @@ use crate::store::models::ControlStore;
 
 pub(crate) async fn router(
     store: &ControlStore,
-    settings: Option<OidcAuthentication>,
+    settings: OidcAuthentication,
 ) -> Result<Router<ControlStore>, ControlError> {
-    let Some(settings) = settings else {
-        return Ok(Router::new());
-    };
     let runtime = oidc_provider::configure(settings)?;
     oidc_provider::client(&runtime).await?;
     Ok(Router::new()
