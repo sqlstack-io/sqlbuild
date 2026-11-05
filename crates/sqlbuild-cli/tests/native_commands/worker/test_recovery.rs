@@ -61,7 +61,7 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
         let mut replacement = start_recovery_scheduler(&control, &url, baseline.location_id);
         wait_for_worker_log(&mut replacement, "Retrying worker shutdown publication").await;
         let held: (i64, i64) = connection.query_row(
-            "SELECT (SELECT COUNT(*) FROM sqb_write_claims), (SELECT COUNT(*) FROM sqb_run_liveness)",
+            "SELECT (SELECT COUNT(*) FROM sqb_write_claims), (SELECT COUNT(*) FROM sqb_runs WHERE worker_instance IS NOT NULL)",
             [], |row| Ok((row.get(0)?, row.get(1)?)),
         ).expect("retained claim while publication is unavailable");
         assert_eq!(held, (1, 1), "{}", test_case.description);
@@ -79,7 +79,7 @@ fn given_an_unlaunchable_committed_claim_when_recovering_then_rejection_retries_
         );
         let finished: (String, i64, i64, i64) = connection.query_row(
             "SELECT status, (SELECT COUNT(*) FROM sqb_write_claims),
-             (SELECT COUNT(*) FROM sqb_run_liveness),
+             (SELECT COUNT(*) FROM sqb_runs WHERE worker_instance IS NOT NULL),
              (SELECT COUNT(*) FROM recall_events WHERE event_type='run_terminated') FROM sqb_runs WHERE run_id=?1",
             [worker.identity.0.to_string()], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         ).expect("terminal fact and released durable claims");

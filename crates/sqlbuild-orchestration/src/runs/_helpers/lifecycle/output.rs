@@ -18,9 +18,9 @@ pub(crate) async fn claim_envelope(
 ) -> Result<(ControlTransaction, RowEnvelope), ControlError> {
     let (transaction, rows) = query(
         transaction,
-        "SELECT l.claimed_at, s.sqb_version FROM sqb_run_liveness l \
-         JOIN sqb_runs r ON r.run_id=l.run_id JOIN sqb_snapshots s ON s.snapshot_id=r.snapshot_id \
-         WHERE l.run_id=$1 AND l.worker_instance=$2",
+        "SELECT r.claimed_at, s.sqb_version FROM sqb_runs r \
+         JOIN sqb_snapshots s ON s.snapshot_id=r.snapshot_id \
+         WHERE r.run_id=$1 AND r.worker_instance=$2",
         vec![Parameter::Id(run_id), Parameter::Id(claim_id)],
     )
     .await?;

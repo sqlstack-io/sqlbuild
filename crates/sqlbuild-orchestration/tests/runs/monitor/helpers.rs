@@ -50,7 +50,7 @@ pub(crate) async fn age_heartbeat(store: &ControlStore, run_id: Uuid, seconds: i
         rusqlite::Connection::open(path)
             .expect("open liveness fixture")
             .execute(
-                "UPDATE sqb_run_liveness SET last_heartbeat_at=?1 WHERE run_id=?2",
+                "UPDATE sqb_runs SET last_heartbeat_at=?1 WHERE run_id=?2",
                 rusqlite::params![
                     timestamp.to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
                     run_id.to_string()
@@ -59,7 +59,7 @@ pub(crate) async fn age_heartbeat(store: &ControlStore, run_id: Uuid, seconds: i
             .expect("age SQLite heartbeat");
         return;
     };
-    sqlx_core::query::query("UPDATE sqb_run_liveness SET last_heartbeat_at=$1 WHERE run_id=$2")
+    sqlx_core::query::query("UPDATE sqb_runs SET last_heartbeat_at=$1 WHERE run_id=$2")
         .bind(timestamp)
         .bind(run_id)
         .execute(pool)

@@ -74,7 +74,7 @@ pub async fn complete_location_work(
     }
     let now = transaction.now;
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_location_work_results (request_id,result_json,completed_at) VALUES ($1,$2,$3)",
+        "UPDATE sqb_location_work SET result_json=$2, completed_at=$3 WHERE request_id=$1 AND completed_at IS NULL",
         vec![Parameter::Id(request_id), Parameter::Json(json!(result)), Parameter::Time(now)]).await?;
     commit(transaction).await?;
     Ok(true)

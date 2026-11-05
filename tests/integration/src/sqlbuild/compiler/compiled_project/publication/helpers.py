@@ -911,9 +911,9 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             (publication["target"], "model:orders", run_id, now.isoformat()),
         )
         _ = connection.execute(
-            "INSERT INTO sqb_run_liveness (run_id,worker_instance,claimed_at,last_heartbeat_at) "
-            "VALUES (?,?,?,?)",
-            (run_id, claim_id, now.isoformat(), now.isoformat()),
+            "UPDATE sqb_runs SET worker_instance=?, claimed_at=?, last_heartbeat_at=? "
+            "WHERE run_id=?",
+            (claim_id, now.isoformat(), now.isoformat(), run_id),
         )
         _ = connection.execute(
             "INSERT INTO sqb_access_tokens "

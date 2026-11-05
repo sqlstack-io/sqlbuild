@@ -18,9 +18,9 @@ pub async fn list_run_claims(
     let (transaction, rows) = query(
         transaction,
         &format!(
-            "SELECT l.worker_instance AS claim_id, r.request_json AS request \
-         FROM sqb_run_liveness l JOIN sqb_runs r ON r.run_id=l.run_id \
-         WHERE r.location_id=$1 AND r.target=$2 AND ($3 IS NULL OR r.run_id>$3) \
+            "SELECT r.worker_instance AS claim_id, r.request_json AS request \
+         FROM sqb_runs r \
+         WHERE r.worker_instance IS NOT NULL AND r.location_id=$1 AND r.target=$2 AND ($3 IS NULL OR r.run_id>$3) \
          ORDER BY r.run_id LIMIT {MONITOR_BATCH_SIZE}"
         ),
         vec![
