@@ -279,11 +279,10 @@ jobs:
         run: uv python install 3.12
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
-      - name: Fetch pull request base for the new-duplicate check
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+      - name: Fetch the base for the new-duplicate check
+        run: git fetch --no-tags --depth=1 origin "$BASE_REF"
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'main:refs/remotes/origin/main' }}
       - name: Run static checks
         run: make check-ci
         env:
