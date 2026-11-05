@@ -444,3 +444,35 @@ SQL_WORD_PATTERN: str = r"[A-Za-z_]\w*"
 SQL_WRITE_WORDS: frozenset[str] = frozenset(
     {"insert", "into", "values", "update", "set", "delete", "conflict", "do"}
 )
+REASON_SEPARATOR: str = "="
+RUST_LOOKBEHIND: int = 16
+RUST_MATCHES_MACRO_PATTERN: str = r"\bmatches!\s*\("
+RUST_PATTERN_FOLLOWER_PATTERN: str = r"\s*(?:=>|\|(?!\|)|if\b|==|!=|=(?![=>]))"
+RUST_PATTERN_LEADER_PATTERN: str = r"(?:(?<!\|)\|(?!\|)|\blet|==|!=)\s*$"
+RUST_QUALIFIED_VARIANT_PATTERN: str = r"\b([A-Za-z_]\w*)\s*::\s*([A-Za-z_]\w*)\b(?!\s*::)"
+RUST_SELF: str = "Self"
+RUST_TABLE_ITEM_PATTERN: str = (
+    r"(?m)^[ \t]*(?:pub(?:\([^)]*\))?\s+)?"
+    r"(?:use\b|(?:const|static)\s+(?:mut\s+)?[A-Z_][A-Z0-9_]*\s*:)"
+)
+VARIANT_CONSTRUCTION_REQUIRED: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="construction_required",
+    default=(),
+    description=(
+        "`Enum=reason` entries whose variants count only where code constructs them as a value, "
+        "not in tables, patterns or comparisons."
+    ),
+)
+VARIANT_EXCEPTIONS: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="exceptions",
+    default=(),
+    description=(
+        "`Enum=reason` or `Enum::Variant=reason` entries for variants built outside Rust code."
+    ),
+)
+CONTROL_STORE_ALLOWED: RuleOption[tuple[str, ...]] = RuleOption.string_list(
+    name="allowed",
+    default=(),
+    description="`table.column=reason` entries for state read outside production code.",
+)
+POLICY_CONFIG_FILE: str = "fensu.toml"
