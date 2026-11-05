@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/sqlbuild-orchestration",
     "crates/sqlbuild-build-features",
     "crates/sqlbuild-core",
     "crates/sqlbuild-cursor",
