@@ -943,7 +943,7 @@ def wait_for_sensor_phase(
             row = control.execute(
                 "SELECT fact_json FROM sqb_sensor_evaluation_events WHERE phase=? "
                 "AND (? = FALSE OR fact_json->'outcome'->'run_ids'='[]') "
-                "ORDER BY storage_id DESC LIMIT 1",
+                "ORDER BY occurred_at DESC, evaluation_id DESC LIMIT 1",
                 (phase, empty_runs),
             ).fetchone()
         time.sleep(0.05)

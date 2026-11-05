@@ -187,8 +187,8 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .expect("due");
             let fault = TransactionFault {
                 description: "source cursor rollback",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected source cursor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected source cursor failure'",
@@ -479,8 +479,8 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 .expect("mirror observations");
             let fault = TransactionFault {
                 description: "stale cursor rollback",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected stale cursor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected stale cursor failure'",

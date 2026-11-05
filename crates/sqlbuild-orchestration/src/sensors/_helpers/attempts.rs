@@ -32,7 +32,8 @@ pub(crate) async fn last_attempt(
     let (transaction, rows) = query(transaction,
         "SELECT e.fact_json, CASE WHEN EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events terminal \
          WHERE terminal.evaluation_id=e.evaluation_id AND terminal.phase<>'requested') THEN 1 ELSE 0 END AS terminal \
-         FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=$1 AND e.phase='requested' ORDER BY e.storage_id DESC LIMIT 1",
+         FROM sqb_sensor_evaluation_events e WHERE e.trigger_id=$1 AND e.phase='requested' \
+         ORDER BY e.occurred_at DESC, e.evaluation_id DESC LIMIT 1",
         vec![Parameter::Id(trigger_id)]).await?;
     let last = rows
         .first()

@@ -418,8 +418,8 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let replica = second_store(store).await;
             let fault = TransactionFault {
                 description: "fail atomic sensor cursor",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected sensor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected sensor failure'",

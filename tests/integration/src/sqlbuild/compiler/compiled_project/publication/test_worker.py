@@ -668,21 +668,23 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
-            outcomes: list[tuple[int, str]] = control.execute(
-                "SELECT storage_id,payload -> 'change' -> 'change' ->> 'outcome' "
+            outcomes: list[tuple[str]] = control.execute(
+                "SELECT payload -> 'change' -> 'change' ->> 'outcome' "
                 "FROM recall_events WHERE run_id=? AND event_type='run_check_finished'",
                 (run["run_id"],),
             ).fetchall()
-            assert [outcome for _, outcome in outcomes] == ["cancelled"]
+            assert outcomes == [("cancelled",)]
+            completed_query: str = (
+                "SELECT count(*) FROM sqb_sensor_evaluation_events WHERE phase='completed'"
+            )
+            # Two more completions mean at least one evaluation started after the outcome.
+            target: int = control.execute(completed_query).fetchone()[0] + 2
             deadline: float = time.monotonic() + 15
             evaluated: int = 0
-            while evaluated < outcomes[0][0]:
+            while evaluated < target:
                 assert worker.process.poll() is None, worker.log.read_text()
                 assert time.monotonic() < deadline, worker.log.read_text()
-                evaluated = control.execute(
-                    "SELECT COALESCE(MAX(storage_id),0) FROM sqb_sensor_evaluation_events "
-                    "WHERE phase='completed'"
-                ).fetchone()[0]
+                evaluated = control.execute(completed_query).fetchone()[0]
                 time.sleep(0.02)
             assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
             assert control.execute(
