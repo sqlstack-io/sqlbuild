@@ -61,12 +61,15 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
             input
                 .nodes
                 .extend(selection.iter().map(|key| (key.clone(), node.clone())));
-            input.documents.insert("jobs".into(), json!({
-                "source": {"description": "Wide source", "selection": selection, "overlap": "allow"},
-                "destination": {"description": "Destination", "selection": ["orders"], "overlap": "allow"}
-            }));
+            input.documents.insert(
+                "jobs".into(),
+                json!({
+                    "source": {"description": "Wide source", "selection": selection},
+                    "destination": {"description": "Destination", "selection": ["orders"]}
+                }),
+            );
             input.documents.insert("groups".into(), json!({
-                "wide_orders": {"description": "Wide group", "selection": selection, "jobs": {"source": []}, "overlap": "allow"}
+                "wide_orders": {"description": "Wide group", "selection": selection, "jobs": {"source": []}}
             }));
             input.documents.insert("triggers".into(), json!({
                 "executed": {"description": "All source nodes must execute", "job_key": "destination",

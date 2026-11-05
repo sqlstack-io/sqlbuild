@@ -56,7 +56,7 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
             input.documents.insert(
                 "triggers".into(),
                 json!({"minutely_orders": {"description": "Minutely orders", "job_key": "orders",
-                    "starts_at": "2026-01-01T00:00:00Z", "catch_up": {"all": {"max_runs": 20}},
+                    "starts_at": "2026-01-01T00:00:00Z",
                     "schedule": {"kind": "cron", "expression": case["expression"], "timezone": "UTC"}}}),
             );
             publish_snapshot(store, &input).await.expect("publication");

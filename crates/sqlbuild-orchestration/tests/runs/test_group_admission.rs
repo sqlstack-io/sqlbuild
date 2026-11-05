@@ -536,7 +536,7 @@ fn given_an_older_blocked_allow_group_when_an_independent_generation_is_queued_t
                 "jobs".into(),
                 json!({"stage": {"description": "Build a pinned stage", "selection": ["orders"]}}),
             );
-            input.documents.insert("groups".into(), json!({"daily": {"description": "Allow independent generations", "selection": ["orders"], "overlap": "allow", "concurrency_groups": ["orders_limit"], "jobs": {"stage": []}}}));
+            input.documents.insert("groups".into(), json!({"daily": {"description": "Allow independent generations", "selection": ["orders"], "concurrency_groups": ["orders_limit"], "jobs": {"stage": []}}}));
             let first = publish_snapshot(store, &input)
                 .await
                 .expect("first snapshot");

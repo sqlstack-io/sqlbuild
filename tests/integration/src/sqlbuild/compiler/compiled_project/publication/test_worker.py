@@ -87,26 +87,6 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             },
         ),
         GroupExecutionTestCase(
-            "whole downstream job is blocked without building an empty selection",
-            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
-            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
-            "partial",
-            [(0,)],
-            on_failure="skip_downstream_jobs",
-            expected_child_statuses={"staging": ("partial",), "marts": ("failed",)},
-        ),
-        GroupExecutionTestCase(
-            "job failure stops the group",
-            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
-            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
-            "failed",
-            [(0,)],
-            on_failure="stop_group",
-            expected_child_statuses={"staging": ("partial", "cancelled"), "marts": ("cancelled",)},
-            expected_totals=("cancelled", None),
-            expected_marts_started=False,
-        ),
-        GroupExecutionTestCase(
             "critical node stops the group under the default policy",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
@@ -152,7 +132,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "orchestration/orders.py": (
                 "from sqlbuild.orchestration import job, job_group, schedule\n"
                 'staging = job("staging", description="Stage orders.", '
-                f'select="stg_orders broken_orders", on_failure="{test_case.on_failure}")\n'
+                'select="stg_orders broken_orders")\n'
                 'marts = job("marts", description="Build independent marts.", select="orders totals")\n'
                 'annual_orders = job_group("annual_orders", description="Stage then build marts.", '
                 "jobs=[marts, staging], "

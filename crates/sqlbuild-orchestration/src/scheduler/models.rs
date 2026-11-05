@@ -49,38 +49,6 @@ pub struct CronSchedule {
     pub(crate) timezone: chrono_tz::Tz,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum CatchUp {
-    #[default]
-    Latest,
-    /// Process the oldest bounded batch; later due times remain due for the next transaction.
-    All {
-        #[schema(value_type = usize, minimum = 1)]
-        max_runs: std::num::NonZeroUsize,
-    },
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum Overlap {
-    #[default]
-    Coalesce,
-    Queue,
-    Allow,
-}
-
-impl Overlap {
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Coalesce => "coalesce",
-            Self::Queue => "queue",
-            Self::Allow => "allow",
-        }
-    }
-}
-
 /// Due times come from the persisted calendar or cron expansion, never elapsed sleep time.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickState {
@@ -90,8 +58,6 @@ pub struct TickState {
     pub due_times: Vec<DateTime<Utc>>,
     /// First omitted time in a bounded expansion; never advance the cursor past an unrecorded tick.
     pub continuation: Option<DateTime<Utc>>,
-    pub catch_up: CatchUp,
-    pub overlap: Overlap,
     /// Only unclaimed waiting work can cover a later tick; executing work cannot cover future data.
     pub waiting_run: Option<Uuid>,
 }

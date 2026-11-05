@@ -54,7 +54,7 @@ fn given_expired_audit_rows_when_pruned_then_undelivered_and_retry_referenced_ro
                 "jobs".into(),
                 json!({"daily_orders": {
                     "description": "Build orders", "selection": ["orders"], "settings": {},
-                    "concurrency_groups": [], "overlap": "queue"
+                    "concurrency_groups": []
                 }}),
             );
             publish_snapshot(store, &input).await.expect("publish job");

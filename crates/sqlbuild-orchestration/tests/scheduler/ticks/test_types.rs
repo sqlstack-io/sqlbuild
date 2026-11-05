@@ -45,7 +45,6 @@ pub(crate) struct TickRetentionTestCase {
 pub(crate) struct LatestCatchUpTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) catch_up: serde_json::Value,
     pub(crate) expected_ticks: usize,
 }
 
@@ -87,8 +86,8 @@ pub(crate) struct FaultStep {
 pub(crate) struct SchedulerLatencyTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) expected_queued_ticks: usize,
+    pub(crate) expected_ticks: usize,
     pub(crate) expected_ticks_after_failover: usize,
-    pub(crate) expected_max_tick_to_queued: chrono::TimeDelta,
+    pub(crate) expected_max_tick_to_decision: chrono::TimeDelta,
     pub(crate) expected_max_failover_catch_up: chrono::TimeDelta,
 }

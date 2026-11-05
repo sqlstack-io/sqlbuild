@@ -22,8 +22,6 @@ edge_orders = job(
         timezone="UTC",
         starts_at="2026-07-03T01:17:23.456789+05:30",
         default_status="paused",
-        catch_up="all",
-        max_catch_up=3,
     ),
 )
 edge_alias = edge_orders

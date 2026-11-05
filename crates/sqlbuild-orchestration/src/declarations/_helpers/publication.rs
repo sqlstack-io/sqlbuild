@@ -92,9 +92,9 @@ pub(crate) async fn publish_jobs(
         let definition =
             serde_json::to_value(job).map_err(|error| ControlError::Invalid(error.to_string()))?;
         (transaction, _) = query(transaction,
-            "INSERT INTO sqb_jobs (location_id, target, job_key, snapshot_id, kind, definition_json, overlap_policy) VALUES ($1,$2,$3,$4,$7,$5,$6)",
+            "INSERT INTO sqb_jobs (location_id, target, job_key, snapshot_id, kind, definition_json) VALUES ($1,$2,$3,$4,$6,$5)",
             vec![Parameter::Id(snapshot.location_id), Parameter::Text(snapshot.target.clone()), Parameter::Text(name.clone()),
-                Parameter::Id(snapshot.snapshot_id), Parameter::Json(definition), Parameter::Text(job.overlap.as_str().into()), Parameter::Text(kind.into())]).await?;
+                Parameter::Id(snapshot.snapshot_id), Parameter::Json(definition), Parameter::Text(kind.into())]).await?;
         for node in &job.selection {
             (transaction, _) = query(transaction,
                 "INSERT INTO sqb_job_nodes (location_id, target, job_key, node_key) VALUES ($1,$2,$3,$4)",
