@@ -19,10 +19,10 @@ use crate::snapshots::models::SnapshotInput;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
+use crate::store::main::query::query;
 use crate::store::models::{ControlEvent, ControlStore, TransactionMode};
 
 use crate::runs::tests::helpers::snapshot as base_snapshot;
-use crate::store::tests::helpers::read_recall_events;
 
 pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     let mut input = base_snapshot(location_id);
@@ -101,12 +101,16 @@ pub(crate) async fn append_events(
 }
 
 pub(crate) async fn evaluations(store: &ControlStore) -> Vec<SensorEvaluationFact> {
-    read_recall_events(store, 0, 1000)
-        .await
-        .expect("read durable history")
-        .into_iter()
-        .filter(|row| row["event_type"] == "sensor_evaluation")
-        .map(|row| serde_json::from_value(row["payload"].clone()).expect("typed attempt fact"))
+    let (transaction, rows) = query(
+        begin(store, TransactionMode::Read).await.expect("read"),
+        "SELECT fact_json FROM sqb_sensor_evaluation_events ORDER BY occurred_at, event_id",
+        vec![],
+    )
+    .await
+    .expect("evaluation history");
+    commit(transaction).await.expect("commit");
+    rows.into_iter()
+        .map(|row| serde_json::from_value(row["fact_json"].clone()).expect("typed attempt fact"))
         .collect()
 }
 

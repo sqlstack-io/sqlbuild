@@ -75,7 +75,6 @@ fn given_paged_platform_events_when_sensor_publication_fails_then_retry_is_atomi
                 "sqb_runs",
                 "sqb_run_requests",
                 "sqb_sensor_evaluation_events",
-                "sqb_sensor_cursor_commits",
             ] {
                 let point = TransactionFault {
                     description: "fail sensor transaction",

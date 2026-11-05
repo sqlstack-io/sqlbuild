@@ -51,9 +51,7 @@ pub(crate) async fn apply_operator_change(
         )?,
         TriggerDeclaration::Sensor(definition) => {
             if matches!(request.change, TriggerChange::ResetCursor) {
-                transaction =
-                    reset_sensor_cursor(transaction, (request.trigger_id, request.event_id))
-                        .await?;
+                transaction = reset_sensor_cursor(transaction, request.trigger_id).await?;
             }
             let status = state.status_override.unwrap_or(definition.default_status);
             (

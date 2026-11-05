@@ -238,8 +238,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             let replica = second_store(store).await;
             let fault = TransactionFault {
                 description: "node cursor rollback",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected node cursor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected node cursor failure'",

@@ -42,7 +42,7 @@ pub async fn begin_sensor_evaluation(
                 commit(transaction).await?;
                 return Ok(Some(previous.request));
             }
-            (transaction, _) = append_evaluation(
+            transaction = append_evaluation(
                 transaction,
                 &previous.request,
                 SensorEvaluationOutcome::Abandoned,
@@ -74,7 +74,7 @@ pub async fn begin_sensor_evaluation(
         epoch: lease.epoch,
         requested_at: now,
     };
-    let (transaction, _) =
+    let transaction =
         append_evaluation(transaction, &request, SensorEvaluationOutcome::Requested).await?;
     let transaction = request_evaluation_work(transaction, &request).await?;
     commit(check_lease(transaction, lease).await?).await?;
