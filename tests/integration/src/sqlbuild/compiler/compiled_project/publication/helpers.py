@@ -1197,15 +1197,13 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
     observed: list[tuple[str, datetime]] = [
         (trigger, datetime.fromisoformat(scheduled)) for trigger, scheduled, _, _ in ticks
     ]
+    newest: dict[str, datetime] = dict(sorted(observed, key=lambda tick: tick[1]))
     requesting: list[str] = list(filter(None, (run for _, _, run, _ in ticks)))
     covering: set[str] = set(filter(None, (covered for _, _, _, covered in ticks)))
     return {
         "triggers_without_ticks": triggers - len({tick[0] for tick in ticks}),
         "duplicate_ticks": len(observed) - len(set(observed)),
-        "missing_latest_ticks": len(
-            {tick[0] for tick in ticks}
-            - {trigger for trigger, minute in observed if minute >= latest}
-        ),
+        "missing_latest_ticks": sum(minute < latest for minute in newest.values()),
         "off_schedule_ticks": sum(
             minute.second != 0 or minute.microsecond != 0 or minute < start
             for _, minute in observed
