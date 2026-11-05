@@ -65,7 +65,7 @@ pub(crate) async fn consume_node_events(
     Ok((transaction, (cursor, run_ids)))
 }
 
-/// A source's newest received version queues one run per change from the version received before it.
+/// A source's newest version queues one run per streak, keyed on the streak's first row so pruning never reuses a key.
 pub(crate) async fn consume_source_events(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
@@ -77,16 +77,21 @@ pub(crate) async fn consume_source_events(
         let (parameters, predicate) = source_scope(evaluation, &key, &definition);
         let rows;
         (transaction, rows) = query(transaction, &format!(
-            "SELECT latest.record_json, (SELECT earlier.event_id FROM sqb_warehouse_freshness earlier \
-             WHERE earlier.location_id=$1 AND earlier.target=$2 AND earlier.record_json ->> 'source_name'=$3{earlier} \
-             AND earlier.record_json ->> 'data_version' IS NOT NULL \
-             AND earlier.record_json ->> 'data_version_hash'<>latest.record_json ->> 'data_version_hash' \
-             AND (earlier.received_at,earlier.observed_at,earlier.event_id)<(latest.received_at,latest.observed_at,latest.event_id) \
-             ORDER BY earlier.received_at DESC,earlier.observed_at DESC,earlier.event_id DESC LIMIT 1) AS changed_from \
+            "SELECT latest.record_json, (SELECT streak.event_id FROM sqb_warehouse_freshness streak \
+             WHERE streak.location_id=$1 AND streak.target=$2 AND streak.record_json ->> 'source_name'=$3{streak} \
+             AND streak.record_json ->> 'data_version' IS NOT NULL \
+             AND streak.record_json ->> 'data_version_hash'=latest.record_json ->> 'data_version_hash' \
+             AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_freshness other \
+               WHERE other.location_id=$1 AND other.target=$2 AND other.record_json ->> 'source_name'=$3{other} \
+               AND other.record_json ->> 'data_version' IS NOT NULL \
+               AND other.record_json ->> 'data_version_hash'<>latest.record_json ->> 'data_version_hash' \
+               AND (other.received_at,other.observed_at,other.event_id)>(streak.received_at,streak.observed_at,streak.event_id)) \
+             ORDER BY streak.received_at,streak.observed_at,streak.event_id LIMIT 1) AS streak_start \
              FROM sqb_warehouse_freshness latest WHERE latest.location_id=$1 AND latest.target=$2 \
              AND latest.record_json ->> 'source_name'=$3{latest} AND latest.record_json ->> 'data_version' IS NOT NULL \
              ORDER BY latest.received_at DESC,latest.observed_at DESC,latest.event_id DESC LIMIT 1",
-            earlier = predicate.replace("record_json", "earlier.record_json"),
+            streak = predicate.replace("record_json", "streak.record_json"),
+            other = predicate.replace("record_json", "other.record_json"),
             latest = predicate.replace("record_json", "latest.record_json"),
         ), parameters).await?;
         let Some(row) = rows.first() else { continue };
@@ -99,7 +104,7 @@ pub(crate) async fn consume_source_events(
             &record.target_schema,
             &record.target_name,
             &record.data_version_hash,
-            &row["changed_from"],
+            &row["streak_start"],
         ))
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
         let run_key = sha256_hex(&identity);
