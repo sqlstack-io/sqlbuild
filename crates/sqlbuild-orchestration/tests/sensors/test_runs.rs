@@ -13,7 +13,7 @@ use crate::declarations::models::TriggerChange;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_rerun::request_rerun;
 use crate::runs::models::{NodeOutcome, RerunRequest, RunOutcome};
-use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
     complete_builtin_sensor::complete_builtin_sensor,
@@ -109,6 +109,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 .await
                 .expect("elect")
                 .expect("leader");
+            let holder = hold_lease(store, &lease);
             let mut expected: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
             let outcomes = [
                 (
@@ -504,6 +505,7 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     "sensor never changes source state"
                 );
             }
+            holder.abort();
             close_store(replica).await;
             close_test_store(fixture).await;
         });
