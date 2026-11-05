@@ -116,7 +116,6 @@ pub(crate) async fn claim(
         ClaimedLogin::Authenticated(session) => Ok(Json(CliLoginSessionResponse {
             identity: session.identity,
             bearer: session.bearer,
-            csrf_token: session.csrf,
         })
         .into_response()),
     }

@@ -47,14 +47,10 @@ pub(crate) fn authorized(
     let mut authorization = HeaderValue::from_str(&format!("Session {}", credential.bearer))
         .map_err(|_| std::io::Error::other("stored CLI credential is invalid"))?;
     authorization.set_sensitive(true);
-    let mut csrf = HeaderValue::from_str(&credential.csrf_token)
-        .map_err(|_| std::io::Error::other("stored CLI credential is invalid"))?;
-    csrf.set_sensitive(true);
     Ok(client
         .client
         .request(method, format!("{}{path}", client.origin))
-        .header(AUTHORIZATION, authorization)
-        .header("x-sqb-csrf", csrf))
+        .header(AUTHORIZATION, authorization))
 }
 
 pub(crate) async fn current(
