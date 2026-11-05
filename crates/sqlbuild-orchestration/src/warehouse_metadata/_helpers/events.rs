@@ -72,10 +72,7 @@ pub(crate) async fn ingest_events(
             Parameter::Json(record.record_json),
             Parameter::Time(transaction.now),
         ]);
-        let placeholders = (1..=parameters.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let placeholders = Parameter::placeholders(1..=parameters.len());
         let sql = format!(
             "INSERT INTO {table} ({}) VALUES ({placeholders}) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
             columns.join(",")

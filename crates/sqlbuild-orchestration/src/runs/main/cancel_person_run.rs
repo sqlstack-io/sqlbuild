@@ -28,12 +28,7 @@ pub async fn cancel_person_run(
         authorize_person(
             transaction,
             credentials,
-            &PermissionScope {
-                action: Action::RunCancel,
-                location_id: None,
-                target: None,
-                nodes: Default::default(),
-            },
+            &PermissionScope::action(Action::RunCancel, None),
             DefaultRole::None,
         )
         .await?;

@@ -50,17 +50,14 @@ async fn delete_snapshots(
     if expired.is_empty() {
         return Ok(transaction);
     }
-    let placeholders = (1..=expired.len())
-        .map(|index| format!("${index}"))
-        .collect::<Vec<_>>()
-        .join(",");
+    let expired_list = Parameter::placeholders(1..=expired.len());
     let ids: Vec<Parameter> = expired.iter().copied().map(Parameter::Id).collect();
     let mut hashes: Vec<Vec<String>> = Vec::with_capacity(CONTENT.len());
     for ((table, column), _, _) in CONTENT {
         let rows;
         (transaction, rows) = query(
             transaction,
-            &format!("SELECT DISTINCT {column} FROM {table} WHERE snapshot_id IN ({placeholders})"),
+            &format!("SELECT DISTINCT {column} FROM {table} WHERE snapshot_id IN ({expired_list})"),
             ids.clone(),
         )
         .await?;
@@ -79,17 +76,14 @@ async fn delete_snapshots(
     ] {
         (transaction, _) = query(
             transaction,
-            &format!("DELETE FROM {table} WHERE snapshot_id IN ({placeholders})"),
+            &format!("DELETE FROM {table} WHERE snapshot_id IN ({expired_list})"),
             ids.clone(),
         )
         .await?;
     }
     for (((table, column), content, elsewhere), hashes) in CONTENT.iter().zip(hashes) {
         for chunk in hashes.chunks(CONTENT_HASH_CHUNK) {
-            let placeholders = (1..=chunk.len())
-                .map(|index| format!("${index}"))
-                .collect::<Vec<_>>()
-                .join(",");
+            let placeholders = Parameter::placeholders(1..=chunk.len());
             (transaction, _) = query(
                 transaction,
                 &format!(

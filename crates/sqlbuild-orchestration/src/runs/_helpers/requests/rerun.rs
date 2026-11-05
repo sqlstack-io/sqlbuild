@@ -29,12 +29,7 @@ pub(crate) async fn frozen_rerun(
             authorize_person(
                 transaction,
                 (context, credentials),
-                &PermissionScope {
-                    action: Action::RunRerun,
-                    location_id: None,
-                    target: None,
-                    nodes: Default::default(),
-                },
+                &PermissionScope::action(Action::RunRerun, None),
                 DefaultRole::None,
             )
             .await?;

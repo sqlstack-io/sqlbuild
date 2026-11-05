@@ -66,10 +66,7 @@ pub(crate) async fn commit_ingestion(
         if !keys.is_empty() {
             let mut parameters = vec![Parameter::Id(scan.scan_id)];
             parameters.extend(keys.iter().copied().map(Parameter::Id));
-            let placeholders = (2..=parameters.len())
-                .map(|index| format!("${index}"))
-                .collect::<Vec<_>>()
-                .join(",");
+            let placeholders = Parameter::placeholders(2..=parameters.len());
             (transaction, _) = query(
                 transaction,
                 &format!("UPDATE {table} SET scan_id=$1 WHERE event_id IN ({placeholders})"),

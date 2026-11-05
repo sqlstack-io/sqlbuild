@@ -2,29 +2,24 @@
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::authorization::main::read_audit_events::read_audit_events;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, SecurityAuditEvent,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::main::commit::commit;
+use crate::store::models::ControlStore;
 
 pub async fn read_security_audit(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
     (after, limit): (i64, u32),
 ) -> Result<Vec<SecurityAuditEvent>, ControlError> {
-    let (transaction, _) = authorize_person(
-        begin(store, TransactionMode::Write).await?,
+    let (transaction, _) = begin_authorized(
+        store,
         (context, credentials),
-        &PermissionScope {
-            action: Action::AuditView,
-            location_id: None,
-            target: None,
-            nodes: Default::default(),
-        },
+        &PermissionScope::action(Action::AuditView, None),
         DefaultRole::None,
     )
     .await?;

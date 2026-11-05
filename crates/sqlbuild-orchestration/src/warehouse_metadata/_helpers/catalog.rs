@@ -7,8 +7,10 @@ use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
+use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::warehouse_metadata::_helpers::ingestion::{outside_scan, validate_fields};
+use crate::warehouse_metadata::_helpers::mirror_pages::page_tail;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
     CatalogObservation, CatalogPage, CatalogQuery, MetadataBatch, WarehouseCatalogRecord,
@@ -82,46 +84,28 @@ pub(crate) async fn read_catalog_page(
         .limit
         .unwrap_or(100)
         .clamp(1, MAX_HISTORY_RECORDS as u32) as usize;
-    let mut parameters = vec![
+    let parameters = vec![
         Parameter::Id(location_id),
         Parameter::Text(target.into()),
         Parameter::Text(options.schema.clone()),
     ];
-    let database = if let Some(database) = &options.database {
-        parameters.push(Parameter::Text(database.clone()));
-        "state_database=$4"
-    } else {
-        "state_database IS NULL"
-    };
-    let mut after = String::new();
-    if let (Some(time), Some(id)) = (options.after_observed_at, options.after_event_id) {
-        let offset = parameters.len();
-        parameters.extend([Parameter::Time(time), Parameter::Id(id)]);
-        after = format!(
-            " AND (observed_at,event_id)>(${},${})",
-            offset + 1,
-            offset + 2
-        );
-    }
-    parameters.push(Parameter::Integer(limit as i64));
-    let (transaction, rows) = query(
+    let (parameters, tail) = page_tail(
+        parameters,
+        options.database.as_ref(),
+        (options.after_observed_at, options.after_event_id),
+        limit,
+    );
+    let (transaction, records) = query_records(
         transaction,
         &format!(
             "SELECT event_id,observed_at,record_json AS record FROM sqb_warehouse_catalog \
-            WHERE location_id=$1 AND target=$2 AND state_schema=$3 AND {database}{after} \
-            ORDER BY observed_at,event_id LIMIT ${}",
-            parameters.len()
+            WHERE location_id=$1 AND target=$2 AND state_schema=$3{tail}"
         ),
         parameters,
     )
     .await?;
-    let more = rows.len() == limit;
-    let records: Vec<CatalogObservation> = rows
-        .into_iter()
-        .map(|row| serde_json::from_value(json!(row)))
-        .collect::<Result<_, _>>()
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    let next_after = more
+    let records: Vec<CatalogObservation> = records;
+    let next_after = (records.len() == limit)
         .then(|| records.last())
         .flatten()
         .map(|record| WarehouseMirrorCursor {

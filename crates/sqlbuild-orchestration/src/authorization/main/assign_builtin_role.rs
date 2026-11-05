@@ -3,28 +3,22 @@
 use uuid::Uuid;
 
 use crate::authorization::_helpers::administrator_roles::assign_role_in;
-use crate::authorization::main::authorize_person::authorize_person;
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, RoleAssignmentRequest,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::ControlStore;
 
 pub async fn assign_builtin_role(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
     request: &RoleAssignmentRequest,
 ) -> Result<bool, ControlError> {
-    let (transaction, context) = authorize_person(
-        begin(store, TransactionMode::Write).await?,
+    let (transaction, context) = begin_authorized(
+        store,
         (context, credentials),
-        &PermissionScope {
-            action: Action::RoleAssign,
-            location_id: None,
-            target: None,
-            nodes: Default::default(),
-        },
+        &PermissionScope::action(Action::RoleAssign, None),
         DefaultRole::None,
     )
     .await?;

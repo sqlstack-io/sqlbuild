@@ -19,12 +19,7 @@ pub(crate) async fn authorize_connection_test(
     authorize_person(
         transaction,
         (context, credentials),
-        &PermissionScope {
-            action: Action::ConnectionTest,
-            location_id: Some(location_id),
-            target: Some(target.into()),
-            nodes: Default::default(),
-        },
+        &PermissionScope::action(Action::ConnectionTest, Some((location_id, target))),
         DefaultRole::None,
     )
     .await

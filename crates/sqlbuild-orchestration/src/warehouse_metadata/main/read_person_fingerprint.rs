@@ -2,12 +2,12 @@
 
 use uuid::Uuid;
 
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::main::commit::commit;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprint;
-use crate::warehouse_metadata::_helpers::person_reads::begin_view;
 use crate::warehouse_metadata::models::{FingerprintObservation, FingerprintQuery};
 
 pub async fn read_person_fingerprint(
@@ -16,7 +16,7 @@ pub async fn read_person_fingerprint(
     (location_id, target, options): (Uuid, &str, &FingerprintQuery),
     default_role: DefaultRole,
 ) -> Result<Option<FingerprintObservation>, ControlError> {
-    let transaction = begin_view(
+    let (transaction, _) = begin_authorized(
         store,
         credentials,
         &PermissionScope {
