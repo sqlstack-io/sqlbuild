@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 use crate::credentials::models::AuditContext;
-use crate::credentials::models::SessionIdentity;
+use crate::credentials::models::AuthenticatedPerson;
 use crate::snapshots::main::read_person_node_sql::read_person_node_sql;
 use crate::snapshots::models::NodeSql;
 use crate::store::models::ControlStore;
@@ -18,12 +18,12 @@ use crate::store::models::ControlStore;
 pub(crate) async fn read(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target, node_key)): Path<(Uuid, String, String)>,
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Option<NodeSql>>, ApiError> {
     Ok(Json(
         read_person_node_sql(
             &store,
-            (&context, identity.principal_id),
+            (&context, principal),
             (location_id, &target, &node_key),
         )
         .await?,

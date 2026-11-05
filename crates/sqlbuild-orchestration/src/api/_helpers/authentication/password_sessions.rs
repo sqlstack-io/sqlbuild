@@ -29,10 +29,25 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 
+/// Session-authenticated person routes, plus routes acting on the caller's own session.
 pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
+    person_routes()
+        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
+        .merge(session_routes(store))
+}
+
+/// Routes that act on the caller's own session.
+pub(crate) fn session_routes(store: &ControlStore) -> Router<ControlStore> {
     Router::new()
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
+        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
+        .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
+}
+
+/// Person operations; the caller layers the authentication that identifies the person.
+pub(crate) fn person_routes() -> Router<ControlStore> {
+    Router::new()
         .route("/api/auth/cli/approve", post(super::cli_login::approve))
         .route(
             "/api/control/audit",
@@ -94,7 +109,6 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql",
             get(crate::api::_helpers::resources::person_node_sql::read),
         )
-        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }
 

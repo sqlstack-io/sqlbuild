@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::credentials::models::AuditContext;
-use crate::credentials::models::SessionIdentity;
+use crate::credentials::models::AuthenticatedPerson;
 use crate::platform::main::read_person_connection_test::read_person_connection_test;
 use crate::platform::main::request_location_work::request_location_work;
 use crate::platform::models::{
@@ -25,13 +25,13 @@ use crate::store::models::ControlStore;
 pub(crate) async fn request(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target)): Path<(Uuid, String)>,
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
     Json(request): Json<ConnectionTestRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
         applied: request_location_work(
             &store,
-            (&context, Some(identity.principal_id)),
+            (&context, Some(principal)),
             &LocationWorkRequest {
                 request_id: request.request_id,
                 location_id,
@@ -52,12 +52,12 @@ pub(crate) async fn request(
 pub(crate) async fn result(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path((location_id, target, request_id)): Path<(Uuid, String, Uuid)>,
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Option<LocationWorkRecord>>, ApiError> {
     Ok(Json(
         read_person_connection_test(
             &store,
-            (&context, identity.principal_id),
+            (&context, principal),
             (location_id, &target, request_id),
         )
         .await?,

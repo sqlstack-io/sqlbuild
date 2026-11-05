@@ -10,9 +10,7 @@ use crate::credentials::main::{
     sessions::authenticate_session::authenticate_session, sessions::login_password::login_password,
     sessions::set_password::set_password,
 };
-use crate::credentials::models::{
-    AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, SessionAccess,
-};
+use crate::credentials::models::{AuditContext, PasswordAuthority, PasswordLogin, SessionAccess};
 use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorRecoveryTestCase;
 use crate::store::main::{
@@ -84,15 +82,10 @@ fn given_lost_administrator_access_when_grant_admin_runs_online_then_authority_a
             else {
                 panic!("valid password");
             };
-            let external_session = authenticate_bound_person(
-                &fixture.store,
-                &context,
-                principal,
-                ExternalIdentityMechanism::Oidc,
-            )
-            .await
-            .expect("verified OIDC identity")
-            .expect("SSO session");
+            let external_session = authenticate_bound_person(&fixture.store, &context, principal)
+                .await
+                .expect("verified OIDC identity")
+                .expect("SSO session");
             let (transaction, _) = query(
                 begin(&fixture.store, TransactionMode::Write)
                     .await

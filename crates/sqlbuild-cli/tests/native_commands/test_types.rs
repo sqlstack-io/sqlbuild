@@ -49,7 +49,7 @@ pub(crate) struct AdministratorCliTestCase {
 pub(crate) struct ProxyCliTestCase {
     pub(crate) description: &'static str,
     pub(crate) subject: &'static str,
-    pub(crate) expected_status: reqwest::StatusCode,
+    pub(crate) expected_statuses: [reqwest::StatusCode; 3],
 }
 
 pub(crate) struct AuthenticationConfigurationTestCase {
