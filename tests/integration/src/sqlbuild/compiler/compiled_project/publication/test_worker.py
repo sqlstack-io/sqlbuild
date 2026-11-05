@@ -6,6 +6,7 @@ import signal
 import sqlite3
 import time
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -159,7 +160,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             for name, statuses in test_case.expected_child_statuses.items()
         )
         assert (runs["marts"]["started_at"] is not None) == test_case.expected_marts_started
-        assert runs["staging"]["ended_at"] <= (
+        assert datetime.fromisoformat(runs["staging"]["ended_at"]) <= datetime.fromisoformat(
             runs["marts"]["started_at"] or runs["staging"]["ended_at"]
         )
         with sqlite3.connect(worker.control_store) as control:
