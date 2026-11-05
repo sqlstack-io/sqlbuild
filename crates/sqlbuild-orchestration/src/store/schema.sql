@@ -469,13 +469,15 @@ CREATE TABLE sqb_warehouse_microbatches (
     scan_id {uuid}
 );
 CREATE INDEX sqb_microbatches_namespace ON sqb_warehouse_microbatches (location_id,target,state_database,state_schema,observed_at,event_id);
-CREATE INDEX recall_warehouse_sources ON recall_events (storage_id)
-    WHERE producer='warehouse' AND event_type='warehouse_source_freshness'
-      AND invocation_id LIKE 'warehouse/source-freshness/%';
 CREATE INDEX sqb_freshness_source_latest ON sqb_warehouse_freshness (
     location_id, target, (record_json ->> 'source_name'),
     (record_json ->> 'target_database'), (record_json ->> 'target_schema'),
     (record_json ->> 'target_name'), observed_at DESC, event_id DESC
+);
+CREATE INDEX sqb_freshness_source_received ON sqb_warehouse_freshness (
+    location_id, target, (record_json ->> 'source_name'),
+    (record_json ->> 'target_database'), (record_json ->> 'target_schema'),
+    (record_json ->> 'target_name'), received_at DESC, observed_at DESC, event_id DESC
 );
 CREATE TABLE sqb_security_audit_deliveries (
     sink_id TEXT NOT NULL,

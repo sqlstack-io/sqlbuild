@@ -26,7 +26,6 @@ use crate::store::main::{
 use crate::store::models::TransactionMode;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
-use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
@@ -65,7 +64,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 "source:raw_orders".into(),
                 SnapshotNode {
                     kind: "source".into(),
-                    definition: json!({"name": "raw_orders"}),
+                    definition: json!({"name": "raw_orders", "database": null, "schema": "main", "table": "raw_orders"}),
                     raw_sql: None,
                     compiled_sql: None,
                     python_source: None,
@@ -118,7 +117,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 "raw_products".into();
             let receipt_fault = TransactionFault {
                 description: "source receipt rollback",
-                table: "recall_events",
+                table: "sqb_warehouse_freshness",
                 operation: "INSERT",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected source receipt failure')",
@@ -141,17 +140,17 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .is_err()
             );
             remove_fault(store, &receipt_fault).await;
-            let (transaction, mirrored) = query(
+            let (transaction, stored) = query(
                 begin(store, TransactionMode::Read)
                     .await
-                    .expect("mirror read"),
+                    .expect("observation read"),
                 "SELECT COUNT(*) AS count FROM sqb_warehouse_freshness",
                 vec![],
             )
             .await
-            .expect("rolled back mirror");
+            .expect("rolled back observations");
             commit(transaction).await.expect("finish read");
-            assert_eq!(mirrored[0]["count"], 0);
+            assert_eq!(stored[0]["count"], 0);
             for page in records.chunks(100) {
                 let batch = MetadataBatch {
                     kind: WarehouseHistoryKind::SourceFreshness,
@@ -233,7 +232,6 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 .await
                 .expect("second page")
                 .expect("due");
-            assert!(second.cursor.event_storage_id > 0);
             assert_eq!(
                 complete_builtin_sensor(store, &lease, &second)
                     .await
@@ -268,31 +266,18 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     .expect("late warehouse time must not skip new receipt"),
                 1
             );
-            let events = read_recall_events(store, 0, 1000)
-                .await
-                .expect("durable observations");
-            let source_events = events
-                .iter()
-                .filter(|event| event["event_type"] == "warehouse_source_freshness")
-                .count();
-            assert_eq!(
-                source_events,
-                records.len() + 1
-                    - data["null_indices"]
-                        .as_array()
-                        .expect("null observations")
-                        .len()
-            );
             let (transaction, _) = query(
                 begin(store, TransactionMode::Write)
                     .await
-                    .expect("disposable mirror"),
+                    .expect("re-ingested observations"),
                 "DELETE FROM sqb_warehouse_freshness",
                 vec![],
             )
             .await
-            .expect("clear mirror");
-            commit(transaction).await.expect("clear mirror committed");
+            .expect("clear observations");
+            commit(transaction)
+                .await
+                .expect("clear observations committed");
             for page in records.chunks(100) {
                 ingest_source_freshness(
                     store,
@@ -306,7 +291,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     },
                 )
                 .await
-                .expect("rebuild mirror");
+                .expect("re-ingest observations");
             }
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
@@ -319,7 +304,7 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             assert_eq!(
                 complete_builtin_sensor(store, &lease, &rebuilt)
                     .await
-                    .expect("rebuild has no new source facts"),
+                    .expect("re-ingesting the same observations changes no version"),
                 0
             );
             assert_eq!(
@@ -330,16 +315,6 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 test_case.expected_runs,
                 "{}",
                 test_case.description
-            );
-            let rebuilt = read_recall_events(store, 0, 1000)
-                .await
-                .expect("rebuilt observations");
-            assert_eq!(
-                rebuilt
-                    .iter()
-                    .filter(|event| event["event_type"] == "warehouse_source_freshness")
-                    .count(),
-                source_events
             );
             close_test_store(fixture).await;
         });
@@ -476,7 +451,7 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
             };
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
-                .expect("mirror observations");
+                .expect("store observations");
             let fault = TransactionFault {
                 description: "stale cursor rollback",
                 table: "sqb_trigger_state",
@@ -552,16 +527,16 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
             let (transaction, _) = query(
                 begin(store, TransactionMode::Write)
                     .await
-                    .expect("clear mirror"),
+                    .expect("clear observations"),
                 "DELETE FROM sqb_warehouse_freshness",
                 vec![],
             )
             .await
-            .expect("delete disposable mirror");
+            .expect("delete observations");
             commit(transaction).await.expect("commit clear");
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
-                .expect("rebuild mirror");
+                .expect("re-ingest observations");
             tokio::time::sleep(Duration::from_secs(1)).await;
             let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
                 .await
