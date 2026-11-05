@@ -13,8 +13,10 @@ from scripts.fensu_policy.constants import (
     BRACKET_CLOSE,
     BRACKET_OPEN,
     LIST_SEPARATOR,
+    NATIVE_PATH_SEPARATOR,
     PARENTHESIS_CLOSE,
     PARENTHESIS_OPEN,
+    REASON_SEPARATOR,
     REMOVED_CODE,
     RUST_ATTRIBUTE_PATTERN,
     RUST_BARE_WORD_PATTERN,
@@ -23,10 +25,17 @@ from scripts.fensu_policy.constants import (
     RUST_IMPL_HEADER_PATTERN,
     RUST_LINE_CONTINUATION,
     RUST_LITERAL_PATTERN,
+    RUST_LOOKBEHIND,
     RUST_MACRO_INVOCATION_PATTERN,
+    RUST_MATCHES_MACRO_PATTERN,
     RUST_PATH_PAIR_PATTERN,
+    RUST_PATTERN_FOLLOWER_PATTERN,
+    RUST_PATTERN_LEADER_PATTERN,
+    RUST_QUALIFIED_VARIANT_PATTERN,
+    RUST_SELF,
     RUST_SELF_PATH_PATTERN,
     RUST_SIMPLE_ESCAPES,
+    RUST_TABLE_ITEM_PATTERN,
     RUST_TEST_FILE_NAME,
     RUST_TEST_MODULE_PATTERN,
     RUST_TEST_PATH_SEGMENTS,
@@ -69,6 +78,11 @@ _IMPL_HEADER: re.Pattern[str] = re.compile(RUST_IMPL_HEADER_PATTERN)
 _SELF_PATH: re.Pattern[str] = re.compile(RUST_SELF_PATH_PATTERN)
 _VARIANT_IMPORT: re.Pattern[str] = re.compile(RUST_VARIANT_IMPORT_PATTERN)
 _BARE_WORD: re.Pattern[str] = re.compile(RUST_BARE_WORD_PATTERN)
+_QUALIFIED: re.Pattern[str] = re.compile(RUST_QUALIFIED_VARIANT_PATTERN)
+_TABLE_ITEM: re.Pattern[str] = re.compile(RUST_TABLE_ITEM_PATTERN)
+_MATCHES_MACRO: re.Pattern[str] = re.compile(RUST_MATCHES_MACRO_PATTERN)
+_PATTERN_FOLLOWER: re.Pattern[str] = re.compile(RUST_PATTERN_FOLLOWER_PATTERN)
+_PATTERN_LEADER: re.Pattern[str] = re.compile(RUST_PATTERN_LEADER_PATTERN)
 _SQL_COMMENTS: re.Pattern[str] = re.compile(SQL_COMMENT_PATTERN, re.DOTALL)
 _SQL_TOKENS: re.Pattern[str] = re.compile(SQL_TOKEN_PATTERN)
 _SQL_WORD: re.Pattern[str] = re.compile(SQL_WORD_PATTERN)
@@ -256,19 +270,108 @@ def enum_variants(*, path: str, code: str) -> list[EnumVariant]:
     return variants
 
 
-def named_variants(*, variants: list[EnumVariant], codes: dict[str, str]) -> set[EnumVariant]:
-    """Variants named by a path, by `Self` in an impl's file, or by an imported variant."""
+def named_variants(
+    *, variants: list[EnumVariant], codes: dict[str, str], strict: frozenset[str] = frozenset()
+) -> set[EnumVariant]:
+    """Variants named in code; a `strict` enum's variants count only where built as a value."""
 
     bodies: dict[str, list[tuple[int, int]]] = {}
     variant: EnumVariant
     for variant in variants:
         bodies.setdefault(variant.path, []).append(variant.body)
     names: set[tuple[str, str]] = set()
+    constructed: set[tuple[str, str]] = set()
     path: str
     code: str
     for path, code in codes.items():
-        names.update(_file_names(code=_without_spans(text=code, spans=bodies.get(path, []))))
-    return {variant for variant in variants if (variant.enum, variant.variant) in names}
+        visible: str = _without_spans(text=code, spans=bodies.get(path, []))
+        names.update(_file_names(code=visible))
+        if strict:
+            constructed.update(_constructed_names(code=visible, strict=strict))
+    return {
+        variant
+        for variant in variants
+        if (variant.enum, variant.variant) in (constructed if variant.enum in strict else names)
+    }
+
+
+def reasoned_entries(*, entries: tuple[str, ...]) -> tuple[dict[str, str], list[str]]:
+    """`name=reason` option entries by name, and the entries that lack a name or a reason."""
+
+    reasons: dict[str, str] = {}
+    malformed: list[str] = []
+    entry: str
+    for entry in entries:
+        name, _, reason = entry.partition(REASON_SEPARATOR)
+        if name.strip() and reason.strip():
+            reasons[name.strip()] = reason.strip()
+        else:
+            malformed.append(entry)
+    return reasons, malformed
+
+
+def _constructed_names(*, code: str, strict: frozenset[str]) -> set[tuple[str, str]]:
+    value_code: str = _without_tables(code=code)
+    implemented: set[str] = set()
+    header: re.Match[str]
+    for header in _IMPL_HEADER.finditer(value_code):
+        implemented.update(set(_SQL_WORD.findall(header.group(0))) & strict)
+    names: set[tuple[str, str]] = set()
+    occurrence: re.Match[str]
+    for occurrence in _QUALIFIED.finditer(value_code):
+        owner: str = occurrence.group(1)
+        enums: set[str] = implemented if owner == RUST_SELF else {owner} & strict
+        if enums and not _pattern_position(
+            code=value_code, start=occurrence.start(), end=occurrence.end()
+        ):
+            names.update(itertools.product(enums, (occurrence.group(2),)))
+    return names
+
+
+def _without_tables(*, code: str) -> str:
+    spans: list[tuple[int, int]] = [
+        (item.start(), _statement_end(text=code, start=item.end()))
+        for item in _TABLE_ITEM.finditer(code)
+    ]
+    macro: re.Match[str]
+    for macro in _MATCHES_MACRO.finditer(code):
+        closing: int = _closing(
+            text=code, opening=macro.end() - 1, pair=(PARENTHESIS_OPEN, PARENTHESIS_CLOSE)
+        )
+        pieces: list[tuple[int, str]] = _top_level_pieces(text=code, start=macro.end(), end=closing)
+        if len(pieces) > 1:
+            spans.append((pieces[1][0], closing))
+    return _without_spans(text=code, spans=spans)
+
+
+def _statement_end(*, text: str, start: int) -> int:
+    depth: int = 0
+    offset: int
+    for offset in range(start, len(text)):
+        character: str = text[offset]
+        depth += (character in (PARENTHESIS_OPEN, BRACKET_OPEN, BRACE_OPEN)) - (
+            character in (PARENTHESIS_CLOSE, BRACKET_CLOSE, BRACE_CLOSE)
+        )
+        if character == SQL_STATEMENT_SEPARATOR and depth == 0:
+            return offset
+    return len(text)
+
+
+def _pattern_position(*, code: str, start: int, end: int) -> bool:
+    after: int = end
+    while after < len(code) and code[after].isspace():
+        after += 1
+    if after < len(code) and code[after] in (PARENTHESIS_OPEN, BRACE_OPEN):
+        pair: tuple[str, str] = (
+            (PARENTHESIS_OPEN, PARENTHESIS_CLOSE)
+            if code[after] == PARENTHESIS_OPEN
+            else (BRACE_OPEN, BRACE_CLOSE)
+        )
+        after = _closing(text=code, opening=after, pair=pair) + 1
+    return (
+        _PATTERN_FOLLOWER.match(code, after) is not None
+        or _PATTERN_LEADER.search(code[max(0, start - RUST_LOOKBEHIND) : start]) is not None
+    )
 
 
 def _file_names(*, code: str) -> set[tuple[str, str]]:
@@ -432,3 +535,57 @@ def _column_name(*, piece: str) -> str | None:
     if first in SQL_COLUMN_CONSTRAINT_WORDS or _SQL_WORD.fullmatch(first) is None:
         return None
     return first
+
+
+def allowed_state(
+    *, definitions: list[StateDefinition], unread: list[StateDefinition], entries: tuple[str, ...]
+) -> tuple[list[StateDefinition], list[str]]:
+    """Unread state not allowlisted, and malformed or stale entries for tables defined here."""
+
+    reasons: dict[str, str]
+    malformed: list[str]
+    reasons, malformed = reasoned_entries(entries=entries)
+    defined_tables: set[str] = {definition.table for definition in definitions}
+    unread_keys: set[str] = {_state_key(definition=definition) for definition in unread}
+    stale: list[str] = [
+        f"allowlisted {key} is read or no longer defined; remove the entry"
+        for key in reasons
+        if key.partition(SQL_QUALIFIER)[0] in defined_tables and key not in unread_keys
+    ]
+    problems: list[str] = [f"allowlist entry {entry!r} needs `name=reason`" for entry in malformed]
+    kept: list[StateDefinition] = [
+        definition for definition in unread if _state_key(definition=definition) not in reasons
+    ]
+    return kept, problems + stale
+
+
+def excepted_variants(
+    *, variants: list[EnumVariant], unnamed: list[EnumVariant], entries: tuple[str, ...]
+) -> tuple[list[EnumVariant], list[str]]:
+    """Unnamed variants not excepted, and problems: malformed or no-longer-needed entries."""
+
+    reasons: dict[str, str]
+    malformed: list[str]
+    reasons, malformed = reasoned_entries(entries=entries)
+    declared: set[str] = {variant.enum for variant in variants}
+    covered: set[str] = set()
+    kept: list[EnumVariant] = []
+    variant: EnumVariant
+    for variant in unnamed:
+        keys: set[str] = {variant.enum, f"{variant.enum}{NATIVE_PATH_SEPARATOR}{variant.variant}"}
+        covered.update(keys & set(reasons))
+        if not keys & set(reasons):
+            kept.append(variant)
+    stale: list[str] = [
+        f"exception {key} no longer matches an unnamed variant; remove the entry"
+        for key in reasons
+        if key.partition(NATIVE_PATH_SEPARATOR)[0] in declared and key not in covered
+    ]
+    problems: list[str] = [f"exception entry {entry!r} needs `name=reason`" for entry in malformed]
+    return kept, problems + stale
+
+
+def _state_key(*, definition: StateDefinition) -> str:
+    if definition.column is None:
+        return definition.table
+    return f"{definition.table}{SQL_QUALIFIER}{definition.column}"

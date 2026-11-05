@@ -4,18 +4,22 @@ from textwrap import dedent
 import pytest
 
 from scripts.fensu_policy._helpers.unused_state import (
+    allowed_state,
     code_view,
     collect_reads,
     enum_variants,
+    excepted_variants,
     named_variants,
     schema_definitions,
     sql_read_fragments,
     string_literals,
     unread_definitions,
 )
-from scripts.fensu_policy.models import EnumVariant, StateDefinition
+from scripts.fensu_policy.models import EnumVariant, StateDefinition, StateReads
 from tests.unit.scripts.fensu_policy.rules._test_types import (
     EnumVariantTestCase,
+    ReasonedEntriesTestCase,
+    StrictVariantTestCase,
     UnreadStateTestCase,
 )
 
@@ -218,3 +222,154 @@ def test_given_rust_enums_when_finding_named_variants_then_reports_unnamed_varia
     assert {(variant.enum, variant.variant) for variant in unnamed} == set(
         test_case.expected_unnamed
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        StrictVariantTestCase(
+            description="tables, patterns, matches! and comparisons do not construct a variant",
+            source=dedent(
+                """
+                pub enum Permission { View, Run, Export, Manage, Preview, Audit, Cancel }
+
+                const ADMINISTRATIVE: [Permission; 1] = [Permission::Manage];
+
+                fn label(permission: Permission) -> &'static str {
+                    match permission { Permission::View => "view", _ => "other" }
+                }
+
+                fn is_read(permission: Permission) -> bool {
+                    matches!(permission, Permission::Preview | Permission::Run)
+                }
+
+                fn is_audit(permission: Permission) -> bool { permission == Permission::Audit }
+
+                fn routes() {
+                    require(Scope { permission: Permission::Run });
+                    require_optional(Some(Permission::View));
+                    let cancel = Permission::Cancel;
+                }
+
+                fn arms(permission: Permission) {
+                    match permission { Permission::Export | Permission::Cancel => {} _ => {} }
+                }
+                """
+            ),
+            expected_unnamed=("Audit", "Export", "Manage", "Preview"),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_strict_enum_when_finding_named_variants_then_only_constructions_count(
+    test_case: StrictVariantTestCase,
+) -> None:
+    code: str = code_view(source=test_case.source)
+    variants: list[EnumVariant] = enum_variants(path="crates/shop/src/access.rs", code=code)
+    named: set[EnumVariant] = named_variants(
+        variants=variants,
+        codes={"crates/shop/src/access.rs": code},
+        strict=frozenset({"Permission"}),
+    )
+
+    assert {variant.variant for variant in set(variants) - named} == set(test_case.expected_unnamed)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ReasonedEntriesTestCase(
+            description="an allowlisted unread column is hidden",
+            entries=("orders.retries=Read through order exports.",),
+            expected_kept=(("orders", "note_json"), ("order_events", None)),
+            expected_problem_count=0,
+        ),
+        ReasonedEntriesTestCase(
+            description="an entry without a reason is a problem and hides nothing",
+            entries=("orders.retries",),
+            expected_kept=(
+                ("orders", "retries"),
+                ("orders", "note_json"),
+                ("order_events", None),
+            ),
+            expected_problem_count=1,
+        ),
+        ReasonedEntriesTestCase(
+            description="an entry for state that is read is stale; one for an absent table is not",
+            entries=("orders.status=Shown in the UI.", "invoices.total=Belongs to another branch."),
+            expected_kept=(
+                ("orders", "retries"),
+                ("orders", "note_json"),
+                ("order_events", None),
+            ),
+            expected_problem_count=1,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_allowlist_entries_when_filtering_unread_state_then_stale_and_malformed_entries_report(
+    test_case: ReasonedEntriesTestCase,
+) -> None:
+    definitions: list[StateDefinition] = schema_definitions(
+        path="store/schema.sql", sql=ORDERS_SCHEMA
+    )
+    reads: StateReads = collect_reads(
+        fragments=["SELECT order_id, status, shipped_at FROM orders"], definitions=definitions
+    )
+    kept: list[StateDefinition]
+    problems: list[str]
+    kept, problems = allowed_state(
+        definitions=definitions,
+        unread=unread_definitions(definitions=definitions, reads=reads),
+        entries=test_case.entries,
+    )
+
+    assert tuple((definition.table, definition.column) for definition in kept) == (
+        test_case.expected_kept
+    )
+    assert len(problems) == test_case.expected_problem_count
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ReasonedEntriesTestCase(
+            description="enum and single-variant exceptions hide only what they name",
+            entries=(
+                "Outcome::Cancelled=Written as SQL text.",
+                "Missing=Belongs to another crate.",
+            ),
+            expected_kept=("Outcome::Returned",),
+            expected_problem_count=0,
+        ),
+        ReasonedEntriesTestCase(
+            description="an exception for a variant that code names is stale",
+            entries=("Outcome::Pending=Built by serde.",),
+            expected_kept=("Outcome::Returned", "Outcome::Cancelled"),
+            expected_problem_count=1,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_variant_exceptions_when_filtering_unnamed_variants_then_stale_entries_report(
+    test_case: ReasonedEntriesTestCase,
+) -> None:
+    code: str = code_view(
+        source="pub enum Outcome { Pending, Returned, Cancelled }\nfn f() -> Outcome { Outcome::Pending }\n"
+    )
+    variants: list[EnumVariant] = enum_variants(path="crates/shop/src/models.rs", code=code)
+    named: set[EnumVariant] = named_variants(
+        variants=variants, codes={"crates/shop/src/models.rs": code}
+    )
+    kept: list[EnumVariant]
+    problems: list[str]
+    kept, problems = excepted_variants(
+        variants=variants,
+        unnamed=list(itertools.filterfalse(named.__contains__, variants)),
+        entries=test_case.entries,
+    )
+
+    assert tuple(f"{variant.enum}::{variant.variant}" for variant in kept) == (
+        test_case.expected_kept
+    )
+    assert len(problems) == test_case.expected_problem_count
