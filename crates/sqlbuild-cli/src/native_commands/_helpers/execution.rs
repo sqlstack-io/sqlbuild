@@ -12,8 +12,7 @@ use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
 use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
-use sqlbuild_orchestration::authorization::main::recover_administrator::recover_administrator;
-use sqlbuild_orchestration::credentials::models::{AuditContext, AuditRetention};
+use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
 use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
@@ -26,7 +25,6 @@ use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
 use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::begin_offline_recovery::begin_offline_recovery;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
 use sqlbuild_orchestration::store::models::ControlStore;
@@ -185,7 +183,7 @@ fn development_location_role(
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .stdin(Stdio::null())
         .kill_on_drop(true);
-    if let ControlStore::Sqlite(path, _) = store {
+    if let ControlStore::Sqlite(path) = store {
         command.env(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
             std::env::current_dir()?.join(path),
@@ -787,42 +785,11 @@ pub(crate) async fn run_control_action(
     command: &str,
 ) -> Result<Option<serde_json::Value>, ControlError> {
     if command == ADMIN_COMMAND {
-        return run_administration(namespace).await.map(Some);
+        return run_admin(namespace).await.map(Some);
     }
     run_control(namespace, command == SCHEDULER_COMMAND)
         .await
         .map(|()| None)
-}
-
-/// Keep exclusive offline recovery outside the online store-opening and migration path.
-pub(crate) async fn run_administration(
-    namespace: &Namespace,
-) -> Result<serde_json::Value, ControlError> {
-    if text(namespace, "admin_command").as_deref() != Some("recover-user") {
-        return run_admin(namespace).await;
-    }
-    let principal_id = Uuid::parse_str(&text(namespace, "admin_subject").unwrap_or_default())
-        .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
-    let reason = text(namespace, "admin_reason").unwrap_or_default();
-    if reason.trim().is_empty() {
-        return Err(ControlError::Invalid(
-            "offline recovery requires --reason".into(),
-        ));
-    }
-    let url = control_database(namespace)?;
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Acquiring exclusive offline control-store access...\n",
-    )]));
-    let recovery = begin_offline_recovery(&url).await?;
-    let context = AuditContext {
-        actor: "local-control-store-owner".into(),
-        granting_role: "control-store-owner".into(),
-        request_id: Uuid::now_v7(),
-        ip_address: None,
-    };
-    recover_administrator(recovery, &context, (principal_id, &reason)).await?;
-    Ok(serde_json::json!({"principal_id":principal_id,"role":"admin","recovered":true}))
 }
 
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.

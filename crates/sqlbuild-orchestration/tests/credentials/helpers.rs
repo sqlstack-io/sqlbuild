@@ -7,7 +7,7 @@ pub(crate) async fn location_state(store: &ControlStore) -> (i64, i64) {
     let sql = "SELECT (SELECT COUNT(*) FROM sqb_locations), \
                (SELECT COUNT(*) FROM sqb_security_audit WHERE action='location.created')";
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         return rusqlite::Connection::open(path)
@@ -23,7 +23,7 @@ pub(crate) async fn location_state(store: &ControlStore) -> (i64, i64) {
 
 pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         let connection = rusqlite::Connection::open(path).expect("inspect durable tokens");

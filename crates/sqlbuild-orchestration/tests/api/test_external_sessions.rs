@@ -1,4 +1,4 @@
-//! Real HTTP federation sessions retain live roles, usable-admin protection and audited revocation.
+//! Real HTTP federation sessions retain live roles, final-admin protection and audited revocation.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -12,7 +12,7 @@ use crate::api::tests::test_types::ExternalSessionTestCase;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::{
     identities::create_principal::create_principal, locations::create_location::create_location,
-    sessions::set_password::set_password, sessions::verify_password::verify_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::store::main::{
@@ -66,29 +66,6 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
             let second = create_principal(store, &context, second_subject)
                 .await
                 .expect("second person");
-            let unbound = create_principal(
-                store,
-                &context,
-                people["unbound_password_person"]
-                    .as_str()
-                    .expect("unbound password person"),
-            )
-            .await
-            .expect("unbound person");
-            set_password(
-                store,
-                &context,
-                PasswordAuthority::Operator(unbound),
-                "products-password-2026",
-            )
-            .await
-            .expect("unbound password");
-            assert!(
-                verify_password(store, unbound, "products-password-2026")
-                    .await
-                    .expect("verified credential")
-                    .is_some()
-            );
             let origin = inputs["origin"].as_str().expect("origin");
             let settings = TrustedProxyAuthentication {
                 origin: origin.into(),
@@ -186,19 +163,16 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                     .header(header::COOKIE, &sessions[index].0)
             };
             let roles = |principal_id| json!({"principal_id":principal_id,"role":"admin","location_id":null,"target":null});
-            for id in [unbound, second] {
-                let response = request(0, "/api/admin/roles")
-                    .json(&roles(id))
-                    .send()
-                    .await
-                    .expect("admin grant");
-                assert_eq!(response.status(), StatusCode::OK);
-                assert_eq!(
-                    response.json::<Value>().await.expect("applied grant")["applied"],
-                    true
-                );
-            }
-            // A bound person needs no local password; an unbound password account cannot replace it.
+            let response = request(0, "/api/admin/roles")
+                .json(&roles(second))
+                .send()
+                .await
+                .expect("admin grant");
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(
+                response.json::<Value>().await.expect("applied grant")["applied"],
+                true
+            );
             assert_eq!(
                 request(0, &format!("/api/admin/people/{first}"))
                     .json(&"revoke")
@@ -222,11 +196,11 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                     .json(&operation)
                     .send()
                     .await
-                    .expect("final usable SSO admin");
+                    .expect("final SSO admin");
                 assert_eq!(response.status(), StatusCode::FORBIDDEN);
                 let body = response.json::<Value>().await.expect("invariant denial");
                 assert!(body["error"].as_str().expect("error").starts_with(
-                    "cannot remove or disable the final usable installation administrator; decision "
+                    "cannot remove or disable the final installation administrator; decision "
                 ));
             }
             let location = create_location(store, "orders", &context)

@@ -207,7 +207,7 @@ pub(super) async fn snapshot_contract(backend: Backend) -> Option<i64> {
 }
 
 fn verify_sqlite_deduplication(store: &ControlStore) {
-    let ControlStore::Sqlite(path, _) = store else {
+    let ControlStore::Sqlite(path) = store else {
         return;
     };
     let connection = rusqlite::Connection::open(path).expect("inspect control store");
