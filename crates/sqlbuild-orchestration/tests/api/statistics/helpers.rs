@@ -11,11 +11,11 @@ use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::main::{
     ingest_statistics::ingest_statistics, read_person_statistics::read_person_statistics,
 };
-use crate::warehouse_metadata::models::{StatisticsBatch, StatisticsQuery};
+use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery};
 
 pub(crate) async fn statistics_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, other, session_id): (Uuid, Uuid, Uuid),
 ) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -48,8 +48,8 @@ pub(crate) async fn statistics_reads(
         })
         .collect();
     for records in records.chunks(100) {
-        let batch: StatisticsBatch = serde_json::from_value(
-            json!({"session_id":session_id,"generation":1,"records":records}),
+        let batch: MetadataBatch = serde_json::from_value(
+            json!({"kind":"statistics","session_id":session_id,"generation":1,"records":records}),
         )
         .expect("batch");
         assert!(
@@ -104,12 +104,18 @@ pub(crate) async fn statistics_reads(
             .all(|observation| observation.record.row_count == Some(7)
                 && observation.record.byte_count == Some(4096))
     );
-    let mut replacement: StatisticsBatch = serde_json::from_value(
-        json!({"session_id":session_id,"generation":1,"records":[records[0]]}),
+    let mut replacement: MetadataBatch = serde_json::from_value(
+        json!({"kind":"statistics","session_id":session_id,"generation":1,"records":[records[0]]}),
     )
     .expect("replacement");
-    replacement.records[0].row_count = Some(999);
-    replacement.records[0].observed_at += Duration::seconds(3599);
+    replacement.records[0]["row_count"] = json!(999);
+    replacement.records[0]["observed_at"] = json!(
+        serde_json::from_value::<chrono::DateTime<chrono::Utc>>(
+            replacement.records[0]["observed_at"].clone()
+        )
+        .expect("observed_at")
+            + Duration::seconds(3599)
+    );
     assert!(
         !ingest_statistics(store, (location, "development"), &replacement)
             .await
@@ -122,9 +128,9 @@ pub(crate) async fn statistics_reads(
         (None, "main", "Orders"),
     ] {
         let mut scoped = replacement.clone();
-        scoped.records[0].state_database = database.map(String::from);
-        scoped.records[0].state_schema = schema.into();
-        scoped.records[0].name = name.into();
+        scoped.records[0]["state_database"] = json!(database);
+        scoped.records[0]["state_schema"] = json!(schema);
+        scoped.records[0]["name"] = json!(name);
         assert!(
             ingest_statistics(store, (location, "development"), &scoped)
                 .await
@@ -195,7 +201,7 @@ pub(crate) async fn statistics_reads(
         );
     }
     let mut invalid = replacement.clone();
-    invalid.records[0].byte_count_basis = None;
+    invalid.records[0]["byte_count_basis"] = Value::Null;
     assert!(matches!(
         ingest_statistics(store, (location, "development"), &invalid).await,
         Err(ControlError::Invalid(_))

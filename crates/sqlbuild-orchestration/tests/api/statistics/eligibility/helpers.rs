@@ -11,12 +11,12 @@ use crate::warehouse_metadata::main::{
     read_statistics_due::read_statistics_due,
 };
 use crate::warehouse_metadata::models::{
-    StatisticsBatch, StatisticsDueRead, StatisticsQuery, WarehouseStateLocation,
+    MetadataBatch, StatisticsDueRead, StatisticsQuery, WarehouseStateLocation,
 };
 
 pub(crate) async fn statistics_eligibility(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     record: &Value,
 ) {
@@ -39,9 +39,10 @@ pub(crate) async fn statistics_eligibility(
     sample["observed_at"] = json!(Utc::now());
     sample["row_count"] = Value::Null;
     sample["byte_count"] = json!(0);
-    let batch: StatisticsBatch =
-        serde_json::from_value(json!({"session_id":session_id,"generation":1,"records":[sample]}))
-            .expect("one sampled relation");
+    let batch: MetadataBatch = serde_json::from_value(
+        json!({"kind":"statistics","session_id":session_id,"generation":1,"records":[sample]}),
+    )
+    .expect("one sampled relation");
     assert!(
         ingest_statistics(store, (location, "development"), &batch)
             .await
@@ -52,7 +53,9 @@ pub(crate) async fn statistics_eligibility(
         database: None,
         schema: "main".into(),
         name: first.names[0].clone(),
-        after_observed_at: Some(batch.records[0].observed_at),
+        after_observed_at: Some(
+            serde_json::from_value(batch.records[0]["observed_at"].clone()).expect("observed_at"),
+        ),
         after_event_id: Some(Uuid::nil()),
         limit: None,
     };

@@ -12,7 +12,7 @@ use crate::warehouse_metadata::models::{StatisticsPage, StatisticsQuery, Statist
 
 pub async fn read_person_statistics(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (location_id, target, options): (Uuid, &str, &StatisticsQuery),
     (default_role, retention): (DefaultRole, StatisticsRetention),
 ) -> Result<StatisticsPage, ControlError> {

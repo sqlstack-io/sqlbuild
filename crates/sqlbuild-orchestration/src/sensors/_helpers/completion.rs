@@ -40,7 +40,7 @@ pub(crate) async fn pending_evaluation(
         sensor.status != TriggerStatus::Running || sensor.snapshot_id != evaluation.snapshot_id
     }) || cursor != evaluation.cursor
     {
-        let (transaction, _) =
+        let transaction =
             append_evaluation(transaction, evaluation, SensorEvaluationOutcome::Abandoned).await?;
         commit(transaction).await?;
         return Ok(None);
@@ -58,15 +58,9 @@ pub(crate) async fn finish_evaluation(
         SensorEvaluationOutcome::Completed { cursor, .. } => Some(cursor.clone()),
         _ => None,
     };
-    let (mut transaction, (event_id, storage_id)) =
-        append_evaluation(transaction, evaluation, outcome).await?;
+    let mut transaction = append_evaluation(transaction, evaluation, outcome).await?;
     if let Some(cursor) = cursor {
-        transaction = commit_cursor(
-            transaction,
-            (evaluation.trigger_id, event_id, storage_id),
-            &cursor,
-        )
-        .await?;
+        transaction = commit_cursor(transaction, evaluation.trigger_id, &cursor).await?;
     }
     let next = evaluation.requested_at
         + TimeDelta::seconds(i64::from(

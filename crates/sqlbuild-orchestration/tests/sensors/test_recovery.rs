@@ -1,10 +1,12 @@
 use std::time::Duration;
+
+use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerStatus};
-use crate::platform::main::rebuild_projections::rebuild_projections;
+use crate::platform::_helpers::retention::retain;
 use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
@@ -17,9 +19,8 @@ use crate::store::errors::ControlError;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
-use crate::store::models::TransactionMode;
+use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::lease_helpers::expire_lease;
-use crate::store::tests::logical_state::logical_state;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -204,20 +205,6 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                 .expect("interval measured from start, not completion")
                 .expect("already due");
             assert_ne!(immediate.evaluation_id, delayed.evaluation_id);
-            let expected = logical_state(store).await;
-            let transaction = begin(store, TransactionMode::Write).await.expect("damage");
-            let (transaction, _) = query(transaction, "DELETE FROM sqb_trigger_state", vec![])
-                .await
-                .expect("missing sensor projection");
-            commit(transaction).await.expect("damage committed");
-            rebuild_projections(store)
-                .await
-                .expect("repair with pending evaluation and live cursor");
-            assert_eq!(
-                logical_state(store).await,
-                expected,
-                "replay preserves attempts, cursor commits, deduplication and operational ownership"
-            );
             complete_builtin_sensor(store, &successor, &immediate)
                 .await
                 .expect("complete next attempt");
@@ -228,6 +215,34 @@ fn given_a_crashed_sensor_when_leadership_or_snapshot_changes_then_stale_results
                     .len(),
                 test_case.expected_runs,
                 "{}",
+                test_case.description
+            );
+            let transaction = begin(store, TransactionMode::Write).await.expect("age");
+            let aged = transaction.now - TimeDelta::days(8);
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_sensor_evaluation_events SET occurred_at=$1 WHERE evaluation_id<>$2",
+                vec![
+                    Parameter::Time(aged),
+                    Parameter::Id(immediate.evaluation_id),
+                ],
+            )
+            .await
+            .expect("aged evaluations");
+            commit(transaction)
+                .await
+                .expect("aged evaluations committed");
+            retain(store, Default::default(), &[])
+                .await
+                .expect("retention pass");
+            assert_eq!(
+                evaluations(store)
+                    .await
+                    .iter()
+                    .map(|fact| fact.request.evaluation_id)
+                    .collect::<Vec<_>>(),
+                [immediate.evaluation_id, immediate.evaluation_id],
+                "{}: retention keeps only the latest attempt's phases",
                 test_case.description
             );
             close_store(replica).await;

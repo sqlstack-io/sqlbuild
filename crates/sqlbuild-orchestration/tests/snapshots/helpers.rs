@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 
 use crate::snapshots::main::current_snapshot::current_snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::snapshots::main::rebuild_projections::replay_snapshot_projections;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::open_store::open_store;
@@ -16,15 +15,8 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::snapshots::tests::test_types::SchemaRejectionCase;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{
-    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor,
-};
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
-
-pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result<(), ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    commit(replay_snapshot_projections(transaction).await?).await
-}
 
 pub(super) fn snapshot(location_id: Uuid) -> SnapshotInput {
     SnapshotInput {
@@ -215,7 +207,7 @@ pub(super) async fn snapshot_contract(backend: Backend) -> Option<i64> {
 }
 
 fn verify_sqlite_deduplication(store: &ControlStore) {
-    let ControlStore::Sqlite(path, _) = store else {
+    let ControlStore::Sqlite(path) = store else {
         return;
     };
     let connection = rusqlite::Connection::open(path).expect("inspect control store");
@@ -248,34 +240,15 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let good = publish_snapshot(&store, &input)
         .await
         .expect("publish good snapshot");
-    reconstruct_warehouse_predecessor(&store).await;
     let connection = rusqlite::Connection::open(&path).expect("open fault injection connection");
-    connection
-        .execute_batch(
-            "DROP TABLE sqb_external_sessions; DROP TABLE sqb_role_assignments; DROP TABLE sqb_admin_initialization; \
-             DROP TABLE sqb_oidc_login_flows; DROP TABLE sqb_authentication_revision; \
-             DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
-             DROP TABLE sqb_password_credentials; DROP TABLE sqb_development_locations; DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
-             DROP INDEX sqb_node_decisive_history; \
-             DROP INDEX sqb_node_finished_cursor; DROP INDEX sqb_node_started_identity; \
-             DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; \
-             DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; \
-             DROP TABLE sqb_sensor_evaluation_events; DROP TABLE sqb_platform_sink_deliveries; \
-             DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; \
-             DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2",
-        )
-        .expect("reconstruct the previous schema without changing existing facts");
     migrate_store(&store)
         .await
-        .expect("upgrade the previous schema");
-    migrate_store(&store)
-        .await
-        .expect("repeat the migration without changes");
+        .expect("repeat schema creation without changes");
     assert_eq!(
         current_snapshot(&store, location, "development")
             .await
-            .expect("read upgraded store")
-            .expect("snapshot survives upgrade")
+            .expect("read store after repeated startup")
+            .expect("snapshot survives repeated startup")
             .record,
         good
     );
@@ -306,20 +279,10 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let recovered = publish_snapshot(&store, &input)
         .await
         .expect("retry publication");
-    for case in [
-        SchemaRejectionCase {
-            description: "minimum server version is newer",
-            update_sql: "UPDATE sqb_schema_migrations SET min_server_version='9999.0.0'",
-        },
-        SchemaRejectionCase {
-            description: "migration checksum changed",
-            update_sql: "UPDATE sqb_schema_migrations SET min_server_version='0.0.0', checksum='different'",
-        },
-        SchemaRejectionCase {
-            description: "migration version is unknown",
-            update_sql: "UPDATE sqb_schema_migrations SET version=999 WHERE version=2",
-        },
-    ] {
+    for case in [SchemaRejectionCase {
+        description: "schema checksum changed",
+        update_sql: "UPDATE sqb_schema_version SET checksum='different'",
+    }] {
         connection
             .execute_batch(case.update_sql)
             .expect("apply synthetic schema incompatibility");
@@ -330,29 +293,6 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
         );
     }
     recovered.generation
-}
-
-pub(super) async fn damage(store: &ControlStore) {
-    use crate::store::main::{begin::begin, commit::commit, query::query};
-    use crate::store::models::TransactionMode;
-
-    let mut transaction = begin(store, TransactionMode::Write)
-        .await
-        .expect("damage cut");
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../benchmarks/duckshop/edge_cases/orchestration/projection_replay.json");
-    let fixture: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(path).expect("projection replay fixture"))
-            .expect("projection replay fixture");
-    for sql in fixture["snapshot_damage"]
-        .as_array()
-        .expect("snapshot damage")
-    {
-        (transaction, _) = query(transaction, sql.as_str().expect("damage SQL"), vec![])
-            .await
-            .expect("projection damage");
-    }
-    commit(transaction).await.expect("damage commits");
 }
 
 /// Retained generations for one location and target, and counts that expose orphaned content.
@@ -373,8 +313,8 @@ pub(super) async fn retained_snapshot_state(store: &ControlStore, location_id: U
         .collect()
 }
 
-/// Source texts, unreferenced source texts and trigger progress facts.
-pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64, i64) {
+/// Source texts and unreferenced source texts.
+pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64) {
     let transaction = begin(store, TransactionMode::Read)
         .await
         .expect("retention counts");
@@ -382,13 +322,12 @@ pub(super) async fn retention_counts(store: &ControlStore) -> (i64, i64, i64) {
         transaction,
         "SELECT (SELECT COUNT(*) FROM sqb_source_texts) AS texts, \
          (SELECT COUNT(*) FROM sqb_source_texts t WHERE NOT EXISTS \
-            (SELECT 1 FROM sqb_snapshot_sources s WHERE s.text_hash=t.text_hash)) AS orphans, \
-         (SELECT COUNT(*) FROM sqb_trigger_progress) AS progress",
+            (SELECT 1 FROM sqb_snapshot_sources s WHERE s.text_hash=t.text_hash)) AS orphans",
         vec![],
     )
     .await
     .expect("counts");
     commit(transaction).await.expect("retention counts read");
     let count = |name: &str| rows[0][name].as_i64().expect("count");
-    (count("texts"), count("orphans"), count("progress"))
+    (count("texts"), count("orphans"))
 }

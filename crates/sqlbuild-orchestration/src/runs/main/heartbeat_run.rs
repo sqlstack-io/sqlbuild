@@ -19,7 +19,7 @@ pub async fn heartbeat_run(
     let transaction = begin(store, TransactionMode::Write).await?;
     let now = transaction.now;
     let (transaction, rows) = query(transaction,
-        "UPDATE sqb_run_liveness SET last_heartbeat_at=$1 WHERE run_id=$2 AND worker_instance=$3 RETURNING run_id",
+        "UPDATE sqb_runs SET last_heartbeat_at=$1 WHERE run_id=$2 AND worker_instance=$3 RETURNING run_id",
         vec![Parameter::Time(now), Parameter::Id(run_id), Parameter::Id(claim_id)]).await?;
     if rows.is_empty() {
         return Err(ControlError::Invalid(

@@ -1,11 +1,11 @@
-//! Record each published custom role; removals and coverage apply now and enter the change feed; additions wait.
+//! Each published `roles` document replaces the target's custom roles at once; coverage changes enter the change feed.
+
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use crate::authorization::_helpers::custom_roles::{
-    decode_grants, decode_roles, effective_role, narrows, record_role_change, retained_grants,
-    set_effective_role,
-};
+use crate::authorization::_helpers::custom_roles::{decode_grants, decode_roles, record_role_change};
+use crate::credentials::models::RoleGrant;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -17,69 +17,57 @@ pub(crate) async fn publish_custom_roles(
     document: Option<&Value>,
 ) -> Result<ControlTransaction, ControlError> {
     let roles = decode_roles(document)?;
-    let scope = (record.location_id, record.target.as_str());
+    let scope = vec![
+        Parameter::Id(record.location_id),
+        Parameter::Text(record.target.clone()),
+    ];
     let rows;
     (transaction, rows) = query(
         transaction,
         "SELECT role_key,resolved_grants_json FROM sqb_effective_roles WHERE location_id=$1 AND target=$2",
-        vec![Parameter::Id(scope.0), Parameter::Text(scope.1.into())],
+        scope.clone(),
     )
     .await?;
-    for row in rows
-        .iter()
-        .filter(|row| !roles.contains_key(row["role_key"].as_str().unwrap_or_default()))
-    {
-        let key = row["role_key"].as_str().unwrap_or_default();
-        let before = decode_grants(&row["resolved_grants_json"])?;
-        transaction = record_role_change(
-            transaction,
-            (record.snapshot_id, key),
-            (Some(&before), None),
-        )
-        .await?;
-        (transaction, _) = query(
-            transaction,
-            "DELETE FROM sqb_effective_roles WHERE location_id=$1 AND target=$2 AND role_key=$3",
-            vec![
-                Parameter::Id(scope.0),
-                Parameter::Text(scope.1.into()),
-                Parameter::Text(key.into()),
-            ],
-        )
-        .await?;
-        transaction.changes.insert(Change::Credentials);
+    let mut previous: BTreeMap<String, Vec<RoleGrant>> = BTreeMap::new();
+    for row in &rows {
+        previous.insert(
+            row["role_key"].as_str().unwrap_or_default().into(),
+            decode_grants(&row["resolved_grants_json"])?,
+        );
     }
-    for (key, role) in &roles {
-        (transaction, _) = query(transaction,
-            "INSERT INTO sqb_role_definition_versions (location_id,target,role_key,definition_digest,definition_json,first_seen_snapshot_id,first_seen_at) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING",
-            vec![Parameter::Id(scope.0), Parameter::Text(scope.1.into()), Parameter::Text(key.clone()),
-                Parameter::Text(role.digest.clone()), Parameter::Text(role.definition.to_string()),
-                Parameter::Id(record.snapshot_id), Parameter::Time(record.published_at)]).await?;
-        let effective;
-        (transaction, effective) = effective_role(transaction, scope, key).await?;
-        let Some((digest, grants)) = effective else {
-            continue;
-        };
-        let next = retained_grants(&role.grants, &grants);
-        let next_digest = if narrows(&role.grants, &grants) {
-            role.digest.as_str()
-        } else {
-            digest.as_str()
-        };
-        if next != grants {
+    let keys: BTreeSet<&String> = previous.keys().chain(roles.keys()).collect();
+    for key in keys {
+        let (before, after) = (previous.get(key), roles.get(key));
+        if before != after {
             transaction = record_role_change(
                 transaction,
                 (record.snapshot_id, key),
-                (Some(&grants), Some(&next)),
+                (before.map(Vec::as_slice), after.map(Vec::as_slice)),
             )
             .await?;
         }
-        if next != grants || next_digest != digest {
-            transaction =
-                set_effective_role(transaction, (scope.0, scope.1, key), (next_digest, &next))
-                    .await?;
-        }
     }
+    (transaction, _) = query(
+        transaction,
+        "DELETE FROM sqb_effective_roles WHERE location_id=$1 AND target=$2",
+        scope,
+    )
+    .await?;
+    for (key, grants) in roles {
+        let grants = serde_json::to_string(&grants)
+            .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        (transaction, _) = query(
+            transaction,
+            "INSERT INTO sqb_effective_roles (location_id,target,role_key,resolved_grants_json) VALUES ($1,$2,$3,$4)",
+            vec![
+                Parameter::Id(record.location_id),
+                Parameter::Text(record.target.clone()),
+                Parameter::Text(key),
+                Parameter::Text(grants),
+            ],
+        )
+        .await?;
+    }
+    transaction.changes.insert(Change::Credentials);
     Ok(transaction)
 }

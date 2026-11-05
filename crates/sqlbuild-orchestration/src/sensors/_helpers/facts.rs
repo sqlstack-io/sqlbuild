@@ -1,4 +1,4 @@
-//! Attempts and cursor commits use Recall's serialized commit-order sequence.
+//! Sensor evaluation phases are recorded once; the latest cursor lives on the trigger's state.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -7,15 +7,14 @@ use crate::sensors::models::{
     SensorCursor, SensorEvaluationFact, SensorEvaluationOutcome, SensorEvaluationRequest,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;
-use crate::store::models::{Change, ControlEvent, ControlTransaction, Parameter};
+use crate::store::models::{Change, ControlTransaction, Parameter};
 
 pub(crate) async fn append_evaluation(
     transaction: ControlTransaction,
     request: &SensorEvaluationRequest,
     outcome: SensorEvaluationOutcome,
-) -> Result<(ControlTransaction, (Uuid, i64)), ControlError> {
+) -> Result<ControlTransaction, ControlError> {
     let phase = outcome.phase();
     let event_id = Uuid::new_v5(&request.evaluation_id, phase.as_bytes());
     let occurred_at = transaction.now;
@@ -23,46 +22,32 @@ pub(crate) async fn append_evaluation(
         request: request.clone(),
         outcome,
     };
-    let payload = json!(fact);
-    let (transaction, appended) = append_control_event(
-        transaction,
-        ControlEvent {
-            event_id,
-            invocation_id: format!("sensor/{}", request.trigger_id),
-            event_type: "sensor_evaluation",
-            producer: "scheduler",
-            occurred_at,
-            run_id: None,
-            payload: payload.clone(),
-        },
-    )
-    .await?;
-    if appended.conflict.is_some() {
-        return Err(ControlError::Invalid(
-            "sensor evaluation conflicts with a durable fact".into(),
-        ));
-    }
-    let storage_id = appended
-        .storage_id
-        .ok_or_else(|| ControlError::Invalid("sensor evaluation has no storage cursor".into()))?;
     let (mut transaction, _) = query(transaction,
-        "INSERT INTO sqb_sensor_evaluation_events (event_id,storage_id,evaluation_id,trigger_id,phase,occurred_at,fact_json) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7)",
-        vec![Parameter::Id(event_id), Parameter::Integer(storage_id), Parameter::Id(request.evaluation_id),
-            Parameter::Id(request.trigger_id), Parameter::Text(phase.into()), Parameter::Time(occurred_at), Parameter::Json(payload)]).await?;
+        "INSERT INTO sqb_sensor_evaluation_events (event_id,evaluation_id,trigger_id,phase,occurred_at,fact_json) \
+         VALUES ($1,$2,$3,$4,$5,$6)",
+        vec![Parameter::Id(event_id), Parameter::Id(request.evaluation_id), Parameter::Id(request.trigger_id),
+            Parameter::Text(phase.into()), Parameter::Time(occurred_at), Parameter::Json(json!(fact))]).await?;
     transaction
         .changes
         .insert(Change::Trigger(request.trigger_id));
-    Ok((transaction, (event_id, storage_id)))
+    Ok(transaction)
 }
 
 pub(crate) async fn commit_cursor(
     transaction: ControlTransaction,
-    (trigger_id, event_id, storage_id): (Uuid, Uuid, i64),
+    trigger_id: Uuid,
     cursor: &SensorCursor,
 ) -> Result<ControlTransaction, ControlError> {
-    let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_sensor_cursor_commits (event_id,storage_id,trigger_id,cursor_json) VALUES ($1,$2,$3,$4)",
-        vec![Parameter::Id(event_id), Parameter::Integer(storage_id), Parameter::Id(trigger_id), Parameter::Json(json!(cursor))]).await?;
+    let now = transaction.now;
+    let (transaction, _) = query(
+        transaction,
+        "UPDATE sqb_trigger_state SET cursor_json=$1,updated_at=$2 WHERE trigger_id=$3",
+        vec![
+            Parameter::Json(json!(cursor)),
+            Parameter::Time(now),
+            Parameter::Id(trigger_id),
+        ],
+    )
+    .await?;
     Ok(transaction)
 }

@@ -12,7 +12,7 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 pub async fn list_person_runs(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (location_id, target, limit): (Uuid, &str, u32),
     default_role: DefaultRole,
 ) -> Result<Vec<RunRecord>, ControlError> {

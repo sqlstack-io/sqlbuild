@@ -53,6 +53,18 @@ pub(crate) async fn publish_change(
         return Ok(transaction);
     }
     let mut transaction = project_change(transaction, request, state).await?;
+    if let Some((node_key, _)) = request.change.finished_node() {
+        (transaction, _) = query(
+            transaction,
+            "UPDATE sqb_run_nodes SET finished_storage_id=$1 WHERE run_id=$2 AND node_key=$3",
+            vec![
+                Parameter::Integer(cursor),
+                Parameter::Id(request.run_id),
+                Parameter::Text(node_key.into()),
+            ],
+        )
+        .await?;
+    }
     let mut cancel_unstarted = matches!(request.change, RunChange::CancelRequested { .. })
         && state.worker_instance.is_none();
     if cancel_unstarted {

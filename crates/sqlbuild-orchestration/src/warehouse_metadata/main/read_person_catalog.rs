@@ -12,7 +12,7 @@ use crate::warehouse_metadata::models::{CatalogPage, CatalogQuery};
 
 pub async fn read_person_catalog(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (location_id, target, options): (Uuid, &str, &CatalogQuery),
     default_role: DefaultRole,
 ) -> Result<CatalogPage, ControlError> {

@@ -6,15 +6,15 @@ use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::_helpers::statistics::prune_statistics;
+use crate::warehouse_metadata::main::prune_statistics::prune_statistics;
 use crate::warehouse_metadata::main::{
     ingest_statistics::ingest_statistics, read_person_statistics::read_person_statistics,
 };
-use crate::warehouse_metadata::models::{StatisticsBatch, StatisticsQuery, StatisticsRetention};
+use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery, StatisticsRetention};
 
 pub(crate) async fn statistics_retention(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     data: &Value,
 ) {
@@ -28,8 +28,8 @@ pub(crate) async fn statistics_retention(
         })
         .collect();
     for records in records.chunks(100) {
-        let batch: StatisticsBatch = serde_json::from_value(
-            json!({"session_id":session_id,"generation":1,"records":records}),
+        let batch: MetadataBatch = serde_json::from_value(
+            json!({"kind":"statistics","session_id":session_id,"generation":1,"records":records}),
         )
         .expect("expired batch");
         assert!(
@@ -91,7 +91,7 @@ pub(crate) async fn statistics_retention(
 /// A shorter installation horizon hides and then deletes samples the default would keep.
 async fn configured_retention(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     data: &Value,
 ) {
@@ -106,9 +106,10 @@ async fn configured_retention(
             record
         })
         .collect();
-    let batch: StatisticsBatch =
-        serde_json::from_value(json!({"session_id":session_id,"generation":1,"records":records}))
-            .expect("horizon batch");
+    let batch: MetadataBatch = serde_json::from_value(
+        json!({"kind":"statistics","session_id":session_id,"generation":1,"records":records}),
+    )
+    .expect("horizon batch");
     assert!(
         ingest_statistics(store, (location, "development"), &batch)
             .await

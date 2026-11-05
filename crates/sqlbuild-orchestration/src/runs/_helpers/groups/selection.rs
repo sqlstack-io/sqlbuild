@@ -1,8 +1,7 @@
-//! Failed nodes block only their lineage dependents unless an upstream job requests broader stops.
+//! Failed nodes block only their lineage dependents inside a group.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::declarations::models::OnFailure;
 use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::models::{RunRequest, RunStatus};
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
@@ -50,22 +49,9 @@ pub(crate) async fn skipped_nodes(
     let Some(parent_id) = request.parent_run_id else {
         return Ok((transaction, BTreeMap::new()));
     };
-    let (transaction, group) = load_group(transaction, parent_id).await?;
-    let name = request
-        .job_key
-        .as_ref()
-        .ok_or_else(|| ControlError::Invalid("group child has no job".into()))?;
-    let parent_name = group
-        .parent
-        .request_json
-        .job_key
-        .as_ref()
-        .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
-    let edges = &group.definitions.groups[parent_name].jobs;
-    let ancestors = upstream_jobs(edges, name);
     let (transaction, rows) = query(transaction,
         "SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.status IN ('failed','skipped','cancelled')",
+         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled')",
         vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)]).await?;
     let failures: BTreeMap<String, String> = rows
         .into_iter()
@@ -79,30 +65,6 @@ pub(crate) async fn skipped_nodes(
             Some((key, cause))
         })
         .collect();
-    let whole_job = group.children.iter().find(|child| {
-        child.request_json.job_key.as_ref().is_some_and(|name| {
-            ancestors.contains(name.as_str())
-                && group.definitions.jobs[name].on_failure == OnFailure::SkipDownstreamJobs
-        }) && child.state.status.is_terminal()
-            && !matches!(child.state.status, RunStatus::Success | RunStatus::Warn)
-    });
-    if let Some(child) = whole_job {
-        let cause = child
-            .request_json
-            .selection
-            .iter()
-            .find_map(|key| failures.get(key))
-            .cloned()
-            .unwrap_or_else(|| format!("run:{}", child.request_json.run_id));
-        return Ok((
-            transaction,
-            request
-                .selection
-                .iter()
-                .map(|key| (key.clone(), cause.clone()))
-                .collect(),
-        ));
-    }
     if failures.is_empty() {
         return Ok((transaction, BTreeMap::new()));
     }

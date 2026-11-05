@@ -1,4 +1,4 @@
-//! Prefer the OS credential store; headless Unix fallback is private, owner-only and atomic.
+//! Prefer the OS credential store; the headless Linux fallback is one owner-only 0600 file.
 
 use crate::person_login::constants::KEYRING_SERVICE;
 use crate::person_login::models::PersonCredential;
@@ -67,7 +67,7 @@ pub(crate) fn remove(origin: &str) -> Result<(), std::io::Error> {
 
 #[cfg(target_os = "linux")]
 fn path(origin: &str, create: bool) -> Result<Option<std::path::PathBuf>, std::io::Error> {
-    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+    use std::os::unix::fs::DirBuilderExt;
     let Some(home) = std::env::var_os("HOME").filter(|value| !value.is_empty()) else {
         return if create {
             Err(std::io::Error::other(
@@ -77,49 +77,22 @@ fn path(origin: &str, create: bool) -> Result<Option<std::path::PathBuf>, std::i
             Ok(None)
         };
     };
-    let mut directory = std::path::PathBuf::from(home);
+    let directory = std::path::PathBuf::from(home).join(".config/sqlbuild/credentials");
     if !directory.is_absolute() {
         return Err(std::io::Error::other(
             "the credential home directory must be absolute",
         ));
     }
-    let credential = directory
-        .join(".config/sqlbuild/credentials")
-        .join(format!("{}.json", blake3::hash(origin.as_bytes()).to_hex()));
-    if !create {
-        match std::fs::symlink_metadata(&credential) {
-            Ok(_) => (),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(error),
-        }
+    if create {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&directory)?;
     }
-    for (component, forbidden) in [
-        ("", 0o022),
-        (".config", 0o022),
-        ("sqlbuild", 0o022),
-        ("credentials", 0o077),
-    ] {
-        if !component.is_empty() {
-            directory.push(component);
-        }
-        if create && !component.is_empty() {
-            match std::fs::DirBuilder::new().mode(0o700).create(&directory) {
-                Ok(()) => (),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
-                Err(error) => return Err(error),
-            }
-        }
-        let metadata = std::fs::symlink_metadata(&directory)?;
-        if !metadata.is_dir()
-            || metadata.uid() != rustix::process::geteuid().as_raw()
-            || metadata.mode() & forbidden != 0
-        {
-            return Err(std::io::Error::other(
-                "CLI credential directories must be owned by you, not symlinks or writable by others; the credential directory must be private",
-            ));
-        }
-    }
-    Ok(Some(credential))
+    Ok(Some(directory.join(format!(
+        "{}.json",
+        blake3::hash(origin.as_bytes()).to_hex()
+    ))))
 }
 
 #[cfg(target_os = "linux")]

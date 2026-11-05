@@ -12,13 +12,13 @@ fn given_two_schedulers_and_faults_between_writes_when_restarting_then_ticks_run
         TickTransactionTestCase {
             description: "SQLite fenced tick transaction",
             backend: Backend::Sqlite,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
         TickTransactionTestCase {
             description: "PostgreSQL fenced tick transaction",
             backend: Backend::Postgres,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
     ];

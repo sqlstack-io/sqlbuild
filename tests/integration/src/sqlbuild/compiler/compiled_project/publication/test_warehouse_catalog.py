@@ -6,7 +6,6 @@ import os
 import sqlite3
 import subprocess
 import sys
-import time
 from collections import Counter
 from contextlib import closing
 from pathlib import Path
@@ -22,7 +21,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     CatalogInspectionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
-    catalog_facts,
     wait_for_catalog,
     wait_for_statistics,
 )
@@ -230,9 +228,6 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
         assert samples[0]["byte_count"] is None
         assert samples[0]["byte_count_basis"] is None
         assert samples[0]["row_count"] == test_case.expected_metadata_rows
-        assert [fact["present"] for fact in catalog_facts(control)] == [True]
-        time.sleep(6)
-        assert [fact["present"] for fact in catalog_facts(control)] == [True]
         connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
         _ = adapter.execute(connection=connection, sql=fixture["alter_sql"])
         adapter.close(connection)
@@ -249,14 +244,10 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
             "columns": [{"name": "order_id", "data_type": "INTEGER"}],
         }
         wait_for_catalog(control, [expected], location, log)
-        assert catalog_facts(control)[-1]["record"]["relation_type"] == test_case.expected_view_type
         connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
         _ = adapter.execute(connection=connection, sql=fixture["drop_sql"])
         adapter.close(connection)
         wait_for_catalog(control, [], location, log)
-        facts: list[dict[str, Any]] = catalog_facts(control)
-        assert [fact["present"] for fact in facts] == [True, True, True, False]
-        assert facts[-1]["record"] == expected
         connection = adapter.connect({test_case.connection_key: str(project / "warehouse.db")})
         _ = adapter.execute(connection=connection, sql=fixture["create_sql"])
         adapter.close(connection)
@@ -266,7 +257,6 @@ def test_given_served_location_when_catalog_changes_then_facts_and_current_proje
             _ = database.execute("DELETE FROM sqb_warehouse_catalog")
             database.commit()
         wait_for_catalog(control, [expected], location, log)
-        assert catalog_facts(control)[-1]["record"] == expected
         current: list[dict[str, Any]] = wait_for_statistics(
             control, expected["name"], location, log
         )

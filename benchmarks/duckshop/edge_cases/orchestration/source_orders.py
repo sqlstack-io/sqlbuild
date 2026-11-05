@@ -6,7 +6,6 @@ orders_refresh = job(
     "orders_refresh",
     description="Refresh orders for a changed source version.",
     select="orders",
-    overlap="allow",
 )
 on_source_orders = sensor(
     "on_source_orders",

@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 use sqlbuild_orchestration::authorization::main::bootstrap_user::bootstrap_user;
+use sqlbuild_orchestration::authorization::main::grant_admin::grant_admin;
 use sqlbuild_orchestration::credentials::main::identities::create_principal::create_principal;
 use sqlbuild_orchestration::credentials::main::locations::create_location::create_location;
 use sqlbuild_orchestration::credentials::main::sessions::set_password::set_password;
@@ -23,7 +24,6 @@ use uuid::Uuid;
 use crate::argv::models::Namespace;
 use crate::native_commands::_helpers::decision::control_admin;
 use crate::native_commands::_helpers::execution::open_control_store;
-use crate::native_commands::_helpers::terminal::read_password;
 use crate::native_commands::models::ControlAdmin;
 
 pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlError> {
@@ -44,9 +44,9 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             let id = create_location(&store, &name, &context).await?;
             Ok(json!({"location_id": id, "name": name}))
         }
-        ControlAdmin::CreatePrincipal(name, kind) => {
-            let id = create_principal(&store, &context, (&name, kind)).await?;
-            Ok(json!({"principal_id": id, "name": name, "kind": kind}))
+        ControlAdmin::CreatePrincipal(name) => {
+            let id = create_principal(&store, &context, &name).await?;
+            Ok(json!({"principal_id": id, "name": name}))
         }
         ControlAdmin::IssueToken(scope, expires_at) => {
             let token = issue_token(&store, &context, scope, expires_at).await?;
@@ -59,8 +59,7 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
         ControlAdmin::RotateToken(token_id) => {
             Ok(json!(rotate_token(&store, &context, token_id).await?))
         }
-        ControlAdmin::SetPassword(principal_id) => {
-            let password = read_password()?;
+        ControlAdmin::SetPassword(principal_id, password) => {
             set_password(
                 &store,
                 &context,
@@ -69,6 +68,10 @@ pub(crate) async fn run_admin(namespace: &Namespace) -> Result<Value, ControlErr
             )
             .await?;
             Ok(json!({"principal_id": principal_id, "password_set": true}))
+        }
+        ControlAdmin::GrantAdmin(principal_id) => {
+            grant_admin(&store, &context, principal_id).await?;
+            Ok(json!({"principal_id": principal_id, "role": "admin"}))
         }
         ControlAdmin::RequestJobRun(request) => {
             let applied = request_job_run(&store, &context, &request).await?;

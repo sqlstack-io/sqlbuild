@@ -5,8 +5,7 @@ use std::collections::BTreeSet;
 use uuid::Uuid;
 
 use crate::declarations::main::frozen_definitions::frozen_definitions;
-use crate::declarations::models::OnFailure;
-use crate::runs::models::{GroupContext, GroupRun, RunStatus};
+use crate::runs::models::{GroupContext, GroupRun};
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
@@ -17,8 +16,8 @@ pub(crate) async fn load_group(
     parent_id: Uuid,
 ) -> Result<(ControlTransaction, GroupContext), ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.run_id=$1 AND r.kind='group'",
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+         WHERE r.run_id=$1 AND r.kind='group'",
         vec![Parameter::Id(parent_id)]).await?;
     let parent: GroupRun = decode_row(
         rows.into_iter()
@@ -26,8 +25,8 @@ pub(crate) async fn load_group(
             .ok_or_else(|| ControlError::Invalid("group run is missing".into()))?,
     )?;
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.parent_run_id=$1 ORDER BY r.run_id",
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+         WHERE r.parent_run_id=$1 ORDER BY r.run_id",
         vec![Parameter::Id(parent_id)]).await?;
     let children = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     let (transaction, definitions) =
@@ -35,7 +34,7 @@ pub(crate) async fn load_group(
     let (transaction, failures) = query(
         transaction,
         "SELECT n.node_key FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND n.status='failed'",
+         WHERE r.parent_run_id=$1 AND n.kind='node' AND n.status='failed'",
         vec![Parameter::Id(parent_id)],
     )
     .await?;
@@ -64,23 +63,7 @@ pub(crate) async fn load_group(
 }
 
 impl GroupContext {
-    pub(crate) fn stopped(&self) -> bool {
+    pub(crate) const fn stopped(&self) -> bool {
         self.critical_failed
-            || self.children.iter().any(|child| {
-                child.request_json.job_key.as_ref().is_some_and(|name| {
-                    self.definitions.jobs[name].on_failure == OnFailure::StopGroup
-                        && (child
-                            .state
-                            .node_counts_json
-                            .get("failed")
-                            .copied()
-                            .unwrap_or_default()
-                            > 0
-                            || matches!(
-                                child.state.status,
-                                RunStatus::Failed | RunStatus::PresumedFailed
-                            ))
-                })
-            })
     }
 }

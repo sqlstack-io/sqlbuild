@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
-use crate::scheduler::models::Overlap;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -82,7 +81,6 @@ pub(crate) fn request(
         settings: BTreeMap::new(),
         window: None,
         concurrency_groups: BTreeSet::new(),
-        overlap: Overlap::Allow,
     }
 }
 

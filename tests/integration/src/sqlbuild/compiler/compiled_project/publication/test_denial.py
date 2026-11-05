@@ -83,8 +83,12 @@ def test_given_denied_browser_requests_when_returned_then_only_durable_decision_
             assert rejected.value.code == expected_status
             assert rejected.value.headers["Cache-Control"] == "no-store"
             body = json.load(rejected.value)
-            assert set(body) == {"error", "decision_id"}
-            decision = str(UUID(body["decision_id"]))
+            identifier: str = {
+                "authorization.denied": "decision_id",
+                "authentication.denied": "request_id",
+            }[action]
+            assert set(body) == {"error", identifier}
+            decision = str(UUID(body[identifier]))
             assert (
                 body["error"]
                 == {
@@ -121,9 +125,16 @@ def test_given_denied_browser_requests_when_returned_then_only_durable_decision_
         )
         by_id: dict[str, dict[str, Any]] = {event["event_id"]: event for event in events}
         assert len(decisions) == test_case.expected_denial_count
-        for decision, action in decisions.items():
-            assert by_id[decision]["action"] == action
-            assert by_id[decision]["after_json"]["allowed"] is False
+        recorded: dict[str, str] = {
+            "authorization.denied": "authorization.denied",
+            "authentication.denied": "not audited",
+        }
+        assert {
+            decision: by_id.get(decision, {"action": "not audited"})["action"]
+            for decision in decisions
+        } == {decision: recorded[action] for decision, action in decisions.items()}, (
+            "only authenticated denials reach the durable audit"
+        )
         with sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3") as store:
             assert store.execute("SELECT count(*) FROM sqb_runs").fetchone() == (0,)
             assert store.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)

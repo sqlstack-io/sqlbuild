@@ -28,9 +28,7 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{
-    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor, run,
-};
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
@@ -40,12 +38,12 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
         SensorTestCase {
             description: "SQLite terminal outcome sensor recovery",
             backend: Backend::Sqlite,
-            expected_runs: 106,
+            expected_runs: 104,
         },
         SensorTestCase {
             description: "PostgreSQL terminal outcome sensor recovery",
             backend: Backend::Postgres,
-            expected_runs: 106,
+            expected_runs: 104,
         },
     ];
     for test_case in test_cases {
@@ -66,11 +64,11 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 .expect("other location");
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders": {"description": "Source orders", "selection": ["orders", "customers"], "overlap": "allow"},
-                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"], "overlap": "allow"}
+                "orders": {"description": "Source orders", "selection": ["orders", "customers"]},
+                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"]}
             }));
             input.documents.insert("groups".into(), json!({
-                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}, "overlap": "allow"}
+                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
             let selectors = [
                 "completed",
@@ -79,7 +77,6 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 "partial",
                 "failed",
                 "cancelled",
-                "presumed_failed",
             ];
             let mut sensors = serde_json::Map::new();
             for job_key in ["orders", "daily_orders"] {
@@ -138,11 +135,6 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                     "cancelled",
                     RunOutcome::Cancelled,
                     [NodeOutcome::Cancelled, NodeOutcome::Cancelled],
-                ),
-                (
-                    "presumed_failed",
-                    RunOutcome::PresumedFailed,
-                    [NodeOutcome::Failed, NodeOutcome::Failed],
                 ),
             ];
             for (selector, outcome, nodes) in outcomes {
@@ -423,74 +415,11 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 [false; 2],
             )
             .await;
-            // Recreate the exact pre-change index/migration state with populated run history.
-            reconstruct_warehouse_predecessor(store).await;
-            let mut transaction = begin(store, TransactionMode::Write)
-                .await
-                .expect("upgrade fixture");
-            for table in [
-                "sqb_external_sessions",
-                "sqb_role_assignments",
-                "sqb_admin_initialization",
-                "sqb_oidc_login_flows",
-                "sqb_authentication_revision",
-                "sqb_password_sessions",
-                "sqb_password_login_attempts",
-            ] {
-                (transaction, _) = query(transaction, &format!("DROP TABLE {table}"), vec![])
-                    .await
-                    .expect("remove subsequent session migration");
-            }
-            let (transaction, _) =
-                query(transaction, "DROP TABLE sqb_password_credentials", vec![])
-                    .await
-                    .expect("remove subsequent password migration");
-            let (transaction, _) =
-                query(transaction, "DROP INDEX sqb_node_decisive_history", vec![])
-                    .await
-                    .expect("remove subsequent transition migration");
-            let (transaction, _) =
-                query(transaction, "DROP TABLE sqb_development_locations", vec![])
-                    .await
-                    .expect("remove subsequent development migration");
-            let (transaction, _) =
-                query(transaction, "DROP TABLE sqb_warehouse_fingerprints", vec![])
-                    .await
-                    .expect("remove subsequent fingerprint mirror migration");
-            let (transaction, _) = query(transaction, "DROP TABLE sqb_warehouse_freshness", vec![])
-                .await
-                .expect("remove subsequent warehouse mirror migration");
-            let (transaction, _) =
-                query(transaction, "DROP INDEX sqb_node_finished_cursor", vec![])
-                    .await
-                    .expect("remove node finish cursor index");
-            let (transaction, _) =
-                query(transaction, "DROP INDEX sqb_node_started_identity", vec![])
-                    .await
-                    .expect("remove node start evidence index");
-            let (transaction, _) = query(transaction, "DROP INDEX sqb_runs_parent", vec![])
-                .await
-                .expect("remove execution lookup index");
-            let (transaction, _) =
-                query(transaction, "DROP INDEX sqb_runs_terminal_cursor", vec![])
-                    .await
-                    .expect("remove new index");
-            let (transaction, _) = query(
-                transaction,
-                "DELETE FROM sqb_schema_migrations WHERE version>=6",
-                vec![],
-            )
-            .await
-            .expect("remove new migration record");
-            commit(transaction).await.expect("pre-change schema ready");
-            migrate_store(store)
-                .await
-                .expect("upgrade populated prior schema");
             let replica = second_store(store).await;
             let fault = TransactionFault {
                 description: "fail atomic sensor cursor",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected sensor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected sensor failure'",

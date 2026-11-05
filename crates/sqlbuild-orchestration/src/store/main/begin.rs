@@ -15,9 +15,8 @@ pub(crate) async fn begin(
     mode: TransactionMode,
 ) -> Result<ControlTransaction, ControlError> {
     let (connection, notifications) = match store {
-        ControlStore::Sqlite(path, access) => {
+        ControlStore::Sqlite(path) => {
             let path = path.clone();
-            let access = access.clone();
             tokio::task::spawn_blocking(move || {
                 let connection = rusqlite::Connection::open_with_flags(
                     &path,
@@ -36,7 +35,7 @@ pub(crate) async fn begin(
                 } else {
                     None
                 };
-                Ok::<_, ControlError>((Connection::Sqlite(connection, access), notifications))
+                Ok::<_, ControlError>((Connection::Sqlite(connection), notifications))
             })
             .await??
         }

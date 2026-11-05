@@ -6,7 +6,7 @@ use crate::store::tests::fault_types::TransactionFault;
 
 pub(crate) async fn install_fault(store: &ControlStore, point: &TransactionFault) {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         let path = path.clone();
@@ -33,7 +33,7 @@ pub(crate) async fn install_fault(store: &ControlStore, point: &TransactionFault
 
 pub(crate) async fn remove_fault(store: &ControlStore, point: &TransactionFault) {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         let path = path.clone();

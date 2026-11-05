@@ -44,14 +44,14 @@ pub(crate) struct AuditRetentionTestCase {
 pub(crate) struct CustomRoleTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) expected_role: Option<&'static str>,
+    pub(crate) expected_after_removal: serde_json::Value,
 }
 
-/// Administrators by sign-in order, and a member holding the published support role.
+/// The first administrator, and a member holding the published support role.
 pub(crate) struct RoleFixture {
     pub(crate) context: crate::credentials::models::AuditContext,
     pub(crate) location_id: uuid::Uuid,
-    pub(crate) administrators: Vec<crate::credentials::models::IssuedSession>,
+    pub(crate) administrator: crate::credentials::models::IssuedSession,
     pub(crate) member: crate::credentials::models::IssuedSession,
     pub(crate) member_id: uuid::Uuid,
 }

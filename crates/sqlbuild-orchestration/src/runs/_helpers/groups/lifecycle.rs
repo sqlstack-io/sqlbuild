@@ -5,13 +5,15 @@ use std::num::NonZeroU32;
 
 use uuid::Uuid;
 
-use crate::runs::_helpers::groups::admission::{earlier_waiter_blocks, group_capacity};
+use crate::runs::_helpers::groups::admission::{
+    admission_limits, earlier_waiter_blocks, limit_waiters,
+};
 use crate::runs::_helpers::groups::context::load_group;
 use crate::runs::_helpers::lifecycle::claims::reserve_claims;
 use crate::runs::_helpers::lifecycle::publish_change::publish_change;
 use crate::runs::models::{
     ChangingRun, GroupContext, NodeOutcome, QueueCandidate, RunChange, RunChangeRequest,
-    RunNodeRecord, RunOutcome, RunStatus,
+    RunNodeRecord, RunOutcome, RunRequest, RunStatus,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query};
@@ -24,8 +26,7 @@ pub(crate) async fn group_change(
     change: RunChange,
 ) -> Result<ControlTransaction, ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.run_id=$1",
+        "SELECT r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r WHERE r.run_id=$1",
         vec![Parameter::Id(run_id)]).await?;
     let state: ChangingRun = decode_row(
         rows.into_iter()
@@ -82,24 +83,25 @@ pub(crate) async fn advance_group(
             }
         }
     } else if parent.state.status == RunStatus::Queued {
-        let capacity;
-        (transaction, capacity) = group_capacity(transaction, limits, eligible).await?;
-        let blocked;
-        (transaction, blocked) = earlier_waiter_blocks(
-            transaction,
-            &capacity,
-            &QueueCandidate {
-                request_json: parent.request_json.clone(),
-                queued_at: parent.queued_at,
-            },
-        )
-        .await?;
-        if blocked || !capacity.safe(&parent.request_json) {
+        let admission = RunRequest {
+            concurrency_groups: admission_limits(
+                &parent.request_json,
+                children.iter().map(|child| &child.request_json),
+            ),
+            ..parent.request_json.clone()
+        };
+        let waiters;
+        (transaction, waiters) = limit_waiters(transaction, eligible).await?;
+        let candidate = QueueCandidate {
+            request_json: parent.request_json.clone(),
+            queued_at: parent.queued_at,
+        };
+        if earlier_waiter_blocks(&waiters, &candidate, &admission.concurrency_groups) {
             return Ok(transaction);
         }
         (transaction, _) = query(transaction, "SAVEPOINT group_claim", vec![]).await?;
         let reserved;
-        (transaction, reserved) = reserve_claims(transaction, &parent.request_json, limits).await?;
+        (transaction, reserved) = reserve_claims(transaction, &admission, limits).await?;
         if !reserved {
             (transaction, _) =
                 query(transaction, "ROLLBACK TO SAVEPOINT group_claim", vec![]).await?;
@@ -126,7 +128,7 @@ async fn finish_group(
     let parent = &group.parent;
     let parent_id = parent.request_json.run_id;
     let (mut transaction, rows) = query(transaction,
-        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 ORDER BY r.run_id, n.node_key",
+        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
         vec![Parameter::Id(parent_id)]).await?;
     let mut nodes: BTreeMap<String, RunNodeRecord> = BTreeMap::new();
     let rank = |status: &str| match status {

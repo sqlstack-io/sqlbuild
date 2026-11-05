@@ -11,7 +11,7 @@ use crate::store::models::{Change, ControlTransaction, Parameter};
 
 /// A missing session ID revokes all mechanisms; the caller audits its password/reset operation.
 pub(crate) async fn revoke_session(
-    mut transaction: ControlTransaction,
+    transaction: ControlTransaction,
     context: &AuditContext,
     (principal_id, session_id): (Uuid, Option<Uuid>),
 ) -> Result<(ControlTransaction, usize), ControlError> {
@@ -24,17 +24,13 @@ pub(crate) async fn revoke_session(
         }
         None => "",
     };
-    let mut revoked = 0;
-    for table in ["sqb_password_sessions", "sqb_external_sessions"] {
-        let rows;
-        (transaction, rows) = query(
-            transaction,
-            &format!("UPDATE {table} SET revoked_at=$1 WHERE principal_id=$2 {predicate} AND revoked_at IS NULL RETURNING session_id"),
-            parameters.clone(),
-        )
-        .await?;
-        revoked += rows.len();
-    }
+    let (mut transaction, rows) = query(
+        transaction,
+        &format!("UPDATE sqb_sessions SET revoked_at=$1 WHERE principal_id=$2 {predicate} AND revoked_at IS NULL RETURNING session_id"),
+        parameters,
+    )
+    .await?;
+    let revoked = rows.len();
     if revoked == 0 {
         return Ok((transaction, 0));
     }

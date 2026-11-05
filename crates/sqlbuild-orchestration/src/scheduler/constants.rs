@@ -4,9 +4,9 @@
 pub const RENEW_INTERVAL_SECONDS: u64 = 5;
 /// A stopped holder cannot delay failover for more than this database-clock interval.
 pub const LEASE_TTL_SECONDS: i64 = 30;
-/// Bound each decision batch, including covered ticks, before opening a write transaction.
+/// Bound a calendar declaration, including due times carried over a republish.
 pub const MAX_TICKS_PER_BATCH: usize = 10_000;
-/// Skipped and covered ticks older than this are deleted, and no tick older than it is created.
+/// Covered ticks older than this are deleted.
 pub(crate) const TICK_RETENTION_DAYS: i64 = 30;
 pub(crate) const TICK_RETENTION_BATCH: usize = 100;
 /// Batches per cleanup pass; a longer backlog resumes next cycle, after the lease renews.

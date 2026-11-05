@@ -10,6 +10,6 @@
     {"description": "access hash", "response": {"access_token": "customers-access"}},
     {"description": "missing token", "remove_fields": ["id_token"]}
   ],
-  "ineligible_subjects": ["unknown-person", "orders-service", "absent-person"],
+  "ineligible_subjects": ["unknown-person", "absent-person"],
   "lifecycle": ["login", "browser-mismatch", "replica-callback", "replay", "disabled-person", "expired-flow"]
 }

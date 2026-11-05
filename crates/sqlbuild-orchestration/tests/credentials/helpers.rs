@@ -7,7 +7,7 @@ pub(crate) async fn location_state(store: &ControlStore) -> (i64, i64) {
     let sql = "SELECT (SELECT COUNT(*) FROM sqb_locations), \
                (SELECT COUNT(*) FROM sqb_security_audit WHERE action='location.created')";
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         return rusqlite::Connection::open(path)
@@ -23,7 +23,7 @@ pub(crate) async fn location_state(store: &ControlStore) -> (i64, i64) {
 
 pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         let connection = rusqlite::Connection::open(path).expect("inspect durable tokens");
@@ -41,12 +41,13 @@ pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
         .expect("read durable token hashes")
 }
 
-pub(crate) async fn authentication_revision(
+/// Committed security facts; every authority change writes exactly one in its own transaction.
+pub(crate) async fn security_event_count(
     store: &ControlStore,
 ) -> Result<u64, crate::store::errors::ControlError> {
     let (transaction, rows) = query(
         begin(store, TransactionMode::Read).await?,
-        "SELECT revision FROM sqb_authentication_revision WHERE singleton=1",
+        "SELECT COUNT(*) AS revision FROM sqb_security_audit",
         vec![],
     )
     .await?;
@@ -55,7 +56,7 @@ pub(crate) async fn authentication_revision(
         .and_then(|row| row.get("revision"))
         .and_then(serde_json::Value::as_u64)
         .ok_or_else(|| {
-            crate::store::errors::ControlError::Schema("authentication revision is invalid".into())
+            crate::store::errors::ControlError::Schema("security event count is invalid".into())
         })
 }
 

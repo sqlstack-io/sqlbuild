@@ -143,7 +143,7 @@ test("generated client preserves native scopes, replay, path encoding, SSE and b
       headers, params: { header: { "x-sqb-csrf": "incorrect-csrf" } },
     });
     assert.equal(invalidLogout.response.status, 401);
-    assert.ok(invalidLogout.error?.decision_id);
+    assert.ok(invalidLogout.error?.request_id);
     assert.equal((await browser.GET("/api/auth/session", { headers })).response.status, 200);
     const logout = await browser.POST("/api/auth/logout", {
       headers, params: { header: { "x-sqb-csrf": login.data.csrf_token } },

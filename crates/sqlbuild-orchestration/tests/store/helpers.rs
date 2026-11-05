@@ -1,8 +1,7 @@
 //! Real-database setup shared by storage, scheduling, and queue contracts.
 
 use crate::store::main::open_store::open_store;
-use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::ControlStore;
 use uuid::Uuid;
 
 use crate::store::tests::store_test_types::{Backend, TestStore};
@@ -85,82 +84,4 @@ pub(crate) async fn close_store(store: ControlStore) {
         return;
     };
     pool.close().await;
-}
-
-pub(crate) async fn reconstruct_fingerprint_predecessor(store: &ControlStore) {
-    let mut transaction = begin(store, TransactionMode::Write)
-        .await
-        .expect("fingerprint predecessor");
-    for sql in [
-        "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
-        "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
-        "DROP TABLE sqb_cli_login_flows",
-        "DELETE FROM sqb_schema_migrations WHERE name='cli_login_flows'",
-        "DROP TABLE sqb_trigger_progress",
-        "DELETE FROM sqb_schema_migrations WHERE name='trigger_progress'",
-        "DROP INDEX sqb_observed_node_cursor",
-        "DROP INDEX sqb_observed_node_identity",
-        "DROP INDEX sqb_observed_node_decisive",
-        "DELETE FROM sqb_schema_migrations WHERE name='check_observations'",
-        "DROP TABLE sqb_warehouse_statistics",
-        "DROP INDEX sqb_catalog_statistics_scan",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_statistics'",
-        "DROP INDEX sqb_fingerprint_node_latest",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN node_type",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN node_name",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_database",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_schema",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN target_name",
-        "DELETE FROM sqb_schema_migrations WHERE name='fingerprint_lookup'",
-    ] {
-        (transaction, _) = query(transaction, sql, vec![])
-            .await
-            .expect("fingerprint predecessor");
-    }
-    commit(transaction)
-        .await
-        .expect("commit fingerprint predecessor");
-}
-
-pub(crate) async fn reconstruct_warehouse_predecessor(store: &ControlStore) {
-    reconstruct_fingerprint_predecessor(store).await;
-    let mut transaction = begin(store, TransactionMode::Write)
-        .await
-        .expect("predecessor");
-    for sql in [
-        "DROP TABLE sqb_warehouse_catalog",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_catalog'",
-        "DROP TABLE sqb_security_audit_deliveries",
-        "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
-        "DROP INDEX sqb_freshness_source_latest",
-        "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
-        "DROP INDEX recall_warehouse_sources",
-        "DELETE FROM sqb_schema_migrations WHERE name='source_sensors'",
-        "DROP TABLE sqb_warehouse_microbatches",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_microbatches'",
-        "DROP TABLE sqb_warehouse_old_name_views",
-        "DROP TABLE sqb_warehouse_migrations",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_migrations'",
-        "DROP TABLE sqb_warehouse_janitor_events",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_janitor_events'",
-        "DROP TABLE sqb_warehouse_audit_results",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_audit_results'",
-        "DROP INDEX sqb_security_audit_storage_id",
-        "ALTER TABLE sqb_security_audit DROP COLUMN storage_id",
-        "DELETE FROM sqb_schema_migrations WHERE name='audit_storage_order'",
-        "DROP TABLE sqb_warehouse_scan_keys",
-        "DROP TABLE sqb_warehouse_scan_pages",
-        "DROP INDEX sqb_fingerprints_reconciliation",
-        "DROP INDEX sqb_freshness_reconciliation",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN state_database",
-        "ALTER TABLE sqb_warehouse_fingerprints DROP COLUMN state_schema",
-        "ALTER TABLE sqb_warehouse_freshness DROP COLUMN state_database",
-        "ALTER TABLE sqb_warehouse_freshness DROP COLUMN state_schema",
-        "DELETE FROM sqb_schema_migrations WHERE name='warehouse_reconciliation'",
-    ] {
-        (transaction, _) = query(transaction, sql, vec![])
-            .await
-            .expect("reconstruct predecessor");
-    }
-    commit(transaction).await.expect("commit predecessor");
 }

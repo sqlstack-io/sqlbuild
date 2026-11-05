@@ -8,26 +8,23 @@ use uuid::Uuid;
 
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::models::{RunClaim, RunRequest};
-use crate::scheduler::models::Overlap;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Occupied slots above a lowered limit still count against the run's concurrency group.
+/// Occupied slots above a lowered limit still count; group children use a parent's slot one at a time.
 pub(crate) async fn reserve_claims(
     mut transaction: ControlTransaction,
     request: &RunRequest,
     limits: &BTreeMap<String, NonZeroU32>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
-    if request.overlap != Overlap::Allow
-        && let Some(job_key) = &request.job_key
-    {
+    if let Some(job_key) = &request.job_key {
         let rows;
         (transaction, rows) = query(
             transaction,
-            "SELECT r.run_id FROM sqb_runs r LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id \
+            "SELECT r.run_id FROM sqb_runs r \
              WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
-             AND (l.run_id IS NOT NULL OR (r.kind='group' AND r.status='running')) LIMIT 1",
+             AND (r.worker_instance IS NOT NULL OR (r.kind='group' AND r.status='running')) LIMIT 1",
             vec![
                 Parameter::Id(request.location_id),
                 Parameter::Text(request.target.clone()),
@@ -37,6 +34,21 @@ pub(crate) async fn reserve_claims(
         .await?;
         if !rows.is_empty() {
             return Ok((transaction, false));
+        }
+    }
+    let mut siblings_hold: BTreeSet<String> = BTreeSet::new();
+    if let Some(parent_id) = request.parent_run_id {
+        let rows;
+        (transaction, rows) = query(
+            transaction,
+            "SELECT request_json FROM sqb_runs WHERE parent_run_id=$1 AND run_id<>$2 AND worker_instance IS NOT NULL",
+            vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)],
+        )
+        .await?;
+        for row in rows {
+            let sibling: RunRequest = serde_json::from_value(row["request_json"].clone())
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+            siblings_hold.extend(sibling.concurrency_groups);
         }
     }
     let now = transaction.now;
@@ -60,6 +72,9 @@ pub(crate) async fn reserve_claims(
             )
             .await?;
             if !inherited.is_empty() {
+                if siblings_hold.contains(group) {
+                    return Ok((transaction, false));
+                }
                 continue;
             }
         }
@@ -110,9 +125,20 @@ pub(crate) async fn publish_claim(
         request,
     };
     let now = transaction.now;
-    let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_run_liveness (run_id, worker_instance, claimed_at, last_heartbeat_at) VALUES ($1,$2,$3,$3)",
-        vec![Parameter::Id(claim.request.run_id), Parameter::Id(claim.claim_id), Parameter::Time(now)]).await?;
+    let (transaction, claimed) = query(
+        transaction,
+        "UPDATE sqb_runs SET worker_instance=$2, claimed_at=$3, last_heartbeat_at=$3 \
+         WHERE run_id=$1 AND worker_instance IS NULL RETURNING run_id",
+        vec![
+            Parameter::Id(claim.request.run_id),
+            Parameter::Id(claim.claim_id),
+            Parameter::Time(now),
+        ],
+    )
+    .await?;
+    if claimed.is_empty() {
+        return Err(ControlError::Invalid("run is already claimed".into()));
+    }
     let (transaction, cursor) = append_run_event(
         transaction,
         (claim.request.run_id, claim.claim_id),

@@ -11,10 +11,9 @@ pub(crate) async fn commit(transaction: ControlTransaction) -> Result<(), Contro
         .take()
         .ok_or_else(|| ControlError::Invalid("transaction has already finished".into()))?
     {
-        Connection::Sqlite(connection, access) => {
+        Connection::Sqlite(connection) => {
             tokio::task::spawn_blocking(move || {
-                let connection = (connection, access);
-                connection.0.execute_batch("COMMIT")?;
+                connection.execute_batch("COMMIT")?;
                 if let Some(sender) = transaction.notifications {
                     for message in messages {
                         let _ = sender.send(message);

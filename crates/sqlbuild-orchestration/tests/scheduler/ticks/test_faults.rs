@@ -32,10 +32,14 @@ fn given_two_schedulers_under_random_faults_failovers_and_frozen_leaders_when_re
         .unwrap_or(5);
     for test_case in test_cases {
         let mut crashes: BTreeMap<&'static str, usize> = BTreeMap::new();
+        let mut point = 0;
         for seed in 0..seeds {
-            let Some((anomalies, counts)) = run(fault_run(test_case.backend, seed, 60)) else {
+            let Some((anomalies, counts, next)) =
+                run(fault_run(test_case.backend, seed, (60, point)))
+            else {
                 return;
             };
+            point = next;
             println!("{} seed {seed}: {counts:?}", test_case.description);
             assert_eq!(
                 anomalies, test_case.expected_anomalies,

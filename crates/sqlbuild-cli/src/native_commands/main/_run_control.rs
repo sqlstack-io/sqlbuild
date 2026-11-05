@@ -31,7 +31,6 @@ pub(crate) async fn run_control(
     let store = open_control_store(namespace).await?;
     let (workers, images) = open_control_workers(namespace)?;
     let (stop, shutdown) = watch::channel(false);
-    let (_changes, changes) = watch::channel(());
     let mut tasks = tokio::task::JoinSet::new();
     if let Some(address) = address {
         drop(write_output(&[(
@@ -43,7 +42,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            (authentication, images, (statistics, snapshots)),
+            (authentication, images, statistics),
             (
                 move || {
                     drop(write_output(&[(
@@ -54,7 +53,11 @@ pub(crate) async fn run_control(
                 stopped(shutdown.clone()),
             ),
         ));
-        start_platform_roles(&mut tasks, (&store, &shutdown), audit)?;
+        start_platform_roles(
+            &mut tasks,
+            (&store, &shutdown),
+            (audit, statistics, snapshots),
+        )?;
     }
     if standalone || !flag(namespace, "control_no_scheduler") {
         drop(write_output(&[(Stream::Stderr, "Starting scheduler...\n")]));
@@ -63,7 +66,7 @@ pub(crate) async fn run_control(
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
-                (shutdown, changes),
+                shutdown,
                 workers,
             )
             .await

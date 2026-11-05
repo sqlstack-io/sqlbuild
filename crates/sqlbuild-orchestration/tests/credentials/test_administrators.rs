@@ -9,13 +9,12 @@ use crate::authorization::main::{
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,
-    sessions::revoke_session::revoke_session, sessions::set_password::set_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AdministratorChange, AuditContext, PasswordAuthority,
-    PasswordLogin, PrincipalKind,
+    AdministratorChange, AuditContext, PasswordAuthority, PasswordLogin,
 };
-use crate::credentials::tests::helpers::authentication_revision;
+use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorTestCase;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
@@ -81,10 +80,9 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     .find_map(|(index, result)| result.ok().map(|id| (index, id)))
                     .expect("one bootstrap winner");
                 let other = 1 - winner;
-                let second =
-                    create_principal(store, &context, (names[other], PrincipalKind::Person))
-                        .await
-                        .expect("ordinary role-free person");
+                let second = create_principal(store, &context, names[other])
+                    .await
+                    .expect("ordinary role-free person");
                 let password = inputs["password"].as_str().expect("password input");
                 let mut sessions = Vec::new();
                 for (id, name) in [(first, names[winner]), (second, names[other])] {
@@ -100,97 +98,57 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     };
                     sessions.push(session);
                 }
-                let first_credentials = (sessions[0].bearer.as_str(), sessions[0].csrf.as_str());
-                let second_credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+                let first_credentials = sessions[0].identity.principal_id;
+                let second_credentials = sessions[1].identity.principal_id;
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        second_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, second_credentials),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .is_err(),
                     "a valid person session is not administrator authority"
                 );
                 assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        (first_credentials.0, "wrong-csrf"),
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
-                    )
-                    .await
-                    .is_err()
-                );
-                assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        first_credentials,
-                        (first, change, &AdministratorAuthentication::Password)
-                    )
-                    .await
-                    .is_err(),
+                    change_administrator(store, (&context, first_credentials), (first, change))
+                        .await
+                        .is_err(),
                     "cannot remove sole administrator"
                 );
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        first_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, first_credentials),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("authenticated administrator grant")
                 );
-                let revision = authentication_revision(store)
+                let revision = security_event_count(store)
                     .await
                     .expect("revision before duplicate grant");
                 assert!(
                     !change_administrator(
                         store,
-                        &context,
-                        first_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, first_credentials),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("idempotent grant")
                 );
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("revision after duplicate grant"),
                     revision
                 );
                 let (left, right) = tokio::join!(
-                    change_administrator(
-                        store,
-                        &context,
-                        first_credentials,
-                        (first, change, &AdministratorAuthentication::Password)
-                    ),
+                    change_administrator(store, (&context, first_credentials), (first, change)),
                     change_administrator(
                         &replica,
-                        &context,
-                        second_credentials,
-                        (second, change, &AdministratorAuthentication::Password)
+                        (&context, second_credentials),
+                        (second, change)
                     )
                 );
                 assert_eq!(
@@ -201,13 +159,8 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     1,
                     "concurrent self-removal leaves one administrator"
                 );
-                let survivor = usize::from(left.is_ok());
-                let survivor_credentials = (
-                    sessions[survivor].bearer.as_str(),
-                    sessions[survivor].csrf.as_str(),
-                );
                 let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("inspect remaining admins"),
-                    "SELECT COUNT(*) AS count FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) WHERE a.role_key='admin' AND a.revoked_at IS NULL AND p.disabled_at IS NULL",vec![]).await.expect("count remaining admins");
+                    "SELECT COUNT(*) AS count FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) WHERE a.role_key='admin' AND p.disabled_at IS NULL",vec![]).await.expect("count remaining admins");
                 assert_eq!(rows[0]["count"], json!(1));
                 commit(transaction)
                     .await
@@ -218,32 +171,6 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                 assert_eq!(audit[0]["actor"], json!(format!("principal:{first}")));
                 assert_eq!(audit[0]["granting_role"], json!("admin"));
                 commit(transaction).await.expect("finish audit read");
-                let identity = &sessions[survivor].identity;
-                let (transaction, _) = revoke_session(
-                    begin(store, TransactionMode::Write)
-                        .await
-                        .expect("logout transaction"),
-                    &context,
-                    (identity.principal_id, Some(identity.session_id)),
-                )
-                .await
-                .expect("logout");
-                commit(transaction).await.expect("publish logout");
-                assert!(
-                    change_administrator(
-                        &replica,
-                        &context,
-                        survivor_credentials,
-                        (
-                            first,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
-                    )
-                    .await
-                    .is_err(),
-                    "revoked session cannot grant"
-                );
                 // Simulate an operator's out-of-band loss: it must never reopen bootstrap.
                 let (transaction, _) = query(
                     begin(store, TransactionMode::Write)
@@ -283,10 +210,8 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
         },
     ];
     for test_case in test_cases {
-        for (table, operation) in [
-            ("sqb_security_audit", "INSERT"),
-            ("sqb_authentication_revision", "UPDATE"),
-        ] {
+        {
+            let (table, operation) = ("sqb_security_audit", "INSERT");
             run(async {
                 let fixture = open_test_store(test_case.backend).await.expect("database");
                 let store = &fixture.store;
@@ -312,10 +237,10 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         .is_err()
                 );
                 remove_fault(store, &fault).await;
-                let (transaction,rows) = query(begin(store,TransactionMode::Read).await.expect("inspect rollback"),"SELECT (SELECT COUNT(*) FROM sqb_principals) AS people, (SELECT COUNT(*) FROM sqb_admin_initialization) AS initialized, (SELECT COUNT(*) FROM sqb_role_assignments) AS assignments",vec![]).await.expect("count rolled back bootstrap");
+                let (transaction,rows) = query(begin(store,TransactionMode::Read).await.expect("inspect rollback"),"SELECT (SELECT COUNT(*) FROM sqb_principals) AS people, (SELECT COUNT(*) FROM sqb_role_assignments) AS assignments",vec![]).await.expect("count rolled back bootstrap");
                 assert_eq!(
                     serde_json::to_value(&rows[0]).expect("serializable row"),
-                    json!({"people":0,"initialized":0,"assignments":0})
+                    json!({"people":0,"assignments":0})
                 );
                 assert_eq!(
                     rows[0]["assignments"],
@@ -325,7 +250,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 );
                 commit(transaction).await.expect("finish rollback read");
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("rolled back revision"),
                     0
@@ -333,10 +258,9 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 let first = bootstrap_user(store, &context, "orders-admin")
                     .await
                     .expect("retry after rollback");
-                let second =
-                    create_principal(store, &context, ("customers-admin", PrincipalKind::Person))
-                        .await
-                        .expect("second person");
+                let second = create_principal(store, &context, "customers-admin")
+                    .await
+                    .expect("second person");
                 set_password(
                     store,
                     &context,
@@ -352,28 +276,23 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 else {
                     panic!("login");
                 };
-                let credentials = (session.bearer.as_str(), session.csrf.as_str());
-                let revision = authentication_revision(store)
+                let credentials = session.identity.principal_id;
+                let revision = security_event_count(store)
                     .await
                     .expect("revision before failed grant");
                 install_fault(store, &fault).await;
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, credentials),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .is_err()
                 );
                 remove_fault(store, &fault).await;
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("revision after failed grant"),
                     revision
@@ -381,32 +300,12 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, credentials),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("retry grant"),
                     "failed grant did not persist"
-                );
-                assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
-                    )
-                    .await
-                    .is_err(),
-                    "an unprovisioned administrator is not a usable password-authentication alternative"
                 );
                 set_password(
                     store,
@@ -420,13 +319,8 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, credentials),
+                        (first, AdministratorChange::Disable),
                     )
                     .await
                     .is_err()
@@ -435,13 +329,8 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (&context, credentials),
+                        (first, AdministratorChange::Disable),
                     )
                     .await
                     .expect("retry disabling person"),

@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -12,7 +12,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 
 pub(crate) async fn authorize_listing(
     transaction: ControlTransaction,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location_id, target): (Uuid, &str),
     default_role: DefaultRole,
 ) -> Result<(ControlTransaction, AuditContext), ControlError> {
@@ -30,5 +30,5 @@ pub(crate) async fn authorize_listing(
         target: Some(target.into()),
         nodes,
     };
-    authorize_session(transaction, credentials, &scope, default_role).await
+    authorize_person(transaction, credentials, &scope, default_role).await
 }

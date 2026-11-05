@@ -3,7 +3,6 @@
 import subprocess
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
 
 import pytest
 
@@ -28,7 +27,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
     "test_case",
     [
         ProjectRolesTestCase(
-            description="roles.toml grants follow tags, rewrites wait, removals apply at once",
+            description="roles.toml grants follow tags and every publication applies at once",
             roles_file="benchmarks/duckshop/edge_cases/orchestration/project_roles.toml",
             expected_warning=(
                 "Warning: role orders_support grant 2 selects no nodes (tag:support,tag:pii); "
@@ -41,7 +40,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
     ],
     ids=lambda case: case.description,
 )
-def test_given_project_roles_when_published_and_approved_then_person_sql_follows_selector_coverage(
+def test_given_project_roles_when_published_then_person_sql_follows_selector_coverage_at_once(
     test_case: ProjectRolesTestCase, tmp_path: Path
 ) -> None:
     project: Path = tmp_path / "project"
@@ -85,31 +84,6 @@ def test_given_project_roles_when_published_and_approved_then_person_sql_follows
             },
             session=admin_session,
         ) == {"applied": True}
-        activation: dict[str, Any] = {
-            "location_id": api.location_id,
-            "target": "development",
-            "role_key": "orders_support",
-            "reason": "Support answers order questions",
-        }
-
-        def approve() -> Any:
-            requested: dict[str, Any] = person_request(
-                api, "/api/admin/role-activations", body=activation, session=admin_session
-            )
-            return person_request(
-                api,
-                "/api/admin/role-approvals",
-                body={
-                    "request_id": requested["request_id"],
-                    "decision": "approved",
-                    "reason": "Reviewed the support grants",
-                    "confirm_self_approval": True,
-                },
-                session=admin_session,
-            )
-
-        assert read_person_sql(api, session, "model:orders")[0] == 403
-        assert approve() == {"applied": True}
         assert read_person_sql(api, session, "model:orders") == (200, "model:orders")
         assert read_person_sql(api, session, "model:customers") == (403, test_case.expected_denial)
         write_files(
@@ -120,19 +94,11 @@ def test_given_project_roles_when_published_and_approved_then_person_sql_follows
         assert grown.returncode == 0, grown.stderr
         assert "Warning:" not in grown.stderr
         assert read_person_sql(api, session, "model:customers") == (200, "model:customers")
-        with pytest.raises(HTTPError) as unchanged:
-            person_request(
-                api, "/api/admin/role-activations", body=activation, session=admin_session
-            )
-        assert unchanged.value.code == 400
         write_files(
             project_dir=project,
             files={"roles.toml": roles.replace('nodes = ["tag:support"]', 'nodes = ["tag:pii"]')},
         )
         rewritten: subprocess.CompletedProcess[str] = publish_generation(project, api, 3)
         assert rewritten.returncode == 0, rewritten.stderr
-        assert read_person_sql(api, session, "model:orders")[0] == 403
-        assert read_person_sql(api, session, "model:customers")[0] == 403
-        assert approve() == {"applied": True}
         assert read_person_sql(api, session, "model:customers") == (200, "model:customers")
         assert read_person_sql(api, session, "model:orders")[0] == 403

@@ -323,7 +323,9 @@ def test_given_a_lost_docker_start_response_when_the_worker_finishes_then_late_o
                 ("platform_launch_failed",),
             ]
             assert control.execute("SELECT COUNT(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT COUNT(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT COUNT(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
             inspection.set()
             assert worker.process.wait(timeout=5) != 0, "Original response failure remains visible"
             assert worker.docker is not None

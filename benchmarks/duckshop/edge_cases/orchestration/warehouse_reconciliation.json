@@ -1,5 +1,4 @@
 {
-  "day": "2026-01-01",
   "obsolete_count": 205,
   "retained_count": 1000,
   "source_freshness": {
@@ -33,15 +32,5 @@
     "definition": "select order_id from orders",
     "metadata_json": "{}",
     "ts": "2026-01-01T10:00:00Z"
-  },
-  "retained_ids": [
-    "reconciliation-keep",
-    "reconciliation-late",
-    "reconciliation-final-new",
-    "reconciliation-other-database",
-    "reconciliation-other-schema",
-    "reconciliation-before-day",
-    "reconciliation-after-day",
-    "reconciliation-preview"
-  ]
+  }
 }

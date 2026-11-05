@@ -19,7 +19,7 @@ pub(crate) async fn event_history(
     store: &ControlStore,
     outbound: &LocationWorkClient,
     (session_id, preview_session): (Uuid, Uuid),
-    (client, freshness_url, bearer, (kind, fixture_name, source_key)): (
+    (client, metadata_url, bearer, (kind, fixture_name, source_key)): (
         &Client,
         &str,
         &str,
@@ -33,11 +33,11 @@ pub(crate) async fn event_history(
         .expect("event history");
     let timestamp = fixture["timestamp_key"].as_str().unwrap_or("occurred_at");
     let record = fixture["record"].clone();
-    let batch = json!({"session_id": session_id, "generation": 1, "records": [record, record]});
-    let url = freshness_url.replace("source-freshness", &kind.as_str().replace('_', "-"));
+    let batch = json!({"kind": kind, "session_id": session_id, "generation": 1, "records": [record, record]});
+    let url = metadata_url;
     for expected in [true, false] {
         assert_eq!(
-            sync_events((client, &url, bearer), &batch).await.applied,
+            sync_events((client, url, bearer), &batch).await.applied,
             expected
         );
     }
@@ -68,7 +68,7 @@ pub(crate) async fn event_history(
         invalid[field] = value;
         assert_eq!(
             client
-                .post(&url)
+                .post(url)
                 .bearer_auth(bearer)
                 .json(&invalid)
                 .send()
@@ -94,7 +94,7 @@ pub(crate) async fn event_history(
     );
     assert_eq!(
         client
-            .post(&url)
+            .post(url)
             .json(&batch)
             .send()
             .await
@@ -106,10 +106,10 @@ pub(crate) async fn event_history(
     scoped["state_schema"] = json!("reporting");
     let mut database = record.clone();
     database["state_database"] = json!("analytics");
-    let scopes = json!({"session_id":session_id,
+    let scopes = json!({"kind":kind,"session_id":session_id,
         "generation":1, "records":[scoped,database]});
-    assert!(sync_events((client, &url, bearer), &scopes).await.applied);
-    let preview = json!({"session_id":preview_session,
+    assert!(sync_events((client, url, bearer), &scopes).await.applied);
+    let preview = json!({"kind":kind,"session_id":preview_session,
         "generation":1, "records":[record]});
     assert!(
         sync_events(
@@ -145,11 +145,12 @@ pub(crate) async fn event_history(
     first[source_key] = json!("accepted-result");
     let mut second = record.clone();
     second[source_key] = json!("rejected-result");
-    let additional = json!({"session_id":session_id,"generation":1,"records":[first,second]});
+    let additional =
+        json!({"kind":kind,"session_id":session_id,"generation":1,"records":[first,second]});
     install_fault(store, &fault).await;
     assert_eq!(
         client
-            .post(&url)
+            .post(url)
             .bearer_auth(bearer)
             .json(&additional)
             .send()
@@ -172,8 +173,8 @@ pub(crate) async fn event_history(
     .await
     .expect("empty mirror");
     commit(transaction).await.expect("wipe");
-    assert!(sync_events((client, &url, bearer), &batch).await.applied);
-    assert!(sync_events((client, &url, bearer), &scopes).await.applied);
+    assert!(sync_events((client, url, bearer), &batch).await.applied);
+    assert!(sync_events((client, url, bearer), &scopes).await.applied);
     assert!(
         sync_events(
             (client, &url.replace("/development/", "/preview/"), bearer),
@@ -191,7 +192,7 @@ pub(crate) async fn event_history(
     assert_eq!(mirrored_events(store, kind).await, before);
     assert_eq!(
         client
-            .post(&url)
+            .post(url)
             .bearer_auth(bearer)
             .json(&additional)
             .send()

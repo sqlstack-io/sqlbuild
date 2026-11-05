@@ -14,13 +14,11 @@ use crate::warehouse_metadata::main::{
     ingest_source_freshness::ingest_source_freshness,
     read_person_node_status::read_person_node_status,
 };
-use crate::warehouse_metadata::models::{
-    CatalogBatch, FingerprintBatch, NodeStatusQuery, SourceFreshnessBatch,
-};
+use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
 
 pub(crate) async fn node_status_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
 ) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -77,9 +75,10 @@ pub(crate) async fn node_status_reads(
     record["metadata_json"] = json!(metadata.to_string());
     record["event_id"] = json!("orders-model-identity");
     record["ts"] = json!("2026-01-05T10:00:00Z");
-    let batch: FingerprintBatch =
-        serde_json::from_value(json!({"session_id":session_id,"generation":2,"records":[record]}))
-            .expect("model build");
+    let batch: MetadataBatch = serde_json::from_value(
+        json!({"kind":"fingerprints","session_id":session_id,"generation":2,"records":[record]}),
+    )
+    .expect("model build");
     ingest_fingerprints(store, (location, "development"), &batch)
         .await
         .expect("build ingestion");
@@ -98,16 +97,25 @@ pub(crate) async fn node_status_reads(
         json!({"status":"matched","local_hash":data["model_local_hash"]})
     );
     assert_eq!(before["physical"]["status"], "unavailable");
-    let catalog: CatalogBatch = serde_json::from_value(json!({"session_id":session_id,"generation":2,"records":[data["physical"]],
-        "reconciliation":{"scan_id":Uuid::now_v7(),"page":0,"state_database":null,"state_schema":"main","complete":false,"day":null,"after":null}})).expect("catalog page");
+    let catalog: MetadataBatch = serde_json::from_value(json!({"kind":"catalog","session_id":session_id,"generation":2,"records":[data["physical"]],
+        "scan":{"scan_id":Uuid::now_v7(),"location":{"database":null,"schema":"main"},"complete":false}})).expect("catalog page");
     ingest_catalog(store, (location, "development"), &catalog)
         .await
         .expect("physical evidence");
-    let freshness: SourceFreshnessBatch = serde_json::from_value(
-        json!({"session_id":session_id,"generation":2,"records":[data["freshness"]]}),
+    let freshness: MetadataBatch = serde_json::from_value(
+        json!({"kind":"source_freshness","session_id":session_id,"generation":2,"records":[data["freshness"]]}),
     )
     .expect("newer source observation");
-    assert!(freshness.records[0].observed_at > batch.records[0].ts);
+    assert!(
+        serde_json::from_value::<chrono::DateTime<chrono::Utc>>(
+            freshness.records[0]["observed_at"].clone()
+        )
+        .expect("observed_at")
+            > serde_json::from_value::<chrono::DateTime<chrono::Utc>>(
+                batch.records[0]["ts"].clone()
+            )
+            .expect("ts")
+    );
     ingest_source_freshness(store, (location, "development"), &freshness)
         .await
         .expect("source observation");
@@ -130,9 +138,9 @@ pub(crate) async fn node_status_reads(
         json!({"status":"unknown","reason":"consumed-input provenance is not recorded"})
     );
     let mut function_batch = batch.clone();
-    function_batch.records[0].node_type = "udf".into();
-    function_batch.records[0].event_id = Some("orders-function-build".into());
-    function_batch.records[0].run_id = "orders-function-run".into();
+    function_batch.records[0]["node_type"] = json!("udf");
+    function_batch.records[0]["event_id"] = json!("orders-function-build");
+    function_batch.records[0]["run_id"] = json!("orders-function-run");
     ingest_fingerprints(store, (location, "development"), &function_batch)
         .await
         .expect("same-named function build");
@@ -158,9 +166,13 @@ pub(crate) async fn node_status_reads(
     assert_eq!(function_status["source_data"], after["source_data"]);
     let mut changed = batch.clone();
     metadata["config"]["lookback"] = json!("7d");
-    changed.records[0].metadata_json = metadata.to_string();
-    changed.records[0].event_id = Some("orders-config-changed".into());
-    changed.records[0].ts += chrono::Duration::days(1);
+    changed.records[0]["metadata_json"] = json!(metadata.to_string());
+    changed.records[0]["event_id"] = json!("orders-config-changed");
+    changed.records[0]["ts"] = json!(
+        serde_json::from_value::<chrono::DateTime<chrono::Utc>>(changed.records[0]["ts"].clone())
+            .expect("ts")
+            + chrono::Duration::days(1)
+    );
     ingest_fingerprints(store, (location, "development"), &changed)
         .await
         .expect("config-only build");

@@ -12,8 +12,8 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AdministratorChange, AuditContext, BuiltinRole, DefaultRole,
-    PasswordAuthority, PasswordLogin, PrincipalKind, RoleAssignmentRequest,
+    AdministratorChange, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin,
+    RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
@@ -96,10 +96,9 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     let admin = bootstrap_user(store, &context, "orders-admin")
                         .await
                         .expect("bootstrap");
-                    let person =
-                        create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                            .await
-                            .expect("role-free person");
+                    let person = create_principal(store, &context, "orders-person")
+                        .await
+                        .expect("role-free person");
                     let mut sessions = Vec::new();
                     for (id, name) in [(admin, "orders-admin"), (person, "orders-person")] {
                         set_password(
@@ -119,7 +118,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         };
                         sessions.push(session);
                     }
-                    let credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+                    let credentials = sessions[1].identity.principal_id;
                     let location_id = create_location(store, "orders", "test-owner")
                         .await
                         .expect("location");
@@ -158,12 +157,8 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     assert!(
                         assign_builtin_role(
                             store,
-                            (
-                                &context,
-                                (sessions[0].bearer.as_str(), sessions[0].csrf.as_str())
-                            ),
-                            &assignment,
-                            &AdministratorAuthentication::Password,
+                            (&context, sessions[0].identity.principal_id),
+                            &assignment
                         )
                         .await
                         .expect("authenticated assignment")
@@ -292,15 +287,6 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                                 "denial must be authorization, not invalid input"
                             );
                         }
-                        assert!(matches!(
-                            request_rerun(
-                                store,
-                                (&context, Some((credentials.0, "wrong-csrf"))),
-                                &rerun
-                            )
-                            .await,
-                            Err(ControlError::Denied { .. })
-                        ));
                         reruns.push(rerun);
                     }
                     let mut adhoc = crate::runs::tests::helpers::request(
@@ -317,10 +303,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         .expect("owner requests ad-hoc execution");
                     cancel_person_run(
                         store,
-                        (
-                            &context,
-                            (sessions[0].bearer.as_str(), sessions[0].csrf.as_str()),
-                        ),
+                        (&context, sessions[0].identity.principal_id),
                         &CancelRunRequest {
                             run_id: adhoc.run_id,
                             event_id: Uuid::now_v7(),
@@ -359,18 +342,12 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             + usize::from(can_rerun_adhoc),
                         "owner sources plus allowed manual/rerun jobs and expanded groups only"
                     );
-                    let administrator_credentials =
-                        (sessions[0].bearer.as_str(), sessions[0].csrf.as_str());
+                    let administrator_credentials = sessions[0].identity.principal_id;
                     assert!(
                         change_administrator(
                             store,
-                            &context,
-                            administrator_credentials,
-                            (
-                                person,
-                                AdministratorChange::Disable,
-                                &AdministratorAuthentication::Password
-                            ),
+                            (&context, administrator_credentials),
+                            (person, AdministratorChange::Disable),
                         )
                         .await
                         .expect("disable person")
@@ -382,8 +359,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             &RoleAssignmentRequest {
                                 revoke: true,
                                 ..assignment
-                            },
-                            &AdministratorAuthentication::Password,
+                            }
                         )
                         .await
                         .expect("revoke a disabled person's grant before reenabling")
@@ -391,13 +367,8 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     assert!(
                         change_administrator(
                             store,
-                            &context,
-                            administrator_credentials,
-                            (
-                                person,
-                                AdministratorChange::Enable,
-                                &AdministratorAuthentication::Password
-                            ),
+                            (&context, administrator_credentials),
+                            (person, AdministratorChange::Enable),
                         )
                         .await
                         .expect("enable person")

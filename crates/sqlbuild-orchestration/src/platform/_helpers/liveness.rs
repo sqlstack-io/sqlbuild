@@ -46,11 +46,14 @@ pub(crate) async fn scan_location_page(
         transaction = observe(
             transaction,
             installation_id,
-            PlatformEvent::LocationBroken {
-                location_id: location.location_id,
-                target: location.target,
-                last_seen_at: location.last_seen_at,
-            },
+            (
+                PlatformEvent::LocationBroken {
+                    location_id: location.location_id,
+                    target: location.target,
+                    last_seen_at: location.last_seen_at,
+                },
+                None,
+            ),
         )
         .await?;
     }

@@ -1,4 +1,4 @@
-//! Frozen requests and rebuildable run projections; lifecycle authority remains in Recall.
+//! Frozen run requests and the run, node and claim records the control store keeps.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -60,7 +60,6 @@ pub enum RunStatus {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunStatus {
@@ -111,7 +110,6 @@ pub struct RunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
-    pub overlap: crate::scheduler::models::Overlap,
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
@@ -191,7 +189,6 @@ impl NodeOutcome {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunNodeRecord {
     pub node_key: String,
-    pub attempt: i64,
     pub status: String,
     pub started_at: Option<DateTime<Utc>>,
     pub ended_at: Option<DateTime<Utc>>,
@@ -235,7 +232,6 @@ pub enum RunOutcome {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunOutcome {
@@ -247,7 +243,6 @@ impl RunOutcome {
             Self::Partial => "partial",
             Self::Failed => "failed",
             Self::Cancelled => "cancelled",
-            Self::PresumedFailed => "presumed_failed",
         }
     }
 }
@@ -386,20 +381,12 @@ pub(crate) struct GroupRun {
     pub(crate) state: ChangingRun,
 }
 
-/// Parent overlap locks and installation-wide limits occupy different resource namespaces.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ConcurrencyResource {
-    Limit(String),
-    Overlap(Uuid, String, String),
-}
-
-/// A transaction-local safety calculation, never a second persisted allocation ledger.
+/// A queued top-level run and the limits it takes when admitted, in queue order.
 #[derive(Debug)]
-pub(crate) struct GroupCapacity {
-    pub(crate) available: BTreeMap<ConcurrencyResource, i64>,
-    pub(crate) held: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
-    pub(crate) needed: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
-    pub(crate) waiting: Vec<QueueCandidate>,
+pub(crate) struct LimitWaiter {
+    pub(crate) rank: (std::cmp::Reverse<i64>, DateTime<Utc>, Uuid),
+    pub(crate) run_id: Uuid,
+    pub(crate) limits: BTreeSet<String>,
 }
 
 #[derive(Debug)]
@@ -447,15 +434,4 @@ pub struct RunObservation {
     pub claimed_at: Option<DateTime<Utc>>,
     pub last_heartbeat_at: Option<DateTime<Utc>>,
     pub observed_at: DateTime<Utc>,
-}
-
-/// Retained causal order and original timestamps, never reconstructed from wall-clock sorting.
-#[derive(Debug, Deserialize)]
-pub(crate) struct RunReplayRow {
-    pub storage_id: i64,
-    pub schema_version: i64,
-    pub occurred_at: DateTime<Utc>,
-    pub event_type: String,
-    pub run_id: Uuid,
-    pub payload: serde_json::Value,
 }

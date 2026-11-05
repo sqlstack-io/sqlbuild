@@ -12,8 +12,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority,
-    PasswordLogin, PrincipalKind, RoleAssignmentRequest,
+    AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::report_location_health::report_location_health;
@@ -27,7 +26,7 @@ use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::{
     ingest_catalog::ingest_catalog, read_person_catalog::read_person_catalog,
 };
-use crate::warehouse_metadata::models::{CatalogBatch, CatalogQuery};
+use crate::warehouse_metadata::models::{CatalogQuery, MetadataBatch};
 
 #[test]
 fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namespaces_bound_every_result()
@@ -58,10 +57,9 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("bootstrap");
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
             let mut sessions = Vec::new();
             for (id, name) in [(admin, "orders-admin"), (person, "orders-reader")] {
                 set_password(
@@ -131,8 +129,8 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                         })
                         .collect();
                     for records in records.chunks(100) {
-                        let batch: CatalogBatch = serde_json::from_value(json!({"session_id":session_id,"generation":1,"records":records,
-                            "reconciliation":{"scan_id":Uuid::now_v7(),"page":0,"state_database":namespace["database"],"state_schema":namespace["schema"],"day":null,"complete":false,"after":null}})).expect("batch");
+                        let batch: MetadataBatch = serde_json::from_value(json!({"kind":"catalog","session_id":session_id,"generation":1,"records":records,
+                            "scan":{"scan_id":Uuid::now_v7(),"location":{"database":namespace["database"],"schema":namespace["schema"]},"complete":false}})).expect("batch");
                         assert!(
                             ingest_catalog(store, (scope, target), &batch)
                                 .await
@@ -142,7 +140,7 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                     }
                 }
             }
-            let credentials = (&context, (sessions[1].bearer.as_str(), ""));
+            let credentials = (&context, sessions[1].identity.principal_id);
             let mut options = CatalogQuery {
                 database: None,
                 schema: "main".into(),
@@ -169,9 +167,8 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             };
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("scoped viewer");
@@ -304,9 +301,8 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             assignment.revoke = true;
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("revoke");

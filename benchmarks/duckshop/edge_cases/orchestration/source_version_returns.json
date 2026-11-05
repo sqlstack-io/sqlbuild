@@ -1,0 +1,21 @@
+{
+  "description": "A source's version changes 1 -> 2 -> 1. Before the last observation arrives, the warehouse janitor has pruned the earlier rows, so a complete scan delivers only the newest. Each change, including the return to version 1, queues exactly one run, and repeating the evaluation queues nothing more.",
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "source_name": "raw_orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "raw_orders",
+    "run_id": "external-orders",
+    "strategy": "max_column",
+    "value_kind": "integer",
+    "observed_at": "2026-02-03T04:05:06Z"
+  },
+  "observations": [
+    {"event_id": "orders-version-a", "data_version": "1", "data_version_hash": "orders-version-1", "complete_scan": false},
+    {"event_id": "orders-version-b", "data_version": "2", "data_version_hash": "orders-version-2", "complete_scan": false},
+    {"event_id": "orders-version-c", "data_version": "1", "data_version_hash": "orders-version-1", "complete_scan": true}
+  ],
+  "expected_runs_after_each": [1, 2, 3]
+}

@@ -19,8 +19,6 @@ pub(crate) struct AuthoredJob {
     pub(crate) description: String,
     pub(crate) select: String,
     pub(crate) exclude: String,
-    pub(crate) overlap: String,
-    pub(crate) on_failure: String,
     #[pyo3(from_py_with = authored_setting)]
     pub(crate) settings: Value,
     #[pyo3(from_py_with = authored_setting)]
@@ -41,7 +39,6 @@ pub(crate) struct AuthoredGroup {
     pub(crate) description: String,
     pub(crate) jobs: Vec<AuthoredJobReference>,
     pub(crate) after: BTreeMap<AuthoredJobReference, Vec<AuthoredJobReference>>,
-    pub(crate) overlap: String,
     pub(crate) concurrency_groups: Vec<String>,
     pub(crate) schedule: Option<Py<PyAny>>,
     pub(crate) targets: Vec<String>,
@@ -102,12 +99,18 @@ pub(crate) fn module_jobs<'py>(
     options.set_item("file_path", file_path)?;
     options.set_item("project_dir", project_dir)?;
     let module = entry(py, UserCodeHost::LoadOrchestrationModule)?.call((), Some(&options))?;
-    let job_class = py.import("sqlbuild.orchestration")?.getattr("Job")?;
-    let group_class = py.import("sqlbuild.orchestration")?.getattr("JobGroup")?;
+    let job_class = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("Job")?;
+    let group_class = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("JobGroup")?;
     let calendar_class = py
-        .import("sqlbuild.orchestration")?
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
         .getattr("CalendarSchedule")?;
-    let sensor_class = py.import("sqlbuild.orchestration")?.getattr("Sensor")?;
+    let sensor_class = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("Sensor")?;
     let attributes = module.getattr("__dict__")?.cast_into::<PyDict>()?;
     let mut pending: Vec<Bound<'py, PyAny>> = attributes.values().iter().collect();
     let mut seen: HashSet<usize> = HashSet::new();
@@ -133,12 +136,18 @@ pub(crate) fn collect_declarations<'py>(
     py: Python<'py>,
     declarations: Vec<Bound<'py, PyAny>>,
 ) -> PyResult<Vec<AuthoredDeclaration>> {
-    let job = py.import("sqlbuild.orchestration")?.getattr("Job")?;
-    let group = py.import("sqlbuild.orchestration")?.getattr("JobGroup")?;
+    let job = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("Job")?;
+    let group = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("JobGroup")?;
     let calendar = py
-        .import("sqlbuild.orchestration")?
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
         .getattr("CalendarSchedule")?;
-    let sensor = py.import("sqlbuild.orchestration")?.getattr("Sensor")?;
+    let sensor = py
+        .import("sqlbuild.orchestration_declarations.models.authoring")?
+        .getattr("Sensor")?;
     let mut roots: HashSet<usize> = HashSet::new();
     for declaration in &declarations {
         if !roots.insert(declaration.as_ptr() as usize) {

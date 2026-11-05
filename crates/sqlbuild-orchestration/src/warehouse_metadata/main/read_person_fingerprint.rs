@@ -12,7 +12,7 @@ use crate::warehouse_metadata::models::{FingerprintObservation, FingerprintQuery
 
 pub async fn read_person_fingerprint(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location_id, target, options): (Uuid, &str, &FingerprintQuery),
     default_role: DefaultRole,
 ) -> Result<Option<FingerprintObservation>, ControlError> {

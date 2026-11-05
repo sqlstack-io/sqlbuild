@@ -62,12 +62,12 @@ upstream subject. Restrict access to the HTTP backend to the configured proxy
 peers. Trusting loopback also trusts other local processes on that host;
 `Forwarded` and `X-Forwarded-For` never establish peer trust.
 
-Through that proxy, `GET /api/auth/proxy` returns the bound `principal_id` only.
-It issues no cookie or bearer and grants no machine or resource authority.
-Unbound subjects, missing or disabled people, and service accounts are denied;
-accounts are not auto-provisioned. Password and trusted-proxy modes cannot be
-combined. No default role or SSO group assignment is inferred by this identity
-endpoint.
+Through that proxy, each person request authenticates as the bound person; it
+issues no cookie or bearer and grants no machine or resource authority. Requests
+that change state must carry the configured `Origin`. Unbound subjects and missing
+or disabled people are denied; accounts are not auto-provisioned. Password and
+trusted-proxy modes cannot be combined. No default role or SSO group assignment
+is inferred from the subject.
 
 ## Verify an OIDC identity
 
@@ -105,7 +105,7 @@ the ID token's signature, issuer, audience, expiry and nonce, and an access-toke
 hash when supplied. Provider keys are refreshed for each exchange.
 
 The callback returns only `principal_id` and clears the flow cookie. Unbound,
-missing or disabled people and service accounts are denied. This identity-only
+missing or disabled people are denied. This identity-only
 endpoint does not create an account, browser/CLI session, bearer or role grant,
 and cannot authenticate machine routes. It is not a complete browser SSO or
 `sqb login` workflow. Authentication denial and successful identity verification

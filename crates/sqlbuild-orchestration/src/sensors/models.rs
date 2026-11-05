@@ -9,25 +9,7 @@ use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
 use crate::platform::models::PlatformEventKind;
-use crate::runs::models::RunOutcome;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SensorStatus {
-    #[default]
-    Running,
-    Stopped,
-}
-
-impl SensorStatus {
-    #[must_use]
-    pub const fn projection(self) -> TriggerStatus {
-        match self {
-            Self::Running => TriggerStatus::Running,
-            Self::Stopped => TriggerStatus::Paused,
-        }
-    }
-}
+use crate::runs::models::{NodeOutcome, RunOutcome};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -80,7 +62,6 @@ pub enum RunEventKind {
     Partial,
     Failed,
     Cancelled,
-    PresumedFailed,
 }
 
 impl RunEventKind {
@@ -94,7 +75,6 @@ impl RunEventKind {
                 | (Self::Partial, RunOutcome::Partial)
                 | (Self::Failed, RunOutcome::Failed)
                 | (Self::Cancelled, RunOutcome::Cancelled)
-                | (Self::PresumedFailed, RunOutcome::PresumedFailed)
         )
     }
 }
@@ -108,19 +88,10 @@ pub(crate) struct TerminalSensorRun {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct NodeSensorEvent {
-    pub(crate) event_id: Uuid,
     pub(crate) run_id: Uuid,
-    pub(crate) storage_id: i64,
-    pub(crate) payload: serde_json::Value,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct SourceSensorEvent {
-    pub(crate) event_id: Uuid,
-    pub(crate) invocation_id: String,
-    pub(crate) invocation_sequence: i64,
-    pub(crate) storage_id: i64,
-    pub(crate) payload: crate::warehouse_metadata::models::SourceFreshnessObservation,
+    pub(crate) node_key: String,
+    pub(crate) status: NodeOutcome,
+    pub(crate) finished_storage_id: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -132,7 +103,7 @@ pub struct SensorDefinition {
     #[schema(value_type = u32, minimum = 1)]
     pub minimum_interval_seconds: NonZeroU32,
     #[serde(default)]
-    pub default_status: SensorStatus,
+    pub default_status: TriggerStatus,
 }
 
 /// Storage order is authoritative even when a fact's occurrence time predates earlier pages.

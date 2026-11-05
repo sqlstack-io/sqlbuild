@@ -7,14 +7,14 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
+use crate::store::main::query::query;
+use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 use crate::warehouse_metadata::_helpers::ingestion::scoped_event_id;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
     StatisticsObservation, StatisticsPage, StatisticsQuery, StatisticsRetention,
-    WarehouseCatalogRecord, WarehouseReconciliationCursor,
+    WarehouseCatalogRecord, WarehouseMirrorCursor,
 };
 
 pub(crate) fn statistics_event_id(
@@ -27,21 +27,6 @@ pub(crate) fn statistics_event_id(
         (database, schema, "statistics"),
         &json!((name, observed_at.timestamp().div_euclid(3600))).to_string(),
     )
-}
-
-/// Expiration is bounded global cleanup, never a lifecycle status or warehouse write.
-pub(crate) async fn prune_statistics(
-    store: &ControlStore,
-    retention: StatisticsRetention,
-) -> Result<usize, ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    let cutoff = retention.cutoff(transaction.now);
-    let (transaction, rows) = query(transaction,
-        "DELETE FROM sqb_warehouse_statistics WHERE event_id IN (SELECT event_id FROM sqb_warehouse_statistics \
-         WHERE observed_at<$1 ORDER BY observed_at,event_id LIMIT $2) RETURNING event_id",
-        vec![Parameter::Time(cutoff), Parameter::Integer(MAX_HISTORY_RECORDS as i64)]).await?;
-    commit(transaction).await?;
-    Ok(rows.len())
 }
 
 /// A partial namespace page never suppresses another relation's missing current-hour sample.
@@ -155,7 +140,7 @@ pub(crate) async fn read_statistics_page(
     let next_after =
         more.then(|| records.last())
             .flatten()
-            .map(|observation| WarehouseReconciliationCursor {
+            .map(|observation| WarehouseMirrorCursor {
                 observed_at: observation.record.observed_at,
                 event_id: observation.event_id,
             });

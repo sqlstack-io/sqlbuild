@@ -1,8 +1,9 @@
 //! A trigger override needs its permission on every node the trigger's current job or group writes.
 
 use serde_json::json;
+use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::_helpers::operator_change::change_trigger_in;
@@ -14,7 +15,7 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 pub async fn change_person_trigger(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     request: &TriggerChangeRequest,
 ) -> Result<bool, ControlError> {
     let (transaction, scope) = trigger_scope(
@@ -23,7 +24,7 @@ pub async fn change_person_trigger(
         request,
     )
     .await?;
-    let (transaction, context) = authorize_session(
+    let (transaction, context) = authorize_person(
         transaction,
         (context, credentials),
         &scope,

@@ -1,31 +1,28 @@
-//! Project role grants follow selector coverage per snapshot; a rewritten selector waits for approval.
+//! Project role grants take effect on publish and follow selector coverage per snapshot.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 
-use crate::authorization::_helpers::custom_roles::set_effective_role;
 use crate::authorization::main::compile_roles::compile_roles;
-use crate::credentials::models::{Action, RoleAssignmentRequest, RoleGrant, RoleKey};
+use crate::credentials::models::{Action, RoleAssignmentRequest, RoleKey};
 use crate::credentials::tests::role_helpers::{
-    SUPPORT_ROLE, activate, assign, authorize_member, developer_grants, member_listings,
+    SUPPORT_ROLE, assign, authorize_member, developer_grants, member_listings,
     member_trigger_change, orders_grant, publish_customers_trigger, publish_support_role,
-    role_changes, role_fixture, try_request,
+    role_changes, role_fixture,
 };
 use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
 use crate::declarations::models::TriggerChange;
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
-use crate::store::models::TransactionMode;
+use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 const ADHOC_DENIED: &str = "missing run.adhoc on nodes customers; all requested nodes denied";
 
 #[test]
-fn given_approved_selector_when_it_matches_more_nodes_then_coverage_grows_without_approval() {
+fn given_published_selector_when_it_matches_more_nodes_then_coverage_grows_on_publish() {
     let test_cases = [
         ProjectRoleTestCase {
             description: "SQLite widens coverage of an unchanged selector on publish",
@@ -47,11 +44,9 @@ fn given_approved_selector_when_it_matches_more_nodes_then_coverage_grows_withou
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             let grants = |nodes: &[&str]| developer_grants("tag:orders", nodes);
             publish_support_role(store, roles.location_id, (2, grants(&["orders"]))).await;
-            activate(store, &roles).await;
             let adhoc = (Action::RunAdhoc, ["customers", "orders"].as_slice());
             assert_eq!(
                 authorize_member(store, &roles, adhoc)
@@ -86,18 +81,14 @@ fn given_approved_selector_when_it_matches_more_nodes_then_coverage_grows_withou
                 "{}: view.sql follows the same coverage",
                 test_case.description
             );
-            assert!(
-                matches!(
-                    try_request(store, &roles, 0).await,
-                    Err(ControlError::Invalid(_))
-                ),
-                "{}: coverage growth is not a widening to approve",
-                test_case.description
-            );
             assert_eq!(
                 role_changes(store).await,
-                [(2, "changed".to_owned()), (3, "changed".to_owned())],
-                "{}: the dropped view grant and the grown coverage enter the change feed",
+                [
+                    (1, "added".to_owned()),
+                    (2, "changed".to_owned()),
+                    (3, "changed".to_owned())
+                ],
+                "{}: the new role, the dropped view grant and the grown coverage enter the change feed",
                 test_case.description
             );
             close_test_store(fixture).await;
@@ -106,83 +97,7 @@ fn given_approved_selector_when_it_matches_more_nodes_then_coverage_grows_withou
 }
 
 #[test]
-fn given_rewritten_selector_when_published_then_its_coverage_waits_for_approval() {
-    let test_cases = [
-        ProjectRoleTestCase {
-            description: "SQLite holds a rewritten selector for approval",
-            backend: Backend::Sqlite,
-            expected_before: Err(
-                "missing run.adhoc on nodes customers, orders; all requested nodes denied",
-            ),
-            expected_after: Ok(SUPPORT_ROLE),
-        },
-        ProjectRoleTestCase {
-            description: "PostgreSQL holds a rewritten selector for approval",
-            backend: Backend::Postgres,
-            expected_before: Err(
-                "missing run.adhoc on nodes customers, orders; all requested nodes denied",
-            ),
-            expected_after: Ok(SUPPORT_ROLE),
-        },
-    ];
-    for test_case in test_cases {
-        run(async {
-            let Some(fixture) = open_test_store(test_case.backend).await else {
-                return;
-            };
-            let store = &fixture.store;
-            migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
-            publish_support_role(
-                store,
-                roles.location_id,
-                (2, developer_grants("tag:orders", &["orders"])),
-            )
-            .await;
-            activate(store, &roles).await;
-            publish_support_role(
-                store,
-                roles.location_id,
-                (3, developer_grants("tag:support", &["customers", "orders"])),
-            )
-            .await;
-            let adhoc = (Action::RunAdhoc, ["customers", "orders"].as_slice());
-            assert_eq!(
-                authorize_member(store, &roles, adhoc)
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                test_case.expected_before,
-                "{}: the rewritten selector grants nothing before approval",
-                test_case.description
-            );
-            assert_eq!(
-                authorize_member(store, &roles, (Action::RunAdhoc, &["orders"]))
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                Err("missing run.adhoc on nodes orders; all requested nodes denied"),
-                "{}: the replaced selector stops applying at once",
-                test_case.description
-            );
-            activate(store, &roles).await;
-            assert_eq!(
-                authorize_member(store, &roles, adhoc)
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                test_case.expected_after,
-                "{}",
-                test_case.description
-            );
-            close_test_store(fixture).await;
-        });
-    }
-}
-
-#[test]
-fn given_selector_resolving_to_no_nodes_when_approved_then_it_grants_nothing() {
+fn given_selector_resolving_to_no_nodes_when_published_then_it_grants_nothing() {
     let test_cases = [
         ProjectRoleTestCase {
             description: "SQLite grants nothing for an empty resolution",
@@ -204,8 +119,7 @@ fn given_selector_resolving_to_no_nodes_when_approved_then_it_grants_nothing() {
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             assert_eq!(
                 authorize_member(store, &roles, (Action::View, &[]))
                     .await
@@ -221,7 +135,6 @@ fn given_selector_resolving_to_no_nodes_when_approved_then_it_grants_nothing() {
                 (2, json!([orders_grant(json!(["view", "run.adhoc"]), &[])])),
             )
             .await;
-            activate(store, &roles).await;
             assert_eq!(
                 authorize_member(store, &roles, (Action::View, &[]))
                     .await
@@ -238,93 +151,6 @@ fn given_selector_resolving_to_no_nodes_when_approved_then_it_grants_nothing() {
                     .map_err(String::as_str),
                 Err("missing run.adhoc on nodes orders; all requested nodes denied"),
                 "{}: the denial names the uncovered node",
-                test_case.description
-            );
-            close_test_store(fixture).await;
-        });
-    }
-}
-
-#[test]
-fn given_removal_and_rewrite_in_one_publish_when_widening_waits_then_the_removal_applies_at_once() {
-    let test_cases = [
-        ProjectRoleTestCase {
-            description: "SQLite removes a permission while a new selector waits",
-            backend: Backend::Sqlite,
-            expected_before: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
-            expected_after: Err("missing view.sql on nodes customers; all requested nodes denied"),
-        },
-        ProjectRoleTestCase {
-            description: "PostgreSQL removes a permission while a new selector waits",
-            backend: Backend::Postgres,
-            expected_before: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
-            expected_after: Err("missing view.sql on nodes customers; all requested nodes denied"),
-        },
-    ];
-    for test_case in test_cases {
-        run(async {
-            let Some(fixture) = open_test_store(test_case.backend).await else {
-                return;
-            };
-            let store = &fixture.store;
-            migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
-            publish_support_role(
-                store,
-                roles.location_id,
-                (2, developer_grants("tag:orders", &["orders"])),
-            )
-            .await;
-            activate(store, &roles).await;
-            publish_support_role(
-                store,
-                roles.location_id,
-                (
-                    3,
-                    json!([
-                        orders_grant(json!(["view.sql"]), &["orders"]),
-                        {"nodes": ["tag:support"], "permissions": ["view.sql"],
-                            "resolved_nodes": {"tag:support": ["customers"]}},
-                    ]),
-                ),
-            )
-            .await;
-            assert_eq!(
-                authorize_member(store, &roles, (Action::RunAdhoc, &["orders"]))
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                test_case.expected_before,
-                "{}: the removed permission is denied at once",
-                test_case.description
-            );
-            assert_eq!(
-                authorize_member(store, &roles, (Action::ViewSql, &["customers"]))
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                test_case.expected_after,
-                "{}: the rewritten selector's coverage waits for approval",
-                test_case.description
-            );
-            assert_eq!(
-                authorize_member(store, &roles, (Action::ViewSql, &["orders"]))
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                Ok(SUPPORT_ROLE),
-                "{}: the kept pair stays effective",
-                test_case.description
-            );
-            activate(store, &roles).await;
-            assert_eq!(
-                authorize_member(store, &roles, (Action::ViewSql, &["customers", "orders"]))
-                    .await
-                    .as_deref()
-                    .map_err(String::as_str),
-                Ok(SUPPORT_ROLE),
-                "{}: approval adds the new coverage",
                 test_case.description
             );
             close_test_store(fixture).await;
@@ -364,8 +190,7 @@ fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_tri
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             let grants = |nodes: &[&str]| {
                 json!([orders_grant(
                     json!(["view", "trigger.toggle", "sensor.reset_cursor"]),
@@ -373,7 +198,6 @@ fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_tri
                 )])
             };
             publish_customers_trigger(store, roles.location_id, (2, grants(&["orders"]))).await;
-            activate(store, &roles).await;
             assert_eq!(
                 member_trigger_change(store, &roles, TriggerChange::Pause)
                     .await
@@ -441,8 +265,7 @@ fn given_view_grant_on_part_of_the_location_when_listing_then_each_listing_is_de
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             assert_eq!(
                 member_listings(store, &roles).await,
                 vec![test_case.expected_before.map(|_| ()).map_err(str::to_owned); 3],
@@ -495,15 +318,13 @@ fn given_role_removed_from_code_when_its_assignment_remains_then_it_grants_nothi
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             publish_support_role(
                 store,
                 roles.location_id,
                 (2, developer_grants("tag:orders", &["orders"])),
             )
             .await;
-            activate(store, &roles).await;
             let adhoc = (Action::RunAdhoc, ["orders"].as_slice());
             assert_eq!(
                 authorize_member(store, &roles, adhoc)
@@ -511,7 +332,7 @@ fn given_role_removed_from_code_when_its_assignment_remains_then_it_grants_nothi
                     .as_deref()
                     .map_err(String::as_str),
                 test_case.expected_before,
-                "{}: the approved role grants ad-hoc runs",
+                "{}: the published role grants ad-hoc runs",
                 test_case.description
             );
             let mut input = snapshot(roles.location_id);
@@ -572,8 +393,7 @@ fn given_two_custom_roles_when_each_covers_part_of_a_run_then_their_union_author
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("migrate");
-            let roles = role_fixture(store, 2).await;
-            activate(store, &roles).await;
+            let roles = role_fixture(store).await;
             let mut input = snapshot(roles.location_id);
             input.generation = 2;
             input.documents.insert(
@@ -586,7 +406,6 @@ fn given_two_custom_roles_when_each_covers_part_of_a_run_then_their_union_author
             publish_snapshot(store, &input)
                 .await
                 .expect("publish roles");
-            activate(store, &roles).await;
             let adhoc = (Action::RunAdhoc, ["customers", "orders"].as_slice());
             assert_eq!(
                 authorize_member(store, &roles, adhoc)
@@ -597,22 +416,9 @@ fn given_two_custom_roles_when_each_covers_part_of_a_run_then_their_union_author
                 "{}: one role alone does not cover the run",
                 test_case.description
             );
-            let returns = serde_json::from_value::<Vec<RoleGrant>>(developer_grants(
-                "tag:returns",
-                &["customers"],
-            ))
-            .expect("returns grants");
-            let transaction = set_effective_role(
-                begin(store, TransactionMode::Write).await.expect("begin"),
-                (roles.location_id, "development", "orders_returns"),
-                ("synthetic-returns-digest", &returns),
-            )
-            .await
-            .expect("effective returns role");
-            commit(transaction).await.expect("commit");
             assign(
                 store,
-                (&roles.context, &roles.administrators[0]),
+                (&roles.context, &roles.administrator),
                 RoleAssignmentRequest {
                     principal_id: roles.member_id,
                     role: RoleKey::Custom("orders_returns".into()),

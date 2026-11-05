@@ -1,4 +1,4 @@
-//! Exchange consumes approval and issues a normal bounded person session atomically.
+//! Exchange consumes approval and issues a bounded session while the approver stays live.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -21,7 +21,7 @@ pub(crate) async fn claim_login(
     let now = transaction.now;
     let (transaction, rows) = query(
         transaction,
-        "SELECT client_hash,session_id FROM sqb_cli_login_flows WHERE flow_id=$1 AND expires_at>$2",
+        "SELECT client_hash,principal_id,session_id FROM sqb_cli_login_flows WHERE flow_id=$1 AND expires_at>$2",
         vec![Parameter::Id(id), Parameter::Time(now)],
     )
     .await?;
@@ -32,25 +32,36 @@ pub(crate) async fn claim_login(
     if !secret_matches(client_secret, &flow.client_hash) {
         return Ok(ClaimedLogin::Unavailable);
     }
-    let Some(parent) = flow.session_id else {
+    let Some(principal_id) = flow.principal_id else {
         return Ok(ClaimedLogin::Pending);
     };
-    let (transaction, parent) = active_session(transaction, parent).await?;
-    let Some(parent) = parent else {
+    let (transaction, approver) = match flow.session_id {
+        Some(session_id) => active_session(transaction, session_id).await?,
+        None => (transaction, None),
+    };
+    if flow.session_id.is_some() && approver.is_none() {
+        return Ok(ClaimedLogin::Unavailable);
+    }
+    let (transaction, people) = query(
+        transaction,
+        "SELECT c.credential_id FROM sqb_principals p LEFT JOIN sqb_password_credentials c \
+         ON c.principal_id=p.principal_id WHERE p.principal_id=$1 AND p.disabled_at IS NULL",
+        vec![Parameter::Id(principal_id)],
+    )
+    .await?;
+    let Some(person) = people.first() else {
         return Ok(ClaimedLogin::Unavailable);
     };
+    let credential_id = serde_json::from_value::<Option<Uuid>>(person["credential_id"].clone())
+        .map_err(|error| ControlError::Schema(error.to_string()))?;
     let (transaction, _) = query(
         transaction,
         "DELETE FROM sqb_cli_login_flows WHERE flow_id=$1",
         vec![Parameter::Id(id)],
     )
     .await?;
-    let (transaction, session) = issue_session(
-        transaction,
-        context,
-        (parent.identity.principal_id, parent.credential_id),
-    )
-    .await?;
+    let (transaction, session) =
+        issue_session(transaction, context, (principal_id, credential_id)).await?;
     commit(
         append_audit(
             transaction,

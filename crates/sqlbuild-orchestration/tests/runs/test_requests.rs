@@ -58,7 +58,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
             input.nodes.insert("warehouse_orders".into(), source);
             input.documents.insert("jobs".into(), json!({"daily_orders": {
                 "description": "Build orders from the warehouse source", "selection": ["orders", "warehouse_orders"],
-                "settings": {"full_refresh": true}, "concurrency_groups": ["orders-load"], "overlap": "queue"
+                "settings": {"full_refresh": true}, "concurrency_groups": ["orders-load"]
             }}));
             let published = publish_snapshot(store, &input).await.expect("publish job");
             let request = JobRunRequest {

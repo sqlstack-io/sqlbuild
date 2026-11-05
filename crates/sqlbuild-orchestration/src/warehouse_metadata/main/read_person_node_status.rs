@@ -19,7 +19,7 @@ use crate::warehouse_metadata::models::{
 
 pub async fn read_person_node_status(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location_id, target, options): (Uuid, &str, &NodeStatusQuery),
     default_role: DefaultRole,
 ) -> Result<Option<NodeStatus>, ControlError> {

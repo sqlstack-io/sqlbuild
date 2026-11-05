@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import itertools
 import json
 import os
 import random
@@ -356,10 +355,10 @@ def warehouse_history_pages(
     return pages
 
 
-def sync_warehouse_history(api: SnapshotApi, table: str, batch: dict[str, Any]) -> dict[str, Any]:
-    """Use the public location transport and return its bounded reconciliation continuation."""
+def sync_warehouse_history(api: SnapshotApi, batch: dict[str, Any]) -> dict[str, Any]:
+    """Deliver one metadata page through the public location transport."""
     request: Request = Request(
-        f"{api.url}/api/locations/{api.location_id}/targets/development/metadata/{table}",
+        f"{api.url}/api/locations/{api.location_id}/targets/development/metadata",
         data=json.dumps(batch).encode(),
         headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
     )
@@ -876,7 +875,6 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
         "write_set": selection,
         "settings": {"full_refresh": True},
         "concurrency_groups": [],
-        "overlap": "allow",
     }
     with sqlite3.connect(directory / ".sqlbuild/control.sqlite3") as connection:
         _ = connection.execute(
@@ -902,8 +900,8 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             ),
         )
         _ = connection.execute(
-            "INSERT INTO sqb_run_nodes (run_id,node_key,attempt,status,writes) "
-            "VALUES (?,'model:orders',1,'pending',TRUE)",
+            "INSERT INTO sqb_run_nodes (run_id,node_key,status,writes) "
+            "VALUES (?,'model:orders','pending',TRUE)",
             (run_id,),
         )
         _ = connection.execute(
@@ -911,9 +909,9 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             (publication["target"], "model:orders", run_id, now.isoformat()),
         )
         _ = connection.execute(
-            "INSERT INTO sqb_run_liveness (run_id,worker_instance,claimed_at,last_heartbeat_at) "
-            "VALUES (?,?,?,?)",
-            (run_id, claim_id, now.isoformat(), now.isoformat()),
+            "UPDATE sqb_runs SET worker_instance=?, claimed_at=?, last_heartbeat_at=? "
+            "WHERE run_id=?",
+            (claim_id, now.isoformat(), now.isoformat(), run_id),
         )
         _ = connection.execute(
             "INSERT INTO sqb_access_tokens "
@@ -944,7 +942,7 @@ def wait_for_sensor_phase(
             row = control.execute(
                 "SELECT fact_json FROM sqb_sensor_evaluation_events WHERE phase=? "
                 "AND (? = FALSE OR fact_json->'outcome'->'run_ids'='[]') "
-                "ORDER BY storage_id DESC LIMIT 1",
+                "ORDER BY occurred_at DESC, evaluation_id DESC LIMIT 1",
                 (phase, empty_runs),
             ).fetchone()
         time.sleep(0.05)
@@ -1070,15 +1068,14 @@ def statistics_relations(directory: Path) -> tuple[str, ...]:
 
 
 def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[str, int]:
-    """SIGKILL real schedulers while they drain a backlog; return breaches and the kill count."""
+    """SIGKILL real schedulers during catch-up; return breaches and the kill count."""
     project: Path = directory / "project"
     start: datetime = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
         minutes=fixture["backlog_minutes"]
     )
     declarations: str = "".join(
-        f'{name} = job("{name}", select="orders", description="Build {name}.", overlap="queue", '
-        f'schedule=schedule(cron="* * * * *", timezone="UTC", catch_up="all", '
-        f"max_catch_up={fixture['max_catch_up']}))\n"
+        f'{name} = job("{name}", select="orders", description="Build {name}.", '
+        f'schedule=schedule(cron="* * * * *", timezone="UTC"))\n'
         for name in fixture["jobs"]
     )
     write_files(
@@ -1177,8 +1174,8 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
                     (settled.replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),),
                 ).fetchone()
     with closing(sqlite3.connect(control_store)) as control:
-        ticks: list[tuple[str, str, str | None]] = control.execute(
-            "SELECT trigger_id, scheduled_for, run_id FROM sqb_ticks"
+        ticks: list[tuple[str, str, str | None, str | None]] = control.execute(
+            "SELECT trigger_id, scheduled_for, run_id, covered_by_run_id FROM sqb_ticks"
         ).fetchall()
         runs: set[str] = {run for (run,) in control.execute("SELECT run_id FROM sqb_runs")}
         (requested,) = control.execute(
@@ -1189,33 +1186,34 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
         with suppress(sqlite3.IntegrityError):
             _ = control.execute(
                 "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, "
-                "outcome, run_id, covered_by_run_id, details_json) "
-                "SELECT ?, trigger_id, scheduled_for, evaluated_at, epoch, 'skipped', NULL, NULL, "
-                "'{}' FROM sqb_ticks LIMIT 1",
+                "outcome, run_id, covered_by_run_id) "
+                "SELECT ?, trigger_id, scheduled_for, evaluated_at, epoch, 'skipped', NULL, NULL "
+                "FROM sqb_ticks LIMIT 1",
                 (str(uuid4()),),
             )
             duplicate_rejected = False
-    minutes: list[datetime] = [
-        start + timedelta(minutes=offset) for offset in range(fixture["backlog_minutes"] + 1)
-    ]
-    expected: set[tuple[str, datetime]] = set(
-        itertools.product({tick[0] for tick in ticks}, minutes)
-    )
+    # A minute can fall due while the survivor runs; the one due at `settled` or a later one ticks.
+    latest: datetime = settled.replace(second=0, microsecond=0)
     observed: list[tuple[str, datetime]] = [
-        (trigger, datetime.fromisoformat(scheduled)) for trigger, scheduled, _ in ticks
+        (trigger, datetime.fromisoformat(scheduled)) for trigger, scheduled, _, _ in ticks
     ]
-    tick_runs: set[str | None] = {run for _, _, run in ticks} - {None}
+    newest: dict[str, datetime] = dict(sorted(observed, key=lambda tick: tick[1]))
+    requesting: list[str] = list(filter(None, (run for _, _, run, _ in ticks)))
+    covering: set[str] = set(filter(None, (covered for _, _, _, covered in ticks)))
     return {
         "triggers_without_ticks": triggers - len({tick[0] for tick in ticks}),
         "duplicate_ticks": len(observed) - len(set(observed)),
-        "missing_ticks": len(expected - set(observed)),
+        "missing_latest_ticks": sum(minute < latest for minute in newest.values()),
         "off_schedule_ticks": sum(
             minute.second != 0 or minute.microsecond != 0 or minute < start
             for _, minute in observed
         ),
-        "runs_without_exactly_one_tick": len(runs ^ tick_runs)
-        + sum(run is None for _, _, run in ticks),
-        "request_event_mismatch": abs(requested - len(ticks)),
+        "runs_without_exactly_one_tick": len(runs ^ set(requesting))
+        + len(requesting)
+        - len(set(requesting))
+        + len(covering - runs)
+        + sum((run is None) == (covered is None) for _, _, run, covered in ticks),
+        "request_event_mismatch": abs(requested - len(requesting)),
         "accepted_duplicate_ticks": int(not duplicate_rejected),
         "kills": kills,
         "ticks_before_survivor": interrupted,

@@ -5,17 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::scheduler::models::{CatchUp, Overlap};
 use crate::sensors::models::SensorDefinition;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OnFailure {
-    #[default]
-    SkipDependents,
-    SkipDownstreamJobs,
-    StopGroup,
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -43,10 +33,6 @@ pub struct JobDefinition {
     pub selection: BTreeSet<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub overlap: Overlap,
-    #[serde(default)]
-    pub on_failure: OnFailure,
     #[serde(default)]
     pub concurrency_groups: BTreeSet<String>,
 }
@@ -82,8 +68,6 @@ pub struct TriggerDefinition {
     pub starts_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub default_status: TriggerStatus,
-    #[serde(default)]
-    pub catch_up: CatchUp,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -112,29 +96,6 @@ pub struct TriggerRecord {
     pub status: TriggerStatus,
     pub last_tick_for: Option<DateTime<Utc>>,
     pub next_due_at: Option<DateTime<Utc>>,
-}
-
-/// Recorded only by live transition owners, never seeded from a legacy projection during replay.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct TriggerProjection {
-    pub(crate) trigger_id: uuid::Uuid,
-    pub(crate) location_id: uuid::Uuid,
-    pub(crate) target: String,
-    pub(crate) kind: String,
-    pub(crate) name: String,
-    pub(crate) job_key: String,
-    pub(crate) definition_json: TriggerDeclaration,
-    pub(crate) snapshot_id: uuid::Uuid,
-    pub(crate) removed_in_snapshot_id: Option<uuid::Uuid>,
-    pub(crate) status: TriggerStatus,
-    pub(crate) status_override: Option<TriggerStatus>,
-    pub(crate) started_at: DateTime<Utc>,
-    pub(crate) cursor_json: Option<serde_json::Value>,
-    pub(crate) last_tick_for: Option<DateTime<Utc>>,
-    pub(crate) next_due_at: Option<DateTime<Utc>>,
-    pub(crate) consecutive_failures: i64,
-    pub(crate) updated_at: DateTime<Utc>,
 }
 
 /// Operator changes are immutable facts; clearing an override restores the published code default.

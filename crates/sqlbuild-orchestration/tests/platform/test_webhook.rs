@@ -6,7 +6,7 @@ use axum::Router;
 use axum::routing::post;
 use uuid::Uuid;
 
-use crate::platform::main::run_watchdog::run_watchdog;
+use crate::platform::main::run_maintenance::run_maintenance;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
 use crate::webhooks::_helpers::delivery::deliver_webhook;
@@ -59,7 +59,12 @@ fn given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_s
             let (stop, shutdown) = tokio::sync::watch::channel(false);
             let watchdog_store = store.clone();
             let tasks = [tokio::spawn(async move {
-                run_watchdog(&watchdog_store, replica_id, shutdown).await
+                run_maintenance(
+                    (&watchdog_store, replica_id),
+                    (Default::default(), &[]),
+                    (|_| {}, shutdown),
+                )
+                .await
             })];
             let observations = wait_for_scans(store, &BTreeSet::from([replica_id]), &tasks).await;
             stop.send(true).expect("stop watchdog");

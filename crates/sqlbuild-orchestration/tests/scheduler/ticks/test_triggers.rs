@@ -256,13 +256,13 @@ fn given_a_calendar_with_unprocessed_due_times_when_refreshed_then_due_ticks_sur
         TickTransactionTestCase {
             description: "SQLite retains due calendar ticks",
             backend: Backend::Sqlite,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
         TickTransactionTestCase {
             description: "PostgreSQL retains due calendar ticks",
             backend: Backend::Postgres,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
     ];
