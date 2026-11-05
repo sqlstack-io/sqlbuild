@@ -118,12 +118,14 @@ pub enum Table {
     Conflicts,
 }
 
-/// What DDL is rendered with: database (ClickHouse), retention and cluster.
+/// What DDL is rendered with: database (ClickHouse), retention, cluster and producing release.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DdlOptions {
     pub database: Option<String>,
     pub retention_days: u32,
     pub cluster: Option<String>,
+    /// The sqlbuild release the schema version row records; this crate's own version is fixed.
+    pub producer_version: String,
 }
 
 /// The statements SQLite maintenance runs, with their positional parameters.

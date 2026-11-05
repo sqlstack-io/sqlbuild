@@ -1541,8 +1541,46 @@ roots = ["crates"]
 tests = []
 tooling = []
 rule_packs = ["rust"]
-rule_modules = ["scripts.fensu_policy.rules.native_boundary"]
+rule_modules = [
+    "scripts.fensu_policy.rules.native_boundary",
+    "scripts.fensu_policy.rules.unused_state",
+]
 select = ["FPRS", "XSB072", "XSB073", "XSB075"]
+warn = ["XSB076", "XSB077"]
+
+[targets.rust.rule_options.XSB076]
+schema_paths = ["crates/sqlbuild-orchestration/src/store"]
+allowed = [
+    "sqb_admin_initialization.initialized_at=Audit history read through audit exports: when the first administrator was created.",
+    "sqb_effective_roles.effective_since=Audit history read through audit exports: when a role's resolved grants took effect.",
+    "sqb_locations.created_by=Audit history read through audit exports: who created the location.",
+    "sqb_password_credentials.changed_at=Audit history read through audit exports: when a password last changed.",
+    "sqb_platform_sink_deliveries.delivered_at=Audit history read through audit exports: when an event reached the platform sink.",
+    "sqb_role_assignments.granted_at=Audit history read through audit exports: when a role was granted.",
+    "sqb_role_assignments.granted_by=Audit history read through audit exports: who granted a role.",
+    "sqb_role_assignments.revoked_by=Audit history read through audit exports: who revoked a role.",
+    "sqb_security_audit_deliveries.delivered_at=Audit history read through audit exports: when an event reached a security audit sink.",
+    "sqb_warehouse_microbatches.execution_run_id=Reader comes with the UI epic (D132), which filters on it: the run that executed the batch.",
+    "sqb_warehouse_microbatches.record_type=Reader comes with the UI epic (D132), which filters on it: the batch state.",
+    "sqb_warehouse_migrations.decision=Reader comes with the UI epic (D132), which filters on it.",
+    "sqb_warehouse_migrations.destination_model=Reader comes with the UI epic (D132), which filters on it.",
+    "sqb_warehouse_old_name_views.migration_event_id=Reader comes with the UI epic (D132), which filters on it.",
+]
+
+[targets.rust.rule_options.XSB077]
+construction_required = [
+    "Action=A permission is live only when a route requires it; role tables and classifiers do not count.",
+]
+exceptions = [
+    "Action::ViewEvidence=Kept under D129; reader comes with the UI epic.",
+    "InaccessibleReason=Wire enum that serde builds from Python scope records.",
+    "RoleDecision::Rejected=Serde builds it from an administrator's decide request.",
+    "ScopeDiagnosticCode=Wire enum that serde builds from Python scope diagnostics.",
+    "TickOutcome::Covered=The scheduler writes it as SQL text and serde reads it back.",
+    "TickOutcome::Requested=The scheduler writes it as SQL text and serde reads it back.",
+    "TickOutcome::Skipped=The scheduler writes it as SQL text and serde reads it back.",
+    "UsageKind=Wire enum that serde builds from Python usage records.",
+]
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSR307"

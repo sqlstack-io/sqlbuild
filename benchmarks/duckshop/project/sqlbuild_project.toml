@@ -316,6 +316,20 @@ Snowflake gives them.
 """
 
 [[rules.rule_ignores]]
+rules = ["SQLCLEAN022"]
+paths = ["models/intermediate/edge_cases/int_edge_check_unnamed_labels.sql"]
+reason = """
+The edge case leaves a literal unaliased on purpose, and reads it by the name Snowflake gives it.
+"""
+
+[[rules.rule_ignores]]
+rules = ["SQLCLEAN044"]
+paths = ["models/intermediate/edge_cases/_sqlbuild/_hooks/sql/create_edge_running_peaks.sql"]
+reason = """
+The hook creates a JavaScript function, whose body Snowflake takes as one dollar-quoted string.
+"""
+
+[[rules.rule_ignores]]
 rules = ["SQLCLEAN040"]
 paths = ["models/intermediate/edge_cases/int_edge_amount_bit_reads.sql"]
 reason = """
