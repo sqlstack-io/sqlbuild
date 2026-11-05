@@ -1,7 +1,6 @@
 //! The row appended before a model or seed writes.
 
 use crate::consumption::_helpers::decision::input_key;
-use crate::consumption::_helpers::event_id::event_id;
 use crate::consumption::constants::STARTED_PHASE;
 use crate::consumption::models::{ConsumptionAppend, NodeFacts};
 
@@ -11,7 +10,6 @@ pub fn started_append(node: &NodeFacts, execution_id: &str, run_id: &str) -> Con
     keys.sort();
     keys.dedup();
     ConsumptionAppend {
-        event_id: event_id(execution_id, STARTED_PHASE, None),
         execution_id: execution_id.to_owned(),
         phase: STARTED_PHASE.to_owned(),
         run_id: run_id.to_owned(),

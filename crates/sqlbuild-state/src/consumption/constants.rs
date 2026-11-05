@@ -7,8 +7,7 @@ pub const INTEGER_STATE_VALUE_TYPE: &str = "integer";
 /// The column the warehouse clock fills on insert.
 pub const RECORDED_AT_COLUMN: &str = "recorded_at";
 /// Columns in declaration order with their state value types; `recorded_at` is last.
-pub const CONSUMPTION_COLUMN_TYPES: [(&str, &str); 15] = [
-    ("event_id", STRING_STATE_VALUE_TYPE),
+pub const CONSUMPTION_COLUMN_TYPES: [(&str, &str); 14] = [
     ("execution_id", STRING_STATE_VALUE_TYPE),
     ("phase", STRING_STATE_VALUE_TYPE),
     ("run_id", STRING_STATE_VALUE_TYPE),
@@ -47,5 +46,3 @@ pub const UNKNOWN_VERSION: &str = "unknown";
 pub const RECENT_EXECUTIONS: usize = 8;
 /// Executions of one relation appended this close to the newest are all checked, in microseconds.
 pub const ORDER_SKEW_MICROS: i64 = 5_000_000;
-/// Event ID namespace of consumption rows.
-pub(crate) const EVENT_NAMESPACE: &str = "sqlbuild.consumption.event.v1";

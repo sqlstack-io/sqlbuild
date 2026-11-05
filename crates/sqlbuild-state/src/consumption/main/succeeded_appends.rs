@@ -1,6 +1,5 @@
 //! The rows appended after a model or seed's write succeeded.
 
-use crate::consumption::_helpers::event_id::event_id;
 use crate::consumption::constants::SUCCEEDED_PHASE;
 use crate::consumption::models::{ConsumedInput, ConsumptionAppend, NodeFacts};
 
@@ -11,7 +10,6 @@ pub fn succeeded_appends(
     inputs: &[ConsumedInput],
 ) -> Vec<ConsumptionAppend> {
     let row = |input: Option<&ConsumedInput>| ConsumptionAppend {
-        event_id: event_id(execution_id, SUCCEEDED_PHASE, input),
         execution_id: execution_id.to_owned(),
         phase: SUCCEEDED_PHASE.to_owned(),
         run_id: run_id.to_owned(),

@@ -453,7 +453,7 @@ impl World {
         self.flush(&mut pending, random);
     }
 
-    /// A retried append of a recent batch lands again, later, with the same event IDs.
+    /// A retried append of a recent batch lands again, later, with the same rows.
     fn late_duplicate(&mut self, random: &mut Random) {
         if self.flushed.is_empty() || !random.chance(15) {
             return;

@@ -9,7 +9,7 @@ use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 use crate::bindings::_helpers::analysis::relation_names::{
     RelationRow, extract_sql_relation_names,
 };
-use crate::bindings::_helpers::compiled_views::{model_reads, project_reads, seed_reads};
+use crate::bindings::_helpers::native_host::consumption_state::optional_text;
 use crate::bindings::_helpers::records::fields::{field as native_field, mapping_items};
 
 /// Function calls, `__udf("name")(...)`, parsed as plain calls; their reads are declared inputs.
@@ -23,55 +23,32 @@ pub(crate) struct Locations {
     by_name: HashMap<String, BTreeSet<RelationKey>>,
 }
 
-fn optional(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    if value.is_none() {
-        return Ok(None);
-    }
-    Ok(Some(value.extract()?))
-}
-
-fn location(destination: &Bound<'_, PyAny>) -> PyResult<RelationKey> {
+/// The relation a model or seed destination names; a destination without a schema has an empty one.
+pub(crate) fn relation(destination: &Bound<'_, PyAny>) -> PyResult<RelationKey> {
     Ok(RelationKey {
-        database: optional(native_field(destination, "database")?)?,
-        schema: optional(native_field(destination, "schema")?)?.unwrap_or_default(),
+        database: optional_text(&native_field(destination, "database")?)?,
+        schema: optional_text(&native_field(destination, "schema")?)?.unwrap_or_default(),
         name: native_field(destination, "name")?.extract()?,
     })
 }
 
 impl Locations {
-    pub(crate) fn read(plan: &Bound<'_, PyAny>, project: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let mut nodes: HashMap<NodeKey, RelationKey> = HashMap::new();
-        for model in project_reads::models(project)?.try_iter()? {
-            let model: Bound<'_, PyAny> = model?;
-            nodes.insert(
-                NodeKey {
-                    kind: "model".to_owned(),
-                    name: model_reads::model_name(&model)?,
-                },
-                location(&model_reads::destination(&model)?)?,
-            );
-        }
-        for seed in project_reads::seeds(project)?.try_iter()? {
-            let seed: Bound<'_, PyAny> = seed?;
-            nodes.insert(
-                NodeKey {
-                    kind: "seed".to_owned(),
-                    name: seed_reads::name(&seed)?.extract()?,
-                },
-                location(&seed_reads::destination(&seed)?)?,
-            );
-        }
+    /// `nodes` holds every model and seed relation of the project.
+    pub(crate) fn read(
+        plan: &Bound<'_, PyAny>,
+        nodes: HashMap<NodeKey, RelationKey>,
+    ) -> PyResult<Self> {
         let mut sources: HashMap<String, (Option<String>, Option<String>, String)> = HashMap::new();
         for map in ["source_map", "source_read_map"] {
             for item in mapping_items(&native_field(plan, map)?)?.try_iter()? {
                 let (name, entry): (String, Bound<'_, PyAny>) = item?.extract()?;
                 let table: String =
-                    optional(native_field(&entry, "table")?)?.unwrap_or_else(|| name.clone());
+                    optional_text(&native_field(&entry, "table")?)?.unwrap_or_else(|| name.clone());
                 sources.insert(
                     name,
                     (
-                        optional(native_field(&entry, "database")?)?,
-                        optional(native_field(&entry, "schema")?)?,
+                        optional_text(&native_field(&entry, "database")?)?,
+                        optional_text(&native_field(&entry, "schema")?)?,
                         table,
                     ),
                 );

@@ -7,7 +7,7 @@ use crate::consumption::models::{
     ConsumedInput, ConsumptionHistory, ConsumptionRow, Execution, RelationHistory, RelationKey,
 };
 
-/// The rows of one execution with the earliest and latest times seen for each event.
+/// The rows of one execution with the earliest and latest times seen for each row.
 #[derive(Default)]
 struct ExecutionRows<'a> {
     rows: Vec<&'a ConsumptionRow>,
@@ -15,15 +15,28 @@ struct ExecutionRows<'a> {
     latest: i64,
 }
 
+/// A retried append repeats a row: its execution, phase and the input it records.
+type RowIdentity<'a> = (&'a str, &'a str, Option<(&'a str, &'a str, &'a str)>);
+
 /// Recent executions per relation, from rows read newest first with at most `limit` per relation.
 pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> ConsumptionHistory {
-    let mut events: HashMap<&str, (&ConsumptionRow, i64, i64)> = HashMap::new();
+    let mut events: HashMap<RowIdentity<'_>, (&ConsumptionRow, i64, i64)> = HashMap::new();
     for row in rows {
-        let entry = events.entry(row.row.event_id.as_str()).or_insert((
-            row,
-            row.recorded_at,
-            row.recorded_at,
-        ));
+        let input = row.row.input.as_ref();
+        let identity: RowIdentity<'_> = (
+            row.row.execution_id.as_str(),
+            row.row.phase.as_str(),
+            input.map(|input| {
+                (
+                    input.kind.as_str(),
+                    input.name.as_str(),
+                    input.version.as_str(),
+                )
+            }),
+        );
+        let entry = events
+            .entry(identity)
+            .or_insert((row, row.recorded_at, row.recorded_at));
         if row.recorded_at < entry.1 {
             *entry = (row, row.recorded_at, entry.2);
         }

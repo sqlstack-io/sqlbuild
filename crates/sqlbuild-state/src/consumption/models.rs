@@ -26,7 +26,6 @@ pub struct ConsumedInput {
 /// One row to append; the warehouse clock fills `recorded_at`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConsumptionAppend {
-    pub event_id: String,
     pub execution_id: String,
     pub phase: String,
     pub run_id: String,

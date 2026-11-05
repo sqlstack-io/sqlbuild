@@ -19,7 +19,9 @@ use sqlbuild_state::consumption::models::{
 };
 use uuid::Uuid;
 
-use crate::bindings::_helpers::consumption::facts::{BuildFacts, build_facts};
+use crate::bindings::_helpers::consumption::facts::{
+    BuildFacts, MODEL, SEED, build_facts, enum_text,
+};
 use crate::bindings::_helpers::native_host::consumption_state::{
     ConsumptionConnection, Location, NodeCompleteHook,
 };
@@ -33,7 +35,6 @@ const MODEL_RESULT: &str = "model_name";
 const SEED_RESULT: &str = "seed_name";
 const SUCCESS: &str = "success";
 const ERROR_OUTCOME: &str = "error";
-const SEED_KIND: &str = "seed";
 
 /// The mutable side of one build's recording.
 struct Recording {
@@ -79,17 +80,12 @@ pub(crate) struct ChangedDecision {
 }
 
 fn kind_of(result: &Bound<'_, PyAny>) -> PyResult<Option<(&'static str, String)>> {
-    for (field, kind) in [(MODEL_RESULT, "model"), (SEED_RESULT, "seed")] {
+    for (field, kind) in [(MODEL_RESULT, MODEL), (SEED_RESULT, SEED)] {
         if let Some(name) = result.getattr_opt(field)? {
             return Ok(Some((kind, name.extract()?)));
         }
     }
     Ok(None)
-}
-
-fn status_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    let value: Bound<'_, PyAny> = value.getattr_opt("value")?.unwrap_or_else(|| value.clone());
-    Ok(value.str()?.extract::<String>()?.to_ascii_lowercase())
 }
 
 impl ConsumptionRecorder {
@@ -160,7 +156,8 @@ impl ConsumptionRecorder {
         for audit in native_field(build_result, "source_audit_results")?.try_iter()? {
             let audit: Bound<'_, PyAny> = audit?;
             let target: Bound<'_, PyAny> = native_field(&audit, "attached_target_name")?;
-            if !target.is_none() && status_text(&native_field(&audit, "outcome")?)? == ERROR_OUTCOME
+            if !target.is_none()
+                && enum_text(&native_field(&audit, "outcome")?)?.eq_ignore_ascii_case(ERROR_OUTCOME)
             {
                 failed_audits.insert(target.extract()?);
             }
@@ -184,7 +181,7 @@ impl ConsumptionRecorder {
         let Some((kind, name)) = kind_of(&node_result)? else {
             return Ok(());
         };
-        if status_text(&native_field(&node_result, "status")?)? != SUCCESS {
+        if !enum_text(&native_field(&node_result, "status")?)?.eq_ignore_ascii_case(SUCCESS) {
             return Ok(());
         }
         let key = NodeKey {
@@ -192,7 +189,7 @@ impl ConsumptionRecorder {
             name,
         };
         let mut recording = self.lock()?;
-        if kind == SEED_KIND {
+        if kind == SEED {
             recording.pending_seeds.push(key);
             return Ok(());
         }
@@ -215,9 +212,9 @@ impl ConsumptionRecorder {
         let _ = connection;
         let name: String = native_field(&entry, "name")?.extract()?;
         let kind: &str = if entry.hasattr("csv_settings")? {
-            "seed"
+            SEED
         } else {
-            "model"
+            MODEL
         };
         let key = NodeKey {
             kind: kind.to_owned(),

@@ -240,7 +240,7 @@ fn read_recent(
         .collect()
 }
 
-fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+pub(crate) fn optional_text(value: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
     if value.is_none() {
         return Ok(None);
     }
@@ -272,16 +272,16 @@ fn epoch_micros(value: &Bound<'_, PyAny>) -> PyResult<i64> {
 
 fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
     let cell = |index: usize| row.get_item(index);
-    let input_kind: Option<String> = optional_text(&cell(11)?)?;
+    let input_kind: Option<String> = optional_text(&cell(10)?)?;
     let input: Option<ConsumedInput> = match input_kind {
         Some(kind) => Some(ConsumedInput {
             kind,
-            name: required_text(&cell(12)?)?,
-            version: required_text(&cell(13)?)?,
+            name: required_text(&cell(11)?)?,
+            version: required_text(&cell(12)?)?,
         }),
         None => None,
     };
-    let count: Bound<'_, PyAny> = cell(10)?;
+    let count: Bound<'_, PyAny> = cell(9)?;
     let input_count: i64 = if count.is_instance_of::<PyInt>() {
         count.extract()?
     } else {
@@ -294,24 +294,23 @@ fn read_row(row: &Bound<'_, PyAny>) -> PyResult<ConsumptionRow> {
     };
     Ok(ConsumptionRow {
         row: ConsumptionAppend {
-            event_id: required_text(&cell(0)?)?,
-            execution_id: required_text(&cell(1)?)?,
-            phase: required_text(&cell(2)?)?,
-            run_id: required_text(&cell(3)?)?,
+            execution_id: required_text(&cell(0)?)?,
+            phase: required_text(&cell(1)?)?,
+            run_id: required_text(&cell(2)?)?,
             node: NodeKey {
-                kind: required_text(&cell(4)?)?,
-                name: required_text(&cell(5)?)?,
+                kind: required_text(&cell(3)?)?,
+                name: required_text(&cell(4)?)?,
             },
             relation: RelationKey {
-                database: optional_text(&cell(6)?)?,
-                schema: required_text(&cell(7)?)?,
-                name: required_text(&cell(8)?)?,
+                database: optional_text(&cell(5)?)?,
+                schema: required_text(&cell(6)?)?,
+                name: required_text(&cell(7)?)?,
             },
-            version_hash: required_text(&cell(9)?)?,
+            version_hash: required_text(&cell(8)?)?,
             input_count,
             input,
         },
-        recorded_at: epoch_micros(&cell(14)?)?,
+        recorded_at: epoch_micros(&cell(13)?)?,
     })
 }
 
@@ -324,7 +323,6 @@ fn literal(py: Python<'_>, value: Option<&str>) -> PyResult<String> {
 fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyResult<Vec<String>> {
     let input = row.input.as_ref();
     Ok(vec![
-        literal(py, Some(&row.event_id))?,
         literal(py, Some(&row.execution_id))?,
         literal(py, Some(&row.phase))?,
         literal(py, Some(&row.run_id))?,

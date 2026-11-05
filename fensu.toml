@@ -1809,7 +1809,7 @@ paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/fingerpr
 reason = "Typed observation field projections intentionally mirror provenance checks while preserving different required identity fields and timestamp names. Bounds, rejection rules and reconciliation completion share the ingestion owner."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_consumption.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_old_name_views.rs"]
+paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_old_name_views.rs"]
 reason = "Typed event projections retain distinct required identities and indexed payload columns. Event persistence, fencing, atomic retries and reconciliation share the events ingestion owner; no per-table lifecycle is copied."
 
 [[targets.python.rule_exceptions]]

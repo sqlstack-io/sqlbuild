@@ -10,7 +10,9 @@ use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeK
 use crate::bindings::_helpers::compiled_views::{
     function_reads, model_reads, project_reads, seed_reads,
 };
-use crate::bindings::_helpers::consumption::relation_reads::{Locations, sql_reads_undeclared};
+use crate::bindings::_helpers::consumption::relation_reads::{
+    Locations, relation, sql_reads_undeclared,
+};
 use crate::bindings::_helpers::planner_identity::hashing::{graph_key, model_query_hash};
 use crate::bindings::_helpers::planner_identity::identities::hook_version_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::{
@@ -18,8 +20,8 @@ use crate::bindings::_helpers::planner_identity::metadata::{
 };
 use crate::bindings::_helpers::records::fields::field as native_field;
 
-const MODEL: &str = "model";
-const SEED: &str = "seed";
+pub(crate) const MODEL: &str = "model";
+pub(crate) const SEED: &str = "seed";
 const SOURCE: &str = "source";
 const FUNCTION_KINDS: [&str; 2] = ["udf", "table_fn"];
 /// Plan reasons that mean the planner sees no change of the model itself.
@@ -42,6 +44,15 @@ enum Compiled<'py> {
     Seed(Bound<'py, PyAny>),
 }
 
+impl<'py> Compiled<'py> {
+    fn destination(&self) -> PyResult<Bound<'py, PyAny>> {
+        match self {
+            Self::Model(model) => model_reads::destination(model),
+            Self::Seed(seed) => seed_reads::destination(seed),
+        }
+    }
+}
+
 fn node_key(kind: &str, name: &str) -> NodeKey {
     NodeKey {
         kind: kind.to_owned(),
@@ -49,26 +60,10 @@ fn node_key(kind: &str, name: &str) -> NodeKey {
     }
 }
 
-fn enum_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
+/// An enum's value, or the value itself, as text.
+pub(crate) fn enum_text(value: &Bound<'_, PyAny>) -> PyResult<String> {
     let value: Bound<'_, PyAny> = value.getattr_opt("value")?.unwrap_or_else(|| value.clone());
     value.str()?.extract()
-}
-
-fn relation(destination: &Bound<'_, PyAny>) -> PyResult<Option<RelationKey>> {
-    let schema: Bound<'_, PyAny> = native_field(destination, "schema")?;
-    if schema.is_none() {
-        return Ok(None);
-    }
-    let database: Bound<'_, PyAny> = native_field(destination, "database")?;
-    Ok(Some(RelationKey {
-        database: if database.is_none() {
-            None
-        } else {
-            Some(database.extract()?)
-        },
-        schema: schema.extract()?,
-        name: native_field(destination, "name")?.extract()?,
-    }))
 }
 
 /// Each observed source's `data_version_hash`; sources loaded in this build are left out.
@@ -284,7 +279,11 @@ pub(crate) fn build_facts(
     let hooks: Bound<'_, PyAny> = native_field(project, "hook_functions")?;
     let hook_hashes: Bound<'_, PyDict> = hook_version_hashes(&hooks)?;
     let locations: Option<Locations> = if changed {
-        Some(Locations::read(plan, project)?)
+        let nodes: HashMap<NodeKey, RelationKey> = compiled
+            .iter()
+            .map(|(key, node)| Ok((key.clone(), relation(&node.destination()?)?)))
+            .collect::<PyResult<_>>()?;
+        Some(Locations::read(plan, nodes)?)
     } else {
         None
     };
@@ -307,9 +306,8 @@ pub(crate) fn build_facts(
         let Some(node) = compiled.get(&key) else {
             continue;
         };
-        let (destination, deps, version_hash) = match node {
+        let (deps, version_hash) = match node {
             Compiled::Model(model) => (
-                model_reads::destination(model)?,
                 model_reads::dep_rows(model)?,
                 model_local_identity_hash(
                     &model_query_hash(
@@ -327,11 +325,7 @@ pub(crate) fn build_facts(
                     )?,
                 ),
             ),
-            Compiled::Seed(seed) => (
-                seed_reads::destination(seed)?,
-                Vec::new(),
-                seed_identity(seed)?.0,
-            ),
+            Compiled::Seed(seed) => (Vec::new(), seed_identity(seed)?.0),
         };
         let node_inputs: Vec<InputFact> = inputs(deps.clone(), &function_deps, &sources);
         for input in &node_inputs {
@@ -346,7 +340,10 @@ pub(crate) fn build_facts(
             }
             None => Vec::new(),
         };
-        let relation: Option<RelationKey> = relation(&destination)?;
+        let destination: Bound<'_, PyAny> = node.destination()?;
+        let relation: Option<RelationKey> = (!native_field(&destination, "schema")?.is_none())
+            .then(|| relation(&destination))
+            .transpose()?;
         if let (Compiled::Model(model), Some(locations), Some(function_checks)) =
             (node, &locations, &mut function_checks)
             && (sql_reads_undeclared(

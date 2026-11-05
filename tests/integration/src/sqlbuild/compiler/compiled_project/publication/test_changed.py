@@ -100,7 +100,7 @@ def test_given_a_changed_job_when_inputs_change_between_runs_then_only_their_con
             started: set[tuple[Any, ...]] = set(
                 test_case.execute(
                     warehouse,
-                    f"SELECT event_id, node_name FROM {test_case.consumption_table} "
+                    f"SELECT execution_id, node_name FROM {test_case.consumption_table} "
                     "WHERE phase = 'started'",
                 )
             )
