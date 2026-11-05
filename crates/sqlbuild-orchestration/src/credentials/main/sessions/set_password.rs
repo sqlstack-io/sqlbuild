@@ -36,7 +36,7 @@ pub async fn set_password(
         transaction,
         "SELECT c.credential_id FROM sqb_principals p \
          LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id \
-         WHERE p.principal_id=$1 AND p.kind='person' AND p.disabled_at IS NULL",
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL",
         vec![Parameter::Id(principal_id)],
     )
     .await?;

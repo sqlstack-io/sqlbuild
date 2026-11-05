@@ -223,14 +223,12 @@ CREATE INDEX sqb_concurrency_slots_run ON sqb_concurrency_slots(run_id);
 CREATE TABLE sqb_principals (
     principal_id {uuid} PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    kind TEXT NOT NULL CHECK (kind IN ('person', 'service_account')),
     created_at {time} NOT NULL,
     disabled_at {time}
 );
 CREATE TABLE sqb_access_tokens (
     token_id {uuid} PRIMARY KEY,
     secret_hash TEXT NOT NULL,
-    principal_id {uuid} REFERENCES sqb_principals(principal_id),
     location_id {uuid} REFERENCES sqb_locations(location_id),
     run_id {uuid} REFERENCES sqb_runs(run_id),
     claim_id {uuid},
@@ -239,12 +237,10 @@ CREATE TABLE sqb_access_tokens (
     expires_at {time} NOT NULL,
     revoked_at {time},
     CHECK (
-        (principal_id IS NOT NULL AND location_id IS NULL AND run_id IS NULL AND claim_id IS NULL)
-        OR (principal_id IS NULL AND location_id IS NOT NULL AND run_id IS NULL AND claim_id IS NULL)
-        OR (principal_id IS NULL AND location_id IS NULL AND run_id IS NOT NULL AND claim_id IS NOT NULL)
+        (location_id IS NOT NULL AND run_id IS NULL AND claim_id IS NULL)
+        OR (location_id IS NULL AND run_id IS NOT NULL AND claim_id IS NOT NULL)
     )
 );
-CREATE INDEX sqb_access_tokens_principal ON sqb_access_tokens(principal_id);
 CREATE INDEX sqb_access_tokens_location ON sqb_access_tokens(location_id);
 CREATE INDEX sqb_access_tokens_run ON sqb_access_tokens(run_id);
 CREATE TABLE sqb_security_audit (

@@ -6,7 +6,7 @@ use crate::credentials::main::tokens::authenticate_token::authenticate_token;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::main::tokens::revoke_token::revoke_token;
 use crate::credentials::main::tokens::rotate_token::rotate_token;
-use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
+use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::runs::main::claim_next_run::claim_next_run;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -63,64 +63,27 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
             let mut transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("predecessor");
-            for name in ["legacy_person_token.sql", "token_rotation.sql"] {
-                let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../benchmarks/duckshop/edge_cases/orchestration")
-                    .join(name);
-                let sql = std::fs::read_to_string(path).expect("DuckShop predecessor tokens");
-                for statement in sql.split(';').map(str::trim).filter(|sql| !sql.is_empty()) {
-                    (transaction, _) = query(transaction, statement, vec![])
-                        .await
-                        .expect("synthetic predecessor token");
-                }
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../benchmarks/duckshop/edge_cases/orchestration/token_rotation.sql");
+            let sql = std::fs::read_to_string(path).expect("DuckShop historical token");
+            for statement in sql.split(';').map(str::trim).filter(|sql| !sql.is_empty()) {
+                (transaction, _) = query(transaction, statement, vec![])
+                    .await
+                    .expect("synthetic historical token");
             }
             commit(transaction).await.expect("predecessor committed");
-            let personal_scope = CredentialScope::Principal {
-                principal_id: Uuid::parse_str("00000000-0000-4000-8000-000000000001")
-                    .expect("synthetic person identity"),
-            };
             assert!(
-                issue_token(
+                rotate_token(
                     store,
                     &context,
-                    personal_scope,
-                    Utc::now() + Duration::hours(1)
+                    Uuid::parse_str("00000000-0000-4000-8000-000000000032")
+                        .expect("synthetic token identity")
                 )
                 .await
                 .is_err(),
-                "people cannot mint API tokens"
+                "archived-location credentials cannot be rotated"
             );
-            assert_eq!(
-                stored_hashes(&replica).await.len(),
-                4,
-                "rejected issuance writes nothing"
-            );
-            for id in [
-                "00000000-0000-4000-8000-000000000002",
-                "00000000-0000-4000-8000-000000000012",
-                "00000000-0000-4000-8000-000000000022",
-                "00000000-0000-4000-8000-000000000032",
-            ] {
-                assert!(
-                    rotate_token(
-                        store,
-                        &context,
-                        Uuid::parse_str(id).expect("synthetic token identity")
-                    )
-                    .await
-                    .is_err(),
-                    "person, expired, disabled and archived-location credentials cannot be rotated"
-                );
-            }
-            assert_eq!(stored_hashes(&replica).await.len(), 4);
-            let legacy_bearer = format!("00000000-0000-4000-8000-000000000002.{}", "0".repeat(64));
-            assert!(
-                authenticate_token(&replica, &legacy_bearer)
-                    .await
-                    .expect("predecessor personal credential")
-                    .is_none(),
-                "pre-existing personal tokens are rejected on every replica"
-            );
+            assert_eq!(stored_hashes(&replica).await.len(), 1);
             let fault = TransactionFault {
                 description: "security audit failure",
                 table: "sqb_security_audit",
@@ -141,32 +104,21 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
             };
             install_fault(store, &fault).await;
             assert!(
-                create_principal(
-                    store,
-                    &context,
-                    ("orders-ci", PrincipalKind::ServiceAccount)
-                )
-                .await
-                .is_err()
+                create_principal(store, &context, "orders-ci")
+                    .await
+                    .is_err()
             );
             assert!(create_location(store, "orders", &context).await.is_err());
             assert_eq!(location_state(&replica).await, (1, 0));
             remove_fault(store, &fault).await;
-            let principal_id = create_principal(
-                store,
-                &context,
-                ("orders-ci", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("principal creation and audit rolled back together");
+            create_principal(store, &context, "orders-ci")
+                .await
+                .expect("principal creation and audit rolled back together");
             let location_id = create_location(store, "orders", &context)
                 .await
                 .expect("location");
             assert_eq!(location_state(&replica).await, (2, 1));
-            let scopes = [
-                CredentialScope::Principal { principal_id },
-                CredentialScope::Location { location_id },
-            ];
+            let scopes = [CredentialScope::Location { location_id }];
             let expiry = Utc::now() + Duration::hours(1);
             for scope in scopes {
                 let issued = issue_token(store, &context, scope, expiry)
@@ -335,9 +287,6 @@ fn given_scoped_tokens_when_revoked_or_the_run_ends_then_all_replicas_reject_the
                 );
             }
             for scope in [
-                CredentialScope::Principal {
-                    principal_id: Uuid::now_v7(),
-                },
                 CredentialScope::Location {
                     location_id: Uuid::now_v7(),
                 },

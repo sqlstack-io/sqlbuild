@@ -10,26 +10,10 @@ use crate::credentials::constants::DEFAULT_AUDIT_RETENTION_DAYS;
 use crate::store::errors::ControlError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PrincipalKind {
-    Person,
-    ServiceAccount,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CredentialScope {
-    /// API tokens belong to service accounts, never person sessions.
-    Principal {
-        principal_id: Uuid,
-    },
-    Location {
-        location_id: Uuid,
-    },
-    Run {
-        run_id: Uuid,
-        claim_id: Uuid,
-    },
+    Location { location_id: Uuid },
+    Run { run_id: Uuid, claim_id: Uuid },
 }
 
 /// Server-derived request metadata, never copied from an action's JSON body.
@@ -107,22 +91,14 @@ pub enum Action {
     TriggerToggle,
     #[serde(rename = "sensor.reset_cursor")]
     SensorResetCursor,
-    #[serde(rename = "warehouse.sync")]
-    WarehouseSync,
     #[serde(rename = "run.adhoc")]
     RunAdhoc,
     #[serde(rename = "connection.test")]
     ConnectionTest,
-    #[serde(rename = "plan.preview")]
-    PlanPreview,
-    #[serde(rename = "location.manage")]
-    LocationManage,
     #[serde(rename = "user.manage")]
     UserManage,
     #[serde(rename = "role.assign")]
     RoleAssign,
-    #[serde(rename = "token.manage")]
-    TokenManage,
     #[serde(rename = "audit.view")]
     AuditView,
 }

@@ -13,8 +13,7 @@ use crate::credentials::main::{
     sessions::verify_password::verify_password, tokens::authenticate_token::authenticate_token,
 };
 use crate::credentials::models::{
-    AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, PrincipalKind,
-    SessionAccess,
+    AuditContext, AuthenticationAttempt, PasswordAuthority, PasswordLogin, SessionAccess,
 };
 use crate::credentials::tests::test_sessions::test_types::SessionTestCase;
 use crate::store::main::{
@@ -69,10 +68,9 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
                 request_id: Uuid::now_v7(),
                 ip_address: Some("127.0.0.1".parse().expect("peer")),
             };
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
             set_password(
                 store,
                 &context,
@@ -179,10 +177,9 @@ fn given_password_sessions_when_replicas_race_or_auditing_fails_then_throttles_a
             let stored = serde_json::to_string(&rows).expect("stored secret hashes");
             assert!(!stored.contains(&session.bearer));
             assert!(!stored.contains(&session.csrf));
-            let customer =
-                create_principal(store, context, ("customers-reader", PrincipalKind::Person))
-                    .await
-                    .expect("second person");
+            let customer = create_principal(store, context, "customers-reader")
+                .await
+                .expect("second person");
             set_password(
                 store,
                 context,

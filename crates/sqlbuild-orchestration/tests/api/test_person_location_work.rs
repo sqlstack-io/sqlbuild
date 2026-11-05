@@ -12,7 +12,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
-    PrincipalKind, RoleAssignmentRequest,
+    RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::{
@@ -56,10 +56,9 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("bootstrap");
-            let person =
-                create_principal(store, &context, ("orders-developer", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-developer")
+                .await
+                .expect("person");
             let mut sessions = Vec::new();
             for (id, name) in [(admin, "orders-admin"), (person, "orders-developer")] {
                 set_password(

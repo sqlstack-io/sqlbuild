@@ -19,7 +19,7 @@ pub(crate) async fn administrator_count(
     let (transaction, rows) = query(transaction,
         "SELECT COUNT(*) AS administrators FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
          WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL AND a.revoked_at IS NULL \
-         AND p.kind='person' AND p.disabled_at IS NULL", vec![]).await?;
+         AND p.disabled_at IS NULL", vec![]).await?;
     let count = rows
         .first()
         .and_then(|row| row["administrators"].as_i64())

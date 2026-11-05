@@ -10,7 +10,7 @@ use crate::api::models::{ApiAuthentication, AuthenticationDenial, TrustedProxyAu
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ProxyApiTestCase;
 use crate::credentials::main::identities::create_principal::create_principal;
-use crate::credentials::models::{AuditContext, PrincipalKind};
+use crate::credentials::models::AuditContext;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -56,23 +56,14 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person =
-                create_principal(store, &context, (value("person"), PrincipalKind::Person))
-                    .await
-                    .expect("known person");
-            let service = create_principal(
-                store,
-                &context,
-                ("orders-service", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("service account");
+            let person = create_principal(store, &context, value("person"))
+                .await
+                .expect("known person");
             let settings = TrustedProxyAuthentication {
                 origin: value("origin").into(),
                 trusted_peers: BTreeSet::from([test_case.trusted_peer.parse().expect("proxy IP")]),
                 identities: BTreeMap::from([
                     (value("subject").into(), person),
-                    (value("service_subject").into(), service),
                     (value("absent_subject").into(), Uuid::now_v7()),
                 ]),
             };
@@ -214,7 +205,6 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 "",
                 value("unknown_subject"),
                 value("person"),
-                value("service_subject"),
                 value("absent_subject"),
             ] {
                 let response = request(&api.url)
@@ -339,7 +329,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
             let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning or personal tokens");
             assert_eq!(
                 json!(rows[0]),
-                json!({"principals": 2, "sessions": test_case.expected_authentications, "tokens": 0})
+                json!({"principals": 1, "sessions": test_case.expected_authentications, "tokens": 0})
             );
             commit(transaction).await.expect("inspection complete");
             stop_api(untrusted).await;

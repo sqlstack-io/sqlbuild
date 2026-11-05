@@ -2,7 +2,6 @@
   "origin": "https://control.example.com",
   "person": "orders-reader",
   "subject": "external-orders-reader",
-  "service_subject": "external-orders-service",
   "absent_subject": "external-absent-reader",
   "unknown_subject": "external-unbound-reader",
   "untrusted_peer": "192.0.2.24",

@@ -4,10 +4,9 @@ use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::main::tokens::revoke_token::revoke_token;
-use crate::credentials::models::{AuditContext, CredentialScope, PrincipalKind};
+use crate::credentials::models::{AuditContext, CredentialScope};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
@@ -141,21 +140,6 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             )
             .await
             .expect("location token");
-            let principal_id = create_principal(
-                store,
-                &audit,
-                ("orders automation", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("unprivileged service account");
-            let principal = issue_token(
-                store,
-                &audit,
-                CredentialScope::Principal { principal_id },
-                expiry,
-            )
-            .await
-            .expect("principal token");
             let claim = claim_next_run(
                 store,
                 &lease,
@@ -374,18 +358,16 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
                         .status(),
                     StatusCode::UNAUTHORIZED
                 );
-                for bearer in [&principal.bearer, &worker.bearer] {
-                    assert_eq!(
-                        client
-                            .get(path)
-                            .bearer_auth(bearer)
-                            .send()
-                            .await
-                            .expect("wrong credential scope")
-                            .status(),
-                        StatusCode::FORBIDDEN
-                    );
-                }
+                assert_eq!(
+                    client
+                        .get(path)
+                        .bearer_auth(&worker.bearer)
+                        .send()
+                        .await
+                        .expect("wrong credential scope")
+                        .status(),
+                    StatusCode::FORBIDDEN
+                );
                 assert_eq!(
                     client
                         .get(path.replace(&location_id.to_string(), &other.to_string()))

@@ -13,7 +13,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AdministratorChange, AuditContext, PasswordAuthority,
-    PasswordLogin, PrincipalKind,
+    PasswordLogin,
 };
 use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorTestCase;
@@ -81,10 +81,9 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     .find_map(|(index, result)| result.ok().map(|id| (index, id)))
                     .expect("one bootstrap winner");
                 let other = 1 - winner;
-                let second =
-                    create_principal(store, &context, (names[other], PrincipalKind::Person))
-                        .await
-                        .expect("ordinary role-free person");
+                let second = create_principal(store, &context, names[other])
+                    .await
+                    .expect("ordinary role-free person");
                 let password = inputs["password"].as_str().expect("password input");
                 let mut sessions = Vec::new();
                 for (id, name) in [(first, names[winner]), (second, names[other])] {
@@ -331,10 +330,9 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 let first = bootstrap_user(store, &context, "orders-admin")
                     .await
                     .expect("retry after rollback");
-                let second =
-                    create_principal(store, &context, ("customers-admin", PrincipalKind::Person))
-                        .await
-                        .expect("second person");
+                let second = create_principal(store, &context, "customers-admin")
+                    .await
+                    .expect("second person");
                 set_password(
                     store,
                     &context,

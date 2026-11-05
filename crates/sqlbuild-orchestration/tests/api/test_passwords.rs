@@ -11,7 +11,7 @@ use crate::api::tests::test_types::PasswordApiTestCase;
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::set_password::set_password,
 };
-use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority, PrincipalKind};
+use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -70,7 +70,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person = create_principal(store, &context, (username, PrincipalKind::Person))
+            let person = create_principal(store, &context, username)
                 .await
                 .expect("person");
             set_password(

@@ -77,8 +77,12 @@ pub(crate) async fn assign_role_in(
     } else {
         transaction
     };
-    let (transaction, people) = query(transaction, "SELECT principal_id,disabled_at FROM sqb_principals WHERE principal_id=$1 AND kind='person'",
-        vec![Parameter::Id(request.principal_id)]).await?;
+    let (transaction, people) = query(
+        transaction,
+        "SELECT principal_id,disabled_at FROM sqb_principals WHERE principal_id=$1",
+        vec![Parameter::Id(request.principal_id)],
+    )
+    .await?;
     if people
         .first()
         .is_none_or(|person| !request.revoke && !person["disabled_at"].is_null())

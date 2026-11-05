@@ -7,7 +7,7 @@ use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::set_password::set_password,
     sessions::verify_password::verify_password,
 };
-use crate::credentials::models::{AuditContext, PasswordAuthority, PrincipalKind};
+use crate::credentials::models::{AuditContext, PasswordAuthority};
 use crate::credentials::tests::helpers::security_event_count;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
@@ -61,18 +61,10 @@ fn given_person_passwords_when_changed_then_replicas_verify_exact_bytes_and_audi
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
-            let service = create_principal(
-                store,
-                &context,
-                ("orders-service", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("service account");
-            for id in [person, service, Uuid::now_v7()] {
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
+            for id in [person, Uuid::now_v7()] {
                 assert!(
                     verify_password(&replica, id, password)
                         .await
@@ -97,16 +89,6 @@ fn given_person_passwords_when_changed_then_replicas_verify_exact_bytes_and_audi
                     &context,
                     PasswordAuthority::Operator(person),
                     &"x".repeat(1025)
-                )
-                .await
-                .is_err()
-            );
-            assert!(
-                set_password(
-                    store,
-                    &context,
-                    PasswordAuthority::Operator(service),
-                    password
                 )
                 .await
                 .is_err()

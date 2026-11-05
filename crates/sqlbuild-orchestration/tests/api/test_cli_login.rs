@@ -13,7 +13,7 @@ use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,
     sessions::revoke_session::revoke_session, sessions::set_password::set_password,
 };
-use crate::credentials::models::{AuditContext, PasswordAuthority, PasswordLogin, PrincipalKind};
+use crate::credentials::models::{AuditContext, PasswordAuthority, PasswordLogin};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -63,10 +63,9 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 request_id: Uuid::now_v7(),
                 ip_address: Some("127.0.0.1".parse().expect("peer")),
             };
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
             set_password(
                 store,
                 &context,

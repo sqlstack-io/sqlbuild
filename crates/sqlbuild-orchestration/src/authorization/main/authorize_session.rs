@@ -14,8 +14,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 
 fn role_allows(role: BuiltinRole, action: Action) -> bool {
     use Action::{
-        ConnectionTest, JobRun, PlanPreview, RunAdhoc, RunCancel, RunRerun, TriggerToggle, View,
-        ViewSql,
+        ConnectionTest, JobRun, RunAdhoc, RunCancel, RunRerun, TriggerToggle, View, ViewSql,
     };
     match role {
         BuiltinRole::Admin => true,
@@ -32,7 +31,6 @@ fn role_allows(role: BuiltinRole, action: Action) -> bool {
                 | ViewSql
                 | RunAdhoc
                 | ConnectionTest
-                | PlanPreview
         ),
     }
 }

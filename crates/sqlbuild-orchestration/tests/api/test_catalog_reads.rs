@@ -13,7 +13,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     AdministratorAuthentication, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority,
-    PasswordLogin, PrincipalKind, RoleAssignmentRequest,
+    PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::report_location_health::report_location_health;
@@ -58,10 +58,9 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("bootstrap");
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
             let mut sessions = Vec::new();
             for (id, name) in [(admin, "orders-admin"), (person, "orders-reader")] {
                 set_password(

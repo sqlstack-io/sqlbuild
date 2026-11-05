@@ -16,8 +16,7 @@ use crate::credentials::main::{
 };
 use crate::credentials::models::{
     Action, AdministratorAuthentication, AuditContext, BuiltinRole, DefaultRole, IssuedSession,
-    PasswordAuthority, PasswordLogin, PermissionScope, PrincipalKind, RoleAssignmentRequest,
-    RoleKey,
+    PasswordAuthority, PasswordLogin, PermissionScope, RoleAssignmentRequest, RoleKey,
 };
 use crate::credentials::models::{
     RoleActivation, RoleActivationRequest, RoleApproval, RoleDecision,
@@ -107,7 +106,7 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     let mut sessions = vec![signed_in(store, &context, (first, "orders-admin")).await];
     for index in 1..administrators {
         let name = format!("fulfillment-admin-{index}");
-        let principal = create_principal(store, &context, (&name, PrincipalKind::Person))
+        let principal = create_principal(store, &context, &name)
             .await
             .expect("administrator");
         let session = signed_in(store, &context, (principal, &name)).await;
@@ -125,7 +124,7 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
         .await;
         sessions.push(session);
     }
-    let member = create_principal(store, &context, ("support-person", PrincipalKind::Person))
+    let member = create_principal(store, &context, "support-person")
         .await
         .expect("member");
     let member_session = signed_in(store, &context, (member, "support-person")).await;
