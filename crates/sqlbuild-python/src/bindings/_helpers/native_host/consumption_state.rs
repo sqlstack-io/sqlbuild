@@ -63,10 +63,11 @@ fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
 }
 
-/// The adapter's qualified name of the consumption table in `(database, schema)`.
-fn qualified_name(
+/// The adapter's qualified name of a state table in `(database, schema)`, if it has one.
+pub(crate) fn state_table_name(
     render_qualified_name: &Bound<'_, PyAny>,
     (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    table: &str,
 ) -> PyResult<Option<String>> {
     let py: Python<'_> = render_qualified_name.py();
     let name: Bound<'_, PyAny> = call_with(
@@ -74,7 +75,7 @@ fn qualified_name(
         &[
             ("database", database.clone()),
             ("schema", schema.clone()),
-            ("name", text(py, CONSUMPTION_TABLE_NAME)),
+            ("name", text(py, table)),
         ],
     )?;
     if name.is_none() {
@@ -89,9 +90,10 @@ fn table_of(adapter: &Bound<'_, PyAny>, location: &Location) -> PyResult<Option<
         .database
         .as_deref()
         .map_or_else(|| py.None().into_bound(py), |database| text(py, database));
-    qualified_name(
+    state_table_name(
         &native_field(adapter, "render_qualified_name")?,
         (&database, &text(py, &location.schema)),
+        CONSUMPTION_TABLE_NAME,
     )
 }
 
@@ -105,7 +107,12 @@ fn build_consumption_create_table_sql(
     render_framework_type: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
     let py: Python<'_> = database.py();
-    let Some(table) = qualified_name(render_qualified_name, (database, schema))? else {
+    let Some(table) = state_table_name(
+        render_qualified_name,
+        (database, schema),
+        CONSUMPTION_TABLE_NAME,
+    )?
+    else {
         return Ok(String::new());
     };
     let columns: Bound<'_, PyAny> = PyTuple::new(
@@ -142,9 +149,13 @@ fn build_consumption_prune_sql(
     render_qualified_name: &Bound<'_, PyAny>,
     retain_versions: i64,
 ) -> PyResult<String> {
-    Ok(qualified_name(render_qualified_name, (database, schema))?
-        .map(|table| prune_executions_sql(&table, retain_versions))
-        .unwrap_or_default())
+    Ok(state_table_name(
+        render_qualified_name,
+        (database, schema),
+        CONSUMPTION_TABLE_NAME,
+    )?
+    .map(|table| prune_executions_sql(&table, retain_versions))
+    .unwrap_or_default())
 }
 
 fn execute<'py>(
@@ -336,7 +347,7 @@ fn row_cells(py: Python<'_>, row: &ConsumptionAppend, recorded_at: &str) -> PyRe
     ])
 }
 
-/// Append `rows` to `location`'s table in statements of whole executions where they fit.
+/// Append `rows` to `location`'s table, in statements no longer than every warehouse accepts.
 fn append(
     adapter: &Bound<'_, PyAny>,
     connection: &Bound<'_, PyAny>,
@@ -353,7 +364,7 @@ fn append(
         .iter()
         .map(|(column, _)| *column)
         .collect();
-    for chunk in execution_chunks(rows) {
+    for chunk in rows.chunks(ROWS_PER_STATEMENT) {
         let cells: Vec<Vec<String>> = chunk
             .iter()
             .map(|row| row_cells(py, row, &recorded_at))
@@ -365,32 +376,6 @@ fn append(
         )?;
     }
     Ok(())
-}
-
-/// Contiguous rows in statements of whole executions, splitting only an execution that alone overflows.
-fn execution_chunks(rows: &[ConsumptionAppend]) -> Vec<&[ConsumptionAppend]> {
-    let mut chunks: Vec<&[ConsumptionAppend]> = Vec::new();
-    let (mut start, mut index): (usize, usize) = (0, 0);
-    while index < rows.len() {
-        let end: usize = index
-            + rows[index..]
-                .iter()
-                .take_while(|row| row.execution_id == rows[index].execution_id)
-                .count();
-        if end - start > ROWS_PER_STATEMENT && index > start {
-            chunks.push(&rows[start..index]);
-            start = index;
-        }
-        while end - start > ROWS_PER_STATEMENT {
-            chunks.push(&rows[start..start + ROWS_PER_STATEMENT]);
-            start += ROWS_PER_STATEMENT;
-        }
-        index = end;
-    }
-    if start < rows.len() {
-        chunks.push(&rows[start..]);
-    }
-    chunks
 }
 
 /// One build's consumption I/O, connected only per phase so loaders can lock file warehouses.

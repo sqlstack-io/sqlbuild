@@ -197,7 +197,7 @@ fn key_rows(keys: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
         .collect()
 }
 
-/// Why the planner runs a selected entry regardless of its records.
+/// Why the planner runs a selected model or seed regardless of its records.
 fn entry_forced(entry: &Bound<'_, PyAny>, full_refresh: bool) -> PyResult<Vec<ForcedRun>> {
     let mut forced: Vec<ForcedRun> = Vec::new();
     if full_refresh {
@@ -271,12 +271,7 @@ pub(crate) fn build_facts(
             if enum_text(&native_field(&entry, "action")?)? != SKIP_ACTION {
                 runnable.insert(key.clone());
             }
-            let forced: Vec<ForcedRun> = if kind == MODEL {
-                entry_forced(&entry, full_refresh)?
-            } else {
-                seed_forced(&entry, full_refresh)?
-            };
-            selected.insert(key, forced);
+            selected.insert(key, entry_forced(&entry, full_refresh)?);
         }
     }
     let sources: HashMap<String, Option<String>> = source_versions(plan)?;
@@ -377,17 +372,4 @@ pub(crate) fn build_facts(
     }
     runnable.retain(|key| nodes.iter().any(|node| node.key == *key));
     Ok(BuildFacts { nodes, runnable })
-}
-
-fn seed_forced(entry: &Bound<'_, PyAny>, full_refresh: bool) -> PyResult<Vec<ForcedRun>> {
-    let mut forced: Vec<ForcedRun> = Vec::new();
-    if full_refresh {
-        forced.push(ForcedRun::FullRefresh);
-    }
-    match enum_text(&native_field(entry, "reason")?)?.as_str() {
-        FIRST_RUN => forced.push(ForcedRun::RelationMissing),
-        reason if UNCHANGED_REASONS.contains(&reason) => {}
-        reason => forced.push(ForcedRun::PlannerChange(reason.to_owned())),
-    }
-    Ok(forced)
 }

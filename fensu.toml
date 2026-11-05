@@ -1434,6 +1434,10 @@ reason = "Metadata sync keeps its pending page for retry and work polling drops 
 paths = ["crates/sqlbuild-cli/src/workers/_helpers/child.rs"]
 reason = "terminate and kill are the two escalation steps for a worker child; each maps every child kind to its own signal."
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/command_runtime/warehouse_scope.rs", "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/scope.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/output_capture/context.rs", "crates/sqlbuild-python/src/bindings/_helpers/result_output/terminal_index.rs"]
+reason = "Each context object takes its own resource out of its own lock and releases it the way that resource needs; only the take-under-lock shape is shared."
+
 [[targets.python.rule_exceptions]]
 rule = "XSB051"
 path = "src/sqlbuild/executor/scenario/_helpers/lifecycle/cleanup.py"

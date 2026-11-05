@@ -16,6 +16,7 @@ use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
 use crate::bindings::_helpers::freshness::support::{
     INPUT_ERROR, exception_text, freshness_error, optional_str, presumed_utc_datetime, text,
 };
+use crate::bindings::_helpers::native_host::consumption_state::state_table_name;
 use crate::bindings::_helpers::native_host::state_column_evolution::ensure_event_id_column;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -28,25 +29,17 @@ const MISSING_SCHEMA_MESSAGE: &str = "source freshness table requires a target s
 /// The qualified state table name the adapter renders for one target schema.
 pub(crate) fn qualified_table_name(
     render_qualified_name: &Bound<'_, PyAny>,
-    (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    location: (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
 ) -> PyResult<String> {
-    let py: Python<'_> = render_qualified_name.py();
-    let name: Bound<'_, PyAny> = call_with(
-        render_qualified_name,
-        &[
-            ("database", database.clone()),
-            ("schema", schema.clone()),
-            ("name", text(py, SOURCE_FRESHNESS_TABLE_NAME)),
-        ],
-    )?;
-    if name.is_none() {
-        return Err(freshness_error(
-            py,
-            (INPUT_ERROR, MISSING_SCHEMA_MESSAGE),
-            None,
-        ));
-    }
-    name.extract()
+    state_table_name(render_qualified_name, location, SOURCE_FRESHNESS_TABLE_NAME)?.ok_or_else(
+        || {
+            freshness_error(
+                render_qualified_name.py(),
+                (INPUT_ERROR, MISSING_SCHEMA_MESSAGE),
+                None,
+            )
+        },
+    )
 }
 
 /// SQL selecting the latest source freshness row per identity.
