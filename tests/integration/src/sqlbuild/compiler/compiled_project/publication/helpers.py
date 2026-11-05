@@ -356,10 +356,10 @@ def warehouse_history_pages(
     return pages
 
 
-def sync_warehouse_history(api: SnapshotApi, table: str, batch: dict[str, Any]) -> dict[str, Any]:
-    """Use the public location transport and return its bounded reconciliation continuation."""
+def sync_warehouse_history(api: SnapshotApi, batch: dict[str, Any]) -> dict[str, Any]:
+    """Deliver one metadata page through the public location transport."""
     request: Request = Request(
-        f"{api.url}/api/locations/{api.location_id}/targets/development/metadata/{table}",
+        f"{api.url}/api/locations/{api.location_id}/targets/development/metadata",
         data=json.dumps(batch).encode(),
         headers={"Authorization": f"Bearer {api.bearer}", "Content-Type": "application/json"},
     )

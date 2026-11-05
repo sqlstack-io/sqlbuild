@@ -14,7 +14,7 @@ use crate::warehouse_metadata::_helpers::ingestion::scoped_event_id;
 use crate::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use crate::warehouse_metadata::models::{
     StatisticsObservation, StatisticsPage, StatisticsQuery, StatisticsRetention,
-    WarehouseCatalogRecord, WarehouseReconciliationCursor,
+    WarehouseCatalogRecord, WarehouseMirrorCursor,
 };
 
 pub(crate) fn statistics_event_id(
@@ -140,7 +140,7 @@ pub(crate) async fn read_statistics_page(
     let next_after =
         more.then(|| records.last())
             .flatten()
-            .map(|observation| WarehouseReconciliationCursor {
+            .map(|observation| WarehouseMirrorCursor {
                 observed_at: observation.record.observed_at,
                 event_id: observation.event_id,
             });

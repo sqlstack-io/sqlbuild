@@ -10,9 +10,7 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, CatalogBatch, FingerprintBatch, JanitorEventsBatch, MicrobatchesBatch,
-    MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, StatisticsBatch, StatisticsDueRead,
-    StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
 };
 
 impl LocationWorkClient {
@@ -21,24 +19,8 @@ impl LocationWorkClient {
         target: &str,
         request: &StatisticsDueRead,
     ) -> Result<StatisticsRead, ClientError> {
-        self.sync_metadata((target, "statistics-due"), request)
+        self.post_metadata((target, Some("statistics-due")), request)
             .await
-    }
-
-    pub async fn sync_statistics(
-        &self,
-        target: &str,
-        batch: &StatisticsBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "statistics"), batch).await
-    }
-
-    pub async fn sync_catalog(
-        &self,
-        target: &str,
-        batch: &CatalogBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "catalog"), batch).await
     }
 
     pub async fn report_health(&self, report: &LocationHealthReport) -> Result<bool, ClientError> {
@@ -58,82 +40,36 @@ impl LocationWorkClient {
         target: &str,
         request: &WarehouseWatermarkRead,
     ) -> Result<Option<chrono::DateTime<chrono::Utc>>, ClientError> {
-        self.sync_metadata((target, "watermark"), request).await
-    }
-
-    pub async fn sync_fingerprints(
-        &self,
-        target: &str,
-        batch: &FingerprintBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "fingerprints"), batch).await
-    }
-
-    pub async fn sync_audit_results(
-        &self,
-        target: &str,
-        batch: &AuditResultsBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "audit-results"), batch).await
-    }
-
-    pub async fn sync_janitor_events(
-        &self,
-        target: &str,
-        batch: &JanitorEventsBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "janitor-events"), batch).await
-    }
-
-    pub async fn sync_migrations(
-        &self,
-        target: &str,
-        batch: &MigrationsBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "migrations"), batch).await
-    }
-
-    pub async fn sync_old_name_views(
-        &self,
-        target: &str,
-        batch: &OldNameViewsBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "old-name-views"), batch).await
-    }
-
-    pub async fn sync_microbatches(
-        &self,
-        target: &str,
-        batch: &MicrobatchesBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "microbatches"), batch).await
-    }
-
-    /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
-    pub async fn sync_source_freshness(
-        &self,
-        target: &str,
-        batch: &SourceFreshnessBatch,
-    ) -> Result<WarehouseSyncResponse, ClientError> {
-        self.sync_metadata((target, "source-freshness"), batch)
+        self.post_metadata((target, Some("watermark")), request)
             .await
     }
 
-    async fn sync_metadata<T: serde::de::DeserializeOwned>(
+    /// Metadata shares the location's scoped pool, not the scheduler's execution authority.
+    pub async fn sync_metadata(
         &self,
-        (target, table): (&str, &str),
-        batch: &impl serde::Serialize,
+        target: &str,
+        batch: &MetadataBatch,
+    ) -> Result<WarehouseSyncResponse, ClientError> {
+        self.post_metadata((target, None), batch).await
+    }
+
+    async fn post_metadata<T: serde::de::DeserializeOwned>(
+        &self,
+        (target, read): (&str, Option<&str>),
+        body: &impl serde::Serialize,
     ) -> Result<T, ClientError> {
-        let endpoint = self.connection.endpoint(&[
+        let location_id = self.location_id.to_string();
+        let mut segments = vec![
             "api",
             "locations",
-            &self.location_id.to_string(),
+            &location_id,
             "targets",
             target,
             "metadata",
-            table,
-        ])?;
-        client_response(self.connection.client.post(endpoint).json(batch)).await
+        ];
+        segments.extend(read);
+        let endpoint = self.connection.endpoint(&segments)?;
+        client_response(self.connection.client.post(endpoint).json(body)).await
     }
 
     pub async fn poll(

@@ -11,7 +11,7 @@ use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::{
     ingest_fingerprints::ingest_fingerprints, read_person_fingerprint::read_person_fingerprint,
 };
-use crate::warehouse_metadata::models::{FingerprintBatch, FingerprintQuery};
+use crate::warehouse_metadata::models::{FingerprintQuery, MetadataBatch};
 
 pub(crate) async fn fingerprint_reads(
     store: &ControlStore,
@@ -54,7 +54,7 @@ pub(crate) async fn fingerprint_reads(
         record[key] = value;
         records.push(record);
     }
-    let batch: FingerprintBatch = serde_json::from_value(json!({
+    let batch: MetadataBatch = serde_json::from_value(json!({"kind":"fingerprints",
         "session_id":session_id,"generation":1,"records":records,
     }))
     .expect("batch");

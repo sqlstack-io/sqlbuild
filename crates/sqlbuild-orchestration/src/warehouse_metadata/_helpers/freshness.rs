@@ -8,14 +8,16 @@ use crate::store::errors::ControlError;
 use crate::store::main::append_control_event::append_control_event;
 use crate::store::main::query::query;
 use crate::store::models::{ControlEvent, ControlTransaction, Parameter};
-use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
+use crate::warehouse_metadata::_helpers::ingestion::{outside_scan, validate_fields};
 use crate::warehouse_metadata::models::{
-    SourceFreshnessBatch, SourceFreshnessObservation, WarehouseFreshnessRecord,
+    MetadataBatch, SourceFreshnessObservation, WarehouseFreshnessRecord,
 };
 
-pub(crate) fn validate_batch(batch: &SourceFreshnessBatch) -> Result<(), ControlError> {
-    let invalid_identity = batch
-        .records
+pub(crate) fn validate_batch(
+    batch: &MetadataBatch,
+    records: &[WarehouseFreshnessRecord],
+) -> Result<(), ControlError> {
+    let invalid_identity = records
         .iter()
         .flat_map(|record| {
             [
@@ -28,24 +30,19 @@ pub(crate) fn validate_batch(batch: &SourceFreshnessBatch) -> Result<(), Control
             ]
         })
         .any(|value| value.trim().is_empty());
-    let invalid_source_id = batch
-        .records
+    let invalid_source_id = records
         .iter()
         .filter_map(|record| record.event_id.as_deref())
         .any(|value| value.trim().is_empty());
-    let invalid_scope = batch.reconciliation.as_ref().is_some_and(|page| {
-        batch.records.iter().any(|record| {
-            record.state_database != page.state_database
-                || record.state_schema != page.state_schema
-                || page
-                    .day
-                    .is_some_and(|day| record.observed_at.date_naive() != day)
-        })
-    });
     validate_fields(
-        ("source freshness", batch.generation, batch.records.len()),
+        batch,
         invalid_identity || invalid_source_id,
-        invalid_scope,
+        outside_scan(
+            batch,
+            records
+                .iter()
+                .map(|record| (&record.state_database, &record.state_schema)),
+        ),
     )
 }
 

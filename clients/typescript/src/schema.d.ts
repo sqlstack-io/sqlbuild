@@ -467,7 +467,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/locations/{location_id}/targets/{target}/metadata/audit-results": {
+    "/api/locations/{location_id}/targets/{target}/metadata": {
         parameters: {
             query?: never;
             header?: never;
@@ -476,135 +476,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["report_audit_results"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/catalog": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_catalog"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/fingerprints": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_fingerprints"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/janitor-events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_janitor_events"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/microbatches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_microbatches"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/migrations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_migrations"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/old-name-views": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_old_name_views"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/source-freshness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_source_freshness"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/locations/{location_id}/targets/{target}/metadata/statistics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["report_statistics"];
+        post: operations["report_metadata"];
         delete?: never;
         options?: never;
         head?: never;
@@ -916,14 +788,6 @@ export interface components {
             decision_id?: string | null;
             error: string;
         };
-        AuditResultsBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseAuditRecord"][];
-            /** Format: uuid */
-            session_id: string;
-        };
         AuthenticationDenial: {
             /** Format: uuid */
             decision_id: string;
@@ -939,14 +803,6 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         };
-        CatalogBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation: components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseCatalogRecord"][];
-            /** Format: uuid */
-            session_id: string;
-        };
         CatalogObservation: {
             /** Format: uuid */
             event_id: string;
@@ -955,7 +811,7 @@ export interface components {
             record: components["schemas"]["WarehouseCatalogRecord"];
         };
         CatalogPage: {
-            next_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+            next_after?: null | components["schemas"]["WarehouseMirrorCursor"];
             records: components["schemas"]["CatalogObservation"][];
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
@@ -1045,15 +901,6 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
-        /** @description Fingerprint observations from one registered reader, independent of automatic polling. */
-        FingerprintBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseFingerprintRecord"][];
-            /** Format: uuid */
-            session_id: string;
-        };
         /** @description Build evidence only: no SQL, arbitrary metadata, or inference about live relation existence. */
         FingerprintObservation: {
             definition_hash: string;
@@ -1080,14 +927,6 @@ export interface components {
             /** @description Tables whose insert failed, so their rows were not written, and the first failure. */
             failed: components["schemas"]["Table"][];
             failure?: string | null;
-        };
-        JanitorEventsBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseJanitorRecord"][];
-            /** Format: uuid */
-            session_id: string;
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
@@ -1211,21 +1050,22 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
-        MicrobatchesBatch: {
+        /** @description One bounded page of one state table from the registered reader of a published generation. */
+        MetadataBatch: {
             /** Format: int64 */
             generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseMicrobatchRecord"][];
+            kind: components["schemas"]["WarehouseHistoryKind"];
+            records: Record<string, never>[];
+            scan?: null | components["schemas"]["MetadataScan"];
             /** Format: uuid */
             session_id: string;
         };
-        MigrationsBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseMigrationRecord"][];
+        /** @description A full scan's complete page removes the namespace's rows that the scan did not deliver. */
+        MetadataScan: {
+            complete: boolean;
+            location: components["schemas"]["WarehouseStateLocation"];
             /** Format: uuid */
-            session_id: string;
+            scan_id: string;
         };
         MutationResponse: {
             applied: boolean;
@@ -1250,14 +1090,6 @@ export interface components {
             /** Format: uuid */
             snapshot_id: string;
             source_data: components["schemas"]["SourceDataStatus"];
-        };
-        OldNameViewsBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseOldNameRecord"][];
-            /** Format: uuid */
-            session_id: string;
         };
         /** @description Output of one stream that was not recorded because it exceeded `max_output_bytes`. */
         OmittedOutput: {
@@ -1722,26 +1554,10 @@ export interface components {
             /** @enum {string} */
             status: "unknown";
         };
-        /** @description A bounded page from one registered reader of a published location/target generation. */
-        SourceFreshnessBatch: {
-            /** Format: int64 */
-            generation: number;
-            reconciliation?: null | components["schemas"]["WarehouseReconciliationPage"];
-            records: components["schemas"]["WarehouseFreshnessRecord"][];
-            /** Format: uuid */
-            session_id: string;
-        };
         StartedLogin: {
             browser_code: string;
             /** Format: date-time */
             expires_at: string;
-        };
-        StatisticsBatch: {
-            /** Format: int64 */
-            generation: number;
-            records: components["schemas"]["WarehouseStatisticsRecord"][];
-            /** Format: uuid */
-            session_id: string;
         };
         /** @description Eligibility comes from each relation's committed hour, never a namespace watermark. */
         StatisticsDueRead: {
@@ -1760,7 +1576,7 @@ export interface components {
             record: components["schemas"]["WarehouseStatisticsRecord"];
         };
         StatisticsPage: {
-            next_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
+            next_after?: null | components["schemas"]["WarehouseMirrorCursor"];
             records: components["schemas"]["StatisticsObservation"][];
         };
         /** @description One bounded catalog page; sampled and unsampled relations both advance its cursor. */
@@ -1854,57 +1670,6 @@ export interface components {
         };
         /** @enum {string} */
         TriggerStatus: "running" | "paused";
-        /** @description Preserve the warehouse representation, including text-encoded measurements and booleans. */
-        WarehouseAuditRecord: {
-            attached_column_name?: string | null;
-            attached_target_kind?: string | null;
-            attached_target_name?: string | null;
-            attachment_kind: string;
-            audit_definition_name: string;
-            audit_description?: string | null;
-            audit_meta_json?: string | null;
-            audit_name: string;
-            binding_key: string;
-            definition_fingerprint: string;
-            evaluation_mode: string;
-            /** Format: int64 */
-            evidence_count?: number | null;
-            evidence_error?: string | null;
-            evidence_json?: string | null;
-            evidence_sql?: string | null;
-            evidence_truncated?: string | null;
-            executed_sql?: string | null;
-            execution_error?: string | null;
-            execution_fingerprint: string;
-            invocation_id: string;
-            measured_value?: string | null;
-            measurement_sql?: string | null;
-            metadata_json?: string | null;
-            /** Format: int64 */
-            minimum_samples?: number | null;
-            /** Format: date-time */
-            occurred_at: string;
-            outcome: string;
-            result_id: string;
-            reused: string;
-            run_id: string;
-            run_scope_phase: string;
-            /** Format: int64 */
-            sample_count?: number | null;
-            sample_unit?: string | null;
-            /** Format: int64 */
-            schema_version: number;
-            severity: string;
-            sql_digest?: string | null;
-            state_database?: string | null;
-            state_schema: string;
-            target_database?: string | null;
-            target_name?: string | null;
-            target_schema?: string | null;
-            thresholds_json?: string | null;
-            /** Format: int64 */
-            violation_count?: number | null;
-        };
         WarehouseCatalogColumn: {
             data_type: string;
             name: string;
@@ -1917,184 +1682,16 @@ export interface components {
             state_database?: string | null;
             state_schema: string;
         };
-        /** @description Fingerprints remain history here; latest-row selection belongs to the existing planner reader. */
-        WarehouseFingerprintRecord: {
-            definition: string;
-            definition_hash: string;
-            event_id?: string | null;
-            metadata_json: string;
-            node_name: string;
-            node_type: string;
-            run_id: string;
-            schema_fingerprint: string;
-            state_database?: string | null;
-            state_schema: string;
-            target_database?: string | null;
-            target_name?: string | null;
-            target_schema?: string | null;
-            /** Format: date-time */
-            ts: string;
-            version_hash: string;
-        };
-        /** @description Preserve observations, not an inferred latest version, age status or run outcome. */
-        WarehouseFreshnessRecord: {
-            data_version?: string | null;
-            data_version_hash: string;
-            event_id?: string | null;
-            /** Format: date-time */
-            observed_at: string;
-            run_id: string;
-            source_name: string;
-            state_database?: string | null;
-            state_schema: string;
-            strategy: string;
-            target_database?: string | null;
-            target_name?: string | null;
-            target_schema?: string | null;
-            value_kind: string;
-        };
         /**
          * @description Catalog observations require full scans; only immutable history supports a watermark.
          * @enum {string}
          */
         WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog" | "statistics";
-        /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
-        WarehouseJanitorRecord: {
-            archive_name: string;
-            archive_qualified_name: string;
-            /** Format: date-time */
-            archived_at: string;
-            event_id: string;
-            event_type: string;
-            /** Format: date-time */
-            occurred_at: string;
-            original_name?: string | null;
-            original_qualified_name?: string | null;
-            relation_database?: string | null;
-            relation_schema: string;
-            relation_type?: string | null;
-            run_id: string;
-            /** Format: int64 */
-            schema_version: number;
-            state_database?: string | null;
-            state_schema: string;
-        };
-        /** @description Immutable coordination evidence, never authority to execute or mark a batch complete. */
-        WarehouseMicrobatchRecord: {
-            batch_size: string;
-            /** Format: date-time */
-            completed_at?: string | null;
-            completion_type?: string | null;
-            coverage_source?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            cursor_column: string;
-            cursor_grain?: string | null;
-            cursor_type: string;
-            definition_hash?: string | null;
-            event_id: string;
-            execution_run_id: string;
-            /** Format: date-time */
-            execution_run_started_at?: string | null;
-            fingerprint_status: string;
-            model_name: string;
-            model_version_hash?: string | null;
-            /** Format: date-time */
-            observed_at?: string | null;
-            /** Format: int64 */
-            observed_row_count?: number | null;
-            origin_run_id: string;
-            /** Format: date-time */
-            origin_run_started_at?: string | null;
-            partition_end?: string | null;
-            partition_start?: string | null;
-            physical_generation_id: string;
-            previous_model_version_hash?: string | null;
-            record_type: string;
-            replay_policy?: string | null;
-            replay_requirement_id?: string | null;
-            required_model_version_hash?: string | null;
-            /** Format: int64 */
-            rows_affected?: number | null;
-            run_end: string;
-            run_start: string;
-            run_type: string;
-            scope_key: string;
-            scope_kind: string;
-            state_database?: string | null;
-            state_schema: string;
-            synthetic_reason?: string | null;
-            target_database?: string | null;
-            target_name: string;
-            target_schema?: string | null;
-            unaccounted_policy?: string | null;
-        };
-        /** @description Model-move history is evidence, not authority to migrate a warehouse relation. */
-        WarehouseMigrationRecord: {
-            /** Format: date-time */
-            created_at: string;
-            decision: string;
-            destination_database?: string | null;
-            destination_model: string;
-            destination_name: string;
-            destination_schema: string;
-            discovery: string;
-            event_id: string;
-            origin_database?: string | null;
-            origin_model?: string | null;
-            origin_name: string;
-            origin_schema?: string | null;
-            origin_version_hash: string;
-            run_id: string;
-            state_database?: string | null;
-            state_schema: string;
-            target_name?: string | null;
-        };
-        /** @description Preserve nullable compatibility-view facts without projecting live warehouse existence. */
-        WarehouseOldNameRecord: {
-            archive_name?: string | null;
-            column_aliases?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            destination_model: string;
-            drop_reason?: string | null;
-            event_id: string;
-            event_type: string;
-            /** Format: date-time */
-            expires_at?: string | null;
-            grants_copied?: string | null;
-            migration_event_id: string;
-            new_database?: string | null;
-            new_name: string;
-            new_schema: string;
-            old_database?: string | null;
-            old_name: string;
-            old_schema?: string | null;
-            run_id: string;
-            state_database?: string | null;
-            state_schema: string;
-            target_name?: string | null;
-            view_retention?: string | null;
-            view_sql?: string | null;
-        };
-        WarehouseReconciliationCursor: {
+        WarehouseMirrorCursor: {
             /** Format: uuid */
             event_id: string;
             /** Format: date-time */
             observed_at: string;
-        };
-        /** @description A complete, ordered key-set scan of one physical state table, optionally one UTC day. */
-        WarehouseReconciliationPage: {
-            after?: null | components["schemas"]["WarehouseReconciliationCursor"];
-            complete: boolean;
-            /** Format: date */
-            day?: string | null;
-            /** Format: int32 */
-            page: number;
-            /** Format: uuid */
-            scan_id: string;
-            state_database?: string | null;
-            state_schema: string;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -2122,7 +1719,6 @@ export interface components {
         WarehouseSyncFailure: "watermark" | "read" | "delivery";
         WarehouseSyncResponse: {
             applied: boolean;
-            next_reconciliation_after?: null | components["schemas"]["WarehouseReconciliationCursor"];
         };
         /** @description Derive progress from committed mirror rows, scoped to the active physical reader. */
         WarehouseWatermarkRead: {
@@ -3322,7 +2918,7 @@ export interface operations {
             };
         };
     };
-    report_audit_results: {
+    report_metadata: {
         parameters: {
             query?: never;
             header?: never;
@@ -3334,398 +2930,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AuditResultsBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_catalog: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CatalogBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Reader generation fenced */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_fingerprints: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FingerprintBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_janitor_events: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JanitorEventsBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_microbatches: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MicrobatchesBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_migrations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MigrationsBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_old_name_views: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["OldNameViewsBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_source_freshness: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SourceFreshnessBatch"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WarehouseSyncResponse"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorBody"];
-                };
-            };
-            /** @description Invalid credential */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Location not authorized */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    report_statistics: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                location_id: string;
-                target: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StatisticsBatch"];
+                "application/json": components["schemas"]["MetadataBatch"];
             };
         };
         responses: {
