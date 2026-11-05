@@ -386,20 +386,12 @@ pub(crate) struct GroupRun {
     pub(crate) state: ChangingRun,
 }
 
-/// Parent overlap locks and installation-wide limits occupy different resource namespaces.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ConcurrencyResource {
-    Limit(String),
-    Overlap(Uuid, String, String),
-}
-
-/// A transaction-local safety calculation, never a second persisted allocation ledger.
+/// A queued top-level run and the limits it takes when admitted, in queue order.
 #[derive(Debug)]
-pub(crate) struct GroupCapacity {
-    pub(crate) available: BTreeMap<ConcurrencyResource, i64>,
-    pub(crate) held: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
-    pub(crate) needed: BTreeMap<Uuid, BTreeSet<ConcurrencyResource>>,
-    pub(crate) waiting: Vec<QueueCandidate>,
+pub(crate) struct LimitWaiter {
+    pub(crate) rank: (std::cmp::Reverse<i64>, DateTime<Utc>, Uuid),
+    pub(crate) run_id: Uuid,
+    pub(crate) limits: BTreeSet<String>,
 }
 
 #[derive(Debug)]
