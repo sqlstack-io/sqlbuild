@@ -119,6 +119,18 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                     .await
                     .expect("per-request proxy authentication");
                 assert_eq!(response.status(), StatusCode::FORBIDDEN);
+                let forwarded = request(url)
+                    .header("x-sqb-user", value("subject"))
+                    .header(header::AUTHORIZATION, value("proxy_authorization"))
+                    .send()
+                    .await
+                    .expect("proxy forwards its own authorization");
+                assert_eq!(
+                    forwarded.status(),
+                    StatusCode::FORBIDDEN,
+                    "{}: only a Session authorization is a CLI session",
+                    test_case.description
+                );
                 assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
                 assert!(!response.headers().contains_key(header::SET_COOKIE));
                 let rejected_write = client

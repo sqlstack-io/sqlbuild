@@ -6,7 +6,7 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 
-use crate::api::_helpers::authentication::password_transport::deny;
+use crate::api::_helpers::authentication::password_transport::{deny, session_header};
 use crate::api::constants::PASSWORD_BODY_BYTES;
 use crate::api::errors::ApiError;
 use crate::api::models::{
@@ -87,7 +87,7 @@ pub(crate) async fn approve(
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    if !headers.contains_key(header::AUTHORIZATION)
+    if !session_header(&headers)
         && approve_login(
             &store,
             &context,

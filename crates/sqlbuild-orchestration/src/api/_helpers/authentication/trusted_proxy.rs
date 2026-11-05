@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Request, State};
-use axum::http::{HeaderValue, header};
+use axum::http::HeaderValue;
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::{Extension, Router, middleware};
@@ -65,7 +65,7 @@ async fn authenticate(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
-    if request.headers().contains_key(header::AUTHORIZATION) {
+    if password_transport::session_header(request.headers()) {
         return password_transport::authenticate(State(store), request, next).await;
     }
     let Some(mut context) = request.extensions().get::<AuditContext>().cloned() else {

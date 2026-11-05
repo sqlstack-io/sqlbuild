@@ -107,6 +107,12 @@ pub(crate) fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'
     values.next().is_none().then_some(value)
 }
 
+/// A CLI session header; other `Authorization` schemes, such as a proxy's own, are not sessions.
+pub(crate) fn session_header(headers: &HeaderMap) -> bool {
+    single_header(headers, header::AUTHORIZATION.as_str())
+        .is_some_and(|value| value.starts_with("Session "))
+}
+
 pub(crate) fn session_credentials(headers: &HeaderMap) -> (&str, &str) {
     let cookie = browser_cookie(headers, PASSWORD_COOKIE);
     let authorization = if headers.contains_key(header::AUTHORIZATION) {

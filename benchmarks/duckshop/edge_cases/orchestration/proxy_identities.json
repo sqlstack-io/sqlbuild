@@ -5,6 +5,7 @@
   "absent_subject": "external-absent-reader",
   "unknown_subject": "external-unbound-reader",
   "untrusted_peer": "192.0.2.24",
+  "proxy_authorization": "Basic b3JkZXJzLXByb3h5",
   "administrator_journey": {
     "bound": ["orders-admin", "customers-admin"]
   }
