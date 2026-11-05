@@ -63,7 +63,7 @@ pub(crate) async fn assign_role_in(
         && !request.revoke
     {
         let (transaction, published) = query(transaction,
-            "SELECT role_key FROM sqb_role_definition_versions WHERE location_id=$1 AND role_key=$2 AND ($3 IS NULL OR target=$3) LIMIT 1",
+            "SELECT role_key FROM sqb_effective_roles WHERE location_id=$1 AND role_key=$2 AND ($3 IS NULL OR target=$3) LIMIT 1",
             vec![Parameter::OptionalId(request.location_id), Parameter::Text(key.clone()), Parameter::OptionalText(request.target.clone())]).await?;
         if published.is_empty() {
             return Err(ControlError::Invalid(format!(

@@ -134,49 +134,6 @@ pub(crate) struct RoleDefinition {
     pub(crate) actions: Vec<Action>,
 }
 
-/// A validated custom role definition with its content digest and granted action names.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PublishedRole {
-    pub(crate) digest: String,
-    pub(crate) grants: std::collections::BTreeSet<String>,
-    pub(crate) definition: serde_json::Value,
-}
-
-/// Asks for a widened custom role definition of the current snapshot to take effect.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RoleActivationRequest {
-    pub location_id: Uuid,
-    pub target: String,
-    pub role_key: String,
-    pub reason: String,
-}
-
-/// The recorded activation request and the exact definition it asks to activate.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct RoleActivation {
-    pub request_id: Uuid,
-    pub definition_digest: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum RoleDecision {
-    Approved,
-    Rejected,
-}
-
-/// An administrator's decision on an activation request; self-approval must be confirmed.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RoleApproval {
-    pub request_id: Uuid,
-    pub decision: RoleDecision,
-    pub reason: String,
-    #[serde(default)]
-    pub confirm_self_approval: bool,
-}
-
 /// Installation-owned ambient access; never permits an administrative or execution default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

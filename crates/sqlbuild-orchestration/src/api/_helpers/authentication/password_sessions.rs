@@ -47,14 +47,6 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             post(crate::api::_helpers::resources::administrators::assign),
         )
         .route(
-            "/api/admin/role-activations",
-            post(crate::api::_helpers::resources::administrators::request_activation),
-        )
-        .route(
-            "/api/admin/role-approvals",
-            post(crate::api::_helpers::resources::administrators::decide),
-        )
-        .route(
             "/api/control/runs",
             post(crate::api::_helpers::resources::person_operations::request_job),
         )
