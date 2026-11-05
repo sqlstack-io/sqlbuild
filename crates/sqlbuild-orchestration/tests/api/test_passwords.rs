@@ -381,9 +381,10 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 "SELECT event_id, action, ip_address, scope_json, before_json, after_json FROM sqb_security_audit", vec![]).await.expect("security evidence");
             commit(transaction).await.expect("audit read complete");
             for decision in decisions {
-                assert!(rows.iter().any(|row| row["event_id"] == json!(decision)
-                    && row["action"] == "authentication.denied"
-                    && row["ip_address"] == "127.0.0.1"));
+                assert!(
+                    rows.iter().all(|row| row["event_id"] != json!(decision)),
+                    "anonymous denials stay out of the durable audit"
+                );
             }
             let audit = serde_json::to_string(&rows).expect("audit");
             for secret in [password, replacement, bearer, &issued.csrf_token] {

@@ -227,11 +227,17 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                 .expect("inspect durable evidence");
             for decision in denials {
                 let rows;
-                (transaction, rows) = query(transaction, "SELECT actor, ip_address, request_id FROM sqb_security_audit WHERE event_id=$1 AND action='authentication.denied'", vec![Parameter::Id(decision)]).await.expect("denial audit");
-                assert_eq!(rows.len(), 1);
-                assert_eq!(rows[0]["actor"], "anonymous");
-                assert_eq!(rows[0]["ip_address"], "127.0.0.1");
-                assert_eq!(rows[0]["request_id"], json!(decision));
+                (transaction, rows) = query(
+                    transaction,
+                    "SELECT event_id FROM sqb_security_audit WHERE event_id=$1",
+                    vec![Parameter::Id(decision)],
+                )
+                .await
+                .expect("denial audit");
+                assert!(
+                    rows.is_empty(),
+                    "anonymous denials stay out of the durable audit"
+                );
             }
             let (transaction, rows) = query(transaction, "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens", vec![]).await.expect("no implicit provisioning or personal tokens");
             assert_eq!(

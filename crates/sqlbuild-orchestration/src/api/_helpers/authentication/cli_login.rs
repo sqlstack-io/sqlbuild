@@ -68,7 +68,7 @@ pub(crate) async fn start(
         reserve_authentication_attempt(&store, &context, AuthenticationAttempt::IdentityProvider)
             .await?;
     if !allowed {
-        let mut response = deny(&store, &context, "cli_login_throttled").await?;
+        let mut response = deny(&context)?;
         *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
         return Ok(response);
     }
@@ -98,7 +98,7 @@ pub(crate) async fn approve(
     {
         Ok(StatusCode::NO_CONTENT.into_response())
     } else {
-        deny(&store, &context, "invalid_cli_approval").await
+        deny(&context)
     }
 }
 
@@ -112,7 +112,7 @@ pub(crate) async fn claim(
 ) -> Result<Response, ApiError> {
     match claim_login(&store, &context, (request.flow_id, &request.client_secret)).await? {
         ClaimedLogin::Pending => Ok(StatusCode::ACCEPTED.into_response()),
-        ClaimedLogin::Unavailable => deny(&store, &context, "cli_login_unavailable").await,
+        ClaimedLogin::Unavailable => deny(&context),
         ClaimedLogin::Authenticated(session) => Ok(Json(CliLoginSessionResponse {
             identity: session.identity,
             bearer: session.bearer,
