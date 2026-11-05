@@ -12,8 +12,8 @@ use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use crate::api::constants::{HTTPS_SCHEME, OIDC_RESPONSE_BYTES};
 use crate::api::main::parse_origin::parse_origin;
 use crate::api::models::{OidcAuthentication, OidcRuntime};
-use crate::api::types::OidcClient;
-use crate::credentials::models::StoredOidcFlow;
+use crate::api::types::{OidcClient, OidcIdToken};
+use crate::credentials::models::{BuiltinRole, RoleKey, StoredOidcFlow};
 use crate::store::errors::ControlError;
 
 pub(crate) fn configure(mut settings: OidcAuthentication) -> Result<OidcRuntime, ControlError> {
@@ -29,6 +29,7 @@ pub(crate) fn configure(mut settings: OidcAuthentication) -> Result<OidcRuntime,
             "OIDC requires a nonempty client ID and nonempty bound subjects".into(),
         ));
     }
+    validate_group_roles(&settings)?;
     let client_secret = settings
         .client_secret_env
         .as_ref()
@@ -103,11 +104,12 @@ pub(crate) async fn client(runtime: &OidcRuntime) -> Result<OidcClient, ControlE
     ))
 }
 
+/// Re-reads the signed ID token with every claim kept, so the configured groups claim survives.
 pub(crate) async fn verify_code(
     runtime: &OidcRuntime,
     code: AuthorizationCode,
     flow: StoredOidcFlow,
-) -> Result<String, ControlError> {
+) -> Result<(String, Vec<String>), ControlError> {
     let client = client(runtime).await?;
     let http = |request| request_provider(runtime.http.clone(), request);
     let tokens = client
@@ -117,7 +119,12 @@ pub(crate) async fn verify_code(
         .request_async(&http)
         .await
         .map_err(|_| invalid_provider())?;
-    let token = tokens.id_token().ok_or_else(invalid_provider)?;
+    let token: OidcIdToken = tokens
+        .id_token()
+        .ok_or_else(invalid_provider)?
+        .to_string()
+        .parse()
+        .map_err(|_| invalid_provider())?;
     let verifier = client.id_token_verifier();
     let claims = token
         .claims(&verifier, &flow.nonce)
@@ -135,7 +142,51 @@ pub(crate) async fn verify_code(
             return Err(invalid_provider());
         }
     }
-    Ok(claims.subject().as_str().to_owned())
+    let groups = runtime
+        .settings
+        .groups_claim
+        .as_ref()
+        .and_then(|claim| claims.additional_claims().0.get(claim))
+        .and_then(claim_groups)
+        .unwrap_or_default();
+    Ok((claims.subject().as_str().to_owned(), groups))
+}
+
+/// A claim that is not a list of nonempty strings, such as an overage pointer, gives no groups.
+fn claim_groups(value: &serde_json::Value) -> Option<Vec<String>> {
+    value.as_array()?.iter().map(group_name).collect()
+}
+
+fn group_name(value: &serde_json::Value) -> Option<String> {
+    Some(value.as_str()?)
+        .filter(|group| !group.is_empty())
+        .map(str::to_owned)
+}
+
+fn validate_group_roles(settings: &OidcAuthentication) -> Result<(), ControlError> {
+    if !settings.group_roles.is_empty()
+        && settings.groups_claim.as_ref().is_none_or(String::is_empty)
+    {
+        return Err(ControlError::Invalid(
+            "OIDC group roles require a nonempty groups_claim".into(),
+        ));
+    }
+    for mapping in &settings.group_roles {
+        let scoped = mapping.target.is_some() || matches!(mapping.role, RoleKey::Custom(_));
+        let blank = |text: &str| text.trim().is_empty();
+        if blank(&mapping.group)
+            || mapping.role == RoleKey::Builtin(BuiltinRole::Admin)
+            || matches!(&mapping.role, RoleKey::Custom(key) if blank(key))
+            || mapping.target.as_deref().is_some_and(blank)
+            || (scoped && mapping.location_id.is_none())
+        {
+            return Err(ControlError::Invalid(format!(
+                "OIDC group {:?} needs a non-admin role, and a location for a target or custom role",
+                mapping.group
+            )));
+        }
+    }
+    Ok(())
 }
 
 async fn request_provider(

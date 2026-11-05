@@ -78,10 +78,11 @@ fn given_lost_administrator_access_when_grant_admin_runs_online_then_authority_a
             else {
                 panic!("valid password");
             };
-            let external_session = authenticate_bound_person(&fixture.store, &context, principal)
-                .await
-                .expect("verified OIDC identity")
-                .expect("SSO session");
+            let external_session =
+                authenticate_bound_person(&fixture.store, &context, (principal, &[]))
+                    .await
+                    .expect("verified OIDC identity")
+                    .expect("SSO session");
             let (transaction, _) = query(
                 begin(&fixture.store, TransactionMode::Write)
                     .await

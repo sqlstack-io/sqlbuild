@@ -1,0 +1,24 @@
+{
+  "groups_claim": "orders_groups",
+  "mapped_group": "orders-operators",
+  "mapped_role": "operator",
+  "asserted_groups": ["orders-operators", "customers-readers"],
+  "claims_without_groups": [
+    {"description": "a single group as text", "claims": {"orders_groups": "orders-operators"}},
+    {"description": "a list with a non-text entry", "claims": {"orders_groups": ["orders-operators", 7]}},
+    {"description": "an empty group name", "claims": {"orders_groups": ["orders-operators", ""]}},
+    {
+      "description": "an overage pointer instead of the list",
+      "claims": {
+        "_claim_names": {"orders_groups": "src1"},
+        "_claim_sources": {"src1": {"endpoint": "https://provider.example.com/groups"}}
+      }
+    }
+  ],
+  "rejected_mappings": [
+    {"description": "admin through a group", "mapping": {"group": "orders-operators", "role": "admin", "location_id": null, "target": null}},
+    {"description": "custom role without a location", "mapping": {"group": "orders-operators", "role": "orders_reviewer", "location_id": null, "target": null}},
+    {"description": "target without a location", "mapping": {"group": "orders-operators", "role": "viewer", "location_id": null, "target": "development"}},
+    {"description": "blank group", "mapping": {"group": " ", "role": "viewer", "location_id": null, "target": null}}
+  ]
+}

@@ -100,6 +100,13 @@ pub(crate) struct OidcApiTestCase {
     pub(crate) expected_authentications: usize,
 }
 
+pub(crate) struct OidcGroupsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_granting_role: &'static str,
+    pub(crate) expected_rejected_mappings: usize,
+}
+
 pub(crate) struct OidcThrottleTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

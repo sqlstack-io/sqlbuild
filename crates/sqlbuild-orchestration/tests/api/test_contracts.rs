@@ -48,6 +48,8 @@ mod test_location_health;
 mod test_location_work;
 #[path = "test_oidc.rs"]
 mod test_oidc;
+#[path = "test_oidc_groups.rs"]
+mod test_oidc_groups;
 #[path = "test_passwords.rs"]
 mod test_passwords;
 #[path = "test_person_location_work.rs"]

@@ -1,11 +1,11 @@
-//! Build the configured sign-in routes before migrations or HTTP startup.
+//! Build the configured sign-in routes and group mapping before migrations or HTTP startup.
 
 use std::net::SocketAddr;
 
 use axum::{Extension, Router};
 
 use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
-use crate::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
+use crate::api::models::{ApiAuthentication, DevelopmentScope, GroupRole, HumanLogin};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -16,7 +16,18 @@ pub(crate) async fn configure(
         default_role,
     }: ApiAuthentication,
     address: SocketAddr,
-) -> Result<(Option<DevelopmentScope>, Router<ControlStore>), ControlError> {
+) -> Result<
+    (
+        Option<DevelopmentScope>,
+        Router<ControlStore>,
+        Vec<GroupRole>,
+    ),
+    ControlError,
+> {
+    let group_roles = match &login {
+        HumanLogin::Oidc(settings) => settings.group_roles.clone(),
+        _ => Vec::new(),
+    };
     let (development, routes) = match login {
         HumanLogin::None => (None, Router::new()),
         HumanLogin::Development(scope) => {
@@ -31,5 +42,9 @@ pub(crate) async fn configure(
         HumanLogin::TrustedProxy(settings) => (None, trusted_proxy::router(store, settings)?),
         HumanLogin::Oidc(settings) => (None, oidc::router(store, settings).await?),
     };
-    Ok((development, routes.layer(Extension(default_role))))
+    Ok((
+        development,
+        routes.layer(Extension(default_role)),
+        group_roles,
+    ))
 }

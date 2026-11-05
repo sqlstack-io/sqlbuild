@@ -371,6 +371,17 @@ CREATE TABLE sqb_role_assignments (
     active_key TEXT NOT NULL UNIQUE
 );
 CREATE INDEX sqb_role_assignments_principal ON sqb_role_assignments(principal_id);
+CREATE TABLE sqb_person_groups (
+    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
+    group_name TEXT NOT NULL,
+    PRIMARY KEY (principal_id, group_name)
+);
+CREATE TABLE sqb_group_roles (
+    group_name TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    location_id {uuid},
+    target TEXT
+);
 CREATE INDEX sqb_fingerprints_namespace ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX sqb_freshness_namespace ON sqb_warehouse_freshness (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE UNIQUE INDEX sqb_security_audit_storage_id ON sqb_security_audit(storage_id);

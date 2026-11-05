@@ -1,4 +1,4 @@
-//! The provider's discovered authorization and token endpoints retain their typed availability.
+//! Typed OIDC endpoints, and ID tokens that keep every claim for the configured groups claim.
 
 use openidconnect::{EndpointMaybeSet, EndpointNotSet, EndpointSet};
 
@@ -9,4 +9,11 @@ pub(crate) type OidcClient = openidconnect::core::CoreClient<
     EndpointNotSet,
     EndpointMaybeSet,
     EndpointMaybeSet,
+>;
+
+pub(crate) type OidcIdToken = openidconnect::IdToken<
+    crate::api::models::OidcExtraClaims,
+    openidconnect::core::CoreGenderClaim,
+    openidconnect::core::CoreJweContentEncryptionAlgorithm,
+    openidconnect::core::CoreJwsSigningAlgorithm,
 >;

@@ -71,6 +71,8 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                     ("orders-person".into(), person),
                     ("absent-person".into(), Uuid::now_v7()),
                 ]),
+                groups_claim: None,
+                group_roles: Vec::new(),
             };
             let api = start_api_with_authentication(
                 store,
@@ -354,6 +356,8 @@ fn given_oidc_login_attempts_when_alternating_replicas_then_the_peer_limit_is_sh
                 client_secret_env: None,
                 certificate_authority: Some(provider.authority.clone()),
                 identities: BTreeMap::new(),
+                groups_claim: None,
+                group_roles: Vec::new(),
             };
             let api = start_api_with_authentication(
                 &fixture.store,
