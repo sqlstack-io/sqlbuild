@@ -1,6 +1,0 @@
-{
-  "description": "The pre-progress build ticks a bounded batch of a minutely cron trigger at a sub-second fraction past each minute, then stops with its lease still live. The store is upgraded in place; the new scheduler waits for the old lease, then resumes from the fractional cursor and ticks each later minute once.",
-  "backlog_minutes": 15,
-  "old_build_ticks": 6,
-  "old_build_fraction_microseconds": 999999
-}
