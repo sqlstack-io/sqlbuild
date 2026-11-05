@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 
 use crate::platform::_helpers::retention::retain;
+use crate::platform::_helpers::watchdog::scan_health;
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::main::run_maintenance::run_maintenance;
 use crate::platform::models::{LocationHealth, LocationHealthReport, PlatformEvent};
@@ -17,7 +18,7 @@ use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::tests::helpers::{retained_platform_facts, snapshot, wait_for_scans};
-use crate::platform::tests::test_types::{LocationWatchdogTestCase, WatchdogTestCase};
+use crate::platform::tests::test_types::{LocationWatchdogTestCase, Observation, WatchdogTestCase};
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -208,6 +209,23 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
                 "{}: alert facts outlive the heartbeat horizon for webhooks and sensors",
                 test_case.description
             );
+            let (_running, idle) = tokio::sync::watch::channel(false);
+            scan_health(store, Uuid::now_v7(), &idle)
+                .await
+                .expect("later window scan");
+            let rescanned = retained_platform_facts(store).await;
+            let alert_count = |facts: &[Observation]| {
+                facts
+                    .iter()
+                    .filter(|row| !matches!(row.payload.platform, PlatformEvent::Heartbeat { .. }))
+                    .count()
+            };
+            assert_eq!(
+                (alert_count(&rescanned), rescanned.len()),
+                (alert_count(&remaining), remaining.len() + 1),
+                "{}: a persisting condition is not recorded again; only the heartbeat is new",
+                test_case.description
+            );
             close_store(second).await;
             close_test_store(fixture).await;
         });
@@ -377,6 +395,37 @@ fn given_stale_location_sessions_when_watchdogs_scan_then_latest_target_liveness
                     .expect("join")
                     .expect("watchdog stopped");
             }
+            let transaction = begin(store, TransactionMode::Write)
+                .await
+                .expect("age instances");
+            let aged = transaction.now - TimeDelta::days(8);
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE sqb_location_instances SET last_seen_at=$1",
+                vec![Parameter::Time(aged)],
+            )
+            .await
+            .expect("aged instances");
+            commit(transaction).await.expect("aged instances committed");
+            retain(store, Default::default(), &[])
+                .await
+                .expect("retention pass");
+            let transaction = begin(store, TransactionMode::Read)
+                .await
+                .expect("read instances");
+            let (transaction, instances) = query(
+                transaction,
+                "SELECT COUNT(*) AS count FROM sqb_location_instances",
+                vec![],
+            )
+            .await
+            .expect("count instances");
+            commit(transaction).await.expect("read instances committed");
+            assert_eq!(
+                instances[0]["count"], 0,
+                "{}: instances unseen past the location horizon are pruned",
+                test_case.description
+            );
             close_store(second).await;
             close_test_store(fixture).await;
         });

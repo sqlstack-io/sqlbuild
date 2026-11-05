@@ -26,15 +26,6 @@ pub struct WarehouseFreshnessRecord {
     pub observed_at: DateTime<Utc>,
 }
 
-/// Receipt order is sensor progress; warehouse observation time remains source evidence.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SourceFreshnessObservation {
-    pub(crate) location_id: Uuid,
-    pub(crate) target: String,
-    pub(crate) record: WarehouseFreshnessRecord,
-}
-
 /// Preserve the warehouse representation, including text-encoded measurements and booleans.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
