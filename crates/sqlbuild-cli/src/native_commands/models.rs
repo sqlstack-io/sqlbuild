@@ -9,7 +9,7 @@ use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::LocationWorkRequest;
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
+    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
 };
 use uuid::Uuid;
 
@@ -177,21 +177,20 @@ pub(crate) struct LocationCompiler {
     pub(crate) python_sources: Vec<PathStamp>,
 }
 
-/// A delivered source page remains frozen until the API acknowledges it and any mirror cursor.
+/// A delivered source page remains frozen until the API acknowledges it.
 #[derive(Debug)]
 pub(crate) struct LocationMetadataPage {
-    pub(crate) body: serde_json::Value,
+    pub(crate) batch: MetadataBatch,
     pub(crate) next_source_after: Option<Vec<Option<String>>>,
 }
 
-/// Only local retry/navigation state; durable scan receipts remain in the control store.
+/// Only local retry and navigation state; the control store keeps no scan progress.
 #[derive(Debug)]
 pub(crate) struct LocationMetadataSync {
     pub(crate) locations: Vec<WarehouseStateLocation>,
     pub(crate) generation: i64,
     pub(crate) index: usize,
     pub(crate) scan_id: Uuid,
-    pub(crate) page: u32,
     pub(crate) source_after: Option<Vec<Option<String>>>,
     pub(crate) observed_since: Option<DateTime<Utc>>,
     pub(crate) watermark_loaded: bool,
@@ -213,7 +212,6 @@ impl LocationMetadataSync {
             self.index -= 1;
             self.source_after = None;
             self.scan_id = Uuid::now_v7();
-            self.page = 0;
             self.observed_since = None;
             self.watermark_loaded = false;
         }

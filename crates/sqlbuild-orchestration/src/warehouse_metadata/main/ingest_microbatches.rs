@@ -6,47 +6,24 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::events::ingest_events;
-use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
+use crate::warehouse_metadata::_helpers::ingestion::batch_records;
 use crate::warehouse_metadata::models::{
-    MicrobatchesBatch, StateEventImport, StateEventsImport, WarehouseHistoryKind,
-    WarehouseStateLocation, WarehouseSyncResponse,
+    MetadataBatch, StateEventImport, WarehouseMicrobatchRecord, WarehouseStateLocation,
+    WarehouseSyncResponse,
 };
 
 pub async fn ingest_microbatches(
     store: &ControlStore,
     scope: (Uuid, &str),
-    batch: &MicrobatchesBatch,
+    batch: &MetadataBatch,
 ) -> Result<WarehouseSyncResponse, ControlError> {
-    validate_fields(
-        ("microbatches", batch.generation, batch.records.len()),
-        false,
-        false,
-    )?;
+    let records: Vec<WarehouseMicrobatchRecord> = batch_records(batch)?;
     ingest_events(
         store,
         scope,
-        StateEventsImport {
-            kind: WarehouseHistoryKind::Microbatches,
-            session_id: batch.session_id,
-            generation: batch.generation,
-            invalid_identity: batch
-                .records
-                .iter()
-                .flat_map(|record| {
-                    [
-                        &record.event_id,
-                        &record.state_schema,
-                        &record.scope_kind,
-                        &record.scope_key,
-                        &record.model_name,
-                        &record.target_name,
-                        &record.physical_generation_id,
-                        &record.record_type,
-                    ]
-                })
-                .any(|value| value.trim().is_empty()),
-            records: batch
-                .records
+        batch,
+        (
+            records
                 .iter()
                 .map(|record| StateEventImport {
                     source_id: record.event_id.clone(),
@@ -81,9 +58,22 @@ pub async fn ingest_microbatches(
                     record_json: json!(record),
                 })
                 .collect(),
-            reconciliation: batch.reconciliation.as_ref(),
-            payload: json!(batch),
-        },
+            records
+                .iter()
+                .flat_map(|record| {
+                    [
+                        &record.event_id,
+                        &record.state_schema,
+                        &record.scope_kind,
+                        &record.scope_key,
+                        &record.model_name,
+                        &record.target_name,
+                        &record.physical_generation_id,
+                        &record.record_type,
+                    ]
+                })
+                .any(|value| value.trim().is_empty()),
+        ),
     )
     .await
 }

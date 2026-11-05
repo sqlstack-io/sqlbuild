@@ -30,7 +30,9 @@ use crate::store::tests::helpers::read_recall_events;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
-use crate::warehouse_metadata::models::{SourceFreshnessBatch, WarehouseFreshnessRecord};
+use crate::warehouse_metadata::models::{
+    MetadataBatch, WarehouseFreshnessRecord, WarehouseHistoryKind,
+};
 
 #[test]
 fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_rebuilds_do_not_repeat()
@@ -127,11 +129,12 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 ingest_source_freshness(
                     store,
                     (location, "development"),
-                    &SourceFreshnessBatch {
+                    &MetadataBatch {
+                        kind: WarehouseHistoryKind::SourceFreshness,
                         session_id,
                         generation: 1,
-                        records: records[..1].to_vec(),
-                        reconciliation: None,
+                        records: records[..1].iter().map(|record| json!(record)).collect(),
+                        scan: None,
                     }
                 )
                 .await
@@ -150,11 +153,12 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
             commit(transaction).await.expect("finish read");
             assert_eq!(mirrored[0]["count"], 0);
             for page in records.chunks(100) {
-                let batch = SourceFreshnessBatch {
+                let batch = MetadataBatch {
+                    kind: WarehouseHistoryKind::SourceFreshness,
                     session_id,
                     generation: 1,
-                    records: page.to_vec(),
-                    reconciliation: None,
+                    records: page.iter().map(|record| json!(record)).collect(),
+                    scan: None,
                 };
                 assert!(
                     ingest_source_freshness(store, (location, "development"), &batch)
@@ -243,11 +247,12 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                     .expect("late source observation")
                     .clone(),
             );
-            let batch = SourceFreshnessBatch {
+            let batch = MetadataBatch {
+                kind: WarehouseHistoryKind::SourceFreshness,
                 session_id,
                 generation: 1,
-                records: vec![serde_json::from_value(json!(late)).expect("late record")],
-                reconciliation: None,
+                records: vec![json!(late)],
+                scan: None,
             };
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await
@@ -292,11 +297,12 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 ingest_source_freshness(
                     store,
                     (location, "development"),
-                    &SourceFreshnessBatch {
+                    &MetadataBatch {
+                        kind: WarehouseHistoryKind::SourceFreshness,
                         session_id,
                         generation: 1,
-                        records: page.to_vec(),
-                        reconciliation: None,
+                        records: page.iter().map(|record| json!(record)).collect(),
+                        scan: None,
                     },
                 )
                 .await
@@ -461,11 +467,12 @@ fn given_timestamp_observations_when_age_crosses_the_boundary_then_scoped_pages_
                 };
                 records.push(record);
             }
-            let batch = SourceFreshnessBatch {
+            let batch = MetadataBatch {
+                kind: WarehouseHistoryKind::SourceFreshness,
                 session_id,
                 generation: 1,
-                records,
-                reconciliation: None,
+                records: records.iter().map(|record| json!(record)).collect(),
+                scan: None,
             };
             ingest_source_freshness(store, (location, "development"), &batch)
                 .await

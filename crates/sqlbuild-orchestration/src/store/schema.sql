@@ -327,7 +327,8 @@ CREATE TABLE sqb_warehouse_freshness (
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
     state_database TEXT,
-    state_schema TEXT
+    state_schema TEXT,
+    scan_id {uuid}
 );
 CREATE INDEX sqb_warehouse_freshness_scope ON sqb_warehouse_freshness (location_id, target, observed_at, event_id);
 CREATE TABLE sqb_warehouse_fingerprints (
@@ -345,7 +346,8 @@ CREATE TABLE sqb_warehouse_fingerprints (
     node_name TEXT,
     target_database TEXT,
     target_schema TEXT,
-    target_name TEXT
+    target_name TEXT,
+    scan_id {uuid}
 );
 CREATE INDEX sqb_warehouse_fingerprints_scope ON sqb_warehouse_fingerprints (location_id, target, observed_at, event_id);
 CREATE TABLE sqb_development_locations (
@@ -419,22 +421,8 @@ CREATE TABLE sqb_external_sessions (
     revoked_at {time}
 );
 CREATE INDEX sqb_external_sessions_person ON sqb_external_sessions(principal_id);
-CREATE INDEX sqb_fingerprints_reconciliation ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);
-CREATE INDEX sqb_freshness_reconciliation ON sqb_warehouse_freshness (location_id,target,state_database,state_schema,observed_at,event_id);
-CREATE TABLE sqb_warehouse_scan_pages (
-    scan_id {uuid} NOT NULL,
-    page BIGINT NOT NULL,
-    scope_hash TEXT NOT NULL,
-    request_hash TEXT NOT NULL,
-    complete BOOLEAN NOT NULL,
-    received_at {time} NOT NULL,
-    PRIMARY KEY (scan_id,page)
-);
-CREATE TABLE sqb_warehouse_scan_keys (
-    scan_id {uuid} NOT NULL,
-    event_id {uuid} NOT NULL,
-    PRIMARY KEY (scan_id,event_id)
-);
+CREATE INDEX sqb_fingerprints_namespace ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_freshness_namespace ON sqb_warehouse_freshness (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE UNIQUE INDEX sqb_security_audit_storage_id ON sqb_security_audit(storage_id);
 CREATE TABLE sqb_warehouse_audit_results (
     event_id {uuid} PRIMARY KEY,
@@ -447,9 +435,10 @@ CREATE TABLE sqb_warehouse_audit_results (
     audit_name TEXT NOT NULL,
     outcome TEXT NOT NULL,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
-CREATE INDEX sqb_audit_results_reconciliation ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_audit_results_namespace ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE TABLE sqb_warehouse_janitor_events (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -463,9 +452,10 @@ CREATE TABLE sqb_warehouse_janitor_events (
     relation_schema TEXT NOT NULL,
     archive_name TEXT NOT NULL,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
-CREATE INDEX sqb_janitor_events_reconciliation ON sqb_warehouse_janitor_events (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_janitor_events_namespace ON sqb_warehouse_janitor_events (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE TABLE sqb_warehouse_migrations (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -478,9 +468,10 @@ CREATE TABLE sqb_warehouse_migrations (
     destination_model TEXT NOT NULL,
     decision TEXT NOT NULL,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
-CREATE INDEX sqb_migrations_reconciliation ON sqb_warehouse_migrations (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_migrations_namespace ON sqb_warehouse_migrations (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE TABLE sqb_warehouse_old_name_views (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -494,9 +485,10 @@ CREATE TABLE sqb_warehouse_old_name_views (
     destination_model TEXT NOT NULL,
     event_type TEXT NOT NULL,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
-CREATE INDEX sqb_old_name_views_reconciliation ON sqb_warehouse_old_name_views (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_old_name_views_namespace ON sqb_warehouse_old_name_views (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE TABLE sqb_warehouse_microbatches (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -515,9 +507,10 @@ CREATE TABLE sqb_warehouse_microbatches (
     execution_run_id TEXT NOT NULL,
     replay_requirement_id TEXT,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
-CREATE INDEX sqb_microbatches_reconciliation ON sqb_warehouse_microbatches (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_microbatches_namespace ON sqb_warehouse_microbatches (location_id,target,state_database,state_schema,observed_at,event_id);
 CREATE INDEX recall_warehouse_sources ON recall_events (storage_id)
     WHERE producer='warehouse' AND event_type='warehouse_source_freshness'
       AND invocation_id LIKE 'warehouse/source-freshness/%';
@@ -541,7 +534,8 @@ CREATE TABLE sqb_warehouse_catalog (
     state_schema TEXT NOT NULL,
     observed_at {time} NOT NULL,
     record_json {json} NOT NULL,
-    received_at {time} NOT NULL
+    received_at {time} NOT NULL,
+    scan_id {uuid}
 );
 CREATE INDEX sqb_warehouse_catalog_namespace ON sqb_warehouse_catalog
     (location_id, target, state_schema, state_database, observed_at, event_id);

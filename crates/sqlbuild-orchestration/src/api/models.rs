@@ -62,14 +62,6 @@ use crate::api::_helpers::resources::{
     trigger_reads::events,
     trigger_reads::ticks,
     warehouse_metadata::report,
-    warehouse_metadata::report_fingerprints,
-    warehouse_metadata::report_audit_results,
-    warehouse_metadata::report_janitor_events,
-    warehouse_metadata::report_migrations,
-    warehouse_metadata::report_old_name_views,
-    warehouse_metadata::report_microbatches,
-    warehouse_metadata::report_catalog,
-    warehouse_metadata::report_statistics,
     warehouse_metadata::statistics_due,
     warehouse_metadata::watermark
 ))]

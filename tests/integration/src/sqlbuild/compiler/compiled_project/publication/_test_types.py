@@ -254,7 +254,7 @@ class CatalogBoundaryTestCase:
 @dataclass(frozen=True)
 class StatisticsRecoveryTestCase:
     description: str
-    expected_catalog_presence: tuple[bool, ...]
+    expected_log: str
 
 
 @dataclass(frozen=True)

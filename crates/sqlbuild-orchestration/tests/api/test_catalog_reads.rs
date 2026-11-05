@@ -27,7 +27,7 @@ use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::{
     ingest_catalog::ingest_catalog, read_person_catalog::read_person_catalog,
 };
-use crate::warehouse_metadata::models::{CatalogBatch, CatalogQuery};
+use crate::warehouse_metadata::models::{CatalogQuery, MetadataBatch};
 
 #[test]
 fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namespaces_bound_every_result()
@@ -130,8 +130,8 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                         })
                         .collect();
                     for records in records.chunks(100) {
-                        let batch: CatalogBatch = serde_json::from_value(json!({"session_id":session_id,"generation":1,"records":records,
-                            "reconciliation":{"scan_id":Uuid::now_v7(),"page":0,"state_database":namespace["database"],"state_schema":namespace["schema"],"day":null,"complete":false,"after":null}})).expect("batch");
+                        let batch: MetadataBatch = serde_json::from_value(json!({"kind":"catalog","session_id":session_id,"generation":1,"records":records,
+                            "scan":{"scan_id":Uuid::now_v7(),"location":{"database":namespace["database"],"schema":namespace["schema"]},"complete":false}})).expect("batch");
                         assert!(
                             ingest_catalog(store, (scope, target), &batch)
                                 .await
