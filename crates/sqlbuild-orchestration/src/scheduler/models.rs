@@ -49,14 +49,12 @@ pub struct CronSchedule {
     pub(crate) timezone: chrono_tz::Tz,
 }
 
-/// Due times come from the persisted calendar or cron expansion, never elapsed sleep time.
+/// The durable cursor and waiting work an evaluation decides from; due times come from the declaration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TickState {
     pub trigger_id: Uuid,
+    pub started_at: DateTime<Utc>,
     pub last_tick_for: Option<DateTime<Utc>>,
-    pub due_times: Vec<DateTime<Utc>>,
-    /// First omitted time in a bounded expansion; never advance the cursor past an unrecorded tick.
-    pub continuation: Option<DateTime<Utc>>,
     /// Only unclaimed waiting work can cover a later tick; executing work cannot cover future data.
     pub waiting_run: Option<Uuid>,
 }

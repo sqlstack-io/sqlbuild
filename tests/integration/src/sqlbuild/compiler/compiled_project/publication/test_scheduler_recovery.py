@@ -1,4 +1,4 @@
-"""Installed schedulers killed at random moments still tick every due minute exactly once."""
+"""Installed schedulers killed at random moments still tick each trigger's latest due minute once."""
 
 import json
 from pathlib import Path
@@ -16,7 +16,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
 NO_ANOMALIES: dict[str, int] = {
     "triggers_without_ticks": 0,
     "duplicate_ticks": 0,
-    "missing_ticks": 0,
+    "missing_latest_ticks": 0,
     "off_schedule_ticks": 0,
     "runs_without_exactly_one_tick": 0,
     "request_event_mismatch": 0,
@@ -36,7 +36,7 @@ NO_ANOMALIES: dict[str, int] = {
     ],
     ids=lambda case: case.description,
 )
-def test_given_schedulers_killed_mid_backlog_when_a_survivor_recovers_then_every_due_minute_ticks_once(
+def test_given_schedulers_killed_mid_backlog_when_a_survivor_recovers_then_the_latest_due_minute_ticks_once(
     test_case: SchedulerCrashTestCase, tmp_path: Path
 ) -> None:
     fixture: dict[str, Any] = json.loads(Path(test_case.fixture).read_text())

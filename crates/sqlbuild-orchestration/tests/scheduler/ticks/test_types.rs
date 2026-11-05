@@ -56,11 +56,11 @@ pub(crate) struct FirstTickPrecisionTestCase {
     pub(crate) expected_repeated_occurrences: usize,
 }
 
-/// Every way a randomized fault run can break the exactly-once contract; all zero when it holds.
+/// Ways a fault run breaks exactly-once; times passed during an outage are skipped by design.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct FaultAnomalies {
     pub(crate) duplicate_ticks: usize,
-    pub(crate) missing_ticks: usize,
+    pub(crate) missing_latest_ticks: usize,
     pub(crate) off_schedule_ticks: usize,
     pub(crate) runs_without_exactly_one_tick: usize,
     pub(crate) request_event_mismatch: usize,

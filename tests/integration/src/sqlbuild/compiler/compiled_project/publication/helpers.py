@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import itertools
 import json
 import os
 import random
@@ -1069,7 +1068,7 @@ def statistics_relations(directory: Path) -> tuple[str, ...]:
 
 
 def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[str, int]:
-    """SIGKILL real schedulers while they drain a backlog; return breaches and the kill count."""
+    """SIGKILL real schedulers during catch-up; return breaches and the kill count."""
     project: Path = directory / "project"
     start: datetime = datetime.now(UTC).replace(second=0, microsecond=0) - timedelta(
         minutes=fixture["backlog_minutes"]
@@ -1193,12 +1192,8 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
                 (str(uuid4()),),
             )
             duplicate_rejected = False
-    minutes: list[datetime] = [
-        start + timedelta(minutes=offset) for offset in range(fixture["backlog_minutes"] + 1)
-    ]
-    expected: set[tuple[str, datetime]] = set(
-        itertools.product({tick[0] for tick in ticks}, minutes)
-    )
+    # A minute can fall due while the survivor runs; the one due at `settled` or a later one ticks.
+    latest: datetime = settled.replace(second=0, microsecond=0)
     observed: list[tuple[str, datetime]] = [
         (trigger, datetime.fromisoformat(scheduled)) for trigger, scheduled, _, _ in ticks
     ]
@@ -1207,7 +1202,10 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
     return {
         "triggers_without_ticks": triggers - len({tick[0] for tick in ticks}),
         "duplicate_ticks": len(observed) - len(set(observed)),
-        "missing_ticks": len(expected - set(observed)),
+        "missing_latest_ticks": len(
+            {tick[0] for tick in ticks}
+            - {trigger for trigger, minute in observed if minute >= latest}
+        ),
         "off_schedule_ticks": sum(
             minute.second != 0 or minute.microsecond != 0 or minute < start
             for _, minute in observed

@@ -26,13 +26,13 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
         TickTransactionTestCase {
             description: "SQLite scheduler loop",
             backend: Backend::Sqlite,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
         TickTransactionTestCase {
             description: "PostgreSQL scheduler loop",
             backend: Backend::Postgres,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
     ];
