@@ -24,7 +24,6 @@ pub(crate) enum LoginAction {
 pub(crate) struct PersonCredential {
     pub(super) identity: SessionIdentity,
     pub(super) bearer: String,
-    pub(super) csrf_token: String,
 }
 
 impl std::fmt::Debug for PersonCredential {

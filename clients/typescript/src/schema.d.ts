@@ -780,7 +780,6 @@ export interface components {
         };
         CliLoginSessionResponse: {
             bearer: string;
-            csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
         };
         CliLoginStartRequest: {

@@ -313,13 +313,15 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 );
                 assert_eq!(
                     client
-                        .post(format!("{url}/api/auth/logout"))
+                        .post(format!("{url}/api/admin/roles"))
                         .header("authorization", &authorization)
+                        .json(&json!({"principal_id": person, "role": "viewer",
+                            "location_id": null, "target": null, "revoke": false}))
                         .send()
                         .await
-                        .expect("CLI CSRF required")
+                        .expect("CLI writes need no CSRF, only permission")
                         .status(),
-                    StatusCode::UNAUTHORIZED
+                    StatusCode::FORBIDDEN
                 );
             }
             assert_eq!(

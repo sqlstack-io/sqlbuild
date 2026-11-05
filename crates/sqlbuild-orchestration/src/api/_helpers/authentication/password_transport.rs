@@ -74,13 +74,14 @@ pub(crate) async fn authenticate(
             message: "trusted authentication context is unavailable".into(),
             decision_id: None,
         })?;
-    let access = if request.method().is_safe() {
-        SessionAccess::Read
-    } else {
-        SessionAccess::Write {
-            csrf: single_header(request.headers(), PASSWORD_CSRF_HEADER).unwrap_or_default(),
-        }
-    };
+    let access =
+        if request.method().is_safe() || request.headers().contains_key(header::AUTHORIZATION) {
+            SessionAccess::Read
+        } else {
+            SessionAccess::Write {
+                csrf: single_header(request.headers(), PASSWORD_CSRF_HEADER).unwrap_or_default(),
+            }
+        };
     let identity =
         authenticate_session(&store, session_credentials(request.headers()).0, access).await?;
     let Some(identity) = identity else {

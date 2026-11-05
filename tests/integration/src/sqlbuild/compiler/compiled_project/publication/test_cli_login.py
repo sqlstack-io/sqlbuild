@@ -114,10 +114,8 @@ def test_given_installed_browser_login_when_reloaded_revoked_and_logged_out_then
             assert stat.S_IMODE(credential_files[0].stat().st_mode) == 0o600
             assert stat.S_IMODE(credential_files[0].parent.stat().st_mode) == 0o700
             saved: dict[str, Any] = json.loads(credential_files[0].read_text())
-            assert (
-                saved["bearer"] not in log.read_text()
-                and saved["csrf_token"] not in log.read_text()
-            )
+            assert saved["bearer"] not in log.read_text()
+            assert "csrf_token" not in saved
             assert (
                 saved["identity"]["session_id"]
                 not in request(client, f"{origin}/api/auth/session")[1].decode()
