@@ -3,7 +3,6 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::consumption::_helpers::history::Window;
-use crate::consumption::_helpers::rules::DecisionRules;
 use crate::consumption::constants::{NODE_INPUT, OPAQUE_INPUT, SOURCE_INPUT};
 use crate::consumption::models::{ConsumptionHistory, InputFact, NodeFacts, NodeKey, RunReason};
 
@@ -22,8 +21,7 @@ pub(crate) fn node_input_name(key: &NodeKey) -> String {
 }
 
 /// Each selected node in input order with the reason it runs, or None when it is skipped.
-pub(crate) fn decide<R: DecisionRules>(
-    rules: &R,
+pub(crate) fn decide(
     nodes: &[NodeFacts],
     history: &ConsumptionHistory,
 ) -> Vec<(NodeKey, Option<RunReason>)> {
@@ -31,10 +29,9 @@ pub(crate) fn decide<R: DecisionRules>(
         nodes.iter().map(|node| (&node.key, node)).collect();
     let mut stale: HashMap<&NodeKey, Option<RunReason>> = HashMap::new();
     for node in topological(nodes, &by_key) {
-        let reason: Option<RunReason> = match own_reason(rules, node, &by_key, history) {
+        let reason: Option<RunReason> = match own_reason(node, &by_key, history) {
             Some(reason) => Some(reason),
-            None if rules.follows_upstream() => stale_upstream(node, &stale),
-            None => None,
+            None => stale_upstream(node, &stale),
         };
         stale.insert(&node.key, reason);
     }
@@ -99,13 +96,12 @@ fn topological<'a>(
 }
 
 /// Why the node's own facts or records make it run, ignoring its upstreams' staleness.
-fn own_reason<R: DecisionRules>(
-    rules: &R,
+fn own_reason(
     node: &NodeFacts,
     by_key: &HashMap<&NodeKey, &NodeFacts>,
     history: &ConsumptionHistory,
 ) -> Option<RunReason> {
-    if let Some(forced) = node.forced.iter().find(|forced| rules.honours(forced)) {
+    if let Some(forced) = node.forced.first() {
         return Some(RunReason::Forced(forced.clone()));
     }
     let Some(window) = history.window(&node.relation) else {
@@ -114,11 +110,10 @@ fn own_reason<R: DecisionRules>(
     if window.ambiguous {
         return Some(RunReason::AmbiguousOrder);
     }
-    execution_reason(rules, node, (by_key, history), &window)
+    execution_reason(node, (by_key, history), &window)
 }
 
-fn execution_reason<R: DecisionRules>(
-    rules: &R,
+fn execution_reason(
     node: &NodeFacts,
     (by_key, history): (&HashMap<&NodeKey, &NodeFacts>, &ConsumptionHistory),
     window: &Window<'_>,
@@ -143,10 +138,9 @@ fn execution_reason<R: DecisionRules>(
             let (kind, name) = input_key(input);
             let current: Option<&str> = match input {
                 InputFact::Source { version, .. } => version.as_deref(),
-                InputFact::Node(upstream) if rules.compares_node_inputs() => by_key
+                InputFact::Node(upstream) => by_key
                     .get(upstream)
                     .and_then(|facts| history.latest_complete(&facts.relation)),
-                InputFact::Node(_) => continue,
                 InputFact::Opaque(_) => None,
             };
             let Some(current) = current else {

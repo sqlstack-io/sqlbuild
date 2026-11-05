@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::consumption::_helpers::decision::decide;
 use crate::consumption::_helpers::history::build_history;
-use crate::consumption::_helpers::rules::DecisionRules;
 use crate::consumption::constants::RECENT_EXECUTIONS;
 use crate::consumption::main::consumed_inputs::consumed_inputs;
 use crate::consumption::main::started_append::started_append;
@@ -14,8 +13,7 @@ use crate::consumption::models::{
     NodeKey, RelationKey, RunReason,
 };
 use crate::consumption::tests::test_types::{
-    Content, Derivation, Input, LatestRowTime, Miss, NoPlannerGuard, NoUpstreamRecursion, Node,
-    Random, Source, TransitiveOnly, World, Writer,
+    Content, Derivation, Input, Miss, Node, Random, Source, World, Writer,
 };
 
 impl Random {
@@ -282,9 +280,9 @@ impl World {
     }
 
     /// One build; under `--changed` the oracle checks every skip before anything executes.
-    pub(crate) fn build<R: DecisionRules>(
+    pub(crate) fn build(
         &mut self,
-        (rules, writer): (&R, Writer),
+        writer: Writer,
         random: &mut Random,
         step: usize,
     ) -> Result<(), Miss> {
@@ -307,9 +305,8 @@ impl World {
             .map(|source| source.observed.then_some(source.version))
             .collect();
         let facts: Vec<NodeFacts> = self.facts(&selected, &observed, full_refresh);
-        let history: ConsumptionHistory =
-            build_history(rules, &self.read_rows(), RECENT_EXECUTIONS);
-        let decided: Vec<(NodeKey, Option<RunReason>)> = decide(rules, &facts, &history);
+        let history: ConsumptionHistory = build_history(&self.read_rows(), RECENT_EXECUTIONS);
+        let decided: Vec<(NodeKey, Option<RunReason>)> = decide(&facts, &history);
         let run: Vec<usize> = (0..self.nodes.len())
             .filter(|index| selected.contains(index))
             .filter(|index| {
@@ -517,57 +514,24 @@ impl World {
 }
 
 /// Run `cases` seeded worlds of `steps` builds and return the first miss, with its seed and trace.
-pub(crate) fn first_miss<R: DecisionRules>(
-    (rules, writer): (&R, Writer),
+pub(crate) fn first_miss(
+    writer: Writer,
     (cases, steps): (u64, usize),
 ) -> Option<(u64, Miss, Vec<String>)> {
-    (0..cases).find_map(|seed| world_miss((rules, writer), seed, steps))
+    (0..cases).find_map(|seed| world_miss(writer, seed, steps))
 }
 
 /// The first miss of one seeded world.
-fn world_miss<R: DecisionRules>(
-    (rules, writer): (&R, Writer),
-    seed: u64,
-    steps: usize,
-) -> Option<(u64, Miss, Vec<String>)> {
+fn world_miss(writer: Writer, seed: u64, steps: usize) -> Option<(u64, Miss, Vec<String>)> {
     let mut random = Random::new(seed);
     let mut world = World::new(&mut random);
-    let miss: Miss =
-        (0..steps).find_map(|step| world.build((rules, writer), &mut random, step).err())?;
+    let miss: Miss = (0..steps).find_map(|step| world.build(writer, &mut random, step).err())?;
     Some((seed, miss, world.trace))
 }
 
-impl DecisionRules for TransitiveOnly {
-    fn compares_node_inputs(&self) -> bool {
-        false
-    }
-}
-
-impl DecisionRules for LatestRowTime {
-    fn execution_time(&self, earliest: i64, latest: i64) -> i64 {
-        let _ = earliest;
-        latest
-    }
-}
-
-impl DecisionRules for NoUpstreamRecursion {
-    fn follows_upstream(&self) -> bool {
-        false
-    }
-}
-
-impl DecisionRules for NoPlannerGuard {
-    fn honours(&self, forced: &ForcedRun) -> bool {
-        !matches!(forced, ForcedRun::PlannerChange(_))
-    }
-}
-
-/// The first miss of `rules` over the standard cases, rendered for an assertion message.
-pub(crate) fn found<R: DecisionRules>(
-    rules: &R,
-    writer: Writer,
-) -> Option<(u64, String, Vec<String>)> {
-    first_miss((rules, writer), (SIMULATED_CASES, SIMULATED_BUILDS)).map(|(seed, miss, trace)| {
+/// The first miss of `writer` over the standard cases, rendered for an assertion message.
+pub(crate) fn found(writer: Writer) -> Option<(u64, String, Vec<String>)> {
+    first_miss(writer, (SIMULATED_CASES, SIMULATED_BUILDS)).map(|(seed, miss, trace)| {
         (
             seed,
             format!("step {} m{}: {}", miss.step, miss.node, miss.why),

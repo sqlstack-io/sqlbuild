@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use crate::consumption::_helpers::rules::DecisionRules;
 use crate::consumption::constants::{ORDER_SKEW_MICROS, SUCCEEDED_PHASE};
 use crate::consumption::models::{
     ConsumedInput, ConsumptionHistory, ConsumptionRow, Execution, RelationHistory, RelationKey,
@@ -17,11 +16,7 @@ struct ExecutionRows<'a> {
 }
 
 /// Recent executions per relation, from rows read newest first with at most `limit` per relation.
-pub(crate) fn build_history<R: DecisionRules>(
-    rules: &R,
-    rows: &[ConsumptionRow],
-    limit: usize,
-) -> ConsumptionHistory {
+pub(crate) fn build_history(rows: &[ConsumptionRow], limit: usize) -> ConsumptionHistory {
     let mut events: HashMap<&str, (&ConsumptionRow, i64, i64)> = HashMap::new();
     for row in rows {
         let entry = events.entry(row.row.event_id.as_str()).or_insert((
@@ -52,7 +47,7 @@ pub(crate) fn build_history<R: DecisionRules>(
             .entry(relation.clone())
             .or_default()
             .executions
-            .push(execution(rules, execution_id, &execution_rows));
+            .push(execution(execution_id, &execution_rows));
     }
     for history in relations.values_mut() {
         history.executions.sort_by(|left, right| {
@@ -63,11 +58,7 @@ pub(crate) fn build_history<R: DecisionRules>(
     ConsumptionHistory { relations }
 }
 
-fn execution<R: DecisionRules>(
-    rules: &R,
-    execution_id: &str,
-    rows: &ExecutionRows<'_>,
-) -> Execution {
+fn execution(execution_id: &str, rows: &ExecutionRows<'_>) -> Execution {
     let succeeded: Vec<&ConsumptionRow> = rows
         .rows
         .iter()
@@ -105,7 +96,7 @@ fn execution<R: DecisionRules>(
         };
     Execution {
         execution_id: execution_id.to_owned(),
-        started_at: rules.execution_time(rows.earliest, rows.latest),
+        started_at: rows.earliest,
         complete,
         version_hash: (versions.len() == 1)
             .then(|| versions.first().map(|version| (*version).to_owned()))

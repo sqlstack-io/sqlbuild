@@ -1,4 +1,4 @@
-//! Simulated worlds, the oracle's view of their data, and broken decision rules.
+//! Simulated worlds and the oracle's view of their data.
 
 use crate::consumption::models::ConsumptionAppend;
 use crate::consumption::models::ConsumptionRow;
@@ -72,18 +72,6 @@ pub(crate) struct Miss {
     pub(crate) node: usize,
     pub(crate) why: &'static str,
 }
-
-/// Compares only source inputs, as if transitive sources were all a model recorded.
-pub(crate) struct TransitiveOnly;
-
-/// Times an execution by its latest row, so a late duplicate looks newest.
-pub(crate) struct LatestRowTime;
-
-/// Ignores stale upstreams, selected or not.
-pub(crate) struct NoUpstreamRecursion;
-
-/// Ignores the planner's own change detection.
-pub(crate) struct NoPlannerGuard;
 
 pub(crate) struct SimulationTestCase {
     pub(crate) description: &'static str,
