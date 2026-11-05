@@ -4,7 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use crate::authorization::_helpers::custom_roles::{decode_grants, decode_roles, record_role_change};
+use crate::authorization::_helpers::custom_roles::{
+    decode_grants, decode_roles, record_role_change,
+};
 use crate::credentials::models::RoleGrant;
 use crate::snapshots::models::SnapshotRecord;
 use crate::store::errors::ControlError;

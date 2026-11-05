@@ -54,7 +54,10 @@ fn given_published_custom_roles_when_republished_then_each_definition_applies_at
                     roles.location_id,
                     (
                         generation,
-                        json!([orders_grant(publication["permissions"].clone(), &["orders"])]),
+                        json!([orders_grant(
+                            publication["permissions"].clone(),
+                            &["orders"]
+                        )]),
                     ),
                 )
                 .await;
