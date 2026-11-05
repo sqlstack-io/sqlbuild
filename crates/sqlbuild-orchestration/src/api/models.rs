@@ -272,7 +272,6 @@ pub(crate) struct CliLoginClaimRequest {
 pub(crate) struct CliLoginSessionResponse {
     pub(crate) identity: crate::credentials::models::SessionIdentity,
     pub(crate) bearer: String,
-    pub(crate) csrf_token: String,
 }
 
 impl std::fmt::Debug for CliLoginApprovalRequest {
