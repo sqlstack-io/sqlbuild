@@ -2,8 +2,6 @@
 pub(crate) mod contracts;
 #[path = "tests/helpers.rs"]
 mod helpers;
-#[path = "tests/test_backlog.rs"]
-mod test_backlog;
 #[path = "tests/test_cron.rs"]
 mod test_cron;
 #[path = "../../tests/scheduler/test_sensor_fairness.rs"]

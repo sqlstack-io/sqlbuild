@@ -6,24 +6,24 @@ use crate::scheduler::tests::test_types::TickTestCase;
 fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_ticks() {
     let test_cases = [
         TickTestCase {
-            description: "latest catch-up covers earlier ticks and deduplicates calendar entries",
+            description: "catch-up requests only the latest missed time and records nothing earlier",
             due_seconds: vec![30, 10, 20, 10, 40],
             last_second: None,
             now_second: 30,
             active: false,
             expected_requests: vec![30],
-            expected_covered: vec![10, 20],
+            expected_covered: vec![],
             expected_last: Some(30),
             expected_next: Some(40),
         },
         TickTestCase {
-            description: "coalesced ticks are covered by the already waiting run",
+            description: "the latest missed time is covered by the already waiting run",
             due_seconds: vec![10, 20, 30, 40],
             last_second: Some(10),
             now_second: 30,
             active: true,
             expected_requests: vec![],
-            expected_covered: vec![20, 30],
+            expected_covered: vec![30],
             expected_last: Some(30),
             expected_next: Some(40),
         },
@@ -40,8 +40,9 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
         },
     ];
     for test_case in test_cases {
-        let input = state(&test_case);
-        let plan = plan_ticks(&input, time(test_case.now_second)).expect("plan valid schedule");
+        let (trigger, input) = state(&test_case);
+        let plan =
+            plan_ticks(&trigger, &input, time(test_case.now_second)).expect("plan valid schedule");
         assert_eq!(
             request_seconds(&plan),
             test_case.expected_requests,
@@ -62,7 +63,8 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
             plan.next_due_at.map(|time| time.timestamp()),
             test_case.expected_next
         );
-        let retried = plan_ticks(&input, time(test_case.now_second)).expect("retry schedule");
+        let retried =
+            plan_ticks(&trigger, &input, time(test_case.now_second)).expect("retry schedule");
         assert_eq!(
             plan, retried,
             "a retry has exactly the same deterministic tick and run IDs"
@@ -77,8 +79,8 @@ fn given_durable_schedule_state_when_time_advances_then_decisions_preserve_due_t
             last_tick_for: plan.last_tick_for,
             ..input
         };
-        let second =
-            plan_ticks(&advanced, time(test_case.now_second)).expect("plan from committed cursor");
+        let second = plan_ticks(&trigger, &advanced, time(test_case.now_second))
+            .expect("plan from committed cursor");
         assert!(second.actions.iter().all(|next| {
             plan.actions
                 .iter()

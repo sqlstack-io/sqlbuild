@@ -1,4 +1,4 @@
-//! Expired skipped/covered ticks go; a cursor reset never recreates history older than the horizon.
+//! Expired covered ticks go; a cursor reset replays only the latest occurrence and recreates nothing.
 
 use chrono::{Datelike, DurationRound, TimeDelta, Utc};
 use serde_json::json;
@@ -79,11 +79,8 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .collect();
             assert_eq!(
                 outcomes,
-                [
-                    TickOutcome::Covered,
-                    TickOutcome::Covered,
-                    TickOutcome::Requested
-                ]
+                [TickOutcome::Requested],
+                "catch-up records only the latest missed time"
             );
             let later = calendar_time(2) + TimeDelta::hours(1);
             let backlog = case["backlog_ticks"].as_i64().expect("backlog");
@@ -152,16 +149,28 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await
                 .expect("re-evaluate")
                 .expect("trigger");
-            assert!(plan.actions.is_empty(), "no tick older than the horizon");
+            let replayed = calendar_time(2) - TimeDelta::days(shift);
+            assert_eq!(
+                plan.actions
+                    .iter()
+                    .map(|action| action.scheduled_for)
+                    .collect::<Vec<_>>(),
+                [replayed],
+                "a reset replays only the latest occurrence"
+            );
             let ticks = list_ticks(store, trigger_id, 10)
                 .await
                 .expect("after reset");
-            assert_eq!(ticks.len(), test_case.expected_survivors);
+            assert_eq!(
+                ticks.len(),
+                test_case.expected_survivors,
+                "the replayed tick already exists, so nothing is recreated"
+            );
             let trigger = list_triggers(store, location, "development")
                 .await
                 .expect("trigger")
                 .remove(0);
-            assert!(trigger.last_tick_for.is_none());
+            assert_eq!(trigger.last_tick_for, Some(replayed));
             assert_eq!(
                 trigger.next_due_at,
                 Some("2030-01-01T00:00:00Z".parse().expect("future"))

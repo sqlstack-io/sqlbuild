@@ -42,13 +42,6 @@ pub(super) struct PreviousCronTestCase {
 }
 
 #[derive(Debug)]
-pub(super) struct BacklogTestCase {
-    pub(super) description: &'static str,
-    pub(super) expected_latest: i64,
-    pub(super) expected_count: usize,
-}
-
-#[derive(Debug)]
 pub(super) struct SimulationTestCase {
     pub(super) description: &'static str,
     pub(super) expected_success: bool,

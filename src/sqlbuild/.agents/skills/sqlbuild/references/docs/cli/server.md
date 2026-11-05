@@ -48,10 +48,9 @@ snapshot only when no retained run, job, trigger, trigger change or location req
 deletes its node definitions and SQL text when no other snapshot shares them. Repeating or
 interrupting this cleanup is safe.
 
-The scheduler deletes skipped and covered ticks older than 30 days. It keeps each trigger's latest
-tick and every tick that started a run. It also never creates a tick more than 30 days old: a new
-schedule, a resumed trigger or a cursor reset catches up from 30 days ago at most, so deleted
-ticks never come back.
+The scheduler deletes covered ticks older than 30 days. It keeps each trigger's latest tick and
+every tick that started a run. A new schedule, a resumed trigger or a cursor reset catches up only
+on the latest missed time, so deleted ticks never come back.
 
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit

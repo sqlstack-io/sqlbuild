@@ -3,9 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
-use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::_helpers::persistence::persist_ticks;
-use crate::scheduler::_helpers::tick_retention::evaluation_start;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickPlan, TickState};
@@ -42,8 +40,6 @@ pub(crate) async fn evaluate_trigger(
         return Ok(None);
     }
     let now = transaction.now;
-    let (transaction, from) = evaluation_start(transaction, &trigger, now).await?;
-    let (due_times, continuation) = expand_schedule(&trigger.definition_json, from, now)?;
     let (transaction, rows) = query(
         transaction,
         "SELECT r.run_id FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
@@ -64,11 +60,11 @@ pub(crate) async fn evaluate_trigger(
         .transpose()
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let plan = plan_ticks(
+        &trigger.definition_json,
         &TickState {
             trigger_id,
+            started_at: trigger.started_at,
             last_tick_for: trigger.last_tick_for,
-            due_times,
-            continuation,
             waiting_run,
         },
         now,
