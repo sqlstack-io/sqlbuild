@@ -16,7 +16,7 @@ use crate::warehouse_metadata::models::{
 
 pub(crate) async fn statistics_eligibility(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
     record: &Value,
 ) {

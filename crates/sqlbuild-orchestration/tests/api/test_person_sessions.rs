@@ -180,7 +180,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 for role in role_case.role.iter().copied() {
                     assign_builtin_role(
                         &replica,
-                        (&context, (&admin_session.bearer, &admin_session.csrf)),
+                        (&context, admin_session.identity.principal_id),
                         &RoleAssignmentRequest {
                             principal_id: person,
                             role: role.into(),
@@ -340,7 +340,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 for role in role_case.role.iter().copied() {
                     assign_builtin_role(
                         &replica,
-                        (&context, (&admin_session.bearer, &admin_session.csrf)),
+                        (&context, admin_session.identity.principal_id),
                         &RoleAssignmentRequest {
                             principal_id: person,
                             role: role.into(),
@@ -411,7 +411,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             }
             assign_builtin_role(
                 &replica,
-                (&context, (&admin_session.bearer, &admin_session.csrf)),
+                (&context, admin_session.identity.principal_id),
                 &RoleAssignmentRequest {
                     principal_id: person,
                     role: crate::credentials::models::BuiltinRole::Developer.into(),
@@ -484,16 +484,20 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         StatusCode::FORBIDDEN
                     );
                 }
+                let sensor_work = request(
+                    &provider.client,
+                    session,
+                    (Method::GET, &format!("{path}/{}", evaluation.evaluation_id)),
+                    (&Value::Null, &session.csrf),
+                )
+                .await;
+                assert_eq!(sensor_work.status(), StatusCode::OK);
                 assert_eq!(
-                    request(
-                        &provider.client,
-                        session,
-                        (Method::GET, &format!("{path}/{}", evaluation.evaluation_id)),
-                        (&Value::Null, "wrong-csrf")
-                    )
-                    .await
-                    .status(),
-                    StatusCode::FORBIDDEN
+                    sensor_work
+                        .json::<Value>()
+                        .await
+                        .expect("hidden sensor work"),
+                    Value::Null
                 );
             }
             assert_eq!(

@@ -9,7 +9,7 @@ use crate::authorization::main::{
 };
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,
-    sessions::revoke_session::revoke_session, sessions::set_password::set_password,
+    sessions::set_password::set_password,
 };
 use crate::credentials::models::{
     AdministratorChange, AuditContext, PasswordAuthority, PasswordLogin,
@@ -98,13 +98,12 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     };
                     sessions.push(session);
                 }
-                let first_credentials = (sessions[0].bearer.as_str(), sessions[0].csrf.as_str());
-                let second_credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+                let first_credentials = sessions[0].identity.principal_id;
+                let second_credentials = sessions[1].identity.principal_id;
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        second_credentials,
+                        (&context, second_credentials),
                         (second, AdministratorChange::Grant),
                     )
                     .await
@@ -112,17 +111,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     "a valid person session is not administrator authority"
                 );
                 assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        (first_credentials.0, "wrong-csrf"),
-                        (second, AdministratorChange::Grant),
-                    )
-                    .await
-                    .is_err()
-                );
-                assert!(
-                    change_administrator(store, &context, first_credentials, (first, change))
+                    change_administrator(store, (&context, first_credentials), (first, change))
                         .await
                         .is_err(),
                     "cannot remove sole administrator"
@@ -130,8 +119,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        first_credentials,
+                        (&context, first_credentials),
                         (second, AdministratorChange::Grant),
                     )
                     .await
@@ -143,8 +131,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                 assert!(
                     !change_administrator(
                         store,
-                        &context,
-                        first_credentials,
+                        (&context, first_credentials),
                         (second, AdministratorChange::Grant),
                     )
                     .await
@@ -157,8 +144,12 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     revision
                 );
                 let (left, right) = tokio::join!(
-                    change_administrator(store, &context, first_credentials, (first, change)),
-                    change_administrator(&replica, &context, second_credentials, (second, change))
+                    change_administrator(store, (&context, first_credentials), (first, change)),
+                    change_administrator(
+                        &replica,
+                        (&context, second_credentials),
+                        (second, change)
+                    )
                 );
                 assert_eq!(
                     [&left, &right]
@@ -167,11 +158,6 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         .count(),
                     1,
                     "concurrent self-removal leaves one administrator"
-                );
-                let survivor = usize::from(left.is_ok());
-                let survivor_credentials = (
-                    sessions[survivor].bearer.as_str(),
-                    sessions[survivor].csrf.as_str(),
                 );
                 let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("inspect remaining admins"),
                     "SELECT COUNT(*) AS count FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) WHERE a.role_key='admin' AND a.revoked_at IS NULL AND p.disabled_at IS NULL",vec![]).await.expect("count remaining admins");
@@ -185,28 +171,6 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                 assert_eq!(audit[0]["actor"], json!(format!("principal:{first}")));
                 assert_eq!(audit[0]["granting_role"], json!("admin"));
                 commit(transaction).await.expect("finish audit read");
-                let identity = &sessions[survivor].identity;
-                let (transaction, _) = revoke_session(
-                    begin(store, TransactionMode::Write)
-                        .await
-                        .expect("logout transaction"),
-                    &context,
-                    (identity.principal_id, Some(identity.session_id)),
-                )
-                .await
-                .expect("logout");
-                commit(transaction).await.expect("publish logout");
-                assert!(
-                    change_administrator(
-                        &replica,
-                        &context,
-                        survivor_credentials,
-                        (first, AdministratorChange::Grant),
-                    )
-                    .await
-                    .is_err(),
-                    "revoked session cannot grant"
-                );
                 // Simulate an operator's out-of-band loss: it must never reopen bootstrap.
                 let (transaction, _) = query(
                     begin(store, TransactionMode::Write)
@@ -312,7 +276,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 else {
                     panic!("login");
                 };
-                let credentials = (session.bearer.as_str(), session.csrf.as_str());
+                let credentials = session.identity.principal_id;
                 let revision = security_event_count(store)
                     .await
                     .expect("revision before failed grant");
@@ -320,8 +284,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
+                        (&context, credentials),
                         (second, AdministratorChange::Grant),
                     )
                     .await
@@ -337,8 +300,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
+                        (&context, credentials),
                         (second, AdministratorChange::Grant),
                     )
                     .await
@@ -357,8 +319,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
+                        (&context, credentials),
                         (first, AdministratorChange::Disable),
                     )
                     .await
@@ -368,8 +329,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 assert!(
                     change_administrator(
                         store,
-                        &context,
-                        credentials,
+                        (&context, credentials),
                         (first, AdministratorChange::Disable),
                     )
                     .await

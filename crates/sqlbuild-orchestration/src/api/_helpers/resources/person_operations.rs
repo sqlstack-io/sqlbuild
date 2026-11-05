@@ -1,13 +1,12 @@
 //! Person operations use person sessions, never the machine-resource bearer router.
 
 use axum::extract::{Path, Query, State};
-use axum::http::HeaderMap;
 use axum::{Extension, Json};
 use uuid::Uuid;
 
-use crate::api::_helpers::authentication::password_transport::session_credentials;
 use crate::api::errors::ApiError;
 use crate::api::models::{MutationResponse, ReadQuery};
+use crate::credentials::models::SessionIdentity;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
@@ -42,12 +41,12 @@ pub(crate) async fn statistics(
         Extension<StatisticsRetention>,
     ),
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<StatisticsQuery>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<StatisticsPage>, ApiError> {
     Ok(Json(
         read_person_statistics(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, &options),
             (default_role, retention),
         )
@@ -61,16 +60,12 @@ pub(crate) async fn statistics(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
     Json(request): Json<JobRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: request_person_job_run(
-            &store,
-            (&context, session_credentials(&headers)),
-            &request,
-        )
-        .await?,
+        applied: request_person_job_run(&store, (&context, identity.principal_id), &request)
+            .await?,
     }))
 }
 
@@ -80,12 +75,11 @@ pub(crate) async fn request_job(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn cancel_run(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
     Json(request): Json<CancelRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: cancel_person_run(&store, (&context, session_credentials(&headers)), &request)
-            .await?,
+        applied: cancel_person_run(&store, (&context, identity.principal_id), &request).await?,
     }))
 }
 
@@ -95,16 +89,11 @@ pub(crate) async fn cancel_run(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn rerun(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
     Json(request): Json<RerunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: request_rerun(
-            &store,
-            (&context, Some(session_credentials(&headers))),
-            &request,
-        )
-        .await?,
+        applied: request_rerun(&store, (&context, Some(identity.principal_id)), &request).await?,
     }))
 }
 
@@ -114,12 +103,11 @@ pub(crate) async fn rerun(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn change_trigger(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
     Json(request): Json<TriggerChangeRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: change_person_trigger(&store, (&context, session_credentials(&headers)), &request)
-            .await?,
+        applied: change_person_trigger(&store, (&context, identity.principal_id), &request).await?,
     }))
 }
 
@@ -131,12 +119,12 @@ pub(crate) async fn recent_runs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<ReadQuery>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<Vec<RunRecord>>, ApiError> {
     Ok(Json(
         list_person_runs(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, options.limit.unwrap_or(100)),
             default_role,
         )
@@ -158,12 +146,12 @@ pub(crate) async fn catalog(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<CatalogQuery>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<CatalogPage>, ApiError> {
     Ok(Json(
         read_person_catalog(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, &options),
             default_role,
         )
@@ -184,12 +172,12 @@ pub(crate) async fn fingerprint(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<FingerprintQuery>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<Option<FingerprintObservation>>, ApiError> {
     Ok(Json(
         read_person_fingerprint(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, &options),
             default_role,
         )
@@ -207,12 +195,12 @@ pub(crate) async fn node_status(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<NodeStatusQuery>),
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<Option<NodeStatus>>, ApiError> {
     Ok(Json(
         read_person_node_status(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (location_id, &target, &options),
             default_role,
         )

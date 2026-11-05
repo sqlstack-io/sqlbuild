@@ -3,7 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::snapshots::_helpers::reading::attach_sources;
@@ -16,7 +16,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn read_person_node_sql(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location_id, target, node_key): (Uuid, &str, &str),
 ) -> Result<Option<NodeSql>, ControlError> {
     let scope = PermissionScope {
@@ -25,7 +25,7 @@ pub async fn read_person_node_sql(
         target: Some(target.into()),
         nodes: [node_key.into()].into(),
     };
-    let (transaction, context) = authorize_session(
+    let (transaction, context) = authorize_person(
         begin(store, TransactionMode::Write).await?,
         credentials,
         &scope,

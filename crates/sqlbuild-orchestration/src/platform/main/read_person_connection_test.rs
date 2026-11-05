@@ -12,7 +12,7 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 pub async fn read_person_connection_test(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (location_id, target, request_id): (Uuid, &str, Uuid),
 ) -> Result<Option<LocationWorkRecord>, ControlError> {
     let (transaction, _) = authorize_connection_test(

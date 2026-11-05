@@ -1,6 +1,8 @@
 //! Person metadata reads share a live permission decision and the operation's writer fence.
 
-use crate::authorization::main::authorize_session::authorize_session;
+use uuid::Uuid;
+
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -8,11 +10,11 @@ use crate::store::models::{ControlStore, ControlTransaction, TransactionMode};
 
 pub(crate) async fn begin_view(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     scope: &PermissionScope,
     default_role: DefaultRole,
 ) -> Result<ControlTransaction, ControlError> {
-    let (transaction, _) = authorize_session(
+    let (transaction, _) = authorize_person(
         begin(store, TransactionMode::Write).await?,
         credentials,
         scope,

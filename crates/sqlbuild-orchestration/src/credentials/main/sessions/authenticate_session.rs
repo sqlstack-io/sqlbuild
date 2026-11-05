@@ -1,7 +1,7 @@
-//! Read authentication and mutations share the same live session/version checks.
+//! Live person eligibility, password versions and revocation apply to every browser request.
 
-use crate::credentials::_helpers::secrets::bearer_id;
-use crate::credentials::main::sessions::authenticate_session_in::authenticate_session_in as authenticate;
+use crate::credentials::_helpers::active_session::active_session;
+use crate::credentials::_helpers::secrets::{bearer_id, secret_matches};
 use crate::credentials::models::{SessionAccess, SessionIdentity};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
@@ -12,11 +12,18 @@ pub async fn authenticate_session(
     bearer: &str,
     access: SessionAccess<'_>,
 ) -> Result<Option<SessionIdentity>, ControlError> {
-    if bearer_id(bearer).is_none() {
+    let Some(id) = bearer_id(bearer) else {
         return Ok(None);
-    }
-    let (transaction, identity) =
-        authenticate(begin(store, TransactionMode::Read).await?, bearer, access).await?;
+    };
+    let (transaction, session) =
+        active_session(begin(store, TransactionMode::Read).await?, id).await?;
     commit(transaction).await?;
-    Ok(identity)
+    let Some(session) = session else {
+        return Ok(None);
+    };
+    let csrf_matches = match access {
+        SessionAccess::Read => true,
+        SessionAccess::Write { csrf } => secret_matches(csrf, &session.csrf_hash),
+    };
+    Ok((secret_matches(bearer, &session.secret_hash) && csrf_matches).then_some(session.identity))
 }

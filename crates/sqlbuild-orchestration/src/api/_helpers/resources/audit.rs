@@ -1,13 +1,12 @@
 //! Person sessions read bounded security facts without machine-token or ambient-viewer access.
 
 use axum::extract::{Query, State};
-use axum::http::HeaderMap;
 use axum::{Extension, Json};
 
-use crate::api::_helpers::authentication::password_transport::session_credentials;
 use crate::api::errors::ApiError;
 use crate::api::models::ReadAuditQuery;
 use crate::authorization::main::read_security_audit::read_security_audit;
+use crate::credentials::models::SessionIdentity;
 use crate::credentials::models::{AuditContext, SecurityAuditEvent};
 use crate::store::models::ControlStore;
 
@@ -19,12 +18,12 @@ use crate::store::models::ControlStore;
 pub(crate) async fn read(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Query(options): Query<ReadAuditQuery>,
-    headers: HeaderMap,
+    Extension(identity): Extension<SessionIdentity>,
 ) -> Result<Json<Vec<SecurityAuditEvent>>, ApiError> {
     Ok(Json(
         read_security_audit(
             &store,
-            (&context, session_credentials(&headers)),
+            (&context, identity.principal_id),
             (options.after.unwrap_or(0), options.limit.unwrap_or(100)),
         )
         .await?,
