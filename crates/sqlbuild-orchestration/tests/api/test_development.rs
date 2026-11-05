@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, DevelopmentScope};
+use crate::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
 use crate::credentials::main::locations::development_location::development_location;
 use crate::credentials::models::AuditContext;
 use crate::declarations::main::{
@@ -85,7 +85,7 @@ fn given_development_when_defaults_publish_then_identity_audit_and_trigger_pause
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    development_scope: Some(DevelopmentScope {
+                    login: HumanLogin::Development(DevelopmentScope {
                         location_id: location,
                         target: "development".into(),
                         triggers: false,

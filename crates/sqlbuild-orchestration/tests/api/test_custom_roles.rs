@@ -3,7 +3,7 @@
 use reqwest::header;
 use serde_json::{Value, json};
 
-use crate::api::models::ApiAuthentication;
+use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::CustomRoleApiTestCase;
 use crate::credentials::models::Action;
@@ -37,7 +37,7 @@ fn given_http_sessions_when_custom_role_is_assigned_then_it_applies_at_once() {
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    password_origin: Some("https://control.example.com".into()),
+                    login: HumanLogin::Password("https://control.example.com".into()),
                     ..ApiAuthentication::default()
                 },
             )

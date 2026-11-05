@@ -6,7 +6,9 @@ use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, AuthenticationDenial, TrustedProxyAuthentication};
+use crate::api::models::{
+    ApiAuthentication, AuthenticationDenial, HumanLogin, TrustedProxyAuthentication,
+};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::ProxyApiTestCase;
 use crate::credentials::main::identities::create_principal::create_principal;
@@ -70,7 +72,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    trusted_proxy: Some(settings.clone()),
+                    login: HumanLogin::TrustedProxy(settings.clone()),
                     ..ApiAuthentication::default()
                 },
             )
@@ -78,7 +80,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    trusted_proxy: Some(settings.clone()),
+                    login: HumanLogin::TrustedProxy(settings.clone()),
                     ..ApiAuthentication::default()
                 },
             )
@@ -86,7 +88,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
             let untrusted = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    trusted_proxy: Some(TrustedProxyAuthentication {
+                    login: HumanLogin::TrustedProxy(TrustedProxyAuthentication {
                         trusted_peers: BTreeSet::from([value("untrusted_peer")
                             .parse()
                             .expect("untrusted IP")]),

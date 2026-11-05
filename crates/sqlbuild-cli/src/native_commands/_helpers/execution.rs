@@ -11,7 +11,9 @@ use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
+use sqlbuild_orchestration::api::models::{
+    ApiAuthentication, DevelopmentScope, DockerImageSource, HumanLogin,
+};
 use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
@@ -106,7 +108,7 @@ pub(crate) async fn run_development_roles(
         store.clone(),
         listener,
         (ApiAuthentication {
-            development_scope: Some(scope),
+            login: HumanLogin::Development(scope),
             ..ApiAuthentication::default()
         }, Vec::new(), Default::default()),
         (move || {

@@ -5,7 +5,9 @@ use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, AuthenticationDenial, PasswordSessionResponse};
+use crate::api::models::{
+    ApiAuthentication, AuthenticationDenial, HumanLogin, PasswordSessionResponse,
+};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::PasswordApiTestCase;
 use crate::credentials::main::{
@@ -84,7 +86,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    password_origin: Some(origin.into()),
+                    login: HumanLogin::Password(origin.into()),
                     ..ApiAuthentication::default()
                 },
             )
@@ -92,9 +94,8 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    password_origin: Some(origin.into()),
+                    login: HumanLogin::Password(origin.into()),
                     default_role: DefaultRole::Viewer,
-                    ..ApiAuthentication::default()
                 },
             )
             .await;

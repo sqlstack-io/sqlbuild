@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::api::models::ApiAuthentication;
+use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::CliLoginTestCase;
 use crate::credentials::main::{
@@ -82,7 +82,7 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 panic!("browser credentials");
             };
             let authentication = || ApiAuthentication {
-                password_origin: Some(origin.into()),
+                login: HumanLogin::Password(origin.into()),
                 ..ApiAuthentication::default()
             };
             let first = start_api_with_authentication(store, authentication()).await;
