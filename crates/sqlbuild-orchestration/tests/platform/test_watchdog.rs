@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 use std::time::Duration;
 
+use crate::platform::_helpers::retention::retain;
 use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::main::run_watchdog::run_watchdog;
+use crate::platform::main::run_maintenance::run_maintenance;
 use crate::platform::models::{LocationHealth, LocationHealthReport, PlatformEvent};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -15,7 +16,7 @@ use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::tests::helpers::{snapshot, wait_for_scans};
+use crate::platform::tests::helpers::{retained_platform_facts, snapshot, wait_for_scans};
 use crate::platform::tests::test_types::{LocationWatchdogTestCase, WatchdogTestCase};
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
@@ -103,7 +104,10 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
                 .map(|(store, id)| {
                     let id = *id;
                     let shutdown = shutdown.clone();
-                    tokio::spawn(async move { run_watchdog(&store, id, shutdown).await })
+                    tokio::spawn(async move {
+                        run_maintenance((&store, id), (Default::default(), &[]), (|_| {}, shutdown))
+                            .await
+                    })
                 })
                 .collect();
             let observations = wait_for_scans(store, &replicas, &tasks).await;
@@ -170,6 +174,40 @@ fn given_two_server_replicas_when_scheduling_is_stalled_then_health_facts_are_du
                     .expect("join watchdog")
                     .expect("watchdog stopped");
             }
+            let transaction = begin(store, TransactionMode::Write)
+                .await
+                .expect("age health facts");
+            let aged = transaction.now - TimeDelta::days(3);
+            let (transaction, _) = query(
+                transaction,
+                "UPDATE recall_events SET occurred_at=$1 WHERE producer='platform'",
+                vec![Parameter::Time(aged)],
+            )
+            .await
+            .expect("aged health facts");
+            commit(transaction).await.expect("aged facts committed");
+            retain(store, Default::default(), &[])
+                .await
+                .expect("retention pass");
+            let alerts = observations
+                .iter()
+                .filter(|row| !matches!(row.payload.platform, PlatformEvent::Heartbeat { .. }))
+                .count();
+            let remaining = retained_platform_facts(store).await;
+            assert_eq!(
+                remaining
+                    .iter()
+                    .filter(|row| matches!(row.payload.platform, PlatformEvent::Heartbeat { .. }))
+                    .count(),
+                0,
+                "{}: expired replica heartbeats are pruned",
+                test_case.description
+            );
+            assert!(
+                remaining.len() >= alerts,
+                "{}: alert facts outlive the heartbeat horizon for webhooks and sensors",
+                test_case.description
+            );
             close_store(second).await;
             close_test_store(fixture).await;
         });
@@ -280,7 +318,10 @@ fn given_stale_location_sessions_when_watchdogs_scan_then_latest_target_liveness
                 .map(|(store, id)| {
                     let id = *id;
                     let shutdown = shutdown.clone();
-                    tokio::spawn(async move { run_watchdog(&store, id, shutdown).await })
+                    tokio::spawn(async move {
+                        run_maintenance((&store, id), (Default::default(), &[]), (|_| {}, shutdown))
+                            .await
+                    })
                 })
                 .collect();
             let observations = wait_for_scans(store, &replicas, &tasks).await;

@@ -3,8 +3,8 @@
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::_helpers::audit_retention::prune_audit;
 use crate::credentials::main::audit::append_audit::append_audit;
+use crate::credentials::main::audit::prune_audit::prune_audit;
 use crate::credentials::models::{AuditContext, AuditRetention};
 use crate::credentials::tests::helpers::{acknowledge_audit, age_audit, audit_rows};
 use crate::credentials::tests::location_helpers::create_location;

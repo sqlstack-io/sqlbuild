@@ -6,7 +6,7 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::runs::tests::helpers::{request, request_run};
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
-use crate::snapshots::_helpers::retention::prune_snapshots;
+use crate::snapshots::main::prune_snapshots::prune_snapshots;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotRetention;
 use crate::snapshots::tests::helpers::{retained_snapshot_state, retention_counts};
