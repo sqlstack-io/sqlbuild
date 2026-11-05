@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::api::tests::helpers::stop_api;
 use crate::api::tests::oidc_helpers::{start_provider, stop_provider};
-use crate::api::tests::person_sessions_helpers::{browser_sessions, queue_counts, request};
+use crate::api::tests::person_sessions_helpers::{
+    browser_sessions, forged_request, queue_counts, request,
+};
 use crate::api::tests::person_sessions_test_types::SessionRoleCase;
 use crate::api::tests::test_types::LocationWorkTestCase;
 use crate::authorization::main::{
@@ -292,11 +294,11 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         [(&path[..], &body), ("/api/control/runs", &job)]
                     {
                         assert_eq!(
-                            request(
+                            forged_request(
                                 &provider.client,
                                 session,
                                 (Method::POST, endpoint),
-                                (request_body, "wrong-csrf")
+                                request_body
                             )
                             .await
                             .status(),

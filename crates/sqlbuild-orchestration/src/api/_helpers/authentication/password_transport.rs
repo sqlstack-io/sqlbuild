@@ -16,7 +16,7 @@ use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityRe
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
 use crate::credentials::main::audit::record_authentication_denial::record_authentication_denial;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
-use crate::credentials::models::{AuditContext, IssuedSession, SessionAccess};
+use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSession, SessionAccess};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -93,6 +93,10 @@ pub(crate) async fn authenticate(
     context.actor = format!("principal:{}", identity.principal_id);
     context.granting_role = "browser-session".into();
     request.extensions_mut().insert(context);
+    request.extensions_mut().insert(AuthenticatedPerson(
+        identity.principal_id,
+        Some(identity.session_id),
+    ));
     request.extensions_mut().insert(identity);
     Ok(next.run(request).await)
 }

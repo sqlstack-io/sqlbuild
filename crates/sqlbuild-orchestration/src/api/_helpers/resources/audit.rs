@@ -6,7 +6,7 @@ use axum::{Extension, Json};
 use crate::api::errors::ApiError;
 use crate::api::models::ReadAuditQuery;
 use crate::authorization::main::read_security_audit::read_security_audit;
-use crate::credentials::models::SessionIdentity;
+use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, SecurityAuditEvent};
 use crate::store::models::ControlStore;
 
@@ -18,12 +18,12 @@ use crate::store::models::ControlStore;
 pub(crate) async fn read(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Query(options): Query<ReadAuditQuery>,
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<SecurityAuditEvent>>, ApiError> {
     Ok(Json(
         read_security_audit(
             &store,
-            (&context, identity.principal_id),
+            (&context, principal),
             (options.after.unwrap_or(0), options.limit.unwrap_or(100)),
         )
         .await?,

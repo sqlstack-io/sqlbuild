@@ -190,7 +190,9 @@ def authentication_arguments(
 
 
 def sign_in(client: Any, origin: str, mode: str, username: str, password: str) -> str:
-    """Password, PKCE provider, and trusted-proxy authentication all use real installed routes."""
+    """Password and PKCE provider sign-in use real routes; the proxy authenticates each request."""
+    if mode == "proxy":
+        return ""
     if mode == "password":
         status, payload = request(
             client,
@@ -198,8 +200,7 @@ def sign_in(client: Any, origin: str, mode: str, username: str, password: str) -
             {"username": username, "password": password},
         )
     else:
-        path: str = "/api/auth/oidc/login" if mode == "oidc" else "/api/auth/proxy"
-        status, payload = request(client, origin + path)
+        status, payload = request(client, origin + "/api/auth/oidc/login")
     assert status == 200, f"Installed browser authentication failed with HTTP {status}"
     return json.loads(payload)["csrf_token"]
 

@@ -116,11 +116,11 @@ For OIDC sign-in, mount a server-owned JSON file with `origin`, `issuer`,
 `--oidc-config /etc/sqlbuild/oidc.json` to the server command. Both origin and issuer require
 HTTPS. Terminate HTTPS at a trusted proxy, preserve the external Host, restrict backend access,
 and register `/api/auth/oidc/callback` at the issuer. The callback verifies an explicitly bound,
-enabled person and issues a one-hour browser session. Trusted-proxy sign-in through
-`GET /api/auth/proxy` uses the same session protections after verifying the configured socket
-peer and upstream-replaced subject. Neither mechanism provisions people or grants roles.
-The bearer stays in a Secure, HttpOnly, host-only cookie; mutations require the returned CSRF
-token and matching origin. Sessions work across replicas sharing the installation, with live
+enabled person and issues a one-hour browser session. With a trusted proxy, every request
+authenticates from the configured socket peer and the upstream-replaced `X-SQB-User` subject; no
+browser session is issued, and mutations require the configured origin. Neither mechanism
+provisions people or grants roles. A session bearer stays in a Secure, HttpOnly, host-only
+cookie; mutations require the returned CSRF token and matching origin. Sessions work across replicas sharing the installation, with live
 person and role checks. `POST /api/auth/logout` revokes the session across replicas; password
 resets and `grant-admin` revoke all of that person's browser sessions.
 
