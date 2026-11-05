@@ -29,7 +29,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
     input.documents.insert(
         "jobs".into(),
         json!({
-            "orders": {"description": "Refresh orders", "selection": ["orders"], "overlap": "allow"}
+            "orders": {"description": "Refresh orders", "selection": ["orders"]}
         }),
     );
     input.documents.insert(

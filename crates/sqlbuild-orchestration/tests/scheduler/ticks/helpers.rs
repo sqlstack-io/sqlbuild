@@ -33,6 +33,10 @@ use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
 
+/// More than one due-trigger page of requesting triggers keeps every crash point reachable.
+const FAULT_TRIGGERS: usize = 400;
+const FAULT_BACKLOG_MINUTES: i64 = 1;
+
 /// Calendar fixtures stay inside the tick-retention horizon: day 0 is midnight three days ago.
 pub(crate) fn calendar_time(day: i64) -> DateTime<Utc> {
     static BASE: LazyLock<DateTime<Utc>> = LazyLock::new(|| {
@@ -478,12 +482,12 @@ async fn cycle_or_restart(store: &ControlStore, state: SchedulerState) -> (Sched
     )
 }
 
-/// Seeded random faults across two schedulers, then recovery; returns contract breaches and step counts.
+/// Seeded faults across two schedulers, then recovery; armed steps advance the crash point once fired.
 pub(crate) async fn fault_run(
     backend: Backend,
     seed: u64,
-    steps: usize,
-) -> Option<(FaultAnomalies, BTreeMap<&'static str, usize>)> {
+    (steps, mut point): (usize, usize),
+) -> Option<(FaultAnomalies, BTreeMap<&'static str, usize>, usize)> {
     let fixture = open_test_store(backend).await?;
     let store = &fixture.store;
     migrate_store(store).await.expect("migrate");
@@ -493,27 +497,46 @@ pub(crate) async fn fault_run(
     let mut input = snapshot(location);
     input.documents.insert(
         "jobs".into(),
-        json!({"orders": {"description": "Build orders", "selection": ["orders"], "overlap": "queue"}}),
+        (0..FAULT_TRIGGERS)
+            .map(|index| {
+                (
+                    format!("orders_{index}"),
+                    json!({"description": "Build orders", "selection": ["orders"]}),
+                )
+            })
+            .collect(),
     );
     input.documents.insert(
         "triggers".into(),
-        json!({"minutely_orders": {"description": "Minutely orders", "job_key": "orders",
-            "starts_at": "2026-01-01T00:00:00Z", "catch_up": {"all": {"max_runs": 3}},
-            "schedule": {"kind": "cron", "expression": "* * * * *", "timezone": "UTC"}}}),
+        (0..FAULT_TRIGGERS)
+            .map(|index| {
+                (
+                    format!("minutely_{index}"),
+                    json!({"description": "Minutely orders", "job_key": format!("orders_{index}"),
+                        "starts_at": "2026-01-01T00:00:00Z",
+                        "schedule": {"kind": "cron", "expression": "* * * * *", "timezone": "UTC"}}),
+                )
+            })
+            .collect(),
     );
     publish_snapshot(store, &input).await.expect("publication");
-    let trigger_id = list_triggers(store, location, "development")
+    let trigger_ids: Vec<Uuid> = list_triggers(store, location, "development")
         .await
-        .expect("trigger")[0]
-        .trigger_id;
+        .expect("triggers")
+        .iter()
+        .map(|trigger| trigger.trigger_id)
+        .collect();
+    let trigger_id = trigger_ids[0];
     let started = Utc::now()
         .duration_trunc(TimeDelta::minutes(1))
         .expect("minute")
-        - TimeDelta::minutes(120)
+        - TimeDelta::minutes(FAULT_BACKLOG_MINUTES)
         + TimeDelta::milliseconds(250);
-    set_trigger_state(store, trigger_id,
-        "UPDATE sqb_trigger_state SET started_at=$1, last_tick_for=NULL, next_due_at=$1 WHERE trigger_id=$2",
-        started).await;
+    for trigger in &trigger_ids {
+        set_trigger_state(store, *trigger,
+            "UPDATE sqb_trigger_state SET started_at=$1, last_tick_for=NULL, next_due_at=$1 WHERE trigger_id=$2",
+            started).await;
+    }
     let second = second_store(store).await;
     let handles = [store, &second];
     let mut states = [
@@ -548,7 +571,7 @@ pub(crate) async fn fault_run(
         for _ in 0..usize::from(step.expire) {
             expire_lease(store).await;
         }
-        let fault = &faults[step.fault];
+        let fault = &faults[[point % 7, 7][usize::from(step.fault >= 7)]];
         install_fault(store, fault).await;
         let cycle = |index: usize| {
             let (handle, mut state, cycles) =
@@ -571,6 +594,7 @@ pub(crate) async fn fault_run(
             ));
         }
         *counts.entry(fault.description).or_default() += left_crashed + right_crashed;
+        point += usize::from(step.fault < 7 && left_crashed + right_crashed > 0);
         for (name, count) in [
             ("restarts", usize::from(step.restart.is_some())),
             ("lease expiries", usize::from(step.expire)),
@@ -598,8 +622,6 @@ pub(crate) async fn fault_run(
     scheduler_cycle(&second, survivor)
         .await
         .expect("final recovery");
-    let ticks = list_ticks(store, trigger_id, 1000).await.expect("ticks");
-    let times: BTreeSet<DateTime<Utc>> = ticks.iter().map(|tick| tick.scheduled_for).collect();
     let first = started
         .duration_trunc(TimeDelta::minutes(1))
         .expect("minute")
@@ -608,28 +630,52 @@ pub(crate) async fn fault_run(
         .map(|minutes| first + TimeDelta::minutes(minutes))
         .take_while(|time| *time <= settled)
         .collect();
-    anomalies.duplicate_ticks = ticks.len() - times.len();
-    anomalies.missing_ticks = expected.difference(&times).count();
-    anomalies.off_schedule_ticks = times
-        .iter()
-        .filter(|time| **time < first || time.second() != 0 || time.nanosecond() != 0)
-        .count();
-    let runs: BTreeSet<Uuid> = list_runs(store, (location, "development"), 1000)
+    let mut ticks: Vec<TickRecord> = Vec::new();
+    for trigger in &trigger_ids {
+        let trigger_ticks = list_ticks(store, *trigger, 1000).await.expect("ticks");
+        let times: BTreeSet<DateTime<Utc>> = trigger_ticks
+            .iter()
+            .map(|tick| tick.scheduled_for)
+            .collect();
+        anomalies.duplicate_ticks += trigger_ticks.len() - times.len();
+        anomalies.missing_ticks += expected.difference(&times).count();
+        anomalies.off_schedule_ticks += times
+            .iter()
+            .filter(|time| **time < first || time.second() != 0 || time.nanosecond() != 0)
+            .count();
+        ticks.extend(trigger_ticks);
+    }
+    let runs: BTreeSet<Uuid> = list_runs(store, (location, "development"), 5_000)
         .await
         .expect("runs")
         .iter()
         .map(|run| run.run_id)
         .collect();
-    let tick_runs: BTreeSet<Uuid> = ticks.iter().filter_map(|tick| tick.run_id).collect();
+    let requesting: Vec<Uuid> = ticks.iter().filter_map(|tick| tick.run_id).collect();
+    let tick_runs: BTreeSet<Uuid> = requesting.iter().copied().collect();
     anomalies.runs_without_exactly_one_tick = runs.symmetric_difference(&tick_runs).count()
-        + ticks.iter().filter(|tick| tick.run_id.is_none()).count();
-    let requested = read_recall_events(store, 0, 10_000)
-        .await
-        .expect("events")
-        .iter()
-        .filter(|event| event["event_type"] == "run_requested")
-        .count();
-    anomalies.request_event_mismatch = requested.abs_diff(ticks.len());
+        + (requesting.len() - tick_runs.len())
+        + ticks
+            .iter()
+            .filter(|tick| {
+                tick.run_id.is_some() == tick.covered_by_run_id.is_some()
+                    || tick
+                        .covered_by_run_id
+                        .is_some_and(|covering| !runs.contains(&covering))
+            })
+            .count();
+    let transaction = begin(store, TransactionMode::Read).await.expect("events");
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT COUNT(*) AS requested FROM recall_events WHERE event_type='run_requested'",
+        vec![],
+    )
+    .await
+    .expect("request events");
+    commit(transaction).await.expect("read events");
+    let requested =
+        usize::try_from(rows[0]["requested"].as_i64().expect("count")).expect("nonnegative count");
+    anomalies.request_event_mismatch = requested.abs_diff(requesting.len());
     let transaction = begin(store, TransactionMode::Write)
         .await
         .expect("duplicate");
@@ -641,7 +687,7 @@ pub(crate) async fn fault_run(
     counts.insert("ticks", ticks.len());
     close_store(second).await;
     close_test_store(fixture).await;
-    Some((anomalies, counts))
+    Some((anomalies, counts, point))
 }
 
 /// Run one real scheduler loop until `deadline`, then stop it and return the trigger's ticks.

@@ -179,20 +179,12 @@ fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_
         LatestCatchUpTestCase {
             description: "SQLite latest catch-up ticks an occurrence older than the horizon",
             backend: Backend::Sqlite,
-            catch_up: json!("latest"),
             expected_ticks: 1,
         },
         LatestCatchUpTestCase {
             description: "PostgreSQL latest catch-up ticks an occurrence older than the horizon",
             backend: Backend::Postgres,
-            catch_up: json!("latest"),
             expected_ticks: 1,
-        },
-        LatestCatchUpTestCase {
-            description: "bounded catch-up keeps the horizon clamp",
-            backend: Backend::Sqlite,
-            catch_up: json!({"all": {"max_runs": 5}}),
-            expected_ticks: 0,
         },
     ];
     for test_case in test_cases {
@@ -222,7 +214,7 @@ fn given_an_old_yearly_schedule_when_first_evaluated_then_latest_catch_up_ticks_
             input.documents.insert(
                 "triggers".into(),
                 json!({"yearly_orders": {"description": "Yearly orders", "job_key": "orders",
-                    "starts_at": case["yearly_starts_at"], "catch_up": test_case.catch_up,
+                    "starts_at": case["yearly_starts_at"],
                     "schedule": {"kind": "cron", "expression": format!("0 0 {} {} *", latest.day(), latest.month()), "timezone": "UTC"}}}),
             );
             publish_snapshot(store, &input).await.expect("publication");

@@ -11,7 +11,7 @@ use crate::scheduler::constants::{
     TICK_RETENTION_INTERVAL_SECONDS,
 };
 use crate::scheduler::main::check_lease::check_lease;
-use crate::scheduler::models::{CatchUp, DueTrigger, SchedulerLease};
+use crate::scheduler::models::{DueTrigger, SchedulerLease};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
@@ -33,8 +33,7 @@ pub(crate) async fn evaluation_start(
     if start >= horizon {
         return Ok((transaction, start));
     }
-    if trigger.definition_json.catch_up == CatchUp::Latest
-        && let Some(latest) = latest_occurrence(&trigger.definition_json, now)?
+    if let Some(latest) = latest_occurrence(&trigger.definition_json, now)?
         && latest > start
         && latest < horizon
     {

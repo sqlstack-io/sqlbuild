@@ -64,11 +64,11 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
                 .expect("other location");
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders": {"description": "Source orders", "selection": ["orders", "customers"], "overlap": "allow"},
-                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"], "overlap": "allow"}
+                "orders": {"description": "Source orders", "selection": ["orders", "customers"]},
+                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"]}
             }));
             input.documents.insert("groups".into(), json!({
-                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}, "overlap": "allow"}
+                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
             let selectors = [
                 "completed",

@@ -9,7 +9,6 @@ use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::scheduler::main::_next_cron_time::next_cron_time;
 use crate::scheduler::main::_previous_cron_time::previous_cron_time;
 use crate::scheduler::main::parse_cron::parse_cron;
-use crate::scheduler::models::CatchUp;
 use crate::scheduler::types::ScheduleExpansion;
 use crate::store::errors::ControlError;
 
@@ -31,10 +30,9 @@ pub(crate) fn expand_schedule(
         }
     };
     let cron = parse_cron(expression, timezone)?;
-    let latest = trigger.catch_up == CatchUp::Latest;
     let mut due: Vec<DateTime<Utc>> = Vec::new();
     let mut cursor = from;
-    for _ in 0..(MAX_TICKS_PER_BATCH - usize::from(latest)) {
+    for _ in 0..(MAX_TICKS_PER_BATCH - 1) {
         cursor = next_cron_time(&cron, cursor)?;
         due.push(cursor);
         if cursor > now {
@@ -42,7 +40,7 @@ pub(crate) fn expand_schedule(
         }
     }
     let continuation = next_cron_time(&cron, cursor)?;
-    if latest && continuation <= now {
+    if continuation <= now {
         let latest = previous_cron_time(&cron, now)?;
         due.push(latest);
         return Ok((

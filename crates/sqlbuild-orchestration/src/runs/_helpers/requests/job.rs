@@ -55,7 +55,6 @@ pub(crate) async fn frozen_group_children(
             selection,
             settings: job.settings.clone(),
             concurrency_groups: job.concurrency_groups.clone(),
-            overlap: job.overlap,
             ..request.clone()
         });
     }

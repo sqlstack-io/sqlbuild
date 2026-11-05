@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 use crate::runs::_helpers::lifecycle::events::append_run_event;
 use crate::runs::models::{RunClaim, RunRequest};
-use crate::scheduler::models::Overlap;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -19,9 +18,7 @@ pub(crate) async fn reserve_claims(
     request: &RunRequest,
     limits: &BTreeMap<String, NonZeroU32>,
 ) -> Result<(ControlTransaction, bool), ControlError> {
-    if request.overlap != Overlap::Allow
-        && let Some(job_key) = &request.job_key
-    {
+    if let Some(job_key) = &request.job_key {
         let rows;
         (transaction, rows) = query(
             transaction,

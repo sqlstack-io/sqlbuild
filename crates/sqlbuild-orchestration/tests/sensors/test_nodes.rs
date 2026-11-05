@@ -63,11 +63,11 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 .expect("other location");
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders": {"description": "Source orders", "selection": ["orders", "customers"], "overlap": "allow"},
-                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"], "overlap": "allow"}
+                "orders": {"description": "Source orders", "selection": ["orders", "customers"]},
+                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"]}
             }));
             input.documents.insert("groups".into(), json!({
-                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}, "overlap": "allow"}
+                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
             input.documents.insert("triggers".into(), json!({
                 "rebuilt_orders": {"description": "Each genuine rebuild", "job_key": "inventory",

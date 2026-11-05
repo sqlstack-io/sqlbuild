@@ -64,7 +64,6 @@ pub(crate) async fn frozen_job_request(
             settings: definition.settings,
             window: request.window.clone(),
             concurrency_groups: definition.concurrency_groups,
-            overlap: definition.overlap,
         },
     ))
 }

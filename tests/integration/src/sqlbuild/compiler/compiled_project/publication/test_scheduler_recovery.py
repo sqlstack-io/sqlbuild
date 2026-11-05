@@ -28,7 +28,7 @@ NO_ANOMALIES: dict[str, int] = {
     "test_case",
     [
         SchedulerCrashTestCase(
-            description="two installed SQLite schedulers SIGKILLed while draining a backlog",
+            description="two installed SQLite schedulers SIGKILLed while recording a backlog",
             fixture="benchmarks/duckshop/edge_cases/orchestration/scheduler_crash_recovery.json",
             expected_anomalies=NO_ANOMALIES,
             expected_minimum_kills=32,
@@ -47,4 +47,4 @@ def test_given_schedulers_killed_mid_backlog_when_a_survivor_recovers_then_every
     print(f"{test_case.description}: {kills} kills, {interrupted} of {ticks} ticks before recovery")
     assert observed == test_case.expected_anomalies
     assert kills >= test_case.expected_minimum_kills
-    assert 0 < interrupted < ticks
+    assert 0 < interrupted <= ticks

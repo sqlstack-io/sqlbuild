@@ -119,7 +119,7 @@ pub(crate) async fn claim_worker_run(
         documents: BTreeMap::from([(
             "jobs".into(),
             serde_json::json!({"daily_orders": {
-                "description": "Build orders", "selection": ["orders"], "overlap": "allow", "settings": {"full_refresh": true}
+                "description": "Build orders", "selection": ["orders"], "settings": {"full_refresh": true}
             }}),
         )]),
     };
