@@ -23,7 +23,16 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
 
 EVERY_MODEL: frozenset[str] = frozenset({"stg_orders", "stg_customers", "customer_orders"})
 # Functions deploy on every build; `--changed` decides models and seeds only.
-FUNCTIONS: frozenset[str] = frozenset({"udf__order_key", "table_fn__customer_order_keys"})
+FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "udf__order_key",
+        "table_fn__customer_order_keys",
+        "udf__raw_customer_count",
+        "table_fn__raw_customers_from",
+    }
+)
+# Their functions read raw.customers without declaring it, so they run on every build.
+UNDECLARED_READERS: frozenset[str] = frozenset({"customers_via_table_fn", "customer_count_via_udf"})
 EXPECTED_CHANGED_RUNS: tuple[tuple[str, frozenset[str]], ...] = (
     ("first --changed build", EVERY_MODEL),
     ("nothing changed", frozenset()),
@@ -67,11 +76,15 @@ def test_given_input_changes_when_building_with_changed_then_exactly_their_consu
             description="duckdb",
             warehouse=DUCKDB_CHANGED,
             expected_ran=(
-                ("first --changed build", EVERY_MODEL | {"first_customer_order_keys"}),
-                ("nothing changed", frozenset()),
+                (
+                    "first --changed build",
+                    EVERY_MODEL | UNDECLARED_READERS | {"first_customer_order_keys"},
+                ),
+                ("nothing changed", UNDECLARED_READERS),
                 (
                     "a new order",
-                    frozenset({"stg_orders", "customer_orders", "first_customer_order_keys"}),
+                    UNDECLARED_READERS
+                    | {"stg_orders", "customer_orders", "first_customer_order_keys"},
                 ),
             ),
         )
@@ -88,8 +101,19 @@ def test_given_models_calling_functions_when_building_with_changed_then_only_cha
         apply_changed_step(project_dir, test_case.warehouse, step)
         ran: frozenset[str] = run_changed_build(project_dir, step.arguments)
         observed.append((step.description, ran - FUNCTIONS))
+    warehouse_file: Path = project_dir / test_case.warehouse.warehouse_file
+    test_case.warehouse.execute(
+        warehouse_file, f"INSERT INTO {test_case.warehouse.customers_table} VALUES (2, 3)"
+    )
+    run_changed_build(project_dir, ("--changed",))
+    function_reads: list[tuple[object, ...]] = test_case.warehouse.execute(
+        warehouse_file,
+        "SELECT (SELECT count(*) FROM main.customers_via_table_fn), "
+        "(SELECT customer_count FROM main.customer_count_via_udf)",
+    )
 
     assert tuple(observed) == test_case.expected_ran
+    assert function_reads == [(2, 2)]
 
 
 @pytest.mark.parametrize(

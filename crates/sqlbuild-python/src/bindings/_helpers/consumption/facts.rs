@@ -10,7 +10,7 @@ use sqlbuild_state::consumption::models::{ForcedRun, InputFact, NodeFacts, NodeK
 use crate::bindings::_helpers::compiled_views::{
     function_reads, model_reads, project_reads, seed_reads,
 };
-use crate::bindings::_helpers::consumption::relation_reads::{Locations, model_reads_undeclared};
+use crate::bindings::_helpers::consumption::relation_reads::{Locations, sql_reads_undeclared};
 use crate::bindings::_helpers::planner_identity::hashing::{graph_key, model_query_hash};
 use crate::bindings::_helpers::planner_identity::identities::hook_version_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::{
@@ -27,6 +27,8 @@ const UNCHANGED_REASONS: [&str; 2] = ["no_change", "normal_incremental"];
 const FIRST_RUN: &str = "first_run";
 const FULL_REFRESH: &str = "full_refresh";
 const SKIP_ACTION: &str = "skip";
+const SQL_LANGUAGE: &str = "sql";
+const UDF: &str = "udf";
 
 /// The selection's nodes and their ancestry, and the selected ones that execute.
 pub(crate) struct BuildFacts {
@@ -121,6 +123,71 @@ fn inputs(
     facts
 }
 
+/// Checks that functions a model calls, transitively, read only their declared inputs.
+struct FunctionReads<'a> {
+    /// Each function's SQL to check, or `None` for a Python function, which reads no relation.
+    bodies: &'a HashMap<(String, String), Option<String>>,
+    function_deps: &'a HashMap<(String, String), Vec<(String, String)>>,
+    sources: &'a HashMap<String, Option<String>>,
+    locations: &'a Locations,
+    dialect: Option<&'a str>,
+    checked: HashMap<(String, String), bool>,
+}
+
+impl FunctionReads<'_> {
+    fn undeclared(&mut self, py: Python<'_>, deps: &[(String, String)]) -> PyResult<bool> {
+        let mut pending: VecDeque<(String, String)> = deps
+            .iter()
+            .filter(|(kind, _)| FUNCTION_KINDS.contains(&kind.as_str()))
+            .cloned()
+            .collect();
+        let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+        while let Some(key) = pending.pop_front() {
+            if !seen.insert(key.clone()) {
+                continue;
+            }
+            let own_deps: Vec<(String, String)> =
+                self.function_deps.get(&key).cloned().unwrap_or_default();
+            if self.function_undeclared(py, &key, &own_deps)? {
+                return Ok(true);
+            }
+            pending.extend(
+                own_deps
+                    .into_iter()
+                    .filter(|(kind, _)| FUNCTION_KINDS.contains(&kind.as_str())),
+            );
+        }
+        Ok(false)
+    }
+
+    fn function_undeclared(
+        &mut self,
+        py: Python<'_>,
+        key: &(String, String),
+        own_deps: &[(String, String)],
+    ) -> PyResult<bool> {
+        if let Some(undeclared) = self.checked.get(key) {
+            return Ok(*undeclared);
+        }
+        let undeclared: bool = match self.bodies.get(key) {
+            None => true,
+            Some(None) => false,
+            Some(Some(sql)) => {
+                let allowed: Vec<InputFact> =
+                    inputs(own_deps.to_vec(), self.function_deps, self.sources);
+                sql_reads_undeclared(
+                    py,
+                    sql.clone(),
+                    (&allowed, None),
+                    (self.locations, self.dialect),
+                )?
+            }
+        };
+        self.checked.insert(key.clone(), undeclared);
+        Ok(undeclared)
+    }
+}
+
 fn key_rows(keys: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
     keys.try_iter()?
         .map(|key| {
@@ -173,14 +240,27 @@ pub(crate) fn build_facts(
         );
     }
     let mut function_deps: HashMap<(String, String), Vec<(String, String)>> = HashMap::new();
+    let mut function_bodies: HashMap<(String, String), Option<String>> = HashMap::new();
     let functions: Bound<'_, PyAny> = project_reads::functions(project)?;
     for function in functions.try_iter()? {
         let function: Bound<'_, PyAny> = function?;
         let key = graph_key(&function_reads::key(&function)?)?;
         function_deps.insert(
-            (key.kind, key.name),
+            (key.kind.clone(), key.name.clone()),
             key_rows(&function_reads::deps(&function)?)?,
         );
+        let body: Option<String> =
+            if enum_text(&function_reads::language(&function)?)? == SQL_LANGUAGE {
+                let body: String = function_reads::body_sql(&function)?.extract()?;
+                Some(if key.kind == UDF {
+                    format!("SELECT ({body})")
+                } else {
+                    body
+                })
+            } else {
+                None
+            };
+        function_bodies.insert((key.kind, key.name), body);
     }
     let mut selected: BTreeMap<NodeKey, Vec<ForcedRun>> = BTreeMap::new();
     let mut runnable: BTreeSet<NodeKey> = BTreeSet::new();
@@ -213,6 +293,15 @@ pub(crate) fn build_facts(
     } else {
         None
     };
+    let mut function_checks: Option<FunctionReads<'_>> =
+        locations.as_ref().map(|locations| FunctionReads {
+            bodies: &function_bodies,
+            function_deps: &function_deps,
+            sources: &sources,
+            locations,
+            dialect: dialect.as_deref(),
+            checked: HashMap::new(),
+        });
     let mut nodes: Vec<NodeFacts> = Vec::new();
     let mut pending: VecDeque<NodeKey> = selected.keys().cloned().collect();
     let mut visited: BTreeSet<NodeKey> = BTreeSet::new();
@@ -249,7 +338,7 @@ pub(crate) fn build_facts(
                 seed_identity(seed)?.0,
             ),
         };
-        let node_inputs: Vec<InputFact> = inputs(deps, &function_deps, &sources);
+        let node_inputs: Vec<InputFact> = inputs(deps.clone(), &function_deps, &sources);
         for input in &node_inputs {
             if let InputFact::Node(upstream) = input {
                 pending.push_back(upstream.clone());
@@ -263,13 +352,14 @@ pub(crate) fn build_facts(
             None => Vec::new(),
         };
         let relation: Option<RelationKey> = relation(&destination)?;
-        if let (Compiled::Model(model), Some(locations)) = (node, &locations)
-            && model_reads_undeclared(
-                model,
+        if let (Compiled::Model(model), Some(locations), Some(function_checks)) =
+            (node, &locations, &mut function_checks)
+            && (sql_reads_undeclared(
+                py,
+                model_reads::query_sql(model)?.extract()?,
                 (&node_inputs, relation.as_ref()),
-                locations,
-                dialect.as_deref(),
-            )?
+                (locations, dialect.as_deref()),
+            )? || function_checks.undeclared(py, &deps)?)
         {
             forced.push(ForcedRun::InputsNotEnumerable);
         }

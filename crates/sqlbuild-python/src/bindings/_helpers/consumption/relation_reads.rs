@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
 use sqlbuild_state::consumption::models::{InputFact, NodeKey, RelationKey};
 
@@ -118,22 +118,20 @@ fn names((name, schema, database): &RelationRow, location: &RelationKey) -> bool
         })
 }
 
-/// True when the SQL cannot be parsed or names a relation no input or the model itself writes.
-pub(crate) fn model_reads_undeclared(
-    model: &Bound<'_, PyAny>,
+/// True when `sql` cannot be parsed or names a relation no input or its own relation writes.
+pub(crate) fn sql_reads_undeclared(
+    py: Python<'_>,
+    sql: String,
     (inputs, own): (&[InputFact], Option<&RelationKey>),
-    locations: &Locations,
-    dialect: Option<&str>,
+    (locations, dialect): (&Locations, Option<&str>),
 ) -> PyResult<bool> {
-    let sql: String = model_reads::query_sql(model)?.extract()?;
     let sql: String = FUNCTION_CALLS.iter().fold(sql, |sql, function| {
         replace_reference_calls(&sql, function, |_| {
             Ok::<_, std::convert::Infallible>(Some((*function).to_owned()))
         })
         .unwrap_or_else(|never| match never {})
     });
-    let Some((relations, temporary)) = extract_sql_relation_names(model.py(), &sql, dialect)?
-    else {
+    let Some((relations, temporary)) = extract_sql_relation_names(py, &sql, dialect)? else {
         return Ok(true);
     };
     for relation in &relations {
