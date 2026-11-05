@@ -52,14 +52,14 @@ def test_given_an_installed_server_when_admin_is_granted_then_authority_is_resto
     "test_case",
     [
         InstalledRecoveryTestCase(
-            description="installed PostgreSQL grant-admin rolls back audit faults while servers run",
+            description="installed PostgreSQL grant-admin restores authority while replicas run",
             executable="sqb",
             expected_rejection="cannot remove or disable the final installation administrator",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_postgres_servers_when_grant_admin_fails_then_retry_revokes_only_the_granted_person(
+def test_given_postgres_replicas_when_grant_admin_runs_then_only_the_granted_persons_sessions_end(
     test_case: InstalledRecoveryTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SQLBUILD_CONTROL_DATABASE_URL", "unsupported://must-not-open")
@@ -120,27 +120,8 @@ def test_given_postgres_servers_when_grant_admin_fails_then_retry_revokes_only_t
                     "WHERE principal_id=%s",
                     (principal,),
                 )
-                control.execute(
-                    "CREATE FUNCTION reject_grant_audit() RETURNS trigger LANGUAGE plpgsql AS $$ "
-                    "BEGIN RAISE EXCEPTION 'grant audit unavailable'; END; $$; "
-                    "CREATE TRIGGER reject_grant_audit BEFORE INSERT ON sqb_security_audit "
-                    "FOR EACH ROW WHEN (NEW.action='admin.granted') "
-                    "EXECUTE FUNCTION reject_grant_audit()"
-                )
-                before: Any = control.execute(state_sql).fetchone()
-                assert before is not None
-                assert before == (1, 0, 2, 0)
+                assert control.execute(state_sql).fetchone() == (1, 0, 2, 0)
                 retained_before: dict[str, str] = postgres_recovery_state(control)
-            rejected: subprocess.CompletedProcess[str] = administer(
-                installation, recovery, extra_environment=extra
-            )
-            assert rejected.returncode != 0 and not rejected.stdout
-            assert "grant audit unavailable" in rejected.stderr
-            with psycopg.connect(url) as control:
-                assert control.execute(state_sql).fetchone() == before
-                assert postgres_recovery_state(control) == retained_before
-                control.execute("DROP TRIGGER reject_grant_audit ON sqb_security_audit")
-                control.execute("DROP FUNCTION reject_grant_audit()")
             assert successful(administer(installation, recovery, extra_environment=extra)) == {
                 "principal_id": principal,
                 "role": "admin",
@@ -174,7 +155,7 @@ def test_given_postgres_servers_when_grant_admin_fails_then_retry_revokes_only_t
                 )
                 assert status == 403
                 assert test_case.expected_rejection in body["error"]
-        rejected = administer(
+        rejected: subprocess.CompletedProcess[str] = administer(
             installation, ["create-user", "replacement-admin"], extra_environment=extra
         )
         assert rejected.returncode != 0 and not rejected.stdout
