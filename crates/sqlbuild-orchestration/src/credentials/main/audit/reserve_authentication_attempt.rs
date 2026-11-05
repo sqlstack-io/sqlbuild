@@ -1,11 +1,9 @@
 //! Serialized reservations bound authentication work across API replicas.
 
 use chrono::Duration;
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::constants::{LOGIN_PEER_LIMIT, LOGIN_USER_LIMIT, LOGIN_WINDOW_SECONDS};
-use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{AuditContext, AuthenticationAttempt};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -52,26 +50,6 @@ pub async fn reserve_authentication_attempt(
             "INSERT INTO sqb_password_login_attempts (attempt_id, identity_key, peer_address, attempted_at) VALUES ($1,$2,$3,$4)",
             vec![Parameter::Id(id), Parameter::Text(identity_key.clone()), Parameter::Text(peer), Parameter::Time(now)]).await?;
     }
-    commit(
-        append_audit(
-            transaction,
-            context,
-            (
-                id,
-                if allowed {
-                    "login.requested"
-                } else {
-                    "login.throttled"
-                },
-            ),
-            (
-                json!({"identity_key": identity_key}),
-                json!(null),
-                json!({"allowed": allowed}),
-            ),
-        )
-        .await?,
-    )
-    .await?;
+    commit(transaction).await?;
     Ok((id, allowed))
 }

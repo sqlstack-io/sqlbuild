@@ -56,7 +56,7 @@ pub(crate) fn router(
         )
         .merge(password_sessions::session_routes(store))
         .merge(super::cli_login::router(BrowserLoginMethod::Proxy))
-        .layer(middleware::from_fn_with_state(store.clone(), guard))
+        .layer(middleware::from_fn(guard))
         .layer(Extension(origin))
         .layer(Extension(Arc::new(settings))))
 }
@@ -80,13 +80,13 @@ async fn authenticate(
         .ip_address
         .is_some_and(|peer| settings.trusted_peers.contains(&peer))
     {
-        return deny(&store, &context, "untrusted_proxy_peer").await;
+        return deny(&context);
     }
     let Some(principal_id) = single_header(request.headers(), PROXY_USER_HEADER)
         .and_then(|subject| settings.identities.get(subject))
         .copied()
     else {
-        return deny(&store, &context, "unbound_proxy_subject").await;
+        return deny(&context);
     };
     let (transaction, people) = query(
         begin(&store, TransactionMode::Read).await?,
@@ -96,7 +96,7 @@ async fn authenticate(
     .await?;
     commit(transaction).await?;
     if people.is_empty() {
-        return deny(&store, &context, "inactive_proxy_person").await;
+        return deny(&context);
     }
     context.actor = format!("principal:{principal_id}");
     context.granting_role = "trusted-proxy".into();
