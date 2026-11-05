@@ -115,5 +115,5 @@ pub(crate) struct CliLoginTestCase {
 pub(crate) struct CustomRoleApiTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
-    pub(crate) expected_statuses: [u16; 5],
+    pub(crate) expected_statuses: [u16; 2],
 }

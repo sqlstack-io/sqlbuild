@@ -1,4 +1,4 @@
-//! Real people, sessions and published custom roles for role approval contracts.
+//! Real people, sessions and published custom roles for custom role contracts.
 
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -7,26 +7,20 @@ use crate::authorization::main::{
     assign_builtin_role::assign_builtin_role, authorize_session::authorize_session,
     bootstrap_user::bootstrap_user,
 };
-use crate::authorization::main::{
-    decide_role_approval::decide_role_approval, request_role_activation::request_role_activation,
-};
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    Action, AuditContext, BuiltinRole, DefaultRole, IssuedSession, PasswordAuthority,
-    PasswordLogin, PermissionScope, RoleAssignmentRequest, RoleKey,
-};
-use crate::credentials::models::{
-    RoleActivation, RoleActivationRequest, RoleApproval, RoleDecision,
+    Action, AuditContext, DefaultRole, IssuedSession, PasswordAuthority, PasswordLogin,
+    PermissionScope, RoleAssignmentRequest, RoleKey,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::test_types::RoleFixture;
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::main::begin::begin;
 use crate::store::models::{ControlStore, TransactionMode};
 
 pub(crate) const SUPPORT_ROLE: &str = "orders_support";
@@ -87,8 +81,8 @@ pub(crate) async fn publish_support_role(
         .expect("publish roles");
 }
 
-/// Administrators by count, then a member holding the published, still unapproved support role.
-pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) -> RoleFixture {
+/// The first administrator, then a member holding the published support role.
+pub(crate) async fn role_fixture(store: &ControlStore) -> RoleFixture {
     let context = AuditContext {
         actor: "local-control-store-owner".into(),
         granting_role: "control-store-owner".into(),
@@ -98,27 +92,7 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     let first = bootstrap_user(store, &context, "orders-admin")
         .await
         .expect("bootstrap");
-    let mut sessions = vec![signed_in(store, &context, (first, "orders-admin")).await];
-    for index in 1..administrators {
-        let name = format!("fulfillment-admin-{index}");
-        let principal = create_principal(store, &context, &name)
-            .await
-            .expect("administrator");
-        let session = signed_in(store, &context, (principal, &name)).await;
-        assign(
-            store,
-            (&context, &sessions[0]),
-            RoleAssignmentRequest {
-                principal_id: principal,
-                role: BuiltinRole::Admin.into(),
-                location_id: None,
-                target: None,
-                revoke: false,
-            },
-        )
-        .await;
-        sessions.push(session);
-    }
+    let administrator = signed_in(store, &context, (first, "orders-admin")).await;
     let member = create_principal(store, &context, "support-person")
         .await
         .expect("member");
@@ -129,7 +103,7 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     publish_support_role(store, location_id, (1, json!(["view"]))).await;
     assign(
         store,
-        (&context, &sessions[0]),
+        (&context, &administrator),
         RoleAssignmentRequest {
             principal_id: member,
             role: RoleKey::Custom(SUPPORT_ROLE.into()),
@@ -142,7 +116,7 @@ pub(crate) async fn role_fixture(store: &ControlStore, administrators: usize) ->
     RoleFixture {
         context,
         location_id,
-        administrators: sessions,
+        administrator,
         member: member_session,
         member_id: member,
     }
@@ -175,69 +149,4 @@ pub(crate) async fn granting_role(
         "authorization either grants or denies"
     );
     decision.ok().map(|(_, context)| context.granting_role)
-}
-
-/// Role approval audit facts in commit order: action and recorded outcome.
-pub(crate) async fn role_audit(store: &ControlStore) -> Vec<(String, Value)> {
-    let transaction = begin(store, TransactionMode::Read).await.expect("read");
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT action, CAST(after_json AS TEXT) AS after FROM sqb_security_audit \
-         WHERE action IN ('role.activation_requested','role.approved','role.rejected') ORDER BY storage_id",
-        vec![],
-    )
-    .await
-    .expect("role audit");
-    commit(transaction).await.expect("commit");
-    rows.iter()
-        .map(|row| {
-            (
-                row["action"].as_str().unwrap_or_default().into(),
-                serde_json::from_str(row["after"].as_str().unwrap_or("null")).expect("after json"),
-            )
-        })
-        .collect()
-}
-
-pub(crate) async fn request(
-    store: &ControlStore,
-    fixture: &RoleFixture,
-    requester: usize,
-) -> RoleActivation {
-    request_role_activation(
-        store,
-        (
-            &fixture.context,
-            credentials(&fixture.administrators[requester]),
-        ),
-        &RoleActivationRequest {
-            location_id: fixture.location_id,
-            target: "development".into(),
-            role_key: SUPPORT_ROLE.into(),
-            reason: "Support answers order questions".into(),
-        },
-    )
-    .await
-    .expect("activation request")
-}
-
-pub(crate) async fn approve(
-    store: &ControlStore,
-    fixture: &RoleFixture,
-    (approver, activation, confirm): (usize, &RoleActivation, bool),
-) -> Result<bool, ControlError> {
-    decide_role_approval(
-        store,
-        (
-            &fixture.context,
-            credentials(&fixture.administrators[approver]),
-        ),
-        &RoleApproval {
-            request_id: activation.request_id,
-            decision: RoleDecision::Approved,
-            reason: "Reviewed the support grants".into(),
-            confirm_self_approval: confirm,
-        },
-    )
-    .await
 }

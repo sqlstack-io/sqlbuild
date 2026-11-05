@@ -15,8 +15,6 @@ use crate::api::_helpers::resources::{
 #[openapi(paths(
     administrators::change,
     administrators::assign,
-    administrators::request_activation,
-    administrators::decide,
     audit::read,
     person_operations::request_job,
     person_operations::cancel_run,
