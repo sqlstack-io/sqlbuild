@@ -1,4 +1,4 @@
-//! A standalone server loads explicit proxy bindings and rejects ambiguous authentication modes.
+//! A standalone server authenticates each request from explicit proxy bindings and rejects ambiguous modes.
 
 use reqwest::{Client, StatusCode, header};
 use serde_json::{Value, json};
@@ -7,12 +7,16 @@ use crate::helpers::{api_ready, start_control_in, wait_for_exit};
 use crate::test_types::{AuthenticationConfigurationTestCase, ProxyCliTestCase};
 
 #[test]
-fn given_an_owner_configured_proxy_when_a_standalone_server_authenticates_then_only_explicit_people_resolve_without_machine_authority()
+fn given_an_owner_configured_proxy_when_requests_carry_a_subject_then_only_explicit_people_resolve_without_sessions_or_machine_authority()
  {
     let test_cases = [ProxyCliTestCase {
         description: "explicit upstream subject differs from the local username",
         subject: "external-orders-reader",
-        expected_status: StatusCode::OK,
+        expected_statuses: [
+            StatusCode::FORBIDDEN,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::UNAUTHORIZED,
+        ],
     }];
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -33,26 +37,18 @@ fn given_an_owner_configured_proxy_when_a_standalone_server_authenticates_then_o
             let mut control = start_control_in(directory, &["server", "--port", "0", "--no-scheduler", "--trusted-proxy-config", "proxy.json"]);
             let url = api_ready(&mut control).await;
             let client = Client::builder().timeout(std::time::Duration::from_secs(5)).build().expect("HTTP client");
-            let response = client.get(format!("{url}/api/auth/proxy"))
-                .header(header::HOST, "control.example.com").header(header::ORIGIN, "https://control.example.com")
-                .header("x-sqb-user", test_case.subject).send().await.expect("upstream identity");
-            assert_eq!(response.status(), test_case.expected_status, "{}", test_case.description);
-            let cookie = response.headers().get_all(header::SET_COOKIE).iter()
-                .map(|value| value.to_str().expect("cookie"))
-                .find(|value| value.starts_with("__Host-sqb-session=")).expect("browser session")
-                .split(';').next().expect("cookie pair").to_owned();
-            let body = response.json::<Value>().await.expect("identity");
-            assert_eq!(body["principal_id"], principal);
-            assert!(body.get("bearer").is_none());
+            let runs = format!("{url}/api/control/locations/{}/targets/development/runs", uuid::Uuid::now_v7());
+            let read = || client.get(&runs).header(header::HOST, "control.example.com");
+            let statuses = [
+                read().header("x-sqb-user", test_case.subject).send().await.expect("bound subject").status(),
+                read().header("x-sqb-user", "orders-reader").send().await.expect("local name is not a subject").status(),
+                read().send().await.expect("missing subject").status(),
+            ];
+            assert_eq!(statuses, test_case.expected_statuses, "{}", test_case.description);
             let session = client.get(format!("{url}/api/auth/session"))
-                .header(header::HOST, "control.example.com").header(header::COOKIE, &cookie)
-                .send().await.expect("standalone shared session path");
-            assert_eq!(session.status(), StatusCode::OK);
-            assert_eq!(session.json::<Value>().await.expect("session identity")["principal_id"], principal);
-            let metadata = client.get(format!("{url}/api/control/locations/{}/targets/development/runs", uuid::Uuid::now_v7()))
-                .header(header::HOST, "control.example.com").header(header::COOKIE, &cookie)
-                .send().await.expect("no implicit viewer grant");
-            assert_eq!(metadata.status(), StatusCode::FORBIDDEN);
+                .header(header::HOST, "control.example.com").header("x-sqb-user", test_case.subject)
+                .send().await.expect("no session is minted");
+            assert_eq!(session.status(), StatusCode::UNAUTHORIZED);
             let machine = client.get(format!("{url}/api/locations/{}/health", uuid::Uuid::now_v7()))
                 .header("x-sqb-user", test_case.subject).send().await.expect("machine boundary");
             assert_eq!(machine.status(), StatusCode::UNAUTHORIZED);

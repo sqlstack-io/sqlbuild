@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
-use crate::scheduler::models::Overlap;
 use crate::snapshots::models::{SnapshotInput, SnapshotNode};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -33,7 +32,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
         git_author: None,
         image_id: Some("sha256:synthetic-orders-image".into()),
         environment_hash: "orders-environment".into(),
-        sqb_version: env!("CARGO_PKG_VERSION").into(),
+        sqb_version: "1.0.0".into(),
         nodes: ["customers", "inventory", "orders", "products"]
             .into_iter()
             .map(|name| {
@@ -82,7 +81,6 @@ pub(crate) fn request(
         settings: BTreeMap::new(),
         window: None,
         concurrency_groups: BTreeSet::new(),
-        overlap: Overlap::Allow,
     }
 }
 

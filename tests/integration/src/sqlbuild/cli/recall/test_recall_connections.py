@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import subprocess
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -122,6 +123,7 @@ def test_given_only_a_read_connection_when_running_then_reads_are_shared_and_wri
                 'DROP VIEW IF EXISTS "invocations";',
                 'CREATE VIEW IF NOT EXISTS "invocations" AS',
                 'INSERT OR IGNORE INTO "recall_meta"',
+                f"'{version('sqlbuild')}', strftime(",
             ),
             expected_up_to_date_note="is up to date with this SQLBuild version",
         ),

@@ -7,7 +7,7 @@ use crate::authorization::_helpers::administrators::{
     deny_change, grant_installation_admin, remaining_administrator,
 };
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{AdministratorAuthentication, AdministratorChange, AuditContext};
+use crate::credentials::models::{AdministratorChange, AuditContext};
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -16,12 +16,11 @@ pub(crate) async fn apply_change(
     transaction: ControlTransaction,
     context: &AuditContext,
     (principal_id, change): (Uuid, AdministratorChange),
-    authentication: &AdministratorAuthentication,
 ) -> Result<bool, ControlError> {
     let (mut transaction, rows) = query(transaction,
         "SELECT p.disabled_at,a.assignment_id FROM sqb_principals p LEFT JOIN sqb_role_assignments a \
          ON p.principal_id=a.principal_id AND a.role_key='admin' AND a.location_id IS NULL \
-         AND a.target IS NULL AND a.revoked_at IS NULL WHERE p.principal_id=$1 AND p.kind='person'",
+         AND a.target IS NULL WHERE p.principal_id=$1",
         vec![Parameter::Id(principal_id)]).await?;
     let Some(person) = rows.first() else {
         return deny_change(
@@ -42,14 +41,13 @@ pub(crate) async fn apply_change(
         )
     {
         let other;
-        (transaction, other) =
-            remaining_administrator(transaction, principal_id, authentication).await?;
+        (transaction, other) = remaining_administrator(transaction, principal_id).await?;
         if !other {
             return deny_change(
                 transaction,
                 context,
                 principal_id,
-                "cannot remove or disable the final usable installation administrator",
+                "cannot remove or disable the final installation administrator",
             )
             .await;
         }
@@ -75,11 +73,13 @@ pub(crate) async fn apply_change(
             return Ok(applied);
         }
         AdministratorChange::Revoke => {
-            (transaction, changed) = query(transaction,
-                "UPDATE sqb_role_assignments SET revoked_at=$1,revoked_by=$2,active_key=NULL \
-                 WHERE principal_id=$3 AND role_key='admin' AND location_id IS NULL AND target IS NULL \
-                 AND revoked_at IS NULL RETURNING assignment_id",
-                vec![Parameter::Time(now), Parameter::Text(context.actor.clone()),Parameter::Id(principal_id)]).await?;
+            (transaction, changed) = query(
+                transaction,
+                "DELETE FROM sqb_role_assignments WHERE principal_id=$1 AND role_key='admin' \
+                 AND location_id IS NULL AND target IS NULL RETURNING assignment_id",
+                vec![Parameter::Id(principal_id)],
+            )
+            .await?;
             "role.revoked"
         }
         AdministratorChange::Disable | AdministratorChange::Enable => {

@@ -1445,18 +1445,17 @@ fn given_threshold_override_change_when_evaluating_then_ruleset_fingerprint_chan
 }
 
 #[test]
-fn given_native_build_when_reading_cache_identity_then_version_carries_source_hash() {
+fn given_native_build_when_reading_cache_identity_then_it_is_a_source_hash() {
     let test_cases = [test_types::BuildIdentityTestCase {
-        description: "cache identity is the package version plus a source content hash",
-        expected_prefix: concat!(env!("CARGO_PKG_VERSION"), "+"),
+        description: "cache identity is a source content hash",
         expected_hash_length: 16,
     }];
     for test_case in &test_cases {
-        let hash = NATIVE_BUILD_IDENTITY.strip_prefix(test_case.expected_prefix);
+        let hash = NATIVE_BUILD_IDENTITY;
 
         assert!(
-            hash.is_some_and(|hash| hash.len() == test_case.expected_hash_length
-                && hash.bytes().all(|byte| byte.is_ascii_hexdigit())),
+            hash.len() == test_case.expected_hash_length
+                && hash.bytes().all(|byte| byte.is_ascii_hexdigit()),
             "{}",
             test_case.description
         );

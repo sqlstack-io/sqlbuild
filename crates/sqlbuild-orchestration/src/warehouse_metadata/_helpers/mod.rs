@@ -4,7 +4,6 @@ pub(crate) mod fingerprint_reads;
 pub(crate) mod fingerprints;
 pub(crate) mod freshness;
 pub(crate) mod ingestion;
+pub(crate) mod mirror_pages;
 pub(crate) mod node_status;
-pub(crate) mod person_reads;
-pub(crate) mod reconciliation;
 pub(crate) mod statistics;

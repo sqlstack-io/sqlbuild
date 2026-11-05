@@ -1,11 +1,10 @@
 pub mod assign_builtin_role;
-pub(crate) mod authorize_session;
+pub(crate) mod authorize_person;
+pub(crate) mod begin_authorized;
 pub mod bootstrap_user;
 pub mod change_administrator;
-pub mod decide_role_approval;
 pub(crate) mod deny_authorization;
+pub mod grant_admin;
 pub(crate) mod publish_custom_roles;
 pub(crate) mod read_audit_events;
 pub mod read_security_audit;
-pub mod recover_administrator;
-pub mod request_role_activation;

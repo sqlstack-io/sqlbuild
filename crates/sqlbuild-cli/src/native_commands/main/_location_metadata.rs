@@ -16,8 +16,8 @@ use tokio::time::Instant;
 
 use crate::argv::models::Stream;
 use crate::native_commands::_helpers::execution::{
-    acknowledge_metadata_page, deliver_metadata_page, freeze_history_page, history_request,
-    location_result, metadata_health, statistics_page,
+    acknowledge_metadata_page, freeze_history_page, history_request, location_result,
+    metadata_health, statistics_page,
 };
 use crate::native_commands::_helpers::paths::location_inputs;
 use crate::native_commands::_helpers::terminal::write_output;
@@ -114,23 +114,20 @@ pub(super) async fn sync_location_metadata(
     };
     let response = tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
-        response = deliver_metadata_page((client, &options.target), &pending.body, state.kind()) => response,
+        response = client.sync_metadata(&options.target, &pending.batch) => response,
     };
-    let response = match response {
-        Ok(response) => response,
-        Err(error) => {
-            tokio::select! {
-                result = &mut stopped => { result?; return Ok(None); },
-                () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
-            }
-            return retry_metadata(state, error);
+    if let Err(error) = response {
+        tokio::select! {
+            result = &mut stopped => { result?; return Ok(None); },
+            () = metadata_health(&state, (client, poll), (started, Some(WarehouseSyncFailure::Delivery))) => {},
         }
-    };
+        return retry_metadata(state, error);
+    }
     tokio::select! {
         result = &mut stopped => { result?; return Ok(None); },
         () = metadata_health(&state, (client, poll), (started, None)) => {},
     }
-    acknowledge_metadata_page(state, response).map(Some)
+    Ok(Some(acknowledge_metadata_page(state)))
 }
 
 fn retry_metadata(

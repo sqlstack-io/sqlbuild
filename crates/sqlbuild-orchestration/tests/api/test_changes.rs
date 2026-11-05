@@ -72,8 +72,12 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             .await
             .expect("location token");
             let mut input = snapshot(location_id);
-            input.documents.insert("jobs".into(), json!({"orders": {"description":"Build orders", "selection":["orders"], "overlap":"allow"}}));
-            input.documents.insert("triggers".into(), json!({"daily_orders": {"description":"Refresh orders", "job_key":"orders", "starts_at":calendar_text(0),
+            input.documents.insert(
+                "jobs".into(),
+                json!({"orders": {"description":"Build orders", "selection":["orders"]},
+                    "daily": {"description":"Refresh orders daily", "selection":["orders"]}}),
+            );
+            input.documents.insert("triggers".into(), json!({"daily_orders": {"description":"Refresh orders", "job_key":"daily", "starts_at":calendar_text(0),
                 "schedule":{"kind":"calendar", "times":[calendar_text(0),"2030-01-01T00:00:00Z"], "refresh_at":"2029-01-01T00:00:00Z"}}}));
             publish_snapshot(store, &input)
                 .await
@@ -202,7 +206,9 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 .await
                 .expect("tick decision")
                 .expect("active trigger");
-            let TickDecision::Requested { run_id } = plan.actions[0].decision else {
+            let TickDecision::Requested { run_id } =
+                plan.actions.last().expect("latest tick").decision
+            else {
                 panic!("new scheduled run")
             };
             let tick_topics = [

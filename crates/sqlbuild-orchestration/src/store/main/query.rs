@@ -15,15 +15,14 @@ pub(crate) async fn query(
         .take()
         .ok_or_else(|| ControlError::Invalid("transaction has already finished".into()))?;
     let rows: Vec<Row> = match connection {
-        Connection::Sqlite(connection, access) => {
+        Connection::Sqlite(connection) => {
             let sql = sql.to_owned();
-            let connection = (connection, access);
             let (connection, result) = tokio::task::spawn_blocking(move || {
-                let result = sqlite_query(&connection.0, &sql, &parameters);
+                let result = sqlite_query(&connection, &sql, &parameters);
                 (connection, result)
             })
             .await?;
-            transaction.connection = Some(Connection::Sqlite(connection.0, connection.1));
+            transaction.connection = Some(Connection::Sqlite(connection));
             result?
         }
         Connection::Postgres(mut connection) => {

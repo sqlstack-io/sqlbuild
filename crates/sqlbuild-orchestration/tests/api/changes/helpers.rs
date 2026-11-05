@@ -99,7 +99,7 @@ pub(crate) async fn restore_snapshot_commits(store: &ControlStore) {
 
 async fn execute_fault_sql(store: &ControlStore, (sqlite, postgres): (&str, &str)) {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         rusqlite::Connection::open(path)

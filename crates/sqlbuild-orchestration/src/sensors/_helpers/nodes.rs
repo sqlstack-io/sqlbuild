@@ -1,4 +1,4 @@
-//! Node conditions consume immutable execution evidence or warehouse source observations.
+//! Node conditions consume executed run-node outcomes or the latest warehouse source observations.
 
 use std::collections::BTreeSet;
 use std::num::NonZeroU32;
@@ -7,13 +7,13 @@ use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::_helpers::transitions::matches_transition;
 use crate::sensors::constants::TIMESTAMP_VALUE_KIND;
 use crate::sensors::models::{
-    NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest, SourceSensorEvent,
+    NodeEventKind, NodeSensorEvent, SensorCursor, SensorEvaluationRequest,
 };
+use crate::sensors::types::SourcePage;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -29,107 +29,178 @@ pub(crate) async fn consume_node_events(
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
-        "SELECT storage_id,event_id,run_id,payload FROM recall_events \
-         WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished') \
-         AND invocation_id='scheduler/' || run_id AND storage_id>$1 \
-         ORDER BY storage_id LIMIT 100",
-        vec![Parameter::Integer(evaluation.cursor.event_storage_id)],
+        "SELECT n.run_id,n.node_key,n.status,n.finished_storage_id FROM sqb_run_nodes n \
+         JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE n.finished_storage_id>$1 AND n.status IN ('success','failed') \
+         AND n.started_at IS NOT NULL AND r.location_id=$2 AND r.target=$3 AND r.kind<>'group' \
+         ORDER BY n.finished_storage_id LIMIT 100",
+        vec![
+            Parameter::Integer(evaluation.cursor.event_storage_id),
+            Parameter::Id(evaluation.location_id),
+            Parameter::Text(evaluation.target.clone()),
+        ],
     )
     .await?;
     let mut cursor = evaluation.cursor.clone();
     let mut run_ids: Vec<Uuid> = Vec::new();
     for row in rows {
-        let event: NodeSensorEvent = decode_row(row)?;
-        cursor.event_storage_id = event.storage_id;
-        let request: RunChangeRequest = serde_json::from_value(event.payload["change"].clone())
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if request.run_id != event.run_id || request.event_id != event.event_id {
-            return Err(ControlError::Invalid("node event identity mismatch".into()));
-        }
-        let Some((node_key, outcome)) = request.change.finished_node() else {
-            continue;
-        };
-        if !selection.contains(node_key)
-            || !matches!(outcome, NodeOutcome::Success | NodeOutcome::Failed)
-        {
-            continue;
-        }
-        let started;
-        (transaction, started) =
-            prior_start(transaction, evaluation, &request, event.storage_id).await?;
-        if !started {
+        let node: NodeSensorEvent = decode_row(row)?;
+        cursor.event_storage_id = node.finished_storage_id;
+        if !selection.contains(&node.node_key) {
             continue;
         }
         let matches;
-        (transaction, matches) = matches_transition(
-            transaction,
-            evaluation,
-            (node_key, outcome, event.storage_id),
-            kinds,
-        )
-        .await?;
+        (transaction, matches) = matches_transition(transaction, evaluation, &node, kinds).await?;
         if matches {
             let run_id;
-            (transaction, run_id) =
-                queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
+            (transaction, run_id) = queue_sensor_run(
+                transaction,
+                evaluation,
+                &format!("{}/{}", node.run_id, node.node_key),
+            )
+            .await?;
             run_ids.push(run_id);
         }
     }
     Ok((transaction, (cursor, run_ids)))
 }
 
+/// A source's newest version queues one run per streak, keyed on the streak's first row so pruning never reuses a key.
 pub(crate) async fn consume_source_events(
     transaction: ControlTransaction,
     evaluation: &SensorEvaluationRequest,
     selection: &BTreeSet<String>,
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
-    let (mut transaction, rows) = query(
-        transaction,
-        "SELECT storage_id,event_id,invocation_id,invocation_sequence,payload FROM recall_events \
-         WHERE producer='warehouse' AND event_type='warehouse_source_freshness' \
-         AND invocation_id LIKE 'warehouse/source-freshness/%' AND storage_id>$1 \
-         ORDER BY storage_id LIMIT 100",
-        vec![Parameter::Integer(evaluation.cursor.event_storage_id)],
-    )
-    .await?;
-    let mut cursor = evaluation.cursor.clone();
+    let (mut transaction, (nodes, next)) = source_page(transaction, evaluation, selection).await?;
     let mut run_ids: Vec<Uuid> = Vec::new();
-    for row in rows {
-        let event: SourceSensorEvent = decode_row(row)?;
-        cursor.event_storage_id = event.storage_id;
-        let observation = &event.payload;
-        let record = &observation.record;
-        if observation.location_id != evaluation.location_id
-            || observation.target != evaluation.target
-            || !selection.contains(&format!("source:{}", record.source_name))
-            || record.data_version.is_none()
-        {
-            continue;
-        }
-        let previous;
-        (transaction, previous) = query(
+    for (key, definition) in nodes {
+        let (parameters, predicate) = source_scope(evaluation, &key, &definition);
+        let rows;
+        (transaction, rows) = query(transaction, &format!(
+            "SELECT latest.record_json, (SELECT streak.event_id FROM sqb_warehouse_freshness streak \
+             WHERE streak.location_id=$1 AND streak.target=$2 AND streak.record_json ->> 'source_name'=$3{streak} \
+             AND streak.record_json ->> 'data_version' IS NOT NULL \
+             AND streak.record_json ->> 'data_version_hash'=latest.record_json ->> 'data_version_hash' \
+             AND NOT EXISTS (SELECT 1 FROM sqb_warehouse_freshness other \
+               WHERE other.location_id=$1 AND other.target=$2 AND other.record_json ->> 'source_name'=$3{other} \
+               AND other.record_json ->> 'data_version' IS NOT NULL \
+               AND other.record_json ->> 'data_version_hash'<>latest.record_json ->> 'data_version_hash' \
+               AND (other.received_at,other.observed_at,other.event_id)>(streak.received_at,streak.observed_at,streak.event_id)) \
+             ORDER BY streak.received_at,streak.observed_at,streak.event_id LIMIT 1) AS streak_start \
+             FROM sqb_warehouse_freshness latest WHERE latest.location_id=$1 AND latest.target=$2 \
+             AND latest.record_json ->> 'source_name'=$3{latest} AND latest.record_json ->> 'data_version' IS NOT NULL \
+             ORDER BY latest.received_at DESC,latest.observed_at DESC,latest.event_id DESC LIMIT 1",
+            streak = predicate.replace("record_json", "streak.record_json"),
+            other = predicate.replace("record_json", "other.record_json"),
+            latest = predicate.replace("record_json", "latest.record_json"),
+        ), parameters).await?;
+        let Some(row) = rows.first() else { continue };
+        let record: WarehouseFreshnessRecord =
+            serde_json::from_value(row["record_json"].clone())
+                .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let identity = serde_json::to_vec(&(
+            &key,
+            &record.target_database,
+            &record.target_schema,
+            &record.target_name,
+            &record.data_version_hash,
+            &row["streak_start"],
+        ))
+        .map_err(|error| ControlError::Invalid(error.to_string()))?;
+        let run_key = sha256_hex(&identity);
+        let requested;
+        (transaction, requested) = query(
             transaction,
-            "SELECT payload -> 'record' ->> 'data_version_hash' AS hash FROM recall_events \
-             WHERE producer='warehouse' AND event_type='warehouse_source_freshness' \
-             AND invocation_id=$1 AND invocation_sequence=$2 LIMIT 1",
+            "SELECT 1 AS requested FROM sqb_run_requests WHERE trigger_id=$1 AND run_key=$2",
             vec![
-                Parameter::Text(event.invocation_id),
-                Parameter::Integer(event.invocation_sequence - 1),
+                Parameter::Id(evaluation.trigger_id),
+                Parameter::Text(run_key.clone()),
             ],
         )
         .await?;
-        if previous
-            .first()
-            .is_some_and(|row| row["hash"] == record.data_version_hash)
-        {
+        if !requested.is_empty() {
             continue;
         }
         let run_id;
-        (transaction, run_id) =
-            queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
+        (transaction, run_id) = queue_sensor_run(transaction, evaluation, &run_key).await?;
         run_ids.push(run_id);
     }
+    let mut cursor = evaluation.cursor.clone();
+    cursor.custom = next;
     Ok((transaction, (cursor, run_ids)))
+}
+
+/// One page of selected source definitions after the cursor's last key, and the next page's start.
+async fn source_page(
+    transaction: ControlTransaction,
+    evaluation: &SensorEvaluationRequest,
+    selection: &BTreeSet<String>,
+) -> Result<SourcePage, ControlError> {
+    let mut remaining = selection.iter().filter(|key| {
+        evaluation
+            .cursor
+            .custom
+            .as_ref()
+            .is_none_or(|after| *key > after)
+    });
+    let page: BTreeSet<String> = remaining.by_ref().take(100).cloned().collect();
+    let next = remaining
+        .next()
+        .is_some()
+        .then(|| page.last().cloned())
+        .flatten();
+    let (transaction, nodes) =
+        read_snapshot_nodes(transaction, evaluation.snapshot_id, Some(&page)).await?;
+    Ok((
+        transaction,
+        (
+            nodes
+                .into_iter()
+                .map(|(key, node)| (key, node.definition))
+                .collect(),
+            next,
+        ),
+    ))
+}
+
+/// Parameters $1-$3 and a predicate matching the declared source's physical relation.
+fn source_scope(
+    evaluation: &SensorEvaluationRequest,
+    key: &str,
+    definition: &serde_json::Value,
+) -> (Vec<Parameter>, String) {
+    let mut parameters = vec![
+        Parameter::Id(evaluation.location_id),
+        Parameter::Text(evaluation.target.clone()),
+        Parameter::Text(key.replacen("source:", "", 1)),
+    ];
+    let mut predicate = String::new();
+    for (column, value) in [
+        (
+            "target_database",
+            definition["namespace"]
+                .get(0)
+                .unwrap_or(&definition["database"]),
+        ),
+        (
+            "target_schema",
+            definition["namespace"]
+                .get(1)
+                .unwrap_or(&definition["schema"]),
+        ),
+        ("target_name", &definition["table"]),
+    ] {
+        if let Some(value) = value.as_str() {
+            parameters.push(Parameter::Text(value.into()));
+            predicate.push_str(&format!(
+                " AND record_json ->> '{column}'=${}",
+                parameters.len()
+            ));
+        } else {
+            predicate.push_str(&format!(" AND record_json ->> '{column}' IS NULL"));
+        }
+    }
+    (parameters, predicate)
 }
 
 fn stale_version(
@@ -165,51 +236,10 @@ pub(crate) async fn consume_stale_sources(
     selection: &BTreeSet<String>,
     after_seconds: NonZeroU32,
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
-    let mut cursor = evaluation.cursor.clone();
-    let mut remaining = selection
-        .iter()
-        .filter(|key| cursor.custom.as_ref().is_none_or(|after| *key > after));
-    let page: BTreeSet<String> = remaining.by_ref().take(100).cloned().collect();
-    let next = remaining
-        .next()
-        .is_some()
-        .then(|| page.last().cloned())
-        .flatten();
-    let (mut transaction, nodes) =
-        read_snapshot_nodes(transaction, evaluation.snapshot_id, Some(&page)).await?;
+    let (mut transaction, (nodes, next)) = source_page(transaction, evaluation, selection).await?;
     let mut run_ids: Vec<Uuid> = Vec::new();
-    for (key, node) in nodes {
-        let mut parameters = vec![
-            Parameter::Id(evaluation.location_id),
-            Parameter::Text(evaluation.target.clone()),
-            Parameter::Text(key.replacen("source:", "", 1)),
-        ];
-        let mut predicate = String::new();
-        for (column, value) in [
-            (
-                "target_database",
-                node.definition["namespace"]
-                    .get(0)
-                    .unwrap_or(&node.definition["database"]),
-            ),
-            (
-                "target_schema",
-                node.definition["namespace"]
-                    .get(1)
-                    .unwrap_or(&node.definition["schema"]),
-            ),
-            ("target_name", &node.definition["table"]),
-        ] {
-            if let Some(value) = value.as_str() {
-                parameters.push(Parameter::Text(value.into()));
-                predicate.push_str(&format!(
-                    " AND record_json ->> '{column}'=${}",
-                    parameters.len()
-                ));
-            } else {
-                predicate.push_str(&format!(" AND record_json ->> '{column}' IS NULL"));
-            }
-        }
+    for (key, definition) in nodes {
+        let (parameters, predicate) = source_scope(evaluation, &key, &definition);
         let rows;
         (transaction, rows) = query(transaction, &format!(
             "SELECT record_json FROM sqb_warehouse_freshness WHERE location_id=$1 AND target=$2 \
@@ -236,45 +266,7 @@ pub(crate) async fn consume_stale_sources(
             queue_sensor_run(transaction, evaluation, &sha256_hex(&identity)).await?;
         run_ids.push(run_id);
     }
+    let mut cursor = evaluation.cursor.clone();
     cursor.custom = next;
     Ok((transaction, (cursor, run_ids)))
-}
-
-async fn prior_start(
-    transaction: ControlTransaction,
-    evaluation: &SensorEvaluationRequest,
-    request: &RunChangeRequest,
-    storage_id: i64,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let (Some((node_key, _)), Some(claim_id)) = (request.change.finished_node(), request.claim_id)
-    else {
-        return Ok((transaction, false));
-    };
-    let started_type = if matches!(request.change, RunChange::CheckFinished { .. }) {
-        "run_check_started"
-    } else {
-        "run_node_started"
-    };
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT s.event_id FROM sqb_runs r JOIN recall_events s ON s.run_id=CAST(r.run_id AS TEXT) \
-         WHERE s.invocation_id=$1 AND s.run_id=$2 AND s.producer='scheduler' \
-         AND s.event_type=$9 AND s.storage_id<$3 \
-         AND (s.payload -> 'change' ->> 'claim_id')=$4 \
-         AND (s.payload -> 'change' -> 'change' ->> 'node_key')=$5 \
-         AND r.run_id=$6 AND r.location_id=$7 AND r.target=$8 AND r.kind<>'group' LIMIT 1",
-        vec![
-            Parameter::Text(format!("scheduler/{}", request.run_id)),
-            Parameter::Text(request.run_id.to_string()),
-            Parameter::Integer(storage_id),
-            Parameter::Text(claim_id.to_string()),
-            Parameter::Text(node_key.into()),
-            Parameter::Id(request.run_id),
-            Parameter::Id(evaluation.location_id),
-            Parameter::Text(evaluation.target.clone()),
-            Parameter::Text(started_type.into()),
-        ],
-    )
-    .await?;
-    Ok((transaction, !rows.is_empty()))
 }

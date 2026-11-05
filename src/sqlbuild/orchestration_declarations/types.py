@@ -23,7 +23,6 @@ class RunEventKind(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    PRESUMED_FAILED = "presumed_failed"
 
 
 class NodeEventKind(StrEnum):

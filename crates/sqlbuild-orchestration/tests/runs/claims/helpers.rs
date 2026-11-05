@@ -12,7 +12,7 @@ use uuid::Uuid;
 pub(crate) async fn slot_counts(store: &ControlStore) -> BTreeMap<String, i64> {
     let sql = "SELECT group_key, count(*) FROM sqb_concurrency_slots GROUP BY group_key";
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         return rusqlite::Connection::open(path)

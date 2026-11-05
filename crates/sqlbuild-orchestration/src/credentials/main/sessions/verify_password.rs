@@ -23,7 +23,7 @@ pub async fn verify_password(
         transaction,
         "SELECT credential_id, password_hash FROM sqb_password_credentials c \
          JOIN sqb_principals p ON p.principal_id=c.principal_id \
-         WHERE p.principal_id=$1 AND p.kind='person' AND p.disabled_at IS NULL",
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL",
         vec![Parameter::Id(principal_id)],
     )
     .await?;

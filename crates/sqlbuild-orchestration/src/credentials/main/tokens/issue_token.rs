@@ -5,9 +5,8 @@ use chrono::{DateTime, Utc};
 use crate::credentials::_helpers::tokens::issue;
 use crate::credentials::models::{AuditContext, CredentialScope, IssuedToken};
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
-use crate::store::main::commit::commit;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::main::write::write;
+use crate::store::models::ControlStore;
 
 /// The caller authorizes token management before entering this storage operation.
 pub async fn issue_token(
@@ -16,8 +15,8 @@ pub async fn issue_token(
     scope: CredentialScope,
     expires_at: DateTime<Utc>,
 ) -> Result<IssuedToken, ControlError> {
-    let transaction = begin(store, TransactionMode::Write).await?;
-    let (transaction, issued) = issue(transaction, context, scope, expires_at).await?;
-    commit(transaction).await?;
-    Ok(issued)
+    write(store, |transaction| {
+        issue(transaction, context, scope, expires_at)
+    })
+    .await
 }

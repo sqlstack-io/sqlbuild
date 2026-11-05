@@ -6,19 +6,18 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, DevelopmentScope, DockerImageSource};
-use sqlbuild_orchestration::authorization::main::recover_administrator::recover_administrator;
-use sqlbuild_orchestration::credentials::main::audit::run_audit_retention::run_audit_retention;
-use sqlbuild_orchestration::credentials::models::{AuditContext, AuditRetention};
+use sqlbuild_orchestration::api::models::{
+    ApiAuthentication, DevelopmentScope, DockerImageSource, HumanLogin,
+};
+use sqlbuild_orchestration::credentials::models::AuditRetention;
 use sqlbuild_orchestration::platform::constants::PLATFORM_WEBHOOK_VARIABLE;
-use sqlbuild_orchestration::platform::main::rebuild_projections::rebuild_projections;
 use sqlbuild_orchestration::platform::main::report_remote_location_health::report_remote_location_health;
-use sqlbuild_orchestration::platform::main::run_watchdog::run_watchdog;
+use sqlbuild_orchestration::platform::main::run_maintenance::run_maintenance;
 use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
@@ -26,15 +25,16 @@ use sqlbuild_orchestration::platform::models::{
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
+use sqlbuild_orchestration::snapshots::models::SnapshotRetention;
 use sqlbuild_orchestration::store::errors::ControlError;
-use sqlbuild_orchestration::store::main::begin_offline_recovery::begin_offline_recovery;
 use sqlbuild_orchestration::store::main::migrate_store::migrate_store;
 use sqlbuild_orchestration::store::main::open_store::open_store;
+use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::models::ControlStore;
 use sqlbuild_orchestration::warehouse_metadata::constants::MAX_HISTORY_RECORDS;
 use sqlbuild_orchestration::warehouse_metadata::models::{
-    StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseHistoryPage,
-    WarehouseReconciliationCursor, WarehouseStateLocation, WarehouseSyncResponse,
+    MetadataBatch, MetadataScan, StatisticsDueRead, StatisticsRead, StatisticsRetention,
+    WarehouseHistoryKind, WarehouseHistoryPage, WarehouseStateLocation,
 };
 use sqlbuild_orchestration::webhooks::constants::SECURITY_AUDIT_WEBHOOK_VARIABLE;
 use sqlbuild_orchestration::webhooks::main::{
@@ -67,8 +67,7 @@ use crate::native_commands::_helpers::terminal::{
 };
 use crate::native_commands::constants::{
     ADMIN_COMMAND, COLUMNS_VARIABLE, FALLBACK_COLUMNS, METADATA_POLL_SECONDS,
-    METADATA_RECONCILE_SECONDS, SCHEDULER_COMMAND, SERVER_COMMAND, UNCAUGHT_EXCEPTION_STATUS,
-    UNKNOWN_COMMAND,
+    METADATA_RECONCILE_SECONDS, SCHEDULER_COMMAND, UNCAUGHT_EXCEPTION_STATUS, UNKNOWN_COMMAND,
 };
 use crate::native_commands::errors::PythonNeeded;
 use crate::native_commands::main::_run_admin::run_admin;
@@ -105,13 +104,12 @@ pub(crate) async fn run_development_roles(
         url.clone(),
     )?;
     let (stop, shutdown) = watch::channel(false);
-    let (_changes, changes) = watch::channel(());
     let mut tasks = JoinSet::new();
     tasks.spawn(serve_api(
         store.clone(),
         listener,
         (ApiAuthentication {
-            development_scope: Some(scope),
+            login: HumanLogin::Development(scope),
             ..ApiAuthentication::default()
         }, Vec::new(), Default::default()),
         (move || {
@@ -121,7 +119,7 @@ pub(crate) async fn run_development_roles(
             ))]));
         }, development_stopped(shutdown.clone())),
     ));
-    start_platform_roles(&mut tasks, (&store, &shutdown), AuditRetention::default())?;
+    start_platform_roles(&mut tasks, (&store, &shutdown), Default::default())?;
     tasks.spawn(development_location_role(
         (&project, &executable),
         (location_id, &target),
@@ -138,7 +136,7 @@ pub(crate) async fn run_development_roles(
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
-                (shutdown, changes),
+                shutdown,
                 workers,
             )
             .await
@@ -188,7 +186,7 @@ fn development_location_role(
         .env_remove("SQLBUILD_DEVELOPMENT_CONTROL_FILE")
         .stdin(Stdio::null())
         .kill_on_drop(true);
-    if let ControlStore::Sqlite(path, _) = store {
+    if let ControlStore::Sqlite(path) = store {
         command.env(
             "SQLBUILD_DEVELOPMENT_CONTROL_FILE",
             std::env::current_dir()?.join(path),
@@ -333,7 +331,6 @@ pub(crate) fn metadata_sync(
         generation,
         index: 0,
         scan_id: Uuid::now_v7(),
-        page: 0,
         source_after: None,
         observed_since: None,
         watermark_loaded: false,
@@ -348,7 +345,7 @@ pub(crate) fn metadata_sync(
 }
 
 pub(crate) fn history_request(state: &LocationMetadataSync) -> Result<Vec<u8>, ControlError> {
-    if state.index == 0 && state.page == 0 && state.limit == MAX_HISTORY_RECORDS {
+    if state.index == 0 && state.source_after.is_none() && state.limit == MAX_HISTORY_RECORDS {
         drop(write_output(&[(
             Stream::Stderr,
             "Reading warehouse history for automatic synchronization...\n",
@@ -391,23 +388,29 @@ pub(crate) async fn statistics_page(
         .await
 }
 
-/// Reserve the largest mirror cursor before freezing: receipts prohibit later content splitting.
+/// Freeze one bounded page; a full scan's last page also removes rows the scan did not deliver.
 pub(crate) fn freeze_history_page(
     mut state: LocationMetadataSync,
     page: WarehouseHistoryPage,
     poll: &LocationWorkPoll,
 ) -> Result<LocationMetadataSync, ControlError> {
-    let location = state.location();
-    let mut body =
-        json!({"session_id":poll.session_id,"generation":state.generation,"records":page.records});
-    if state.reconciling() {
-        body["reconciliation"] = json!({"scan_id":state.scan_id,"page":state.page,"state_database":location.database,
-            "state_schema":location.schema,"day":null,"complete":page.next_after.is_none(),
-            "after":WarehouseReconciliationCursor { observed_at: DateTime::<Utc>::MAX_UTC, event_id: Uuid::nil() }});
-    } else if state.kind() != WarehouseHistoryKind::Statistics {
-        body["reconciliation"] = serde_json::Value::Null;
-    }
-    if serde_json::to_vec(&body)
+    let batch = MetadataBatch {
+        kind: state.kind(),
+        session_id: poll.session_id,
+        generation: state.generation,
+        records: page
+            .records
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<_, _>>()
+            .map_err(|error| ControlError::Invalid(error.to_string()))?,
+        scan: state.reconciling().then(|| MetadataScan {
+            scan_id: state.scan_id,
+            location: state.location().clone(),
+            complete: page.next_after.is_none(),
+        }),
+    };
+    if serde_json::to_vec(&batch)
         .map_err(|error| ControlError::Invalid(error.to_string()))?
         .len()
         > BODY_BYTES
@@ -419,154 +422,46 @@ pub(crate) fn freeze_history_page(
             state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
             drop(write_output(&[(
                 Stream::Stderr,
-                "Warehouse history row exceeds the request bound; synchronization incomplete, no reconciliation authorized.\n",
+                "Warehouse history row exceeds the request bound; synchronization incomplete, no stale rows removed.\n",
             )]));
         }
     } else {
-        if state.reconciling() {
-            body["reconciliation"]["after"] = serde_json::Value::Null;
-        }
         state.pending = Some(LocationMetadataPage {
-            body,
+            batch,
             next_source_after: page.next_after,
         });
     }
     Ok(state)
 }
 
-pub(crate) async fn deliver_metadata_page(
-    (client, target): (&LocationWorkClient, &str),
-    body: &serde_json::Value,
-    kind: WarehouseHistoryKind,
-) -> Result<WarehouseSyncResponse, ClientError> {
-    match kind {
-        WarehouseHistoryKind::Statistics => {
-            client
-                .sync_statistics(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid statistics batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::Catalog => {
-            client
-                .sync_catalog(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid catalog batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::Fingerprints => {
-            client
-                .sync_fingerprints(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid fingerprint batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::SourceFreshness => {
-            client
-                .sync_source_freshness(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid freshness batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::AuditResults => {
-            client
-                .sync_audit_results(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid audit results batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::JanitorEvents => {
-            client
-                .sync_janitor_events(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid janitor events batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::Migrations => {
-            client
-                .sync_migrations(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid migrations batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::OldNameViews => {
-            client
-                .sync_old_name_views(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid old name views batch"))?,
-                )
-                .await
-        }
-        WarehouseHistoryKind::Microbatches => {
-            client
-                .sync_microbatches(
-                    target,
-                    &serde_json::from_value(body.clone())
-                        .map_err(|_| ClientError::Configuration("invalid microbatches batch"))?,
-                )
-                .await
-        }
-    }
-}
-
-/// Source progress waits for all mirror continuations of the identical frozen final batch.
-pub(crate) fn acknowledge_metadata_page(
-    mut state: LocationMetadataSync,
-    response: WarehouseSyncResponse,
-) -> Result<LocationMetadataSync, ControlError> {
-    let Some(mut pending) = state.pending.take() else {
-        return Ok(state);
+pub(crate) fn acknowledge_metadata_page(mut state: LocationMetadataSync) -> LocationMetadataSync {
+    let Some(pending) = state.pending.take() else {
+        return state;
     };
-    if let Some(after) = response.next_reconciliation_after {
-        pending.body["reconciliation"]["after"] = json!(after);
-        state.pending = Some(pending);
-    } else {
-        state.source_after = pending.next_source_after;
-        if state.kind() == WarehouseHistoryKind::Statistics {
-            state.statistics = None;
-        }
-        if state.source_after.is_some() {
-            state.page = state
-                .page
-                .checked_add(1)
-                .ok_or_else(|| ControlError::Invalid("warehouse scan page overflow".into()))?;
-        } else {
-            state.index += 1;
-            state.scan_id = Uuid::now_v7();
-            state.page = 0;
-            state.observed_since = None;
-            state.watermark_loaded = false;
-            state.limit = MAX_HISTORY_RECORDS;
-            if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
-                state.index = 0;
-                if state.reconcile {
-                    state.reconcile_at =
-                        Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
-                }
-                state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
-                drop(write_output(&[(
-                    Stream::Stderr,
-                    "Warehouse history synchronization completed.\n",
-                )]));
+    state.source_after = pending.next_source_after;
+    if state.kind() == WarehouseHistoryKind::Statistics {
+        state.statistics = None;
+    }
+    if state.source_after.is_none() {
+        state.index += 1;
+        state.scan_id = Uuid::now_v7();
+        state.observed_since = None;
+        state.watermark_loaded = false;
+        state.limit = MAX_HISTORY_RECORDS;
+        if state.index == state.locations.len() * WarehouseHistoryKind::ALL.len() {
+            state.index = 0;
+            if state.reconcile {
+                state.reconcile_at =
+                    Instant::now() + Duration::from_secs(u64::from(state.reconcile_seconds));
             }
+            state.next_at = Instant::now() + Duration::from_secs(METADATA_POLL_SECONDS);
+            drop(write_output(&[(
+                Stream::Stderr,
+                "Warehouse history synchronization completed.\n",
+            )]));
         }
     }
-    Ok(state)
+    state
 }
 
 /// Operational cost is elapsed IO time, not an estimate of warehouse billing.
@@ -587,8 +482,7 @@ pub(crate) async fn metadata_health(
             records_sent: state
                 .pending
                 .as_ref()
-                .and_then(|page| page.body["records"].as_array())
-                .map_or(0, Vec::len) as u64,
+                .map_or(0, |page| page.batch.records.len()) as u64,
             elapsed_millis: started.elapsed().as_millis() as u64,
         },
     };
@@ -822,7 +716,7 @@ fn location_child(options: &LocationServe, script: &Path) -> Command {
 pub(crate) fn start_platform_roles(
     tasks: &mut JoinSet<Result<(), ControlError>>,
     (store, shutdown): (&ControlStore, &watch::Receiver<bool>),
-    audit: AuditRetention,
+    retention: (AuditRetention, StatisticsRetention, SnapshotRetention),
 ) -> Result<(), ControlError> {
     let mut sinks: Vec<(Webhook, &str)> = Vec::new();
     for (variable, source, label) in [
@@ -849,19 +743,10 @@ pub(crate) fn start_platform_roles(
     }
     drop(write_output(&[(
         Stream::Stderr,
-        "Starting platform watchdog...\n",
+        "Starting platform maintenance...\n",
     )]));
-    let watchdog_store = store.clone();
-    let watchdog_shutdown = shutdown.clone();
-    tasks.spawn(
-        async move { run_watchdog(&watchdog_store, Uuid::now_v7(), watchdog_shutdown).await },
-    );
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Platform watchdog started\n",
-    )]));
-    let audit_store = store.clone();
-    let audit_shutdown = shutdown.clone();
+    let maintenance_store = store.clone();
+    let maintenance_shutdown = shutdown.clone();
     let audit_sinks: Vec<Webhook> = sinks.iter().map(|(sink, _)| sink.clone()).collect();
     tasks.spawn(async move {
         let report = |retained: i64| {
@@ -870,13 +755,17 @@ pub(crate) fn start_platform_roles(
                 &format!("Security audit retention: retained past horizon: {retained}\n"),
             )]));
         };
-        run_audit_retention(
-            &audit_store,
-            (audit, &audit_sinks),
-            (report, audit_shutdown),
+        run_maintenance(
+            (&maintenance_store, Uuid::now_v7()),
+            (retention, &audit_sinks),
+            (report, maintenance_shutdown),
         )
         .await
     });
+    drop(write_output(&[(
+        Stream::Stderr,
+        "Platform maintenance started\n",
+    )]));
     for (sink, label) in sinks {
         drop(write_output(&[(
             Stream::Stderr,
@@ -899,53 +788,11 @@ pub(crate) async fn run_control_action(
     command: &str,
 ) -> Result<Option<serde_json::Value>, ControlError> {
     if command == ADMIN_COMMAND {
-        return run_administration(namespace).await.map(Some);
-    }
-    if command == SERVER_COMMAND
-        && text(namespace, "server_action").as_deref() == Some("rebuild-projections")
-    {
-        drop(write_output(&[(
-            Stream::Stderr,
-            "Rebuilding control projections...\n",
-        )]));
-        let store = open_store(&control_database(namespace)?).await?;
-        rebuild_projections(&store).await?;
-        return Ok(Some(json!({"rebuilt":true})));
+        return run_admin(namespace).await.map(Some);
     }
     run_control(namespace, command == SCHEDULER_COMMAND)
         .await
         .map(|()| None)
-}
-
-/// Keep exclusive offline recovery outside the online store-opening and migration path.
-pub(crate) async fn run_administration(
-    namespace: &Namespace,
-) -> Result<serde_json::Value, ControlError> {
-    if text(namespace, "admin_command").as_deref() != Some("recover-user") {
-        return run_admin(namespace).await;
-    }
-    let principal_id = Uuid::parse_str(&text(namespace, "admin_subject").unwrap_or_default())
-        .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
-    let reason = text(namespace, "admin_reason").unwrap_or_default();
-    if reason.trim().is_empty() {
-        return Err(ControlError::Invalid(
-            "offline recovery requires --reason".into(),
-        ));
-    }
-    let url = control_database(namespace)?;
-    drop(write_output(&[(
-        Stream::Stderr,
-        "Acquiring exclusive offline control-store access...\n",
-    )]));
-    let recovery = begin_offline_recovery(&url).await?;
-    let context = AuditContext {
-        actor: "local-control-store-owner".into(),
-        granting_role: "control-store-owner".into(),
-        request_id: Uuid::now_v7(),
-        ip_address: None,
-    };
-    recover_administrator(recovery, &context, (principal_id, &reason)).await?;
-    Ok(serde_json::json!({"principal_id":principal_id,"role":"admin","recovered":true}))
 }
 
 /// Open and migrate the privileged store, reporting progress without contaminating JSON stdout.
@@ -953,6 +800,7 @@ pub(crate) async fn open_control_store(
     namespace: &Namespace,
 ) -> Result<ControlStore, ControlError> {
     let url = control_database(namespace)?;
+    set_release_version(env!("CARGO_PKG_VERSION"));
     drop(write_output(&[(
         Stream::Stderr,
         "Opening control store...\n",

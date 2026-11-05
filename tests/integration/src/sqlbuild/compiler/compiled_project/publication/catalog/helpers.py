@@ -1,4 +1,4 @@
-"""Observe the installed location's catalog projection and original structural facts."""
+"""Observe the installed location's catalog projection and statistics samples."""
 
 import json
 import sqlite3
@@ -25,16 +25,6 @@ def wait_for_catalog(
             ).fetchall()
         observed = [json.loads(row[0]) for row in rows]
         time.sleep(0.05)
-
-
-def catalog_facts(control: Path) -> list[dict[str, Any]]:
-    """Return commit-ordered facts for the exact Unicode relation."""
-    with closing(sqlite3.connect(control)) as connection:
-        rows: list[tuple[str]] = connection.execute(
-            "SELECT payload FROM recall_events WHERE event_type='warehouse_catalog_changed' "
-            "AND json_extract(payload, '$.record.name')='orders_🧾' ORDER BY storage_id"
-        ).fetchall()
-    return [json.loads(row[0]) for row in rows]
 
 
 def wait_for_statistics(

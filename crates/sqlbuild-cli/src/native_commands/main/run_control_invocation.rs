@@ -46,21 +46,13 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
         }
     };
     let admin = command == ADMIN_COMMAND;
-    let rebuild = command == SERVER_COMMAND
-        && text(namespace, "server_action").as_deref() == Some("rebuild-projections");
-    let role = if admin {
-        "administration"
-    } else if rebuild {
-        "projection rebuild"
-    } else {
-        "service"
-    };
+    let role = if admin { "administration" } else { "service" };
     let result = runtime.block_on(run_control_action(namespace, &command));
     Some(match result {
         Ok(output) => {
             let lost =
                 output.and_then(|value| write_output(&[(Stream::Stdout, &format!("{value}\n"))]));
-            if (admin || rebuild) && lost.is_some() {
+            if admin && lost.is_some() {
                 drop(write_output(&[(
                     Stream::Stderr,
                     &format!(
@@ -73,8 +65,6 @@ pub(crate) fn run_control_invocation(namespace: &Namespace) -> Option<i32> {
             if exit_code == 0 {
                 let message = if admin {
                     "Control administration completed successfully\n"
-                } else if rebuild {
-                    "Control projections rebuilt successfully\n"
                 } else {
                     "Control service stopped successfully\n"
                 };

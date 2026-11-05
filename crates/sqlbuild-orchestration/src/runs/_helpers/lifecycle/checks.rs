@@ -1,5 +1,6 @@
-//! Attached checks are immutable observations, not additions to the frozen execution selection.
+//! Attached checks are recorded beside nodes, but never join the frozen execution selection.
 
+use crate::runs::constants::NODE_RUNNING;
 use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -25,30 +26,39 @@ pub(crate) async fn check_execution_history(
     }
     let (transaction, previous) = query(
         transaction,
-        "SELECT event_type FROM recall_events WHERE invocation_id=$1 AND producer='scheduler' \
-         AND run_id=$2 AND event_type IN ('run_check_started','run_check_finished') \
-         AND (payload -> 'change' -> 'change' ->> 'node_key')=$3 \
-         AND (payload -> 'change' ->> 'claim_id')=$4 AND event_id<>$5 \
-         ORDER BY storage_id DESC LIMIT 1",
+        "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key=$2 AND kind='check'",
         vec![
-            Parameter::Text(format!("scheduler/{}", request.run_id)),
-            Parameter::Text(request.run_id.to_string()),
+            Parameter::Id(request.run_id),
             Parameter::Text(node_key.clone()),
-            Parameter::OptionalText(request.claim_id.map(|id| id.to_string())),
-            Parameter::Text(request.event_id.to_string()),
         ],
     )
     .await?;
-    let previous = previous.first().and_then(|row| row["event_type"].as_str());
+    let previous = previous.first().and_then(|row| row["status"].as_str());
     let valid = match outcome {
         None => previous.is_none(),
-        Some(NodeOutcome::Skipped) => previous.is_none() || previous == Some("run_check_started"),
-        Some(_) => previous == Some("run_check_started"),
+        Some(NodeOutcome::Skipped) => previous.is_none() || previous == Some(NODE_RUNNING),
+        Some(_) => previous == Some(NODE_RUNNING),
     };
     if !valid {
         return Err(ControlError::Invalid(
             "check fact is inconsistent with its execution history".into(),
         ));
     }
+    let now = transaction.now;
+    let status = outcome.map_or(NODE_RUNNING, |outcome| outcome.as_str());
+    let (transaction, _) = query(
+        transaction,
+        "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes, started_at, ended_at, kind) \
+         VALUES ($1,$2,$3,FALSE,$4,$5,'check') ON CONFLICT (run_id, node_key) \
+         DO UPDATE SET status=excluded.status, ended_at=excluded.ended_at",
+        vec![
+            Parameter::Id(request.run_id),
+            Parameter::Text(node_key.clone()),
+            Parameter::Text(status.into()),
+            Parameter::OptionalTime(outcome.is_none().then_some(now)),
+            Parameter::OptionalTime(outcome.is_some().then_some(now)),
+        ],
+    )
+    .await?;
     Ok(transaction)
 }

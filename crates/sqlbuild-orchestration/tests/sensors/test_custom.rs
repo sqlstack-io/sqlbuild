@@ -213,7 +213,6 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                 "sqb_runs",
                 "sqb_run_requests",
                 "sqb_sensor_evaluation_events",
-                "sqb_sensor_cursor_commits",
             ] {
                 let point = TransactionFault {
                     description: "custom sensor atomic publication",

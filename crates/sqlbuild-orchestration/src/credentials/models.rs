@@ -10,26 +10,10 @@ use crate::credentials::constants::DEFAULT_AUDIT_RETENTION_DAYS;
 use crate::store::errors::ControlError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PrincipalKind {
-    Person,
-    ServiceAccount,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CredentialScope {
-    /// API tokens belong to service accounts, never person sessions.
-    Principal {
-        principal_id: Uuid,
-    },
-    Location {
-        location_id: Uuid,
-    },
-    Run {
-        run_id: Uuid,
-        claim_id: Uuid,
-    },
+    Location { location_id: Uuid },
+    Run { run_id: Uuid, claim_id: Uuid },
 }
 
 /// Server-derived request metadata, never copied from an action's JSON body.
@@ -107,22 +91,14 @@ pub enum Action {
     TriggerToggle,
     #[serde(rename = "sensor.reset_cursor")]
     SensorResetCursor,
-    #[serde(rename = "warehouse.sync")]
-    WarehouseSync,
     #[serde(rename = "run.adhoc")]
     RunAdhoc,
     #[serde(rename = "connection.test")]
     ConnectionTest,
-    #[serde(rename = "plan.preview")]
-    PlanPreview,
-    #[serde(rename = "location.manage")]
-    LocationManage,
     #[serde(rename = "user.manage")]
     UserManage,
     #[serde(rename = "role.assign")]
     RoleAssign,
-    #[serde(rename = "token.manage")]
-    TokenManage,
     #[serde(rename = "audit.view")]
     AuditView,
 }
@@ -136,7 +112,7 @@ pub enum BuiltinRole {
     Admin,
 }
 
-/// A built-in role by name, or a custom role a location publishes and an administrator approves.
+/// A built-in role by name, or a custom role a location publishes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
 pub enum RoleKey {
@@ -158,49 +134,6 @@ pub(crate) struct RoleDefinition {
     pub(crate) actions: Vec<Action>,
 }
 
-/// A validated custom role definition with its content digest and granted action names.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct PublishedRole {
-    pub(crate) digest: String,
-    pub(crate) grants: std::collections::BTreeSet<String>,
-    pub(crate) definition: serde_json::Value,
-}
-
-/// Asks for a widened custom role definition of the current snapshot to take effect.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RoleActivationRequest {
-    pub location_id: Uuid,
-    pub target: String,
-    pub role_key: String,
-    pub reason: String,
-}
-
-/// The recorded activation request and the exact definition it asks to activate.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct RoleActivation {
-    pub request_id: Uuid,
-    pub definition_digest: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum RoleDecision {
-    Approved,
-    Rejected,
-}
-
-/// An administrator's decision on an activation request; self-approval must be confirmed.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct RoleApproval {
-    pub request_id: Uuid,
-    pub decision: RoleDecision,
-    pub reason: String,
-    #[serde(default)]
-    pub confirm_self_approval: bool,
-}
-
 /// Installation-owned ambient access; never permits an administrative or execution default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -210,14 +143,6 @@ pub enum DefaultRole {
     Viewer,
 }
 
-/// Server-owned sign-in configuration, used to protect a genuinely usable administrator.
-#[derive(Clone, Debug, Default)]
-pub enum AdministratorAuthentication {
-    #[default]
-    Password,
-    BoundPeople(std::collections::BTreeSet<Uuid>),
-}
-
 /// Scope is computed by the server from the operation, never accepted as a claimed write set.
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct PermissionScope {
@@ -225,6 +150,18 @@ pub(crate) struct PermissionScope {
     pub(crate) location_id: Option<Uuid>,
     pub(crate) target: Option<String>,
     pub(crate) nodes: std::collections::BTreeSet<String>,
+}
+
+impl PermissionScope {
+    /// An action on every node, installation-wide or within one location target.
+    pub(crate) fn action(action: Action, target: Option<(Uuid, &str)>) -> Self {
+        Self {
+            action,
+            location_id: target.map(|(location_id, _)| location_id),
+            target: target.map(|(_, target)| target.into()),
+            nodes: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
@@ -271,6 +208,10 @@ pub enum AdministratorChange {
     Enable,
 }
 
+/// The person a request authenticated as, and their session unless a trusted proxy vouched.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AuthenticatedPerson(pub(crate) Uuid, pub(crate) Option<Uuid>);
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionIdentity {
     pub session_id: Uuid,
@@ -305,6 +246,7 @@ pub(crate) enum ClaimedLogin {
 #[derive(Debug, Deserialize)]
 pub(crate) struct StoredLogin {
     pub(crate) client_hash: String,
+    pub(crate) principal_id: Option<Uuid>,
     pub(crate) session_id: Option<Uuid>,
 }
 
@@ -331,19 +273,13 @@ impl std::fmt::Debug for IssuedSession {
 #[derive(Debug)]
 pub enum PasswordLogin {
     Authenticated(IssuedSession),
-    Denied { decision_id: Uuid, throttled: bool },
+    Denied { throttled: bool },
 }
 
 pub enum AuthenticationAttempt<'a> {
     Login(&'a str),
     Reauthenticate(Uuid),
     IdentityProvider,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum ExternalIdentityMechanism {
-    TrustedProxy,
-    Oidc,
 }
 
 #[derive(Debug)]
@@ -366,7 +302,6 @@ pub(crate) struct StoredOidcFlow {
 pub(crate) struct StoredSession {
     #[serde(flatten)]
     pub(crate) identity: SessionIdentity,
-    pub(crate) credential_id: Option<Uuid>,
     pub(crate) secret_hash: String,
     pub(crate) csrf_hash: String,
 }

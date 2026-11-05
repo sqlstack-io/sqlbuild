@@ -26,19 +26,14 @@ use crate::credentials::main::sessions::authenticate_bound_person::authenticate_
 use crate::credentials::main::sessions::{
     claim_oidc_flow::claim_oidc_flow, create_oidc_flow::create_oidc_flow,
 };
-use crate::credentials::models::{
-    AuditContext, AuthenticationAttempt, ExternalIdentityMechanism, OidcFlowStart,
-};
+use crate::credentials::models::{AuditContext, AuthenticationAttempt, OidcFlowStart};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn router(
     store: &ControlStore,
-    settings: Option<OidcAuthentication>,
+    settings: OidcAuthentication,
 ) -> Result<Router<ControlStore>, ControlError> {
-    let Some(settings) = settings else {
-        return Ok(Router::new());
-    };
     let runtime = oidc_provider::configure(settings)?;
     oidc_provider::client(&runtime).await?;
     Ok(Router::new()
@@ -46,7 +41,7 @@ pub(crate) async fn router(
         .route("/api/auth/oidc/callback", get(callback))
         .merge(password_sessions::protected(store))
         .merge(super::cli_login::router(BrowserLoginMethod::Oidc))
-        .layer(middleware::from_fn_with_state(store.clone(), guard))
+        .layer(middleware::from_fn(guard))
         .layer(Extension(BrowserOrigin(runtime.settings.origin.clone())))
         .layer(Extension(Arc::new(runtime))))
 }
@@ -63,13 +58,13 @@ pub(crate) async fn login(
         reserve_authentication_attempt(&store, &context, AuthenticationAttempt::IdentityProvider)
             .await?;
     if !allowed {
-        let mut response = deny(&store, &context, "oidc_login_throttled").await?;
+        let mut response = deny(&context)?;
         *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
         return Ok(response);
     }
     let client = match oidc_provider::client(&runtime).await {
         Ok(client) => client,
-        Err(_) => return deny(&store, &context, "oidc_provider_unavailable").await,
+        Err(_) => return deny(&context),
     };
     let (challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let (url, state, nonce) = client
@@ -107,7 +102,7 @@ pub(crate) async fn callback(
     (headers, Query(request)): (HeaderMap, Query<OidcCallback>),
 ) -> Result<Response, ApiError> {
     let Some(state) = request.state else {
-        return deny(&store, &context, "missing_oidc_state").await;
+        return deny(&context);
     };
     let Some(flow) = claim_oidc_flow(
         &store,
@@ -120,7 +115,7 @@ pub(crate) async fn callback(
     )
     .await?
     else {
-        return deny(&store, &context, "invalid_oidc_browser_or_state").await;
+        return deny(&context);
     };
     let subject = match request.code {
         Some(code) => oidc_provider::verify_code(&runtime, code, flow).await,
@@ -131,22 +126,17 @@ pub(crate) async fn callback(
     let mut response = match subject {
         Ok(subject) => match runtime.settings.identities.get(&subject).copied() {
             Some(principal) => {
-                if let Some(session) = authenticate_bound_person(
-                    &store,
-                    &context,
-                    principal,
-                    ExternalIdentityMechanism::Oidc,
-                )
-                .await?
+                if let Some(session) =
+                    authenticate_bound_person(&store, &context, principal).await?
                 {
                     external_session(session)?
                 } else {
-                    deny(&store, &context, "inactive_oidc_person").await?
+                    deny(&context)?
                 }
             }
-            None => deny(&store, &context, "unbound_oidc_subject").await?,
+            None => deny(&context)?,
         },
-        Err(_) => deny(&store, &context, "invalid_oidc_identity").await?,
+        Err(_) => deny(&context)?,
     };
     if browser_cookie(&headers, "__Host-sqb-cli-return") == Some("1") {
         set_cookie(

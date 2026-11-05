@@ -1,6 +1,5 @@
-//! Inputs make cursor, catch-up, and overlap decisions observably different.
+//! Inputs make cursor, catch-up, and coalescing decisions observably different.
 
-use crate::scheduler::models::{CatchUp, Overlap};
 use crate::store::tests::store_test_types::Backend;
 
 pub(super) struct SensorFairnessTestCase {
@@ -14,12 +13,9 @@ pub(super) struct SensorFairnessTestCase {
 #[derive(Debug)]
 pub(super) struct TickTestCase {
     pub(super) description: &'static str,
-    pub(super) enabled: bool,
     pub(super) due_seconds: Vec<i64>,
     pub(super) last_second: Option<i64>,
     pub(super) now_second: i64,
-    pub(super) catch_up: CatchUp,
-    pub(super) overlap: Overlap,
     pub(super) active: bool,
     pub(super) expected_requests: Vec<i64>,
     pub(super) expected_covered: Vec<i64>,
@@ -46,17 +42,8 @@ pub(super) struct PreviousCronTestCase {
 }
 
 #[derive(Debug)]
-pub(super) struct BacklogTestCase {
-    pub(super) description: &'static str,
-    pub(super) catch_up: CatchUp,
-    pub(super) expected_latest: i64,
-    pub(super) expected_count: usize,
-}
-
-#[derive(Debug)]
 pub(super) struct SimulationTestCase {
     pub(super) description: &'static str,
-    pub(super) catch_up: CatchUp,
     pub(super) expected_success: bool,
 }
 
@@ -64,6 +51,5 @@ pub(super) struct CronSimulationTestCase {
     pub(super) description: &'static str,
     pub(super) expression: &'static str,
     pub(super) wall_times: &'static [(u32, u32)],
-    pub(super) catch_up: CatchUp,
     pub(super) expected_success: bool,
 }

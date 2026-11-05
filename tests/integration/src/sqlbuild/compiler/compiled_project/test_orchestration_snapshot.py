@@ -19,7 +19,6 @@ from sqlbuild._native import (
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.orchestration import (
-    Job,
     RunEventKind,
     compile_snapshot,
     job,
@@ -28,6 +27,7 @@ from sqlbuild.orchestration import (
     schedule,
     sensor,
 )
+from sqlbuild.orchestration_declarations.models.authoring import Job
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
     SnapshotDeclarationRejectionTestCase,
@@ -385,32 +385,17 @@ def test_given_a_dependency_lock_when_it_changes_then_environment_identity_chang
             expected_selection=("model:orders",),
         ),
         SnapshotScheduleTestCase(
-            description="paused bounded catch-up with a zoned start",
+            description="paused with a zoned start",
             schedule=schedule(
                 cron="15 2 * * *",
                 timezone="Europe/London",
                 starts_at="2026-07-03T01:17:23.456789+05:30",
                 default_status="paused",
-                catch_up="all",
-                max_catch_up=3,
             ),
             expected_selection=("model:orders",),
             expected_controls={
                 "starts_at": "2026-07-02T19:47:23.456789Z",
                 "default_status": "paused",
-                "catch_up": {"all": {"max_runs": 3}},
-            },
-        ),
-        SnapshotScheduleTestCase(
-            description="largest supported catch-up batch",
-            schedule=schedule(
-                cron="15 2 * * *", timezone="UTC", catch_up="all", max_catch_up=10_000
-            ),
-            expected_selection=("model:orders",),
-            expected_controls={
-                "starts_at": None,
-                "default_status": "running",
-                "catch_up": {"all": {"max_runs": 10_000}},
             },
         ),
     ],
@@ -430,7 +415,6 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         description="Refresh order reporting.",
         select="+orders",
         exclude="stg_orders",
-        overlap="queue",
         settings={"run_tests": False, "vars": {"batch": 3}, "warehouse": "reporting"},
         concurrency=4,
         concurrency_groups=("order_reporting",),
@@ -456,8 +440,6 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "vars": {"batch": 3},
                 "warehouse": "reporting",
             },
-            "overlap": "queue",
-            "on_failure": "skip_dependents",
             "concurrency_groups": ["order_reporting"],
         }
     }
@@ -504,38 +486,6 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
         ),
         SnapshotDeclarationRejectionTestCase(
             description="invalid timezone", timezone="Unknown/Zone", expected_message="time zone"
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="zero catch-up bound",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=0),
-            expected_message="catch_up",
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="negative catch-up bound",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=-1),
-            expected_message="catch_up",
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="boolean is not a catch-up bound",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=True),
-            expected_message="catch_up",
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="unbounded all catch-up",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", catch_up="all"),
-            expected_message="catch_up",
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="catch-up exceeds transaction bound",
-            schedule=schedule(
-                cron="0 2 * * *", timezone="UTC", catch_up="all", max_catch_up=10_001
-            ),
-            expected_message="catch-up exceeds 10000",
-        ),
-        SnapshotDeclarationRejectionTestCase(
-            description="latest does not silently ignore a bound",
-            schedule=schedule(cron="0 2 * * *", timezone="UTC", max_catch_up=3),
-            expected_message="latest.*without a bound",
         ),
         SnapshotDeclarationRejectionTestCase(
             description="start needs an explicit offset",
@@ -708,7 +658,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kinds": ["tick_overdue", "location_broken", "launch_failed"],
                     },
                     "minimum_interval_seconds": 7,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
                 "edge_job_outcomes": {
                     "description": "Keep warning and partial outcomes distinct from success.",
@@ -719,7 +669,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kinds": ["warn", "partial"],
                     },
                     "minimum_interval_seconds": 30,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
                 "edge_group_outcomes": {
                     "description": "Observe group completion including cancellation and presumed failure.",
@@ -731,7 +681,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
             },
             expected_schedules=("edge_snapshot_orders",),
@@ -901,7 +851,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "job_key": "health_orders",
                     "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
                     "minimum_interval_seconds": 7,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 }
             },
         ),
@@ -1267,13 +1217,13 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="executed_successfully must select nonempty source job/group nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="sensor code defaults use running or stopped",
+            description="sensor code defaults use running or paused",
             files={
                 "orchestration/health.py": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
                 )
                 .read_text()
-                .replace('default_status="stopped"', 'default_status="paused"')
+                .replace('default_status="paused"', 'default_status="stopped"')
             },
             expected_error=ValueError,
             expected_message="unknown variant",

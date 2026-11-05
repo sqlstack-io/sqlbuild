@@ -1,14 +1,16 @@
 //! Claim priority-ordered work without allowing a blocked page to starve later candidates.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use sqlbuild_recall::schema::models::ColumnType;
 
-use crate::runs::_helpers::groups::admission::{earlier_waiter_blocks, group_capacity};
+use crate::runs::_helpers::groups::admission::{
+    admission_limits, earlier_waiter_blocks, limit_waiters,
+};
 use crate::runs::_helpers::groups::selection::child_ready;
 use crate::runs::_helpers::lifecycle::claims::{publish_claim, reserve_claims};
-use crate::runs::models::{ConcurrencyResource, QueueCandidate, RunClaim, RunDispatch};
+use crate::runs::models::{QueueCandidate, RunClaim, RunDispatch};
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
@@ -26,13 +28,11 @@ pub async fn claim_next_run<'a>(
     dispatch: impl Into<RunDispatch<'a>>,
 ) -> Result<Option<RunClaim>, ControlError> {
     let dispatch = dispatch.into();
-    let (mut transaction, capacity) = group_capacity(
+    let (mut transaction, waiters) = limit_waiters(
         check_lease(begin(store, TransactionMode::Write).await?, lease).await?,
-        limits,
         dispatch.eligible,
     )
     .await?;
-    let mut waiting: BTreeSet<ConcurrencyResource> = BTreeSet::new();
     let locking = if matches!(transaction.connection, Some(Connection::Postgres(_))) {
         " FOR UPDATE OF r SKIP LOCKED"
     } else {
@@ -43,7 +43,7 @@ pub async fn claim_next_run<'a>(
         let rows;
         (transaction, rows) = query(transaction,
             &format!("SELECT r.request_json, r.queued_at FROM sqb_runs r WHERE r.status='queued' AND r.kind<>'group' AND r.cancel_requested_at IS NULL \
-             AND NOT EXISTS (SELECT 1 FROM sqb_run_liveness l WHERE l.run_id=r.run_id) \
+             AND r.worker_instance IS NULL \
              AND ($4 IS NULL OR (r.location_id=$4 AND r.target=$5)) \
              AND ($1 IS NULL OR r.priority<$1 OR (r.priority=$1 AND (r.queued_at>$2 OR (r.queued_at=$2 AND r.run_id>$3)))) \
              ORDER BY r.priority DESC, r.queued_at, r.run_id LIMIT 100{locking}"),
@@ -64,10 +64,8 @@ pub async fn claim_next_run<'a>(
                 after = Some(candidate);
                 continue;
             }
-            let blocked;
-            (transaction, blocked) =
-                earlier_waiter_blocks(transaction, &capacity, &candidate).await?;
-            if blocked || capacity.blocks_claim(&candidate, &waiting) {
+            let wanted = admission_limits(&candidate.request_json, []);
+            if earlier_waiter_blocks(&waiters, &candidate, &wanted) {
                 after = Some(candidate);
                 continue;
             }
@@ -80,7 +78,6 @@ pub async fn claim_next_run<'a>(
                     query(transaction, "ROLLBACK TO SAVEPOINT candidate_claim", vec![]).await?;
                 (transaction, _) =
                     query(transaction, "RELEASE SAVEPOINT candidate_claim", vec![]).await?;
-                waiting = capacity.record_waiter(&candidate.request_json, waiting);
                 after = Some(candidate);
                 continue;
             }

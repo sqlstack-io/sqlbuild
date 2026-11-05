@@ -3,8 +3,9 @@
 use std::collections::BTreeSet;
 
 use serde_json::from_value;
+use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
 use crate::runs::models::{RerunRequest, RunOrigin, RunRequest, RunStatus};
@@ -14,7 +15,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 
 pub(crate) async fn frozen_rerun(
     transaction: ControlTransaction,
-    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (context, credentials): (&AuditContext, Option<Uuid>),
     request: &RerunRequest,
 ) -> Result<(ControlTransaction, (AuditContext, RunRequest)), ControlError> {
     let (mut transaction, rows) = query(
@@ -25,15 +26,10 @@ pub(crate) async fn frozen_rerun(
     .await?;
     let Some(source) = rows.first() else {
         if let Some(credentials) = credentials {
-            authorize_session(
+            authorize_person(
                 transaction,
                 (context, credentials),
-                &PermissionScope {
-                    action: Action::RunRerun,
-                    location_id: None,
-                    target: None,
-                    nodes: Default::default(),
-                },
+                &PermissionScope::action(Action::RunRerun, None),
                 DefaultRole::None,
             )
             .await?;
@@ -48,7 +44,7 @@ pub(crate) async fn frozen_rerun(
         let rows;
         (transaction, rows) = query(
             transaction,
-            "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND status IN ('failed','skipped')",
+            "SELECT node_key FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' AND status IN ('failed','skipped')",
             vec![Parameter::Id(request.source_run_id)],
         )
         .await?;

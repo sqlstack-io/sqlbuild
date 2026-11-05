@@ -338,7 +338,6 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     "successful work has nothing to retry from failure"
                 );
             }
-            crate::runs::tests::replay_helpers::run_replay_contract(store).await;
             close_test_store(fixture).await;
         });
     }

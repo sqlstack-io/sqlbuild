@@ -1,8 +1,6 @@
 //! A sub-second trigger start or cursor never moves a cron tick off its whole-second occurrence.
 
-use std::collections::BTreeSet;
-
-use chrono::{DateTime, DurationRound, TimeDelta, Timelike, Utc};
+use chrono::{DurationRound, TimeDelta, Timelike, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -56,7 +54,7 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
             input.documents.insert(
                 "triggers".into(),
                 json!({"minutely_orders": {"description": "Minutely orders", "job_key": "orders",
-                    "starts_at": "2026-01-01T00:00:00Z", "catch_up": {"all": {"max_runs": 20}},
+                    "starts_at": "2026-01-01T00:00:00Z",
                     "schedule": {"kind": "cron", "expression": case["expression"], "timezone": "UTC"}}}),
             );
             publish_snapshot(store, &input).await.expect("publication");
@@ -64,11 +62,11 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
                 .await
                 .expect("trigger")[0]
                 .trigger_id;
-            // Publication records a sub-second start; place it a few minutes back so ticks are due.
-            let start_minute = Utc::now()
+            // A sub-second start just after a whole minute must not tick that minute.
+            let now_minute = Utc::now()
                 .duration_trunc(TimeDelta::minutes(1))
-                .expect("minute")
-                - TimeDelta::minutes(number("start_minutes_ago"));
+                .expect("minute");
+            let start_minute = now_minute + TimeDelta::minutes(number("start_minutes_ahead"));
             let started =
                 start_minute + TimeDelta::microseconds(number("start_fraction_microseconds"));
             set_trigger_state(store, trigger_id,
@@ -78,25 +76,33 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
                 .await
                 .expect("election")
                 .expect("lease");
-            evaluate_trigger(store, &lease, trigger_id)
+            let first = evaluate_trigger(store, &lease, trigger_id)
                 .await
                 .expect("first evaluation")
                 .expect("trigger");
-            let first = tick_times(store, trigger_id).await;
             assert_eq!(
-                first.iter().min(),
-                Some(
-                    &(start_minute
-                        + TimeDelta::minutes(test_case.expected_first_tick_minutes_after_start))
+                (first.actions.len(), first.next_due_at),
+                (
+                    0,
+                    Some(
+                        start_minute
+                            + TimeDelta::minutes(test_case.expected_first_tick_minutes_after_start)
+                    )
                 ),
                 "{}",
                 test_case.description
             );
-            // A cursor written by an earlier build sits just past its occurrence; resuming from it
-            // must not tick that occurrence again at the whole second.
-            let latest: DateTime<Utc> = *first.iter().max().expect("latest tick");
+            // A cursor written by an earlier build sits just past the latest occurrence; resuming
+            // from it must not tick that occurrence again at the whole second.
+            set_trigger_state(
+                store,
+                trigger_id,
+                "UPDATE sqb_trigger_state SET started_at=$1 WHERE trigger_id=$2",
+                now_minute - TimeDelta::minutes(10),
+            )
+            .await;
             let legacy =
-                latest + TimeDelta::microseconds(number("legacy_cursor_fraction_microseconds"));
+                now_minute + TimeDelta::microseconds(number("legacy_cursor_fraction_microseconds"));
             set_trigger_state(
                 store,
                 trigger_id,
@@ -109,9 +115,8 @@ fn given_a_sub_second_trigger_start_or_cursor_when_evaluated_then_cron_ticks_lan
                 .expect("resumed evaluation")
                 .expect("trigger");
             let resumed = tick_times(store, trigger_id).await;
-            let seconds: BTreeSet<i64> = resumed.iter().map(DateTime::timestamp).collect();
             assert_eq!(
-                resumed.len() - seconds.len(),
+                resumed.iter().filter(|time| **time == now_minute).count(),
                 test_case.expected_repeated_occurrences,
                 "{}: {resumed:?}",
                 test_case.description

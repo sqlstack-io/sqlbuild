@@ -12,7 +12,7 @@ pub(crate) async fn second_store(store: &ControlStore) -> ControlStore {
 
 pub(crate) fn store_url(store: &ControlStore) -> String {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         return path.to_str().expect("UTF-8 test path").to_owned();

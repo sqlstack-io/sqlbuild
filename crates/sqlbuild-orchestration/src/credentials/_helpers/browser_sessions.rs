@@ -13,6 +13,31 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// A live person gets a session; a password sign-in also needs its password version to be current.
+pub(crate) async fn issue_live_session(
+    transaction: ControlTransaction,
+    context: &AuditContext,
+    (principal_id, credential_id): (Uuid, Option<Uuid>),
+    granting_role: &str,
+) -> Result<(ControlTransaction, Option<(AuditContext, IssuedSession)>), ControlError> {
+    let (transaction, rows) = query(transaction,
+        "SELECT p.principal_id FROM sqb_principals p LEFT JOIN sqb_password_credentials c \
+         ON c.principal_id=p.principal_id AND c.credential_id=$2 \
+         WHERE p.principal_id=$1 AND p.disabled_at IS NULL AND ($2 IS NULL OR c.credential_id IS NOT NULL)",
+        vec![Parameter::Id(principal_id), Parameter::OptionalId(credential_id)]).await?;
+    if rows.is_empty() {
+        return Ok((transaction, None));
+    }
+    let context = AuditContext {
+        actor: format!("principal:{principal_id}"),
+        granting_role: granting_role.into(),
+        ..context.clone()
+    };
+    let (transaction, session) =
+        issue_session(transaction, &context, (principal_id, credential_id)).await?;
+    Ok((transaction, Some((context, session))))
+}
+
 pub(crate) async fn issue_session(
     transaction: ControlTransaction,
     context: &AuditContext,
@@ -27,24 +52,17 @@ pub(crate) async fn issue_session(
         principal_id,
         expires_at: (now + Duration::seconds(PASSWORD_SESSION_SECONDS)).trunc_subsecs(6),
     };
-    let mut parameters = vec![
-        Parameter::Id(session_id),
-        Parameter::Id(principal_id),
-        Parameter::Text(sha256_hex(bearer.as_bytes())),
-        Parameter::Text(sha256_hex(csrf.as_bytes())),
-        Parameter::Time(now),
-        Parameter::Time(identity.expires_at),
-    ];
-    let (table, column, value) = match credential_id {
-        Some(id) => {
-            parameters.push(Parameter::Id(id));
-            ("sqb_password_sessions", ",credential_id", ",$7")
-        }
-        None => ("sqb_external_sessions", "", ""),
-    };
     let (transaction, _) = query(transaction,
-        &format!("INSERT INTO {table} (session_id,principal_id,secret_hash,csrf_hash,created_at,expires_at{column}) VALUES ($1,$2,$3,$4,$5,$6{value})"),
-        parameters).await?;
+        "INSERT INTO sqb_sessions (session_id,principal_id,secret_hash,csrf_hash,created_at,expires_at,credential_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        vec![
+            Parameter::Id(session_id),
+            Parameter::Id(principal_id),
+            Parameter::Text(sha256_hex(bearer.as_bytes())),
+            Parameter::Text(sha256_hex(csrf.as_bytes())),
+            Parameter::Time(now),
+            Parameter::Time(identity.expires_at),
+            Parameter::OptionalId(credential_id),
+        ]).await?;
     let transaction = append_audit(
         transaction,
         context,

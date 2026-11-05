@@ -12,14 +12,12 @@ from sqlbuild.orchestration_declarations.types import NodeEventKind, PlatformEve
 
 @dataclass(frozen=True, kw_only=True)
 class Schedule:
-    """Cron with an RFC 3339 start; catch_up='all' requires a positive max_catch_up."""
+    """Cron with an RFC 3339 start; missed times collapse into one run of the latest."""
 
     cron: str
     timezone: str
     starts_at: str | None = None
     default_status: Literal["running", "paused"] = "running"
-    catch_up: Literal["latest", "all"] = "latest"
-    max_catch_up: int | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -30,10 +28,6 @@ class Job:
     description: str = field(kw_only=True)
     select: str = field(kw_only=True)
     exclude: str = field(default="", kw_only=True)
-    overlap: Literal["coalesce", "queue", "allow"] = field(default="coalesce", kw_only=True)
-    on_failure: Literal["skip_dependents", "skip_downstream_jobs", "stop_group"] = field(
-        default="skip_dependents", kw_only=True
-    )
     settings: dict[str, object] = field(default_factory=dict, kw_only=True)
     concurrency: int | None = field(default=None, kw_only=True)
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
@@ -49,7 +43,6 @@ class JobGroup:
     description: str = field(kw_only=True)
     jobs: Sequence[Job] = field(kw_only=True)
     after: dict[Job, Sequence[Job]] = field(default_factory=dict, kw_only=True)
-    overlap: Literal["coalesce", "queue", "allow"] = field(default="coalesce", kw_only=True)
     concurrency_groups: tuple[str, ...] = field(default=(), kw_only=True)
     schedule: Schedule | None = field(default=None, kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
@@ -73,8 +66,6 @@ class CalendarSchedule:
     timezone: str
     starts_at: str | None = None
     default_status: Literal["running", "paused"] = "running"
-    catch_up: Literal["latest", "all"] = "latest"
-    max_catch_up: int | None = None
     targets: tuple[str, ...] = ()
     function: Callable[..., Iterable[datetime]] | None = field(default=None, repr=False)
 
@@ -142,7 +133,7 @@ class Sensor:
     ) = field(default=None, kw_only=True)
     run: Job | JobGroup = field(kw_only=True)
     minimum_interval_seconds: int = field(default=30, kw_only=True)
-    default_status: Literal["running", "stopped"] = field(default="running", kw_only=True)
+    default_status: Literal["running", "paused"] = field(default="running", kw_only=True)
     targets: tuple[str, ...] = field(default=(), kw_only=True)
     function: Callable[..., Iterable[RunRequest] | SkipReason] | None = field(
         default=None, repr=False, kw_only=True

@@ -5,6 +5,7 @@ use serde_json::{Map, Value, json};
 use sqlbuild_recall::records::main::event_object_row::event_object_row;
 use sqlbuild_recall::records::models::RowEnvelope;
 
+use crate::store::_helpers::release_version::RELEASE_VERSION;
 use crate::store::errors::ControlError;
 use crate::store::main::append_recall::append_recall;
 use crate::store::main::query::query;
@@ -34,7 +35,7 @@ pub(crate) async fn append_control_event(
             .and_then(Value::as_str)
             .unwrap_or(&timestamp)
             .into(),
-        producer_version: env!("CARGO_PKG_VERSION").into(),
+        producer_version: RELEASE_VERSION.get().copied().unwrap_or("unknown").into(),
     };
     let object = Map::from_iter([
         ("event_id".into(), json!(event.event_id)),

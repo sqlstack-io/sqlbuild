@@ -5,13 +5,15 @@ use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, AuthenticationDenial, PasswordSessionResponse};
+use crate::api::models::{
+    ApiAuthentication, AuthenticationDenial, HumanLogin, PasswordSessionResponse,
+};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::PasswordApiTestCase;
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::set_password::set_password,
 };
-use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority, PrincipalKind};
+use crate::credentials::models::{AuditContext, DefaultRole, PasswordAuthority};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -70,7 +72,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person = create_principal(store, &context, (username, PrincipalKind::Person))
+            let person = create_principal(store, &context, username)
                 .await
                 .expect("person");
             set_password(
@@ -84,7 +86,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    password_origin: Some(origin.into()),
+                    login: HumanLogin::Password(origin.into()),
                     ..ApiAuthentication::default()
                 },
             )
@@ -92,9 +94,8 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    password_origin: Some(origin.into()),
+                    login: HumanLogin::Password(origin.into()),
                     default_role: DefaultRole::Viewer,
-                    ..ApiAuthentication::default()
                 },
             )
             .await;
@@ -143,7 +144,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("denial decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             for (name, secret) in [
@@ -159,7 +160,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
                 let denial: AuthenticationDenial = response.json().await.expect("generic denial");
                 assert_eq!(denial.error, "authentication rejected");
-                decisions.push(denial.decision_id);
+                decisions.push(denial.request_id);
             }
             let response = client
                 .post(format!("{}/api/auth/password/login", api.url))
@@ -214,7 +215,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("session decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -287,7 +288,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("CSRF decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -331,7 +332,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("revocation decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -375,15 +376,16 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                     .json::<AuthenticationDenial>()
                     .await
                     .expect("logout decision")
-                    .decision_id,
+                    .request_id,
             );
             let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("audit read"),
                 "SELECT event_id, action, ip_address, scope_json, before_json, after_json FROM sqb_security_audit", vec![]).await.expect("security evidence");
             commit(transaction).await.expect("audit read complete");
             for decision in decisions {
-                assert!(rows.iter().any(|row| row["event_id"] == json!(decision)
-                    && row["action"] == "authentication.denied"
-                    && row["ip_address"] == "127.0.0.1"));
+                assert!(
+                    rows.iter().all(|row| row["event_id"] != json!(decision)),
+                    "anonymous denials stay out of the durable audit"
+                );
             }
             let audit = serde_json::to_string(&rows).expect("audit");
             for secret in [password, replacement, bearer, &issued.csrf_token] {

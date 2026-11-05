@@ -1,32 +1,26 @@
 //! Only live installation administrators may assign or revoke additive built-in roles.
 
+use uuid::Uuid;
+
 use crate::authorization::_helpers::administrator_roles::assign_role_in;
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{
-    Action, AdministratorAuthentication, AuditContext, DefaultRole, PermissionScope,
-    RoleAssignmentRequest,
+    Action, AuditContext, DefaultRole, PermissionScope, RoleAssignmentRequest,
 };
 use crate::store::errors::ControlError;
-use crate::store::main::begin::begin;
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::ControlStore;
 
 pub async fn assign_builtin_role(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     request: &RoleAssignmentRequest,
-    authentication: &AdministratorAuthentication,
 ) -> Result<bool, ControlError> {
-    let (transaction, context) = authorize_session(
-        begin(store, TransactionMode::Write).await?,
+    let (transaction, context) = begin_authorized(
+        store,
         (context, credentials),
-        &PermissionScope {
-            action: Action::RoleAssign,
-            location_id: None,
-            target: None,
-            nodes: Default::default(),
-        },
+        &PermissionScope::action(Action::RoleAssign, None),
         DefaultRole::None,
     )
     .await?;
-    assign_role_in(transaction, &context, request, authentication).await
+    assign_role_in(transaction, &context, request).await
 }

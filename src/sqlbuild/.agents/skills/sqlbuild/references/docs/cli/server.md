@@ -2,16 +2,9 @@
 
 # sqb server
 
-> Run the control service or repair its derived views.
+> Run the control service and scheduler.
 
 Online: https://sqlbuild.com/docs/cli/server/
-
-## Contents
-
-- Set retention
-- Inspect published SQL
-- Repair control views
-- Handle a refused repair
 
 Run the control API and scheduler without loading project Python:
 
@@ -55,10 +48,9 @@ snapshot only when no retained run, job, trigger, trigger change or location req
 deletes its node definitions and SQL text when no other snapshot shares them. Repeating or
 interrupting this cleanup is safe.
 
-The scheduler deletes skipped and covered ticks older than 30 days. It keeps each trigger's latest
-tick and every tick that started a run. It also never creates a tick more than 30 days old: a new
-schedule, a resumed trigger or a cursor reset catches up from 30 days ago at most, so deleted
-ticks never come back.
+The scheduler deletes covered ticks older than 30 days. It keeps each trigger's latest tick and
+every tick that started a run. A new schedule, a resumed trigger or a cursor reset catches up only
+on the latest missed time, so deleted ticks never come back.
 
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit
@@ -93,49 +85,3 @@ SQL inspection does not execute SQL or return Python source, execution artifacts
 data. Every successful inspection records an audit entry without copying SQL into it. If the
 audit cannot be saved, the request fails without returning SQL. Revocation takes effect on the
 next request, including sessions created by [`sqb login`](login.md).
-
-## Repair control views
-
-Repair snapshot selection, jobs, triggers, runs, node status and the structural catalog from
-retained control facts:
-
-```bash
-sqb server rebuild-projections
-```
-
-This operation requires direct ownership of the initialized control database. A browser role
-or location credential does not grant it. Back up the database before repair. This command
-does not initialize or upgrade a database; start the matching server version first if a schema
-upgrade is needed.
-
-| Database | Selection |
-| --- | --- |
-| SQLite | `.sqlbuild/control.sqlite3` in the project directory when the database variable is unset |
-| PostgreSQL | URL in `SQLBUILD_CONTROL_DATABASE_URL` |
-
-Use `--database-env VARIABLE` to read the database URL from a different environment variable.
-Use `--project-dir PATH` to select a different SQLite project directory.
-
-Repair waits for the current writer and uses one consistent source cut. It commits all repaired
-views together or leaves every view unchanged. Repeating a successful repair has the same result.
-It preserves credentials, security audits, retained source facts, worker claims, leases and other
-operational ownership. It does not rerun jobs, release workers or modify the warehouse.
-
-## Handle a refused repair
-
-Repair fails if a retained source is unsupported, invalid or insufficient to reconstruct the
-views exactly. A trigger without a recorded semantic-progress image cannot be repaired: tick
-history alone cannot distinguish a cursor reset from a subsequent reevaluation of existing ticks.
-The command never guesses the cursor, substitutes the current time or reports partial success.
-
-If repair reports missing semantic progress, preserve the database and use a known-good backup.
-Do not delete source history to force a repair. Recording future transitions does not recover
-missing historical facts.
-
-| Result | Exit status | stdout |
-| --- | --- | --- |
-| All views repaired | `0` | `{"rebuilt":true}` |
-| Repair refused or rolled back | Nonzero | No success result |
-
-Progress and completion messages go to stderr. If stdout delivery fails after commit, the
-command reports that changes may already be committed; rerunning the repair is safe.

@@ -23,7 +23,7 @@ pub(crate) async fn scan_health(
     let transaction = begin(store, TransactionMode::Write).await?;
     let now = transaction.now;
     let (transaction, rows) = query(transaction,
-        "SELECT i.installation_id, CASE WHEN l.expires_at>$1 THEN 1 ELSE 0 END AS leader \
+        "SELECT i.installation_id, l.expires_at AS lease_expires_at, CASE WHEN l.expires_at>$1 THEN 1 ELSE 0 END AS leader \
          FROM sqb_installation i LEFT JOIN sqb_scheduler_lease l ON l.name='scheduler' WHERE i.singleton=1",
         vec![Parameter::Time(now)]).await?;
     let health: InstallationHealth = decode_row(
@@ -36,7 +36,7 @@ pub(crate) async fn scan_health(
         transaction = observe(
             transaction,
             health.installation_id,
-            PlatformEvent::SchedulerNoLeader,
+            (PlatformEvent::SchedulerNoLeader, health.lease_expires_at),
         )
         .await?;
     }
@@ -65,7 +65,7 @@ pub(crate) async fn scan_health(
         observe(
             transaction,
             health.installation_id,
-            PlatformEvent::Heartbeat { replica_id },
+            (PlatformEvent::Heartbeat { replica_id }, None),
         )
         .await?,
     )
@@ -103,10 +103,13 @@ async fn scan_trigger_page(
             transaction = observe(
                 transaction,
                 installation_id,
-                PlatformEvent::TickOverdue {
-                    trigger_id: trigger.trigger_id,
-                    scheduled_for,
-                },
+                (
+                    PlatformEvent::TickOverdue {
+                        trigger_id: trigger.trigger_id,
+                        scheduled_for,
+                    },
+                    None,
+                ),
             )
             .await?;
         }
@@ -118,11 +121,14 @@ async fn scan_trigger_page(
             transaction = observe(
                 transaction,
                 installation_id,
-                PlatformEvent::CalendarHorizonLow {
-                    trigger_id: trigger.trigger_id,
-                    refresh_at,
-                    horizon_end: times.last().copied(),
-                },
+                (
+                    PlatformEvent::CalendarHorizonLow {
+                        trigger_id: trigger.trigger_id,
+                        refresh_at,
+                        horizon_end: times.last().copied(),
+                    },
+                    None,
+                ),
             )
             .await?;
         }

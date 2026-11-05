@@ -26,7 +26,7 @@ pub(crate) async fn project_change(
     if let RunChange::Launched { container_id } = &request.change {
         (transaction, _) = query(
             transaction,
-            "UPDATE sqb_run_liveness SET container_id=$1 WHERE run_id=$2",
+            "UPDATE sqb_runs SET container_id=$1 WHERE run_id=$2 AND worker_instance IS NOT NULL",
             vec![
                 Parameter::OptionalText(container_id.clone()),
                 Parameter::Id(request.run_id),
@@ -35,17 +35,14 @@ pub(crate) async fn project_change(
         .await?;
     }
     if matches!(request.change, RunChange::Finished { .. }) {
-        for table in [
-            "sqb_write_claims",
-            "sqb_concurrency_slots",
-            "sqb_run_liveness",
+        for statement in [
+            "DELETE FROM sqb_write_claims WHERE run_id=$1",
+            "DELETE FROM sqb_concurrency_slots WHERE run_id=$1",
+            "UPDATE sqb_runs SET worker_instance=NULL, container_id=NULL, claimed_at=NULL, \
+             last_heartbeat_at=NULL WHERE run_id=$1",
         ] {
-            (transaction, _) = query(
-                transaction,
-                &format!("DELETE FROM {table} WHERE run_id=$1"),
-                vec![Parameter::Id(request.run_id)],
-            )
-            .await?;
+            (transaction, _) =
+                query(transaction, statement, vec![Parameter::Id(request.run_id)]).await?;
         }
     }
     Ok(transaction)
@@ -105,12 +102,12 @@ pub(crate) async fn project_run_state(
             let cancelled = *outcome == RunOutcome::Cancelled;
             (transaction, _) = query(transaction,
                 "UPDATE sqb_run_nodes SET status=CASE WHEN status='running' THEN $1 ELSE $2 END, ended_at=$3 \
-                 WHERE run_id=$4 AND status IN ('pending','running')",
+                 WHERE run_id=$4 AND kind='node' AND status IN ('pending','running')",
                 vec![Parameter::Text(if cancelled { "cancelled" } else { "failed" }.into()),
                     Parameter::Text(if cancelled { "cancelled" } else { "skipped" }.into()), Parameter::Time(now), Parameter::Id(request.run_id)]).await?;
             let counts;
             (transaction, counts) = query(transaction,
-                "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 GROUP BY status",
+                "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' GROUP BY status",
                 vec![Parameter::Id(request.run_id)]).await?;
             let counts: BTreeMap<String, i64> = counts
                 .into_iter()

@@ -1256,6 +1256,16 @@ class BenchmarkProjectCompileTestCase:
 
 
 @dataclass(frozen=True)
+class BenchmarkProjectTestPlanTestCase:
+    """A benchmark project whose unit tests must plan without a warehouse connection."""
+
+    description: str
+    project_dir: Path
+    expected_final_line_prefix: str
+    expected_final_line_suffix: str
+
+
+@dataclass(frozen=True)
 class BenchmarkCoreCopyCompileTestCase:
     """A script that copies a benchmark project without an area, and the copy's compiled output.
 

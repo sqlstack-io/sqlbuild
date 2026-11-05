@@ -6,31 +6,47 @@ use uuid::Uuid;
 use crate::store::errors::ControlError;
 use crate::store::models::{ControlStore, Parameter};
 use crate::warehouse_metadata::_helpers::events::ingest_events;
-use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
+use crate::warehouse_metadata::_helpers::ingestion::batch_records;
 use crate::warehouse_metadata::models::{
-    MicrobatchesBatch, StateEventImport, StateEventsImport, WarehouseHistoryKind,
-    WarehouseStateLocation, WarehouseSyncResponse,
+    MetadataBatch, StateEventImport, WarehouseMicrobatchRecord, WarehouseStateLocation,
+    WarehouseSyncResponse,
 };
 
 pub async fn ingest_microbatches(
     store: &ControlStore,
     scope: (Uuid, &str),
-    batch: &MicrobatchesBatch,
+    batch: &MetadataBatch,
 ) -> Result<WarehouseSyncResponse, ControlError> {
-    validate_fields(
-        ("microbatches", batch.generation, batch.records.len()),
-        false,
-        false,
-    )?;
+    let records: Vec<WarehouseMicrobatchRecord> = batch_records(batch)?;
     ingest_events(
         store,
         scope,
-        StateEventsImport {
-            kind: WarehouseHistoryKind::Microbatches,
-            session_id: batch.session_id,
-            generation: batch.generation,
-            invalid_identity: batch
-                .records
+        batch,
+        (
+            records
+                .iter()
+                .map(|record| StateEventImport {
+                    source_id: record.event_id.clone(),
+                    location: WarehouseStateLocation {
+                        database: record.state_database.clone(),
+                        schema: record.state_schema.clone(),
+                    },
+                    observed_at: record.created_at,
+                    columns: vec![
+                        ("model_name", Parameter::Text(record.model_name.clone())),
+                        ("target_name", Parameter::Text(record.target_name.clone())),
+                        ("scope_kind", Parameter::Text(record.scope_kind.clone())),
+                        ("scope_key", Parameter::Text(record.scope_key.clone())),
+                        ("record_type", Parameter::Text(record.record_type.clone())),
+                        (
+                            "execution_run_id",
+                            Parameter::Text(record.execution_run_id.clone()),
+                        ),
+                    ],
+                    record_json: json!(record),
+                })
+                .collect(),
+            records
                 .iter()
                 .flat_map(|record| {
                     [
@@ -45,45 +61,7 @@ pub async fn ingest_microbatches(
                     ]
                 })
                 .any(|value| value.trim().is_empty()),
-            records: batch
-                .records
-                .iter()
-                .map(|record| StateEventImport {
-                    source_id: record.event_id.clone(),
-                    location: WarehouseStateLocation {
-                        database: record.state_database.clone(),
-                        schema: record.state_schema.clone(),
-                    },
-                    observed_at: record.created_at,
-                    columns: vec![
-                        ("model_name", Parameter::Text(record.model_name.clone())),
-                        ("target_name", Parameter::Text(record.target_name.clone())),
-                        ("scope_kind", Parameter::Text(record.scope_kind.clone())),
-                        ("scope_key", Parameter::Text(record.scope_key.clone())),
-                        (
-                            "physical_generation_id",
-                            Parameter::Text(record.physical_generation_id.clone()),
-                        ),
-                        ("record_type", Parameter::Text(record.record_type.clone())),
-                        (
-                            "origin_run_id",
-                            Parameter::Text(record.origin_run_id.clone()),
-                        ),
-                        (
-                            "execution_run_id",
-                            Parameter::Text(record.execution_run_id.clone()),
-                        ),
-                        (
-                            "replay_requirement_id",
-                            Parameter::OptionalText(record.replay_requirement_id.clone()),
-                        ),
-                    ],
-                    record_json: json!(record),
-                })
-                .collect(),
-            reconciliation: batch.reconciliation.as_ref(),
-            payload: json!(batch),
-        },
+        ),
     )
     .await
 }

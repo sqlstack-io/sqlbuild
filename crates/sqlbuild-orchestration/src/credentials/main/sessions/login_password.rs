@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 use crate::credentials::_helpers::password_sessions::issue_session;
 use crate::credentials::constants::{LOGIN_USERNAME_BYTES, MAX_PASSWORD_BYTES};
-use crate::credentials::main::audit::record_authentication_denial::record_authentication_denial;
 use crate::credentials::main::audit::reserve_authentication_attempt::reserve_authentication_attempt;
 use crate::credentials::main::sessions::verify_password::verify_password;
 use crate::credentials::models::{AuditContext, AuthenticationAttempt, PasswordLogin};
@@ -19,14 +18,11 @@ pub async fn login_password(
 ) -> Result<PasswordLogin, ControlError> {
     let bounded = username.len() <= LOGIN_USERNAME_BYTES && password.len() <= MAX_PASSWORD_BYTES;
     let username = if bounded { username } else { "" };
-    let (attempt_id, allowed) =
+    let (_, allowed) =
         reserve_authentication_attempt(store, context, AuthenticationAttempt::Login(username))
             .await?;
     if !allowed {
-        return Ok(PasswordLogin::Denied {
-            decision_id: attempt_id,
-            throttled: true,
-        });
+        return Ok(PasswordLogin::Denied { throttled: true });
     }
     if bounded {
         let transaction = begin(store, TransactionMode::Read).await?;
@@ -49,15 +45,5 @@ pub async fn login_password(
             return Ok(PasswordLogin::Authenticated(session));
         }
     }
-    let decision_id = record_authentication_denial(
-        store,
-        context,
-        (Uuid::new_v5(&attempt_id, b"denied"), "invalid_credentials"),
-        serde_json::json!({"attempt_id": attempt_id}),
-    )
-    .await?;
-    Ok(PasswordLogin::Denied {
-        decision_id,
-        throttled: false,
-    })
+    Ok(PasswordLogin::Denied { throttled: false })
 }

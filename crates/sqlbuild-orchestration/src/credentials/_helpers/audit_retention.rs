@@ -1,52 +1,15 @@
-//! Audit expiry is bounded cleanup that never outruns a sink, a retry lookup or the storage order.
-
-use std::collections::BTreeSet;
+//! Bounded audit expiry batches that never outrun a sink or the storage order.
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 use crate::credentials::constants::AUDIT_RETENTION_BATCH;
 use crate::credentials::models::AuditRetention;
-use crate::runs::constants::{MANUAL_JOB_AUDIT_TAG, RERUN_AUDIT_TAG};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
-use crate::store::types::Row;
-
-/// One full pass in storage order; returns rows deleted and rows still kept past the horizon.
-pub(crate) async fn prune_audit(
-    store: &ControlStore,
-    retention: AuditRetention,
-    sinks: &[String],
-) -> Result<(usize, i64), ControlError> {
-    let mut deleted = 0;
-    let mut after = 0;
-    loop {
-        let (count, next) = prune_audit_batch(store, (retention, sinks), after).await?;
-        deleted += count;
-        match next {
-            Some(next) => after = next,
-            None => break,
-        }
-    }
-    let transaction = begin(store, TransactionMode::Read).await?;
-    let cutoff = retention.cutoff(transaction.now);
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT COUNT(*) AS retained FROM sqb_security_audit WHERE occurred_at<$1",
-        vec![Parameter::Time(cutoff)],
-    )
-    .await?;
-    commit(transaction).await?;
-    let retained = rows
-        .first()
-        .and_then(|row| row["retained"].as_i64())
-        .unwrap_or_default();
-    Ok((deleted, retained))
-}
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 /// The newest row is never deleted, so the next MAX+1 storage ID is never reused.
-async fn prune_audit_batch(
+pub(crate) async fn prune_audit_batch(
     store: &ControlStore,
     (retention, sinks): (AuditRetention, &[String]),
     after: i64,
@@ -71,7 +34,7 @@ async fn prune_audit_batch(
     let (transaction, rows) = query(
         transaction,
         &format!(
-            "SELECT a.storage_id, a.event_id, a.scope_json FROM sqb_security_audit a \
+            "SELECT a.storage_id FROM sqb_security_audit a \
              WHERE a.occurred_at<$1 AND a.storage_id>$2 \
              AND a.storage_id<(SELECT MAX(storage_id) FROM sqb_security_audit){acknowledged} \
              ORDER BY a.storage_id LIMIT $3"
@@ -82,19 +45,14 @@ async fn prune_audit_batch(
     let next = (rows.len() == AUDIT_RETENTION_BATCH)
         .then(|| rows.last().and_then(|row| row["storage_id"].as_i64()))
         .flatten();
-    let (transaction, referenced) = retry_referenced(transaction, &rows).await?;
     let expired: Vec<Parameter> = rows
         .iter()
         .filter_map(|row| row["storage_id"].as_i64())
-        .filter(|storage_id| !referenced.contains(storage_id))
         .map(Parameter::Integer)
         .collect();
     let mut transaction = transaction;
     if !expired.is_empty() {
-        let placeholders = (1..=expired.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let placeholders = Parameter::placeholders(1..=expired.len());
         for table in ["sqb_security_audit_deliveries", "sqb_security_audit"] {
             (transaction, _) = query(
                 transaction,
@@ -106,63 +64,4 @@ async fn prune_audit_batch(
     }
     commit(transaction).await?;
     Ok((expired.len(), next))
-}
-
-/// Mirrors the retry join; a row whose identifiers cannot be read is kept, not guessed about.
-async fn retry_referenced(
-    transaction: ControlTransaction,
-    rows: &[Row],
-) -> Result<(ControlTransaction, BTreeSet<i64>), ControlError> {
-    let mut kept: BTreeSet<i64> = BTreeSet::new();
-    let mut candidates: Vec<(i64, Uuid)> = Vec::new();
-    for row in rows {
-        let Some(storage_id) = row["storage_id"].as_i64() else {
-            continue;
-        };
-        let Some(run_id) = row["scope_json"].get("run_id") else {
-            continue;
-        };
-        let (Ok(event_id), Ok(run_id)) = (
-            serde_json::from_value::<Uuid>(row["event_id"].clone()),
-            serde_json::from_value::<Uuid>(run_id.clone()),
-        ) else {
-            kept.insert(storage_id);
-            continue;
-        };
-        if Uuid::new_v5(&run_id, MANUAL_JOB_AUDIT_TAG) == event_id
-            || Uuid::new_v5(&run_id, RERUN_AUDIT_TAG) == event_id
-        {
-            candidates.push((storage_id, run_id));
-        }
-    }
-    if candidates.is_empty() {
-        return Ok((transaction, kept));
-    }
-    let placeholders = (1..=candidates.len())
-        .map(|index| format!("${index}"))
-        .collect::<Vec<_>>()
-        .join(",");
-    let (transaction, runs) = query(
-        transaction,
-        &format!("SELECT run_id FROM sqb_runs WHERE run_id IN ({placeholders})"),
-        candidates
-            .iter()
-            .map(|(_, run_id)| Parameter::Id(*run_id))
-            .collect(),
-    )
-    .await?;
-    let mut retained: BTreeSet<Uuid> = BTreeSet::new();
-    for row in runs {
-        retained.insert(
-            serde_json::from_value(row["run_id"].clone())
-                .map_err(|error| ControlError::Invalid(error.to_string()))?,
-        );
-    }
-    kept.extend(
-        candidates
-            .into_iter()
-            .filter(|(_, run_id)| retained.contains(run_id))
-            .map(|(storage_id, _)| storage_id),
-    );
-    Ok((transaction, kept))
 }

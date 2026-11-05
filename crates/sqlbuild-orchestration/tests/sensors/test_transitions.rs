@@ -60,8 +60,8 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                 .expect("customers check")
                 .kind = "check".into();
             input.documents.insert("jobs".into(), json!({
-                "orders": {"description": "Source checks", "selection": ["orders", "customers"], "overlap": "allow"},
-                "inventory": {"description": "React to a transition", "selection": ["inventory"], "overlap": "allow"}
+                "orders": {"description": "Source checks", "selection": ["orders", "customers"]},
+                "inventory": {"description": "React to a transition", "selection": ["inventory"]}
             }));
             input.documents.insert("triggers".into(), json!({
                 "failed_checks": {"description": "Actual failures", "job_key": "inventory",

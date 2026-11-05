@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
-use sqlbuild_orchestration::api::models::ApiAuthentication;
-use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope, PrincipalKind};
+use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin};
+use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
 use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest, RunWindow};
@@ -19,6 +19,7 @@ use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
+use crate::native_commands::_helpers::terminal::read_password;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,
@@ -69,11 +70,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
         if value.trim().is_empty() {
             return Err(ControlError::Invalid("principal name is required".into()));
         }
-        let kind = match text(namespace, "admin_principal_kind").as_deref() {
-            Some("service_account") => PrincipalKind::ServiceAccount,
-            _ => PrincipalKind::Person,
-        };
-        return Ok(ControlAdmin::CreatePrincipal(value, kind));
+        return Ok(ControlAdmin::CreatePrincipal(value));
     }
     let id = Uuid::parse_str(&value)
         .map_err(|_| ControlError::Invalid("a valid subject UUID is required".into()))?;
@@ -216,7 +213,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                 reason,
             })
         }
-        Some("issue-location-token" | "issue-principal-token") => {
+        Some("issue-location-token") => {
             let expiry = DateTime::parse_from_rfc3339(
                 &text(namespace, "admin_expires_at").unwrap_or_default(),
             )
@@ -227,15 +224,15 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     "token expiry must be in the future".into(),
                 ));
             }
-            let scope = match action.as_deref() {
-                Some("issue-principal-token") => CredentialScope::Principal { principal_id: id },
-                _ => CredentialScope::Location { location_id: id },
-            };
-            Ok(ControlAdmin::IssueToken(scope, expiry))
+            Ok(ControlAdmin::IssueToken(
+                CredentialScope::Location { location_id: id },
+                expiry,
+            ))
         }
         Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
         Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
-        Some("set-password") => Ok(ControlAdmin::SetPassword(id)),
+        Some("set-password") => Ok(ControlAdmin::SetPassword(id, read_password()?)),
+        Some("grant-admin") => Ok(ControlAdmin::GrantAdmin(id)),
         _ => Err(ControlError::Invalid(
             "an administration command is required".into(),
         )),
@@ -304,21 +301,38 @@ fn retention_setting(namespace: &Namespace, flag: &str) -> Result<Option<u16>, C
 }
 
 fn control_authentication(namespace: &Namespace) -> Result<ApiAuthentication, ControlError> {
+    let password = text(namespace, "control_password_origin");
+    let proxy = authentication_settings(
+        text(namespace, "control_trusted_proxy_config"),
+        ("trusted-proxy", "origin, trusted_peers and identities"),
+    )?;
+    let oidc = authentication_settings(
+        text(namespace, "control_oidc_config"),
+        ("OIDC", "origin, issuer, client_id and identities"),
+    )?;
+    let login = match (password, proxy, oidc) {
+        (None, None, None) => HumanLogin::None,
+        (Some(origin), None, None) => HumanLogin::Password(origin),
+        (None, Some(settings), None) => HumanLogin::TrustedProxy(settings),
+        (None, None, Some(settings)) => HumanLogin::Oidc(settings),
+        (_, Some(_), _) => {
+            return Err(ControlError::Invalid(
+                "trusted-proxy authentication cannot be combined with other human authentication modes".into(),
+            ));
+        }
+        _ => {
+            return Err(ControlError::Invalid(
+                "OIDC authentication cannot be combined with other human authentication modes"
+                    .into(),
+            ));
+        }
+    };
     Ok(ApiAuthentication {
-        password_origin: text(namespace, "control_password_origin"),
+        login,
         default_role: serde_json::from_value(json!(
             text(namespace, "control_default_role").unwrap_or_else(|| "none".into())
         ))
         .map_err(|_| ControlError::Invalid("default role must be none or viewer".into()))?,
-        trusted_proxy: authentication_settings(
-            text(namespace, "control_trusted_proxy_config"),
-            ("trusted-proxy", "origin, trusted_peers and identities"),
-        )?,
-        oidc: authentication_settings(
-            text(namespace, "control_oidc_config"),
-            ("OIDC", "origin, issuer, client_id and identities"),
-        )?,
-        ..ApiAuthentication::default()
     })
 }
 

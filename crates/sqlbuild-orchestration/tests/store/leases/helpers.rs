@@ -4,7 +4,7 @@ use crate::store::models::ControlStore;
 
 pub(crate) async fn expire_lease(store: &ControlStore) {
     let ControlStore::Postgres(pool) = store else {
-        let ControlStore::Sqlite(path, _) = store else {
+        let ControlStore::Sqlite(path) = store else {
             unreachable!()
         };
         rusqlite::Connection::open(path)

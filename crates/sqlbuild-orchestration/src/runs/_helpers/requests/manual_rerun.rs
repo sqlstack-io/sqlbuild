@@ -6,7 +6,9 @@ use uuid::Uuid;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext};
 use crate::runs::_helpers::requests::permissions::authorize_execution;
-use crate::runs::_helpers::requests::publication::{publish_request, request_retry};
+use crate::runs::_helpers::requests::publication::{
+    publish_request, record_authored, request_retry,
+};
 use crate::runs::_helpers::requests::rerun::frozen_rerun;
 use crate::runs::constants::RERUN_AUDIT_TAG;
 use crate::runs::models::{RerunRequest, RunRequest};
@@ -17,7 +19,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 /// No credentials means a trusted direct-store owner, never an HTTP-supplied role.
 pub(crate) async fn request_rerun_in(
     mut transaction: ControlTransaction,
-    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (context, credentials): (&AuditContext, Option<Uuid>),
     request: &RerunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let mut context = context.clone();
@@ -55,12 +57,8 @@ pub(crate) async fn request_rerun_in(
         ));
     }
     let event_id = Uuid::new_v5(&request.run_id, RERUN_AUDIT_TAG);
-    let (transaction, retry) = request_retry(
-        transaction,
-        &context,
-        (request.run_id, event_id, &json!(request)),
-    )
-    .await?;
+    let (transaction, retry) =
+        request_retry(transaction, &context, (request.run_id, &json!(request))).await?;
     if retry {
         return Ok((transaction, false));
     }
@@ -72,6 +70,8 @@ pub(crate) async fn request_rerun_in(
         (transaction, frozen)
     };
     let (transaction, _) = publish_request(transaction, &frozen).await?;
+    let transaction =
+        record_authored(transaction, &context, (request.run_id, &json!(request))).await?;
     let transaction = append_audit(
         transaction,
         &context,

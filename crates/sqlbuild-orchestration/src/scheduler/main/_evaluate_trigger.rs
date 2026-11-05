@@ -3,9 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
-use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::_helpers::persistence::persist_ticks;
-use crate::scheduler::_helpers::tick_retention::evaluation_start;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
 use crate::scheduler::main::check_lease::check_lease;
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickPlan, TickState};
@@ -42,13 +40,18 @@ pub(crate) async fn evaluate_trigger(
         return Ok(None);
     }
     let now = transaction.now;
-    let (transaction, from) = evaluation_start(transaction, &trigger, now).await?;
-    let (due_times, continuation) = expand_schedule(&trigger.definition_json, from, now)?;
-    let (transaction, rows) = query(transaction,
+    let (transaction, rows) = query(
+        transaction,
         "SELECT r.run_id FROM sqb_runs r WHERE r.location_id=$1 AND r.target=$2 AND r.job_key=$3 \
          AND r.status='queued' AND r.cancel_requested_at IS NULL \
-         AND NOT EXISTS (SELECT 1 FROM sqb_run_liveness l WHERE l.run_id=r.run_id) ORDER BY r.queued_at, r.run_id LIMIT 1",
-        vec![Parameter::Id(trigger.location_id), Parameter::Text(trigger.target.clone()), Parameter::Text(trigger.job_key.clone())]).await?;
+         AND r.worker_instance IS NULL ORDER BY r.queued_at, r.run_id LIMIT 1",
+        vec![
+            Parameter::Id(trigger.location_id),
+            Parameter::Text(trigger.target.clone()),
+            Parameter::Text(trigger.job_key.clone()),
+        ],
+    )
+    .await?;
     let waiting_run = rows
         .first()
         .and_then(|row| row.get("run_id"))
@@ -57,14 +60,11 @@ pub(crate) async fn evaluate_trigger(
         .transpose()
         .map_err(|error| ControlError::Invalid(error.to_string()))?;
     let plan = plan_ticks(
+        &trigger.definition_json,
         &TickState {
             trigger_id,
-            enabled: true,
+            started_at: trigger.started_at,
             last_tick_for: trigger.last_tick_for,
-            due_times,
-            continuation,
-            catch_up: trigger.definition_json.catch_up,
-            overlap: trigger.job_json.overlap,
             waiting_run,
         },
         now,

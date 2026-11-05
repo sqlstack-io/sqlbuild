@@ -27,10 +27,9 @@ pub async fn monitor_runs(
         transaction,
         &format!(
             "SELECT r.run_id, r.status, r.cancel_requested_at, r.node_counts_json, \
-         r.last_event_storage_id, l.worker_instance FROM sqb_runs r \
-         JOIN sqb_run_liveness l ON l.run_id=r.run_id \
-         WHERE r.status='running' AND l.last_heartbeat_at<$1 \
-         ORDER BY l.last_heartbeat_at, r.run_id LIMIT {MONITOR_BATCH_SIZE}"
+         r.last_event_storage_id, r.worker_instance FROM sqb_runs r \
+         WHERE r.status='running' AND r.last_heartbeat_at<$1 \
+         ORDER BY r.last_heartbeat_at, r.run_id LIMIT {MONITOR_BATCH_SIZE}"
         ),
         vec![Parameter::Time(cutoff)],
     )

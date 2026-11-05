@@ -87,9 +87,6 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         initial: dict[str, Any] = current_snapshot(api, test_case.target)
         assert frozenset(initial["nodes"]) == test_case.expected_nodes
         assert initial["nodes"]["model:orders"]["definition"]["deps"] == ["model:stg_orders"]
-        assert initial["documents"]["triggers"]["edge_snapshot_orders"]["catch_up"] == {
-            "all": {"max_runs": 3}
-        }
         edited: dict[str, str] = files | {
             "models/stg_orders.sql": TYPE_PROOF_FILES["models/stg_orders.sql"].replace(
                 "CAST(5 AS INTEGER)", "CAST(9 AS INTEGER)"
@@ -133,9 +130,8 @@ def test_given_retained_compiler_data_when_publishing_then_http_updates_atomical
         assert scheduled["status"] == "paused"
         assert scheduled["definition_json"]["starts_at"] == "2026-07-02T19:47:23.456789Z"
         assert scheduled["definition_json"]["default_status"] == "paused"
-        assert scheduled["definition_json"]["catch_up"] == {"all": {"max_runs": 3}}
         assert by_name["edge_platform_orders"]["status"] == "paused"
-        assert by_name["edge_platform_orders"]["definition_json"]["default_status"] == "stopped"
+        assert by_name["edge_platform_orders"]["definition_json"]["default_status"] == "paused"
         assert by_name["edge_platform_orders"]["definition_json"]["when"] == {
             "kind": "platform_event",
             "kinds": ["tick_overdue", "location_broken", "launch_failed"],

@@ -2,57 +2,18 @@
 
 use std::time::{Duration, Instant};
 
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::TimeDelta;
 use uuid::Uuid;
 
-use crate::scheduler::_helpers::expansion::latest_occurrence;
 use crate::scheduler::constants::{
     TICK_RETENTION_BATCH, TICK_RETENTION_BATCHES_PER_PASS, TICK_RETENTION_DAYS,
     TICK_RETENTION_INTERVAL_SECONDS,
 };
 use crate::scheduler::main::check_lease::check_lease;
-use crate::scheduler::models::{CatchUp, DueTrigger, SchedulerLease};
+use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
-use crate::store::models::{Change, ControlStore, ControlTransaction, Parameter, TransactionMode};
-
-/// Evaluation starts at the horizon, except that an unticked `latest` occurrence keeps its one tick.
-pub(crate) async fn evaluation_start(
-    transaction: ControlTransaction,
-    trigger: &DueTrigger,
-    now: DateTime<Utc>,
-) -> Result<(ControlTransaction, DateTime<Utc>), ControlError> {
-    let start = match trigger.last_tick_for {
-        Some(last) => last,
-        None => trigger
-            .started_at
-            .checked_sub_signed(TimeDelta::microseconds(1))
-            .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
-    };
-    let horizon = now - TimeDelta::days(TICK_RETENTION_DAYS);
-    if start >= horizon {
-        return Ok((transaction, start));
-    }
-    if trigger.definition_json.catch_up == CatchUp::Latest
-        && let Some(latest) = latest_occurrence(&trigger.definition_json, now)?
-        && latest > start
-        && latest < horizon
-    {
-        let (transaction, rows) = query(
-            transaction,
-            "SELECT tick_id FROM sqb_ticks WHERE trigger_id=$1 AND scheduled_for>=$2 LIMIT 1",
-            vec![Parameter::Id(trigger.trigger_id), Parameter::Time(latest)],
-        )
-        .await?;
-        let from = if rows.is_empty() {
-            latest - TimeDelta::seconds(1)
-        } else {
-            horizon
-        };
-        return Ok((transaction, from));
-    }
-    Ok((transaction, horizon))
-}
+use crate::store::models::{Change, ControlStore, Parameter, TransactionMode};
 
 /// Run the leader's tick cleanup at most once per interval; a capped pass runs again next cycle.
 pub(crate) async fn prune_ticks_when_due(
@@ -76,7 +37,7 @@ pub(crate) async fn prune_ticks_when_due(
     }
 }
 
-/// One bounded pass; requested, failed and deferred ticks stay, as does any tick a run points at.
+/// One bounded pass; requested ticks stay, as does any tick a run points at.
 pub(crate) async fn prune_ticks(
     store: &ControlStore,
     lease: &SchedulerLease,
@@ -90,7 +51,7 @@ pub(crate) async fn prune_ticks(
         (transaction, rows) = query(
             transaction,
             "DELETE FROM sqb_ticks WHERE tick_id IN (SELECT k.tick_id FROM sqb_ticks k \
-             WHERE k.outcome IN ('skipped','covered') AND k.scheduled_for<$1 \
+             WHERE k.outcome='covered' AND k.scheduled_for<$1 \
              AND k.scheduled_for<(SELECT MAX(l.scheduled_for) FROM sqb_ticks l WHERE l.trigger_id=k.trigger_id) \
              AND NOT EXISTS (SELECT 1 FROM sqb_runs r WHERE r.tick_id=k.tick_id) \
              ORDER BY k.scheduled_for, k.tick_id LIMIT $2) RETURNING trigger_id",

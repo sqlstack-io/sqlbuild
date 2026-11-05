@@ -15,14 +15,20 @@ async function request(path, body) {
 }
 
 async function current() {
+  if (document.body.dataset.method === "proxy") {
+    element("account").textContent = "Signed in through your organization";
+    element("confirmation").hidden = false;
+    message("Check that the verification code matches your terminal before authorizing.");
+    return;
+  }
   const response = await fetch("/api/auth/session", { credentials: "same-origin" });
   if (!response.ok) {
     message("Sign in before authorizing your CLI.");
-    element(document.body.dataset.method === "password" ? "password" : document.body.dataset.method === "oidc" ? "sso" : "proxy").hidden = false;
+    element(document.body.dataset.method === "password" ? "password" : "sso").hidden = false;
     return;
   }
   const identity = await response.json();
-  for (const id of ["password", "sso", "proxy"]) element(id).hidden = true;
+  for (const id of ["password", "sso"]) element(id).hidden = true;
   element("account").textContent = `Signed in as person ${identity.principal_id}`;
   element("confirmation").hidden = false;
   message("Check that the verification code matches your terminal before authorizing.");
@@ -43,16 +49,6 @@ element("password").addEventListener("submit", async (event) => {
 element("sso").addEventListener("click", () => {
   document.cookie = "__Host-sqb-cli-return=1; Secure; SameSite=Lax; Path=/; Max-Age=300";
   location.assign("/api/auth/oidc/login");
-});
-
-element("proxy").addEventListener("click", async () => {
-  element("proxy").disabled = true;
-  try {
-    const response = await fetch("/api/auth/proxy", { credentials: "same-origin" });
-    if (!response.ok) { message("Organization sign-in was rejected. Contact your administrator."); return; }
-    await current();
-  } catch { message("Could not reach SQLBuild. Try again."); }
-  finally { element("proxy").disabled = false; }
 });
 
 async function decide(approve) {

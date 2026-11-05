@@ -63,11 +63,11 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 .expect("other location");
             let mut input = snapshot(location);
             input.documents.insert("jobs".into(), json!({
-                "orders": {"description": "Source orders", "selection": ["orders", "customers"], "overlap": "allow"},
-                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"], "overlap": "allow"}
+                "orders": {"description": "Source orders", "selection": ["orders", "customers"]},
+                "inventory": {"description": "Sensor destination", "selection": ["orders", "customers"]}
             }));
             input.documents.insert("groups".into(), json!({
-                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}, "overlap": "allow"}
+                "daily_orders": {"description": "Source group", "selection": ["orders", "customers"], "jobs": {"orders": []}}
             }));
             input.documents.insert("triggers".into(), json!({
                 "rebuilt_orders": {"description": "Each genuine rebuild", "job_key": "inventory",
@@ -146,7 +146,6 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 [true; 2],
             )
             .await;
-            // Page past nonmatches without borrowing starts from earlier real runs.
             for _ in 0..46 {
                 finish_run(
                     store,
@@ -239,8 +238,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             let replica = second_store(store).await;
             let fault = TransactionFault {
                 description: "node cursor rollback",
-                table: "sqb_sensor_cursor_commits",
-                operation: "INSERT",
+                table: "sqb_trigger_state",
+                operation: "UPDATE",
                 condition: "",
                 sqlite_body: "SELECT RAISE(ABORT, 'injected node cursor failure')",
                 postgres_body: "RAISE EXCEPTION 'injected node cursor failure'",
@@ -271,9 +270,9 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     complete_builtin_sensor(&replica, &lease, &pending),
                 )
                 .await
-                .expect("bounded 100-event page")
+                .expect("bounded 100-row page")
                 .expect("first page"),
-                6
+                7
             );
             assert_eq!(
                 complete_builtin_sensor(store, &lease, &pending)
@@ -291,8 +290,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 complete_builtin_sensor(store, &lease, &next)
                     .await
                     .expect("second page"),
-                1,
-                "the other selected node is still pending"
+                0,
+                "unstarted finishes never fill a page"
             );
             for change in [
                 RunChange::NodeStarted {

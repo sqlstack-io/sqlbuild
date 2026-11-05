@@ -19,7 +19,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
     StatisticsRecoveryTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.catalog.helpers import (
-    catalog_facts,
     wait_for_catalog,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
@@ -34,7 +33,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helper
 
 @pytest.mark.parametrize(
     "test_case",
-    [StatisticsRecoveryTestCase("Drop after discovery before sampling", (True, False))],
+    [
+        StatisticsRecoveryTestCase(
+            "Drop after discovery before sampling", "Warehouse history read failed"
+        )
+    ],
     ids=lambda case: case.description,
 )
 def test_given_relation_dropped_during_sampling_when_read_fails_then_catalog_can_reconcile(
@@ -102,11 +105,7 @@ def test_given_relation_dropped_during_sampling_when_read_fails_then_catalog_can
             assert time.monotonic() < deadline, log.read_text()
             time.sleep(0.05)
         wait_for_catalog(control, [], location, log)
-        assert (
-            tuple(fact["present"] for fact in catalog_facts(control))
-            == test_case.expected_catalog_presence
-        )
-        assert "Warehouse history read failed" in log.read_text()
+        assert test_case.expected_log in log.read_text()
 
 
 @pytest.mark.parametrize(

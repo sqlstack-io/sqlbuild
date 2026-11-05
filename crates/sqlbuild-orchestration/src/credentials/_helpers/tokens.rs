@@ -43,8 +43,8 @@ pub(crate) async fn issue(
         Parameter::Time(expires_at),
     ]);
     let (transaction, _) = query(transaction,
-        "INSERT INTO sqb_access_tokens (token_id, secret_hash, principal_id, location_id, run_id, claim_id, scope_json, created_at, expires_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)", parameters).await?;
+        "INSERT INTO sqb_access_tokens (token_id, secret_hash, location_id, run_id, scope_json, created_at, expires_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7)", parameters).await?;
     let identity = TokenIdentity {
         token_id,
         scope,
