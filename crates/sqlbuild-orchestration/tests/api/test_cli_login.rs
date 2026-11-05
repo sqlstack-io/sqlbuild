@@ -6,14 +6,14 @@ use serde_json::{Value, json};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::api::models::ApiAuthentication;
+use crate::api::models::{ApiAuthentication, HumanLogin};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::test_types::CliLoginTestCase;
 use crate::credentials::main::{
     identities::create_principal::create_principal, sessions::login_password::login_password,
     sessions::revoke_session::revoke_session, sessions::set_password::set_password,
 };
-use crate::credentials::models::{AuditContext, PasswordAuthority, PasswordLogin, PrincipalKind};
+use crate::credentials::models::{AuditContext, PasswordAuthority, PasswordLogin};
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -63,10 +63,9 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 request_id: Uuid::now_v7(),
                 ip_address: Some("127.0.0.1".parse().expect("peer")),
             };
-            let person =
-                create_principal(store, &context, ("orders-reader", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-reader")
+                .await
+                .expect("person");
             set_password(
                 store,
                 &context,
@@ -83,7 +82,7 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 panic!("browser credentials");
             };
             let authentication = || ApiAuthentication {
-                password_origin: Some(origin.into()),
+                login: HumanLogin::Password(origin.into()),
                 ..ApiAuthentication::default()
             };
             let first = start_api_with_authentication(store, authentication()).await;
@@ -314,13 +313,15 @@ fn given_browser_approved_cli_login_when_exchange_races_or_authority_changes_the
                 );
                 assert_eq!(
                     client
-                        .post(format!("{url}/api/auth/logout"))
+                        .post(format!("{url}/api/admin/roles"))
                         .header("authorization", &authorization)
+                        .json(&json!({"principal_id": person, "role": "viewer",
+                            "location_id": null, "target": null, "revoke": false}))
                         .send()
                         .await
-                        .expect("CLI CSRF required")
+                        .expect("CLI writes need no CSRF, only permission")
                         .status(),
-                    StatusCode::UNAUTHORIZED
+                    StatusCode::FORBIDDEN
                 );
             }
             assert_eq!(

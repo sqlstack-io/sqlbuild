@@ -1,0 +1,8 @@
+{
+  "description": "A support role is published, widened in a different action order, narrowed, then removed. Every publication takes effect at once.",
+  "publications": [
+    {"actions": ["view"], "expected": {"view": "orders_support", "job.run": null}},
+    {"actions": ["job.run", "view"], "expected": {"view": "orders_support", "job.run": "orders_support"}},
+    {"actions": ["job.run"], "expected": {"view": null, "job.run": "orders_support"}}
+  ]
+}

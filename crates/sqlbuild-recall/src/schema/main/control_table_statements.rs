@@ -4,7 +4,6 @@ use crate::schema::_helpers::relational_tables::relational_table;
 use crate::schema::constants::ALL_TABLES;
 use crate::schema::main::table_spec::table_spec;
 
-/// PostgreSQL partitions invocation facts; globally deduplicated artifacts remain unpartitioned.
 #[must_use]
 pub fn control_table_statements(postgres: bool) -> Vec<String> {
     ALL_TABLES

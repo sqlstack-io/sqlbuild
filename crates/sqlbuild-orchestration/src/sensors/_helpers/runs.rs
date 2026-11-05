@@ -24,7 +24,7 @@ pub(crate) async fn consume_run_events(
         transaction,
         "SELECT run_id,status,last_event_storage_id FROM sqb_runs \
          WHERE location_id=$1 AND target=$2 AND job_key=$3 AND last_event_storage_id>$4 \
-         AND status IN ('success','warn','partial','failed','cancelled','presumed_failed') \
+         AND status IN ('success','warn','partial','failed','cancelled') \
          ORDER BY last_event_storage_id LIMIT 100",
         vec![
             Parameter::Id(evaluation.location_id),
@@ -66,10 +66,7 @@ async fn matching_executions(
             break;
         }
         let mut parameters: Vec<Parameter> = eligible.iter().copied().map(Parameter::Id).collect();
-        let run_parameters = (1..=parameters.len())
-            .map(|index| format!("${index}"))
-            .collect::<Vec<_>>()
-            .join(",");
+        let run_parameters = Parameter::placeholders(1..=parameters.len());
         let node_parameters = (parameters.len() + 1..=parameters.len() + chunk.len())
             .map(|index| format!("${index}"))
             .collect::<Vec<_>>()
@@ -79,11 +76,11 @@ async fn matching_executions(
         (transaction, rows) = query(transaction, &format!(
             "SELECT r.run_id,r.status,r.last_event_storage_id FROM sqb_runs r \
              WHERE r.run_id IN ({run_parameters}) AND \
-             (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.attempt=1 \
+             (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.kind='node' \
               AND n.node_key IN ({node_parameters}) AND n.status='success' AND n.ended_at IS NOT NULL \
               AND ((r.kind<>'group' AND n.started_at IS NOT NULL) OR \
                    (r.kind='group' AND EXISTS(SELECT 1 FROM sqb_runs c \
-                    JOIN sqb_run_nodes cn ON cn.run_id=c.run_id AND cn.node_key=n.node_key AND cn.attempt=1 \
+                    JOIN sqb_run_nodes cn ON cn.run_id=c.run_id AND cn.node_key=n.node_key AND cn.kind='node' \
                     WHERE c.parent_run_id=r.run_id AND c.location_id=r.location_id AND c.target=r.target \
                     AND cn.status='success' AND cn.started_at IS NOT NULL AND cn.ended_at IS NOT NULL))))={}",
             chunk.len()), parameters).await?;

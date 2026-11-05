@@ -39,12 +39,6 @@ pub(crate) async fn resolve_changes(
     let mut messages: BTreeSet<ChangeMessage> = BTreeSet::new();
     for change in std::mem::take(&mut transaction.changes) {
         if change == Change::Credentials {
-            (transaction, _) = query(
-                transaction,
-                "UPDATE sqb_authentication_revision SET revision=revision+1 WHERE singleton=1",
-                vec![],
-            )
-            .await?;
             messages.insert(ChangeMessage::CredentialsChanged);
             continue;
         }

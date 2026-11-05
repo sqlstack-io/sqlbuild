@@ -10,7 +10,6 @@ use crate::credentials::models::TokenIdentity;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
 use crate::warehouse_metadata::main::ingest_catalog::ingest_catalog;
-use crate::warehouse_metadata::main::ingest_consumption::ingest_consumption;
 use crate::warehouse_metadata::main::ingest_fingerprints::ingest_fingerprints;
 use crate::warehouse_metadata::main::ingest_janitor_events::ingest_janitor_events;
 use crate::warehouse_metadata::main::ingest_microbatches::ingest_microbatches;
@@ -21,10 +20,38 @@ use crate::warehouse_metadata::main::ingest_statistics::ingest_statistics;
 use crate::warehouse_metadata::main::read_statistics_due::read_statistics_due;
 use crate::warehouse_metadata::main::read_watermark::read_watermark;
 use crate::warehouse_metadata::models::{
-    AuditResultsBatch, CatalogBatch, ConsumptionBatch, FingerprintBatch, JanitorEventsBatch,
-    MicrobatchesBatch, MigrationsBatch, OldNameViewsBatch, SourceFreshnessBatch, StatisticsBatch,
-    StatisticsDueRead, StatisticsRead, WarehouseSyncResponse, WarehouseWatermarkRead,
+    MetadataBatch, StatisticsDueRead, StatisticsRead, WarehouseHistoryKind, WarehouseSyncResponse,
+    WarehouseWatermarkRead,
 };
+
+#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata", operation_id = "report_metadata",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = MetadataBatch,
+    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
+        (status = 409, description = "Reader generation fenced")), security(("bearer" = [])))]
+pub(crate) async fn report(
+    State(store): State<ControlStore>,
+    Extension(identity): Extension<TokenIdentity>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Json(batch): Json<MetadataBatch>,
+) -> Result<Json<WarehouseSyncResponse>, ApiError> {
+    require_location(&identity, location_id)?;
+    let scope = (location_id, target.as_str());
+    let response = match batch.kind {
+        WarehouseHistoryKind::Fingerprints => ingest_fingerprints(&store, scope, &batch).await,
+        WarehouseHistoryKind::SourceFreshness => {
+            ingest_source_freshness(&store, scope, &batch).await
+        }
+        WarehouseHistoryKind::AuditResults => ingest_audit_results(&store, scope, &batch).await,
+        WarehouseHistoryKind::JanitorEvents => ingest_janitor_events(&store, scope, &batch).await,
+        WarehouseHistoryKind::Migrations => ingest_migrations(&store, scope, &batch).await,
+        WarehouseHistoryKind::OldNameViews => ingest_old_name_views(&store, scope, &batch).await,
+        WarehouseHistoryKind::Microbatches => ingest_microbatches(&store, scope, &batch).await,
+        WarehouseHistoryKind::Catalog => ingest_catalog(&store, scope, &batch).await,
+        WarehouseHistoryKind::Statistics => ingest_statistics(&store, scope, &batch).await,
+    }?;
+    Ok(Json(response))
+}
 
 #[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/statistics-due",
     params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = StatisticsDueRead,
@@ -40,40 +67,6 @@ pub(crate) async fn statistics_due(
     require_location(&identity, location_id)?;
     Ok(Json(
         read_statistics_due(&store, (location_id, &target), &request).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/statistics",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = StatisticsBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
-        (status = 409, description = "Reader generation fenced")), security(("bearer" = [])))]
-pub(crate) async fn report_statistics(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<StatisticsBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_statistics(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/catalog",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = CatalogBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
-        (status = 409, description = "Reader generation fenced")), security(("bearer" = [])))]
-pub(crate) async fn report_catalog(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<CatalogBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_catalog(&store, (location_id, &target), &batch).await?,
     ))
 }
 
@@ -93,141 +86,5 @@ pub(crate) async fn watermark(
     require_location(&identity, location_id)?;
     Ok(Json(
         read_watermark(&store, (location_id, &target), &request).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/source-freshness", operation_id = "report_source_freshness",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = SourceFreshnessBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<SourceFreshnessBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_source_freshness(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/fingerprints",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = FingerprintBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_fingerprints(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<FingerprintBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_fingerprints(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/audit-results",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = AuditResultsBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_audit_results(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<AuditResultsBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_audit_results(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/janitor-events",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = JanitorEventsBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_janitor_events(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<JanitorEventsBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_janitor_events(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/migrations",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = MigrationsBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_migrations(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<MigrationsBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_migrations(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/old-name-views",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = OldNameViewsBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_old_name_views(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<OldNameViewsBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_old_name_views(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/microbatches",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = MicrobatchesBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_microbatches(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<MicrobatchesBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_microbatches(&store, (location_id, &target), &batch).await?,
-    ))
-}
-
-#[utoipa::path(post, path = "/api/locations/{location_id}/targets/{target}/metadata/consumption",
-    params(("location_id" = Uuid, Path), ("target" = String, Path)), request_body = ConsumptionBatch,
-    responses((status = 200, body = WarehouseSyncResponse), (status = 400, body = crate::api::models::ApiErrorBody),
-        (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized")),
-    security(("bearer" = [])))]
-pub(crate) async fn report_consumption(
-    State(store): State<ControlStore>,
-    Extension(identity): Extension<TokenIdentity>,
-    Path((location_id, target)): Path<(Uuid, String)>,
-    Json(batch): Json<ConsumptionBatch>,
-) -> Result<Json<WarehouseSyncResponse>, ApiError> {
-    require_location(&identity, location_id)?;
-    Ok(Json(
-        ingest_consumption(&store, (location_id, &target), &batch).await?,
     ))
 }

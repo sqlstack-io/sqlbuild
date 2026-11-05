@@ -12,8 +12,7 @@ use crate::store::main::{
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
-use crate::store::tests::store_helpers::reconstruct_warehouse_predecessor;
-use crate::warehouse_metadata::models::{FingerprintBatch, WarehouseWatermarkRead};
+use crate::warehouse_metadata::models::{MetadataBatch, WarehouseWatermarkRead};
 
 pub(crate) async fn fingerprint_history(
     store: &ControlStore,
@@ -21,43 +20,6 @@ pub(crate) async fn fingerprint_history(
     (session_id, preview_session_id): (Uuid, Uuid),
     (client, freshness_url, bearer): (&Client, &str, &str),
 ) {
-    // Upgrade the immediate predecessor while published snapshots and freshness facts exist.
-    reconstruct_warehouse_predecessor(store).await;
-    let mut transaction = begin(store, TransactionMode::Write).await.expect("upgrade");
-    for table in [
-        "sqb_external_sessions",
-        "sqb_role_assignments",
-        "sqb_admin_initialization",
-        "sqb_oidc_login_flows",
-        "sqb_authentication_revision",
-        "sqb_password_sessions",
-        "sqb_password_login_attempts",
-    ] {
-        (transaction, _) = query(transaction, &format!("DROP TABLE {table}"), vec![])
-            .await
-            .expect("remove subsequent session migration");
-    }
-    let (transaction, _) = query(transaction, "DROP TABLE sqb_password_credentials", vec![])
-        .await
-        .expect("remove subsequent password migration");
-    let (transaction, _) = query(transaction, "DROP INDEX sqb_node_decisive_history", vec![])
-        .await
-        .expect("remove subsequent transition migration");
-    let (transaction, _) = query(transaction, "DROP TABLE sqb_development_locations", vec![])
-        .await
-        .expect("remove subsequent development migration");
-    let (transaction, _) = query(transaction, "DROP TABLE sqb_warehouse_fingerprints", vec![])
-        .await
-        .expect("predecessor table set");
-    let (transaction, _) = query(
-        transaction,
-        "DELETE FROM sqb_schema_migrations WHERE name IN ('retention_indexes','warehouse_fingerprints','development_locations','node_transitions','password_credentials','password_sessions','authentication_revision','oidc_login_flows','administrator_initialization','external_sessions')",
-        vec![],
-    )
-    .await
-    .expect("predecessor schema version");
-    commit(transaction).await.expect("populated predecessor");
-    migrate_store(store).await.expect("additive mirror upgrade");
     let url = freshness_url.replace("source-freshness", "fingerprints");
     let variants_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
         "../../benchmarks/duckshop/edge_cases/orchestration/fingerprint_definition_variants.json",
@@ -94,12 +56,13 @@ pub(crate) async fn fingerprint_history(
     page[3] = legacy_null.clone();
     legacy_null["ts"] = json!("2026-01-01T10:00:00.000001Z");
     page[4] = legacy_null;
-    let batch = json!({"session_id": session_id, "generation": 1, "records": page});
-    let typed: FingerprintBatch = serde_json::from_value(batch.clone()).expect("typed page");
+    let batch =
+        json!({"kind": "fingerprints", "session_id": session_id, "generation": 1, "records": page});
+    let typed: MetadataBatch = serde_json::from_value(batch.clone()).expect("typed page");
     for expected in [true, false] {
         assert_eq!(
             outbound
-                .sync_fingerprints("development", &typed)
+                .sync_metadata("development", &typed)
                 .await
                 .expect("sync")
                 .applied,
@@ -207,7 +170,7 @@ pub(crate) async fn fingerprint_history(
     second["event_id"] = json!("new-fingerprint-2");
     second["node_name"] = json!("inventory");
     second["definition"] = json!("select inventory_id from inventory");
-    let additional = json!({"session_id": session_id, "generation": 1, "records": [first, second]});
+    let additional = json!({"kind": "fingerprints", "session_id": session_id, "generation": 1, "records": [first, second]});
     let bodies_before = source_bodies(store).await;
     install_fault(store, &fault).await;
     assert_eq!(
@@ -246,7 +209,7 @@ pub(crate) async fn fingerprint_history(
     commit(transaction).await.expect("commit rebuild start");
     assert!(
         outbound
-            .sync_fingerprints("development", &typed)
+            .sync_metadata("development", &typed)
             .await
             .expect("resync")
             .applied
@@ -284,13 +247,13 @@ pub(crate) async fn fingerprint_history(
     {
         marker[key] = value.clone();
     }
-    let marker: FingerprintBatch = serde_json::from_value(json!({
+    let marker: MetadataBatch = serde_json::from_value(json!({"kind":"fingerprints",
         "session_id": session_id, "generation": 1, "records": [marker],
     }))
     .expect("review marker page");
     assert!(
         outbound
-            .sync_fingerprints("development", &marker)
+            .sync_metadata("development", &marker)
             .await
             .expect("review marker sync")
             .applied
@@ -307,24 +270,24 @@ pub(crate) async fn fingerprint_history(
     scoped["state_schema"] = json!("reporting");
     let mut other_database = record.clone();
     other_database["state_database"] = json!("analytics");
-    let scoped: FingerprintBatch = serde_json::from_value(json!({
+    let scoped: MetadataBatch = serde_json::from_value(json!({"kind":"fingerprints",
         "session_id": session_id, "generation": 1, "records": [scoped, other_database],
     }))
     .expect("physical scopes");
     assert!(
         outbound
-            .sync_fingerprints("development", &scoped)
+            .sync_metadata("development", &scoped)
             .await
             .expect("distinct physical scopes")
             .applied
     );
-    let preview: FingerprintBatch = serde_json::from_value(json!({
+    let preview: MetadataBatch = serde_json::from_value(json!({"kind":"fingerprints",
         "session_id": preview_session_id, "generation": 1, "records": [record],
     }))
     .expect("preview target");
     assert!(
         outbound
-            .sync_fingerprints("preview", &preview)
+            .sync_metadata("preview", &preview)
             .await
             .expect("distinct target scope")
             .applied
@@ -420,7 +383,7 @@ pub(crate) async fn fingerprint_history(
             json!(expected)
         );
     }
-    let watermark_url = freshness_url.replace("source-freshness", "watermark");
+    let watermark_url = format!("{freshness_url}/watermark");
     let request = json!({"kind": "fingerprints", "session_id":session_id,"generation":1,
         "location":{"database":null,"schema":"main"}});
     for (endpoint, mut body, status, field, value) in [

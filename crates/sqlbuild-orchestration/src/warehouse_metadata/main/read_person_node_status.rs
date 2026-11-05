@@ -2,6 +2,7 @@
 
 use uuid::Uuid;
 
+use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
@@ -12,18 +13,17 @@ use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprint;
 use crate::warehouse_metadata::_helpers::node_status::{
     definition_evidence, destination, physical_evidence,
 };
-use crate::warehouse_metadata::_helpers::person_reads::begin_view;
 use crate::warehouse_metadata::models::{
     NodeStatus, NodeStatusQuery, PhysicalEvidence, SourceDataStatus,
 };
 
 pub async fn read_person_node_status(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location_id, target, options): (Uuid, &str, &NodeStatusQuery),
     default_role: DefaultRole,
 ) -> Result<Option<NodeStatus>, ControlError> {
-    let transaction = begin_view(
+    let (transaction, _) = begin_authorized(
         store,
         credentials,
         &PermissionScope {

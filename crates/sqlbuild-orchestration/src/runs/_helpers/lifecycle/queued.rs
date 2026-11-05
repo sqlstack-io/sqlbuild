@@ -1,4 +1,4 @@
-//! Initial run and node projections shared by fact publication and replay.
+//! Initial run and node rows written when a run is queued.
 
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
@@ -38,7 +38,7 @@ pub(crate) async fn project_queued_run(
             Parameter::Time(now), Parameter::Json(json!({"pending": request.selection.len()})), Parameter::Integer(cursor), Parameter::Json(json!(request))]).await?;
     for node in &request.selection {
         (transaction, _) = query(transaction,
-            "INSERT INTO sqb_run_nodes (run_id, node_key, attempt, status, writes) VALUES ($1,$2,1,'pending',$3)",
+            "INSERT INTO sqb_run_nodes (run_id, node_key, status, writes) VALUES ($1,$2,'pending',$3)",
             vec![Parameter::Id(request.run_id), Parameter::Text(node.clone()), Parameter::Boolean(request.write_set.contains(node))]).await?;
     }
     Ok(transaction)

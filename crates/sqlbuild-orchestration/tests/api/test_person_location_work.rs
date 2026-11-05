@@ -11,8 +11,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
-    PrincipalKind, RoleAssignmentRequest,
+    AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::{
@@ -56,10 +55,9 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("bootstrap");
-            let person =
-                create_principal(store, &context, ("orders-developer", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-developer")
+                .await
+                .expect("person");
             let mut sessions = Vec::new();
             for (id, name) in [(admin, "orders-admin"), (person, "orders-developer")] {
                 set_password(
@@ -79,7 +77,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 };
                 sessions.push(session);
             }
-            let credentials = (sessions[1].bearer.as_str(), sessions[1].csrf.as_str());
+            let credentials = sessions[1].identity.principal_id;
             let location = create_location(store, "orders", "test-owner")
                 .await
                 .expect("location");
@@ -95,9 +93,8 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             };
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("assign existing builtin");
@@ -146,7 +143,7 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 assert!(
                     read_person_connection_test(
                         store,
-                        (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                        (&context, sessions[0].identity.principal_id),
                         (other, target, request.request_id)
                     )
                     .await
@@ -156,12 +153,11 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
             }
             assign_builtin_role(
                 store,
-                (&context, (&sessions[0].bearer, &sessions[0].csrf)),
+                (&context, sessions[0].identity.principal_id),
                 &RoleAssignmentRequest {
                     revoke: true,
                     ..assignment
                 },
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("live revoke");

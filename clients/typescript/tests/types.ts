@@ -24,76 +24,25 @@ if (observation.report.health.kind === "warehouse_sync") {
 const invalidFailure: components["schemas"]["WarehouseSyncFailure"] = "warehouse exception text";
 void invalidFailure;
 const auditHistory: components["schemas"]["WarehouseHistoryKind"] = "audit_results";
-const auditMeasurement: components["schemas"]["WarehouseAuditRecord"]["measured_value"] = "99.5";
 void auditHistory;
-void auditMeasurement;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/audit-results", {
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata", {
   params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
+  body: { kind: "janitor_events", session_id: "synthetic-session", generation: 1, records: [] },
 });
-const janitorHistory: components["schemas"]["WarehouseHistoryKind"] = "janitor_events";
-const archivedAt: components["schemas"]["WarehouseJanitorRecord"]["archived_at"] = "2026-01-02T03:04:05Z";
-void janitorHistory;
-void archivedAt;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/janitor-events", {
-  params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
-});
-const migrationHistory: components["schemas"]["WarehouseHistoryKind"] = "migrations";
-const oldNameHistory: components["schemas"]["WarehouseHistoryKind"] = "old_name_views";
-const optionalExpiry: components["schemas"]["WarehouseOldNameRecord"]["expires_at"] = null;
-const optionalAliases: components["schemas"]["WarehouseOldNameRecord"]["column_aliases"] = null;
-const createdAt: components["schemas"]["WarehouseMigrationRecord"]["created_at"] = "2026-01-02T03:04:05Z";
-void migrationHistory;
-void oldNameHistory;
-void optionalExpiry;
-void optionalAliases;
-void createdAt;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/migrations", {
-  params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
-});
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/old-name-views", {
-  params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
-});
-const microbatchHistory: components["schemas"]["WarehouseHistoryKind"] = "microbatches";
-const cursorBound: components["schemas"]["WarehouseMicrobatchRecord"]["run_end"] = "18446744073709551617";
-const optionalCompletion: components["schemas"]["WarehouseMicrobatchRecord"]["completed_at"] = null;
-void microbatchHistory;
-void cursorBound;
-void optionalCompletion;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/microbatches", {
-  params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
-});
-const consumptionHistory: components["schemas"]["WarehouseHistoryKind"] = "consumption";
-const startedInput: components["schemas"]["WarehouseConsumptionRecord"]["input_version"] = null;
-void consumptionHistory;
-void startedInput;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/consumption", {
-  params: { path: { location_id: "synthetic-location", target: "development" } },
-  body: { session_id: "synthetic-session", generation: 1, records: [] },
-});
-const catalogHistory: components["schemas"]["WarehouseHistoryKind"] = "catalog";
 const catalogColumn: components["schemas"]["WarehouseCatalogColumn"] = {
   name: "order_id", data_type: "INTEGER",
 };
-void catalogHistory;
 void catalogColumn;
-void client.POST("/api/locations/{location_id}/targets/{target}/metadata/catalog", {
+void client.POST("/api/locations/{location_id}/targets/{target}/metadata", {
   params: { path: { location_id: "synthetic-location", target: "development" } },
   body: {
-    session_id: "synthetic-session", generation: 1, records: [],
-    reconciliation: {
-      scan_id: "synthetic-scan", page: 0, state_database: null, state_schema: "main",
-      day: null, complete: true, after: null,
-    },
+    kind: "catalog", session_id: "synthetic-session", generation: 1, records: [],
+    scan: { scan_id: "synthetic-scan", location: { database: null, schema: "main" }, complete: true },
   },
 });
-// @ts-expect-error Catalog scans must include reconciliation; incremental imports cannot remove relations safely.
-const incompleteCatalog: components["schemas"]["CatalogBatch"] = { session_id: "synthetic-session", generation: 1, records: [] };
-void incompleteCatalog;
+// @ts-expect-error Every metadata page names the state table it mirrors.
+const unnamedPage: components["schemas"]["MetadataBatch"] = { session_id: "synthetic-session", generation: 1, records: [] };
+void unnamedPage;
 void client.GET("/api/control/locations/{location_id}/targets/{target}/catalog", {
   params: {
     path: { location_id: "synthetic-location", target: "development" },

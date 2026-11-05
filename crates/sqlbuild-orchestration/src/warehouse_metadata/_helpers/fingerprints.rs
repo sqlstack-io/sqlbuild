@@ -4,12 +4,14 @@ use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 
 use crate::store::errors::ControlError;
-use crate::warehouse_metadata::_helpers::ingestion::validate_fields;
-use crate::warehouse_metadata::models::{FingerprintBatch, WarehouseFingerprintRecord};
+use crate::warehouse_metadata::_helpers::ingestion::{outside_scan, validate_fields};
+use crate::warehouse_metadata::models::{MetadataBatch, WarehouseFingerprintRecord};
 
-pub(crate) fn validate_batch(batch: &FingerprintBatch) -> Result<(), ControlError> {
-    let invalid = batch
-        .records
+pub(crate) fn validate_batch(
+    batch: &MetadataBatch,
+    records: &[WarehouseFingerprintRecord],
+) -> Result<(), ControlError> {
+    let invalid = records
         .iter()
         .flat_map(|record| {
             [
@@ -20,22 +22,19 @@ pub(crate) fn validate_batch(batch: &FingerprintBatch) -> Result<(), ControlErro
             ]
         })
         .any(|value| value.trim().is_empty());
-    let invalid_id = batch
-        .records
+    let invalid_id = records
         .iter()
         .filter_map(|record| record.event_id.as_deref())
         .any(|value| value.trim().is_empty());
-    let invalid_scope = batch.reconciliation.as_ref().is_some_and(|page| {
-        batch.records.iter().any(|record| {
-            record.state_database != page.state_database
-                || record.state_schema != page.state_schema
-                || page.day.is_some_and(|day| record.ts.date_naive() != day)
-        })
-    });
     validate_fields(
-        ("fingerprint", batch.generation, batch.records.len()),
+        batch,
         invalid || invalid_id,
-        invalid_scope,
+        outside_scan(
+            batch,
+            records
+                .iter()
+                .map(|record| (&record.state_database, &record.state_schema)),
+        ),
     )
 }
 

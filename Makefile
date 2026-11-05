@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
+.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
 	check-e2e-shards test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
 	test-e2e-duckdb-cli-data test-e2e-duckdb-cli test-e2e-duckdb-inspection \
@@ -585,6 +585,18 @@ dupes:
 	uv run fensu dupes
 
 
+# Fails on duplicated code new since DUPES_BASE. A missing base fails too, so the check cannot
+# silently disappear.
+DUPES_BASE ?= origin/main
+
+check-dupes-new:
+	@if ! git rev-parse --verify --quiet "$(DUPES_BASE)^{commit}" >/dev/null; then \
+		echo "error: new-duplicate check needs base $(DUPES_BASE); fetch it or set DUPES_BASE" >&2; \
+		exit 2; \
+	fi; \
+	uv run fensu dupes --since "$(DUPES_BASE)" --fail-on-new
+
+
 check:
 	uv run ruff format .
 	uv run ruff check --fix .
@@ -694,7 +706,7 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill rust-lint
+check-ci: check-dupes-new check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests

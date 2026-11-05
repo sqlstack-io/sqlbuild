@@ -24,7 +24,7 @@ use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
-use crate::warehouse_metadata::models::{SourceFreshnessBatch, WarehouseHistoryKind};
+use crate::warehouse_metadata::models::{MetadataBatch, WarehouseHistoryKind};
 
 #[test]
 fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicity_are_preserved() {
@@ -86,7 +86,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             let api = start_api(store).await;
             let client = reqwest::Client::new();
             let url = format!(
-                "{}/api/locations/{location}/targets/development/metadata/source-freshness",
+                "{}/api/locations/{location}/targets/development/metadata",
                 api.url
             );
             let record = json!({
@@ -115,15 +115,15 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             // Both missing and explicitly NULL identities use the same fixed legacy fallback.
             other_run["event_id"] = json!(null);
             page[4] = other_run;
-            let batch = json!({"session_id": session_id, "generation": 1, "records": page});
+            let batch = json!({"kind": "source_freshness", "session_id": session_id, "generation": 1, "records": page});
             let outbound = connect_location_work((&api.url, &token.bearer), location)
                 .expect("pooled native location client");
-            let typed: SourceFreshnessBatch = serde_json::from_value(batch.clone()).expect("page");
+            let typed: MetadataBatch = serde_json::from_value(batch.clone()).expect("page");
             let mut changes =
                 connect(&client, &api, (location, "development", &token.bearer)).await;
             assert!(
                 outbound
-                    .sync_source_freshness("development", &typed)
+                    .sync_metadata("development", &typed)
                     .await
                     .expect("native client sync")
                     .applied
@@ -131,7 +131,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
             expect_topics(&mut changes, &["node_status:development".into()]).await;
             assert!(
                 !outbound
-                    .sync_source_freshness("development", &typed)
+                    .sync_metadata("development", &typed)
                     .await
                     .expect("native client replay")
                     .applied
@@ -170,7 +170,7 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (&url, invalid, StatusCode::BAD_REQUEST),
                 (&url, invalid_id, StatusCode::BAD_REQUEST),
                 (&url, oversized, StatusCode::BAD_REQUEST),
-                (&url, unknown, StatusCode::UNPROCESSABLE_ENTITY),
+                (&url, unknown, StatusCode::BAD_REQUEST),
                 (&foreign, batch.clone(), StatusCode::FORBIDDEN),
                 (&other_target, batch.clone(), StatusCode::BAD_REQUEST),
             ] {
@@ -346,11 +346,6 @@ fn given_warehouse_observations_when_pages_retry_then_scope_history_and_atomicit
                 (
                     WarehouseHistoryKind::Microbatches,
                     "microbatch_history",
-                    "event_id",
-                ),
-                (
-                    WarehouseHistoryKind::Consumption,
-                    "consumption_history",
                     "event_id",
                 ),
             ] {

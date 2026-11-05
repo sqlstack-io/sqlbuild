@@ -32,19 +32,19 @@ WITH __ref__stg_po_receipts AS (
 
 __ref__stg_purchase_order_lines AS (
   SELECT
-    'PO1' AS po_id,
-    NULL AS currency_code,
     'PO1#1' AS po_line_key,
+    'PO1' AS po_id,
     'DUCK-1' AS sku,
     10 AS ordered_qty,
-    NULL AS unit_cost_minor
+    NULL AS unit_cost_minor,
+    NULL AS currency_code
   UNION ALL
   SELECT
-    'PO1',
-    NULL,
     'PO1#2',
+    'PO1',
     'DUCK-2',
     5,
+    NULL,
     NULL
 ),
 

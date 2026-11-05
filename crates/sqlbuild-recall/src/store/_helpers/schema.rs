@@ -17,6 +17,7 @@ pub(crate) fn sqlite_options() -> DdlOptions {
         database: None,
         retention_days: 0,
         cluster: None,
+        producer_version: String::new(),
     }
 }
 

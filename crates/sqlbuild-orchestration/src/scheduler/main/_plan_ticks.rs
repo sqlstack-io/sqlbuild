@@ -1,61 +1,34 @@
 //! Pure scheduling decisions: crashes and clock jumps cannot change a tick's identity.
 
-use std::collections::BTreeSet;
+use chrono::{DateTime, TimeDelta, Utc};
 
-use chrono::{DateTime, Utc};
-
-use crate::scheduler::_helpers::ticks::catch_up_actions;
-use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
+use crate::declarations::models::TriggerDefinition;
+use crate::scheduler::_helpers::expansion::latest_occurrence;
+use crate::scheduler::_helpers::ticks::action;
+use crate::scheduler::main::next_schedule_time::next_schedule_time;
 use crate::scheduler::models::{TickPlan, TickState};
 use crate::store::errors::ControlError;
 
-/// Return facts to append and the cursor to commit atomically with them.
+/// Only the latest missed occurrence ticks; a waiting unclaimed run covers it instead of queueing another.
 pub(in crate::scheduler) fn plan_ticks(
+    trigger: &TriggerDefinition,
     state: &TickState,
     now: DateTime<Utc>,
 ) -> Result<TickPlan, ControlError> {
-    if !state.enabled {
-        return Ok(TickPlan {
-            actions: vec![],
-            last_tick_for: state.last_tick_for,
-            next_due_at: None,
-        });
-    }
-    if state.due_times.len() > MAX_TICKS_PER_BATCH {
-        return Err(ControlError::Invalid(
-            "schedule expansion exceeds the bounded tick batch".into(),
-        ));
-    }
-    let pending: BTreeSet<DateTime<Utc>> = state
-        .due_times
-        .iter()
-        .copied()
-        .filter(|time| state.last_tick_for.is_none_or(|last| *time > last))
-        .collect();
-    let due: Vec<DateTime<Utc>> = pending
-        .iter()
-        .copied()
-        .take_while(|time| *time <= now)
-        .collect();
-    let actions = catch_up_actions(state, &due);
-    let last_tick_for = actions
-        .iter()
-        .rev()
-        .find(|action| {
-            state
-                .continuation
-                .is_none_or(|next| action.scheduled_for < next)
-        })
-        .map(|action| action.scheduled_for)
-        .or(state.last_tick_for);
-    let next_due_at = pending
-        .into_iter()
-        .chain(state.continuation)
-        .filter(|time| last_tick_for.is_none_or(|last| *time > last))
-        .min();
+    let after = match state.last_tick_for {
+        Some(last) => last,
+        None => state
+            .started_at
+            .checked_sub_signed(TimeDelta::microseconds(1))
+            .ok_or_else(|| ControlError::Invalid("trigger start is out of range".into()))?,
+    };
+    let latest = latest_occurrence(trigger, now)?.filter(|time| *time > after);
     Ok(TickPlan {
-        actions,
-        last_tick_for,
-        next_due_at,
+        actions: latest
+            .map(|time| action(state.trigger_id, time, state.waiting_run))
+            .into_iter()
+            .collect(),
+        last_tick_for: latest.or(state.last_tick_for),
+        next_due_at: next_schedule_time(&trigger.schedule, latest.unwrap_or(after))?,
     })
 }

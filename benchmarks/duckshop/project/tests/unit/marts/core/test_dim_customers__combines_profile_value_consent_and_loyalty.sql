@@ -115,23 +115,23 @@ __ref__int_customer_consent_state AS (
 
 __ref__int_loyalty_tier_changes AS (
   SELECT
+    'LA1:1' AS tier_change_key,
     NULL AS loyalty_account_id,
     'C1' AS customer_id,
+    1 AS change_sequence,
     'DUCKLING' AS tier_code,
     NULL AS previous_tier_code,
-    'LA1:1' AS tier_change_key,
-    1 AS change_sequence,
     NULL AS changed_at,
     NULL AS direction,
     NULL AS days_in_previous_tier
   UNION ALL
   SELECT
+    'LA1:2',
     NULL,
     'C1',
+    2,
     'GOLDEN_DUCK',
     NULL,
-    'LA1:2',
-    2,
     NULL,
     NULL,
     NULL

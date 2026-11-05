@@ -6,13 +6,13 @@ use reqwest::{StatusCode, header};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, OidcAuthentication};
+use crate::api::models::{ApiAuthentication, HumanLogin, OidcAuthentication};
 use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
 use crate::api::tests::oidc_helpers::{callback, login, start_provider, stop_provider};
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault};
 use crate::api::tests::test_types::{OidcApiTestCase, OidcThrottleTestCase};
 use crate::credentials::main::identities::create_principal::create_principal;
-use crate::credentials::models::{AuditContext, PrincipalKind};
+use crate::credentials::models::AuditContext;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
 };
@@ -58,17 +58,9 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let person =
-                create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                    .await
-                    .expect("person");
-            let service = create_principal(
-                store,
-                &context,
-                ("orders-service", PrincipalKind::ServiceAccount),
-            )
-            .await
-            .expect("service");
+            let person = create_principal(store, &context, "orders-person")
+                .await
+                .expect("person");
             let settings = OidcAuthentication {
                 origin: inputs["origin"].as_str().expect("origin").into(),
                 issuer: provider.state.issuer.clone(),
@@ -77,14 +69,13 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
                 certificate_authority: Some(provider.authority.clone()),
                 identities: BTreeMap::from([
                     ("orders-person".into(), person),
-                    ("orders-service".into(), service),
                     ("absent-person".into(), Uuid::now_v7()),
                 ]),
             };
             let api = start_api_with_authentication(
                 store,
                 ApiAuthentication {
-                    oidc: Some(settings.clone()),
+                    login: HumanLogin::Oidc(settings.clone()),
                     ..Default::default()
                 },
             )
@@ -92,7 +83,7 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    oidc: Some(settings),
+                    login: HumanLogin::Oidc(settings),
                     ..Default::default()
                 },
             )
@@ -316,11 +307,11 @@ fn given_oidc_codes_when_verified_across_replicas_then_only_bound_live_people_au
             assert_eq!(machine.status(), StatusCode::UNAUTHORIZED);
             let transaction = begin(store, TransactionMode::Read).await.expect("evidence");
             let (transaction, rows) = query(transaction,
-                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_external_sessions) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
+                "SELECT (SELECT COUNT(*) FROM sqb_principals) AS principals, (SELECT COUNT(*) FROM sqb_sessions WHERE credential_id IS NULL) AS sessions, (SELECT COUNT(*) FROM sqb_access_tokens) AS tokens, (SELECT COUNT(*) FROM sqb_security_audit WHERE action='oidc.authenticated') AS authentications",
                 vec![]).await.expect("no provisioning");
             assert_eq!(
                 json!(rows[0]),
-                json!({"principals":2,"sessions":test_case.expected_authentications,"tokens":0,"authentications":test_case.expected_authentications}),
+                json!({"principals":1,"sessions":test_case.expected_authentications,"tokens":0,"authentications":test_case.expected_authentications}),
                 "{}",
                 test_case.description
             );
@@ -367,7 +358,7 @@ fn given_oidc_login_attempts_when_alternating_replicas_then_the_peer_limit_is_sh
             let api = start_api_with_authentication(
                 &fixture.store,
                 ApiAuthentication {
-                    oidc: Some(settings.clone()),
+                    login: HumanLogin::Oidc(settings.clone()),
                     ..Default::default()
                 },
             )
@@ -375,7 +366,7 @@ fn given_oidc_login_attempts_when_alternating_replicas_then_the_peer_limit_is_sh
             let other = start_api_with_authentication(
                 &replica,
                 ApiAuthentication {
-                    oidc: Some(settings),
+                    login: HumanLogin::Oidc(settings),
                     ..Default::default()
                 },
             )

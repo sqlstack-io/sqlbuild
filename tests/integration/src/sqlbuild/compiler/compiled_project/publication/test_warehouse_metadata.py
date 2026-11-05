@@ -44,7 +44,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     append_audit_history,
-    append_consumption_history,
     append_contended_fingerprints,
     append_janitor_history,
     append_legacy_history,
@@ -104,22 +103,6 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             ("sqlite", "path", "janitor_event_history", append_janitor_history, "cleanup-run", ()),
             # SQLite has no supported concurrent-microbatch coordination writer.
             ("duckdb", "database", "microbatch_history", append_microbatch_history, "", ()),
-            (
-                "duckdb",
-                "database",
-                "consumption_history",
-                append_consumption_history,
-                "external-build",
-                (),
-            ),
-            (
-                "sqlite",
-                "path",
-                "consumption_history",
-                append_consumption_history,
-                "external-build",
-                (),
-            ),
             (
                 "duckdb",
                 "database",
@@ -713,18 +696,19 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
         )
         with urlopen(heartbeat, timeout=5) as response:
             assert json.load(response) == {"applied": True}
-        for kind, endpoint, mirror in [
-            ("source_freshness", "source-freshness", "sqb_warehouse_freshness"),
-            ("fingerprints", "fingerprints", "sqb_warehouse_fingerprints"),
+        for kind, mirror in [
+            ("source_freshness", "sqb_warehouse_freshness"),
+            ("fingerprints", "sqb_warehouse_fingerprints"),
         ]:
             initial: dict[str, Any] = warehouse_history_page(project, kind)
             assert len(initial["records"]) == 2 and initial["next_after"] is None
             batch: dict[str, Any] = {
+                "kind": kind,
                 "session_id": session_id,
                 "generation": 1,
                 "records": initial["records"],
             }
-            assert sync_warehouse_history(api, endpoint, batch) == {"applied": True}
+            assert sync_warehouse_history(api, batch) == {"applied": True}
             control: Path = tmp_path / "control/.sqlbuild/control.sqlite3"
             with closing(sqlite3.connect(control)) as database:
                 before: list[tuple[str, str]] = database.execute(
@@ -739,21 +723,17 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
             remaining: dict[str, Any] = warehouse_history_page(project, kind)
             assert [row["run_id"] for row in remaining["records"]] == [test_case.expected_run_id]
             batch["records"] = remaining["records"]
-            batch["reconciliation"] = {
+            batch["scan"] = {
                 "scan_id": str(uuid4()),
-                "page": 0,
-                "state_database": None,
-                "state_schema": "main",
-                "day": "2026-01-01",
+                "location": {"database": None, "schema": "main"},
                 "complete": False,
-                "after": None,
             }
-            assert sync_warehouse_history(api, endpoint, batch) == {"applied": False}
+            assert sync_warehouse_history(api, batch) == {"applied": False}
             with closing(sqlite3.connect(control)) as database:
                 assert database.execute(f"SELECT COUNT(*) FROM {mirror}").fetchone() == (2,)
             batch["records"] = []
-            batch["reconciliation"].update(page=1, complete=True)
-            assert sync_warehouse_history(api, endpoint, batch) == {"applied": True}
+            batch["scan"]["complete"] = True
+            assert sync_warehouse_history(api, batch) == {"applied": True}
             originals_by_run: dict[str, tuple[str, str]] = {
                 json.loads(row[1])["run_id"]: row for row in before
             }
@@ -767,8 +747,12 @@ def test_given_external_warehouse_retention_when_a_complete_scan_arrives_then_mi
                 database.commit()
             assert sync_warehouse_history(
                 api,
-                endpoint,
-                {"session_id": session_id, "generation": 1, "records": remaining["records"]},
+                {
+                    "kind": kind,
+                    "session_id": session_id,
+                    "generation": 1,
+                    "records": remaining["records"],
+                },
             ) == {"applied": True}
             with closing(sqlite3.connect(control)) as database:
                 assert (

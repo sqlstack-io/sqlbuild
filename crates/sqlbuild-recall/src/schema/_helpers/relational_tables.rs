@@ -3,7 +3,7 @@
 use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
 
 use crate::schema::_helpers::rendering::{all_columns, sqlite_type};
-use crate::schema::constants::{ARTIFACTS_TABLE, EVENTS_TABLE};
+use crate::schema::constants::EVENTS_TABLE;
 use crate::schema::models::{ColumnType, TableSpec};
 
 pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) -> Vec<String> {
@@ -28,22 +28,10 @@ pub(crate) fn relational_table(spec: &TableSpec, postgres: bool, control: bool) 
             "    storage_id INTEGER PRIMARY KEY AUTOINCREMENT".into()
         });
     }
-    let mut key: Vec<&str> = spec.key.to_vec();
-    let partition = if postgres && spec.name != ARTIFACTS_TABLE.name {
-        if !key.contains(&spec.expiry_column) {
-            key.push(spec.expiry_column);
-        }
-        format!(
-            " PARTITION BY RANGE ({})",
-            sqlite_identifier(spec.expiry_column)
-        )
-    } else {
-        String::new()
-    };
-    let key: Vec<String> = key.into_iter().map(sqlite_identifier).collect();
+    let key: Vec<String> = spec.key.iter().copied().map(sqlite_identifier).collect();
     definitions.push(format!("    UNIQUE ({})", key.join(", ")));
     let mut statements = vec![format!(
-        "CREATE TABLE IF NOT EXISTS {} (\n{}\n){partition}",
+        "CREATE TABLE IF NOT EXISTS {} (\n{}\n)",
         sqlite_identifier(spec.name),
         definitions.join(",\n")
     )];

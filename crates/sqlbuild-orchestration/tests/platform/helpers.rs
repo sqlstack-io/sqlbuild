@@ -63,7 +63,7 @@ pub(crate) fn snapshot(location_id: Uuid) -> SnapshotInput {
         git_author: None,
         image_id: None,
         environment_hash: "orders-watchdog-environment".into(),
-        sqb_version: env!("CARGO_PKG_VERSION").into(),
+        sqb_version: "1.0.0".into(),
         nodes: BTreeMap::from([(
             "orders".into(),
             SnapshotNode {
@@ -209,4 +209,15 @@ pub(crate) async fn publish_platform_impostor(store: &ControlStore, identity: (U
         .expect("publish untrusted producer");
     assert_eq!(result.delivered, [(Table::Events, 1)]);
     assert!(result.conflicts.is_empty());
+}
+
+/// Every platform fact still stored after retention, in storage order.
+pub(crate) async fn retained_platform_facts(store: &ControlStore) -> Vec<Observation> {
+    read_recall_events(store, 0, 1000)
+        .await
+        .expect("read retained facts")
+        .into_iter()
+        .filter(|row| row["producer"] == "platform")
+        .map(|row| serde_json::from_value(json!(row)).expect("typed platform event"))
+        .collect()
 }

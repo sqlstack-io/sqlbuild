@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
-use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changes, location_health, location_work, person_location_work,
@@ -15,8 +14,6 @@ use crate::api::_helpers::resources::{
 #[openapi(paths(
     administrators::change,
     administrators::assign,
-    administrators::request_activation,
-    administrators::decide,
     audit::read,
     person_operations::request_job,
     person_operations::cancel_run,
@@ -37,7 +34,6 @@ use crate::api::_helpers::resources::{
     cli_login::start,
     cli_login::approve,
     cli_login::claim,
-    trusted_proxy::identity,
     oidc::login,
     oidc::callback,
     changes::subscribe,
@@ -62,15 +58,6 @@ use crate::api::_helpers::resources::{
     trigger_reads::events,
     trigger_reads::ticks,
     warehouse_metadata::report,
-    warehouse_metadata::report_fingerprints,
-    warehouse_metadata::report_audit_results,
-    warehouse_metadata::report_janitor_events,
-    warehouse_metadata::report_migrations,
-    warehouse_metadata::report_old_name_views,
-    warehouse_metadata::report_microbatches,
-    warehouse_metadata::report_consumption,
-    warehouse_metadata::report_catalog,
-    warehouse_metadata::report_statistics,
     warehouse_metadata::statistics_due,
     warehouse_metadata::watermark
 ))]
@@ -142,12 +129,20 @@ pub struct DevelopmentScope {
     pub triggers: bool,
 }
 
+/// The one way people sign in to this server, if any.
+#[derive(Debug, Default)]
+pub enum HumanLogin {
+    #[default]
+    None,
+    Development(DevelopmentScope),
+    Password(String),
+    TrustedProxy(TrustedProxyAuthentication),
+    Oidc(OidcAuthentication),
+}
+
 #[derive(Debug, Default)]
 pub struct ApiAuthentication {
-    pub development_scope: Option<DevelopmentScope>,
-    pub password_origin: Option<String>,
-    pub trusted_proxy: Option<TrustedProxyAuthentication>,
-    pub oidc: Option<OidcAuthentication>,
+    pub login: HumanLogin,
     pub default_role: crate::credentials::models::DefaultRole,
 }
 
@@ -285,7 +280,6 @@ pub(crate) struct CliLoginClaimRequest {
 pub(crate) struct CliLoginSessionResponse {
     pub(crate) identity: crate::credentials::models::SessionIdentity,
     pub(crate) bearer: String,
-    pub(crate) csrf_token: String,
 }
 
 impl std::fmt::Debug for CliLoginApprovalRequest {
@@ -327,7 +321,7 @@ impl std::fmt::Debug for PasswordSessionResponse {
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuthenticationDenial {
     pub error: String,
-    pub decision_id: uuid::Uuid,
+    pub request_id: uuid::Uuid,
 }
 
 #[derive(Clone, Debug)]

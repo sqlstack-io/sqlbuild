@@ -20,9 +20,7 @@ use crate::api::tests::test_types::LocationWorkTestCase;
 use crate::api::tests::work_helpers::execute;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::snapshot;
-use crate::store::tests::store_helpers::{
-    close_test_store, open_test_store, reconstruct_warehouse_predecessor, run,
-};
+use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
@@ -47,24 +45,6 @@ fn given_outbound_work_when_claimed_retried_or_replaced_then_scope_and_immutable
             };
             let store = &fixture.store;
             migrate_store(store).await.expect("fresh migration");
-            // Exercise both deployed predecessors, including checksums and repeated startup.
-            for (version, location_cleanup) in [(3, ""), (2, "DROP TABLE sqb_location_instances;")]
-            {
-                reconstruct_warehouse_predecessor(store).await;
-                execute(store, &format!(
-                    "DROP TABLE sqb_external_sessions; DROP TABLE sqb_role_assignments; DROP TABLE sqb_admin_initialization; \
-                     DROP TABLE sqb_oidc_login_flows; DROP TABLE sqb_authentication_revision; \
-                     DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
-                     DROP TABLE sqb_password_credentials; DROP TABLE sqb_development_locations; \
-                     DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
-                     DROP INDEX sqb_node_decisive_history; DROP INDEX sqb_node_finished_cursor; \
-                     DROP INDEX sqb_node_started_identity; DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; \
-                     DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; DROP TABLE sqb_sensor_evaluation_events; \
-                     DROP TABLE sqb_platform_sink_deliveries; DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; \
-                     {location_cleanup} DELETE FROM sqb_schema_migrations WHERE version>={version}"
-                )).await;
-                migrate_store(store).await.expect("predecessor upgrade");
-            }
             migrate_store(store).await.expect("repeat migration");
             let location_id = create_location(store, "orders", "test-admin")
                 .await

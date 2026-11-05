@@ -16,12 +16,12 @@ fn clickhouse_version_row(options: &DdlOptions) -> String {
          '{RECALL_SCHEMA_VERSION}', now64(6), '{DDL_SCRIPT_INVOCATION}', now64(6), \
          {RECALL_SCHEMA_VERSION}, '{version}', now64(6), ''",
         meta = clickhouse_table(table_spec(Table::Meta).name, options),
-        version = env!("CARGO_PKG_VERSION"),
+        version = options.producer_version,
     )
 }
 
 /// The SQLite `recall_meta` row recording the schema version.
-fn sqlite_version_row() -> String {
+fn sqlite_version_row(options: &DdlOptions) -> String {
     let now = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
     format!(
         "INSERT OR IGNORE INTO \"{meta}\" (component, key, value, recorded_at, invocation_id, \
@@ -30,7 +30,7 @@ fn sqlite_version_row() -> String {
          '{RECALL_SCHEMA_VERSION}', {now}, '{DDL_SCRIPT_INVOCATION}', {now}, \
          {RECALL_SCHEMA_VERSION}, '{version}', {now}, '')",
         meta = table_spec(Table::Meta).name,
-        version = env!("CARGO_PKG_VERSION"),
+        version = options.producer_version,
     )
 }
 
@@ -38,7 +38,7 @@ fn sqlite_version_row() -> String {
 #[must_use]
 pub(crate) fn version_row_statement(dialect: Dialect, options: &DdlOptions) -> String {
     match dialect {
-        Dialect::Sqlite => sqlite_version_row(),
+        Dialect::Sqlite => sqlite_version_row(options),
         Dialect::ClickHouse => clickhouse_version_row(options),
     }
 }

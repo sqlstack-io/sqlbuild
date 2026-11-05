@@ -1,4 +1,4 @@
-//! Only the exchange secret can receive a CLI credential; browser approval returns no bearer.
+//! Only the exchange secret can receive a CLI credential; a browser person approves it.
 
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -6,10 +6,8 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 
-use crate::api::_helpers::authentication::password_transport::{
-    browser_cookie, deny, single_header,
-};
-use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_HEADER};
+use crate::api::_helpers::authentication::password_transport::{deny, session_header};
+use crate::api::constants::PASSWORD_BODY_BYTES;
 use crate::api::errors::ApiError;
 use crate::api::models::{
     AuthenticationDenial, BrowserLoginMethod, CliLoginApprovalRequest, CliLoginClaimRequest,
@@ -19,7 +17,9 @@ use crate::credentials::main::audit::reserve_authentication_attempt::reserve_aut
 use crate::credentials::main::cli_login::{
     approve_login::approve_login, claim_login::claim_login, start_login::start_login,
 };
-use crate::credentials::models::{AuditContext, AuthenticationAttempt, ClaimedLogin, StartedLogin};
+use crate::credentials::models::{
+    AuditContext, AuthenticatedPerson, AuthenticationAttempt, ClaimedLogin, StartedLogin,
+};
 use crate::store::models::ControlStore;
 
 pub(crate) fn router(method: BrowserLoginMethod) -> Router<ControlStore> {
@@ -68,7 +68,7 @@ pub(crate) async fn start(
         reserve_authentication_attempt(&store, &context, AuthenticationAttempt::IdentityProvider)
             .await?;
     if !allowed {
-        let mut response = deny(&store, &context, "cli_login_throttled").await?;
+        let mut response = deny(&context)?;
         *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
         return Ok(response);
     }
@@ -76,28 +76,29 @@ pub(crate) async fn start(
 }
 
 #[utoipa::path(post, path = "/api/auth/cli/approve", operation_id = "approveCliLogin",
-    request_body = CliLoginApprovalRequest, security(("session" = [])),
+    request_body = CliLoginApprovalRequest, security(("session" = []), ("proxy" = [])),
     responses((status = 204), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn approve(
     State(store): State<ControlStore>,
-    Extension(context): Extension<AuditContext>,
+    (Extension(context), Extension(person)): (
+        Extension<AuditContext>,
+        Extension<AuthenticatedPerson>,
+    ),
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    if approve_login(
-        &store,
-        &context,
-        (
-            browser_cookie(&headers, PASSWORD_COOKIE).unwrap_or_default(),
-            single_header(&headers, PASSWORD_CSRF_HEADER).unwrap_or_default(),
-        ),
-        (&request.browser_code, request.approve),
-    )
-    .await?
+    if !session_header(&headers)
+        && approve_login(
+            &store,
+            &context,
+            person,
+            (&request.browser_code, request.approve),
+        )
+        .await?
     {
         Ok(StatusCode::NO_CONTENT.into_response())
     } else {
-        deny(&store, &context, "invalid_cli_approval").await
+        deny(&context)
     }
 }
 
@@ -111,11 +112,10 @@ pub(crate) async fn claim(
 ) -> Result<Response, ApiError> {
     match claim_login(&store, &context, (request.flow_id, &request.client_secret)).await? {
         ClaimedLogin::Pending => Ok(StatusCode::ACCEPTED.into_response()),
-        ClaimedLogin::Unavailable => deny(&store, &context, "cli_login_unavailable").await,
+        ClaimedLogin::Unavailable => deny(&context),
         ClaimedLogin::Authenticated(session) => Ok(Json(CliLoginSessionResponse {
             identity: session.identity,
             bearer: session.bearer,
-            csrf_token: session.csrf,
         })
         .into_response()),
     }

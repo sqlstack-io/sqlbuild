@@ -13,10 +13,7 @@ use crate::store::models::RecallStatement;
 #[must_use]
 pub fn relational_lookup(row: &RecallRow, postgres: bool, control: bool) -> RecallStatement<'_> {
     let spec = table_spec(row.table);
-    let mut keys = spec.key.to_vec();
-    if postgres && row.table != Table::Artifacts && !keys.contains(&spec.expiry_column) {
-        keys.push(spec.expiry_column);
-    }
+    let keys = spec.key;
     let metadata = table_columns(row.table);
     let mut values: Vec<(&RecallValue, ColumnType)> = Vec::new();
     let mut conditions: Vec<String> = Vec::new();

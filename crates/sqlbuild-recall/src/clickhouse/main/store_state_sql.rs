@@ -30,6 +30,7 @@ pub fn store_state_sql(database: &str) -> StoreStateSql {
         database: Some(database.to_owned()),
         retention_days: 0,
         cluster: None,
+        producer_version: String::new(),
     };
     StoreStateSql {
         relations: format!(

@@ -32,44 +32,8 @@ pub(crate) fn router(store: &ControlStore, feed: ChangeFeed) -> Router<ControlSt
             get(location_health::recent).post(location_health::report),
         )
         .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/source-freshness",
+            "/api/locations/{location_id}/targets/{target}/metadata",
             post(warehouse_metadata::report),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/fingerprints",
-            post(warehouse_metadata::report_fingerprints),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/audit-results",
-            post(warehouse_metadata::report_audit_results),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/janitor-events",
-            post(warehouse_metadata::report_janitor_events),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/migrations",
-            post(warehouse_metadata::report_migrations),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/old-name-views",
-            post(warehouse_metadata::report_old_name_views),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/microbatches",
-            post(warehouse_metadata::report_microbatches),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/consumption",
-            post(warehouse_metadata::report_consumption),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/catalog",
-            post(warehouse_metadata::report_catalog),
-        )
-        .route(
-            "/api/locations/{location_id}/targets/{target}/metadata/statistics",
-            post(warehouse_metadata::report_statistics),
         )
         .route(
             "/api/locations/{location_id}/targets/{target}/metadata/statistics-due",

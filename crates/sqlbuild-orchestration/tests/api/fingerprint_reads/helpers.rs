@@ -7,17 +7,15 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
-use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
-use crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor;
 use crate::warehouse_metadata::main::{
     ingest_fingerprints::ingest_fingerprints, read_person_fingerprint::read_person_fingerprint,
 };
-use crate::warehouse_metadata::models::{FingerprintBatch, FingerprintQuery};
+use crate::warehouse_metadata::models::{FingerprintQuery, MetadataBatch};
 
 pub(crate) async fn fingerprint_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, other): (Uuid, Uuid),
 ) -> Uuid {
     let session_id = Uuid::now_v7();
@@ -56,7 +54,7 @@ pub(crate) async fn fingerprint_reads(
         record[key] = value;
         records.push(record);
     }
-    let batch: FingerprintBatch = serde_json::from_value(json!({
+    let batch: MetadataBatch = serde_json::from_value(json!({"kind":"fingerprints",
         "session_id":session_id,"generation":1,"records":records,
     }))
     .expect("batch");
@@ -140,11 +138,6 @@ pub(crate) async fn fingerprint_reads(
         .is_none()
     );
     options.name = Some("orders".into());
-    reconstruct_fingerprint_predecessor(store).await;
-    migrate_store(store)
-        .await
-        .expect("populated fingerprint upgrade");
-    migrate_store(store).await.expect("idempotent migration");
     assert!(
         !ingest_fingerprints(store, (location, "development"), &batch)
             .await
@@ -160,7 +153,7 @@ pub(crate) async fn fingerprint_reads(
                 DefaultRole::None
             )
             .await
-            .expect("backfilled index")
+            .expect("indexed fingerprint")
         ),
         serialized
     );

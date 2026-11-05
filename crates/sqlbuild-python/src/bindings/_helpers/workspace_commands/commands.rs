@@ -22,6 +22,7 @@ use sqlbuild_host::entries::models::FacadeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, imported};
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::host::write_console;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record;
@@ -145,12 +146,6 @@ fn load_packaged_skill_files(py: Python<'_>) -> PyResult<BTreeMap<String, String
         .map_err(|error| raised(py, error))
 }
 
-fn print(py: Python<'_>, text: &str) -> PyResult<()> {
-    let stdout: Bound<'_, PyAny> = py.import("sys")?.getattr("stdout")?;
-    stdout.call_method1("write", (text,))?;
-    Ok(())
-}
-
 /// `sqb skills`: install or update SQLBuild skill files.
 #[pyfunction]
 #[pyo3(signature = (**options))]
@@ -177,7 +172,7 @@ pub(crate) fn run_skills_command(
     for path in written {
         text.push_str(&format!("  {}\n", path.display()));
     }
-    print(py, &text)?;
+    write_console(py, "stdout", &text)?;
     Ok(0)
 }
 
@@ -209,8 +204,9 @@ pub(crate) fn run_playground_command(py: Python<'_>, request: &Bound<'_, PyAny>)
         &skill_request(py, playground_project_dir(&target_dir, &template))?,
     )?;
     let use_color: bool = stdout_supports_color(py)?;
-    print(
+    write_console(
         py,
+        "stdout",
         &playground_summary(&display_path, &template, CliStyle { use_color }),
     )?;
     Ok(0)

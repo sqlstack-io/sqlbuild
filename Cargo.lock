@@ -1464,16 +1464,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fs4"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
-dependencies = [
- "rustix",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4132,7 +4122,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-analysis"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "memchr",
  "polyglot-sql",
@@ -4156,7 +4146,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-attachments"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "sqlbuild-core",
  "sqlbuild-sqltext",
@@ -4164,7 +4154,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-build-features"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "arrayvec",
  "bstr",
@@ -4181,7 +4171,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cache"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "blake3",
  "rayon",
@@ -4225,7 +4215,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-config"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "saphyr-parser",
  "sqlbuild-core",
@@ -4236,7 +4226,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-core"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "regex",
  "serde_json",
@@ -4245,14 +4235,14 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cursor"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "sqlbuild-core",
 ]
 
 [[package]]
 name = "sqlbuild-discovery"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "junction",
  "rayon",
@@ -4266,14 +4256,14 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-host"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "sqlbuild-core",
 ]
 
 [[package]]
 name = "sqlbuild-model-config"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "regex",
  "sqlbuild-core",
@@ -4281,7 +4271,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-orchestration"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "argon2",
  "axum",
@@ -4290,7 +4280,6 @@ dependencies = [
  "chrono-tz",
  "croner",
  "flate2",
- "fs4",
  "futures-util",
  "getrandom 0.4.3",
  "openidconnect",
@@ -4298,7 +4287,6 @@ dependencies = [
  "rcgen",
  "reqwest",
  "rusqlite",
- "semver",
  "serde",
  "serde_json",
  "sqlbuild-core",
@@ -4316,7 +4304,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-project"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "sqlbuild-analysis",
  "sqlbuild-core",
@@ -4325,7 +4313,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-pysource"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
@@ -4378,7 +4366,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-recall"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4395,7 +4383,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-refactor"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4410,7 +4398,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-render"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "serde_json",
  "sqlbuild-cache",
@@ -4421,7 +4409,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-rules"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "blake3",
  "fensu-policy",
@@ -4447,7 +4435,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-scopes"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
@@ -4460,7 +4448,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-sqltext"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "rayon",
  "serde",
@@ -4469,7 +4457,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-state"
-version = "0.187.3"
+version = "0.0.0"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",

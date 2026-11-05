@@ -4,10 +4,9 @@ use serde_json::json;
 
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::platform::main::rebuild_projections::rebuild_projections;
 use crate::runs::tests::helpers::{request, request_run};
 use crate::scheduler::tests::contracts::ticks::helpers::snapshot;
-use crate::snapshots::_helpers::retention::prune_snapshots;
+use crate::snapshots::main::prune_snapshots::prune_snapshots;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotRetention;
 use crate::snapshots::tests::helpers::{retained_snapshot_state, retention_counts};
@@ -79,8 +78,7 @@ fn given_twelve_snapshots_when_collected_then_ten_newest_and_run_referenced_snap
             let triggers = list_triggers(store, location, "development")
                 .await
                 .expect("triggers before collection");
-            let (texts, orphans, progress) = retention_counts(store).await;
-            assert_eq!((texts, orphans), (12, 0));
+            assert_eq!(retention_counts(store).await, (12, 0));
             assert_eq!(
                 prune_snapshots(store, setting("keep"))
                     .await
@@ -95,8 +93,8 @@ fn given_twelve_snapshots_when_collected_then_ten_newest_and_run_referenced_snap
             );
             assert_eq!(
                 retention_counts(store).await,
-                (11, 0, progress - 1),
-                "the expired snapshot's text and superseded progress fact go with it"
+                (11, 0),
+                "the expired snapshot's text goes with it"
             );
             assert_eq!(
                 prune_snapshots(store, setting("keep"))
@@ -116,15 +114,12 @@ fn given_twelve_snapshots_when_collected_then_ten_newest_and_run_referenced_snap
                 case["expected_after_shorter"]
             );
             assert_eq!(retention_counts(store).await.1, 0);
-            rebuild_projections(store)
-                .await
-                .expect("rebuild after collection");
             assert_eq!(
                 list_triggers(store, location, "development")
                     .await
-                    .expect("rebuilt triggers"),
+                    .expect("triggers after collection"),
                 triggers,
-                "latest progress facts alone rebuild the same trigger state"
+                "collection never changes live trigger state"
             );
             close_test_store(fixture).await;
         });

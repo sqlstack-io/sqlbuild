@@ -7,21 +7,18 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json};
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::constants::{PASSWORD_COOKIE, PASSWORD_CSRF_COOKIE, PASSWORD_CSRF_HEADER};
 use crate::api::errors::ApiError;
 use crate::api::models::{AuthenticationDenial, BrowserOrigin, ExternalIdentityResponse};
 use crate::credentials::constants::PASSWORD_SESSION_SECONDS;
-use crate::credentials::main::audit::record_authentication_denial::record_authentication_denial;
 use crate::credentials::main::sessions::authenticate_session::authenticate_session;
-use crate::credentials::models::{AuditContext, IssuedSession, SessionAccess};
+use crate::credentials::models::{AuditContext, AuthenticatedPerson, IssuedSession, SessionAccess};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn guard(
-    State(store): State<ControlStore>,
     Extension(origin): Extension<BrowserOrigin>,
     mut request: Request,
     next: Next,
@@ -48,7 +45,7 @@ pub(crate) async fn guard(
         None => request.method().is_safe() && !request.headers().contains_key(header::ORIGIN),
     };
     let mut response = if !valid_host || !valid_origin {
-        deny(&store, &context, "invalid_origin").await?
+        deny(&context)?
     } else {
         request.extensions_mut().insert(context);
         next.run(request).await
@@ -77,22 +74,27 @@ pub(crate) async fn authenticate(
             message: "trusted authentication context is unavailable".into(),
             decision_id: None,
         })?;
-    let access = if request.method().is_safe() {
-        SessionAccess::Read
-    } else {
-        SessionAccess::Write {
-            csrf: single_header(request.headers(), PASSWORD_CSRF_HEADER).unwrap_or_default(),
-        }
-    };
+    let access =
+        if request.method().is_safe() || request.headers().contains_key(header::AUTHORIZATION) {
+            SessionAccess::Read
+        } else {
+            SessionAccess::Write {
+                csrf: single_header(request.headers(), PASSWORD_CSRF_HEADER).unwrap_or_default(),
+            }
+        };
     let identity =
         authenticate_session(&store, session_credentials(request.headers()).0, access).await?;
     let Some(identity) = identity else {
-        return deny(&store, &context, "invalid_session_or_csrf").await;
+        return deny(&context);
     };
     let mut context = context;
     context.actor = format!("principal:{}", identity.principal_id);
     context.granting_role = "browser-session".into();
     request.extensions_mut().insert(context);
+    request.extensions_mut().insert(AuthenticatedPerson(
+        identity.principal_id,
+        Some(identity.session_id),
+    ));
     request.extensions_mut().insert(identity);
     Ok(next.run(request).await)
 }
@@ -103,6 +105,12 @@ pub(crate) fn single_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'
         return None;
     };
     values.next().is_none().then_some(value)
+}
+
+/// A CLI session header; other `Authorization` schemes, such as a proxy's own, are not sessions.
+pub(crate) fn session_header(headers: &HeaderMap) -> bool {
+    single_header(headers, header::AUTHORIZATION.as_str())
+        .is_some_and(|value| value.starts_with("Session "))
 }
 
 pub(crate) fn session_credentials(headers: &HeaderMap) -> (&str, &str) {
@@ -189,23 +197,13 @@ pub(crate) fn set_cookie(
     Ok(())
 }
 
-pub(crate) async fn deny(
-    store: &ControlStore,
-    context: &AuditContext,
-    reason: &str,
-) -> Result<Response, ApiError> {
-    let decision_id = record_authentication_denial(
-        store,
-        context,
-        (context.request_id, reason),
-        json!({"kind": "browser_authentication"}),
-    )
-    .await?;
+/// Anonymous denials are not durably audited; the response names the request.
+pub(crate) fn deny(context: &AuditContext) -> Result<Response, ApiError> {
     Ok((
         StatusCode::UNAUTHORIZED,
         Json(AuthenticationDenial {
             error: "authentication rejected".into(),
-            decision_id,
+            request_id: context.request_id,
         }),
     )
         .into_response())

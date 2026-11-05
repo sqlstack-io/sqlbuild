@@ -1,4 +1,4 @@
-//! Operator reads and evaluations share the latest immutable cursor commit.
+//! Operator reads and evaluations share the cursor on the trigger state.
 
 use uuid::Uuid;
 
@@ -11,9 +11,12 @@ pub(crate) async fn read_sensor_cursor(
     transaction: ControlTransaction,
     trigger_id: Uuid,
 ) -> Result<(ControlTransaction, SensorCursor), ControlError> {
-    let (transaction, rows) = query(transaction,
-        "SELECT cursor_json FROM sqb_sensor_cursor_commits WHERE trigger_id=$1 ORDER BY storage_id DESC LIMIT 1",
-        vec![Parameter::Id(trigger_id)]).await?;
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT cursor_json FROM sqb_trigger_state WHERE trigger_id=$1 AND cursor_json IS NOT NULL",
+        vec![Parameter::Id(trigger_id)],
+    )
+    .await?;
     let cursor = rows
         .first()
         .map(|row| serde_json::from_value(row["cursor_json"].clone()))

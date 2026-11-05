@@ -1,62 +1,35 @@
-//! Validate authentication modes before migrations or HTTP startup.
+//! Build the configured sign-in routes before migrations or HTTP startup.
 
 use std::net::SocketAddr;
 
 use axum::{Extension, Router};
 
 use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
-use crate::api::models::{ApiAuthentication, DevelopmentScope};
-use crate::credentials::models::AdministratorAuthentication;
+use crate::api::models::{ApiAuthentication, DevelopmentScope, HumanLogin};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn configure(
     store: &ControlStore,
-    authentication: ApiAuthentication,
+    ApiAuthentication {
+        login,
+        default_role,
+    }: ApiAuthentication,
     address: SocketAddr,
 ) -> Result<(Option<DevelopmentScope>, Router<ControlStore>), ControlError> {
-    let ApiAuthentication {
-        development_scope,
-        password_origin,
-        trusted_proxy,
-        oidc,
-        default_role,
-    } = authentication;
-    if development_scope.is_some() && password_origin.is_some() {
-        return Err(ControlError::Invalid(
-            "disabled and password authentication cannot be combined".into(),
-        ));
-    }
-    if development_scope.is_some() && !address.ip().is_loopback() {
-        return Err(ControlError::Invalid(
-            "disabled authentication requires a loopback listener".into(),
-        ));
-    }
-    if trusted_proxy.is_some() && (development_scope.is_some() || password_origin.is_some()) {
-        return Err(ControlError::Invalid(
-            "trusted-proxy authentication cannot be combined with disabled or password authentication".into(),
-        ));
-    }
-    if oidc.is_some()
-        && (development_scope.is_some() || password_origin.is_some() || trusted_proxy.is_some())
-    {
-        return Err(ControlError::Invalid(
-            "OIDC authentication cannot be combined with other human authentication modes".into(),
-        ));
-    }
-    let administrator_authentication = if let Some(settings) = &trusted_proxy {
-        AdministratorAuthentication::BoundPeople(settings.identities.values().copied().collect())
-    } else if let Some(settings) = &oidc {
-        AdministratorAuthentication::BoundPeople(settings.identities.values().copied().collect())
-    } else {
-        AdministratorAuthentication::Password
+    let (development, routes) = match login {
+        HumanLogin::None => (None, Router::new()),
+        HumanLogin::Development(scope) => {
+            if !address.ip().is_loopback() {
+                return Err(ControlError::Invalid(
+                    "disabled authentication requires a loopback listener".into(),
+                ));
+            }
+            (Some(scope), Router::new())
+        }
+        HumanLogin::Password(origin) => (None, password_sessions::router(store, origin)?),
+        HumanLogin::TrustedProxy(settings) => (None, trusted_proxy::router(store, settings)?),
+        HumanLogin::Oidc(settings) => (None, oidc::router(store, settings).await?),
     };
-    Ok((
-        development_scope,
-        password_sessions::router(store, password_origin)?
-            .merge(trusted_proxy::router(store, trusted_proxy)?)
-            .merge(oidc::router(store, oidc).await?)
-            .layer(Extension(default_role))
-            .layer(Extension(administrator_authentication)),
-    ))
+    Ok((development, routes.layer(Extension(default_role))))
 }

@@ -1,6 +1,6 @@
 //! Existing warehouse state rows, with their physical state-table provenance.
 
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -24,35 +24,6 @@ pub struct WarehouseFreshnessRecord {
     pub data_version: Option<String>,
     pub data_version_hash: String,
     pub observed_at: DateTime<Utc>,
-}
-
-/// Receipt order is sensor progress; warehouse observation time remains source evidence.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct SourceFreshnessObservation {
-    pub(crate) location_id: Uuid,
-    pub(crate) target: String,
-    pub(crate) record: WarehouseFreshnessRecord,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct StoredSourceFreshnessObservation {
-    pub(crate) event_id: Uuid,
-    pub(crate) location_id: Uuid,
-    pub(crate) target: String,
-    pub(crate) observed_at: DateTime<Utc>,
-    pub(crate) record_json: WarehouseFreshnessRecord,
-}
-
-/// A bounded page from one registered reader of a published location/target generation.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SourceFreshnessBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseFreshnessRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
 /// Preserve the warehouse representation, including text-encoded measurements and booleans.
@@ -103,16 +74,6 @@ pub struct WarehouseAuditRecord {
     pub audit_meta_json: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AuditResultsBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseAuditRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
-}
-
 /// Warehouse cleanup facts do not authorize control-plane deletion or worker recovery.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -132,16 +93,6 @@ pub struct WarehouseJanitorRecord {
     pub archive_name: String,
     pub archive_qualified_name: String,
     pub archived_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct JanitorEventsBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseJanitorRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
 /// Model-move history is evidence, not authority to migrate a warehouse relation.
@@ -165,16 +116,6 @@ pub struct WarehouseMigrationRecord {
     pub decision: String,
     pub run_id: String,
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MigrationsBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseMigrationRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
 /// Preserve nullable compatibility-view facts without projecting live warehouse existence.
@@ -203,16 +144,6 @@ pub struct WarehouseOldNameRecord {
     pub drop_reason: Option<String>,
     pub run_id: String,
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct OldNameViewsBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseOldNameRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
 }
 
 /// Immutable coordination evidence, never authority to execute or mark a batch complete.
@@ -261,49 +192,6 @@ pub struct WarehouseMicrobatchRecord {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct MicrobatchesBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseMicrobatchRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
-}
-
-/// What one execution consumed, as history; `--changed` reads the warehouse table, never this mirror.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WarehouseConsumptionRecord {
-    pub state_database: Option<String>,
-    pub state_schema: String,
-    pub event_id: String,
-    pub execution_id: String,
-    pub phase: String,
-    pub run_id: String,
-    pub node_type: String,
-    pub node_name: String,
-    pub target_database: Option<String>,
-    pub target_schema: String,
-    pub target_name: String,
-    pub version_hash: String,
-    pub input_count: i64,
-    pub input_kind: Option<String>,
-    pub input_name: Option<String>,
-    pub input_version: Option<String>,
-    pub recorded_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ConsumptionBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseConsumptionRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
-}
-
 /// Physical namespace of SQLBuild's source-freshness state table, never a source query.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
@@ -325,13 +213,12 @@ pub enum WarehouseHistoryKind {
     Migrations,
     OldNameViews,
     Microbatches,
-    Consumption,
     Catalog,
     Statistics,
 }
 
 impl WarehouseHistoryKind {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 9] = [
         Self::Fingerprints,
         Self::SourceFreshness,
         Self::AuditResults,
@@ -339,7 +226,6 @@ impl WarehouseHistoryKind {
         Self::Migrations,
         Self::OldNameViews,
         Self::Microbatches,
-        Self::Consumption,
         Self::Catalog,
         Self::Statistics,
     ];
@@ -354,7 +240,6 @@ impl WarehouseHistoryKind {
             Self::Migrations => "migrations",
             Self::OldNameViews => "old_name_views",
             Self::Microbatches => "microbatches",
-            Self::Consumption => "consumption",
             Self::Catalog => "catalog",
             Self::Statistics => "statistics",
         }
@@ -370,7 +255,6 @@ impl WarehouseHistoryKind {
             Self::Migrations => "sqb_warehouse_migrations",
             Self::OldNameViews => "sqb_warehouse_old_name_views",
             Self::Microbatches => "sqb_warehouse_microbatches",
-            Self::Consumption => "sqb_warehouse_consumption",
             Self::Catalog => "sqb_warehouse_catalog",
             Self::Statistics => "sqb_warehouse_statistics",
         }
@@ -419,34 +303,9 @@ pub struct WarehouseFingerprintRecord {
     pub ts: DateTime<Utc>,
 }
 
-/// Fingerprint observations from one registered reader, independent of automatic polling.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
-pub struct FingerprintBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseFingerprintRecord>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reconciliation: Option<WarehouseReconciliationPage>,
-}
-
-/// A complete, ordered key-set scan of one physical state table, optionally one UTC day.
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WarehouseReconciliationPage {
-    pub scan_id: Uuid,
-    pub page: u32,
-    pub state_database: Option<String>,
-    pub state_schema: String,
-    pub day: Option<NaiveDate>,
-    pub complete: bool,
-    /// Repeat the identical final page with this mirror cursor until the response has none.
-    pub after: Option<WarehouseReconciliationCursor>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct WarehouseReconciliationCursor {
+pub struct WarehouseMirrorCursor {
     pub observed_at: DateTime<Utc>,
     pub event_id: Uuid,
 }
@@ -454,8 +313,28 @@ pub struct WarehouseReconciliationCursor {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct WarehouseSyncResponse {
     pub applied: bool,
+}
+
+/// One bounded page of one state table from the registered reader of a published generation.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataBatch {
+    pub kind: WarehouseHistoryKind,
+    pub session_id: Uuid,
+    pub generation: i64,
+    #[schema(value_type = Vec<Object>)]
+    pub records: Vec<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_reconciliation_after: Option<WarehouseReconciliationCursor>,
+    pub scan: Option<MetadataScan>,
+}
+
+/// A full scan's complete page removes the namespace's rows that the scan did not deliver.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MetadataScan {
+    pub scan_id: Uuid,
+    pub location: WarehouseStateLocation,
+    pub complete: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -488,7 +367,6 @@ pub enum WarehouseHistoryRead {
     Migrations(StateEventsRead),
     OldNameViews(StateEventsRead),
     Microbatches(StateEventsRead),
-    Consumption(StateEventsRead),
     Catalog(CatalogRead),
     Statistics(StatisticsRead),
 }
@@ -503,7 +381,6 @@ pub enum WarehouseHistoryRecord {
     Migration(Box<WarehouseMigrationRecord>),
     OldNameView(Box<WarehouseOldNameRecord>),
     Microbatch(Box<WarehouseMicrobatchRecord>),
-    Consumption(Box<WarehouseConsumptionRecord>),
     Catalog(WarehouseCatalogRecord),
     Statistics(WarehouseStatisticsRecord),
 }
@@ -525,17 +402,6 @@ pub(crate) struct StateEventImport {
     pub record_json: serde_json::Value,
 }
 
-#[derive(Debug)]
-pub(crate) struct StateEventsImport<'a> {
-    pub kind: WarehouseHistoryKind,
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<StateEventImport>,
-    pub invalid_identity: bool,
-    pub reconciliation: Option<&'a WarehouseReconciliationPage>,
-    pub payload: serde_json::Value,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct WarehouseCatalogColumn {
@@ -552,33 +418,6 @@ pub struct WarehouseCatalogRecord {
     pub name: String,
     pub relation_type: String,
     pub columns: Vec<WarehouseCatalogColumn>,
-}
-
-/// Payload of the retained structural-change fact, including authoritative removals.
-#[derive(Debug, Deserialize)]
-pub(crate) struct CatalogProjectionFact {
-    pub location_id: Uuid,
-    pub target: String,
-    pub relation_id: Uuid,
-    pub record: WarehouseCatalogRecord,
-    pub present: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct CatalogReplayRow {
-    pub storage_id: i64,
-    pub schema_version: i64,
-    pub occurred_at: DateTime<Utc>,
-    pub payload: CatalogProjectionFact,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct CatalogBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseCatalogRecord>,
-    pub reconciliation: WarehouseReconciliationPage,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -612,7 +451,7 @@ pub struct CatalogObservation {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CatalogPage {
     pub records: Vec<CatalogObservation>,
-    pub next_after: Option<WarehouseReconciliationCursor>,
+    pub next_after: Option<WarehouseMirrorCursor>,
 }
 
 /// Exact node and physical destination, not a selector; omitted namespace values match SQL NULL.
@@ -699,14 +538,6 @@ pub struct WarehouseStatisticsRecord {
     pub byte_count_basis: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct StatisticsBatch {
-    pub session_id: Uuid,
-    pub generation: i64,
-    pub records: Vec<WarehouseStatisticsRecord>,
-}
-
 /// Eligibility comes from each relation's committed hour, never a namespace watermark.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -747,7 +578,7 @@ pub struct StatisticsObservation {
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct StatisticsPage {
     pub records: Vec<StatisticsObservation>,
-    pub next_after: Option<WarehouseReconciliationCursor>,
+    pub next_after: Option<WarehouseMirrorCursor>,
 }
 
 /// Installation configuration: expired samples are hidden on read before bounded pruning removes them.

@@ -29,10 +29,25 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 
+/// Session-authenticated person routes, plus routes acting on the caller's own session.
 pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
+    person_routes()
+        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
+        .merge(session_routes(store))
+}
+
+/// Routes that act on the caller's own session.
+pub(crate) fn session_routes(store: &ControlStore) -> Router<ControlStore> {
     Router::new()
         .route("/api/auth/session", get(current))
         .route("/api/auth/logout", post(logout))
+        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
+        .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
+}
+
+/// Person operations; the caller layers the authentication that identifies the person.
+pub(crate) fn person_routes() -> Router<ControlStore> {
+    Router::new()
         .route("/api/auth/cli/approve", post(super::cli_login::approve))
         .route(
             "/api/control/audit",
@@ -45,14 +60,6 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
         .route(
             "/api/admin/roles",
             post(crate::api::_helpers::resources::administrators::assign),
-        )
-        .route(
-            "/api/admin/role-activations",
-            post(crate::api::_helpers::resources::administrators::request_activation),
-        )
-        .route(
-            "/api/admin/role-approvals",
-            post(crate::api::_helpers::resources::administrators::decide),
         )
         .route(
             "/api/control/runs",
@@ -102,17 +109,13 @@ pub(crate) fn protected(store: &ControlStore) -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql",
             get(crate::api::_helpers::resources::person_node_sql::read),
         )
-        .route_layer(middleware::from_fn_with_state(store.clone(), authenticate))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }
 
 pub(crate) fn router(
     store: &ControlStore,
-    origin: Option<String>,
+    origin: String,
 ) -> Result<Router<ControlStore>, ControlError> {
-    let Some(origin) = origin else {
-        return Ok(Router::new());
-    };
     let origin = BrowserOrigin(parse_origin(&origin, "password")?);
     let protected = protected(store).merge(
         Router::new()
@@ -123,7 +126,7 @@ pub(crate) fn router(
         .route("/api/auth/password/login", post(login))
         .merge(super::cli_login::router(BrowserLoginMethod::Password))
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
-        .layer(middleware::from_fn_with_state(store.clone(), guard))
+        .layer(middleware::from_fn(guard))
         .layer(Extension(origin)))
 }
 
@@ -145,10 +148,7 @@ pub(crate) async fn login(
             .into_response();
             session_cookies(response, &session)
         }
-        PasswordLogin::Denied {
-            decision_id,
-            throttled,
-        } => {
+        PasswordLogin::Denied { throttled } => {
             let mut response = (
                 if throttled {
                     StatusCode::TOO_MANY_REQUESTS
@@ -157,7 +157,7 @@ pub(crate) async fn login(
                 },
                 Json(AuthenticationDenial {
                     error: "authentication rejected".into(),
-                    decision_id,
+                    request_id: context.request_id,
                 }),
             )
                 .into_response();
@@ -220,12 +220,12 @@ pub(crate) async fn change_password(
     )
     .await?;
     if !allowed {
-        return deny(&store, &context, "reauthentication_throttled").await;
+        return deny(&context);
     }
     let Some(proof) =
         verify_password(&store, identity.principal_id, &request.current_password).await?
     else {
-        return deny(&store, &context, "invalid_current_password").await;
+        return deny(&context);
     };
     set_password(
         &store,

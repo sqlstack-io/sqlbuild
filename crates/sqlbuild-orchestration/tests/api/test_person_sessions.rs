@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use crate::api::tests::helpers::stop_api;
 use crate::api::tests::oidc_helpers::{start_provider, stop_provider};
-use crate::api::tests::person_sessions_helpers::{browser_sessions, queue_counts, request};
+use crate::api::tests::person_sessions_helpers::{
+    browser_sessions, forged_request, queue_counts, request,
+};
 use crate::api::tests::person_sessions_test_types::SessionRoleCase;
 use crate::api::tests::test_types::LocationWorkTestCase;
 use crate::authorization::main::{
@@ -17,8 +19,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, PasswordAuthority, PasswordLogin, PrincipalKind,
-    RoleAssignmentRequest,
+    AuditContext, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
@@ -66,10 +67,9 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let admin = bootstrap_user(store, &context, "orders-admin")
                 .await
                 .expect("administrator");
-            let person =
-                create_principal(store, &context, ("orders-person", PrincipalKind::Person))
-                    .await
-                    .expect("person");
+            let person = create_principal(store, &context, "orders-person")
+                .await
+                .expect("person");
             for id in [admin, person] {
                 set_password(
                     store,
@@ -182,7 +182,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 for role in role_case.role.iter().copied() {
                     assign_builtin_role(
                         &replica,
-                        (&context, (&admin_session.bearer, &admin_session.csrf)),
+                        (&context, admin_session.identity.principal_id),
                         &RoleAssignmentRequest {
                             principal_id: person,
                             role: role.into(),
@@ -190,7 +190,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             target: None,
                             revoke: false,
                         },
-                        &AdministratorAuthentication::Password,
                     )
                     .await
                     .expect("assign role through independent store");
@@ -295,11 +294,11 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         [(&path[..], &body), ("/api/control/runs", &job)]
                     {
                         assert_eq!(
-                            request(
+                            forged_request(
                                 &provider.client,
                                 session,
                                 (Method::POST, endpoint),
-                                (request_body, "wrong-csrf")
+                                request_body
                             )
                             .await
                             .status(),
@@ -343,7 +342,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 for role in role_case.role.iter().copied() {
                     assign_builtin_role(
                         &replica,
-                        (&context, (&admin_session.bearer, &admin_session.csrf)),
+                        (&context, admin_session.identity.principal_id),
                         &RoleAssignmentRequest {
                             principal_id: person,
                             role: role.into(),
@@ -351,7 +350,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             target: None,
                             revoke: true,
                         },
-                        &AdministratorAuthentication::Password,
                     )
                     .await
                     .expect("revoke through independent store");
@@ -415,7 +413,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             }
             assign_builtin_role(
                 &replica,
-                (&context, (&admin_session.bearer, &admin_session.csrf)),
+                (&context, admin_session.identity.principal_id),
                 &RoleAssignmentRequest {
                     principal_id: person,
                     role: crate::credentials::models::BuiltinRole::Developer.into(),
@@ -423,7 +421,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     target: Some("development".into()),
                     revoke: false,
                 },
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("scoped developer");
@@ -489,16 +486,20 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         StatusCode::FORBIDDEN
                     );
                 }
+                let sensor_work = request(
+                    &provider.client,
+                    session,
+                    (Method::GET, &format!("{path}/{}", evaluation.evaluation_id)),
+                    (&Value::Null, &session.csrf),
+                )
+                .await;
+                assert_eq!(sensor_work.status(), StatusCode::OK);
                 assert_eq!(
-                    request(
-                        &provider.client,
-                        session,
-                        (Method::GET, &format!("{path}/{}", evaluation.evaluation_id)),
-                        (&Value::Null, "wrong-csrf")
-                    )
-                    .await
-                    .status(),
-                    StatusCode::FORBIDDEN
+                    sensor_work
+                        .json::<Value>()
+                        .await
+                        .expect("hidden sensor work"),
+                    Value::Null
                 );
             }
             assert_eq!(

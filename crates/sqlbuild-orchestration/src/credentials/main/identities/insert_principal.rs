@@ -4,7 +4,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{AuditContext, PrincipalKind};
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -12,24 +12,19 @@ use crate::store::models::{ControlTransaction, Parameter};
 pub(crate) async fn insert_principal(
     transaction: ControlTransaction,
     context: &AuditContext,
-    (name, kind): (&str, PrincipalKind),
+    name: &str,
 ) -> Result<(ControlTransaction, Uuid), ControlError> {
     if name.trim().is_empty() {
         return Err(ControlError::Invalid("principal name is required".into()));
     }
     let id = Uuid::now_v7();
     let now = transaction.now;
-    let kind = match kind {
-        PrincipalKind::Person => "person",
-        PrincipalKind::ServiceAccount => "service_account",
-    };
     let (transaction, _) = query(
         transaction,
-        "INSERT INTO sqb_principals (principal_id, name, kind, created_at) VALUES ($1,$2,$3,$4)",
+        "INSERT INTO sqb_principals (principal_id, name, created_at) VALUES ($1,$2,$3)",
         vec![
             Parameter::Id(id),
             Parameter::Text(name.into()),
-            Parameter::Text(kind.into()),
             Parameter::Time(now),
         ],
     )
@@ -41,7 +36,7 @@ pub(crate) async fn insert_principal(
         (
             json!({"principal_id": id}),
             json!(null),
-            json!({"name": name, "kind": kind}),
+            json!({"name": name}),
         ),
     )
     .await?;

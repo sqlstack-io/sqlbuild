@@ -12,7 +12,7 @@ def definitions():
             when=platform_event(kinds=[PlatformEventKind.TICK_OVERDUE]),
             run=refresh,
             minimum_interval_seconds=7,
-            default_status="stopped",
+            default_status="paused",
             targets=("development",),
         ),
         sensor(

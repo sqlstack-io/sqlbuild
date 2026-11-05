@@ -17,7 +17,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn request_location_work(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, Option<(&str, &str)>),
+    (context, credentials): (&AuditContext, Option<Uuid>),
     request: &LocationWorkRequest,
 ) -> Result<bool, ControlError> {
     if matches!(request.work, LocationWork::EvaluateSensor { .. }) {

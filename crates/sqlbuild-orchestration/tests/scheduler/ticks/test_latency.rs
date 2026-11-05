@@ -1,4 +1,4 @@
-//! Regression bounds for tick-to-queued latency and a waiting standby's catch-up after a lease lapses.
+//! Bounds tick-to-decision latency, where a decision queues or covers a run, and standby catch-up.
 
 use chrono::{DurationRound, SecondsFormat, TimeDelta, Utc};
 use serde_json::json;
@@ -23,17 +23,17 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
         SchedulerLatencyTestCase {
             description: "SQLite scheduler latency",
             backend: Backend::Sqlite,
-            expected_queued_ticks: 3,
-            expected_ticks_after_failover: 5,
-            expected_max_tick_to_queued: TimeDelta::milliseconds(500),
+            expected_ticks: 3,
+            expected_ticks_after_failover: 4,
+            expected_max_tick_to_decision: TimeDelta::milliseconds(500),
             expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
         SchedulerLatencyTestCase {
             description: "PostgreSQL scheduler latency",
             backend: Backend::Postgres,
-            expected_queued_ticks: 3,
-            expected_ticks_after_failover: 5,
-            expected_max_tick_to_queued: TimeDelta::milliseconds(500),
+            expected_ticks: 3,
+            expected_ticks_after_failover: 4,
+            expected_max_tick_to_decision: TimeDelta::milliseconds(500),
             expected_max_failover_catch_up: TimeDelta::milliseconds(1_500),
         },
     ];
@@ -55,7 +55,7 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             let mut input = snapshot(location);
             input.documents.insert(
                 "jobs".into(),
-                json!({"orders": {"description": "Build orders", "selection": ["orders"], "overlap": "queue"}}),
+                json!({"orders": {"description": "Build orders", "selection": ["orders"]}}),
             );
             input.documents.insert(
                 "triggers".into(),
@@ -70,25 +70,44 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
                 .trigger_id;
             let ticks = run_scheduler_until(store, trigger_id, at(6)).await;
             let queued = queued_times(store, location).await;
+            let earliest = ticks
+                .iter()
+                .min_by_key(|tick| tick.scheduled_for)
+                .expect("ticks");
+            let requested = earliest.run_id.expect("the first due time queues a run");
+            assert!(
+                queued[&requested] <= earliest.evaluated_at,
+                "{}: the run is queued with its tick",
+                test_case.description
+            );
+            assert!(
+                ticks
+                    .iter()
+                    .filter(|tick| tick.tick_id != earliest.tick_id)
+                    .all(|tick| tick.covered_by_run_id == Some(requested)),
+                "{}: later times are covered by the waiting run",
+                test_case.description
+            );
             let latencies: Vec<TimeDelta> = ticks
                 .iter()
-                .filter_map(|tick| tick.run_id.map(|run| queued[&run] - tick.scheduled_for))
+                .map(|tick| tick.evaluated_at - tick.scheduled_for)
                 .collect();
-            println!("{} tick-to-queued: {latencies:?}", test_case.description);
+            println!("{} tick-to-decision: {latencies:?}", test_case.description);
             assert_eq!(
                 latencies.len(),
-                test_case.expected_queued_ticks,
+                test_case.expected_ticks,
                 "{}",
                 test_case.description
             );
             assert!(
                 latencies
                     .iter()
-                    .all(|latency| *latency <= test_case.expected_max_tick_to_queued),
+                    .all(|latency| *latency <= test_case.expected_max_tick_to_decision),
                 "{}: {latencies:?}",
                 test_case.description
             );
-            // The first leader stopped without releasing its lease while two more times fell due.
+            // The first leader stopped without releasing its lease while two more times fell due;
+            // the standby catches up on the latest one only.
             // A standby is already polling when that lease lapses, so its own retry wait counts.
             tokio::time::sleep((at(10) - Utc::now()).to_std().unwrap_or_default()).await;
             let second = second_store(store).await;
@@ -99,19 +118,17 @@ fn given_a_running_scheduler_and_a_stopped_leader_when_times_fall_due_then_ticks
             };
             let (ticks, available) =
                 tokio::join!(run_scheduler_until(&second, trigger_id, at(14)), lapse);
-            let queued = queued_times(store, location).await;
             assert_eq!(
                 ticks.len(),
                 test_case.expected_ticks_after_failover,
-                "{}: the standby ticks both overdue times",
+                "{}: the standby ticks only the latest overdue time",
                 test_case.description
             );
             let latest = ticks
                 .iter()
                 .find(|tick| tick.scheduled_for == at(9))
-                .and_then(|tick| tick.run_id)
-                .expect("the latest overdue time is requested");
-            let catch_up = queued[&latest] - available;
+                .expect("the latest overdue time is decided");
+            let catch_up = latest.evaluated_at - available;
             println!("{} failover catch-up: {catch_up:?}", test_case.description);
             assert!(
                 catch_up <= test_case.expected_max_failover_catch_up,

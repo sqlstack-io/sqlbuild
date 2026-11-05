@@ -22,8 +22,6 @@ edge_orders = job(
         timezone="UTC",
         starts_at="2026-07-03T01:17:23.456789+05:30",
         default_status="paused",
-        catch_up="all",
-        max_catch_up=3,
     ),
 )
 edge_alias = edge_orders
@@ -72,7 +70,7 @@ edge_health = sensor(
     ),
     run=edge_group,
     minimum_interval_seconds=7,
-    default_status="stopped",
+    default_status="paused",
 )
 edge_factory_results.append(edge_health)
 
@@ -81,7 +79,7 @@ edge_job_outcomes = sensor(
     description="Keep warning and partial outcomes distinct from success.",
     when=run_event(job=edge_orders, kinds=[RunEventKind.WARN, RunEventKind.PARTIAL]),
     run=edge_inventory,
-    default_status="stopped",
+    default_status="paused",
 )
 edge_group_outcomes = sensor(
     "edge_group_outcomes",
@@ -92,6 +90,6 @@ edge_group_outcomes = sensor(
         executed_successfully=("tag:edge_case",),
     ),
     run=edge_inventory,
-    default_status="stopped",
+    default_status="paused",
 )
 edge_factory_results.extend([edge_job_outcomes, edge_group_outcomes])

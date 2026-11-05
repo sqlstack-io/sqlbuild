@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlbuild.orchestration import CalendarSchedule, Job, JobGroup, Schedule, Sensor
+from sqlbuild.orchestration_declarations.models.authoring import (
+    CalendarSchedule,
+    Job,
+    JobGroup,
+    Schedule,
+    Sensor,
+)
 
 
 @dataclass(frozen=True)
@@ -236,7 +242,6 @@ class SnapshotScheduleTestCase:
         default_factory=lambda: {
             "starts_at": None,
             "default_status": "running",
-            "catch_up": "latest",
         }
     )
 

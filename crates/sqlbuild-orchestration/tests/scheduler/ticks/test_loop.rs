@@ -26,13 +26,13 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
         TickTransactionTestCase {
             description: "SQLite scheduler loop",
             backend: Backend::Sqlite,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
         TickTransactionTestCase {
             description: "PostgreSQL scheduler loop",
             backend: Backend::Postgres,
-            expected_ticks: 3,
+            expected_ticks: 1,
             expected_runs: 1,
         },
     ];
@@ -83,13 +83,8 @@ fn given_embedded_and_standalone_schedulers_when_taking_over_then_only_one_drain
                     .expect("queued run");
             assert_eq!(runs.len(), test_case.expected_runs);
             let (stop, shutdown) = tokio::sync::watch::channel(false);
-            let (_changed, changes) = tokio::sync::watch::channel(());
-            let mut running = Box::pin(run_scheduler(
-                &second,
-                second_state,
-                (shutdown, changes),
-                IdleLauncher,
-            ));
+            let mut running =
+                Box::pin(run_scheduler(&second, second_state, shutdown, IdleLauncher));
             tokio::select! {
                 result = &mut running => panic!("loop ended before shutdown: {result:?}"),
                 _ = tokio::time::sleep(Duration::from_millis(50)) => {},

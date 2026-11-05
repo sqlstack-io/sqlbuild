@@ -5,8 +5,9 @@ use crate::credentials::models::BuiltinRole;
 
 pub(crate) struct BrowserSession {
     pub(crate) api: TestApi,
-    pub(crate) cookie: String,
+    pub(crate) credential: (&'static str, String),
     pub(crate) csrf: String,
+    pub(crate) forgery: (&'static str, &'static str),
 }
 
 #[derive(serde::Deserialize)]

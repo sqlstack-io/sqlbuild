@@ -129,7 +129,6 @@ class PersonJourneyTestCase(WorkerExecutionTestCase):
 @dataclass(frozen=True)
 class GroupExecutionTestCase(WorkerExecutionTestCase):
     description: str
-    on_failure: Literal["skip_dependents", "skip_downstream_jobs", "stop_group"] = "skip_dependents"
     expected_child_statuses: dict[str, tuple[str, ...]] = field(default_factory=dict)
     expected_totals: tuple[str, str | None] = ("skipped", "model:broken_orders")
     expected_marts_started: bool = True
@@ -255,7 +254,7 @@ class CatalogBoundaryTestCase:
 @dataclass(frozen=True)
 class StatisticsRecoveryTestCase:
     description: str
-    expected_catalog_presence: tuple[bool, ...]
+    expected_log: str
 
 
 @dataclass(frozen=True)
@@ -290,19 +289,6 @@ class StatisticsHorizonRejectionTestCase:
 class DenialMetadataTestCase:
     description: str
     expected_denial_count: int
-
-
-class ProjectionStore(NamedTuple):
-    environment: dict[str, str]
-    connection: Any
-    table_query: str
-
-
-@dataclass(frozen=True)
-class ProjectionReplayTestCase:
-    description: str
-    open_store: Callable[[tuple[Path, Path]], AbstractContextManager[ProjectionStore]]
-    expected_progress_facts: int
 
 
 @dataclass(frozen=True)

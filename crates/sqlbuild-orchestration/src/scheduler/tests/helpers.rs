@@ -2,36 +2,43 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use proptest::prelude::any;
 use proptest::test_runner::{Config, TestCaseError, TestCaseResult, TestRunner};
 use proptest::{prop_assert, prop_assert_eq};
 use uuid::Uuid;
 
 use crate::declarations::models::{Schedule, TriggerDefinition, TriggerStatus};
-use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
-use crate::scheduler::models::{CatchUp, Overlap, TickAction, TickDecision, TickPlan, TickState};
+use crate::scheduler::models::{TickAction, TickDecision, TickPlan, TickState};
 use crate::scheduler::tests::test_types::TickTestCase;
 
 pub(super) fn time(second: i64) -> DateTime<Utc> {
     DateTime::from_timestamp(second, 0).expect("synthetic schedule time is representable")
 }
 
-pub(super) fn state(test_case: &TickTestCase) -> TickState {
-    TickState {
-        trigger_id: Uuid::from_u128(19),
-        enabled: test_case.enabled,
-        last_tick_for: test_case.last_second.map(time),
-        due_times: test_case
-            .due_seconds
-            .iter()
-            .map(|second| time(*second))
-            .collect(),
-        catch_up: test_case.catch_up,
-        overlap: test_case.overlap,
-        waiting_run: test_case.active.then_some(Uuid::from_u128(31)),
-        continuation: None,
+pub(super) fn state(test_case: &TickTestCase) -> (TriggerDefinition, TickState) {
+    (
+        calendar(test_case.due_seconds.iter().copied()),
+        TickState {
+            trigger_id: Uuid::from_u128(19),
+            started_at: time(0),
+            last_tick_for: test_case.last_second.map(time),
+            waiting_run: test_case.active.then_some(Uuid::from_u128(31)),
+        },
+    )
+}
+
+fn calendar(seconds: impl Iterator<Item = i64>) -> TriggerDefinition {
+    TriggerDefinition {
+        description: "orders calendar".into(),
+        job_key: "orders".into(),
+        starts_at: Some(time(0)),
+        default_status: TriggerStatus::Running,
+        schedule: Schedule::Calendar {
+            times: seconds.map(time).collect(),
+            refresh_at: time(2000),
+        },
     }
 }
 
@@ -51,21 +58,20 @@ pub(super) fn covered_seconds(plan: &TickPlan) -> Vec<i64> {
         .collect()
 }
 
-fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>, catch_up: CatchUp) -> TestCaseResult {
+/// Under crashes and clock jumps a tick is never early, repeated or invented, and the latest due time always ticks.
+fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>) -> TestCaseResult {
     let expected: BTreeSet<i64> = due.iter().copied().collect();
+    let trigger = calendar(due.into_iter());
     let mut state = TickState {
         trigger_id: Uuid::from_u128(19),
-        enabled: true,
+        started_at: time(0),
         last_tick_for: None,
-        due_times: due.into_iter().map(time).collect(),
-        catch_up,
-        overlap: Overlap::Queue,
         waiting_run: None,
-        continuation: None,
     };
     let mut committed: BTreeMap<i64, TickAction> = BTreeMap::new();
-    for (clock, commit_succeeds) in history {
-        let plan = plan_ticks(&state, time(clock))
+    let final_step = std::iter::once((1001, true));
+    for (clock, commit_succeeds) in history.into_iter().chain(final_step) {
+        let plan = plan_ticks(&trigger, &state, time(clock))
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
         let Some(plan) = commit_succeeds.then_some(plan) else {
             continue;
@@ -81,26 +87,12 @@ fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>, catch_up: CatchUp)
         }
         state.last_tick_for = plan.last_tick_for;
     }
-    for _ in 0..=expected.len() {
-        let plan = plan_ticks(&state, time(1001))
-            .map_err(|error| TestCaseError::fail(error.to_string()))?;
-        let Some(_) = plan.actions.first() else {
-            break;
-        };
-        for action in plan.actions {
-            prop_assert!(
-                committed
-                    .insert(action.scheduled_for.timestamp(), action)
-                    .is_none(),
-                "restart repeated a committed tick"
-            );
-        }
-        state.last_tick_for = plan.last_tick_for;
-    }
+    let ticked: BTreeSet<i64> = committed.keys().copied().collect();
+    prop_assert!(ticked.is_subset(&expected), "a tick was invented");
     prop_assert_eq!(
-        committed.keys().copied().collect::<BTreeSet<_>>(),
-        expected,
-        "a due tick was lost or invented"
+        ticked.last(),
+        expected.last(),
+        "the latest due time was lost"
     );
     prop_assert_eq!(
         committed
@@ -113,7 +105,7 @@ fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>, catch_up: CatchUp)
     Ok(())
 }
 
-pub(super) fn simulate(catch_up: CatchUp) -> Result<(), String> {
+pub(super) fn simulate() -> Result<(), String> {
     let strategy = (
         proptest::collection::vec(0_i64..1000, 0..128),
         proptest::collection::vec((-100_i64..1100, any::<bool>()), 0..128),
@@ -124,9 +116,7 @@ pub(super) fn simulate(catch_up: CatchUp) -> Result<(), String> {
         ..Config::default()
     });
     property_runner
-        .run(&strategy, |(due, history)| {
-            exercise_history(due, history, catch_up)
-        })
+        .run(&strategy, |(due, history)| exercise_history(due, history))
         .map_err(|error| error.to_string())
 }
 
@@ -136,7 +126,7 @@ fn reference_occurrences(
     wall_times: &[(u32, u32)],
     (start, end): (DateTime<Utc>, DateTime<Utc>),
 ) -> BTreeSet<DateTime<Utc>> {
-    use chrono::{TimeDelta, TimeZone};
+    use chrono::TimeZone;
     let first_date = start.with_timezone(&timezone).date_naive() - TimeDelta::days(1);
     let days = (end.with_timezone(&timezone).date_naive() - first_date).num_days();
     (0..=days)
@@ -160,70 +150,44 @@ fn reference_occurrences(
         .collect()
 }
 
-/// Real cron expansion and planning under random crashes and clock jumps, including backwards.
-fn exercise_cron_history(
-    (trigger, timezone): (&TriggerDefinition, chrono_tz::Tz),
-    wall_times: &[(u32, u32)],
+/// Real cron planning from a start time; each committed tick is due, distinct and later than the last.
+fn cron_ticks(
+    trigger: &TriggerDefinition,
     (start, end): (DateTime<Utc>, DateTime<Utc>),
-    history: Vec<(i64, bool)>,
-) -> TestCaseResult {
-    use chrono::TimeDelta;
-    let mut last_tick_for: Option<DateTime<Utc>> = None;
+    steps: impl Iterator<Item = (TimeDelta, bool)>,
+) -> Result<BTreeSet<DateTime<Utc>>, TestCaseError> {
+    let mut state = TickState {
+        trigger_id: Uuid::from_u128(23),
+        started_at: start,
+        last_tick_for: None,
+        waiting_run: None,
+    };
     let mut committed: BTreeSet<DateTime<Utc>> = BTreeSet::new();
     let mut clock = start;
-    // After the random history, enough uncrashed steps at the end time to drain a bounded backlog.
-    let steps = history
-        .into_iter()
-        .map(|(minutes, commit)| (TimeDelta::minutes(minutes), commit))
-        .chain(std::iter::repeat_n((end - start, true), 500));
-    for (jump, commit) in steps {
+    for (jump, commit) in steps.chain(std::iter::once((end - start, true))) {
         clock = (clock + jump).clamp(start, end);
-        let (due_times, continuation) = expand_schedule(
-            trigger,
-            last_tick_for.unwrap_or(start - TimeDelta::microseconds(1)),
-            clock,
-        )
-        .map_err(|error| TestCaseError::fail(error.to_string()))?;
-        let plan = plan_ticks(
-            &TickState {
-                trigger_id: Uuid::from_u128(23),
-                enabled: true,
-                last_tick_for,
-                due_times,
-                continuation,
-                catch_up: trigger.catch_up,
-                overlap: Overlap::Queue,
-                waiting_run: None,
-            },
-            clock,
-        )
-        .map_err(|error| TestCaseError::fail(error.to_string()))?;
+        let plan = plan_ticks(trigger, &state, clock)
+            .map_err(|error| TestCaseError::fail(error.to_string()))?;
         for action in plan.actions.iter().filter(|_| commit) {
             prop_assert!(
                 action.scheduled_for <= clock,
                 "a tick ran before it was due"
             );
             prop_assert!(
-                committed.insert(action.scheduled_for),
-                "a committed tick was emitted twice"
+                committed
+                    .last()
+                    .is_none_or(|last| action.scheduled_for > *last),
+                "a committed tick was emitted twice or out of order"
             );
+            committed.insert(action.scheduled_for);
         }
-        last_tick_for = [last_tick_for, plan.last_tick_for][usize::from(commit)];
+        state.last_tick_for = [state.last_tick_for, plan.last_tick_for][usize::from(commit)];
     }
-    prop_assert_eq!(
-        committed,
-        reference_occurrences(timezone, wall_times, (start, end)),
-        "a due tick was lost or invented"
-    );
-    Ok(())
+    Ok(committed)
 }
 
 /// Months spanning both 2026 New York transitions; clocks jump up to a day back or four days on.
-pub(super) fn simulate_cron(
-    expression: &str,
-    wall_times: &[(u32, u32)],
-    catch_up: CatchUp,
-) -> Result<(), String> {
+pub(super) fn simulate_cron(expression: &str, wall_times: &[(u32, u32)]) -> Result<(), String> {
     let start = DateTime::parse_from_rfc3339("2026-02-25T00:00:00.25Z")
         .expect("start")
         .to_utc();
@@ -239,7 +203,6 @@ pub(super) fn simulate_cron(
         },
         starts_at: Some(start),
         default_status: TriggerStatus::default(),
-        catch_up,
     };
     let strategy = proptest::collection::vec((-1_440_i64..5_760, any::<bool>()), 0..256);
     let mut property_runner = TestRunner::new(Config {
@@ -247,14 +210,26 @@ pub(super) fn simulate_cron(
         failure_persistence: None,
         ..Config::default()
     });
+    let reference = reference_occurrences(chrono_tz::America::New_York, wall_times, (start, end));
+    let every_step = std::iter::repeat_n((TimeDelta::minutes(10), true), 37_500);
+    let stepped =
+        cron_ticks(&trigger, (start, end), every_step).map_err(|error| error.to_string())?;
+    (stepped == reference)
+        .then_some(())
+        .ok_or("ten-minute evaluation lost, repeated or invented an occurrence")?;
     property_runner
         .run(&strategy, |history| {
-            exercise_cron_history(
-                (&trigger, chrono_tz::America::New_York),
-                wall_times,
-                (start, end),
-                history,
-            )
+            let steps = history
+                .into_iter()
+                .map(|(minutes, commit)| (TimeDelta::minutes(minutes), commit));
+            let ticked = cron_ticks(&trigger, (start, end), steps)?;
+            prop_assert!(ticked.is_subset(&reference), "a tick was invented");
+            prop_assert_eq!(
+                ticked.last(),
+                reference.last(),
+                "the latest due time was lost"
+            );
+            Ok(())
         })
         .map_err(|error| error.to_string())
 }

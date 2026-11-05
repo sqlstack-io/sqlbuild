@@ -218,6 +218,8 @@ impl PlatformEvent {
 #[derive(Debug, Deserialize)]
 pub(crate) struct InstallationHealth {
     pub(crate) installation_id: Uuid,
+    /// Distinguishes one leaderless outage from the next.
+    pub(crate) lease_expires_at: Option<DateTime<Utc>>,
     pub(crate) leader: i64,
 }
 

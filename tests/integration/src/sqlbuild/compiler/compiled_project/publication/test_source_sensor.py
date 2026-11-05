@@ -183,6 +183,3 @@ def test_given_external_source_versions_when_a_location_resyncs_then_only_change
                 )
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT COUNT(*) FROM sqb_run_requests").fetchone() == (2,)
-            assert control.execute(
-                "SELECT COUNT(*) FROM recall_events WHERE producer='warehouse'"
-            ).fetchone() == (105,)

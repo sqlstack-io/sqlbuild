@@ -87,26 +87,6 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
             },
         ),
         GroupExecutionTestCase(
-            "whole downstream job is blocked without building an empty selection",
-            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
-            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
-            "partial",
-            [(0,)],
-            on_failure="skip_downstream_jobs",
-            expected_child_statuses={"staging": ("partial",), "marts": ("failed",)},
-        ),
-        GroupExecutionTestCase(
-            "job failure stops the group",
-            "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
-            "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
-            "failed",
-            [(0,)],
-            on_failure="stop_group",
-            expected_child_statuses={"staging": ("partial", "cancelled"), "marts": ("cancelled",)},
-            expected_totals=("cancelled", None),
-            expected_marts_started=False,
-        ),
-        GroupExecutionTestCase(
             "critical node stops the group under the default policy",
             "WITH source(value) AS (VALUES ('invalid')) SELECT CAST(value AS INTEGER) AS amount FROM source",
             "SELECT count(*) FROM information_schema.tables WHERE table_name IN ('orders','totals')",
@@ -152,7 +132,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
             "orchestration/orders.py": (
                 "from sqlbuild.orchestration import job, job_group, schedule\n"
                 'staging = job("staging", description="Stage orders.", '
-                f'select="stg_orders broken_orders", on_failure="{test_case.on_failure}")\n'
+                'select="stg_orders broken_orders")\n'
                 'marts = job("marts", description="Build independent marts.", select="orders totals")\n'
                 'annual_orders = job_group("annual_orders", description="Stage then build marts.", '
                 "jobs=[marts, staging], "
@@ -204,7 +184,9 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 (runs["staging"]["run_id"],),
             ).fetchone() == ({"success": "success"}.get(test_case.expected_status, "failed"),)
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         with duckdb.connect(str(project_dir / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
@@ -247,7 +229,7 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
     ],
     ids=lambda case: case.description,
 )
-def test_given_opposing_group_limits_when_scheduled_then_both_real_workers_finish_without_hoisting_limits(
+def test_given_opposing_group_limits_when_scheduled_then_each_group_holds_every_limit_and_both_finish(
     test_case: WorkerExecutionTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
@@ -264,9 +246,9 @@ def test_given_opposing_group_limits_when_scheduled_then_both_real_workers_finis
                 "JOIN sqb_runs r ON r.run_id=c.run_id GROUP BY r.job_key, c.group_key ORDER BY r.job_key"
             ).fetchall() == [
                 ("annual_inventory", "inventory_limit", 1),
+                ("annual_inventory", "orders_limit", 1),
+                ("annual_orders", "inventory_limit", 1),
                 ("annual_orders", "orders_limit", 1),
-                ("inventory_job", "orders_limit", 1),
-                ("orders_job", "inventory_limit", 1),
             ]
             assert control.execute(
                 "SELECT count(*) FROM sqb_runs WHERE status='success'"
@@ -529,12 +511,18 @@ def test_given_attached_python_code_when_a_worker_starts_then_publication_pins_i
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
-        with sqlite3.connect(worker.control_store) as control:
-            nodes: list[tuple[str, str | None]] = control.execute(
-                "SELECT node_key,started_at FROM sqb_run_nodes WHERE run_id=? ORDER BY node_key",
-                (run["run_id"],),
-            ).fetchall()
-        assert [(name, started is not None) for name, started in nodes] == [
+        runs_url: str = (
+            f"{worker.api.url}/api/locations/{worker.api.location_id}/targets/development/runs"
+        )
+        with urlopen(
+            Request(
+                f"{runs_url}/{run['run_id']}/nodes",
+                headers={"Authorization": f"Bearer {worker.api.bearer}"},
+            ),
+            timeout=5,
+        ) as response:
+            nodes: list[dict[str, Any]] = json.load(response)
+        assert [(node["node_key"], node["started_at"] is not None) for node in nodes] == [
             ("model:orders", test_case.expected_status == "success")
         ]
         assert (worker.project / "warehouse.duckdb").exists() == (
@@ -680,21 +668,23 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
         )
         assert run["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
-            outcomes: list[tuple[int, str]] = control.execute(
-                "SELECT storage_id,payload -> 'change' -> 'change' ->> 'outcome' "
+            outcomes: list[tuple[str]] = control.execute(
+                "SELECT payload -> 'change' -> 'change' ->> 'outcome' "
                 "FROM recall_events WHERE run_id=? AND event_type='run_check_finished'",
                 (run["run_id"],),
             ).fetchall()
-            assert [outcome for _, outcome in outcomes] == ["cancelled"]
+            assert outcomes == [("cancelled",)]
+            completed_query: str = (
+                "SELECT count(*) FROM sqb_sensor_evaluation_events WHERE phase='completed'"
+            )
+            # Two more completions mean at least one evaluation started after the outcome.
+            target: int = control.execute(completed_query).fetchone()[0] + 2
             deadline: float = time.monotonic() + 15
-            cursor: int = 0
-            while cursor < outcomes[0][0]:
+            evaluated: int = 0
+            while evaluated < target:
                 assert worker.process.poll() is None, worker.log.read_text()
                 assert time.monotonic() < deadline, worker.log.read_text()
-                cursor = control.execute(
-                    "SELECT COALESCE(MAX(CAST(cursor_json ->> 'event_storage_id' AS INTEGER)),0) "
-                    "FROM sqb_sensor_cursor_commits"
-                ).fetchone()[0]
+                evaluated = control.execute(completed_query).fetchone()[0]
                 time.sleep(0.02)
             assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
             assert control.execute(
@@ -806,9 +796,9 @@ def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_t
             ).fetchall() == [
                 (
                     control.execute(
-                        "SELECT e.event_id FROM recall_events e JOIN sqb_runs r ON r.run_id=e.run_id "
-                        "WHERE r.job_key='source_orders' AND e.event_type='run_node_finished'"
-                    ).fetchone()[0],
+                        "SELECT run_id FROM sqb_runs WHERE job_key='source_orders'"
+                    ).fetchone()[0]
+                    + "/model:orders",
                     destination["run_id"],
                 )
             ]
@@ -896,7 +886,9 @@ def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_b
                 (parent["run_id"], completed["ended_at"]),
             ).fetchone() == (0,)
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
@@ -948,7 +940,9 @@ def test_given_a_committed_claim_when_launch_preparation_fails_then_unstarted_wo
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
             assert control.execute("SELECT count(*) FROM sqb_concurrency_slots").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         assert not (worker.project / "warehouse.duckdb").exists()
         assert "Worker launched for run" not in worker.log.read_text()
 
@@ -982,7 +976,9 @@ def test_given_a_stopped_worker_when_terminal_publication_fails_then_shutdown_re
         assert worker.process.poll() is None, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (1,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (1,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (1,)
             _ = control.execute("DROP TRIGGER reject_terminal")
         assert worker.process.wait(timeout=10) != 0, worker.log.read_text()
         request: Request = Request(
@@ -995,7 +991,9 @@ def test_given_a_stopped_worker_when_terminal_publication_fails_then_shutdown_re
         assert runs[0]["status"] == test_case.expected_status
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
             assert control.execute(
                 "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
             ).fetchone() == (1,)
@@ -1049,7 +1047,9 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
         assert runs[0]["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
             assert control.execute(
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"

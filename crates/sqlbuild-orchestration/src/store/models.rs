@@ -2,7 +2,6 @@
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -14,13 +13,9 @@ use uuid::Uuid;
 /// An installation's control store. Workers and locations never receive this handle.
 #[derive(Clone, Debug)]
 pub enum ControlStore {
-    Sqlite(PathBuf, Arc<std::fs::File>),
+    Sqlite(PathBuf),
     Postgres(sqlx_postgres::PgPool),
 }
-
-/// Only the offline opener can establish the exclusive-access capability.
-#[derive(Debug)]
-pub struct OfflineRecovery(pub(crate) ControlTransaction);
 
 /// The first copy wins; duplicate events retain their original storage cursor.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,7 +54,7 @@ pub(crate) struct ControlTransaction {
 
 #[derive(Debug)]
 pub(crate) enum Connection {
-    Sqlite(rusqlite::Connection, Arc<std::fs::File>),
+    Sqlite(rusqlite::Connection),
     Postgres(sqlx_core::transaction::Transaction<'static, sqlx_postgres::Postgres>),
 }
 
@@ -115,4 +110,14 @@ pub(crate) enum Parameter {
     OptionalId(Option<Uuid>),
     Time(DateTime<Utc>),
     OptionalTime(Option<DateTime<Utc>>),
+}
+
+impl Parameter {
+    /// Numbered placeholders for the parameters at these positions, such as an IN list.
+    pub(crate) fn placeholders(positions: std::ops::RangeInclusive<usize>) -> String {
+        positions
+            .map(|index| format!("${index}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
 }
