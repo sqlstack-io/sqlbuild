@@ -92,7 +92,6 @@ CREATE TABLE sqb_jobs (
     snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
     kind TEXT NOT NULL CHECK (kind IN ('job', 'group')),
     definition_json {json} NOT NULL,
-    overlap_policy TEXT NOT NULL CHECK (overlap_policy IN ('coalesce', 'queue', 'allow')),
     PRIMARY KEY (location_id, target, job_key)
 );
 CREATE TABLE sqb_job_nodes (

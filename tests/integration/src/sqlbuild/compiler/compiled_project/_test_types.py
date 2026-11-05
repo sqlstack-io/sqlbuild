@@ -242,7 +242,6 @@ class SnapshotScheduleTestCase:
         default_factory=lambda: {
             "starts_at": None,
             "default_status": "running",
-            "catch_up": "latest",
         }
     )
 

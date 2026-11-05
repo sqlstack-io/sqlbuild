@@ -16,9 +16,8 @@ use sqlbuild_discovery::tree::models::ProjectTree;
 use sqlbuild_orchestration::declarations::main::group_dependencies::group_dependencies;
 use sqlbuild_orchestration::declarations::main::snapshot_definitions::snapshot_definitions;
 use sqlbuild_orchestration::declarations::models::{
-    Definitions, GroupDefinition, JobDefinition, OnFailure, TriggerDeclaration, TriggerDefinition,
+    Definitions, GroupDefinition, JobDefinition, TriggerDeclaration, TriggerDefinition,
 };
-use sqlbuild_orchestration::scheduler::models::Overlap;
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
@@ -135,10 +134,6 @@ pub(crate) fn compile_declarations(
                 description: job.description,
                 selection,
                 settings,
-                overlap: serde_json::from_value::<Overlap>(Value::String(job.overlap))
-                    .map_err(|error| PyValueError::new_err(error.to_string()))?,
-                on_failure: serde_json::from_value::<OnFailure>(Value::String(job.on_failure))
-                    .map_err(|error| PyValueError::new_err(error.to_string()))?,
                 concurrency_groups: job.concurrency_groups.into_iter().collect(),
             },
         );
@@ -187,9 +182,6 @@ pub(crate) fn compile_declarations(
                     description: group.description,
                     selection,
                     settings: BTreeMap::new(),
-                    overlap: serde_json::from_value(Value::String(group.overlap))
-                        .map_err(|error| PyValueError::new_err(error.to_string()))?,
-                    on_failure: OnFailure::SkipDependents,
                     concurrency_groups: group.concurrency_groups.into_iter().collect(),
                 },
                 jobs: dependencies,

@@ -7,7 +7,6 @@ use crate::declarations::main::group_dependencies::group_dependencies;
 use crate::declarations::models::{Definitions, Schedule};
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::scheduler::main::parse_cron::parse_cron;
-use crate::scheduler::models::CatchUp;
 use crate::sensors::main::validate_sensors::validate_sensors;
 use crate::snapshots::models::SnapshotInput;
 use crate::store::errors::ControlError;
@@ -57,13 +56,6 @@ pub fn snapshot_definitions(input: &SnapshotInput) -> Result<Definitions, Contro
         {
             return Err(ControlError::Invalid(format!(
                 "trigger {name} needs a description and a known job"
-            )));
-        }
-        if let CatchUp::All { max_runs } = trigger.catch_up
-            && max_runs.get() > MAX_TICKS_PER_BATCH
-        {
-            return Err(ControlError::Invalid(format!(
-                "trigger {name} catch-up exceeds {MAX_TICKS_PER_BATCH}"
             )));
         }
         match &trigger.schedule {

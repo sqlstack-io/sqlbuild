@@ -5,17 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::scheduler::models::{CatchUp, Overlap};
 use crate::sensors::models::SensorDefinition;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OnFailure {
-    #[default]
-    SkipDependents,
-    SkipDownstreamJobs,
-    StopGroup,
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -43,10 +33,6 @@ pub struct JobDefinition {
     pub selection: BTreeSet<String>,
     #[serde(default)]
     pub settings: BTreeMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub overlap: Overlap,
-    #[serde(default)]
-    pub on_failure: OnFailure,
     #[serde(default)]
     pub concurrency_groups: BTreeSet<String>,
 }
@@ -82,8 +68,6 @@ pub struct TriggerDefinition {
     pub starts_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub default_status: TriggerStatus,
-    #[serde(default)]
-    pub catch_up: CatchUp,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

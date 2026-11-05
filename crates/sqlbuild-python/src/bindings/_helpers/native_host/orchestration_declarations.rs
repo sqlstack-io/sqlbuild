@@ -19,8 +19,6 @@ pub(crate) struct AuthoredJob {
     pub(crate) description: String,
     pub(crate) select: String,
     pub(crate) exclude: String,
-    pub(crate) overlap: String,
-    pub(crate) on_failure: String,
     #[pyo3(from_py_with = authored_setting)]
     pub(crate) settings: Value,
     #[pyo3(from_py_with = authored_setting)]
@@ -41,7 +39,6 @@ pub(crate) struct AuthoredGroup {
     pub(crate) description: String,
     pub(crate) jobs: Vec<AuthoredJobReference>,
     pub(crate) after: BTreeMap<AuthoredJobReference, Vec<AuthoredJobReference>>,
-    pub(crate) overlap: String,
     pub(crate) concurrency_groups: Vec<String>,
     pub(crate) schedule: Option<Py<PyAny>>,
     pub(crate) targets: Vec<String>,

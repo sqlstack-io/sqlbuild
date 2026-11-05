@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::declarations::models::{Schedule, TriggerDefinition, TriggerStatus};
 use crate::scheduler::_helpers::expansion::expand_schedule;
 use crate::scheduler::main::_plan_ticks::plan_ticks;
-use crate::scheduler::models::{CatchUp, Overlap, TickAction, TickDecision, TickPlan, TickState};
+use crate::scheduler::models::{TickAction, TickDecision, TickPlan, TickState};
 use crate::scheduler::tests::test_types::TickTestCase;
 
 pub(super) fn time(second: i64) -> DateTime<Utc> {
@@ -28,8 +28,6 @@ pub(super) fn state(test_case: &TickTestCase) -> TickState {
             .iter()
             .map(|second| time(*second))
             .collect(),
-        catch_up: test_case.catch_up,
-        overlap: test_case.overlap,
         waiting_run: test_case.active.then_some(Uuid::from_u128(31)),
         continuation: None,
     }
@@ -51,15 +49,13 @@ pub(super) fn covered_seconds(plan: &TickPlan) -> Vec<i64> {
         .collect()
 }
 
-fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>, catch_up: CatchUp) -> TestCaseResult {
+fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>) -> TestCaseResult {
     let expected: BTreeSet<i64> = due.iter().copied().collect();
     let mut state = TickState {
         trigger_id: Uuid::from_u128(19),
         enabled: true,
         last_tick_for: None,
         due_times: due.into_iter().map(time).collect(),
-        catch_up,
-        overlap: Overlap::Queue,
         waiting_run: None,
         continuation: None,
     };
@@ -113,7 +109,7 @@ fn exercise_history(due: Vec<i64>, history: Vec<(i64, bool)>, catch_up: CatchUp)
     Ok(())
 }
 
-pub(super) fn simulate(catch_up: CatchUp) -> Result<(), String> {
+pub(super) fn simulate() -> Result<(), String> {
     let strategy = (
         proptest::collection::vec(0_i64..1000, 0..128),
         proptest::collection::vec((-100_i64..1100, any::<bool>()), 0..128),
@@ -124,9 +120,7 @@ pub(super) fn simulate(catch_up: CatchUp) -> Result<(), String> {
         ..Config::default()
     });
     property_runner
-        .run(&strategy, |(due, history)| {
-            exercise_history(due, history, catch_up)
-        })
+        .run(&strategy, |(due, history)| exercise_history(due, history))
         .map_err(|error| error.to_string())
 }
 
@@ -191,8 +185,6 @@ fn exercise_cron_history(
                 last_tick_for,
                 due_times,
                 continuation,
-                catch_up: trigger.catch_up,
-                overlap: Overlap::Queue,
                 waiting_run: None,
             },
             clock,
@@ -219,11 +211,7 @@ fn exercise_cron_history(
 }
 
 /// Months spanning both 2026 New York transitions; clocks jump up to a day back or four days on.
-pub(super) fn simulate_cron(
-    expression: &str,
-    wall_times: &[(u32, u32)],
-    catch_up: CatchUp,
-) -> Result<(), String> {
+pub(super) fn simulate_cron(expression: &str, wall_times: &[(u32, u32)]) -> Result<(), String> {
     let start = DateTime::parse_from_rfc3339("2026-02-25T00:00:00.25Z")
         .expect("start")
         .to_utc();
@@ -239,7 +227,6 @@ pub(super) fn simulate_cron(
         },
         starts_at: Some(start),
         default_status: TriggerStatus::default(),
-        catch_up,
     };
     let strategy = proptest::collection::vec((-1_440_i64..5_760, any::<bool>()), 0..256);
     let mut property_runner = TestRunner::new(Config {

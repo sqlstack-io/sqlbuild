@@ -111,7 +111,6 @@ pub struct RunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
-    pub overlap: crate::scheduler::models::Overlap,
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.

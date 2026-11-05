@@ -39,9 +39,6 @@ struct AuthoredControls {
     #[pyo3(from_py_with = authored_setting)]
     starts_at: Value,
     default_status: String,
-    catch_up: String,
-    #[pyo3(from_py_with = authored_setting)]
-    max_catch_up: Value,
 }
 
 fn compile_trigger(
@@ -51,11 +48,6 @@ fn compile_trigger(
     schedule: Schedule,
 ) -> PyResult<TriggerDefinition> {
     let controls = authored.extract::<AuthoredControls>()?;
-    let catch_up = if controls.max_catch_up.is_null() {
-        Value::String(controls.catch_up)
-    } else {
-        serde_json::json!({controls.catch_up: {"max_runs": controls.max_catch_up}})
-    };
     Ok(TriggerDefinition {
         description: description.into(),
         job_key: job_key.into(),
@@ -64,9 +56,6 @@ fn compile_trigger(
             .map_err(|error| PyValueError::new_err(format!("starts_at: {error}")))?,
         default_status: serde_json::from_value(Value::String(controls.default_status))
             .map_err(|error| PyValueError::new_err(format!("default_status: {error}")))?,
-        catch_up: serde_json::from_value(catch_up).map_err(|error| PyValueError::new_err(format!(
-            "catch_up: {error}; use 'latest' without a bound or 'all' with a positive max_catch_up"
-        )))?,
     })
 }
 

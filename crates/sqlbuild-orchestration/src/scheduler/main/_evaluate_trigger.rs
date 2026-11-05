@@ -70,8 +70,6 @@ pub(crate) async fn evaluate_trigger(
             last_tick_for: trigger.last_tick_for,
             due_times,
             continuation,
-            catch_up: trigger.definition_json.catch_up,
-            overlap: trigger.job_json.overlap,
             waiting_run,
         },
         now,
