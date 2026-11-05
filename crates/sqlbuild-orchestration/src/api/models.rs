@@ -321,7 +321,7 @@ impl std::fmt::Debug for PasswordSessionResponse {
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AuthenticationDenial {
     pub error: String,
-    pub decision_id: uuid::Uuid,
+    pub request_id: uuid::Uuid,
 }
 
 #[derive(Clone, Debug)]

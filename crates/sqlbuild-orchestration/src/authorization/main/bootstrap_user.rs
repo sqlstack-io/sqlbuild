@@ -1,4 +1,4 @@
-//! Direct local store ownership may initialize the first administrator once, never reopen recovery.
+//! Direct local store ownership may initialize the first administrator once.
 
 use serde_json::json;
 use uuid::Uuid;

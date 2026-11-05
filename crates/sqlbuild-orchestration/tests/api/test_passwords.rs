@@ -144,7 +144,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("denial decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             for (name, secret) in [
@@ -160,7 +160,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                 assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
                 let denial: AuthenticationDenial = response.json().await.expect("generic denial");
                 assert_eq!(denial.error, "authentication rejected");
-                decisions.push(denial.decision_id);
+                decisions.push(denial.request_id);
             }
             let response = client
                 .post(format!("{}/api/auth/password/login", api.url))
@@ -215,7 +215,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("session decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -288,7 +288,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("CSRF decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -332,7 +332,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("revocation decision")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let response = client
@@ -376,7 +376,7 @@ fn given_password_http_sessions_when_changed_or_revoked_then_cookie_and_csrf_bou
                     .json::<AuthenticationDenial>()
                     .await
                     .expect("logout decision")
-                    .decision_id,
+                    .request_id,
             );
             let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("audit read"),
                 "SELECT event_id, action, ip_address, scope_json, before_json, after_json FROM sqb_security_audit", vec![]).await.expect("security evidence");

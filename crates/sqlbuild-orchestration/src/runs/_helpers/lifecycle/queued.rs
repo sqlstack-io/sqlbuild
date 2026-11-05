@@ -1,4 +1,4 @@
-//! Initial run and node projections shared by fact publication and replay.
+//! Initial run and node rows written when a run is queued.
 
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;

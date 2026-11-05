@@ -197,14 +197,13 @@ pub(crate) fn set_cookie(
     Ok(())
 }
 
-/// Anonymous denials are not durably audited; the request ID identifies the decision.
+/// Anonymous denials are not durably audited; the response names the request.
 pub(crate) fn deny(context: &AuditContext) -> Result<Response, ApiError> {
-    let decision_id = context.request_id;
     Ok((
         StatusCode::UNAUTHORIZED,
         Json(AuthenticationDenial {
             error: "authentication rejected".into(),
-            decision_id,
+            request_id: context.request_id,
         }),
     )
         .into_response())

@@ -83,8 +83,12 @@ def test_given_denied_browser_requests_when_returned_then_only_durable_decision_
             assert rejected.value.code == expected_status
             assert rejected.value.headers["Cache-Control"] == "no-store"
             body = json.load(rejected.value)
-            assert set(body) == {"error", "decision_id"}
-            decision = str(UUID(body["decision_id"]))
+            identifier: str = {
+                "authorization.denied": "decision_id",
+                "authentication.denied": "request_id",
+            }[action]
+            assert set(body) == {"error", identifier}
+            decision = str(UUID(body[identifier]))
             assert (
                 body["error"]
                 == {

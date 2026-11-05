@@ -148,10 +148,7 @@ pub(crate) async fn login(
             .into_response();
             session_cookies(response, &session)
         }
-        PasswordLogin::Denied {
-            decision_id,
-            throttled,
-        } => {
+        PasswordLogin::Denied { throttled } => {
             let mut response = (
                 if throttled {
                     StatusCode::TOO_MANY_REQUESTS
@@ -160,7 +157,7 @@ pub(crate) async fn login(
                 },
                 Json(AuthenticationDenial {
                     error: "authentication rejected".into(),
-                    decision_id,
+                    request_id: context.request_id,
                 }),
             )
                 .into_response();

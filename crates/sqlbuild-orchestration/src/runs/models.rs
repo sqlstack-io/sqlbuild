@@ -1,4 +1,4 @@
-//! Frozen requests and rebuildable run projections; lifecycle authority remains in Recall.
+//! Frozen run requests and the run, node and claim records the control store keeps.
 
 use std::collections::{BTreeMap, BTreeSet};
 

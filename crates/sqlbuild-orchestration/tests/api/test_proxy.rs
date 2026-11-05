@@ -162,7 +162,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("durable denial")
-                        .decision_id,
+                        .request_id,
                 );
             }
             for probe in [
@@ -194,7 +194,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("spoofing denial")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let machine = client
@@ -233,7 +233,7 @@ fn given_explicit_proxy_bindings_when_real_peers_and_live_people_are_checked_the
                         .json::<AuthenticationDenial>()
                         .await
                         .expect("disabled denial")
-                        .decision_id,
+                        .request_id,
                 );
             }
             let mut transaction = begin(store, TransactionMode::Read)

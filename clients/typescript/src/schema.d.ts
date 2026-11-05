@@ -740,9 +740,9 @@ export interface components {
             error: string;
         };
         AuthenticationDenial: {
-            /** Format: uuid */
-            decision_id: string;
             error: string;
+            /** Format: uuid */
+            request_id: string;
         };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
@@ -1165,7 +1165,7 @@ export interface components {
             role: components["schemas"]["RoleKey"];
             target?: string | null;
         };
-        /** @description A built-in role by name, or a custom role a location publishes and an administrator approves. */
+        /** @description A built-in role by name, or a custom role a location publishes. */
         RoleKey: components["schemas"]["BuiltinRole"] | string;
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
@@ -2034,7 +2034,7 @@ export interface operations {
     readSecurityAudit: {
         parameters: {
             query?: {
-                /** @description Exclusive storage-order cursor; pre-upgrade facts are ordered by timestamp and event ID */
+                /** @description Exclusive storage-order cursor */
                 after?: number;
                 limit?: number;
             };

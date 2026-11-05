@@ -112,7 +112,7 @@ pub enum BuiltinRole {
     Admin,
 }
 
-/// A built-in role by name, or a custom role a location publishes and an administrator approves.
+/// A built-in role by name, or a custom role a location publishes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
 pub enum RoleKey {
@@ -261,7 +261,7 @@ impl std::fmt::Debug for IssuedSession {
 #[derive(Debug)]
 pub enum PasswordLogin {
     Authenticated(IssuedSession),
-    Denied { decision_id: Uuid, throttled: bool },
+    Denied { throttled: bool },
 }
 
 pub enum AuthenticationAttempt<'a> {
