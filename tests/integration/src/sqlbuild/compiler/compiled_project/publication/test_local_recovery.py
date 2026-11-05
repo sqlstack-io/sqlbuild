@@ -53,7 +53,7 @@ def test_given_a_running_local_worker_when_scheduler_dies_then_restart_adopts_an
         active: dict[str, Any] = running_statement(worker)
         with sqlite3.connect(worker.control_store) as control:
             claim_id: str = control.execute(
-                "SELECT worker_instance FROM sqb_run_liveness WHERE run_id=?", (active["run_id"],)
+                "SELECT worker_instance FROM sqb_runs WHERE run_id=?", (active["run_id"],)
             ).fetchone()[0]
         lock: Path = worker.project / ".sqlbuild/workers" / f"{claim_id}.lock"
         with lock.open("rb") as ownership:
@@ -132,19 +132,24 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
             worker.api, worker.process, worker.log, pending=frozenset({"queued"})
         )
         assert active["status"] == "launched"
-        tables: tuple[str, ...] = ("sqb_write_claims", "sqb_concurrency_slots", "sqb_run_liveness")
+        claims: tuple[str, ...] = (
+            "SELECT * FROM sqb_write_claims",
+            "SELECT * FROM sqb_concurrency_slots",
+            "SELECT run_id, worker_instance, container_id, claimed_at, last_heartbeat_at "
+            "FROM sqb_runs WHERE worker_instance IS NOT NULL",
+        )
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute(
                 "SELECT group_key, run_id FROM sqb_concurrency_slots"
             ).fetchall() == [("orders_limit", active["run_id"])]
             retained: dict[str, list[tuple[Any, ...]]] = {
-                table: control.execute(f"SELECT * FROM {table}").fetchall() for table in tables
+                claim: control.execute(claim).fetchall() for claim in claims
             }
             request: tuple[Any, ...] = control.execute(
                 "SELECT request_json FROM sqb_runs"
             ).fetchone()
             claim_id: str = control.execute(
-                "SELECT worker_instance FROM sqb_run_liveness"
+                "SELECT worker_instance FROM sqb_runs WHERE worker_instance IS NOT NULL"
             ).fetchone()[0]
         arguments: list[str] = [
             str(Path(sys.executable).with_name("sqb")),
@@ -182,8 +187,7 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
                         1,
                     )
                     assert {
-                        table: control.execute(f"SELECT * FROM {table}").fetchall()
-                        for table in tables
+                        claim: control.execute(claim).fetchall() for claim in claims
                     } == retained
                     assert control.execute(
                         "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
@@ -201,8 +205,7 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
                 assert int((worker.project / "worker.pid").read_text()) == pid
                 with sqlite3.connect(worker.control_store) as control:
                     assert {
-                        table: control.execute(f"SELECT * FROM {table}").fetchall()
-                        for table in tables
+                        claim: control.execute(claim).fetchall() for claim in claims
                     } == retained
                     assert (
                         control.execute("SELECT request_json FROM sqb_runs").fetchone() == request
@@ -228,9 +231,9 @@ def test_given_an_unstarted_orphan_when_recovery_publication_fails_then_claims_w
                     assert control.execute(
                         "SELECT count(*) FROM sqb_concurrency_slots"
                     ).fetchone() == (0,)
-                    assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (
-                        0,
-                    )
+                    assert control.execute(
+                        "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+                    ).fetchone() == (0,)
                     assert (
                         control.execute("SELECT request_json FROM sqb_runs").fetchone() == request
                     )

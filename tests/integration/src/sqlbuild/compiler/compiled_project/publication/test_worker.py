@@ -204,7 +204,9 @@ def test_given_a_scheduled_group_when_workers_execute_then_dependencies_and_fail
                 (runs["staging"]["run_id"],),
             ).fetchone() == ({"success": "success"}.get(test_case.expected_status, "failed"),)
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         with duckdb.connect(str(project_dir / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
@@ -896,7 +898,9 @@ def test_given_an_executing_group_when_parent_cancelled_then_all_children_stop_b
                 (parent["run_id"], completed["ended_at"]),
             ).fetchone() == (0,)
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         with duckdb.connect(str(worker.project / "warehouse.duckdb"), read_only=True) as warehouse:
             assert warehouse.sql(test_case.warehouse_query).fetchall() == test_case.expected_rows
 
@@ -948,7 +952,9 @@ def test_given_a_committed_claim_when_launch_preparation_fails_then_unstarted_wo
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
             assert control.execute("SELECT count(*) FROM sqb_concurrency_slots").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
         assert not (worker.project / "warehouse.duckdb").exists()
         assert "Worker launched for run" not in worker.log.read_text()
 
@@ -982,7 +988,9 @@ def test_given_a_stopped_worker_when_terminal_publication_fails_then_shutdown_re
         assert worker.process.poll() is None, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (1,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (1,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (1,)
             _ = control.execute("DROP TRIGGER reject_terminal")
         assert worker.process.wait(timeout=10) != 0, worker.log.read_text()
         request: Request = Request(
@@ -995,7 +1003,9 @@ def test_given_a_stopped_worker_when_terminal_publication_fails_then_shutdown_re
         assert runs[0]["status"] == test_case.expected_status
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
             assert control.execute(
                 "SELECT count(*) FROM recall_events WHERE event_type='run_terminated'"
             ).fetchone() == (1,)
@@ -1049,7 +1059,9 @@ def test_given_an_uncooperative_worker_when_scheduler_stops_then_the_fence_and_c
         assert runs[0]["status"] == test_case.expected_status, worker.log.read_text()
         with sqlite3.connect(worker.control_store) as control:
             assert control.execute("SELECT count(*) FROM sqb_write_claims").fetchone() == (0,)
-            assert control.execute("SELECT count(*) FROM sqb_run_liveness").fetchone() == (0,)
+            assert control.execute(
+                "SELECT count(*) FROM sqb_runs WHERE worker_instance IS NOT NULL"
+            ).fetchone() == (0,)
             assert control.execute(
                 "SELECT json_extract(payload, '$.change.change.exit_code') FROM recall_events "
                 "WHERE event_type='run_terminated'"

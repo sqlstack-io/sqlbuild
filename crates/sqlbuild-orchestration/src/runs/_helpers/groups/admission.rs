@@ -32,7 +32,7 @@ pub(crate) async fn limit_waiters(
 ) -> Result<(ControlTransaction, Vec<LimitWaiter>), ControlError> {
     let (transaction, rows) = query(transaction,
         "SELECT r.request_json, r.queued_at FROM sqb_runs r WHERE r.status='queued' AND r.parent_run_id IS NULL \
-         AND r.cancel_requested_at IS NULL AND NOT EXISTS (SELECT 1 FROM sqb_run_liveness l WHERE l.run_id=r.run_id)",
+         AND r.cancel_requested_at IS NULL AND r.worker_instance IS NULL",
         vec![]).await?;
     let waiting: Vec<QueueCandidate> = rows
         .into_iter()

@@ -32,7 +32,7 @@ pub(crate) async fn scope_is_active(
             vec![Parameter::Id(location_id)],
         ),
         CredentialScope::Run { run_id, claim_id } => (
-            "SELECT run_id FROM sqb_run_liveness WHERE run_id=$1 AND worker_instance=$2",
+            "SELECT run_id FROM sqb_runs WHERE run_id=$1 AND worker_instance=$2",
             vec![Parameter::Id(run_id), Parameter::Id(claim_id)],
         ),
     };
