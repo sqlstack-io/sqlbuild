@@ -77,7 +77,6 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
                 .expect("leader");
             let silent = start_run(store, &lease, &request(scope, 1, 0, &["orders"])).await;
             start_run(store, &lease, &request(scope, 2, 0, &["customers"])).await;
-            age_heartbeat(store, Uuid::from_u128(2), 40).await;
             queue(store, &request(scope, 3, 0, &["inventory"])).await;
             let launching = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
@@ -153,6 +152,7 @@ fn given_silent_and_live_workers_when_the_scheduler_monitors_then_fenced_atomic_
                     .expect("projection rollback"),
                 projection
             );
+            age_heartbeat(store, Uuid::from_u128(2), 5).await;
             expire_lease(store).await;
             let (state, observed) = scheduler_cycle(store, SchedulerState::new(holder))
                 .await
