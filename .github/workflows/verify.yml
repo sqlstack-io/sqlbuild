@@ -592,14 +592,6 @@ jobs:
         with:
           shared-key: verify-recovery-${{ matrix.name }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      # Store transactions on the Windows runner are about 20 times slower than on
-      # Linux, which fences tests that hold one 30-second scheduler lease across
-      # their setup. Real-time scanning of each SQLite open and PostgreSQL write
-      # is the suspected cost; the tests cover the stores, not the scanner.
-      - name: Stop Defender scanning the test stores
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
       - name: Start a native PostgreSQL server
         run: |
           if [[ "${RUNNER_OS}" == "macOS" ]]; then
