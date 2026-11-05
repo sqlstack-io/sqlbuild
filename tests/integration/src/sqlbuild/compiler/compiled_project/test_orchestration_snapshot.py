@@ -19,7 +19,6 @@ from sqlbuild._native import (
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from sqlbuild.orchestration import (
-    Job,
     RunEventKind,
     compile_snapshot,
     job,
@@ -28,6 +27,7 @@ from sqlbuild.orchestration import (
     schedule,
     sensor,
 )
+from sqlbuild.orchestration_declarations.models.authoring import Job
 from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import (
     SnapshotCatalogTestCase,
     SnapshotDeclarationRejectionTestCase,
