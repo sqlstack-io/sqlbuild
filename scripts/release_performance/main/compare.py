@@ -34,7 +34,15 @@ def _parse_args(argv: list[str] | None) -> ComparisonOptions:
     parser.add_argument(
         "--baseline",
         default=None,
-        help="Defaults to the highest published or release-tagged version below the candidate.",
+        help="Defaults to the highest version on PyPI below the candidate.",
+    )
+    parser.add_argument(
+        "--same-version-baseline",
+        action="store_true",
+        help=(
+            "The candidate is an unreleased commit carrying the latest release's version, so "
+            "that release is the baseline once it is on PyPI."
+        ),
     )
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--python", default=DEFAULT_PYTHON)
@@ -66,4 +74,5 @@ def _parse_args(argv: list[str] | None) -> ComparisonOptions:
         work_dir=args.work_dir,
         output=args.output,
         baseline_source=args.baseline_source,
+        same_version_baseline=args.same_version_baseline,
     )
