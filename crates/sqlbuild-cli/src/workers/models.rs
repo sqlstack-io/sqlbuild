@@ -13,7 +13,6 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub(super) enum WorkerChild {
     Local(Child),
-    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     RecoveredLocal(sqlbuild_process_ownership::ownership::models::RecoveredOwnership),
     Docker(DockerWorker),
 }
@@ -22,7 +21,6 @@ pub(super) enum WorkerChild {
 #[derive(Debug)]
 pub(super) struct LocalSpawn {
     pub(super) command: tokio::process::Command,
-    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     pub(super) ownership: sqlbuild_process_ownership::ownership::models::PendingOwnership,
 }
 

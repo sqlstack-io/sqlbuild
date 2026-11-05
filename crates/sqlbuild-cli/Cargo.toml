@@ -31,6 +31,7 @@ sqlbuild-core.workspace = true
 sqlbuild-cursor.workspace = true
 sqlbuild-model-config.workspace = true
 sqlbuild-orchestration.workspace = true
+sqlbuild-process-ownership.workspace = true
 sqlbuild-recall.workspace = true
 sqlbuild-rules.workspace = true
 tokio.workspace = true
@@ -38,9 +39,6 @@ uuid.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
-
-[target.'cfg(any(target_os = "linux", target_os = "macos", windows))'.dependencies]
-sqlbuild-process-ownership.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 ctrlc.workspace = true
