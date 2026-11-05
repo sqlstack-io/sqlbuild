@@ -93,6 +93,14 @@ impl WorkerBuild {
         Ok(())
     }
 
+    /// Nodes `build --changed` leaves unbuilt are up to date, as a planner `no_change` skip is.
+    pub(crate) fn unchanged(&self, py: Python<'_>, keys: &[String]) -> PyResult<()> {
+        for key in keys {
+            self.complete(py, key, (NodeOutcome::Success, None, None))?;
+        }
+        Ok(())
+    }
+
     fn complete(
         &self,
         py: Python<'_>,

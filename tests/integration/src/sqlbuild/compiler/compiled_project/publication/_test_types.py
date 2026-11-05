@@ -319,3 +319,15 @@ class ProjectRolesTestCase:
     roles_file: str
     expected_warning: str
     expected_denial: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class ChangedJobTestCase(WorkerExecutionTestCase):
+    description: str
+    project_toml: str
+    warehouse_file: str
+    consumption_table: str
+    raw_tables_sql: tuple[str, ...]
+    new_order_sql: str
+    execute: Callable[[Path, str], list[tuple[Any, ...]]]
+    expected_runs: tuple[tuple[str, frozenset[str], dict[str, int]], ...]

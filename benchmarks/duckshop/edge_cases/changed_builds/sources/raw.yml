@@ -1,0 +1,17 @@
+sources:
+  - name: raw_orders
+    description: Synthetic orders, numbered by load batch.
+    schema: raw
+    table: orders
+    freshness:
+      strategy: column
+      column: load_id
+      type: integer
+  - name: raw_customers
+    description: Synthetic customers, numbered by load batch.
+    schema: raw
+    table: customers
+    freshness:
+      strategy: column
+      column: load_id
+      type: integer

@@ -147,8 +147,9 @@ like a review schema is left alone.
 ### State history pruning
 
 The janitor prunes old rows from `_sqlbuild_fingerprints` and `_sqlbuild_source_freshness`, keeping
-the latest `direct_state_history_versions` rows per identity (default `20`). This is separate from
-relation retention.
+the latest `direct_state_history_versions` rows per identity (default `20`), and from
+`_sqlbuild_consumption`, keeping the latest `direct_state_history_versions` builds of each model and
+seed. This is separate from relation retention.
 
 ## Safety
 

@@ -1270,3 +1270,59 @@ def tagged_model(name: str, tags: str) -> str:
         f"MODEL (description 'Synthetic {name}.', materialized table, tags [{tags}]);\n"
         "select 1 as id\n"
     )
+
+
+CHANGED_FIXTURE: Path = Path("benchmarks/duckshop/edge_cases/changed_builds")
+CHANGED_JOB: str = (
+    "from sqlbuild.orchestration import job\n"
+    "changed_orders = job('changed_orders', description='Build what changed.', "
+    "select='stg_orders stg_customers customer_orders', settings={'changed': True})\n"
+)
+
+
+def duckdb_rows(path: Path, sql: str) -> list[tuple[Any, ...]]:
+    """Run `sql` on a DuckDB warehouse file and return its rows."""
+    with duckdb.connect(str(path)) as connection:
+        return connection.execute(sql).fetchall()
+
+
+def sqlite_rows(path: Path, sql: str) -> list[tuple[Any, ...]]:
+    """Run and commit `sql` on a SQLite warehouse file and return its rows."""
+    with closing(sqlite3.connect(path)) as connection, connection:
+        return connection.execute(sql).fetchall()
+
+
+def changed_job_files(project_toml: str) -> dict[str, str]:
+    """The DuckShop changed-builds edge case with one scheduled `changed` job."""
+    return {
+        str(path.relative_to(CHANGED_FIXTURE)): path.read_text()
+        for path in sorted(CHANGED_FIXTURE.glob("*/*"))
+    } | {"orchestration/orders.py": CHANGED_JOB, "sqlbuild_project.toml": project_toml}
+
+
+def request_job_run(worker: ScheduledWorker, job: str) -> dict[str, Any]:
+    """Queue `job` through privileged administration and wait for its terminal run."""
+    run_id: str = str(uuid4())
+    requested: subprocess.CompletedProcess[str] = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("sqb")),
+            "admin",
+            "--database-env",
+            "SQLBUILD_SCHEDULER_TEST_STORE",
+            "request-run",
+            worker.api.location_id,
+            job,
+            "--target",
+            "development",
+            "--run-id",
+            run_id,
+            "--reason",
+            "Build what changed",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert requested.returncode == 0, requested.stderr
+    return wait_for_run(worker.api, worker.process, worker.log, run_id=run_id)

@@ -2285,6 +2285,34 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         del database, schema
         return ()
 
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        """Render DDL that creates the consumption table when it is missing."""
+
+        from sqlbuild._native import build_consumption_create_table_sql
+
+        return build_consumption_create_table_sql(
+            database=database,
+            schema=schema,
+            render_qualified_name=self.render_qualified_name,
+            render_framework_type=self.render_framework_type,
+        )
+
+    def render_create_consumption_index_sqls(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+    ) -> tuple[str, ...]:
+        """Render optional consumption table index DDL statements."""
+
+        del database, schema
+        return ()
+
+    def render_current_utc_timestamp(self) -> str:
+        """Render the warehouse clock as a UTC timestamp expression."""
+
+        return "CURRENT_TIMESTAMP"
+
     def render_insert_source_freshness_records_sql(
         self,
         *,
@@ -2428,6 +2456,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         retain_versions: int,
     ) -> str:
         """Render SQL that prunes old source freshness history rows."""
+
+        del database, schema, retain_versions
+        raise AdapterUserError(message="direct-state history pruning is adapter-specific")
+
+    def render_prune_consumption_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old consumption executions."""
 
         del database, schema, retain_versions
         raise AdapterUserError(message="direct-state history pruning is adapter-specific")

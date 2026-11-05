@@ -2286,6 +2286,17 @@
        {
         "kind": "store_true",
         "options": [
+         "--changed"
+        ],
+        "dest": "changed",
+        "nargs": 0,
+        "const": true,
+        "default": false,
+        "group": 1
+       },
+       {
+        "kind": "store_true",
+        "options": [
          "--allow-snapshot-full-refresh"
         ],
         "dest": "allow_snapshot_full_refresh",

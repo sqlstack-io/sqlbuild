@@ -121,7 +121,7 @@ DATE_PATTERN: re.Pattern[str] = re.compile(r"(?<![\d-])(\d{4}-\d{2}-\d{2})(?![\d
 RUN_RELATIVE_PAST_DAYS: int = 7
 RUN_RELATIVE_FUTURE_DAYS: int = 400
 MAPPING_MARKER: str = "__mapping__"
-VOLATILE_KEY_SUFFIXES: tuple[str, ...] = ("event_id",)
+VOLATILE_KEY_SUFFIXES: tuple[str, ...] = ("event_id", "execution_id")
 VOLATILE_KEYS: frozenset[str] = frozenset(
     {
         "invocation_time",
@@ -140,6 +140,7 @@ VOLATILE_KEYS: frozenset[str] = frozenset(
         "created_at",
         "updated_at",
         "recorded_at",
+        "input_version",
     }
 )
 BASE64_COLUMN_SUFFIX: str = "_b64"

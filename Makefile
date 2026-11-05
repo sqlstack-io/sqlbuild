@@ -145,6 +145,7 @@ E2E_DUCKDB_BUILD_INCREMENTAL_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/own_change_replay \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_append_cursor_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_capped_microbatch_build.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_changed_builds.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_concurrent_microbatch_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_cursor_runtime_failures.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_dropped_relation_rebuild.py \

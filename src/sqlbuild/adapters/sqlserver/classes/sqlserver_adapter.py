@@ -28,6 +28,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_typed_value_list,
     _typed_scalar_payload,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -130,7 +131,7 @@ def _render_tsql_distinct_condition(*, left: str, right: str) -> str:
     )
 
 
-class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """Microsoft SQL Server adapter backed by pymssql."""
 
     def get_columns_for_relations(
@@ -410,24 +411,10 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         from sqlbuild._native import FINGERPRINT_TABLE_NAME
 
-        table_name: str | None = self.render_qualified_name(
-            database=database,
-            schema=schema,
-            name=FINGERPRINT_TABLE_NAME,
-        )
-        if table_name is None:
-            return ()
-        index_name: str = "_sqlbuild_fingerprints_latest_idx"
-        escaped_index_name: str = index_name.replace("'", "''")
-        escaped_table_name: str = table_name.replace("'", "''")
-        return (
-            "IF NOT EXISTS ("
-            "SELECT 1 FROM sys.indexes "
-            f"WHERE name = '{escaped_index_name}' "
-            f"AND object_id = OBJECT_ID(N'{escaped_table_name}')"
-            ") "
-            f"CREATE INDEX {index_name} ON {table_name} "
-            "(node_type, node_name, ts DESC, run_id DESC)",
+        return self._state_index_sqls(
+            table=(database, schema, FINGERPRINT_TABLE_NAME),
+            index_name="_sqlbuild_fingerprints_latest_idx",
+            columns="node_type, node_name, ts DESC, run_id DESC",
         )
 
     def render_read_latest_fingerprints_sql(
@@ -478,25 +465,21 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             build_source_freshness_create_table_sql,
         )
 
-        create_sql: str = build_source_freshness_create_table_sql(
-            database=database,
-            schema=schema,
-            render_qualified_name=self.render_qualified_name,
-            render_framework_type=self.render_framework_type,
-        ).replace("CREATE TABLE IF NOT EXISTS ", "CREATE TABLE ", 1)
-        for column in (
-            "source_name",
-            "target_database",
-            "target_schema",
-            "target_name",
-            "run_id",
-        ):
-            create_sql = create_sql.replace(f"{column} NVARCHAR(MAX)", f"{column} NVARCHAR(450)")
-        return self._create_table_if_missing_sql(
-            create_sql=create_sql,
-            database=database,
-            schema=schema,
-            table_name=SOURCE_FRESHNESS_TABLE_NAME,
+        return self._keyed_state_table_sql(
+            create_sql=build_source_freshness_create_table_sql(
+                database=database,
+                schema=schema,
+                render_qualified_name=self.render_qualified_name,
+                render_framework_type=self.render_framework_type,
+            ),
+            table=(database, schema, SOURCE_FRESHNESS_TABLE_NAME),
+            key_columns=(
+                "source_name",
+                "target_database",
+                "target_schema",
+                "target_name",
+                "run_id",
+            ),
         )
 
     def render_create_source_freshness_index_sqls(
@@ -507,14 +490,63 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         from sqlbuild._native import SOURCE_FRESHNESS_TABLE_NAME
 
+        return self._state_index_sqls(
+            table=(database, schema, SOURCE_FRESHNESS_TABLE_NAME),
+            index_name="_sqlbuild_source_freshness_latest_idx",
+            columns="source_name, target_database, target_schema, target_name, "
+            "observed_at DESC, run_id DESC",
+        )
+
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        return self._keyed_state_table_sql(
+            create_sql=super().render_create_consumption_table_sql(
+                database=database, schema=schema
+            ),
+            table=(database, schema, CONSUMPTION_TABLE_NAME),
+            key_columns=("target_schema", "target_name"),
+        )
+
+    def render_create_consumption_index_sqls(
+        self, *, database: str | None, schema: str
+    ) -> tuple[str, ...]:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        return self._state_index_sqls(
+            table=(database, schema, CONSUMPTION_TABLE_NAME),
+            index_name="_sqlbuild_consumption_relation_idx",
+            columns="target_schema, target_name, recorded_at",
+        )
+
+    def _keyed_state_table_sql(
+        self,
+        *,
+        create_sql: str,
+        table: tuple[str | None, str, str],
+        key_columns: tuple[str, ...],
+    ) -> str:
+        """Create a state table once, with indexable NVARCHAR(450) key columns."""
+
+        database, schema, table_name = table
+        create_sql = create_sql.replace("CREATE TABLE IF NOT EXISTS ", "CREATE TABLE ", 1)
+        for column in key_columns:
+            create_sql = create_sql.replace(f"{column} NVARCHAR(MAX)", f"{column} NVARCHAR(450)")
+        return self._create_table_if_missing_sql(
+            create_sql=create_sql, database=database, schema=schema, table_name=table_name
+        )
+
+    def _state_index_sqls(
+        self, *, table: tuple[str | None, str, str], index_name: str, columns: str
+    ) -> tuple[str, ...]:
+        """Create a state-table index unless sys.indexes already has it."""
+
+        database, schema, name = table
         table_name: str | None = self.render_qualified_name(
-            database=database,
-            schema=schema,
-            name=SOURCE_FRESHNESS_TABLE_NAME,
+            database=database, schema=schema, name=name
         )
         if table_name is None:
             return ()
-        index_name: str = "_sqlbuild_source_freshness_latest_idx"
         escaped_index_name: str = index_name.replace("'", "''")
         escaped_table_name: str = table_name.replace("'", "''")
         return (
@@ -523,9 +555,7 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             f"WHERE name = '{escaped_index_name}' "
             f"AND object_id = OBJECT_ID(N'{escaped_table_name}')"
             ") "
-            f"CREATE INDEX {index_name} ON {table_name} "
-            "(source_name, target_database, target_schema, target_name, "
-            "observed_at DESC, run_id DESC)",
+            f"CREATE INDEX {index_name} ON {table_name} ({columns})",
         )
 
     def render_insert_source_freshness_records_sql(
@@ -584,34 +614,16 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         from sqlbuild.executor.node_results.constants import NODE_RESULTS_TABLE_NAME
 
-        table_name: str | None = self.render_qualified_name(
-            database=database,
-            schema=schema,
-            name=NODE_RESULTS_TABLE_NAME,
-        )
-        if table_name is None:
-            return ()
-        latest_index_name: str = "_sqlbuild_node_results_latest_idx"
-        run_id_index_name: str = "_sqlbuild_node_results_run_id_idx"
-        escaped_table_name: str = table_name.replace("'", "''")
-        escaped_latest_index_name: str = latest_index_name.replace("'", "''")
-        escaped_run_id_index_name: str = run_id_index_name.replace("'", "''")
-        return (
-            "IF NOT EXISTS ("
-            "SELECT 1 FROM sys.indexes "
-            f"WHERE name = '{escaped_latest_index_name}' "
-            f"AND object_id = OBJECT_ID(N'{escaped_table_name}')"
-            ") "
-            f"CREATE INDEX {latest_index_name} ON {table_name} "
-            "(node_type, node_name, target_database, target_schema, target_name, status, "
-            "ts DESC, run_id DESC)",
-            "IF NOT EXISTS ("
-            "SELECT 1 FROM sys.indexes "
-            f"WHERE name = '{escaped_run_id_index_name}' "
-            f"AND object_id = OBJECT_ID(N'{escaped_table_name}')"
-            ") "
-            f"CREATE INDEX {run_id_index_name} ON {table_name} "
-            "(run_id, node_type, node_name, target_database, target_schema, target_name)",
+        table: tuple[str | None, str, str] = (database, schema, NODE_RESULTS_TABLE_NAME)
+        return self._state_index_sqls(
+            table=table,
+            index_name="_sqlbuild_node_results_latest_idx",
+            columns="node_type, node_name, target_database, target_schema, target_name, status, "
+            "ts DESC, run_id DESC",
+        ) + self._state_index_sqls(
+            table=table,
+            index_name="_sqlbuild_node_results_run_id_idx",
+            columns="run_id, node_type, node_name, target_database, target_schema, target_name",
         )
 
     def render_create_audit_result_table_sql(self, *, database: str | None, schema: str) -> str:
@@ -2245,6 +2257,9 @@ class SqlServerAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "SYSUTCDATETIME()"
 
     def render_delete_insert(
         self,

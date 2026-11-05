@@ -51,7 +51,9 @@ fn string_pairs(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
 }
 
 /// `{name: identity.version_hash}` of the discovered Python hooks.
-fn hook_version_hashes<'py>(hook_functions: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn hook_version_hashes<'py>(
+    hook_functions: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = hook_functions.py();
     let hashes: Bound<'py, PyDict> = PyDict::new(py);
     let identities: Bound<'py, PyAny> =

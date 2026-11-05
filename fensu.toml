@@ -1434,6 +1434,10 @@ reason = "Metadata sync keeps its pending page for retry and work polling drops 
 paths = ["crates/sqlbuild-cli/src/workers/_helpers/child.rs"]
 reason = "terminate and kill are the two escalation steps for a worker child; each maps every child kind to its own signal."
 
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-python/src/bindings/_helpers/command_runtime/warehouse_scope.rs", "crates/sqlbuild-python/src/bindings/_helpers/event_exporting/scope.rs", "crates/sqlbuild-python/src/bindings/_helpers/native_host/consumption_state.rs", "crates/sqlbuild-python/src/bindings/_helpers/output_capture/context.rs", "crates/sqlbuild-python/src/bindings/_helpers/result_output/terminal_index.rs"]
+reason = "Each context object takes its own resource out of its own lock and releases it the way that resource needs; only the take-under-lock shape is shared."
+
 [[targets.python.rule_exceptions]]
 rule = "XSB051"
 path = "src/sqlbuild/executor/scenario/_helpers/lifecycle/cleanup.py"
@@ -1774,7 +1778,7 @@ paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/_helpers/fingerpr
 reason = "Typed observation field projections intentionally mirror provenance checks while preserving different required identity fields and timestamp names. Bounds, rejection rules and reconciliation completion share the ingestion owner."
 
 [[dupes.allowlist]]
-paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_old_name_views.rs"]
+paths = ["crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_audit_results.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_consumption.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_janitor_events.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_microbatches.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_migrations.rs", "crates/sqlbuild-orchestration/src/warehouse_metadata/main/ingest_old_name_views.rs"]
 reason = "Typed event projections retain distinct required identities and indexed payload columns. Event persistence, fencing, atomic retries and reconciliation share the events ingestion owner; no per-table lifecycle is copied."
 
 [[targets.python.rule_exceptions]]
@@ -2724,6 +2728,7 @@ module_layers = [
     "compute_logs=output",
     "contract_command=commands",
     "contract_records=infra",
+    "consumption=plan",
     "contracts=project",
     "contracts/effective_config=front",
     "contracts/resource_identities=infra",
@@ -2775,6 +2780,7 @@ module_layers = [
     "microbatches=plan",
     "model_config=front",
     "native_host=infra",
+    "native_host/consumption_state=front",
     "native_host/model_lookup=project",
     "native_host/orchestration_sensors=commands",
     "native_host/orchestration_triggers=project",

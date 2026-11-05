@@ -184,6 +184,7 @@ COMMAND_OUTPUT_LOSS_RECORD_TYPE: str
 INTEGRATION_RESULT_PATH_ENV: str
 FINGERPRINT_TABLE_NAME: str
 SOURCE_FRESHNESS_TABLE_NAME: str
+CONSUMPTION_TABLE_NAME: str
 MIGRATION_TABLE_NAME: str
 COLUMN_MIGRATION_TABLE_NAME: str
 OLD_NAME_VIEW_TABLE_NAME: str
@@ -5455,6 +5456,20 @@ def evaluate_source_freshness_age_policy(
 def build_source_freshness_read_latest_sql(
     *, database: str | None, schema: str, render_qualified_name: Callable[..., str | None]
 ) -> str: ...
+def build_consumption_create_table_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    render_framework_type: Callable[[FrameworkType], str],
+) -> str: ...
+def build_consumption_prune_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    retain_versions: int,
+) -> str: ...
 def build_source_freshness_create_table_sql(
     *,
     database: str | None,
@@ -6452,6 +6467,7 @@ class BuildCommandRequest(NativeRecord):
     no_color: bool
     fail_fast: bool
     full_refresh: bool
+    changed: bool
     load_sources: bool | None
     reload_sources: bool
     include_python: bool
@@ -6490,6 +6506,7 @@ class BuildCommandRequest(NativeRecord):
         no_color: bool = False,
         fail_fast: bool = False,
         full_refresh: bool = False,
+        changed: bool = False,
         load_sources: bool | None = None,
         reload_sources: bool = False,
         include_python: bool = True,
