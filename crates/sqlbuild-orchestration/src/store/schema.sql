@@ -191,9 +191,15 @@ CREATE TABLE sqb_run_nodes (
     rows_affected BIGINT,
     error_code TEXT,
     skipped_because_of TEXT,
+    kind TEXT NOT NULL DEFAULT 'node' CHECK (kind IN ('node', 'check')),
+    finished_storage_id BIGINT,
     PRIMARY KEY (run_id, node_key, attempt)
 );
 CREATE INDEX sqb_run_nodes_node ON sqb_run_nodes(node_key, run_id);
+CREATE INDEX sqb_run_nodes_finished ON sqb_run_nodes(finished_storage_id)
+WHERE finished_storage_id IS NOT NULL;
+CREATE INDEX sqb_run_nodes_decisive ON sqb_run_nodes(node_key, finished_storage_id)
+WHERE finished_storage_id IS NOT NULL AND status IN ('success', 'failed');
 CREATE TABLE sqb_write_claims (
     target TEXT NOT NULL,
     node_key TEXT NOT NULL,
@@ -323,12 +329,6 @@ CREATE TABLE sqb_run_requests (
 CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
 WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'presumed_failed');
 CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
-CREATE INDEX sqb_node_finished_cursor ON recall_events(storage_id)
-WHERE producer='scheduler' AND event_type='run_node_finished';
-CREATE INDEX sqb_node_started_identity ON recall_events(
-    invocation_id, (payload -> 'change' ->> 'claim_id'),
-    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id
-) WHERE producer='scheduler' AND event_type='run_node_started';
 CREATE TABLE sqb_warehouse_freshness (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -365,10 +365,6 @@ CREATE TABLE sqb_development_locations (
     location_id {uuid} NOT NULL UNIQUE REFERENCES sqb_locations(location_id),
     PRIMARY KEY (project_path, target)
 );
-CREATE INDEX sqb_node_decisive_history ON recall_events(
-    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id DESC
-) WHERE producer='scheduler' AND event_type='run_node_finished'
-AND (payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed');
 CREATE TABLE sqb_password_credentials (
     principal_id {uuid} PRIMARY KEY REFERENCES sqb_principals(principal_id),
     credential_id {uuid} NOT NULL UNIQUE,
@@ -578,16 +574,6 @@ CREATE INDEX sqb_statistics_relation_time ON sqb_warehouse_statistics
 CREATE INDEX sqb_statistics_expiration ON sqb_warehouse_statistics (observed_at,event_id);
 CREATE INDEX sqb_catalog_statistics_scan ON sqb_warehouse_catalog
     (location_id,target,state_schema,state_database,event_id);
-CREATE INDEX sqb_observed_node_cursor ON recall_events(storage_id)
-WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished');
-CREATE INDEX sqb_observed_node_identity ON recall_events(
-    invocation_id, (payload -> 'change' -> 'change' ->> 'node_key'),
-    (payload -> 'change' ->> 'claim_id'), storage_id DESC
-) WHERE producer='scheduler';
-CREATE INDEX sqb_observed_node_decisive ON recall_events(
-    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id DESC
-) WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished')
-AND (payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed');
 CREATE TABLE sqb_cli_login_flows (
     flow_id {uuid} PRIMARY KEY,
     client_hash TEXT NOT NULL,

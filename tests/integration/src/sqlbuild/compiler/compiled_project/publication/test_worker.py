@@ -529,12 +529,18 @@ def test_given_attached_python_code_when_a_worker_starts_then_publication_pins_i
     with scheduled_worker(tmp_path, monkeypatch, test_case) as worker:
         run: dict[str, Any] = wait_for_run(worker.api, worker.process, worker.log)
         assert run["status"] == test_case.expected_status, worker.log.read_text()
-        with sqlite3.connect(worker.control_store) as control:
-            nodes: list[tuple[str, str | None]] = control.execute(
-                "SELECT node_key,started_at FROM sqb_run_nodes WHERE run_id=? ORDER BY node_key",
-                (run["run_id"],),
-            ).fetchall()
-        assert [(name, started is not None) for name, started in nodes] == [
+        runs_url: str = (
+            f"{worker.api.url}/api/locations/{worker.api.location_id}/targets/development/runs"
+        )
+        with urlopen(
+            Request(
+                f"{runs_url}/{run['run_id']}/nodes",
+                headers={"Authorization": f"Bearer {worker.api.bearer}"},
+            ),
+            timeout=5,
+        ) as response:
+            nodes: list[dict[str, Any]] = json.load(response)
+        assert [(node["node_key"], node["started_at"] is not None) for node in nodes] == [
             ("model:orders", test_case.expected_status == "success")
         ]
         assert (worker.project / "warehouse.duckdb").exists() == (
@@ -687,13 +693,13 @@ def test_given_an_attached_check_query_when_cancelled_then_it_cannot_trigger_fai
             ).fetchall()
             assert [outcome for _, outcome in outcomes] == ["cancelled"]
             deadline: float = time.monotonic() + 15
-            cursor: int = 0
-            while cursor < outcomes[0][0]:
+            evaluated: int = 0
+            while evaluated < outcomes[0][0]:
                 assert worker.process.poll() is None, worker.log.read_text()
                 assert time.monotonic() < deadline, worker.log.read_text()
-                cursor = control.execute(
-                    "SELECT COALESCE(MAX(CAST(cursor_json ->> 'event_storage_id' AS INTEGER)),0) "
-                    "FROM sqb_sensor_cursor_commits"
+                evaluated = control.execute(
+                    "SELECT COALESCE(MAX(storage_id),0) FROM sqb_sensor_evaluation_events "
+                    "WHERE phase='completed'"
                 ).fetchone()[0]
                 time.sleep(0.02)
             assert control.execute("SELECT count(*) FROM sqb_run_requests").fetchone() == (0,)
@@ -806,9 +812,9 @@ def test_given_a_real_group_child_rebuild_when_a_node_sensor_matches_then_only_t
             ).fetchall() == [
                 (
                     control.execute(
-                        "SELECT e.event_id FROM recall_events e JOIN sqb_runs r ON r.run_id=e.run_id "
-                        "WHERE r.job_key='source_orders' AND e.event_type='run_node_finished'"
-                    ).fetchone()[0],
+                        "SELECT run_id FROM sqb_runs WHERE job_key='source_orders'"
+                    ).fetchone()[0]
+                    + "/model:orders",
                     destination["run_id"],
                 )
             ]

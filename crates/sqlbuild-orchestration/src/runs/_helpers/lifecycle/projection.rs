@@ -105,12 +105,12 @@ pub(crate) async fn project_run_state(
             let cancelled = *outcome == RunOutcome::Cancelled;
             (transaction, _) = query(transaction,
                 "UPDATE sqb_run_nodes SET status=CASE WHEN status='running' THEN $1 ELSE $2 END, ended_at=$3 \
-                 WHERE run_id=$4 AND status IN ('pending','running')",
+                 WHERE run_id=$4 AND kind='node' AND status IN ('pending','running')",
                 vec![Parameter::Text(if cancelled { "cancelled" } else { "failed" }.into()),
                     Parameter::Text(if cancelled { "cancelled" } else { "skipped" }.into()), Parameter::Time(now), Parameter::Id(request.run_id)]).await?;
             let counts;
             (transaction, counts) = query(transaction,
-                "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 GROUP BY status",
+                "SELECT status, COUNT(*) AS count FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' GROUP BY status",
                 vec![Parameter::Id(request.run_id)]).await?;
             let counts: BTreeMap<String, i64> = counts
                 .into_iter()

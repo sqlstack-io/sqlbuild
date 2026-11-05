@@ -79,11 +79,11 @@ async fn matching_executions(
         (transaction, rows) = query(transaction, &format!(
             "SELECT r.run_id,r.status,r.last_event_storage_id FROM sqb_runs r \
              WHERE r.run_id IN ({run_parameters}) AND \
-             (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.attempt=1 \
+             (SELECT COUNT(*) FROM sqb_run_nodes n WHERE n.run_id=r.run_id AND n.attempt=1 AND n.kind='node' \
               AND n.node_key IN ({node_parameters}) AND n.status='success' AND n.ended_at IS NOT NULL \
               AND ((r.kind<>'group' AND n.started_at IS NOT NULL) OR \
                    (r.kind='group' AND EXISTS(SELECT 1 FROM sqb_runs c \
-                    JOIN sqb_run_nodes cn ON cn.run_id=c.run_id AND cn.node_key=n.node_key AND cn.attempt=1 \
+                    JOIN sqb_run_nodes cn ON cn.run_id=c.run_id AND cn.node_key=n.node_key AND cn.attempt=1 AND cn.kind='node' \
                     WHERE c.parent_run_id=r.run_id AND c.location_id=r.location_id AND c.target=r.target \
                     AND cn.status='success' AND cn.started_at IS NOT NULL AND cn.ended_at IS NOT NULL))))={}",
             chunk.len()), parameters).await?;

@@ -65,7 +65,7 @@ pub(crate) async fn skipped_nodes(
     let ancestors = upstream_jobs(edges, name);
     let (transaction, rows) = query(transaction,
         "SELECT n.node_key, n.status, n.skipped_because_of FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.status IN ('failed','skipped','cancelled')",
+         WHERE r.parent_run_id=$1 AND r.run_id<>$2 AND n.kind='node' AND n.status IN ('failed','skipped','cancelled')",
         vec![Parameter::Id(parent_id), Parameter::Id(request.run_id)]).await?;
     let failures: BTreeMap<String, String> = rows
         .into_iter()

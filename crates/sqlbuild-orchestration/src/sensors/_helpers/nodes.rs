@@ -1,4 +1,4 @@
-//! Node conditions consume immutable execution evidence or warehouse source observations.
+//! Node conditions consume executed run-node outcomes or warehouse source observations.
 
 use std::collections::BTreeSet;
 use std::num::NonZeroU32;
@@ -7,7 +7,6 @@ use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
-use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
 use crate::sensors::_helpers::requests::queue_sensor_run;
 use crate::sensors::_helpers::transitions::matches_transition;
 use crate::sensors::constants::TIMESTAMP_VALUE_KIND;
@@ -29,49 +28,36 @@ pub(crate) async fn consume_node_events(
 ) -> Result<(ControlTransaction, (SensorCursor, Vec<Uuid>)), ControlError> {
     let (mut transaction, rows) = query(
         transaction,
-        "SELECT storage_id,event_id,run_id,payload FROM recall_events \
-         WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished') \
-         AND invocation_id='scheduler/' || run_id AND storage_id>$1 \
-         ORDER BY storage_id LIMIT 100",
-        vec![Parameter::Integer(evaluation.cursor.event_storage_id)],
+        "SELECT n.run_id,n.node_key,n.status,n.finished_storage_id FROM sqb_run_nodes n \
+         JOIN sqb_runs r ON r.run_id=n.run_id \
+         WHERE n.finished_storage_id>$1 AND n.status IN ('success','failed') \
+         AND n.started_at IS NOT NULL AND r.location_id=$2 AND r.target=$3 AND r.kind<>'group' \
+         ORDER BY n.finished_storage_id LIMIT 100",
+        vec![
+            Parameter::Integer(evaluation.cursor.event_storage_id),
+            Parameter::Id(evaluation.location_id),
+            Parameter::Text(evaluation.target.clone()),
+        ],
     )
     .await?;
     let mut cursor = evaluation.cursor.clone();
     let mut run_ids: Vec<Uuid> = Vec::new();
     for row in rows {
-        let event: NodeSensorEvent = decode_row(row)?;
-        cursor.event_storage_id = event.storage_id;
-        let request: RunChangeRequest = serde_json::from_value(event.payload["change"].clone())
-            .map_err(|error| ControlError::Invalid(error.to_string()))?;
-        if request.run_id != event.run_id || request.event_id != event.event_id {
-            return Err(ControlError::Invalid("node event identity mismatch".into()));
-        }
-        let Some((node_key, outcome)) = request.change.finished_node() else {
-            continue;
-        };
-        if !selection.contains(node_key)
-            || !matches!(outcome, NodeOutcome::Success | NodeOutcome::Failed)
-        {
-            continue;
-        }
-        let started;
-        (transaction, started) =
-            prior_start(transaction, evaluation, &request, event.storage_id).await?;
-        if !started {
+        let node: NodeSensorEvent = decode_row(row)?;
+        cursor.event_storage_id = node.finished_storage_id;
+        if !selection.contains(&node.node_key) {
             continue;
         }
         let matches;
-        (transaction, matches) = matches_transition(
-            transaction,
-            evaluation,
-            (node_key, outcome, event.storage_id),
-            kinds,
-        )
-        .await?;
+        (transaction, matches) = matches_transition(transaction, evaluation, &node, kinds).await?;
         if matches {
             let run_id;
-            (transaction, run_id) =
-                queue_sensor_run(transaction, evaluation, &event.event_id.to_string()).await?;
+            (transaction, run_id) = queue_sensor_run(
+                transaction,
+                evaluation,
+                &format!("{}/{}", node.run_id, node.node_key),
+            )
+            .await?;
             run_ids.push(run_id);
         }
     }
@@ -238,43 +224,4 @@ pub(crate) async fn consume_stale_sources(
     }
     cursor.custom = next;
     Ok((transaction, (cursor, run_ids)))
-}
-
-async fn prior_start(
-    transaction: ControlTransaction,
-    evaluation: &SensorEvaluationRequest,
-    request: &RunChangeRequest,
-    storage_id: i64,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let (Some((node_key, _)), Some(claim_id)) = (request.change.finished_node(), request.claim_id)
-    else {
-        return Ok((transaction, false));
-    };
-    let started_type = if matches!(request.change, RunChange::CheckFinished { .. }) {
-        "run_check_started"
-    } else {
-        "run_node_started"
-    };
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT s.event_id FROM sqb_runs r JOIN recall_events s ON s.run_id=CAST(r.run_id AS TEXT) \
-         WHERE s.invocation_id=$1 AND s.run_id=$2 AND s.producer='scheduler' \
-         AND s.event_type=$9 AND s.storage_id<$3 \
-         AND (s.payload -> 'change' ->> 'claim_id')=$4 \
-         AND (s.payload -> 'change' -> 'change' ->> 'node_key')=$5 \
-         AND r.run_id=$6 AND r.location_id=$7 AND r.target=$8 AND r.kind<>'group' LIMIT 1",
-        vec![
-            Parameter::Text(format!("scheduler/{}", request.run_id)),
-            Parameter::Text(request.run_id.to_string()),
-            Parameter::Integer(storage_id),
-            Parameter::Text(claim_id.to_string()),
-            Parameter::Text(node_key.into()),
-            Parameter::Id(request.run_id),
-            Parameter::Id(evaluation.location_id),
-            Parameter::Text(evaluation.target.clone()),
-            Parameter::Text(started_type.into()),
-        ],
-    )
-    .await?;
-    Ok((transaction, !rows.is_empty()))
 }
