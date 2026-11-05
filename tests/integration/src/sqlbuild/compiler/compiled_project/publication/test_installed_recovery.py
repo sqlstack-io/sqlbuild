@@ -76,7 +76,7 @@ def test_given_postgres_servers_when_grant_admin_fails_then_retry_revokes_only_t
     state_sql: str = (
         "SELECT (SELECT COUNT(*) FROM sqb_principals WHERE disabled_at IS NOT NULL),"
         "(SELECT COUNT(*) FROM sqb_role_assignments WHERE revoked_at IS NULL),"
-        "(SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL),"
+        "(SELECT COUNT(*) FROM sqb_sessions WHERE revoked_at IS NULL),"
         "(SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted')"
     )
     with PostgresContainer(POSTGRES_IMAGE, driver=None) as postgres:
