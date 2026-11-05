@@ -17,7 +17,7 @@ use crate::runs::main::{
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
-use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
     complete_builtin_sensor::complete_builtin_sensor,
@@ -89,6 +89,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 .await
                 .expect("elect")
                 .expect("leader");
+            let holder = hold_lease(store, &lease);
             let trigger = list_triggers(store, location, "development")
                 .await
                 .expect("triggers")
@@ -368,6 +369,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     .count(),
                 test_case.expected_runs
             );
+            holder.abort();
             close_store(replica).await;
             close_test_store(fixture).await;
         });

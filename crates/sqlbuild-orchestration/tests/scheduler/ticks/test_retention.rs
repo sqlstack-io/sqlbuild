@@ -14,6 +14,7 @@ use crate::scheduler::main::{
     _acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger, list_ticks::list_ticks,
 };
 use crate::scheduler::models::TickOutcome;
+use crate::scheduler::tests::contracts::helpers::hold_lease;
 use crate::scheduler::tests::contracts::ticks::helpers::{
     append_covered_tick, calendar_time, shift_schedule, snapshot,
 };
@@ -67,6 +68,7 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await
                 .expect("election")
                 .expect("lease");
+            let holder = hold_lease(store, &lease);
             evaluate_trigger(store, &lease, trigger_id)
                 .await
                 .expect("catch up");
@@ -176,6 +178,7 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 Some("2030-01-01T00:00:00Z".parse().expect("future"))
             );
             assert!(ticks.iter().all(|tick| tick.scheduled_for < Utc::now()));
+            holder.abort();
             close_test_store(fixture).await;
         });
     }

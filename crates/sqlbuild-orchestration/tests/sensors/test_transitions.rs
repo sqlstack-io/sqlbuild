@@ -10,7 +10,7 @@ use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::models::{NodeOutcome, RunOutcome};
-use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
     complete_builtin_sensor::complete_builtin_sensor,
@@ -82,6 +82,7 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                 .await
                 .expect("elect")
                 .expect("leader");
+            let holder = hold_lease(store, &lease);
             let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../benchmarks/duckshop/edge_cases/orchestration/check_transitions.json");
             let transitions: Vec<serde_json::Value> = serde_json::from_str(
@@ -178,6 +179,7 @@ fn given_independent_check_failures_when_nondecisive_results_arrive_then_only_ex
                     .count(),
                 test_case.expected_runs
             );
+            holder.abort();
             close_test_store(fixture).await;
         });
     }
