@@ -905,8 +905,8 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
             (run_id,),
         )
         _ = connection.execute(
-            "INSERT INTO sqb_write_claims (target,node_key,run_id,claimed_at) VALUES (?,?,?,?)",
-            (publication["target"], "model:orders", run_id, now.isoformat()),
+            "INSERT INTO sqb_write_claims (target,node_key,run_id) VALUES (?,?,?)",
+            (publication["target"], "model:orders", run_id),
         )
         _ = connection.execute(
             "UPDATE sqb_runs SET worker_instance=?, claimed_at=?, last_heartbeat_at=? "
@@ -915,13 +915,12 @@ def claimed_worker(directory: Path, api: SnapshotApi, publication: dict[str, Any
         )
         _ = connection.execute(
             "INSERT INTO sqb_access_tokens "
-            "(token_id,secret_hash,run_id,claim_id,scope_json,created_at,expires_at) "
-            "VALUES (?,?,?,?,?,?,?)",
+            "(token_id,secret_hash,run_id,scope_json,created_at,expires_at) "
+            "VALUES (?,?,?,?,?,?)",
             (
                 token_id,
                 hashlib.sha256(bearer.encode()).hexdigest(),
                 run_id,
-                claim_id,
                 json.dumps({"kind": "run", "run_id": run_id, "claim_id": claim_id}),
                 now.isoformat(),
                 (now + timedelta(hours=1)).isoformat(),

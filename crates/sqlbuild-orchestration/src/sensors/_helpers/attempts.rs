@@ -51,16 +51,11 @@ pub(crate) async fn defer_sensor(
     trigger_id: Uuid,
     next: DateTime<Utc>,
 ) -> Result<ControlTransaction, ControlError> {
-    let now = transaction.now;
     let (transaction, _) = query(
         transaction,
-        "UPDATE sqb_trigger_state SET next_due_at=$1,updated_at=$2 WHERE trigger_id=$3 \
+        "UPDATE sqb_trigger_state SET next_due_at=$1 WHERE trigger_id=$2 \
          AND next_due_at IS DISTINCT FROM $1",
-        vec![
-            Parameter::Time(next),
-            Parameter::Time(now),
-            Parameter::Id(trigger_id),
-        ],
+        vec![Parameter::Time(next), Parameter::Id(trigger_id)],
     )
     .await?;
     Ok(transaction)

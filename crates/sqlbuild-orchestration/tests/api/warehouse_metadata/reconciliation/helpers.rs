@@ -185,7 +185,7 @@ async fn retained_history(
     .expect("a retained-heavy scan has a strict total deadline");
     let (transaction, rows) = query(
         begin(store, TransactionMode::Read).await.expect("read retained"),
-        &format!("SELECT source_event_id FROM {table} WHERE state_database='analytics' AND state_schema='reconcile_retained' ORDER BY source_event_id"),
+        &format!("SELECT record_json ->> 'event_id' AS source_event_id FROM {table} WHERE state_database='analytics' AND state_schema='reconcile_retained' ORDER BY source_event_id"),
         vec![],
     ).await.expect("retained identities");
     commit(transaction).await.expect("close retained read");
@@ -221,7 +221,7 @@ async fn post(
 
 async fn observations(store: &ControlStore, table: &str) -> Vec<crate::store::types::Row> {
     let (transaction, rows) = query(begin(store, TransactionMode::Read).await.expect("read"),
-        &format!("SELECT event_id,target,source_event_id,record_json FROM {table} WHERE state_schema IN ('reconcile_orders','reconcile_inventory') ORDER BY event_id"), vec![]).await.expect("mirror facts");
+        &format!("SELECT event_id,target,record_json FROM {table} WHERE state_schema IN ('reconcile_orders','reconcile_inventory') ORDER BY event_id"), vec![]).await.expect("mirror facts");
     commit(transaction).await.expect("close read");
     rows
 }

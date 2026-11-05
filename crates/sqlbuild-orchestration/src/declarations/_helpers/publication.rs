@@ -55,9 +55,9 @@ pub(crate) async fn publish_projections(
             state.as_ref().and_then(|state| state.status_override),
         )?;
         (transaction, _) = query(transaction,
-            "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at, updated_at) VALUES ($1,$2,$3,$4,$5) \
-             ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at, updated_at=excluded.updated_at",
-            vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next), Parameter::Time(snapshot.published_at)]).await?;
+            "INSERT INTO sqb_trigger_state (trigger_id, status, started_at, next_due_at) VALUES ($1,$2,$3,$4) \
+             ON CONFLICT (trigger_id) DO UPDATE SET status=excluded.status, next_due_at=excluded.next_due_at",
+            vec![Parameter::Id(id), Parameter::Text(status.as_str().into()), Parameter::Time(started_at), Parameter::OptionalTime(next)]).await?;
     }
     Ok(transaction)
 }

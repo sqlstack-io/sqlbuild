@@ -61,10 +61,10 @@ pub async fn ingest_source_freshness(
         let received_at = transaction.now;
         let inserted;
         (transaction, inserted) = query(transaction,
-        "INSERT INTO sqb_warehouse_freshness (event_id,location_id,target,source_event_id,observed_at,record_json,received_at,state_database,state_schema) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
+        "INSERT INTO sqb_warehouse_freshness (event_id,location_id,target,observed_at,record_json,received_at,state_database,state_schema) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (event_id) DO NOTHING RETURNING event_id",
         vec![Parameter::Id(event_id), Parameter::Id(location_id), Parameter::Text(target.into()),
-            Parameter::Text(source_event_id), Parameter::Time(record.observed_at), Parameter::Json(json!(record)), Parameter::Time(received_at),
+            Parameter::Time(record.observed_at), Parameter::Json(json!(record)), Parameter::Time(received_at),
             Parameter::OptionalText(record.state_database.clone()), Parameter::Text(record.state_schema.clone())]).await?;
         applied |= !inserted.is_empty();
     }

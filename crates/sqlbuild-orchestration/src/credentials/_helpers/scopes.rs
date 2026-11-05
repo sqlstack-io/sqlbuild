@@ -5,11 +5,11 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Bound values in location/run/claim column order for the credential insert.
+/// Bound values in location/run column order for the credential insert.
 pub(crate) fn scope_parameters(scope: CredentialScope) -> Vec<Parameter> {
     match scope {
-        CredentialScope::Location { location_id } => [Some(location_id), None, None],
-        CredentialScope::Run { run_id, claim_id } => [None, Some(run_id), Some(claim_id)],
+        CredentialScope::Location { location_id } => [Some(location_id), None],
+        CredentialScope::Run { run_id, .. } => [None, Some(run_id)],
     }
     .into_iter()
     .map(Parameter::OptionalId)
