@@ -9,6 +9,7 @@ that can be tested and benchmarked with `cargo test` alone.
 | `sqlbuild-build-features` | No code. Enables, in the `sqb` build, the dependency features the extension build resolves, so Cargo compiles the crates both builds share (polyglot-sql, `sqlbuild-analysis`, `sqlbuild-rules` and the rest) once. `make check-build-features` (part of `make check-ci`) fails when the two builds resolve a shared crate differently and names the features to add. |
 | `sqlbuild-core` | Constants shared by several crates, the panic boundary that turns an unwinding native failure into a named compiler error, passive identity, diagnostic and SQL value types, text positions, a JSON emitter whose output matches Python's `json.dumps` and `orjson` byte for byte, and run-cost allocation with exact Python `decimal` default-context arithmetic and Snowflake query-history SQL. |
 | `sqlbuild-cursor` | Microbatch cursor algebra: typed cursor values, grain flooring and stepping, half-open interval clamping, merging and batch splitting, timestamp text normalization and calendar durations, with Python `datetime` results and errors. Zones other than fixed offsets are resolved through a caller-supplied lookup. |
+| `sqlbuild-process-ownership` | Proof that a live process owns a scheduler worker claim, and the only way to stop one: an inherited claim lock on Linux and macOS, checked through `/proc` and a pidfd or through libproc with a start-time recheck, and a private named Job object on Windows. It is the only crate allowed unsafe code, for those platform calls. |
 | `sqlbuild-state` | Append-only warehouse state rows: content-addressed migration event IDs, typed event SQL literals and statements, and source freshness data-version normalization, hashing, equivalence, age policy and latest-state read SQL, byte-compatible with the rows Python wrote. It also owns execution history: lifecycle event batch digests and conflicts, run projection, event and run cursors, filter and page validation, and the SQLite and PostgreSQL statements the native history backends run. |
 | `sqlbuild-pysource` | Static reading of project Python source with the ruff parser: macro module structure, literal SQL arguments, definition locations and string-literal edits. It never imports or runs user code; CPython stays the authority on whether a file is valid Python. |
 | `sqlbuild-cache` | The shared native store every native cache uses (one atomically replaced, checksummed file per cache kind, keyed by content digests) and the one fingerprinting scheme for cache keys: the content digest and the project file fingerprint. |
@@ -36,7 +37,7 @@ sqlbuild-python
   -> sqlbuild-project -> sqlbuild-refactor -> sqlbuild-rules -> sqlbuild-analysis -> sqlbuild-attachments
   -> sqlbuild-model-config -> sqlbuild-scopes -> sqlbuild-render -> sqlbuild-discovery -> sqlbuild-host
   -> sqlbuild-config -> sqlbuild-sqltext -> sqlbuild-cache -> sqlbuild-pysource -> sqlbuild-state -> sqlbuild-cursor -> sqlbuild-core
-sqlbuild-cli -> sqlbuild-cache, sqlbuild-core, sqlbuild-build-features
+sqlbuild-cli -> sqlbuild-cache, sqlbuild-core, sqlbuild-build-features, sqlbuild-process-ownership
 ```
 
 `sqlbuild-scopes` reuses the macro scanner in `sqlbuild-render`; render itself depends only on

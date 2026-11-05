@@ -12,6 +12,7 @@ use crate::runs::main::list_runs::list_runs;
 use crate::scheduler::_helpers::tick_retention::prune_ticks;
 use crate::scheduler::main::{
     _acquire_lease::acquire_lease, _evaluate_trigger::evaluate_trigger, list_ticks::list_ticks,
+    renew_lease::renew_lease,
 };
 use crate::scheduler::models::TickOutcome;
 use crate::scheduler::tests::contracts::helpers::hold_lease;
@@ -95,6 +96,9 @@ fn given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_
                 .await;
             }
             append_covered_tick(store, trigger_id, later).await;
+            // Inserting the backlog one tick at a time can outlast the lease on a slow
+            // machine; the scheduler renews between passes, so the test does too.
+            let lease = renew_lease(store, &lease).await.expect("renew");
             assert_eq!(prune_ticks(store, &lease).await.expect("recent ticks"), 0);
             shift_schedule(store, trigger_id, shift).await;
             assert_eq!(

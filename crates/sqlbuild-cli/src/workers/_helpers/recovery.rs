@@ -9,6 +9,9 @@ use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
 
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+use sqlbuild_process_ownership::ownership::main::recover_worker::recover_worker;
+
 use crate::workers::models::{ClaimedWorker, DockerWorker, Launcher, WorkerChild, Workers};
 
 impl Workers {
@@ -26,7 +29,7 @@ impl Workers {
             .map(|worker| worker.claim.claim_id)
             .collect();
         for location in self.configuration.locations() {
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
             if matches!(location, Launcher::Local(_)) {
                 continue;
             }
@@ -45,11 +48,11 @@ impl Workers {
                         continue;
                     }
                     let child = match location {
-                        #[cfg(target_os = "linux")]
+                        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
                         Launcher::Local(location) => Some(WorkerChild::RecoveredLocal(
-                            crate::workers::models::LocalWorker::open(location, &claim)?,
+                            recover_worker(&location.claim(&claim))?,
                         )),
-                        #[cfg(not(target_os = "linux"))]
+                        #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
                         Launcher::Local(_) => continue,
                         Launcher::Docker(location) => match DockerWorker::prepare(location, &claim)
                         {

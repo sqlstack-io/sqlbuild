@@ -19,12 +19,17 @@ use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
 use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+use sqlbuild_process_ownership::ownership::main::{
+    prepare_worker::prepare_worker, start_worker::start_worker,
+};
 use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::workers::_helpers::invocation::{arguments, environment, excluded};
 use crate::workers::models::{
-    ClaimedWorker, DockerWorker, Launcher, LocalLauncher, WorkerChild, WorkerExit, Workers,
+    ClaimedWorker, DockerWorker, Launcher, LocalLauncher, LocalSpawn, WorkerChild, WorkerExit,
+    Workers,
 };
 
 impl sqlbuild_orchestration::scheduler::types::RunLauncher for Workers {
@@ -250,12 +255,9 @@ impl Workers {
                 )
                 .await?;
                 let launched = match local_command {
-                    Some(mut command) => command
-                        .spawn()
-                        .map(|child| {
-                            worker.child = Some(WorkerChild::Local(child));
-                        })
-                        .map_err(ControlError::from),
+                    Some(command) => command.spawn().map(|child| {
+                        worker.child = Some(WorkerChild::Local(child));
+                    }),
                     None => {
                         if let (Launcher::Docker(location), Some(WorkerChild::Docker(child))) =
                             (location, &worker.child)
@@ -305,13 +307,14 @@ impl Workers {
     }
 }
 
+/// The worker holds its claim's ownership before it runs any code; other platforms never adopt.
 fn prepare_spawn(
     location: &LocalLauncher,
     claim: &RunClaim,
     bearer: &str,
     control_variable: &str,
-) -> Result<Command, ControlError> {
-    let mut command = Command::new(&location.executable);
+) -> Result<LocalSpawn, ControlError> {
+    let mut command = std::process::Command::new(&location.executable);
     command
         .args(arguments(&Launcher::Local(location).scope(), claim))
         .arg(&location.project_dir)
@@ -324,11 +327,47 @@ fn prepare_spawn(
         .envs(environment(claim, bearer))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::inherit())
-        .kill_on_drop(true);
-    #[cfg(target_os = "linux")]
-    crate::workers::_helpers::local::inherit_claim(&mut command, location, claim)?;
-    Ok(command)
+        .stderr(Stdio::inherit());
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    let (command, ownership) = prepare_worker(command, &location.claim(claim))?;
+    let mut command = Command::from(command);
+    command.kill_on_drop(true);
+    Ok(LocalSpawn {
+        command,
+        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+        ownership,
+    })
+}
+
+impl LocalLauncher {
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    pub(in crate::workers) fn claim<'a>(
+        &'a self,
+        claim: &RunClaim,
+    ) -> sqlbuild_process_ownership::ownership::models::Claim<'a> {
+        sqlbuild_process_ownership::ownership::models::Claim {
+            project_dir: &self.project_dir,
+            location_id: self.location_id,
+            claim_id: claim.claim_id,
+        }
+    }
+}
+
+impl LocalSpawn {
+    /// A child whose ownership could not be completed is killed before the error is returned.
+    fn spawn(mut self) -> Result<tokio::process::Child, ControlError> {
+        let mut child = self.command.spawn()?;
+        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+        if let Err(error) = child
+            .id()
+            .ok_or_else(|| std::io::Error::other("worker exited before it was owned"))
+            .and_then(|id| start_worker(self.ownership, id))
+        {
+            drop(child.start_kill());
+            return Err(error.into());
+        }
+        Ok(child)
+    }
 }
 
 impl ClaimedWorker {

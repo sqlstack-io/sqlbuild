@@ -28,6 +28,7 @@ jobs:
       format_performance: ${{ steps.scope.outputs.format_performance }}
       rules_performance: ${{ steps.scope.outputs.rules_performance }}
       wheels: ${{ steps.scope.outputs.wheels }}
+      recovery: ${{ steps.scope.outputs.recovery }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,11 +53,12 @@ jobs:
               echo "wheels=$7"
               echo "compiler_differential=$8"
               echo "clickhouse=$9"
+              echo "recovery=${10}"
             } >> "${GITHUB_OUTPUT}"
           }
 
           if [[ "${EVENT_NAME}" != "pull_request" && "${EVENT_NAME}" != "merge_group" ]]; then
-            write_scope true true true true true true true true true
+            write_scope true true true true true true true true true true
             exit 0
           fi
 
@@ -68,7 +70,7 @@ jobs:
           if [[ -z "${BASE_SHA}" || -z "${HEAD_SHA}" ]] || \
              ! git diff --name-only -z "${BASE_SHA}...${HEAD_SHA}" > "${changed_paths}"; then
             echo "Could not diff ${BASE_SHA:-<none>}...${HEAD_SHA:-<none>}; running every suite" >&2
-            write_scope true true true true true true true true true
+            write_scope true true true true true true true true true true
             exit 0
           fi
 
@@ -114,7 +116,7 @@ jobs:
                 && "${HEAD_REF}" == release-please--branches--* ]] && release_metadata_only; then
             echo "Release Please pull request changes only release metadata; skipping the suites" \
               | tee -a "${GITHUB_STEP_SUMMARY}"
-            write_scope false false false false false false false false false
+            write_scope false false false false false false false false false false
             exit 0
           fi
 
@@ -126,6 +128,7 @@ jobs:
           rules_performance=false
           wheels=false
           compiler_differential=false
+          recovery=false
           broad=false
           changed=false
           # A change that only touches the website, root-level Markdown, the README demo GIFs or the
@@ -144,6 +147,11 @@ jobs:
             case "${path}" in
               crates/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
+                ;;
+            esac
+            case "${path}" in
+              crates/sqlbuild-orchestration/*|crates/sqlbuild-process-ownership/*|crates/sqlbuild-cli/*|Cargo.toml|Cargo.lock|.github/workflows/verify.yml)
+                recovery=true
                 ;;
             esac
             case "${path}" in
@@ -207,7 +215,7 @@ jobs:
           done < "${changed_paths}"
 
           if [[ "${changed}" != "true" ]]; then
-            write_scope true true true true true true true true true
+            write_scope true true true true true true true true true true
             exit 0
           fi
 
@@ -232,7 +240,8 @@ jobs:
             "${checks}" \
             "${wheels}" \
             "${compiler_differential}" \
-            "${clickhouse}"
+            "${clickhouse}" \
+            "${recovery}"
 
   lockfile:
     name: Lockfile consistency
@@ -554,6 +563,56 @@ jobs:
           nodes="${RUNNER_TEMP}/python-nodes"
           uv run --no-sync sqb playground --template python_nodes "${nodes}"
           uv run --no-sync sqb --project-dir "${nodes}" --no-color compile
+
+  scheduler_recovery:
+    name: Scheduler recovery (${{ matrix.name }})
+    needs: [changes, lockfile]
+    if: needs.changes.outputs.recovery == 'true'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-15
+            test_threads: 3
+          - name: Windows
+            runner: windows-2025
+            test_threads: 2
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: verify-recovery-${{ matrix.name }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Start a native PostgreSQL server
+        run: |
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            brew install --quiet postgresql@16
+            bin="$(brew --prefix postgresql@16)/bin"
+          else
+            bin="$(cygpath -u "${PGBIN}")"
+          fi
+          data="${RUNNER_TEMP}/postgres-data"
+          "${bin}/initdb" -D "${data}" -U postgres --auth=trust -E UTF8 > /dev/null
+          "${bin}/pg_ctl" -D "${data}" -o "-p 5433 -c listen_addresses=127.0.0.1" \
+            -l "${RUNNER_TEMP}/postgres.log" -w start
+      - name: Worker claim ownership, recovery and stop
+        run: cargo test --locked -p sqlbuild-process-ownership
+      - name: Control store, scheduler and recovery contracts on SQLite and PostgreSQL
+        env:
+          SQLBUILD_TEST_CONTROL_POSTGRES_URL: postgresql://postgres@127.0.0.1:5433/postgres
+        run: cargo test --locked -p sqlbuild-orchestration --lib -- --test-threads=${{ matrix.test_threads }}
+      - name: PostgreSQL server log
+        if: failure()
+        run: cat "${RUNNER_TEMP}/postgres.log" || true
 
   format_performance:
     name: Formatter performance guards
@@ -1086,6 +1145,7 @@ jobs:
         compiler_differential,
         compiler_differential_python_versions,
         native_discovery_windows,
+        scheduler_recovery,
         format_performance,
         performance,
         cold_compile_performance,
@@ -1111,6 +1171,7 @@ jobs:
           COMPILER_DIFFERENTIAL_RESULT: ${{ needs.compiler_differential.result }}
           COMPILER_DIFFERENTIAL_PYTHON_VERSIONS_RESULT: ${{ needs.compiler_differential_python_versions.result }}
           NATIVE_DISCOVERY_WINDOWS_RESULT: ${{ needs.native_discovery_windows.result }}
+          SCHEDULER_RECOVERY_RESULT: ${{ needs.scheduler_recovery.result }}
           FORMAT_PERFORMANCE_RESULT: ${{ needs.format_performance.result }}
           PERFORMANCE_RESULT: ${{ needs.performance.result }}
           COLD_COMPILE_PERFORMANCE_RESULT: ${{ needs.cold_compile_performance.result }}
@@ -1143,6 +1204,7 @@ jobs:
             "${COMPILER_DIFFERENTIAL_RESULT}" \
             "${COMPILER_DIFFERENTIAL_PYTHON_VERSIONS_RESULT}" \
             "${NATIVE_DISCOVERY_WINDOWS_RESULT}" \
+            "${SCHEDULER_RECOVERY_RESULT}" \
             "${FORMAT_PERFORMANCE_RESULT}" \
             "${PERFORMANCE_RESULT}" \
             "${COLD_COMPILE_PERFORMANCE_RESULT}" \

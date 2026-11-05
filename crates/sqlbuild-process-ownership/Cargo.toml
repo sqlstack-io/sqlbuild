@@ -1,0 +1,46 @@
+[package]
+name = "sqlbuild-process-ownership"
+version.workspace = true
+description = "Proof that a live process owns a scheduler worker claim, and the only way to stop one, on Linux, macOS and Windows."
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+command-fds.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+# The workspace forbids unsafe code; this crate alone denies it, so each platform call opts in
+# with an item-level allow and a SAFETY comment, behind the safe API in `ownership::main`.
+[lints.rust]
+unsafe_code = "deny"
+unreachable_pub = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+await_holding_lock = "deny"
+undocumented_unsafe_blocks = "deny"

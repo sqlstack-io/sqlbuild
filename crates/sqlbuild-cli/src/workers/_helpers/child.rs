@@ -2,6 +2,11 @@
 
 use sqlbuild_orchestration::store::errors::ControlError;
 
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+use sqlbuild_process_ownership::ownership::main::{
+    stop_worker::stop_worker, worker_exited::worker_exited,
+};
+
 use crate::workers::_helpers::supervisor::exit_code;
 use crate::workers::main::terminate_child::terminate_child;
 use crate::workers::models::{WorkerChild, WorkerExit};
@@ -23,8 +28,8 @@ impl WorkerChild {
             Self::Local(child) => Ok(child
                 .try_wait()?
                 .map(|exit| WorkerExit::Code(exit_code(exit)))),
-            #[cfg(target_os = "linux")]
-            Self::RecoveredLocal(child) => child.try_wait(),
+            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+            Self::RecoveredLocal(owner) => Ok(worker_exited(owner)?.then_some(WorkerExit::Absent)),
             Self::Docker(child) => child.try_wait().await,
         }
     }
@@ -44,8 +49,8 @@ impl WorkerChild {
     pub(in crate::workers) async fn terminate(&mut self) -> Result<(), ControlError> {
         match self {
             Self::Local(child) => terminate_child(child),
-            #[cfg(target_os = "linux")]
-            Self::RecoveredLocal(child) => child.signal(rustix::process::Signal::TERM),
+            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+            Self::RecoveredLocal(owner) => Ok(stop_worker(owner, false)?),
             Self::Docker(child) => child.signal("SIGTERM").await,
         }
     }
@@ -56,8 +61,8 @@ impl WorkerChild {
                 child.start_kill()?;
                 Ok(())
             }
-            #[cfg(target_os = "linux")]
-            Self::RecoveredLocal(child) => child.signal(rustix::process::Signal::KILL),
+            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+            Self::RecoveredLocal(owner) => Ok(stop_worker(owner, true)?),
             Self::Docker(child) => child.signal("SIGKILL").await,
         }
     }

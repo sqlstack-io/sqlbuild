@@ -1728,6 +1728,36 @@ forbidden_packages = [
     "fensu-structure-checker",
 ]
 
+[[targets.rust.rule_exceptions]]
+rule = "FPRSL302"
+path = "crates/sqlbuild-process-ownership/Cargo.toml"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH012"
+path = "crates/sqlbuild-process-ownership/src/lib.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH013"
+path = "crates/sqlbuild-process-ownership/src/ownership/_helpers/macos.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH002"
+path = "crates/sqlbuild-process-ownership/src/ownership/_helpers/macos.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH013"
+path = "crates/sqlbuild-process-ownership/src/ownership/_helpers/windows.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSH002"
+path = "crates/sqlbuild-process-ownership/src/ownership/_helpers/windows.rs"
+reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
+
 [targets.rust.rule_options.FPRSL102]
 packages = []
 restricted_paths = ["crates/sqlbuild-rules/src/rules"]
@@ -1747,6 +1777,7 @@ crate_names = [
     "sqlbuild-host",
     "sqlbuild-model-config",
     "sqlbuild-orchestration",
+    "sqlbuild-process-ownership",
     "sqlbuild-project",
     "sqlbuild-pysource",
     "sqlbuild-python",

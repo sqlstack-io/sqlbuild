@@ -13,18 +13,17 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub(super) enum WorkerChild {
     Local(Child),
-    #[cfg(target_os = "linux")]
-    RecoveredLocal(LocalWorker),
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    RecoveredLocal(sqlbuild_process_ownership::ownership::models::RecoveredOwnership),
     Docker(DockerWorker),
 }
 
-/// The inherited lock proves physical ownership without relying on a remembered process ID.
-#[cfg(target_os = "linux")]
+/// A local worker command with the claim ownership it must hold before running any code.
 #[derive(Debug)]
-pub(super) struct LocalWorker {
-    pub(super) lock: std::fs::File,
-    pub(super) run_id: Uuid,
-    pub(super) stopped: bool,
+pub(super) struct LocalSpawn {
+    pub(super) command: tokio::process::Command,
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    pub(super) ownership: sqlbuild_process_ownership::ownership::models::PendingOwnership,
 }
 
 #[derive(Clone, Copy, Debug)]
