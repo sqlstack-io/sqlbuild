@@ -7,6 +7,7 @@ use sqlbuild_orchestration::credentials::main::locations::development_location::
 use sqlbuild_orchestration::credentials::models::AuditContext;
 use sqlbuild_orchestration::declarations::main::pause_development_triggers::pause_development_triggers;
 use sqlbuild_orchestration::store::errors::ControlError;
+use sqlbuild_orchestration::store::main::set_release_version::set_release_version;
 use sqlbuild_orchestration::store::main::{migrate_store::migrate_store, open_store::open_store};
 use sqlbuild_orchestration::store::models::ControlStore;
 use uuid::Uuid;
@@ -60,6 +61,7 @@ async fn development_store(
             .to_string_lossy()
             .into_owned()
     });
+    set_release_version(env!("CARGO_PKG_VERSION"));
     let store = open_store(&database).await?;
     migrate_store(&store).await?;
     let context = AuditContext {

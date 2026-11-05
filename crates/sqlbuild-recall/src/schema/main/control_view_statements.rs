@@ -26,6 +26,7 @@ pub fn control_view_statements(postgres: bool) -> Vec<String> {
                 database: None,
                 retention_days: 30,
                 cluster: None,
+                producer_version: String::new(),
             },
         )
         .into_iter()

@@ -12,5 +12,6 @@ pub mod open_store;
 pub(crate) mod query;
 pub mod read_recall_view;
 pub(crate) mod refresh_clock;
+pub mod set_release_version;
 pub(crate) mod store_source_text;
 pub(crate) mod subscribe_changes;
