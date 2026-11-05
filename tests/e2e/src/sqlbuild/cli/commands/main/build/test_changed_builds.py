@@ -11,9 +11,11 @@ from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
     ChangedCrashE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.build.helpers import (
+    CHANGED_BUILDS_UDF_FIXTURE,
+    CHANGED_BUILDS_UNQUALIFIED_FIXTURE,
     DUCKDB_CHANGED,
     SQLITE_CHANGED,
-    add_changed_function_calls,
+    add_changed_overlay,
     apply_changed_step,
     changed_build_steps,
     kill_changed_build_mid_write,
@@ -95,7 +97,7 @@ def test_given_models_calling_functions_when_building_with_changed_then_only_cha
     test_case: ChangedBuildE2ETestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=test_case.warehouse)
-    add_changed_function_calls(project_dir)
+    add_changed_overlay(project_dir, CHANGED_BUILDS_UDF_FIXTURE)
     observed: list[tuple[str, frozenset[str]]] = []
     for step in changed_build_steps(test_case.warehouse)[: len(test_case.expected_ran)]:
         apply_changed_step(project_dir, test_case.warehouse, step)
@@ -114,6 +116,48 @@ def test_given_models_calling_functions_when_building_with_changed_then_only_cha
 
     assert tuple(observed) == test_case.expected_ran
     assert function_reads == [(2, 2)]
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ChangedBuildE2ETestCase(
+            description="duckdb",
+            warehouse=DUCKDB_CHANGED,
+            expected_ran=(
+                ("nothing changed", frozenset({"unqualified_customer_reader"})),
+                ("customers redefined", frozenset({"customers", "unqualified_customer_reader"})),
+            ),
+        )
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_an_unqualified_name_matching_two_relations_when_building_with_changed_then_it_runs(
+    test_case: ChangedBuildE2ETestCase, tmp_path: Path
+) -> None:
+    project_dir: Path = prepare_changed_project(tmp_path=tmp_path, warehouse=test_case.warehouse)
+    add_changed_overlay(project_dir, CHANGED_BUILDS_UNQUALIFIED_FIXTURE)
+    customers_model: Path = project_dir / "models/customers.sql"
+    run_changed_build(project_dir, ("--select", "+customers"))
+    run_changed_build(project_dir, ("--changed",))
+    nothing_changed: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    customers_model.write_text(
+        customers_model.read_text(encoding="utf-8").replace(
+            '__ref("stg_customers")', '__ref("stg_customers") WHERE customer_id > 100'
+        ),
+        encoding="utf-8",
+    )
+    redefined: frozenset[str] = run_changed_build(project_dir, ("--changed",))
+    modelled: list[tuple[object, ...]] = test_case.warehouse.execute(
+        project_dir / test_case.warehouse.warehouse_file,
+        "SELECT modelled FROM main.unqualified_customer_reader",
+    )
+
+    assert (
+        ("nothing changed", nothing_changed),
+        ("customers redefined", redefined),
+    ) == test_case.expected_ran
+    assert modelled == [(0,)]
 
 
 @pytest.mark.parametrize(

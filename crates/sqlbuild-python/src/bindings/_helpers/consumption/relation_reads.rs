@@ -1,6 +1,6 @@
 //! Whether a model's compiled SQL reads a relation that none of its declared inputs writes.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use sqlbuild_analysis::auditing::main::replace_reference_calls::replace_reference_calls;
@@ -19,6 +19,8 @@ const FUNCTION_CALLS: [&str; 2] = ["__udf", "__table_fn"];
 pub(crate) struct Locations {
     nodes: HashMap<NodeKey, RelationKey>,
     sources: HashMap<String, (Option<String>, Option<String>, String)>,
+    /// Every project relation, distinct and lower-cased, by lower-cased relation name.
+    by_name: HashMap<String, BTreeSet<RelationKey>>,
 }
 
 fn optional(value: Bound<'_, PyAny>) -> PyResult<Option<String>> {
@@ -75,7 +77,34 @@ impl Locations {
                 );
             }
         }
-        Ok(Self { nodes, sources })
+        let mut by_name: HashMap<String, BTreeSet<RelationKey>> = HashMap::new();
+        let source_keys = sources
+            .values()
+            .map(|(database, schema, table)| RelationKey {
+                database: database.clone(),
+                schema: schema.clone().unwrap_or_default(),
+                name: table.clone(),
+            });
+        for key in nodes.values().cloned().chain(source_keys) {
+            let key: RelationKey = RelationKey {
+                database: key.database.map(|database| database.to_lowercase()),
+                schema: key.schema.to_lowercase(),
+                name: key.name.to_lowercase(),
+            };
+            by_name.entry(key.name.clone()).or_default().insert(key);
+        }
+        Ok(Self {
+            nodes,
+            sources,
+            by_name,
+        })
+    }
+
+    /// Whether the SQL relation, with the qualifiers it spells, can name several project relations.
+    fn ambiguous(&self, relation: &RelationRow) -> bool {
+        self.by_name
+            .get(&relation.0.to_lowercase())
+            .is_some_and(|keys| keys.iter().filter(|key| names(relation, key)).count() > 1)
     }
 
     fn allows(&self, input: &InputFact, relation: &RelationRow) -> bool {
@@ -118,7 +147,7 @@ fn names((name, schema, database): &RelationRow, location: &RelationKey) -> bool
         })
 }
 
-/// True when `sql` cannot be parsed or names a relation no input or its own relation writes.
+/// True when `sql` cannot be parsed or names an ambiguous relation or one no input writes.
 pub(crate) fn sql_reads_undeclared(
     py: Python<'_>,
     sql: String,
@@ -139,7 +168,12 @@ pub(crate) fn sql_reads_undeclared(
             .iter()
             .any(|created| created.eq_ignore_ascii_case(&relation.0));
         let declared: bool = inputs.iter().any(|input| locations.allows(input, relation));
-        if !created && !own.is_some_and(|own| names(relation, own)) && !declared {
+        if created {
+            continue;
+        }
+        if locations.ambiguous(relation)
+            || (!own.is_some_and(|own| names(relation, own)) && !declared)
+        {
             return Ok(true);
         }
     }

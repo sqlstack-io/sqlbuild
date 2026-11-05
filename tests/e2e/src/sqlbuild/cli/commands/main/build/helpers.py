@@ -1249,6 +1249,9 @@ def target_concurrency_microbatch_files() -> dict[str, str]:
 
 CHANGED_BUILDS_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds"
 CHANGED_BUILDS_UDF_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_udf"
+CHANGED_BUILDS_UNQUALIFIED_FIXTURE: Path = (
+    REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_unqualified"
+)
 CHANGED_ORDER_SKEW_SECONDS: float = 5.2
 _CHANGED_PROGRESS_PATTERN: re.Pattern[str] = re.compile(
     r"^\s+\d+/\d+\s+\S+\s+(\S+)\s+OK\b", re.MULTILINE
@@ -1330,11 +1333,11 @@ def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> P
     return project_dir
 
 
-def add_changed_function_calls(project_dir: Path) -> None:
-    """Overlay the DuckShop case whose models call a SQL function and a table function."""
+def add_changed_overlay(project_dir: Path, fixture: Path) -> None:
+    """Overlay one of the DuckShop changed-builds cases on the base case."""
 
-    for path in CHANGED_BUILDS_UDF_FIXTURE.rglob("*.sql"):
-        destination: Path = project_dir / path.relative_to(CHANGED_BUILDS_UDF_FIXTURE)
+    for path in fixture.rglob("*.sql"):
+        destination: Path = project_dir / path.relative_to(fixture)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
 
