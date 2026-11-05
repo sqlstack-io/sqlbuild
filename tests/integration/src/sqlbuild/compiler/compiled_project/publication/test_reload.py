@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -199,7 +200,9 @@ def test_given_a_served_location_when_inputs_change_or_restart_then_generations_
             assert (
                 restarted_health["report"]["session_id"] != initial_health["report"]["session_id"]
             )
-            assert restarted_health["received_at"] >= initial_health["received_at"]
+            assert datetime.fromisoformat(
+                restarted_health["received_at"]
+            ) >= datetime.fromisoformat(initial_health["received_at"])
             # Redirected output and compiler cache writes must not feed the input watcher.
             time.sleep(1)
             assert current_snapshot(api, test_case.target)["record"] == restarted["record"]

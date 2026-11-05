@@ -9,6 +9,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 ## Contents
 
 - Set retention
+- Grant roles to OIDC groups (beta)
 - Inspect published SQL
 - Define project roles
 
@@ -61,6 +62,53 @@ on the latest missed time, so deleted ticks never come back.
 An invalid value stops the server before it opens the control database. Servers that share one
 control database delete at the shortest horizon among them and count only their own audit
 webhook, so give them the same values and webhook.
+
+## Grant roles to OIDC groups (beta)
+
+With OIDC sign-in, members of an identity-provider group can get a role without a per-person
+assignment. Add `groups_claim` and `group_roles` to the JSON file passed to `--oidc-config`:
+
+```json
+{
+  "origin": "https://control.example.com",
+  "issuer": "https://login.example.com",
+  "client_id": "orders-control",
+  "identities": {"orders-person": "0190c3c1-5a4e-7b8e-9f00-2a7d1c9e4b11"},
+  "groups_claim": "groups",
+  "group_roles": [
+    {"group": "orders-operators", "role": "operator", "location_id": "0190c3c1-6b2f-7c3d-8e44-5f1a2b3c4d5e", "target": null},
+    {"group": "orders-readers", "role": "viewer", "location_id": null, "target": null}
+  ]
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `groups_claim` | ID-token claim that lists the person's groups. Required when `group_roles` is set. |
+| `group_roles[].group` | Group name exactly as the claim lists it. |
+| `group_roles[].role` | `viewer`, `operator`, `developer` or a project role the location publishes. Not `admin`. |
+| `group_roles[].location_id` | Limits the role to one location. Required for a project role or a target. |
+| `group_roles[].target` | Limits the role to one target in that location. |
+
+Groups grant roles only to people who already have an entry in `identities`; a group never
+creates an account. Group roles add to the person's own role assignments.
+
+The server reads groups only from the signed ID token, at sign-in. Each sign-in replaces the
+person's groups with the ones in that token:
+
+- Removing someone from a group in the identity provider stops the grant at their next sign-in.
+  Until then, all of their sessions use the groups from their most recent sign-in.
+- Removing or changing a `group_roles` entry and restarting the server changes access at once,
+  without a new sign-in.
+- A claim that is missing, is not a list of non-empty names, or is replaced by an overage pointer
+  gives no groups.
+
+The server refuses to start when a mapping grants `admin`, scopes a project role or target without
+a location, has a blank group, or when `group_roles` is set without `groups_claim`.
+
+Servers that share one control database must use identical OIDC and `group_roles` configuration.
+Different configurations on one database are unsupported: the last server to start decides the
+group mapping for all of them.
 
 ## Inspect published SQL
 
