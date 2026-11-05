@@ -2237,9 +2237,7 @@ export interface operations {
     readConnectionTest: {
         parameters: {
             query?: never;
-            header: {
-                "x-sqb-csrf": string;
-            };
+            header?: never;
             path: {
                 location_id: string;
                 target: string;

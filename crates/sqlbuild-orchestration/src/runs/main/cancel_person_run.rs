@@ -1,6 +1,8 @@
 //! Cancellation derives scope and actor from durable execution inputs and live authentication.
 
-use crate::authorization::main::authorize_session::authorize_session;
+use uuid::Uuid;
+
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::runs::_helpers::lifecycle::change_run::change_run_in;
 use crate::runs::_helpers::requests::permissions::authorize_execution;
@@ -13,7 +15,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn cancel_person_run(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     request: &CancelRunRequest,
 ) -> Result<bool, ControlError> {
     let (transaction, rows) = query(
@@ -23,7 +25,7 @@ pub async fn cancel_person_run(
     )
     .await?;
     let Some(source) = rows.into_iter().next() else {
-        authorize_session(
+        authorize_person(
             transaction,
             credentials,
             &PermissionScope {

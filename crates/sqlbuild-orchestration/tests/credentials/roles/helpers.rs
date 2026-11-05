@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, authorize_session::authorize_session,
+    assign_builtin_role::assign_builtin_role, authorize_person::authorize_person,
     bootstrap_user::bootstrap_user,
 };
 use crate::credentials::main::{
@@ -48,8 +48,8 @@ async fn signed_in(
     session
 }
 
-pub(crate) fn credentials(session: &IssuedSession) -> (&str, &str) {
-    (session.bearer.as_str(), session.csrf.as_str())
+pub(crate) fn credentials(session: &IssuedSession) -> Uuid {
+    session.identity.principal_id
 }
 
 async fn assign(
@@ -134,7 +134,7 @@ pub(crate) async fn granting_role(
         target: Some("development".into()),
         nodes: Default::default(),
     };
-    let decision = authorize_session(
+    let decision = authorize_person(
         begin(store, TransactionMode::Write).await.expect("begin"),
         (&fixture.context, credentials(&fixture.member)),
         &scope,

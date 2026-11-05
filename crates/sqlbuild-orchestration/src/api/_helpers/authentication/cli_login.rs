@@ -6,10 +6,8 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 
-use crate::api::_helpers::authentication::password_transport::{
-    browser_cookie, deny, single_header,
-};
-use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE, PASSWORD_CSRF_HEADER};
+use crate::api::_helpers::authentication::password_transport::{browser_cookie, deny};
+use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE};
 use crate::api::errors::ApiError;
 use crate::api::models::{
     AuthenticationDenial, BrowserLoginMethod, CliLoginApprovalRequest, CliLoginClaimRequest,
@@ -19,7 +17,9 @@ use crate::credentials::main::audit::reserve_authentication_attempt::reserve_aut
 use crate::credentials::main::cli_login::{
     approve_login::approve_login, claim_login::claim_login, start_login::start_login,
 };
-use crate::credentials::models::{AuditContext, AuthenticationAttempt, ClaimedLogin, StartedLogin};
+use crate::credentials::models::{
+    AuditContext, AuthenticationAttempt, ClaimedLogin, SessionIdentity, StartedLogin,
+};
 use crate::store::models::ControlStore;
 
 pub(crate) fn router(method: BrowserLoginMethod) -> Router<ControlStore> {
@@ -80,20 +80,21 @@ pub(crate) async fn start(
     responses((status = 204), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn approve(
     State(store): State<ControlStore>,
-    Extension(context): Extension<AuditContext>,
+    (Extension(context), Extension(identity)): (
+        Extension<AuditContext>,
+        Extension<SessionIdentity>,
+    ),
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    if approve_login(
-        &store,
-        &context,
-        (
-            browser_cookie(&headers, PASSWORD_COOKIE).unwrap_or_default(),
-            single_header(&headers, PASSWORD_CSRF_HEADER).unwrap_or_default(),
-        ),
-        (&request.browser_code, request.approve),
-    )
-    .await?
+    if browser_cookie(&headers, PASSWORD_COOKIE).is_some()
+        && approve_login(
+            &store,
+            &context,
+            &identity,
+            (&request.browser_code, request.approve),
+        )
+        .await?
     {
         Ok(StatusCode::NO_CONTENT.into_response())
     } else {

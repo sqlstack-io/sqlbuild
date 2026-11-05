@@ -18,7 +18,7 @@ use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
 
 pub(crate) async fn node_status_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, session_id): (Uuid, Uuid),
 ) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

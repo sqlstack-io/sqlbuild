@@ -1,6 +1,8 @@
 //! Live installation-wide audit permission and each bounded page share one transaction.
 
-use crate::authorization::main::authorize_session::authorize_session;
+use uuid::Uuid;
+
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::authorization::main::read_audit_events::read_audit_events;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, SecurityAuditEvent,
@@ -11,10 +13,10 @@ use crate::store::models::{ControlStore, TransactionMode};
 
 pub async fn read_security_audit(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     (after, limit): (i64, u32),
 ) -> Result<Vec<SecurityAuditEvent>, ControlError> {
-    let (transaction, _) = authorize_session(
+    let (transaction, _) = authorize_person(
         begin(store, TransactionMode::Write).await?,
         (context, credentials),
         &PermissionScope {

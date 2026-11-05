@@ -15,7 +15,7 @@ use crate::warehouse_metadata::models::{FingerprintQuery, MetadataBatch};
 
 pub(crate) async fn fingerprint_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, other): (Uuid, Uuid),
 ) -> Uuid {
     let session_id = Uuid::now_v7();

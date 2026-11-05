@@ -15,7 +15,7 @@ use crate::warehouse_metadata::models::{MetadataBatch, StatisticsQuery};
 
 pub(crate) async fn statistics_reads(
     store: &ControlStore,
-    credentials: (&AuditContext, (&str, &str)),
+    credentials: (&AuditContext, Uuid),
     (location, other, session_id): (Uuid, Uuid, Uuid),
 ) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -1,8 +1,9 @@
 //! Resolve a trigger's real location before authorizing an authenticated runtime override.
 
 use serde_json::json;
+use uuid::Uuid;
 
-use crate::authorization::main::authorize_session::authorize_session;
+use crate::authorization::main::authorize_person::authorize_person;
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::declarations::_helpers::operator_change::change_trigger_in;
@@ -13,7 +14,7 @@ use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 pub async fn change_person_trigger(
     store: &ControlStore,
-    (context, credentials): (&AuditContext, (&str, &str)),
+    (context, credentials): (&AuditContext, Uuid),
     request: &TriggerChangeRequest,
 ) -> Result<bool, ControlError> {
     let (transaction, rows) = query(begin(store, TransactionMode::Write).await?,
@@ -37,7 +38,7 @@ pub async fn change_person_trigger(
             .map_err(|error| ControlError::Invalid(error.to_string()))?,
         nodes: Default::default(),
     };
-    let (transaction, context) = authorize_session(
+    let (transaction, context) = authorize_person(
         transaction,
         (context, credentials),
         &scope,
