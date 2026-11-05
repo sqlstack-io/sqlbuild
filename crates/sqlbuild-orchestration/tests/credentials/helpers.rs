@@ -41,12 +41,13 @@ pub(crate) async fn stored_hashes(store: &ControlStore) -> Vec<String> {
         .expect("read durable token hashes")
 }
 
-pub(crate) async fn authentication_revision(
+/// Committed security facts; every authority change writes exactly one in its own transaction.
+pub(crate) async fn security_event_count(
     store: &ControlStore,
 ) -> Result<u64, crate::store::errors::ControlError> {
     let (transaction, rows) = query(
         begin(store, TransactionMode::Read).await?,
-        "SELECT revision FROM sqb_authentication_revision WHERE singleton=1",
+        "SELECT COUNT(*) AS revision FROM sqb_security_audit",
         vec![],
     )
     .await?;
@@ -55,7 +56,7 @@ pub(crate) async fn authentication_revision(
         .and_then(|row| row.get("revision"))
         .and_then(serde_json::Value::as_u64)
         .ok_or_else(|| {
-            crate::store::errors::ControlError::Schema("authentication revision is invalid".into())
+            crate::store::errors::ControlError::Schema("security event count is invalid".into())
         })
 }
 

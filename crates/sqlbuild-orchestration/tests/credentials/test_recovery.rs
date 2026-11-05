@@ -18,7 +18,7 @@ use crate::credentials::models::{
     AuditContext, ExternalIdentityMechanism, PasswordAuthority, PasswordLogin, PrincipalKind,
     SessionAccess,
 };
-use crate::credentials::tests::helpers::authentication_revision;
+use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorRecoveryTestCase;
 use crate::store::main::{
     begin::begin, begin_offline_recovery::begin_offline_recovery, commit::commit,
@@ -133,7 +133,7 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
             let now = transaction.now;
             let (transaction, _) = query(transaction, "UPDATE sqb_role_assignments SET revoked_at=$1,active_key=NULL WHERE principal_id=$2", vec![Parameter::Time(now), Parameter::Id(principal)]).await.expect("lose administrator assignment");
             commit(transaction).await.expect("commit simulated loss");
-            let revision = authentication_revision(&fixture.store)
+            let revision = security_event_count(&fixture.store)
                 .await
                 .expect("revision");
             for (table, operation) in [
@@ -141,7 +141,6 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
                 ("sqb_role_assignments", "INSERT"),
                 ("sqb_password_sessions", "UPDATE"),
                 ("sqb_external_sessions", "UPDATE"),
-                ("sqb_authentication_revision", "UPDATE"),
             ] {
                 let fault = TransactionFault {
                     description: "recovery publication fails",
@@ -166,7 +165,7 @@ fn given_lost_administrator_access_when_offline_recovery_runs_then_authority_and
                     .expect("reopen after failed recovery");
                 remove_fault(&fixture.store, &fault).await;
                 assert_eq!(
-                    authentication_revision(&fixture.store)
+                    security_event_count(&fixture.store)
                         .await
                         .expect("revision after rollback"),
                     revision

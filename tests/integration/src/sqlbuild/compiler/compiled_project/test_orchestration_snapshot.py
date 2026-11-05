@@ -708,7 +708,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kinds": ["tick_overdue", "location_broken", "launch_failed"],
                     },
                     "minimum_interval_seconds": 7,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
                 "edge_job_outcomes": {
                     "description": "Keep warning and partial outcomes distinct from success.",
@@ -719,7 +719,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "kinds": ["warn", "partial"],
                     },
                     "minimum_interval_seconds": 30,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
                 "edge_group_outcomes": {
                     "description": "Observe group completion including cancellation and presumed failure.",
@@ -731,7 +731,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                         "executed_successfully": ["model:orders"],
                     },
                     "minimum_interval_seconds": 30,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 },
             },
             expected_schedules=("edge_snapshot_orders",),
@@ -901,7 +901,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "job_key": "health_orders",
                     "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
                     "minimum_interval_seconds": 7,
-                    "default_status": "stopped",
+                    "default_status": "paused",
                 }
             },
         ),
@@ -1267,13 +1267,13 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_message="executed_successfully must select nonempty source job/group nodes",
         ),
         SnapshotDiscoveryRejectionTestCase(
-            description="sensor code defaults use running or stopped",
+            description="sensor code defaults use running or paused",
             files={
                 "orchestration/health.py": Path(
                     "benchmarks/duckshop/edge_cases/orchestration/platform_orders.py"
                 )
                 .read_text()
-                .replace('default_status="stopped"', 'default_status="paused"')
+                .replace('default_status="paused"', 'default_status="stopped"')
             },
             expected_error=ValueError,
             expected_message="unknown variant",

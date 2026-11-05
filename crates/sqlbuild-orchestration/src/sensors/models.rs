@@ -11,24 +11,6 @@ use crate::declarations::models::TriggerStatus;
 use crate::platform::models::PlatformEventKind;
 use crate::runs::models::RunOutcome;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum SensorStatus {
-    #[default]
-    Running,
-    Stopped,
-}
-
-impl SensorStatus {
-    #[must_use]
-    pub const fn projection(self) -> TriggerStatus {
-        match self {
-            Self::Running => TriggerStatus::Running,
-            Self::Stopped => TriggerStatus::Paused,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SensorCondition {
@@ -132,7 +114,7 @@ pub struct SensorDefinition {
     #[schema(value_type = u32, minimum = 1)]
     pub minimum_interval_seconds: NonZeroU32,
     #[serde(default)]
-    pub default_status: SensorStatus,
+    pub default_status: TriggerStatus,
 }
 
 /// Storage order is authoritative even when a fact's occurrence time predates earlier pages.

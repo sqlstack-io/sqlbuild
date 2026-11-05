@@ -55,9 +55,7 @@ pub(crate) async fn apply_operator_change(
                     reset_sensor_cursor(transaction, (request.trigger_id, request.event_id))
                         .await?;
             }
-            let status = state
-                .status_override
-                .unwrap_or(definition.default_status.projection());
+            let status = state.status_override.unwrap_or(definition.default_status);
             (
                 status,
                 (status == TriggerStatus::Running).then_some(transaction.now),

@@ -4,9 +4,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, SecondsFormat};
 use sqlbuild_recall::records::models::{RecallRow, RecallValue};
-use sqlbuild_recall::schema::main::postgres_partition_statement::postgres_partition_statement;
 use sqlbuild_recall::schema::main::table_columns::table_columns;
-use sqlbuild_recall::schema::main::table_spec::table_spec;
 use sqlbuild_recall::schema::models::{ColumnType, Table};
 use sqlbuild_recall::store::main::conflict_evidence::conflict_evidence;
 use sqlbuild_recall::store::main::relational_insert::relational_insert;
@@ -51,19 +49,10 @@ pub(crate) fn text<'a>(row: &'a RecallRow, name: &str) -> Result<&'a str, Contro
 }
 
 pub(crate) async fn write_row(
-    mut transaction: ControlTransaction,
+    transaction: ControlTransaction,
     row: &RecallRow,
 ) -> Result<(ControlTransaction, RecallAppendOutcome), ControlError> {
     let postgres = matches!(transaction.connection, Some(Connection::Postgres(_)));
-    if postgres && row.table != Table::Artifacts {
-        let date = DateTime::parse_from_rfc3339(text(row, table_spec(row.table).expiry_column)?)
-            .map_err(|error| ControlError::Invalid(error.to_string()))?
-            .to_utc()
-            .date_naive();
-        let statement = postgres_partition_statement(row.table, date)
-            .ok_or_else(|| ControlError::Invalid("Recall partition date is out of range".into()))?;
-        (transaction, _) = query(transaction, &statement, vec![]).await?;
-    }
     let ingested = RecallValue::Text(transaction.now.to_rfc3339_opts(SecondsFormat::Micros, true));
     let columns: HashSet<String> = table_columns(row.table)
         .into_iter()

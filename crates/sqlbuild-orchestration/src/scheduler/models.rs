@@ -140,7 +140,6 @@ pub enum TickOutcome {
     Skipped,
     Covered,
     Failed,
-    Deferred,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]

@@ -1,7 +1,5 @@
 //! Deterministic tick insertion gates all run facts; retries cannot queue a second run.
 
-use serde_json::json;
-
 use crate::runs::main::queue_run::queue_run;
 use crate::runs::models::{RunKind, RunOrigin, RunRequest};
 use crate::scheduler::models::{DueTrigger, SchedulerLease, TickDecision, TickPlan};
@@ -31,10 +29,10 @@ pub(crate) async fn persist_ticks(
         };
         let inserted;
         (transaction, inserted) = query(transaction,
-            "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id, details_json) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (trigger_id, scheduled_for) DO NOTHING RETURNING tick_id",
+            "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (trigger_id, scheduled_for) DO NOTHING RETURNING tick_id",
             vec![Parameter::Id(action.tick_id), Parameter::Id(trigger.trigger_id), Parameter::Time(action.scheduled_for), Parameter::Time(now), Parameter::Integer(lease.epoch),
-                Parameter::Text(outcome.into()), Parameter::OptionalId(run), Parameter::OptionalId(covered), Parameter::Json(json!({}))]).await?;
+                Parameter::Text(outcome.into()), Parameter::OptionalId(run), Parameter::OptionalId(covered)]).await?;
         if !inserted.is_empty() {
             transaction
                 .changes

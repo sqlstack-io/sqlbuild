@@ -15,7 +15,7 @@ use crate::credentials::models::{
     AdministratorAuthentication, AdministratorChange, AuditContext, PasswordAuthority,
     PasswordLogin, PrincipalKind,
 };
-use crate::credentials::tests::helpers::authentication_revision;
+use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorTestCase;
 use crate::store::main::{
     begin::begin, commit::commit, migrate_store::migrate_store, query::query,
@@ -156,7 +156,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     .await
                     .expect("authenticated administrator grant")
                 );
-                let revision = authentication_revision(store)
+                let revision = security_event_count(store)
                     .await
                     .expect("revision before duplicate grant");
                 assert!(
@@ -174,7 +174,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     .expect("idempotent grant")
                 );
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("revision after duplicate grant"),
                     revision
@@ -283,10 +283,8 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
         },
     ];
     for test_case in test_cases {
-        for (table, operation) in [
-            ("sqb_security_audit", "INSERT"),
-            ("sqb_authentication_revision", "UPDATE"),
-        ] {
+        {
+            let (table, operation) = ("sqb_security_audit", "INSERT");
             run(async {
                 let fixture = open_test_store(test_case.backend).await.expect("database");
                 let store = &fixture.store;
@@ -325,7 +323,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 );
                 commit(transaction).await.expect("finish rollback read");
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("rolled back revision"),
                     0
@@ -353,7 +351,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                     panic!("login");
                 };
                 let credentials = (session.bearer.as_str(), session.csrf.as_str());
-                let revision = authentication_revision(store)
+                let revision = security_event_count(store)
                     .await
                     .expect("revision before failed grant");
                 install_fault(store, &fault).await;
@@ -373,7 +371,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                 );
                 remove_fault(store, &fault).await;
                 assert_eq!(
-                    authentication_revision(store)
+                    security_event_count(store)
                         .await
                         .expect("revision after failed grant"),
                     revision

@@ -103,7 +103,6 @@ pub(crate) async fn run_development_roles(
         url.clone(),
     )?;
     let (stop, shutdown) = watch::channel(false);
-    let (_changes, changes) = watch::channel(());
     let mut tasks = JoinSet::new();
     tasks.spawn(serve_api(
         store.clone(),
@@ -136,7 +135,7 @@ pub(crate) async fn run_development_roles(
             run_scheduler(
                 &scheduler_store,
                 SchedulerState::new(Uuid::now_v7()),
-                (shutdown, changes),
+                shutdown,
                 workers,
             )
             .await
