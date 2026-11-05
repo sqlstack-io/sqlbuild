@@ -126,17 +126,17 @@ resets and `grant-admin` revoke all of that person's browser sessions.
 
 The local control-store owner initializes the first installation administrator with
 `sqb admin create-user NAME`, then provisions its password separately with
-`sqb admin set-password PRINCIPAL_ID`. Initialization is available once only; losing or disabling
-administrators never reopens it. `create-principal` creates a role-free identity, not another
-administrator. With password, OIDC or trusted-proxy authentication, installation administrators
+`sqb admin set-password PRINCIPAL_ID`. `create-user` works only while no person exists; once
+anyone exists, use `grant-admin` instead. `create-principal` creates a role-free identity, not
+another administrator. With password, OIDC or trusted-proxy authentication, installation administrators
 use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revoke`, `disable`,
 or `enable`, their session cookie and CSRF header. This cannot remove or disable the final active
 administrator. These endpoints never authorize a machine bearer or grant non-admin defaults.
 
 If administrator access is lost, run `sqb admin grant-admin PRINCIPAL_ID` as the installation's local
-control-store owner; servers may keep running. It enables an existing person, restores installation
-admin membership, revokes that person's browser sessions and records an audit event. It never reopens
-first-user initialization or creates a person. Provision a password with `set-password` if needed.
+control-store owner; servers may keep running. It enables an existing person, grants installation
+admin membership, revokes that person's browser sessions and records an audit event. It never
+creates a person. Provision a password with `set-password` if needed.
 
 An installation administrator assigns or revokes additive built-in roles through
 `POST /api/admin/roles`, using `principal_id`, `role`, optional `location_id` and `target`,

@@ -42,7 +42,6 @@ def postgres_recovery_state(connection: Any) -> dict[str, str]:
         "sqb_password_credentials",
         "sqb_sessions",
         "sqb_security_audit",
-        "sqb_admin_initialization",
         "sqb_installation",
     )
     return {
@@ -87,9 +86,6 @@ def verify_recovery(binary: Path) -> str:
             )
             assert result == {"principal_id": principal, "role": "admin"}
         with closing(sqlite3.connect(database)) as control:
-            assert control.execute("SELECT COUNT(*) FROM sqb_admin_initialization").fetchone() == (
-                1,
-            )
             assert control.execute(
                 "SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'"
             ).fetchone() == (1,)

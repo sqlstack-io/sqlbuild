@@ -24,8 +24,8 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         runtime.block_on(async {
         let mut control = start_control(&["server","--port","0","--no-scheduler","--password-origin","https://control.example.com"]);
         let url = api_ready(&mut control).await;
-        let ordinary = administer(&control,&["create-principal","orders-reader"]);
         let first = administer(&control,&["create-user","orders-admin"]);
+        let ordinary = administer(&control,&["create-principal","orders-reader"]);
         assert_eq!(first["role"],"admin");
         let connection = rusqlite::Connection::open(control.directory.path().join(".sqlbuild/control.sqlite3")).expect("inspect initialization");
         let (count,id): (i64,String) = connection.query_row("SELECT COUNT(*),MIN(principal_id) FROM sqb_role_assignments WHERE role_key='admin' AND revoked_at IS NULL",[],|row| Ok((row.get(0)?,row.get(1)?))).expect("initial administrator membership");
@@ -76,8 +76,8 @@ fn given_local_store_ownership_when_create_user_runs_then_only_the_first_process
         let recovery = invoke_admin(&control, &["grant-admin", id.as_str()]);
         assert!(recovery.status.success(), "{}", String::from_utf8_lossy(&recovery.stderr));
         assert_eq!(serde_json::from_slice::<Value>(&recovery.stdout).expect("JSON-only grant"), json!({"principal_id":id,"role":"admin"}));
-        let (audits, initialized): (i64,i64) = connection.query_row("SELECT (SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'),(SELECT COUNT(*) FROM sqb_admin_initialization)",[],|row| Ok((row.get(0)?,row.get(1)?))).expect("grant and bootstrap audits");
-        assert_eq!((audits,initialized),(1,1));
+        let audits: i64 = connection.query_row("SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'",[],|row| row.get(0)).expect("grant audit");
+        assert_eq!(audits,1);
         let previous = client.get(format!("{url}/api/auth/session")).header(header::HOST,"control.example.com")
             .header(header::COOKIE,&sessions[0].0).send().await.expect("old session after grant-admin");
         assert_eq!(previous.status(),StatusCode::UNAUTHORIZED);

@@ -1,4 +1,4 @@
-//! Local store ownership restores an existing person as administrator, never reopens bootstrap.
+//! Local store ownership makes an existing person an administrator.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -16,19 +16,8 @@ pub async fn grant_admin(
     context: &AuditContext,
     principal_id: Uuid,
 ) -> Result<(), ControlError> {
-    let (transaction, initialized) = query(
-        begin(store, TransactionMode::Write).await?,
-        "SELECT principal_id FROM sqb_admin_initialization WHERE singleton=1",
-        vec![],
-    )
-    .await?;
-    if initialized.is_empty() {
-        return Err(ControlError::Invalid(
-            "administrator initialization has not occurred; use create-user".into(),
-        ));
-    }
     let (transaction, people) = query(
-        transaction,
+        begin(store, TransactionMode::Write).await?,
         "SELECT disabled_at FROM sqb_principals WHERE principal_id=$1",
         vec![Parameter::Id(principal_id)],
     )

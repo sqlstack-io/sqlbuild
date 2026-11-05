@@ -5,7 +5,6 @@ use uuid::Uuid;
 
 use crate::authorization::main::{bootstrap_user::bootstrap_user, grant_admin::grant_admin};
 use crate::credentials::main::{
-    identities::create_principal::create_principal,
     sessions::authenticate_bound_person::authenticate_bound_person,
     sessions::authenticate_session::authenticate_session, sessions::login_password::login_password,
     sessions::set_password::set_password,
@@ -55,18 +54,15 @@ fn given_lost_administrator_access_when_grant_admin_runs_online_then_authority_a
                     .expect("inputs");
             let name = inputs["first_person"].as_str().expect("person name");
             let password = inputs["password"].as_str().expect("password");
-            let ordinary = create_principal(&fixture.store, &context, "customers-reader")
-                .await
-                .expect("ordinary person");
-            assert!(
-                grant_admin(&fixture.store, &context, ordinary)
-                    .await
-                    .is_err(),
-                "grant-admin cannot initialize an admin"
-            );
             let principal = bootstrap_user(&fixture.store, &context, name)
                 .await
                 .expect("first admin");
+            assert!(
+                bootstrap_user(&fixture.store, &context, "customers-reader")
+                    .await
+                    .is_err(),
+                "bootstrap closes once any person exists"
+            );
             set_password(
                 &fixture.store,
                 &context,

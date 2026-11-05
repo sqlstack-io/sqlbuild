@@ -13,7 +13,6 @@ pub(crate) const EXPIRED_SNAPSHOTS: &str = "SELECT s.snapshot_id FROM sqb_snapsh
     AND NOT EXISTS (SELECT 1 FROM sqb_jobs j WHERE j.snapshot_id=s.snapshot_id) \
     AND NOT EXISTS (SELECT 1 FROM sqb_triggers t WHERE t.snapshot_id=s.snapshot_id \
         OR t.removed_in_snapshot_id=s.snapshot_id) \
-    AND NOT EXISTS (SELECT 1 FROM sqb_trigger_state_events e WHERE e.snapshot_id=s.snapshot_id) \
     AND NOT EXISTS (SELECT 1 FROM sqb_location_work w WHERE w.snapshot_id=s.snapshot_id) \
     ORDER BY s.published_at, s.snapshot_id LIMIT $2";
 
