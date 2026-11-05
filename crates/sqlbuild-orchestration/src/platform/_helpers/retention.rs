@@ -5,7 +5,8 @@ use chrono::TimeDelta;
 use crate::credentials::main::audit::prune_audit::prune_audit;
 use crate::credentials::models::AuditRetention;
 use crate::platform::constants::{
-    HEARTBEAT_PAGE, HEARTBEAT_RETENTION_DAYS, SENSOR_EVALUATION_RETENTION_DAYS,
+    HEARTBEAT_PAGE, HEARTBEAT_RETENTION_DAYS, LOCATION_RETENTION_DAYS,
+    PLATFORM_ALERT_RETENTION_DAYS, SENSOR_EVALUATION_RETENTION_DAYS,
 };
 use crate::snapshots::main::prune_snapshots::prune_snapshots;
 use crate::snapshots::models::SnapshotRetention;
@@ -26,7 +27,10 @@ pub(crate) async fn retain(
     while prune_statistics(store, statistics).await? == MAX_HISTORY_RECORDS {
         tokio::task::yield_now().await;
     }
-    while prune_heartbeats(store).await? == HEARTBEAT_PAGE {
+    while prune_platform_events(store).await? == HEARTBEAT_PAGE {
+        tokio::task::yield_now().await;
+    }
+    while prune_locations(store).await? == HEARTBEAT_PAGE {
         tokio::task::yield_now().await;
     }
     while prune_sensor_evaluations(store).await? == HEARTBEAT_PAGE {
@@ -56,15 +60,47 @@ async fn prune_sensor_evaluations(store: &ControlStore) -> Result<usize, Control
     Ok(rows.len())
 }
 
-/// Heartbeats only prove a replica was alive; alert facts stay for webhooks and sensors.
-async fn prune_heartbeats(store: &ControlStore) -> Result<usize, ControlError> {
+/// Heartbeats only prove a replica was alive, so they go sooner than alerts.
+async fn prune_platform_events(store: &ControlStore) -> Result<usize, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let cutoff = transaction.now - TimeDelta::days(HEARTBEAT_RETENTION_DAYS);
+    let heartbeats = transaction.now - TimeDelta::days(HEARTBEAT_RETENTION_DAYS);
+    let alerts = transaction.now - TimeDelta::days(PLATFORM_ALERT_RETENTION_DAYS);
     let (transaction, rows) = query(
         transaction,
         "DELETE FROM recall_events WHERE storage_id IN (SELECT storage_id FROM recall_events \
-         WHERE producer='platform' AND event_type='platform_heartbeat' AND occurred_at<$1 \
-         ORDER BY storage_id LIMIT $2) RETURNING storage_id",
+         WHERE producer='platform' AND occurred_at<CASE WHEN event_type='platform_heartbeat' \
+         THEN $1 ELSE $2 END ORDER BY storage_id LIMIT $3) RETURNING storage_id",
+        vec![
+            Parameter::Time(heartbeats),
+            Parameter::Time(alerts),
+            Parameter::Integer(HEARTBEAT_PAGE as i64),
+        ],
+    )
+    .await?;
+    commit(transaction).await?;
+    Ok(rows.len())
+}
+
+/// Expired location work goes first, then instances that no remaining work names.
+async fn prune_locations(store: &ControlStore) -> Result<usize, ControlError> {
+    let transaction = begin(store, TransactionMode::Write).await?;
+    let cutoff = transaction.now - TimeDelta::days(LOCATION_RETENTION_DAYS);
+    let (transaction, work) = query(
+        transaction,
+        "DELETE FROM sqb_location_work WHERE request_id IN (SELECT request_id FROM sqb_location_work \
+         WHERE expires_at<$1 ORDER BY expires_at LIMIT $2) RETURNING request_id",
+        vec![
+            Parameter::Time(cutoff),
+            Parameter::Integer(HEARTBEAT_PAGE as i64),
+        ],
+    )
+    .await?;
+    let (transaction, instances) = query(
+        transaction,
+        "DELETE FROM sqb_location_instances WHERE instance_id IN (SELECT i.instance_id \
+         FROM sqb_location_instances i WHERE i.last_seen_at<$1 AND NOT EXISTS (SELECT 1 \
+         FROM sqb_location_work w WHERE w.session_id=i.instance_id) \
+         ORDER BY i.last_seen_at LIMIT $2) RETURNING instance_id",
         vec![
             Parameter::Time(cutoff),
             Parameter::Integer(HEARTBEAT_PAGE as i64),
@@ -72,5 +108,5 @@ async fn prune_heartbeats(store: &ControlStore) -> Result<usize, ControlError> {
     )
     .await?;
     commit(transaction).await?;
-    Ok(rows.len())
+    Ok(work.len().max(instances.len()))
 }

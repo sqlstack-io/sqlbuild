@@ -171,7 +171,8 @@ platform stream. Leave it unset to disable delivery. Receivers must deduplicate 
 or the matching `Idempotency-Key` header: delivery is at least once and retries after failure.
 The native watchdog runs independently of location Python and scheduler leadership. It observes
 heartbeats, overdue ticks, missing leadership, and locations silent for over 90 seconds; its
-30-second scan and delivery polling add detection latency. Monitor platform heartbeats from
+30-second scan and delivery polling add detection latency. Each alert is sent once when its
+condition starts, not on every scan. Monitor platform heartbeats from
 outside this stack too: a stopped server cannot report its own outage.
 
 ## Back up and upgrade

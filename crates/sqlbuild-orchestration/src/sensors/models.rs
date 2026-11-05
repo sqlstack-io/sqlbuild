@@ -94,15 +94,6 @@ pub(crate) struct NodeSensorEvent {
     pub(crate) finished_storage_id: i64,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct SourceSensorEvent {
-    pub(crate) event_id: Uuid,
-    pub(crate) invocation_id: String,
-    pub(crate) invocation_sequence: i64,
-    pub(crate) storage_id: i64,
-    pub(crate) payload: crate::warehouse_metadata::models::SourceFreshnessObservation,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SensorDefinition {
