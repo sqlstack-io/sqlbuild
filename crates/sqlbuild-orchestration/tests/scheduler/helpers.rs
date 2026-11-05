@@ -4,14 +4,35 @@ pub(crate) use crate::scheduler::main::_acquire_lease::acquire_lease;
 pub(crate) use crate::scheduler::main::_evaluate_trigger::evaluate_trigger;
 pub(crate) use crate::scheduler::main::_scheduler_cycle::scheduler_cycle;
 use crate::scheduler::main::renew_lease::renew_lease;
+use crate::scheduler::models::SchedulerLease;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::models::ControlStore;
+use futures_util::{StreamExt, stream};
 use uuid::Uuid;
 
 use crate::store::tests::lease_helpers::expire_lease;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
+
+/// Renew `lease` every five seconds, as a running scheduler does, until a renewal fails.
+pub(crate) fn hold_lease(
+    store: &ControlStore,
+    lease: &SchedulerLease,
+) -> tokio::task::JoinHandle<()> {
+    let store = store.clone();
+    let renewals = stream::try_unfold(lease.clone(), move |lease| {
+        let store = store.clone();
+        async move {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            renew_lease(&store, &lease)
+                .await
+                .map(|renewed| Some(((), renewed)))
+        }
+    });
+    tokio::spawn(renewals.for_each(|_| async {}))
+}
 
 pub(crate) async fn leadership_contract(backend: Backend) -> Option<i64> {
     let test_store = open_test_store(backend).await?;
