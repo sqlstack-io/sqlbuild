@@ -9,16 +9,25 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{Duration, Utc};
 use openidconnect::core::{
-    CoreEdDsaPrivateSigningKey, CoreIdToken, CoreIdTokenClaims, CoreJwsSigningAlgorithm,
+    CoreEdDsaPrivateSigningKey, CoreGenderClaim, CoreIdTokenClaims, CoreJwsSigningAlgorithm,
 };
 use openidconnect::{
-    AccessToken, Audience, EmptyAdditionalClaims, IssuerUrl, JsonWebKeyId, Nonce,
+    AccessToken, Audience, EmptyAdditionalClaims, IdTokenClaims, IssuerUrl, JsonWebKeyId, Nonce,
     PkceCodeChallenge, PkceCodeVerifier, PrivateSigningKey, StandardClaims, SubjectIdentifier,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::api::models::OidcExtraClaims;
+use crate::api::models::{ApiAuthentication, HumanLogin, OidcAuthentication};
+use crate::api::tests::helpers::start_api_with_authentication;
 use crate::api::tests::oidc_test_types::{BrowserFlow, ProviderFault, ProviderState, TestProvider};
+use crate::api::types::OidcIdToken;
+use crate::authorization::main::begin_authorized::begin_authorized;
+use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::store::errors::ControlError;
+use crate::store::main::commit::commit;
+use crate::store::models::ControlStore;
 
 pub(crate) async fn start_provider() -> TestProvider {
     let directory = tempfile::tempdir().expect("disposable provider certificates");
@@ -175,9 +184,10 @@ async fn token(State(state): State<ProviderState>, body: String) -> Json<Value> 
         .as_object_mut()
         .expect("claims object")
         .extend(fault.claims);
-    let claims = serde_json::from_value::<CoreIdTokenClaims>(claims).expect("fixture claims");
+    let claims = serde_json::from_value::<IdTokenClaims<OidcExtraClaims, CoreGenderClaim>>(claims)
+        .expect("fixture claims");
     let signing = &state.keys[fault.signing_key.as_deref().unwrap_or("orders")];
-    let id_token = CoreIdToken::new(
+    let id_token = OidcIdToken::new(
         claims,
         signing.as_ref(),
         CoreJwsSigningAlgorithm::EdDsa,
@@ -256,4 +266,50 @@ pub(crate) async fn callback(
         .send()
         .await
         .expect("callback response")
+}
+
+pub(crate) async fn start_oidc_api(
+    store: &ControlStore,
+    settings: &OidcAuthentication,
+) -> crate::api::tests::test_types::TestApi {
+    start_api_with_authentication(
+        store,
+        ApiAuthentication {
+            login: HumanLogin::Oidc(settings.clone()),
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+pub(crate) async fn sign_in(provider: &TestProvider, url: &str, fault: ProviderFault) {
+    *provider.state.fault.lock().expect("fault lock") = fault;
+    let flow = login(provider, url).await;
+    assert_eq!(
+        callback(provider, url, &flow).await.status(),
+        reqwest::StatusCode::OK
+    );
+}
+
+pub(crate) async fn authorize_in(
+    store: &ControlStore,
+    person: Uuid,
+    (action, location_id): (Action, Uuid),
+) -> Result<String, ControlError> {
+    let context = AuditContext {
+        actor: format!("principal:{person}"),
+        granting_role: "browser-session".into(),
+        request_id: Uuid::now_v7(),
+        ip_address: None,
+    };
+    let scope = PermissionScope {
+        action,
+        location_id: Some(location_id),
+        target: Some("development".into()),
+        nodes: Default::default(),
+    };
+    let (transaction, context) =
+        begin_authorized(store, (&context, person), &scope, DefaultRole::None).await?;
+    commit(transaction).await?;
+    Ok(context.granting_role)
 }

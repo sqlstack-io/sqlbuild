@@ -1,4 +1,4 @@
-//! Live identity and the union of role grants over every requested node decide under the store lock.
+//! Live identity and the union of assigned and group role grants decide every node under lock.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -61,9 +61,12 @@ pub(crate) async fn authorize_person(
         .await;
     }
     let (transaction, rows) = query(transaction,
-        "SELECT a.role_key,a.location_id,a.target,e.resolved_grants_json FROM sqb_role_assignments a \
-         LEFT JOIN sqb_effective_roles e ON e.location_id=a.location_id AND e.role_key=a.role_key AND e.target=$2 \
-         WHERE a.principal_id=$1 ORDER BY a.role_key",
+        "SELECT r.role_key,r.location_id,r.target,r.group_name,e.resolved_grants_json FROM \
+         (SELECT role_key,location_id,target,NULL AS group_name FROM sqb_role_assignments WHERE principal_id=$1 \
+          UNION ALL SELECT g.role_key,g.location_id,g.target,g.group_name FROM sqb_person_groups p \
+          JOIN sqb_group_roles g ON g.group_name=p.group_name WHERE p.principal_id=$1) r \
+         LEFT JOIN sqb_effective_roles e ON e.location_id=r.location_id AND e.role_key=r.role_key AND e.target=$2 \
+         ORDER BY r.role_key,r.group_name",
         vec![Parameter::Id(principal_id), Parameter::OptionalText(scope.target.clone())]).await?;
     let rows: Vec<&Row> = rows
         .iter()
@@ -77,7 +80,11 @@ pub(crate) async fn authorize_person(
             .is_ok_and(|role| role_allows(role, scope.action))
     });
     if let Some(row) = builtin {
-        context.granting_role = row["role_key"].as_str().unwrap_or_default().into();
+        let role = row["role_key"].as_str().unwrap_or_default();
+        context.granting_role = match row["group_name"].as_str() {
+            Some(group) => format!("group:{group}:{role}"),
+            None => role.into(),
+        };
         return Ok((transaction, context));
     }
     let (granting, missing) = custom_coverage(&rows, scope);
