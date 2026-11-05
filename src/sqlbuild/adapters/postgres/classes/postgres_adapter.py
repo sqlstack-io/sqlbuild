@@ -1715,14 +1715,11 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> tuple[str, ...]:
         from sqlbuild._native import CONSUMPTION_TABLE_NAME
 
-        table_name: str | None = self.render_qualified_name(
-            database=database, schema=schema, name=CONSUMPTION_TABLE_NAME
-        )
-        if table_name is None:
-            return ()
-        return (
-            "CREATE INDEX IF NOT EXISTS _sqlbuild_consumption_relation_idx "
-            f"ON {table_name} (target_schema, target_name, recorded_at)",
+        return self._state_index_sqls(
+            table=(database, schema, CONSUMPTION_TABLE_NAME),
+            indexes=(
+                ("_sqlbuild_consumption_relation_idx", "target_schema, target_name, recorded_at"),
+            ),
         )
 
     def render_insert_source_freshness_records_sql(
@@ -1800,17 +1797,32 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> tuple[str, ...]:
         from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
 
+        return self._state_index_sqls(
+            table=(database, schema, AUDIT_RESULTS_TABLE_NAME),
+            indexes=(
+                (
+                    "_sqlbuild_audit_results_latest_idx",
+                    "audit_name, binding_key, execution_fingerprint, run_scope_phase, "
+                    "occurred_at DESC, result_id DESC",
+                ),
+                ("_sqlbuild_audit_results_run_id_idx", "run_id, invocation_id, result_id"),
+            ),
+        )
+
+    def _state_index_sqls(
+        self, *, table: tuple[str | None, str, str], indexes: tuple[tuple[str, str], ...]
+    ) -> tuple[str, ...]:
+        """Create each named state-table index on its columns unless it already exists."""
+
+        database, schema, name = table
         table_name: str | None = self.render_qualified_name(
-            database=database, schema=schema, name=AUDIT_RESULTS_TABLE_NAME
+            database=database, schema=schema, name=name
         )
         if table_name is None:
             return ()
-        return (
-            "CREATE INDEX IF NOT EXISTS _sqlbuild_audit_results_latest_idx "
-            f"ON {table_name} (audit_name, binding_key, execution_fingerprint, "
-            "run_scope_phase, occurred_at DESC, result_id DESC)",
-            "CREATE INDEX IF NOT EXISTS _sqlbuild_audit_results_run_id_idx "
-            f"ON {table_name} (run_id, invocation_id, result_id)",
+        return tuple(
+            f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})"
+            for index_name, columns in indexes
         )
 
     def render_create_janitor_event_table_sql(self, *, database: str | None, schema: str) -> str:
