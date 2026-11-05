@@ -37,8 +37,7 @@ pub(crate) async fn change_run_in(
     }
     let (mut transaction, rows) = query(
         transaction,
-        "SELECT r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.run_id=$1",
+        "SELECT r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r WHERE r.run_id=$1",
         vec![Parameter::Id(request.run_id)],
     )
     .await?;

@@ -22,9 +22,8 @@ pub async fn run_execution(
     let (transaction, rows) = query(
         transaction,
         "SELECT r.request_json, s.environment_hash, s.sqb_version FROM sqb_runs r \
-         JOIN sqb_run_liveness l ON l.run_id=r.run_id \
          JOIN sqb_snapshots s ON s.snapshot_id=r.snapshot_id \
-         WHERE r.run_id=$1 AND l.worker_instance=$2",
+         WHERE r.run_id=$1 AND r.worker_instance=$2",
         vec![Parameter::Id(run_id), Parameter::Id(claim_id)],
     )
     .await?;

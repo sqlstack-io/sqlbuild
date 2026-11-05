@@ -74,7 +74,6 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
             for (table, operation) in [
                 ("sqb_write_claims", "INSERT"),
                 ("sqb_concurrency_slots", "INSERT"),
-                ("sqb_run_liveness", "INSERT"),
                 ("recall_events", "INSERT"),
                 ("sqb_runs", "UPDATE"),
             ] {
@@ -108,9 +107,9 @@ fn given_failures_during_claim_publication_when_retried_then_claims_slots_livene
             }
             let expiry = TransactionFault {
                 description: "claim fence expires before commit",
-                table: "sqb_run_liveness",
-                operation: "INSERT",
-                condition: "",
+                table: "sqb_runs",
+                operation: "UPDATE",
+                condition: "WHEN NEW.worker_instance IS NOT NULL AND OLD.worker_instance IS NULL",
                 sqlite_body: "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
                 postgres_body: "UPDATE sqb_scheduler_lease SET expires_at='2000-01-01T00:00:00.000000Z'",
             };

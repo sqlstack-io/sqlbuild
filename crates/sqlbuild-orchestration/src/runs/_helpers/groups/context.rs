@@ -17,8 +17,8 @@ pub(crate) async fn load_group(
     parent_id: Uuid,
 ) -> Result<(ControlTransaction, GroupContext), ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.run_id=$1 AND r.kind='group'",
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+         WHERE r.run_id=$1 AND r.kind='group'",
         vec![Parameter::Id(parent_id)]).await?;
     let parent: GroupRun = decode_row(
         rows.into_iter()
@@ -26,8 +26,8 @@ pub(crate) async fn load_group(
             .ok_or_else(|| ControlError::Invalid("group run is missing".into()))?,
     )?;
     let (transaction, rows) = query(transaction,
-        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, l.worker_instance FROM sqb_runs r \
-         LEFT JOIN sqb_run_liveness l ON l.run_id=r.run_id WHERE r.parent_run_id=$1 ORDER BY r.run_id",
+        "SELECT r.request_json, r.queued_at, r.status, r.cancel_requested_at, r.node_counts_json, r.worker_instance FROM sqb_runs r \
+         WHERE r.parent_run_id=$1 ORDER BY r.run_id",
         vec![Parameter::Id(parent_id)]).await?;
     let children = rows.into_iter().map(decode_row).collect::<Result<_, _>>()?;
     let (transaction, definitions) =

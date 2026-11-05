@@ -175,7 +175,11 @@ CREATE TABLE sqb_runs (
     ended_at {time},
     cancel_requested_at {time},
     node_counts_json {json} NOT NULL,
-    last_event_storage_id BIGINT NOT NULL
+    last_event_storage_id BIGINT NOT NULL,
+    worker_instance {uuid},
+    container_id TEXT,
+    claimed_at {time},
+    last_heartbeat_at {time}
 );
 CREATE INDEX sqb_runs_location_time ON sqb_runs(location_id, target, queued_at);
 CREATE INDEX sqb_runs_queue ON sqb_runs(priority DESC, queued_at) WHERE status = 'queued';
@@ -217,13 +221,6 @@ CREATE TABLE sqb_concurrency_slots (
     UNIQUE (group_key, run_id)
 );
 CREATE INDEX sqb_concurrency_slots_run ON sqb_concurrency_slots(run_id);
-CREATE TABLE sqb_run_liveness (
-    run_id {uuid} PRIMARY KEY REFERENCES sqb_runs(run_id),
-    worker_instance {uuid} NOT NULL,
-    container_id TEXT,
-    claimed_at {time} NOT NULL,
-    last_heartbeat_at {time} NOT NULL
-);
 CREATE TABLE sqb_principals (
     principal_id {uuid} PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
@@ -286,14 +283,11 @@ CREATE TABLE sqb_location_work (
     expires_at {time} NOT NULL,
     claim_id {uuid},
     session_id {uuid} REFERENCES sqb_location_instances(instance_id),
-    claimed_until {time}
+    claimed_until {time},
+    result_json {json},
+    completed_at {time}
 );
 CREATE INDEX sqb_location_work_pending ON sqb_location_work(location_id, target, requested_at);
-CREATE TABLE sqb_location_work_results (
-    request_id {uuid} PRIMARY KEY REFERENCES sqb_location_work(request_id),
-    result_json {json} NOT NULL,
-    completed_at {time} NOT NULL
-);
 CREATE TABLE sqb_platform_sink_deliveries (
     sink_id TEXT NOT NULL,
     storage_id BIGINT NOT NULL,

@@ -12,11 +12,15 @@ pub(crate) async fn read_location_work(
     transaction: ControlTransaction,
     request_id: Uuid,
 ) -> Result<(ControlTransaction, Option<StoredLocationWork>), ControlError> {
-    let (transaction, rows) = query(transaction,
+    let (transaction, rows) = query(
+        transaction,
         "SELECT w.request_json, w.requested_by, w.requested_at, w.expires_at, w.generation, \
-         w.claim_id, w.session_id, w.claimed_until, r.result_json, r.completed_at \
-         FROM sqb_location_work w LEFT JOIN sqb_location_work_results r ON r.request_id=w.request_id \
-         WHERE w.request_id=$1", vec![Parameter::Id(request_id)]).await?;
+         w.claim_id, w.session_id, w.claimed_until, w.result_json, w.completed_at \
+         FROM sqb_location_work w \
+         WHERE w.request_id=$1",
+        vec![Parameter::Id(request_id)],
+    )
+    .await?;
     Ok((
         transaction,
         rows.into_iter().next().map(decode_row).transpose()?,

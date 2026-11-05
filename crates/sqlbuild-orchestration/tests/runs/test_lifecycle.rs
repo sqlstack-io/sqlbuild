@@ -315,7 +315,6 @@ fn given_a_claimed_worker_when_reports_are_retried_and_fail_between_writes_then_
                 ("recall_events", "INSERT"),
                 ("sqb_runs", "UPDATE"),
                 ("sqb_write_claims", "DELETE"),
-                ("sqb_run_liveness", "DELETE"),
             ] {
                 let point = TransactionFault {
                     description: "terminal transaction failure",
