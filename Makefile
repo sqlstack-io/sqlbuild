@@ -562,20 +562,16 @@ dupes:
 	uv run fensu dupes
 
 
-# Warn mode: report new duplicated code since DUPES_BASE without failing the build.
+# Fails on duplicated code new since DUPES_BASE. A missing base fails too, so the check cannot
+# silently disappear.
 DUPES_BASE ?= origin/main
 
 check-dupes-new:
 	@if ! git rev-parse --verify --quiet "$(DUPES_BASE)^{commit}" >/dev/null; then \
-		echo "warning: skipped new-duplicate check: base $(DUPES_BASE) is not available"; \
-		exit 0; \
+		echo "error: new-duplicate check needs base $(DUPES_BASE); fetch it or set DUPES_BASE" >&2; \
+		exit 2; \
 	fi; \
-	uv run fensu dupes --since "$(DUPES_BASE)" --fail-on-new; rc=$$?; \
-	if [ $$rc -eq 1 ]; then \
-		echo "warning: new duplicated code above (warn mode: this check does not fail yet)"; \
-	elif [ $$rc -ne 0 ]; then \
-		exit $$rc; \
-	fi
+	uv run fensu dupes --since "$(DUPES_BASE)" --fail-on-new
 
 
 check:
