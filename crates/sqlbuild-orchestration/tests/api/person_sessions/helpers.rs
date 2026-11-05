@@ -52,6 +52,8 @@ pub(crate) async fn browser_sessions(
                 client_secret_env: None,
                 certificate_authority: Some(provider.authority.clone()),
                 identities: BTreeMap::from([("orders-person".into(), person)]),
+                groups_claim: None,
+                group_roles: Vec::new(),
             }),
             ..Default::default()
         },

@@ -117,17 +117,17 @@ pub(crate) async fn callback(
     else {
         return deny(&context);
     };
-    let subject = match request.code {
+    let identity = match request.code {
         Some(code) => oidc_provider::verify_code(&runtime, code, flow).await,
         None => Err(ControlError::Invalid(
             "OIDC authorization was not completed".into(),
         )),
     };
-    let mut response = match subject {
-        Ok(subject) => match runtime.settings.identities.get(&subject).copied() {
+    let mut response = match identity {
+        Ok((subject, groups)) => match runtime.settings.identities.get(&subject).copied() {
             Some(principal) => {
                 if let Some(session) =
-                    authenticate_bound_person(&store, &context, principal).await?
+                    authenticate_bound_person(&store, &context, (principal, &groups)).await?
                 {
                     external_session(session)?
                 } else {

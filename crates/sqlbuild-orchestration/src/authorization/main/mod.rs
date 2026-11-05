@@ -6,5 +6,6 @@ pub mod change_administrator;
 pub(crate) mod deny_authorization;
 pub mod grant_admin;
 pub(crate) mod publish_custom_roles;
+pub(crate) mod publish_group_roles;
 pub(crate) mod read_audit_events;
 pub mod read_security_audit;

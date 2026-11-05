@@ -1110,7 +1110,7 @@
         "kind": "store",
         "options": ["--oidc-config"],
         "dest": "control_oidc_config",
-        "help": "JSON HTTPS origin/issuer, client_id and explicit subject-to-person identities; native code flow with PKCE; no provisioning or grants",
+        "help": "JSON HTTPS origin/issuer, client_id and explicit subject-to-person identities; native code flow with PKCE; no provisioning. Beta: groups_claim names an ID-token claim and group_roles maps a group to a non-admin role, optionally in one location and target",
         "group": 1
        },
        {

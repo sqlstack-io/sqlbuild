@@ -6,7 +6,10 @@ use axum::{Extension, Json, Router, middleware};
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
-use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource};
+use crate::api::models::{
+    ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource, GroupRole,
+};
+use crate::authorization::main::publish_group_roles::publish_group_roles;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
@@ -27,9 +30,9 @@ pub async fn serve_api(
     ),
 ) -> Result<(), ControlError> {
     let address = listener.local_addr()?;
-    let (development_scope, authentication_routes) =
+    let (development_scope, authentication_routes, group_roles) =
         configure(&store, authentication, address).await?;
-    migrate_store(&store).await?;
+    prepare_store(&store, &group_roles).await?;
     let (sender, listener_changes) = subscribe_changes(&store).await?;
     let (stop, stopped) = tokio::sync::watch::channel(false);
     let feed = ChangeFeed {
@@ -59,6 +62,14 @@ pub async fn serve_api(
         result = async { server.await } => { result?; Ok(()) },
         result = changes::relay(store.clone(), listener_changes, sender) => result,
     }
+}
+
+async fn prepare_store(
+    store: &ControlStore,
+    group_roles: &[GroupRole],
+) -> Result<(), ControlError> {
+    migrate_store(store).await?;
+    publish_group_roles(store, group_roles).await
 }
 
 fn development_application(

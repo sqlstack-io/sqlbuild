@@ -167,7 +167,7 @@ pub struct TrustedProxyAuthentication {
     pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
 }
 
-/// Exact issuer/subject bindings authenticate existing people without provisioning or grants.
+/// Exact issuer/subject bindings authenticate existing people; beta group mappings grant roles.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OidcAuthentication {
@@ -177,6 +177,27 @@ pub struct OidcAuthentication {
     pub client_secret_env: Option<String>,
     pub certificate_authority: Option<std::path::PathBuf>,
     pub identities: std::collections::BTreeMap<String, uuid::Uuid>,
+    /// The ID-token claim that lists the person's groups; no claim means no groups.
+    #[serde(default)]
+    pub groups_claim: Option<String>,
+    #[serde(default)]
+    pub group_roles: Vec<GroupRole>,
+}
+
+/// The verified ID token's claims beyond the standard ones, read only for the groups claim.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct OidcExtraClaims(pub(crate) serde_json::Map<String, serde_json::Value>);
+
+impl openidconnect::AdditionalClaims for OidcExtraClaims {}
+
+/// Members of an identity-provider group get a role, optionally in one location and target.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GroupRole {
+    pub group: String,
+    pub role: crate::credentials::models::RoleKey,
+    pub location_id: Option<uuid::Uuid>,
+    pub target: Option<String>,
 }
 
 #[derive(Debug)]
