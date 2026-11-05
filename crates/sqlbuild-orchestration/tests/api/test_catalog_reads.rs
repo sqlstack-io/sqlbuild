@@ -12,8 +12,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, BuiltinRole, DefaultRole, PasswordAuthority,
-    PasswordLogin, RoleAssignmentRequest,
+    AuditContext, BuiltinRole, DefaultRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::report_location_health::report_location_health;
@@ -170,7 +169,6 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 store,
                 (&context, (&sessions[0].bearer, &sessions[0].csrf)),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("scoped viewer");
@@ -305,7 +303,6 @@ fn given_catalog_observations_when_people_page_then_live_grants_and_exact_namesp
                 store,
                 (&context, (&sessions[0].bearer, &sessions[0].csrf)),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("revoke");

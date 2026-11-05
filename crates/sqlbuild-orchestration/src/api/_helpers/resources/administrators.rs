@@ -13,8 +13,8 @@ use crate::authorization::main::change_administrator::change_administrator;
 use crate::authorization::main::decide_role_approval::decide_role_approval;
 use crate::authorization::main::request_role_activation::request_role_activation;
 use crate::credentials::models::{
-    AdministratorAuthentication, AdministratorChange, AuditContext, RoleActivation,
-    RoleActivationRequest, RoleApproval, RoleAssignmentRequest,
+    AdministratorChange, AuditContext, RoleActivation, RoleActivationRequest, RoleApproval,
+    RoleAssignmentRequest,
 };
 use crate::store::models::ControlStore;
 
@@ -24,11 +24,7 @@ use crate::store::models::ControlStore;
     responses((status = 200, body = MutationResponse), (status = 401, body = crate::api::models::AuthenticationDenial),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn change(
-    (State(store), Extension(context), Extension(authentication)): (
-        State<ControlStore>,
-        Extension<AuditContext>,
-        Extension<AdministratorAuthentication>,
-    ),
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path(principal_id): Path<Uuid>,
     headers: HeaderMap,
     Json(change): Json<AdministratorChange>,
@@ -38,7 +34,7 @@ pub(crate) async fn change(
             &store,
             &context,
             session_credentials(&headers),
-            (principal_id, change, &authentication),
+            (principal_id, change),
         )
         .await?,
     }))
@@ -50,18 +46,12 @@ pub(crate) async fn change(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn assign(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(authentication): Extension<AdministratorAuthentication>,
     headers: HeaderMap,
     Json(request): Json<RoleAssignmentRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: assign_builtin_role(
-            &store,
-            (&context, session_credentials(&headers)),
-            &request,
-            &authentication,
-        )
-        .await?,
+        applied: assign_builtin_role(&store, (&context, session_credentials(&headers)), &request)
+            .await?,
     }))
 }
 

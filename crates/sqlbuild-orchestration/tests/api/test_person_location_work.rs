@@ -11,8 +11,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
-    RoleAssignmentRequest,
+    AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::platform::main::{
@@ -96,7 +95,6 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                 store,
                 (&context, (&sessions[0].bearer, &sessions[0].csrf)),
                 &assignment,
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("assign existing builtin");
@@ -160,7 +158,6 @@ fn given_person_connection_tests_when_retried_and_revoked_then_live_scope_preced
                     revoke: true,
                     ..assignment
                 },
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("live revoke");

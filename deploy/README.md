@@ -122,7 +122,7 @@ peer and upstream-replaced subject. Neither mechanism provisions people or grant
 The bearer stays in a Secure, HttpOnly, host-only cookie; mutations require the returned CSRF
 token and matching origin. Sessions work across replicas sharing the installation, with live
 person and role checks. `POST /api/auth/logout` revokes the session across replicas; password
-resets and offline administrator recovery revoke all of that person's browser sessions.
+resets and `grant-admin` revoke all of that person's browser sessions.
 
 The local control-store owner initializes the first installation administrator with
 `sqb admin create-user NAME`, then provisions its password separately with
@@ -130,22 +130,13 @@ The local control-store owner initializes the first installation administrator w
 administrators never reopens it. `create-principal` creates a role-free identity, not another
 administrator. With password, OIDC or trusted-proxy authentication, installation administrators
 use `POST /api/admin/people/{principal_id}` with a JSON action of `grant`, `revoke`, `disable`,
-or `enable`, their session cookie and CSRF header. This cannot remove or disable the final usable
-administrator. A password installation requires another enabled, password-provisioned admin;
-an OIDC or proxy installation requires another enabled admin in its configured identity bindings.
-A password alone does not make an unbound person a usable SSO administrator. These endpoints
-never authorize a machine bearer or grant non-admin defaults.
+or `enable`, their session cookie and CSRF header. This cannot remove or disable the final active
+administrator. These endpoints never authorize a machine bearer or grant non-admin defaults.
 
-If administrator access is lost, stop every server and administration process connected to the
-installation, then run `sqb admin recover-user PRINCIPAL_ID --reason "restore administrator access"`
-as its local control-store owner. Recovery requires exclusive store access, enables an existing
-person, restores installation admin membership, revokes that person's browser sessions, and records
-the reason in the same durable transaction. It never reopens first-user initialization or creates a
-person. Provision a replacement password with `set-password` if needed, restart the services and sign
-in again. SQLite clients coordinate through an adjacent `.access.lock` file: retain that file and
-use the same database path for all clients. PostgreSQL clients coordinate through advisory locks in
-the installation schema. These locks protect supported SQLBuild clients, not arbitrary database-owner
-SQL or older clients that do not implement this protocol; those processes must also be stopped.
+If administrator access is lost, run `sqb admin grant-admin PRINCIPAL_ID` as the installation's local
+control-store owner; servers may keep running. It enables an existing person, restores installation
+admin membership, revokes that person's browser sessions and records an audit event. It never reopens
+first-user initialization or creates a person. Provision a password with `set-password` if needed.
 
 An installation administrator assigns or revokes additive built-in roles through
 `POST /api/admin/roles`, using `principal_id`, `role`, optional `location_id` and `target`,

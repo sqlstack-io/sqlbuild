@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::authorization::main::deny_authorization::deny;
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{AdministratorAuthentication, AuditContext};
+use crate::credentials::models::AuditContext;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
@@ -53,31 +53,22 @@ pub(crate) async fn grant_installation_admin(
     Ok((transaction, applied))
 }
 
+/// Another active installation administrator exists; a lost one is restored with grant-admin.
 pub(crate) async fn remaining_administrator(
     transaction: ControlTransaction,
     principal_id: Uuid,
-    authentication: &AdministratorAuthentication,
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let (transaction, rows) = query(transaction,
-        "SELECT a.principal_id,c.credential_id FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
-         LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id \
+        "SELECT COUNT(*) AS administrators FROM sqb_role_assignments a JOIN sqb_principals p USING(principal_id) \
          WHERE a.role_key='admin' AND a.location_id IS NULL AND a.target IS NULL AND a.revoked_at IS NULL \
          AND p.disabled_at IS NULL AND p.principal_id<>$1",
         vec![Parameter::Id(principal_id)]).await?;
-    for person in rows {
-        let usable = match authentication {
-            AdministratorAuthentication::Password => !person["credential_id"].is_null(),
-            AdministratorAuthentication::BoundPeople(people) => {
-                let id: Uuid = serde_json::from_value(person["principal_id"].clone())
-                    .map_err(|error| ControlError::Schema(error.to_string()))?;
-                people.contains(&id)
-            }
-        };
-        if usable {
-            return Ok((transaction, true));
-        }
-    }
-    Ok((transaction, false))
+    Ok((
+        transaction,
+        rows.first()
+            .and_then(|row| row["administrators"].as_i64())
+            .is_some_and(|count| count > 0),
+    ))
 }
 
 pub(crate) async fn deny_change(

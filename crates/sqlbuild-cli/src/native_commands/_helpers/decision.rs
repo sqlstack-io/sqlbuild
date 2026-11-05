@@ -19,6 +19,7 @@ use crate::argv::constants::{JSON_OPTION, REVIEW_PROG};
 use crate::argv::models::{ArgvOutcome, Namespace, Value};
 use crate::dispatch::main::invocation_policy::invocation_policy;
 use crate::dispatch::models::{CommandFacts, InvocationPolicy};
+use crate::native_commands::_helpers::terminal::read_password;
 use crate::native_commands::constants::{
     CLEAN_COMMAND, INIT_COMMAND, RULES_COMMAND, RULES_LIST_ACTION, RULES_SHOW_ACTION,
     SKILLS_COMMAND,
@@ -230,7 +231,8 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
         }
         Some("revoke-token") => Ok(ControlAdmin::RevokeToken(id)),
         Some("rotate-token") => Ok(ControlAdmin::RotateToken(id)),
-        Some("set-password") => Ok(ControlAdmin::SetPassword(id)),
+        Some("set-password") => Ok(ControlAdmin::SetPassword(id, read_password()?)),
+        Some("grant-admin") => Ok(ControlAdmin::GrantAdmin(id)),
         _ => Err(ControlError::Invalid(
             "an administration command is required".into(),
         )),

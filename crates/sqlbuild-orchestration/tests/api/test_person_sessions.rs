@@ -17,8 +17,7 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, PasswordAuthority, PasswordLogin,
-    RoleAssignmentRequest,
+    AuditContext, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::declarations::main::list_triggers::list_triggers;
@@ -189,7 +188,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             target: None,
                             revoke: false,
                         },
-                        &AdministratorAuthentication::Password,
                     )
                     .await
                     .expect("assign role through independent store");
@@ -350,7 +348,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             target: None,
                             revoke: true,
                         },
-                        &AdministratorAuthentication::Password,
                     )
                     .await
                     .expect("revoke through independent store");
@@ -422,7 +419,6 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     target: Some("development".into()),
                     revoke: false,
                 },
-                &AdministratorAuthentication::Password,
             )
             .await
             .expect("scoped developer");

@@ -1,7 +1,6 @@
 pub(crate) mod append_control_event;
 pub(crate) mod append_recall;
 pub(crate) mod begin;
-pub mod begin_offline_recovery;
 pub(crate) mod commit;
 pub(crate) mod compress;
 pub(crate) mod decode_row;

@@ -12,8 +12,7 @@ use crate::credentials::main::{
     sessions::revoke_session::revoke_session, sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AdministratorChange, AuditContext, PasswordAuthority,
-    PasswordLogin,
+    AdministratorChange, AuditContext, PasswordAuthority, PasswordLogin,
 };
 use crate::credentials::tests::helpers::security_event_count;
 use crate::credentials::tests::test_types::AdministratorTestCase;
@@ -106,11 +105,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         store,
                         &context,
                         second_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .is_err(),
@@ -121,24 +116,15 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         store,
                         &context,
                         (first_credentials.0, "wrong-csrf"),
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .is_err()
                 );
                 assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        first_credentials,
-                        (first, change, &AdministratorAuthentication::Password)
-                    )
-                    .await
-                    .is_err(),
+                    change_administrator(store, &context, first_credentials, (first, change))
+                        .await
+                        .is_err(),
                     "cannot remove sole administrator"
                 );
                 assert!(
@@ -146,11 +132,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         store,
                         &context,
                         first_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("authenticated administrator grant")
@@ -163,11 +145,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         store,
                         &context,
                         first_credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("idempotent grant")
@@ -179,18 +157,8 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                     revision
                 );
                 let (left, right) = tokio::join!(
-                    change_administrator(
-                        store,
-                        &context,
-                        first_credentials,
-                        (first, change, &AdministratorAuthentication::Password)
-                    ),
-                    change_administrator(
-                        &replica,
-                        &context,
-                        second_credentials,
-                        (second, change, &AdministratorAuthentication::Password)
-                    )
+                    change_administrator(store, &context, first_credentials, (first, change)),
+                    change_administrator(&replica, &context, second_credentials, (second, change))
                 );
                 assert_eq!(
                     [&left, &right]
@@ -233,11 +201,7 @@ fn given_installation_administrators_when_replicas_race_then_bootstrap_is_once_o
                         &replica,
                         &context,
                         survivor_credentials,
-                        (
-                            first,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (first, AdministratorChange::Grant),
                     )
                     .await
                     .is_err(),
@@ -358,11 +322,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         store,
                         &context,
                         credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .is_err()
@@ -379,30 +339,11 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         store,
                         &context,
                         credentials,
-                        (
-                            second,
-                            AdministratorChange::Grant,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (second, AdministratorChange::Grant),
                     )
                     .await
                     .expect("retry grant"),
                     "failed grant did not persist"
-                );
-                assert!(
-                    change_administrator(
-                        store,
-                        &context,
-                        credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
-                    )
-                    .await
-                    .is_err(),
-                    "an unprovisioned administrator is not a usable password-authentication alternative"
                 );
                 set_password(
                     store,
@@ -418,11 +359,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         store,
                         &context,
                         credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (first, AdministratorChange::Disable),
                     )
                     .await
                     .is_err()
@@ -433,11 +370,7 @@ fn given_bootstrap_and_admin_changes_when_durable_publication_fails_then_all_aut
                         store,
                         &context,
                         credentials,
-                        (
-                            first,
-                            AdministratorChange::Disable,
-                            &AdministratorAuthentication::Password
-                        ),
+                        (first, AdministratorChange::Disable),
                     )
                     .await
                     .expect("retry disabling person"),

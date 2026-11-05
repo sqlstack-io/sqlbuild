@@ -1,4 +1,4 @@
-"""Bootstrap, authenticate, lose authority, recover offline and authenticate again."""
+"""Bootstrap, authenticate, lose authority, restore it with grant-admin and authenticate again."""
 
 import hashlib
 import json
@@ -72,39 +72,34 @@ def verify_recovery(binary: Path) -> str:
         principal: str = person["principal_id"]
         password = "orders-recovery-password-2026"
         successful(administer(installation, ["set-password", principal], password))
-        recovery: list[str] = [
-            "recover-user",
-            principal,
-            "--reason",
-            "restore local administrator access",
-        ]
+        database: Path = root / ".sqlbuild/control.sqlite3"
         with serve(installation) as url:
             previous: tuple[str, str] = login(url, person["name"], password)
-            rejected: subprocess.CompletedProcess[str] = administer(installation, recovery)
+            with closing(sqlite3.connect(database)) as control:
+                control.execute("UPDATE sqb_principals SET disabled_at='2026-01-01T00:00:00Z'")
+                control.commit()
+            rejected: subprocess.CompletedProcess[str] = administer(
+                installation, ["create-user", "replacement-admin"]
+            )
             assert rejected.returncode != 0 and not rejected.stdout
-            assert "exclusive access" in rejected.stderr
-        print("Online recovery rejected; server killed and reaped.", flush=True)
-        database: Path = root / ".sqlbuild/control.sqlite3"
-        with closing(sqlite3.connect(database)) as control:
-            control.execute("UPDATE sqb_principals SET disabled_at='2026-01-01T00:00:00Z'")
-            control.commit()
-        rejected = administer(installation, ["create-user", "replacement-admin"])
-        assert rejected.returncode != 0 and not rejected.stdout
-        assert "bootstrap is closed" in rejected.stderr
-        result: dict[str, Any] = successful(administer(installation, recovery))
-        assert result == {"principal_id": principal, "role": "admin", "recovered": True}
+            assert "bootstrap is closed" in rejected.stderr
+            result: dict[str, Any] = successful(
+                administer(installation, ["grant-admin", principal])
+            )
+            assert result == {"principal_id": principal, "role": "admin"}
         with closing(sqlite3.connect(database)) as control:
             assert control.execute("SELECT COUNT(*) FROM sqb_admin_initialization").fetchone() == (
                 1,
             )
             assert control.execute(
-                "SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.offline_recovered'"
+                "SELECT COUNT(*) FROM sqb_security_audit WHERE action='admin.granted'"
             ).fetchone() == (1,)
             assert control.execute(
                 "SELECT COUNT(*) FROM sqb_password_sessions WHERE revoked_at IS NULL"
             ).fetchone() == (0,)
         print(
-            "Offline recovery committed one audit; bootstrap stayed closed; sessions revoked.",
+            "grant-admin committed one audit while serving; bootstrap stayed closed; "
+            "sessions revoked.",
             flush=True,
         )
         with serve(installation) as url:
@@ -113,10 +108,7 @@ def verify_recovery(binary: Path) -> str:
             assert request(f"{url}/api/auth/session", session=session)[0] == 200
             status, _, body = request(f"{url}/api/admin/people/{principal}", b'"revoke"', session)
             assert status == 403
-            assert (
-                "cannot remove or disable the final usable installation administrator"
-                in body["error"]
-            )
+            assert "cannot remove or disable the final installation administrator" in body["error"]
             rejected = administer(installation, ["create-user", "replacement-admin"])
             assert rejected.returncode != 0 and "bootstrap is closed" in rejected.stderr
     print("Installed-artifact administrator recovery acceptance passed.", flush=True)

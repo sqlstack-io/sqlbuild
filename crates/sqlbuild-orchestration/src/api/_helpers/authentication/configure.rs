@@ -6,7 +6,6 @@ use axum::{Extension, Router};
 
 use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
 use crate::api::models::{ApiAuthentication, DevelopmentScope};
-use crate::credentials::models::AdministratorAuthentication;
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -44,19 +43,11 @@ pub(crate) async fn configure(
             "OIDC authentication cannot be combined with other human authentication modes".into(),
         ));
     }
-    let administrator_authentication = if let Some(settings) = &trusted_proxy {
-        AdministratorAuthentication::BoundPeople(settings.identities.values().copied().collect())
-    } else if let Some(settings) = &oidc {
-        AdministratorAuthentication::BoundPeople(settings.identities.values().copied().collect())
-    } else {
-        AdministratorAuthentication::Password
-    };
     Ok((
         development_scope,
         password_sessions::router(store, password_origin)?
             .merge(trusted_proxy::router(store, trusted_proxy)?)
             .merge(oidc::router(store, oidc).await?)
-            .layer(Extension(default_role))
-            .layer(Extension(administrator_authentication)),
+            .layer(Extension(default_role)),
     ))
 }

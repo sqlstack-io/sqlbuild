@@ -23,8 +23,7 @@ use crate::credentials::main::{
     sessions::login_password::login_password, sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    AdministratorAuthentication, AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin,
-    RoleAssignmentRequest,
+    AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
 };
 use crate::credentials::tests::test_types::{AuditTestCase, AuditWebhookReceiver};
 use crate::store::errors::ControlError;
@@ -111,8 +110,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                             location_id: None,
                             target: None,
                             revoke: false,
-                        },
-                        &AdministratorAuthentication::Password
+                        }
                     )
                     .await
                     .expect("role assignment")
@@ -299,8 +297,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                         location_id: None,
                         target: None,
                         revoke: false,
-                    },
-                    &AdministratorAuthentication::Password
+                    }
                 )
                 .await
                 .expect("second administrator")
@@ -318,8 +315,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                         location_id: None,
                         target: None,
                         revoke: true,
-                    },
-                    &AdministratorAuthentication::Password
+                    }
                 )
                 .await
                 .expect("live role revocation")

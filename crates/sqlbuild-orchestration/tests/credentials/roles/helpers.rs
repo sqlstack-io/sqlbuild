@@ -15,8 +15,8 @@ use crate::credentials::main::{
     sessions::set_password::set_password,
 };
 use crate::credentials::models::{
-    Action, AdministratorAuthentication, AuditContext, BuiltinRole, DefaultRole, IssuedSession,
-    PasswordAuthority, PasswordLogin, PermissionScope, RoleAssignmentRequest, RoleKey,
+    Action, AuditContext, BuiltinRole, DefaultRole, IssuedSession, PasswordAuthority,
+    PasswordLogin, PermissionScope, RoleAssignmentRequest, RoleKey,
 };
 use crate::credentials::models::{
     RoleActivation, RoleActivationRequest, RoleApproval, RoleDecision,
@@ -64,14 +64,9 @@ async fn assign(
     request: RoleAssignmentRequest,
 ) {
     assert!(
-        assign_builtin_role(
-            store,
-            (fixture.0, credentials(fixture.1)),
-            &request,
-            &AdministratorAuthentication::Password
-        )
-        .await
-        .expect("role assignment")
+        assign_builtin_role(store, (fixture.0, credentials(fixture.1)), &request)
+            .await
+            .expect("role assignment")
     );
 }
 
