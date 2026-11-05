@@ -172,8 +172,9 @@ pub(crate) const MODEL_HEADER_KEYS: [&str; 73] = [
     "valid_from_column",
     "valid_to_column",
 ];
-pub(crate) const TARGET_KEYS: [&str; 20] = [
+pub(crate) const TARGET_KEYS: [&str; 21] = [
     "connection",
+    "catalog_connection",
     "vars",
     "database",
     "schema",

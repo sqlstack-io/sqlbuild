@@ -243,6 +243,7 @@ const BUILD_COMMAND_REQUEST: RecordSpec = RecordSpec {
         FieldSpec::new("no_color", FieldDefault::False),
         FieldSpec::new("fail_fast", FieldDefault::False),
         FieldSpec::new("full_refresh", FieldDefault::False),
+        FieldSpec::new("changed", FieldDefault::False),
         FieldSpec::new("load_sources", FieldDefault::None),
         FieldSpec::new("reload_sources", FieldDefault::False),
         FieldSpec::new("include_python", FieldDefault::True),
@@ -982,6 +983,7 @@ const CLI_ENTRYPOINT_HANDLERS: RecordSpec = RecordSpec {
         FieldSpec::new("run_refactor", FieldDefault::None),
         FieldSpec::new("run_recall", FieldDefault::None),
         FieldSpec::new("run_review", FieldDefault::None),
+        FieldSpec::new("run_location", FieldDefault::None),
     ],
 };
 const COMMAND_WAREHOUSE_SCOPE: RecordSpec = RecordSpec {
@@ -1366,6 +1368,8 @@ const SOURCE_FRESHNESS_RENDERERS: RecordSpec = RecordSpec {
         FieldSpec::required("render_insert_records_sql"),
         FieldSpec::new("render_create_table_sql", FieldDefault::None),
         FieldSpec::new("render_create_index_sqls", FieldDefault::None),
+        FieldSpec::new("read_columns", FieldDefault::None),
+        FieldSpec::new("render_add_columns", FieldDefault::None),
     ],
 };
 const SOURCE_FRESHNESS_OBSERVATION: RecordSpec = RecordSpec {
@@ -1560,6 +1564,7 @@ const CLI_COMMAND: EnumSpec = EnumSpec {
         ("DIFF", "diff"),
         ("REVIEW", "review"),
         ("DEBUG", "debug"),
+        ("LOCATION", "location"),
         ("LINEAGE", "lineage"),
         ("QUERY", "query"),
         ("COST", "cost"),

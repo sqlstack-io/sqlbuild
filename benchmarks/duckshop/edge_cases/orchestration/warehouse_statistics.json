@@ -1,0 +1,34 @@
+{
+  "retained_hours": 205,
+  "expired_samples": 205,
+  "drop_during_sampling": {
+    "name": "orders_🧾",
+    "create_sql": "CREATE TABLE \"orders_🧾\" (order_id INTEGER)",
+    "drop_sql": "DROP TABLE \"orders_🧾\"",
+    "model": "MODEL (description 'Orders.', materialized table); SELECT 17 AS amount\n",
+    "failure": "relation disappeared before statistics sampling"
+  },
+  "cleanup_interruption": {
+    "block_sql": "CREATE FUNCTION pause_statistics_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(30); RETURN NULL; END $$; CREATE TRIGGER pause_statistics_cleanup BEFORE DELETE ON sqb_warehouse_statistics FOR EACH STATEMENT EXECUTE FUNCTION pause_statistics_cleanup();",
+    "wait_sql": "DO $$ DECLARE deadline timestamptz := clock_timestamp() + interval '5 seconds'; BEGIN WHILE NOT EXISTS (SELECT 1 FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE l.relation='sqb_warehouse_statistics'::regclass AND a.wait_event='PgSleep' AND a.query LIKE 'DELETE FROM sqb_warehouse_statistics%') LOOP IF clock_timestamp() >= deadline THEN RAISE EXCEPTION 'cleanup did not start'; END IF; PERFORM pg_stat_clear_snapshot(); PERFORM pg_sleep(0.02); END LOOP; END $$;",
+    "restore_sql": "SELECT pg_cancel_backend(a.pid) FROM pg_stat_activity a JOIN pg_locks l ON l.pid=a.pid WHERE l.relation='sqb_warehouse_statistics'::regclass AND a.wait_event='PgSleep' AND a.query LIKE 'DELETE FROM sqb_warehouse_statistics%'; DROP TRIGGER pause_statistics_cleanup ON sqb_warehouse_statistics; DROP FUNCTION pause_statistics_cleanup();"
+  },
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "name": "orders_🧾_000",
+    "observed_at": "2026-01-01T00:00:00Z",
+    "row_count": 7,
+    "detail": "synthetic catalog estimate",
+    "byte_count": 4096,
+    "byte_count_basis": "synthetic_catalog_bytes"
+  },
+  "sqlite": {
+    "setup_sql": [
+      "CREATE TABLE orders (order_id INTEGER)",
+      "INSERT INTO orders VALUES (17), (31), (59)"
+    ],
+    "name": "orders",
+    "metadata_detail": "SQLite does not report table row counts from metadata"
+  }
+}

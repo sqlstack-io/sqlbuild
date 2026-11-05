@@ -38,6 +38,8 @@ pub struct DebugReport {
     pub configuration: Vec<DebugLine>,
     pub providers: Vec<DebugLine>,
     pub connection: Vec<DebugLine>,
+    /// Exact local database paths, not the shortened display values in connection lines.
+    pub local_files: Vec<String>,
 }
 
 impl DebugReport {

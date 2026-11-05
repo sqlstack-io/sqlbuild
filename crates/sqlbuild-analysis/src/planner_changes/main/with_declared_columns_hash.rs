@@ -2,8 +2,10 @@
 
 use serde_json::Value;
 
-use crate::planner_changes::_helpers::json_payload::{canonical_text, decoded_object};
-use crate::planner_changes::constants::DECLARED_COLUMNS_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::constants::DECLARED_COLUMNS_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::main::{
+    canonical_text::canonical_text, decoded_object::decoded_object,
+};
 
 /// Canonical metadata JSON that also records `declared_columns_hash`; text that is not an object is returned unchanged.
 pub fn with_declared_columns_hash(metadata_json: &str, declared_columns_hash: &str) -> String {

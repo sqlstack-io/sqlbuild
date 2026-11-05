@@ -22,6 +22,22 @@ pub enum ColumnType {
     Boolean,
 }
 
+impl ColumnType {
+    /// The PostgreSQL type used by both DDL and typed query placeholders.
+    #[must_use]
+    pub const fn postgres_type(self) -> &'static str {
+        match self {
+            Self::Text => "TEXT",
+            Self::Timestamp => "TIMESTAMPTZ",
+            Self::Json => "JSONB",
+            Self::Integer => "BIGINT",
+            Self::Boolean => "BOOLEAN",
+            Self::Real => "DOUBLE PRECISION",
+            Self::Blob => "BYTEA",
+        }
+    }
+}
+
 /// One column: its name, type and whether it may be null.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ColumnSpec {
@@ -75,7 +91,20 @@ pub struct TableSpec {
 }
 
 /// The tables Recall writes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum Table {
     Invocations,
     Output,

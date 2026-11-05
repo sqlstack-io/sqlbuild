@@ -217,4 +217,11 @@ pub(crate) const TARGET_FIELDS: &[TargetField] = &[
             decided_by: &["concurrency"],
         },
     },
+    TargetField {
+        group: None,
+        name: "catalog_connection",
+        rule: MergeRule::Overlay {
+            decided_by: &["catalog_connection"],
+        },
+    },
 ];

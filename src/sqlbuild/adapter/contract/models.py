@@ -369,10 +369,12 @@ class RowDiffCoverage:
 
 @dataclass(frozen=True)
 class RelationRowCountEstimate:
-    """Metadata row count read without scanning data; ``row_count`` is None when unknown."""
+    """Relation estimates; unavailable counts and storage bytes remain None."""
 
     row_count: int | None
     detail: str | None = None
+    byte_count: int | None = None
+    byte_count_basis: str | None = None
 
 
 @dataclass(frozen=True)

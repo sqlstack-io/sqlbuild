@@ -219,3 +219,10 @@ class SqliteUnkeyedSampleTestCase:
     limit: int
     expected_row_count: int
     expected_order_ids: frozenset[object]
+
+
+@dataclass(frozen=True)
+class SqliteStatisticsTestCase:
+    description: str
+    fixture_name: str
+    expected_interactive_row_count: int

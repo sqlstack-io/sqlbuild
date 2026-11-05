@@ -1,0 +1,34 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "name": "orders_🧾",
+    "relation_type": "BASE TABLE",
+    "columns": [
+      {"name": "order_id", "data_type": "INTEGER"},
+      {"name": "note\"text", "data_type": "VARCHAR"}
+    ]
+  },
+  "create_sql": "CREATE TABLE \"orders_🧾\" (order_id INTEGER, \"note\"\"text\" VARCHAR)",
+  "alter_sql": "ALTER TABLE \"orders_🧾\" ADD COLUMN shipped INTEGER",
+  "replace_sql": ["DROP TABLE \"orders_🧾\"", "CREATE VIEW \"orders_🧾\" AS SELECT 7 AS order_id"],
+  "drop_sql": "DROP VIEW \"orders_🧾\"",
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 17 AS amount\n",
+  "extra_relations": 104,
+  "non_authoritative_database": null,
+  "postgres_sql": [
+    "CREATE SCHEMA main",
+    "CREATE TABLE main.orders (order_id INTEGER, amount NUMERIC)",
+    "CREATE TABLE main.\"Orders\" (note TEXT, shipped BOOLEAN)"
+  ],
+  "postgres_records": [
+    {"state_database": null, "state_schema": "main", "name": "Orders", "relation_type": "BASE TABLE", "columns": [{"name": "note", "data_type": "text"}, {"name": "shipped", "data_type": "boolean"}]},
+    {"state_database": null, "state_schema": "main", "name": "orders", "relation_type": "BASE TABLE", "columns": [{"name": "order_id", "data_type": "integer"}, {"name": "amount", "data_type": "numeric"}]}
+  ],
+  "lifecycle": ["create", "unchanged scan", "column added", "table becomes view", "drop", "empty mirror rebuild"],
+  "read_namespaces": [
+    {"database": null, "schema": "main"},
+    {"database": "orders_data", "schema": "main"},
+    {"database": null, "schema": "reporting"}
+  ]
+}

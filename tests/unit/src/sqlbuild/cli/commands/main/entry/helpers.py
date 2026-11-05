@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import signal
+import weakref
 from collections.abc import Callable
 from importlib.machinery import ModuleSpec
 from pathlib import Path
@@ -11,6 +13,7 @@ from typing import Any, Protocol, cast
 
 from sqlbuild._native import (
     CliEntrypointHandlers,
+    CompileCommandRequest,
     SpecConfigError,
     loader_destination_parts,
 )
@@ -42,6 +45,20 @@ def invalid_loader_destination_error(_: Path) -> SpecConfigError:
 
 
 def noop_handler(*_a: Any, **_k: Any) -> int:
+    return 0
+
+
+def compile_with_callback_interrupt(_request: CompileCommandRequest) -> int:
+    """Deliver one real SIGINT from a callback where Python cannot propagate its exception."""
+
+    def value() -> None:
+        return None
+
+    reference: weakref.ReferenceType[Callable[[], None]] = weakref.ref(
+        value, lambda _: signal.raise_signal(signal.SIGINT)
+    )
+    del value
+    assert reference() is None
     return 0
 
 

@@ -142,8 +142,9 @@ fn given_rows_when_inserting_then_literals_are_escaped_and_definitions_encoded()
             expected_sql: Ok(
                 "INSERT INTO main.t (node_type, node_name, target_database, target_schema, \
                  target_name, run_id, definition_hash, version_hash, schema_fingerprint, \
-                 definition_b64, metadata_json_b64, ts) VALUES ('model', 'o''rders', NULL, \
-                 'main', 'orders', 'run', 'd', '', 's', 'YWI=', 'e30=', '2026-01-01T00:00:00')",
+                 definition_b64, metadata_json_b64, ts, event_id) VALUES ('model', 'o''rders', NULL, \
+                 'main', 'orders', 'run', 'd', '', 's', 'YWI=', 'e30=', '2026-01-01T00:00:00', \
+                 'b9397954c803e7f99f6a233c2985be772c7ddf2c6f234197d77bc227ae175cbd')",
             ),
         },
         InsertTestCase {

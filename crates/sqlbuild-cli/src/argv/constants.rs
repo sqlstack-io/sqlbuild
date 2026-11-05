@@ -36,6 +36,8 @@ pub(crate) const MAXIMUM_BLANK_RUN: usize = 2;
 
 /// `CliNamespace` attributes the post-parse rules read and write.
 pub(crate) const COMMAND_DEST: &str = "command";
+pub(crate) const BUILD_COMMAND: &str = "build";
+pub(crate) const CONCURRENCY_DEST: &str = "concurrency";
 pub(crate) const DBT_COMMAND: &str = "dbt";
 pub(crate) const DBT_DEBUG_COMMAND: &str = "debug";
 pub(crate) const DBT_PASSTHROUGH_COMMANDS: [&str; 4] = ["plan", "run", "build", "debug"];
@@ -69,7 +71,7 @@ pub(crate) const INT_CONVERTER: &str = "int";
 pub(crate) const PATH_CONVERTER: &str = "Path";
 
 /// Every `CliNamespace` attribute with a default, in declaration order.
-pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 184] = [
+pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 185] = [
     ("command", NamespaceDefault::None),
     ("project_dir", NamespaceDefault::None),
     ("dbt_project_dir", NamespaceDefault::None),
@@ -124,6 +126,7 @@ pub(crate) const CLI_NAMESPACE_DEFAULTS: [(&str, NamespaceDefault); 184] = [
     ("no_color", NamespaceDefault::Bool(false)),
     ("fail_fast", NamespaceDefault::Bool(false)),
     ("full_refresh", NamespaceDefault::Bool(false)),
+    ("changed", NamespaceDefault::Bool(false)),
     ("as_target", NamespaceDefault::None),
     ("include_python", NamespaceDefault::Bool(true)),
     ("load_sources", NamespaceDefault::None),

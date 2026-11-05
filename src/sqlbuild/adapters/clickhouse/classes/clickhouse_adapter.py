@@ -29,6 +29,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _typed_scalar_payload,
     _validate_rectangular_typed_array,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_snapshot_sql import render_is_distinct_from
 from sqlbuild.adapter.contract.classes.microbatch import MicrobatchMixin
 from sqlbuild.adapter.contract.classes.snapshot_sql import SnapshotSql
@@ -153,7 +154,7 @@ _NOT_NULL_COLUMN_PATTERN: re.Pattern[str] = re.compile(
 )
 
 
-class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class ClickHouseAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """ClickHouse adapter that builds tables aside and rewrites whole partitions."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.CLICKHOUSE.value
@@ -465,22 +466,34 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         return generation_comment(tuple(row)).removeprefix(GENERATION_COMMENT_PREFIX)
 
     def estimate_relation_row_count(
-        self, *, connection: Any, database: str | None, schema: str | None, name: str
+        self,
+        *,
+        connection: Any,
+        database: str | None,
+        schema: str | None,
+        name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         del database
         row: Any = self.execute(
             connection=connection,
-            sql="SELECT engine, total_rows FROM system.tables WHERE "
+            sql=(
+                "SELECT engine, total_rows, total_bytes FROM system.tables WHERE "
+                if metadata_only
+                else "SELECT engine, total_rows FROM system.tables WHERE "
+            )
             + _database_filter(schema)
             + f" AND name = {quote_string(name)}",
         ).fetchone()
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        if row[1] is None:
-            return RelationRowCountEstimate(
-                row_count=None, detail=f"engine {row[0]} does not report row counts"
-            )
-        return RelationRowCountEstimate(row_count=int(row[1]))
+        byte_count: int | None = int(row[2]) if metadata_only and row[2] is not None else None
+        return RelationRowCountEstimate(
+            row_count=int(row[1]) if row[1] is not None else None,
+            detail=f"engine {row[0]} does not report row counts" if row[1] is None else None,
+            byte_count=byte_count,
+            byte_count_basis="system_tables_total_bytes" if byte_count is not None else None,
+        )
 
     def read_view_definition(
         self, *, connection: Any, database: str | None, schema: str, name: str
@@ -660,6 +673,9 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         )
 
     def render_current_timestamp(self) -> str:
+        return "now64(6, 'UTC')"
+
+    def render_current_utc_timestamp(self) -> str:
         return "now64(6, 'UTC')"
 
     def normalize_row_diff_numeric_type(self, column_type: str) -> str | None:
@@ -1903,6 +1919,11 @@ class ClickHouseAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     def render_create_source_freshness_table_sql(self, *, database: str | None, schema: str) -> str:
         return _state_table_ddl(
             super().render_create_source_freshness_table_sql(database=database, schema=schema)
+        )
+
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        return _state_table_ddl(
+            super().render_create_consumption_table_sql(database=database, schema=schema)
         )
 
     def render_create_node_result_table_sql(self, *, database: str | None, schema: str) -> str:

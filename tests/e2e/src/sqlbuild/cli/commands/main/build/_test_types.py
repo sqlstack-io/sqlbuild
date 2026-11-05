@@ -5,6 +5,8 @@ from __future__ import annotations
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import NamedTuple
 
 
 @dataclass(frozen=True)
@@ -1524,3 +1526,41 @@ class QuotedConfiguredColumnsE2ETestCase:
     cursor: str
     expected_history_rows: list[tuple[object, ...]]
     expected_activity_rows: list[tuple[object, ...]]
+
+
+class ChangedWarehouse(NamedTuple):
+    """One adapter's changed-builds project: configuration, raw tables and how to query it."""
+
+    name: str
+    project_toml: str
+    warehouse_file: str
+    raw_tables_sql: tuple[str, ...]
+    consumption_table: str
+    orders_table: str
+    customers_table: str
+    slow_scan_cte: str
+    execute: Callable[[Path, str], list[tuple[object, ...]]]
+
+
+class ChangedBuildStep(NamedTuple):
+    """One mutation of the warehouse or project followed by one build."""
+
+    description: str
+    warehouse_sql: tuple[str, ...]
+    project_files: dict[str, str]
+    arguments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ChangedBuildE2ETestCase:
+    description: str
+    warehouse: ChangedWarehouse
+    expected_ran: tuple[tuple[str, frozenset[str]], ...]
+
+
+@dataclass(frozen=True)
+class ChangedCrashE2ETestCase:
+    description: str
+    warehouse: ChangedWarehouse
+    expected_ran: frozenset[str]
+    expected_killed_rows: list[tuple[object, ...]]

@@ -17,13 +17,16 @@ pub const DDL_SCRIPT_INVOCATION: &str = "ddl-script";
 pub const META_MAINTENANCE_COMPONENT: &str = "maintenance";
 pub const META_MAINTENANCE_CLAIM_KEY: &str = "claim";
 
+/// Assigned by storage rather than accepted from a producer's row values.
+pub const INGESTED_AT_COLUMN: &str = "ingested_at";
+
 /// Columns every Recall row carries, after the table's own columns.
 pub const COMMON_COLUMNS: [ColumnSpec; 6] = [
     ColumnSpec::required("invocation_id", ColumnType::Text),
     ColumnSpec::required("invocation_started_at", ColumnType::Timestamp),
     ColumnSpec::required("schema_version", ColumnType::Integer),
     ColumnSpec::required("producer_version", ColumnType::Text),
-    ColumnSpec::required("ingested_at", ColumnType::Timestamp),
+    ColumnSpec::required(INGESTED_AT_COLUMN, ColumnType::Timestamp),
     ColumnSpec::required("content_hash", ColumnType::Text),
 ];
 /// The artifact columns its content digest covers: what it is, not who saw it when.

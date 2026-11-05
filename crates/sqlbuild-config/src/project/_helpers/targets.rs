@@ -415,6 +415,10 @@ fn local_target(payload: &ConfigValue, target: TargetPlace<'_>) -> Loaded<Fields
         .collect::<Loaded<Fields>>()?;
     fields.push(("clone", object("LocalClonePolicy", clone_fields)));
     fields.push(("concurrency", target_concurrency(mapping, target)?));
+    fields.push((
+        "catalog_connection",
+        optional_text_field(mapping, "catalog_connection")?,
+    ));
     Ok(fields)
 }
 

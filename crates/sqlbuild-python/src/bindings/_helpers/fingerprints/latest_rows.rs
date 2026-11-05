@@ -130,7 +130,7 @@ fn borrowed(identities: &[(String, String)]) -> Vec<FingerprintIdentity<'_>> {
         .collect()
 }
 
-fn row_fingerprint<'py>(
+pub(crate) fn row_fingerprint<'py>(
     fingerprint_class: &Bound<'py, PyAny>,
     from_iso: &Bound<'py, PyAny>,
     row: &Bound<'py, PyAny>,

@@ -62,10 +62,6 @@ pub(crate) fn key_text(value: Option<&RecallValue>, column_type: ColumnType) -> 
         Some(RecallValue::Text(text)) if column_type == ColumnType::Timestamp => {
             parse_timestamp(text).map_or_else(|| text.clone(), format_timestamp)
         }
-        Some(RecallValue::Text(text)) => text.clone(),
-        Some(RecallValue::Integer(number)) => number.to_string(),
-        Some(RecallValue::Real(number)) => number.to_string(),
-        Some(RecallValue::Blob(_)) => "<blob>".to_owned(),
-        Some(RecallValue::Null) | None => String::new(),
+        _ => value.map_or_else(String::new, RecallValue::key_text),
     }
 }

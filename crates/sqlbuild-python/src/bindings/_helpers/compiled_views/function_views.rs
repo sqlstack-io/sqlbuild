@@ -436,7 +436,10 @@ impl NativeCompiledFunction {
     }
 
     /// The destination and fingerprint destination, with target defaults once applied.
-    fn current_destinations(&self, py: Python<'_>) -> PyResult<(DestinationFact, DestinationFact)> {
+    pub(crate) fn current_destinations(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<(DestinationFact, DestinationFact)> {
         if let Some(defaulted) = &self.defaulted {
             return Ok(defaulted.clone());
         }

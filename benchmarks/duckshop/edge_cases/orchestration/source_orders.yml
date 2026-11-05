@@ -1,0 +1,8 @@
+sources:
+  - name: raw_orders
+    description: Raw orders.
+    schema: main
+    table: raw_orders
+    columns:
+      - name: order_id
+        type: BIGINT

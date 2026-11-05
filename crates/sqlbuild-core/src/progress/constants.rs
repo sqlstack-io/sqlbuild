@@ -110,6 +110,7 @@ pub(crate) const SQL_PREVIEW_LENGTH: usize = 160;
 pub(crate) const EXECUTION_TITLE: &str = "Execution";
 pub(crate) const LINEAGE_COMMAND: &str = "lineage";
 pub(crate) const QUERY_COMMAND: &str = "query";
+pub(crate) const LOCATION_COMMAND: &str = "location";
 pub(crate) const DBT_COMMAND: &str = "dbt";
 pub(crate) const DBT_JSON_OPTION: &str = "--json";
 pub(crate) const JSON_FORMAT: &str = "json";

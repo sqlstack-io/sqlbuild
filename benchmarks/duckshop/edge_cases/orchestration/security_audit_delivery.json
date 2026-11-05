@@ -1,0 +1,7 @@
+{
+  "events": 105,
+  "action": "role.assigned",
+  "scope": {"location": "orders", "target": "development"},
+  "before": {"role": null},
+  "after": {"role": "viewer", "note": "Order metadata — read only"}
+}

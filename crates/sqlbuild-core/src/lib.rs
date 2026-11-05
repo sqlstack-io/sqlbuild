@@ -28,6 +28,7 @@ pub mod diagnostic_routing;
 pub mod diagnostic_text;
 pub mod dlt_destination;
 pub mod event_export;
+pub mod fingerprint_identity;
 pub mod format_command;
 pub mod freshness_text;
 pub mod git_revisions;

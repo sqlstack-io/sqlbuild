@@ -1,0 +1,7 @@
+{
+  "raw_sql": "SELECT {{ order_amount() }} AS amount -- Orders 🧾\n",
+  "compiled_sql": "SELECT 23 AS amount -- Orders 🧾\n",
+  "python_source": "def order_amount():\n    return 23\n",
+  "function_sql": "43",
+  "updated_sql": "SELECT 37 AS amount -- Updated orders 🧾\n"
+}

@@ -167,6 +167,10 @@ _TARGETS: dict[str, tuple[str, str]] = {
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
         "load_sink_module",
     ),
+    "load_orchestration_module": (
+        "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
+        "load_orchestration_module",
+    ),
     "module_functions": (
         "sqlbuild.compiler.discovery._helpers.filesystem.project_modules",
         "module_functions",

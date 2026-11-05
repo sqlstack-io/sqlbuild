@@ -1,0 +1,8 @@
+{
+  "description": "A support role is published, widened in a different permission order over the tag:orders selector, narrowed, then removed. Every publication takes effect at once.",
+  "publications": [
+    {"permissions": ["view"], "expected": {"view": "orders_support", "job.run": null}},
+    {"permissions": ["job.run", "view"], "expected": {"view": "orders_support", "job.run": "orders_support"}},
+    {"permissions": ["job.run"], "expected": {"view": null, "job.run": "orders_support"}}
+  ]
+}

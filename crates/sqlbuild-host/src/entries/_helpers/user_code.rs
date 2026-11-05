@@ -65,6 +65,11 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         edge: HostEdge::UserCode,
     },
     HostEntry {
+        name: "load_orchestration_module",
+        kind: HostKind::Function,
+        edge: HostEdge::UserCode,
+    },
+    HostEntry {
         name: "module_functions",
         kind: HostKind::Function,
         edge: HostEdge::UserCode,

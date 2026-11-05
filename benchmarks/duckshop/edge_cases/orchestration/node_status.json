@@ -1,0 +1,39 @@
+{
+  "model_metadata": {
+    "model_name": "orders",
+    "config": {"materialized": "table", "lookback": "2d"},
+    "execution_signature": {"custom_config": {"label": "orders 🧾", "threshold": 1.25}},
+    "local_function_hashes": {"order_total": "function-v1"}
+  },
+  "model_local_hash": "34dd67f2ccccda42100a392d5bb611da80d22205a358cd5a45e8dc1c3f6d7e4b",
+  "query_hash": "orders-definition-latest",
+  "same_named_function": {
+    "name": "orders",
+    "destination": {"database": null, "schema": "main", "name": "orders"},
+    "arguments": [],
+    "returns": "INTEGER",
+    "deps": []
+  },
+  "physical": {
+    "state_database": null,
+    "state_schema": "main",
+    "name": "orders",
+    "relation_type": "BASE TABLE",
+    "columns": [{"name": "order_id", "data_type": "INTEGER"}]
+  },
+  "freshness": {
+    "event_id": "orders-source-newer",
+    "state_database": null,
+    "state_schema": "main",
+    "source_name": "raw_orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "raw_orders",
+    "run_id": "external-orders",
+    "strategy": "max_column",
+    "value_kind": "integer",
+    "data_version": "18446744073709551619",
+    "data_version_hash": "orders-source-newer-version",
+    "observed_at": "2026-02-03T04:05:06Z"
+  }
+}

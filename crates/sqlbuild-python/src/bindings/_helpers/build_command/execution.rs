@@ -20,7 +20,7 @@ use crate::bindings::_helpers::build_command::support::{
     boolean, display_text, emit, frozenset, joined, keyword_relay, line_writer, none, text, tuple,
 };
 use crate::bindings::_helpers::build_progress::build_callbacks::{
-    BuildProgressCallbacks, batch_complete_callback,
+    BuildProgressCallbacks, batch_complete_callback, check_callback,
 };
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::write_execution_header;
@@ -31,10 +31,14 @@ use crate::bindings::_helpers::check::check_core::{
 use crate::bindings::_helpers::check::check_results::write_check_results;
 use crate::bindings::_helpers::command_runtime::warehouses::describe_connection_warehouse;
 use crate::bindings::_helpers::compile_driver::relation_targets::build_project_relation_targets;
+use crate::bindings::_helpers::consumption::recorder::{
+    ConsumptionRecorder, Prepared, prepare as prepare_consumption, run_reason_text,
+};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::cursor::overrides::{cursor_integer, cursor_timestamp};
 use crate::bindings::_helpers::freshness::publication::append_freshness_records;
 use crate::bindings::_helpers::graph::python_node_graph::python_node_graph;
+use crate::bindings::_helpers::native_host::consumption_state::recorder_callbacks;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_resolution::cursor_overrides::type_cursor_overrides;
@@ -225,6 +229,10 @@ pub(crate) fn prepare_build_execution<'py>(
             ],
         )?),
     )
+    .map(|mut value| {
+        value.worker = context.worker.clone();
+        value
+    })
     .and_then(|value| pyo3::Bound::new(py, value))
     .map(pyo3::Bound::into_any)?;
     let concurrency = context.concurrency()?.limit;
@@ -366,6 +374,21 @@ pub(crate) fn execute_build_plan<'py>(
             ),
         ],
     )?;
+    let prepared: Prepared<'py> = prepare_consumption(
+        (&plan, &project),
+        (&adapter, &connection_config),
+        (
+            context.request_flag("changed")?,
+            context.request_flag("full_refresh")?,
+        ),
+        (
+            native_field(&project, "run_id")?.str()?.extract()?,
+            native_field(&preparation.lifecycle, "on_node_complete")?,
+        ),
+    )?;
+    report_changed_decision(context, &prepared)?;
+    let recorder: &Bound<'py, ConsumptionRecorder> = &prepared.recorder;
+    let (on_node_complete, before_node_write) = recorder_callbacks(recorder.as_any())?;
     let connection: &Bound<'py, PyAny> = &preparation.connection_progress;
     let build_callbacks: Bound<'py, PyAny> = call_with(
         &host::entry(py, ExecutorHost::BuildCallbacks)?,
@@ -375,10 +398,8 @@ pub(crate) fn execute_build_plan<'py>(
                 "on_node_start",
                 keyword_relay(native_field(callbacks, "on_node_start")?, &NODE_START)?,
             ),
-            (
-                "on_node_complete",
-                native_field(&preparation.lifecycle, "on_node_complete")?,
-            ),
+            ("on_node_complete", on_node_complete),
+            ("before_node_write", before_node_write),
             (
                 "on_sub_progress",
                 native_field(callbacks, "on_sub_progress")?,
@@ -425,7 +446,10 @@ pub(crate) fn execute_build_plan<'py>(
     let initial_state: Bound<'py, PyAny> = call_with(
         &host::entry(py, ExecutorHost::BuildInitialState)?,
         &[
-            ("precompleted_keys", lifecycle.precompleted_keys(py)?),
+            (
+                "precompleted_keys",
+                with_skipped_keys(&plan, lifecycle.precompleted_keys(py)?, &prepared)?,
+            ),
             ("initial_load_results", lifecycle.ingress_load_results(py)),
             ("initial_failed_keys", lifecycle.blocked_keys(py)?),
         ],
@@ -443,6 +467,9 @@ pub(crate) fn execute_build_plan<'py>(
             ("initial_state", initial_state),
         ],
     )?;
+    for warning in recorder.get().finish(py, &result)? {
+        emit(&context.stream, &format!("warning: {warning}\n"))?;
+    }
     let native_result = BuildExecutionResult::read(&result)?;
     let successful_models: Vec<String> = native_result
         .model_results
@@ -462,6 +489,74 @@ pub(crate) fn execute_build_plan<'py>(
         executor_result: result,
         python_results: lifecycle.python_results(py)?,
     })
+}
+
+/// Report what `--changed` runs and skips, and any warnings from reading records.
+fn report_changed_decision(context: &BuildContext<'_>, prepared: &Prepared<'_>) -> PyResult<()> {
+    for warning in &prepared.warnings {
+        emit(&context.stream, &format!("warning: {warning}\n"))?;
+    }
+    let Some(decision) = &prepared.decision else {
+        return Ok(());
+    };
+    if let Some(worker) = &context.worker {
+        let skipped: Vec<String> = decision
+            .skipped
+            .iter()
+            .map(|key| format!("{}:{}", key.kind, key.name))
+            .collect();
+        worker.unchanged(context.py(), &skipped)?;
+    }
+    emit(
+        &context.stream,
+        &format!(
+            "Changed: {} of {} selected models and seeds run; {} unchanged are skipped.\n",
+            decision.run,
+            decision.run + decision.skipped.len(),
+            decision.skipped.len()
+        ),
+    )?;
+    if context.request_flag("verbose")? {
+        for (key, reason) in &decision.reasons {
+            emit(
+                &context.stream,
+                &format!(
+                    "  runs {} {}: {}\n",
+                    key.kind,
+                    key.name,
+                    run_reason_text(reason)
+                ),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// `precompleted` with the plan keys of the models and seeds `--changed` skips.
+fn with_skipped_keys<'py>(
+    plan: &Bound<'py, PyAny>,
+    precompleted: Bound<'py, PyAny>,
+    prepared: &Prepared<'py>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let Some(decision) = &prepared.decision else {
+        return Ok(precompleted);
+    };
+    let py: Python<'py> = plan.py();
+    let mut keys: Vec<Bound<'py, PyAny>> = precompleted.try_iter()?.collect::<PyResult<_>>()?;
+    for (entries, kind) in [("model_entries", "model"), ("seed_entries", "seed")] {
+        for entry in native_field(plan, entries)?.try_iter()? {
+            let entry: Bound<'py, PyAny> = entry?;
+            let name: String = native_field(&entry, "name")?.extract()?;
+            if decision
+                .skipped
+                .iter()
+                .any(|key| key.kind == kind && key.name == name)
+            {
+                keys.push(native_field(&entry, "key")?);
+            }
+        }
+    }
+    frozenset(py, &keys)
 }
 
 fn check_runtime<'py>(
@@ -592,10 +687,16 @@ pub(crate) fn run_post_build_python_checks<'py>(
         )?;
         let callbacks: Bound<'py, PyAny> = call_with(
             &host::entry(py, ExecutorHost::PythonCheckCallbacks)?,
-            &[(
-                "on_check_complete",
-                native_field(&preparation.callbacks, "write_execution_event")?,
-            )],
+            &[
+                (
+                    "on_check_start",
+                    check_callback(&preparation.callbacks, false)?,
+                ),
+                (
+                    "on_check_complete",
+                    check_callback(&preparation.callbacks, true)?,
+                ),
+            ],
         )?;
         call_with(
             &host::entry(py, ExecutorHost::ExecutePythonChecks)?,

@@ -1,16 +1,18 @@
 //! Janitor planning names, prefixes and skip reasons.
 
 use sqlbuild_core::constants::COLUMN_MIGRATION_TABLE_NAME;
+use sqlbuild_core::constants::CONSUMPTION_TABLE_NAME;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 
 /// SQLBuild state tables the janitor never acts on.
-pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; 9] = [
+pub const BUILT_IN_EXCLUDE_PATTERNS: [&str; 10] = [
     FINGERPRINT_TABLE_NAME,
     "_sqlbuild_microbatches",
     SOURCE_FRESHNESS_TABLE_NAME,
+    CONSUMPTION_TABLE_NAME,
     "_sqlbuild_node_results",
     "_sqlbuild_audit_results",
     "_sqlbuild_janitor_events",

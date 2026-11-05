@@ -1,0 +1,25 @@
+{
+  "after_seconds": 60,
+  "source_count": 104,
+  "source_definitions": {
+    "source:raw_orders_103": {
+      "database": null, "schema": null, "table": "raw_orders",
+      "namespace": ["orders_data", "landing"]
+    }
+  },
+  "cases": [
+    {"index": 0, "age_seconds": 61, "offset_seconds": 10800},
+    {"index": 1, "age_seconds": 60},
+    {"index": 2, "age_seconds": 59},
+    {"index": 3, "age_seconds": 600},
+    {"index": 3, "age_seconds": 600, "null": true, "observed_offset_microseconds": 1},
+    {"index": 4, "age_seconds": 600, "value_kind": "integer", "data_version": "18446744073709551617"},
+    {"index": 5, "age_seconds": 600, "target_name": "archived_orders"},
+    {"index": 103, "age_seconds": 61, "format": "%Y-%m-%dT%H:%M:%S%.f", "target_database": "orders_data", "target_schema": "landing"}
+  ],
+  "later_pages": [
+    {"expected_cursor": "source:raw_orders_099", "expected_runs": 2},
+    {"expected_cursor": null, "expected_runs": 4},
+    {"expected_cursor": "source:raw_orders_099", "expected_runs": 4}
+  ]
+}

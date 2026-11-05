@@ -12,20 +12,14 @@ use crate::schema::models::Table;
 use crate::store::_helpers::schema::stored_columns;
 use crate::store::_helpers::sqlite::{SqlValue, checked};
 use crate::store::errors::StoreError;
+use crate::store::main::conflict_evidence::conflict_evidence;
+use crate::store::main::relational_insert::relational_insert;
+use crate::store::main::relational_lookup::relational_lookup;
 use crate::store::models::{ConflictEvidence, InsertOutcome};
 
-fn key_text(value: Option<&RecallValue>) -> String {
-    match value {
-        Some(RecallValue::Text(text)) => text.clone(),
-        Some(RecallValue::Integer(number)) => number.to_string(),
-        Some(RecallValue::Real(number)) => number.to_string(),
-        Some(RecallValue::Blob(_)) => "<blob>".to_owned(),
-        Some(RecallValue::Null) | None => String::new(),
-    }
-}
-
 fn text_of(row: &RecallRow, column: &str) -> String {
-    key_text(row.value(column))
+    row.value(column)
+        .map_or_else(String::new, RecallValue::key_text)
 }
 
 /// Insert one row's values for the columns its table has; `Some(evidence)` when its key holds different content.
@@ -34,28 +28,17 @@ fn write_row(
     (row, columns): (&RecallRow, &HashSet<String>),
     ingested_at: &str,
 ) -> Result<Option<ConflictEvidence>, StoreError> {
-    let spec = table_spec(row.table);
     let ingested: RecallValue = RecallValue::Text(ingested_at.to_owned());
-    let stored: Vec<&(&str, RecallValue)> = row
+    let insert = relational_insert((row, columns), &ingested, false);
+    let parameters: Vec<SqlValue<'_>> = insert
         .values
         .iter()
-        .filter(|(name, _)| columns.contains(*name))
+        .map(|(value, _)| SqlValue(value))
         .collect();
-    let mut names: Vec<&str> = stored.iter().map(|(name, _)| *name).collect();
-    names.push("ingested_at");
-    let placeholders: Vec<String> = (1..=names.len()).map(|index| format!("?{index}")).collect();
-    let sql = format!(
-        "INSERT INTO \"{}\" ({}) VALUES ({}) ON CONFLICT DO NOTHING",
-        spec.name,
-        names.join(", "),
-        placeholders.join(", ")
-    );
-    let parameters: Vec<SqlValue<'_>> = stored
-        .iter()
-        .map(|(_, value)| SqlValue(value))
-        .chain(std::iter::once(SqlValue(&ingested)))
-        .collect();
-    let mut statement = checked(connection.prepare_cached(&sql), "prepare Recall insert")?;
+    let mut statement = checked(
+        connection.prepare_cached(&insert.sql),
+        "prepare Recall insert",
+    )?;
     let changed: usize = checked(
         statement.execute(rusqlite::params_from_iter(parameters.iter())),
         "write Recall rows",
@@ -63,24 +46,16 @@ fn write_row(
     if changed > 0 {
         return Ok(None);
     }
-    let condition: Vec<String> = spec
-        .key
+    let lookup = relational_lookup(row, false, false);
+    let key_values: Vec<SqlValue<'_>> = lookup
+        .values
         .iter()
-        .enumerate()
-        .map(|(index, name)| format!("{name} = ?{}", index + 1))
+        .map(|(value, _)| SqlValue(value))
         .collect();
-    let lookup = format!(
-        "SELECT content_hash FROM \"{}\" WHERE {}",
-        spec.name,
-        condition.join(" AND ")
-    );
-    let null = RecallValue::Null;
-    let key_values: Vec<SqlValue<'_>> = spec
-        .key
-        .iter()
-        .map(|name| SqlValue(row.value(name).unwrap_or(&null)))
-        .collect();
-    let mut statement = checked(connection.prepare_cached(&lookup), "prepare Recall lookup")?;
+    let mut statement = checked(
+        connection.prepare_cached(&lookup.sql),
+        "prepare Recall lookup",
+    )?;
     let existing: Option<String> = checked(
         statement
             .query_row(rusqlite::params_from_iter(key_values.iter()), |found| {
@@ -89,21 +64,7 @@ fn write_row(
             .optional(),
         "read stored Recall row",
     )?;
-    let rejected: &str = row.content_hash().unwrap_or_default();
-    match existing {
-        Some(existing) if existing != rejected => Ok(Some(ConflictEvidence {
-            table: row.table,
-            record_key: spec
-                .key
-                .iter()
-                .map(|name| key_text(row.value(name)))
-                .collect::<Vec<_>>()
-                .join(":"),
-            existing_sha256: existing,
-            rejected_sha256: rejected.to_owned(),
-        })),
-        _ => Ok(None),
-    }
+    Ok(existing.and_then(|existing| conflict_evidence(row, &existing)))
 }
 
 /// Write `rows` on the current transaction; conflicts become `recall_conflicts` rows.

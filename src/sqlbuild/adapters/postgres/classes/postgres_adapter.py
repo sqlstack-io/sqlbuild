@@ -28,6 +28,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_typed_value_list,
     _validate_rectangular_typed_array,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -121,7 +122,7 @@ from sqlbuild.runtime.execution_limits.main.execution_deadlines_suspended import
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """PostgreSQL adapter backed by psycopg."""
 
     def get_columns_for_relations(
@@ -977,6 +978,9 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
 
+    def render_current_utc_timestamp(self) -> str:
+        return "(now() AT TIME ZONE 'UTC')"
+
     def create_table_as(
         self,
         *,
@@ -1706,6 +1710,18 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             "observed_at DESC, run_id DESC)",
         )
 
+    def render_create_consumption_index_sqls(
+        self, *, database: str | None, schema: str
+    ) -> tuple[str, ...]:
+        from sqlbuild._native import CONSUMPTION_TABLE_NAME
+
+        return self._state_index_sqls(
+            table=(database, schema, CONSUMPTION_TABLE_NAME),
+            indexes=(
+                ("_sqlbuild_consumption_relation_idx", "target_schema, target_name, recorded_at"),
+            ),
+        )
+
     def render_insert_source_freshness_records_sql(
         self,
         *,
@@ -1781,17 +1797,32 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         from sqlbuild.executor.audit_results.constants import AUDIT_RESULTS_TABLE_NAME
 
+        return self._state_index_sqls(
+            table=(database, schema, AUDIT_RESULTS_TABLE_NAME),
+            indexes=(
+                (
+                    "_sqlbuild_audit_results_latest_idx",
+                    "audit_name, binding_key, execution_fingerprint, run_scope_phase, "
+                    "occurred_at DESC, result_id DESC",
+                ),
+                ("_sqlbuild_audit_results_run_id_idx", "run_id, invocation_id, result_id"),
+            ),
+        )
+
+    def _state_index_sqls(
+        self, *, table: tuple[str | None, str, str], indexes: tuple[tuple[str, str], ...]
+    ) -> tuple[str, ...]:
+        """Create each named state-table index on its columns unless it already exists."""
+
+        database, schema, name = table
         table_name: str | None = self.render_qualified_name(
-            database=database, schema=schema, name=AUDIT_RESULTS_TABLE_NAME
+            database=database, schema=schema, name=name
         )
         if table_name is None:
             return ()
-        return (
-            "CREATE INDEX IF NOT EXISTS _sqlbuild_audit_results_latest_idx "
-            f"ON {table_name} (audit_name, binding_key, execution_fingerprint, "
-            "run_scope_phase, occurred_at DESC, result_id DESC)",
-            "CREATE INDEX IF NOT EXISTS _sqlbuild_audit_results_run_id_idx "
-            f"ON {table_name} (run_id, invocation_id, result_id)",
+        return tuple(
+            f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})"
+            for index_name, columns in indexes
         )
 
     def render_create_janitor_event_table_sql(self, *, database: str | None, schema: str) -> str:
@@ -2356,6 +2387,7 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read the planner's ``reltuples`` estimate, treating unanalyzed data as unknown."""
 
@@ -2381,12 +2413,16 @@ class PostgresAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
                 row_count=None, detail="no table statistics (view or partitioned table)"
             )
         estimated_rows: float = float(row[1])
+        row_count: int | None = None
         if estimated_rows > 0:
-            return RelationRowCountEstimate(row_count=int(estimated_rows))
-        if int(row[2]) == 0:
-            return RelationRowCountEstimate(row_count=0)
+            row_count = int(estimated_rows)
+        elif int(row[2]) == 0:
+            row_count = 0
         return RelationRowCountEstimate(
-            row_count=None, detail="table statistics not collected; run ANALYZE"
+            row_count=row_count,
+            detail="table statistics not collected; run ANALYZE" if row_count is None else None,
+            byte_count=int(row[2]) if metadata_only else None,
+            byte_count_basis="pg_relation_size_main_fork" if metadata_only else None,
         )
 
     def diff_schema(

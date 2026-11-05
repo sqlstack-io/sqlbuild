@@ -11,8 +11,8 @@ use sqlbuild_analysis::planner_identity::constants::{
 };
 use sqlbuild_analysis::planner_identity::main::expected_graph_identity_hashes::expected_graph_identity_hashes;
 use sqlbuild_analysis::planner_identity::main::graph_write_identity_hashes::graph_write_identity_hashes;
-use sqlbuild_analysis::planner_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, IdentityNode};
+use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
@@ -51,7 +51,9 @@ fn string_pairs(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
 }
 
 /// `{name: identity.version_hash}` of the discovered Python hooks.
-fn hook_version_hashes<'py>(hook_functions: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn hook_version_hashes<'py>(
+    hook_functions: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = hook_functions.py();
     let hashes: Bound<'py, PyDict> = PyDict::new(py);
     let identities: Bound<'py, PyAny> =

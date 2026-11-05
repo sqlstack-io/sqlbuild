@@ -635,6 +635,7 @@ fn read_native_project_view<'py>(
         "sql_lexical_syntax" => this.sql_lexical_syntax(py).into_bound_py_any(py),
         "compile_cache_dir" => this.compile_cache_dir(py).into_bound_py_any(py),
         "loader_functions" => this.loader_functions(py).into_bound_py_any(py),
+        "python_execution_inputs" => this.python_execution_inputs().into_bound_py_any(py),
         "hook_functions" => this.hook_functions(py).into_bound_py_any(py),
         "sql_hook_files" => this.sql_hook_files(py).into_bound_py_any(py),
         "materialization_files" => this.materialization_files(py).into_bound_py_any(py),

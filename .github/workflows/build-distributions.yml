@@ -189,6 +189,11 @@ jobs:
           "${run_as[@]}" "${smoke_scripts}/sqb" --version
           "${run_as[@]}" "${smoke_scripts}/sqb" --help
           "${run_as[@]}" "${smoke_scripts}/sqlbuild" --help
+          if [[ "${{ inputs.prebuilt-run-id == '' }}" == "true" ]]; then
+            cd "${GITHUB_WORKSPACE}"
+            "${run_as[@]}" "${smoke_python}" -m tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.helpers \
+              "${smoke_scripts}/sqb${{ runner.os == 'Windows' && '.exe' || '' }}"
+          fi
       - name: Check wheel contents and run a native command
         if: matrix.platform.name == 'linux-x86_64'
         run: |

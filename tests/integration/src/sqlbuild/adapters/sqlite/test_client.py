@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     RelationInfo,
+    RelationRowCountEstimate,
     RowDiffResult,
     RowDiffSampleRow,
 )
@@ -25,6 +27,7 @@ from tests.integration.src.sqlbuild.adapters.sqlite._test_types import (
     SqliteSchemaEvolutionTestCase,
     SqliteSeedTestCase,
     SqliteStateTableTestCase,
+    SqliteStatisticsTestCase,
     SqliteStrategyTestCase,
     SqliteSwapTestCase,
     SqliteTypedTableTestCase,
@@ -766,3 +769,49 @@ def test_given_view_when_renaming_then_sqlite_recreates_it(
         )
         == test_case.expected_names
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqliteStatisticsTestCase(
+            description="background metadata avoids scans while interactive counts remain exact",
+            fixture_name="sqlite",
+            expected_interactive_row_count=3,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_sqlite_rows_when_sampling_metadata_then_unknown_without_scanning(
+    test_case: SqliteStatisticsTestCase, adapter: SqliteAdapter, connection: Any
+) -> None:
+    fixture: Any = json.loads(
+        (
+            Path(__file__).resolve().parents[6]
+            / "benchmarks/duckshop/edge_cases/orchestration/warehouse_statistics.json"
+        ).read_text()
+    )[test_case.fixture_name]
+    run_sql(adapter=adapter, connection=connection, statements=tuple(fixture["setup_sql"]))
+    statements: list[str] = []
+    connection.raw_connection.set_trace_callback(statements.append)
+
+    metadata: RelationRowCountEstimate = adapter.estimate_relation_row_count(
+        connection=connection,
+        database=None,
+        schema="main",
+        name=fixture["name"],
+        metadata_only=True,
+    )
+
+    assert metadata.row_count is None
+    assert metadata.detail == fixture["metadata_detail"]
+    assert metadata.byte_count is None
+    assert metadata.byte_count_basis is None
+    assert statements == []
+
+    interactive: RelationRowCountEstimate = adapter.estimate_relation_row_count(
+        connection=connection, database=None, schema="main", name=fixture["name"]
+    )
+
+    assert interactive.row_count == test_case.expected_interactive_row_count
+    assert interactive.detail is None

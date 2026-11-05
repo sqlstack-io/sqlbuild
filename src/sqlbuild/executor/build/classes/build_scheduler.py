@@ -89,7 +89,7 @@ from sqlbuild.executor.build.models import (
     SourceAuditRunResult,
     SourceLoadPlanEntry,
 )
-from sqlbuild.executor.build.types import BeforeModelMaterializeCallback
+from sqlbuild.executor.build.types import BeforeNodeWriteCallback
 from sqlbuild.executor.custom.models import MaterializationResult
 from sqlbuild.executor.functions.constants import FUNCTION_ENTRY_MISSING_CODE
 from sqlbuild.executor.functions.main._execute import execute_function
@@ -209,9 +209,7 @@ class BuildScheduler:
         self._on_node_start: NodeStartCallback | None = callbacks.on_node_start
         self._on_node_complete: Callable[[object], None] | None = callbacks.on_node_complete
         self._on_progress: Callable[[str], None] | None = callbacks.on_progress
-        self._before_model_materialize: BeforeModelMaterializeCallback | None = (
-            callbacks.before_model_materialize
-        )
+        self._before_node_write: BeforeNodeWriteCallback | None = callbacks.before_node_write
         self._custom_materializations: Mapping[str, Callable[..., MaterializationResult]] = (
             customizations.custom_materializations or {}
         )
@@ -986,6 +984,17 @@ class BuildScheduler:
             sqlbuild_phase="load",
             sqlbuild_kind="seed",
         ):
+            try:
+                if self._before_node_write is not None:
+                    self._before_node_write(entry=seed_entry, connection=connection)
+            except Exception as error:
+                return SeedExecutionResult(
+                    seed_name=seed_entry.name,
+                    status=ExecutionStatus.FAILED,
+                    error_code=BUILD_WORKER_FAILED_CODE,
+                    error_message=str(error),
+                    duration_ms=int((time.monotonic() - start) * 1000),
+                )
             result: SeedExecutionResult = execute_seed(
                 seed_entry=seed_entry,
                 adapter=self._adapter,
@@ -1148,6 +1157,8 @@ class BuildScheduler:
             ) as deadline,
         ):
             try:
+                if self._before_node_write is not None:
+                    self._before_node_write(entry=model_entry, connection=connection)
                 table_type_entry: TableTypePlanEntry | None = self._table_type_entries.get(
                     model_entry.name
                 )
@@ -1157,8 +1168,6 @@ class BuildScheduler:
                     apply_table_type_conversion(
                         entry=table_type_entry, adapter=self._adapter, connection=connection
                     )
-                if self._before_model_materialize is not None:
-                    self._before_model_materialize(entry=model_entry, connection=connection)
                 if (
                     model_entry.incremental_mode == IncrementalMode.MICROBATCH
                     and model_entry.batch_concurrency > 1

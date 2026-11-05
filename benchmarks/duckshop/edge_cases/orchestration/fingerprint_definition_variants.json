@@ -1,0 +1,20 @@
+{
+  "semantic_hash": "fd5b7a46925b590b562e8b32bc94ee204b05867e9c9c266cf5b734f1586ae6e0",
+  "definitions": [
+    {
+      "sql": "select order_id from orders",
+      "text_hash": "76d5ce528df9a090f025926fca724f92ac23e1021941e5061d211fcb5ded1e77"
+    },
+    {
+      "sql": "SELECT order_id FROM orders -- retained source comment\n",
+      "text_hash": "1daa5068b226bbc6b50d082920762afc31df73b0c02e9d7e9f05fe6b7297d205"
+    }
+  ],
+  "review_marker": {
+    "node_type": "review_schema",
+    "definition_hash": "",
+    "version_hash": "",
+    "schema_fingerprint": "",
+    "definition": ""
+  }
+}

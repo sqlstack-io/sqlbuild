@@ -1,0 +1,26 @@
+{
+  "record": {
+    "event_id": "orders-source-000",
+    "state_database": null,
+    "state_schema": "main",
+    "source_name": "raw_orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "raw_orders",
+    "run_id": "external-orders-🧾",
+    "strategy": "max_column",
+    "value_kind": "integer",
+    "data_version": "18446744073709551617",
+    "data_version_hash": "orders-version-1",
+    "observed_at": "2026-02-03T04:05:06Z"
+  },
+  "source_rows": 104,
+  "null_indices": [1, 102],
+  "unselected_index": 103,
+  "late_record": {
+    "event_id": "orders-source-late",
+    "data_version": "18446744073709551619",
+    "data_version_hash": "orders-version-2",
+    "observed_at": "2026-01-01T01:02:03Z"
+  }
+}

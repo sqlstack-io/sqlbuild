@@ -14,7 +14,9 @@ use sqlbuild_state::freshness::main::age_status::age_status;
 use sqlbuild_state::freshness::main::data_version_hash::data_version_hash;
 use sqlbuild_state::freshness::main::normalized_data_version::normalized_data_version;
 use sqlbuild_state::freshness::main::records_equivalent::records_equivalent;
-use sqlbuild_state::freshness::models::{AgeStatus, ComparableRecord, DataVersion};
+use sqlbuild_state::freshness::models::{
+    AgeStatus, ComparableRecord, DataVersion, FreshnessEventIdentity,
+};
 use sqlbuild_state::freshness::types::TimestampParser;
 
 use crate::bindings::_helpers::boundary::python_calls::imported;
@@ -30,6 +32,40 @@ use crate::bindings::_helpers::state_rows::timestamps::{
 const TIMESTAMP_KIND: &str = "timestamp";
 const INTEGER_KIND: &str = "integer";
 const STRING_KIND: &str = "string";
+
+/// Normalize timestamp offsets and precision before computing a persisted observation identity.
+pub(crate) fn record_event_id(record: &Bound<'_, PyAny>) -> PyResult<String> {
+    let observed_at = presumed_utc(&native_field(record, "observed_at")?)?;
+    let observed_at = format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}+00:00",
+        observed_at.date.year,
+        observed_at.date.month,
+        observed_at.date.day,
+        observed_at.hour,
+        observed_at.minute,
+        observed_at.second,
+        observed_at.microsecond,
+    );
+    Ok(sqlbuild_state::freshness::main::event_id::event_id(
+        &FreshnessEventIdentity {
+            source_name: &native_field(record, "source_name")?.extract::<String>()?,
+            target_database: native_field(record, "target_database")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+            target_schema: native_field(record, "target_schema")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+            target_name: native_field(record, "target_name")?
+                .extract::<Option<String>>()?
+                .as_deref(),
+            run_id: &native_field(record, "run_id")?.extract::<String>()?,
+            strategy: &native_field(record, "strategy")?.extract::<String>()?,
+            value_kind: &native_field(record, "value_kind")?.extract::<String>()?,
+            data_version_hash: &native_field(record, "data_version_hash")?.extract::<String>()?,
+            observed_at: &observed_at,
+        },
+    ))
+}
 
 fn raised(py: Python<'_>, class: NativeAttr, message: String) -> PyErr {
     match registry::native(py, class).and_then(|class| class.call1((message,))) {

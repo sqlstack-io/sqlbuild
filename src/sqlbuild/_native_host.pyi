@@ -131,6 +131,9 @@ from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     load_materialize_function as load_materialize_function,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
+    load_orchestration_module as load_orchestration_module,
+)
+from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (
     load_provider_module as load_provider_module,
 )
 from sqlbuild.compiler.discovery._helpers.filesystem.project_modules import (

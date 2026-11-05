@@ -6,8 +6,10 @@ import random
 import shutil
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from scripts.delta_compile_series._helpers.edits import edited_file
+from scripts.delta_compile_series._helpers.evidence import cache_state, keep_comparison_failure
 from scripts.delta_compile_series._helpers.outcomes import full_compile_difference, judged
 from scripts.delta_compile_series.constants import (
     DELTA_COMPILE_LINE,
@@ -29,16 +31,43 @@ def _compared(
     project_dir: Path,
     compile_project: Callable[[], DeltaCompileOutcome],
     compile_in_full: Callable[[Path], DeltaCompileOutcome],
+    diagnostics_dir: Path | None,
+    seed: int,
+    step: str,
+    case: str,
 ) -> tuple[DeltaCompileOutcome, str | None]:
     """Compile, and compile a copy of the project as it was in full; how what they print differs."""
 
     copy: Path = project_dir.with_name(project_dir.name + FULL_COPY_SUFFIX)
     shutil.rmtree(copy, ignore_errors=True)
     _ = shutil.copytree(project_dir, copy, symlinks=True)
-    outcome: DeltaCompileOutcome = compile_project()
-    problem: str | None = full_compile_difference(
-        outcome=outcome, full=compile_in_full(copy), project_dir=project_dir, full_project_dir=copy
+    before: dict[str, Any] = (
+        {"delta": cache_state(project_dir), "full": cache_state(copy)} if diagnostics_dir else {}
     )
+    outcome: DeltaCompileOutcome = compile_project()
+    after: dict[str, Any] = {"delta": cache_state(project_dir)} if diagnostics_dir else {}
+    full: DeltaCompileOutcome = compile_in_full(copy)
+    if diagnostics_dir:
+        after["full"] = cache_state(copy)
+    problem: str | None = full_compile_difference(
+        outcome=outcome, full=full, project_dir=project_dir, full_project_dir=copy
+    )
+    if problem is not None and diagnostics_dir is not None:
+        try:
+            _ = keep_comparison_failure(
+                destination=diagnostics_dir,
+                seed=seed,
+                step=step,
+                case=case,
+                project=project_dir,
+                copy=copy,
+                outcome=outcome,
+                full=full,
+                before=before,
+                after=after,
+            )
+        except OSError:
+            pass
     return outcome, problem
 
 
@@ -49,6 +78,8 @@ def run_delta_compile_series(
     steps: int,
     compile_project: Callable[[], DeltaCompileOutcome],
     compile_in_full: Callable[[Path], DeltaCompileOutcome] | None = None,
+    diagnostics_dir: Path | None = None,
+    case: str = "",
 ) -> DeltaCompileSeries:
     """Edit or revert `steps` times, compiling after each, and judge or compare every compile."""
 
@@ -87,6 +118,10 @@ def run_delta_compile_series(
                 project_dir=project_dir,
                 compile_project=compile_project,
                 compile_in_full=compile_in_full,
+                diagnostics_dir=diagnostics_dir,
+                seed=seed,
+                step=step,
+                case=case,
             )
             delta: bool = DELTA_COMPILE_LINE in outcome.stderr
         deltas += int(delta)

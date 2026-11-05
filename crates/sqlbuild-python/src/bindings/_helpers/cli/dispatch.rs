@@ -23,11 +23,13 @@ use crate::bindings::_helpers::init_command::command::run_init_command;
 use crate::bindings::_helpers::janitor::janitor_command::run_janitor_command;
 use crate::bindings::_helpers::lineage::lineage_command::run_lineage_command;
 use crate::bindings::_helpers::load::load_command::run_load_command;
+use crate::bindings::_helpers::location_command::command::run_location;
 use crate::bindings::_helpers::plan_command::plan::run_plan_command;
 use crate::bindings::_helpers::plan_command::rules::run_rules_command;
 use crate::bindings::_helpers::query_command::dag::run_dag_command;
 use crate::bindings::_helpers::query_command::query::run_query_command;
 use crate::bindings::_helpers::recall::command::run_recall_command;
+use crate::bindings::_helpers::recall::session::InvocationRecall;
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::refactor::refactor_command::run_refactor_command;
 use crate::bindings::_helpers::review_command::command::run_review_command;
@@ -74,7 +76,7 @@ const RAW_QUERY_ATTRIBUTES: [&str; 4] = [
 ];
 
 /// One invocation being dispatched: its namespace and the values derived from it once.
-struct Invocation<'py> {
+pub(crate) struct Invocation<'py> {
     args: Bound<'py, PyAny>,
     project_dir: Bound<'py, PyAny>,
     select: Bound<'py, PyTuple>,
@@ -82,6 +84,27 @@ struct Invocation<'py> {
 }
 
 impl<'py> Invocation<'py> {
+    pub(crate) fn new(args: &Bound<'py, PyAny>) -> PyResult<Self> {
+        let raw_project_dir = native_field(args, "project_dir")?;
+        let project_dir = if raw_project_dir.is_none() {
+            raw_project_dir
+        } else {
+            path_class(args.py())?
+                .call1((raw_project_dir,))?
+                .call_method0("resolve")?
+        };
+        let (select, selector_files) = selector_inputs(args)?;
+        if native_field(args, "select_file")?.is_truthy()? {
+            withhold_launch_record(args.py())?;
+        }
+        Ok(Self {
+            args: args.clone(),
+            project_dir,
+            select,
+            selector_files,
+        })
+    }
+
     fn py(&self) -> Python<'py> {
         self.args.py()
     }
@@ -95,7 +118,7 @@ impl<'py> Invocation<'py> {
     }
 
     /// The value of one handler argument or request field.
-    fn value(&self, source: Source) -> PyResult<Bound<'py, PyAny>> {
+    pub(crate) fn value(&self, source: Source) -> PyResult<Bound<'py, PyAny>> {
         let py: Python<'py> = self.py();
         match source {
             Source::Attr(name) => self.attr(name),
@@ -312,6 +335,7 @@ fn call_route<'py>(
     invocation: &Invocation<'py>,
     route: &Route,
     handler: Option<Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = invocation.py();
     let mut positional: Vec<Bound<'py, PyAny>> = Vec::new();
@@ -339,7 +363,7 @@ fn call_route<'py>(
     }
     match handler {
         Some(handler) => handler.call(PyTuple::new(py, positional)?, Some(&keywords)),
-        None => run_implementation(route.implementation, (positional, keywords)),
+        None => run_implementation(route.implementation, (positional, keywords), recall),
     }
 }
 
@@ -358,6 +382,7 @@ fn argument<'py>(
 fn run_implementation<'py>(
     name: &str,
     arguments: (Vec<Bound<'py, PyAny>>, Bound<'py, PyDict>),
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = arguments.1.py();
     let request = || -> PyResult<Bound<'py, PyAny>> {
@@ -387,6 +412,7 @@ fn run_implementation<'py>(
         "run_janitor_command" => run_janitor_command(py, &request()?)?,
         "run_lineage_command" => run_lineage_command(py, &request()?)?,
         "run_load_command" => run_load_command(py, &request()?)?,
+        "run_location_command" => run_location(py, options(), Some(recall))?,
         "run_plan_command" => run_plan_command(&request()?)?,
         "run_playground_command" => run_playground_command(py, &request()?)?,
         "run_query_command" => run_query_command(py, options())?,
@@ -417,26 +443,10 @@ fn run_implementation<'py>(
 fn routed_command<'py>(
     args: &Bound<'py, PyAny>,
     handlers: Option<&Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
-    let raw_project_dir: Bound<'py, PyAny> = native_field(args, "project_dir")?;
-    let project_dir: Bound<'py, PyAny> = if raw_project_dir.is_none() {
-        raw_project_dir
-    } else {
-        path_class(py)?
-            .call1((raw_project_dir,))?
-            .call_method0("resolve")?
-    };
-    let (select, selector_files) = selector_inputs(args)?;
-    if native_field(args, "select_file")?.is_truthy()? {
-        withhold_launch_record(py)?;
-    }
-    let invocation = Invocation {
-        args: args.clone(),
-        project_dir,
-        select,
-        selector_files,
-    };
+    let invocation = Invocation::new(args)?;
     match command_dispatch(&command_facts(args)?) {
         Dispatch::Nothing => 0.into_bound_py_any(py),
         Dispatch::Fail(failure) => Err(user_error(py, failure)),
@@ -456,7 +466,7 @@ fn routed_command<'py>(
             if let Some(failure) = failure {
                 return Err(user_error(py, failure));
             }
-            call_route(&invocation, route, handler)
+            call_route(&invocation, route, handler, recall)
         }
     }
 }
@@ -465,7 +475,14 @@ fn routed_command<'py>(
 pub(crate) fn dispatch_command<'py>(
     args: &Bound<'py, PyAny>,
     handlers: Option<Bound<'py, PyAny>>,
+    recall: &InvocationRecall,
 ) -> PyResult<Bound<'py, PyAny>> {
+    within(&warehouse_scope(args)?, |_| {
+        routed_command(args, handlers.as_ref(), recall)
+    })
+}
+
+pub(crate) fn warehouse_scope<'py>(args: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = args.py();
     let warehouse: Bound<'py, PyAny> = native_field(args, "warehouse")?;
     if !warehouse.is_none() {
@@ -484,7 +501,7 @@ pub(crate) fn dispatch_command<'py>(
         )
         .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     }
-    let scope: Bound<'py, PyAny> = Bound::new(
+    Ok(Bound::new(
         py,
         command_warehouse_scope(
             &native_field(args, "command")?,
@@ -492,8 +509,7 @@ pub(crate) fn dispatch_command<'py>(
             Some(&native_field(args, "vars")?),
         )?,
     )?
-    .into_any();
-    within(&scope, |_| routed_command(args, handlers.as_ref()))
+    .into_any())
 }
 
 /// The parsed values that select a route, read from the namespace.

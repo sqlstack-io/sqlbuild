@@ -9,6 +9,7 @@ that can be tested and benchmarked with `cargo test` alone.
 | `sqlbuild-build-features` | No code. Enables, in the `sqb` build, the dependency features the extension build resolves, so Cargo compiles the crates both builds share (polyglot-sql, `sqlbuild-analysis`, `sqlbuild-rules` and the rest) once. `make check-build-features` (part of `make check-ci`) fails when the two builds resolve a shared crate differently and names the features to add. |
 | `sqlbuild-core` | Constants shared by several crates, the panic boundary that turns an unwinding native failure into a named compiler error, passive identity, diagnostic and SQL value types, text positions, a JSON emitter whose output matches Python's `json.dumps` and `orjson` byte for byte, and run-cost allocation with exact Python `decimal` default-context arithmetic and Snowflake query-history SQL. |
 | `sqlbuild-cursor` | Microbatch cursor algebra: typed cursor values, grain flooring and stepping, half-open interval clamping, merging and batch splitting, timestamp text normalization and calendar durations, with Python `datetime` results and errors. Zones other than fixed offsets are resolved through a caller-supplied lookup. |
+| `sqlbuild-process-ownership` | Proof that a live process owns a scheduler worker claim, and the only way to stop one: an inherited claim lock on Linux and macOS, checked through `/proc` and a pidfd or through libproc with a start-time recheck, and a private named Job object on Windows. It is the only crate allowed unsafe code, for those platform calls. |
 | `sqlbuild-state` | Append-only warehouse state rows: content-addressed migration event IDs, typed event SQL literals and statements, and source freshness data-version normalization, hashing, equivalence, age policy and latest-state read SQL, byte-compatible with the rows Python wrote. It also owns execution history: lifecycle event batch digests and conflicts, run projection, event and run cursors, filter and page validation, and the SQLite and PostgreSQL statements the native history backends run. |
 | `sqlbuild-pysource` | Static reading of project Python source with the ruff parser: macro module structure, literal SQL arguments, definition locations and string-literal edits. It never imports or runs user code; CPython stays the authority on whether a file is valid Python. |
 | `sqlbuild-cache` | The shared native store every native cache uses (one atomically replaced, checksummed file per cache kind, keyed by content digests) and the one fingerprinting scheme for cache keys: the content digest and the project file fingerprint. |
@@ -36,7 +37,7 @@ sqlbuild-python
   -> sqlbuild-project -> sqlbuild-refactor -> sqlbuild-rules -> sqlbuild-analysis -> sqlbuild-attachments
   -> sqlbuild-model-config -> sqlbuild-scopes -> sqlbuild-render -> sqlbuild-discovery -> sqlbuild-host
   -> sqlbuild-config -> sqlbuild-sqltext -> sqlbuild-cache -> sqlbuild-pysource -> sqlbuild-state -> sqlbuild-cursor -> sqlbuild-core
-sqlbuild-cli -> sqlbuild-cache, sqlbuild-core, sqlbuild-build-features
+sqlbuild-cli -> sqlbuild-cache, sqlbuild-core, sqlbuild-build-features, sqlbuild-process-ownership
 ```
 
 `sqlbuild-scopes` reuses the macro scanner in `sqlbuild-render`; render itself depends only on
@@ -106,6 +107,125 @@ every compile.
 the goldens in `tests/goldens/compiler`, with stage captures and full discovery, render and
 analysis coverage required. CI also runs it on Python 3.13 and 3.14, and compiles and builds a
 playground project on Windows.
+
+## Service credentials
+
+Principal API tokens require an active service account at issuance and on every authenticated
+request. Person sessions are a separate credential mechanism. Existing personal API-token rows
+remain in storage for history but cannot authenticate; disabling a service account also
+invalidates its tokens across replicas without a process-local cache. Location and run-claim
+credentials retain their separate scopes and lifecycle checks.
+
+## Individual node and check transitions
+
+`NodeEventKind.FAILED` matches entry into failure; repeated failures do not retrigger it.
+`RECOVERED` matches an actual successful execution after a failure of that same node/check,
+location and target, independently of its job or whole-run outcome. `SUCCESS` still matches
+each genuine successful execution. A prior start in the same worker claim is required:
+cached, blocked or unexecuted work cannot create a failure or claim a recovery.
+
+WARN is not failure. WARN, SKIPPED and CANCELLED do not clear an earlier actual failure;
+cancellation remains in execution history but is not itself an active health problem.
+Transitions are pure queries over immutable committed start/finish facts in storage order,
+using the latest prior decisive execution, not a persisted mutable health flag. Cursor reset
+recomputes the same transitions and existing run-key uniqueness prevents duplicate runs.
+These consumers require individual committed node facts. Publishing Python checks into
+worker snapshots and defining their frozen membership/retry behavior is a separate execution
+boundary; the consumers do not infer check results from whole-build exit codes or diagnostic text.
+
+## Control-plane live updates
+
+`GET /api/locations/{location_id}/targets/{target}/changes` streams authenticated SSE
+`changed` events containing only a `topic`. Location credentials retain their existing scope;
+subscribers never receive another location's or target's invalidations. Topics are `runs`,
+`run:<id>`, `ticks`, `snapshot:<location>` and `node_status:<target>`. Clients refetch the
+corresponding REST resource rather than deriving application state from a notification.
+
+Invalidations are deduplicated within the writing transaction. PostgreSQL publishes with
+transactional `NOTIFY`, with each API replica holding a schema-isolated `LISTEN`; SQLite publishes
+through an in-process broadcast immediately after successful COMMIT, even if the awaiting async
+caller was cancelled. Rejected transactions publish nothing. Snapshot, run, trigger, sensor and
+warehouse-ingestion owners mark their own changes without adding a second durable event log.
+
+The first event, subscriber lag and restored PostgreSQL subscriptions emit `all`, requiring a
+complete authorized REST refetch. There is no durable SSE cursor or replay guarantee. Recoverable
+listener failures retry without stopping HTTP serving; fatal configuration/protocol failures remain
+errors. Every event and 15-second keepalive revalidates the credential against the store. Revocation
+invalidates active streams across replicas; expired or inactive credentials disclose no subsequent
+changes. Server shutdown closes live streams instead of waiting indefinitely for their bodies.
+
+## Local development supervisor
+
+`sqb dev` runs the native API, scheduler and reloadable code location together. Its default
+store is `.sqlbuild/control.sqlite3` in the canonical project directory. `--control-store-url`
+selects another control store, `--target` overrides the configured target, `--port 0` chooses a
+free port, and `--no-scheduler` leaves publication and reads active without launching runs.
+This backend-only command does not serve a UI.
+
+Authentication is disabled only for the explicit development listener on loopback. Host and Origin
+checks reject browser cross-origin and DNS-rebinding requests; ordinary `sqb server` authentication
+is unchanged. Development retains an opaque location identity per canonical project and target.
+The spawned code location receives no control-store credentials and uses the ordinary HTTP
+publication, reload and health paths; workers retain their ordinary run-scoped credentials.
+
+Triggers start paused before scheduling can begin. Publication pauses newly introduced or revived
+triggers in the same transaction as the snapshot, using ordinary audited operator facts rather
+than rewriting code definitions. Reload preserves explicit operator changes to retained triggers.
+`--triggers` skips these automatic pauses; it does not undo an operator's persisted pause.
+SIGINT or SIGTERM shuts down the scheduler, API streams and location interpreter together.
+
+## Warehouse event identity
+
+Fingerprint and source-freshness writers persist deterministic `event_id` values in nullable text
+columns. Existing tables evolve additively; no predecessor rows are rewritten. Latest-state readers
+retain their existing projections. IDs are lowercase SHA-256 hex over compact UTF-8 JSON arrays,
+whose fixed namespace is independent of the package version:
+
+| Table | Array fields, in order |
+|---|---|
+| `_sqlbuild_fingerprints` | `"sqlbuild.fingerprint.event.v1"`, node kind, node name, target database, target schema, target name, run ID, version hash |
+| `_sqlbuild_source_freshness` | `"sqlbuild.source-freshness.event.v1"`, source name, target database, target schema, target name, run ID, observation time, strategy, value kind, value hash |
+
+Nullable identity fields remain JSON null, distinct from empty strings. Freshness observation time
+is normalized to UTC ISO text with six fractional digits and a `+00:00` offset. Retrying the same
+observation retains its ID; another run or observation is distinct. Definitions, display values,
+and future storage columns do not alter these identities.
+
+The location history reader pages fingerprint and source-freshness observations without selecting
+only the latest row. It is read-only, including local database connections: it neither creates
+databases nor evolves tables. A target can select `catalog_connection = "catalog"` from named
+connections; project and local settings for that name resolve independently, with normal secret
+expansion and adapter defaults. Project, local and target writer credentials are never overlaid or
+used to fill missing catalog credentials. Without the override, reads use the target's normal
+connection. Local target overrides select the catalog name through the normal target precedence;
+unknown names and blank or non-string selections are configuration errors.
+Fingerprint definitions and metadata use the existing storage decoder;
+raw storage values remain the keyset cursor, separate from decoded UTC timestamps and text.
+Fingerprint and source-freshness ingestion preserve warehouse IDs, scoped by location, target and
+physical state table. Only missing or NULL IDs use fixed legacy fields, never a hash of an evolving
+full row. Bounded pages of at most 100 observations commit atomically under the current location
+session and snapshot generation, and repeated pages are idempotent. Fingerprint legacy IDs are
+SHA-256 over a compact JSON array: `"sqlbuild.fingerprint.legacy.v1"`, node kind/name, target
+database/schema/name, run ID, definition hash, version hash, schema fingerprint, exact definition,
+metadata JSON text and UTC observation time (six fractional digits, `+00:00`).
+
+Fingerprint events retain their warehouse `definition_hash` unchanged. This is a semantic token
+hash: SQL with different whitespace, comments or keyword case can share it. The separate
+`definition_text_hash` references the existing immutable `sqb_source_texts` store, keyed by SHA-256
+of the exact UTF-8 bytes and using its existing compressed encoding. Identical bytes share a body;
+semantic-hash-equivalent SQL variants remain lossless. Event JSON omits the definition body, and
+the event and its referenced body commit or roll back together. Rebuilding the mirror by replaying
+history preserves source identities and definitions; no warehouse mutation is involved.
+
+A history read can hold an
+inclusive observation-time lower bound fixed across pages, independently of the row-key cursor.
+SQLite's SQL prefilter includes the boundary day and its predecessor so legacy separators, variable
+fractional precision and writer offsets crossing a UTC date remain readable; decoded UTC timestamps
+enforce the exact bound. Other adapters prefilter at whole-second precision. Continuation follows
+the raw row count: even an empty decoded page can have more rows to inspect. Ingestion and per-hash
+definition storage are separate from this read-only transport. Automatic polling,
+watermark/overlap management and deletion reconciliation are separate location-sync responsibilities,
+not implemented by the page reader.
 
 ## Working on the crates
 

@@ -184,6 +184,7 @@ COMMAND_OUTPUT_LOSS_RECORD_TYPE: str
 INTEGRATION_RESULT_PATH_ENV: str
 FINGERPRINT_TABLE_NAME: str
 SOURCE_FRESHNESS_TABLE_NAME: str
+CONSUMPTION_TABLE_NAME: str
 MIGRATION_TABLE_NAME: str
 COLUMN_MIGRATION_TABLE_NAME: str
 OLD_NAME_VIEW_TABLE_NAME: str
@@ -199,6 +200,7 @@ COLUMN_SCHEMA_FINGERPRINT: str
 COLUMN_DEFINITION_B64: str
 COLUMN_METADATA_JSON_B64: str
 COLUMN_TIMESTAMP: str
+COLUMN_EVENT_ID: str
 NODE_TYPE_MODEL: str
 NODE_TYPE_SEED: str
 AUDIT_GATE_METADATA_KEY: str
@@ -1738,6 +1740,48 @@ class NativeCompiledAudit:
     @property
     def meta(self) -> dict[str, object] | None: ...
 
+class NativeOrchestrationSnapshot:
+    """Compiled jobs, schedules and event/source-version/age sensors as publishable data."""
+
+    def to_json(self) -> str: ...
+    def publish(self, server_url: str, bearer: str) -> str: ...
+    def start_worker(
+        self, server_url: str, bearer: str, identity: tuple[str, str]
+    ) -> NativeOrchestrationWorker: ...
+
+class NativeOrchestrationWorker:
+    """A verified claim owner with joined native heartbeat teardown."""
+
+    def execution_json(self) -> str: ...
+    def cancel_requested(self) -> bool: ...
+    def report(self, event_id: str, change_json: str) -> bool: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> Self: ...
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+def build_orchestration_snapshot(
+    project: CompiledProjectView,
+    metadata_json: str,
+    project_dir: Path,
+    *,
+    declarations: Sequence[object] | None = None,
+) -> NativeOrchestrationSnapshot: ...
+def run_location_command(
+    *,
+    project_dir: Path,
+    location_id: str,
+    selected_target: str,
+    generation: int,
+    server_url: str,
+    image_id: str | None = None,
+    action: str = "publish",
+) -> int: ...
+
 class NativeProjectView:
     @property
     def run_id(self) -> str: ...
@@ -1779,6 +1823,8 @@ class NativeProjectView:
     def sql_scenarios(self) -> tuple[CompiledSqlScenario, ...]: ...
     @property
     def loader_functions(self) -> tuple[DiscoveredLoaderFunction, ...]: ...
+    @property
+    def python_execution_inputs(self) -> dict[str, tuple[str, Path]]: ...
     @property
     def hook_functions(self) -> tuple[DiscoveredHookFunction, ...]: ...
     @property
@@ -2308,6 +2354,13 @@ def resolve_target_connection_config(
     project_dir: Path,
     target_name: str,
     cli_vars: dict[str, object] | None = None,
+) -> dict[str, object]: ...
+def build_effective_connection_config(
+    *,
+    discovered_inputs: DiscoveredProjectInputs,
+    selected_target: str | None = None,
+    cli_vars: dict[str, object] | None = None,
+    catalog: bool = False,
 ) -> dict[str, object]: ...
 def normalize_dbt_profile_connection(
     *, resolved: ResolvedDbtProfileOutput
@@ -4146,6 +4199,8 @@ def write_fingerprint(
     render_create_table_sql: Callable[..., str] | None = None,
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
     ensure_table: bool = True,
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+    render_add_columns: Callable[..., tuple[str, ...]] | None = None,
 ) -> bool: ...
 def write_fingerprints(
     *,
@@ -4159,6 +4214,8 @@ def write_fingerprints(
     render_create_table_sql: Callable[..., str] | None = None,
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
     on_progress: FingerprintWriteProgress | None = None,
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+    render_add_columns: Callable[..., tuple[str, ...]] | None = None,
 ) -> None: ...
 def select_latest_fingerprints(
     *,
@@ -5005,6 +5062,8 @@ class BuildProgressCallbacks:
     def redraw_transient_line(self) -> None: ...
     def on_node_complete(self, node_result: object) -> None: ...
     def write_execution_event(self, result: object) -> None: ...
+    def on_check_start(self, name: str) -> None: ...
+    def on_check_complete(self, result: PythonCheckExecutionResult) -> None: ...
     def close(self) -> None: ...
 
 class AuditProgressReporter:
@@ -5396,6 +5455,20 @@ def evaluate_source_freshness_age_policy(
 ) -> SourceFreshnessAgeStatus | None: ...
 def build_source_freshness_read_latest_sql(
     *, database: str | None, schema: str, render_qualified_name: Callable[..., str | None]
+) -> str: ...
+def build_consumption_create_table_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    render_framework_type: Callable[[FrameworkType], str],
+) -> str: ...
+def build_consumption_prune_sql(
+    *,
+    database: str | None,
+    schema: str,
+    render_qualified_name: Callable[..., str | None],
+    retain_versions: int,
 ) -> str: ...
 def build_source_freshness_create_table_sql(
     *,
@@ -6394,6 +6467,7 @@ class BuildCommandRequest(NativeRecord):
     no_color: bool
     fail_fast: bool
     full_refresh: bool
+    changed: bool
     load_sources: bool | None
     reload_sources: bool
     include_python: bool
@@ -6432,6 +6506,7 @@ class BuildCommandRequest(NativeRecord):
         no_color: bool = False,
         fail_fast: bool = False,
         full_refresh: bool = False,
+        changed: bool = False,
         load_sources: bool | None = None,
         reload_sources: bool = False,
         include_python: bool = True,
@@ -7274,6 +7349,7 @@ class CliEntrypointHandlers(NativeRecord):
     run_refactor: Callable[..., int] | None
     run_recall: Callable[..., int] | None
     run_review: Callable[..., int] | None
+    run_location: Callable[..., int] | None
     def __init__(
         self,
         run_compile: Callable[[CompileCommandRequest], int],
@@ -7310,6 +7386,7 @@ class CliEntrypointHandlers(NativeRecord):
         run_refactor: Callable[..., int] | None = None,
         run_recall: Callable[..., int] | None = None,
         run_review: Callable[..., int] | None = None,
+        run_location: Callable[..., int] | None = None,
     ) -> None: ...
 
 class CommandWarehouseScope(NativeRecord):
@@ -7798,6 +7875,8 @@ class SourceFreshnessRenderers(NativeRecord):
     render_insert_records_sql: Callable[..., str]
     render_create_table_sql: Callable[..., str] | None
     render_create_index_sqls: Callable[..., tuple[str, ...]] | None
+    read_columns: Callable[..., tuple[ColumnInfo, ...]] | None
+    render_add_columns: Callable[..., tuple[str, ...]] | None
     def __init__(
         self,
         render_qualified_name: Callable[..., str | None],
@@ -7805,6 +7884,8 @@ class SourceFreshnessRenderers(NativeRecord):
         render_insert_records_sql: Callable[..., str],
         render_create_table_sql: Callable[..., str] | None = None,
         render_create_index_sqls: Callable[..., tuple[str, ...]] | None = None,
+        read_columns: Callable[..., tuple[ColumnInfo, ...]] | None = None,
+        render_add_columns: Callable[..., tuple[str, ...]] | None = None,
     ) -> None: ...
 
 class SourceFreshnessObservation(NativeRecord):
@@ -8025,6 +8106,7 @@ class CliCommand(StrEnum):
     DIFF = "diff"
     REVIEW = "review"
     DEBUG = "debug"
+    LOCATION = "location"
     LINEAGE = "lineage"
     QUERY = "query"
     COST = "cost"
@@ -11755,6 +11837,7 @@ class TargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    catalog_connection: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -11778,6 +11861,7 @@ class TargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        catalog_connection: str | None = ...,
     ) -> None: ...
 
 class LocalTargetConfig(NativeRecord):
@@ -11804,6 +11888,7 @@ class LocalTargetConfig(NativeRecord):
     diff: TargetDiffConfig
     warehouses: TargetWarehousesConfig
     concurrency: int | None
+    catalog_connection: str | None
     def __init__(
         self,
         connection: dict[str, object] = ...,
@@ -11828,6 +11913,7 @@ class LocalTargetConfig(NativeRecord):
         diff: TargetDiffConfig = ...,
         warehouses: TargetWarehousesConfig = ...,
         concurrency: int | None = ...,
+        catalog_connection: str | None = ...,
     ) -> None: ...
 
 class SettingsConfig(NativeRecord):
@@ -15550,6 +15636,7 @@ class CompiledProject(NativeRecord):
     sql_expansions: dict[Path, CompiledSqlExpansion]
     native_session: Any | None
     native_project: NativeCompiledProject | None
+    python_execution_inputs: dict[str, tuple[str, Path]]
     def __init__(
         self,
         run_id: str,
@@ -15586,6 +15673,7 @@ class CompiledProject(NativeRecord):
         sql_expansions: dict[Path, CompiledSqlExpansion] = ...,
         native_session: Any | None = ...,
         native_project: NativeCompiledProject | None = ...,
+        python_execution_inputs: dict[str, tuple[str, Path]] = ...,
     ) -> None: ...
     @property
     def lineage_graph(self) -> NativeProjectGraph: ...

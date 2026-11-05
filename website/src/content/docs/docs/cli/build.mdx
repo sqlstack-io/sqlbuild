@@ -41,6 +41,7 @@ own option. `--version` works only directly after `sqb`, as in `sqb --version`:
 | `--no-sql-analysis` | Disable compile-time SQL analysis (`--no-sql-validation` is an alias) |
 | `--no-cache` | Bypass the reusable compile-analysis cache for this invocation |
 | `--full-refresh` | Drop and rebuild selected models unless a model sets `full_refresh false`; `full_refresh true` forces a model even without this flag |
+| `--changed` | Build only the selected models and seeds whose definition or inputs changed since they last succeeded; see [Building only what changed](#building-only-what-changed) |
 | `--defer-to` | Resolve unselected model references against another target |
 | `--defer-sources-to` | Read managed source data from another target |
 | `--fail-fast` | Stop on first failure and skip remaining nodes |
@@ -72,6 +73,57 @@ sqb build --no-tests --no-audits
 ```
 
 This replaces the former `sqb run` command. The full lifecycle (tests + audits) is always the default; skip flags opt out of specific phases when you need speed.
+
+## Building only what changed
+
+`--changed` skips each selected model or seed that would read exactly what it read the last time
+it built successfully:
+
+```bash
+sqb build --changed
+```
+
+```
+Changed: 2 of 3 selected models and seeds run; 1 unchanged are skipped.
+```
+
+Add `--verbose` to print why each one runs, such as `input raw_orders changed`.
+
+A selected model or seed runs when any of these is true:
+
+| Reason | Example |
+|--------|---------|
+| It has no successful build on record | A new model |
+| Its last build did not finish | The build was killed or failed after the model started writing |
+| Its relation is missing, or `--full-refresh` or a cursor override applies | `sqb build --changed --full-refresh` |
+| Its definition changed | Edited SQL, config, hooks, contract or a function it calls |
+| A source it reads has a different [freshness](/docs/concepts/sources#source-freshness) value | New rows raise `MAX(loaded_at)` |
+| An upstream model or seed was rebuilt since, or runs in this build | `stg_orders` ran, so `customer_orders` runs |
+| An upstream model or seed needs to run, even when it is not selected | `sqb build customer_orders --changed` runs `customer_orders` on every build until a changed `stg_orders` is built |
+| What it reads can't be listed | SQL that reads relations not declared as sources or models, or a Python task or asset upstream |
+
+A model that runs under `--changed` plans exactly as in a plain build: its
+[`replay_on_change`](/docs/concepts/planning/replay-decisions) policy still decides how much
+history an incremental model reprocesses. A model that runs only because an upstream was rebuilt
+takes its normal incremental step.
+
+In a scheduled job, set `settings={'changed': True}`. Skipped models count as successful nodes of
+the run.
+
+Every build, with or without `--changed`, records what each model and seed read in
+`_sqlbuild_consumption` in its target schema, so the build needs permission to create and insert
+into that table. [`sqb janitor`](/docs/cli/janitor) keeps the newest
+`direct_state_history_versions` builds of each relation.
+
+Limitations:
+
+- A source is compared only through its freshness value. A change that doesn't move it, such as an
+  update that keeps the old `loaded_at`, isn't seen. A source without freshness configuration counts
+  as changed on every build.
+- SQL that depends on the time, such as `current_date`, or on random values never counts as changed.
+  Build those models without `--changed`.
+- Two builds of one model less than 5 seconds apart can't be ordered, so its downstream models run
+  on the next `--changed` build.
 
 ## Execution order
 

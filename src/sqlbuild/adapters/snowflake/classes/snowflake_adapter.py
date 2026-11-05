@@ -29,6 +29,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_ansi_typed_scalar,
     _render_typed_value_list,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -195,7 +196,7 @@ _RELATION_LISTING_COLUMNS: str = (
 _BULK_COLUMN_RELATION_CHUNK_SIZE: int = 2_000
 
 
-class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """Snowflake adapter backed by snowflake-connector-python."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.SNOWFLAKE.value
@@ -648,6 +649,15 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         del database, schema
         return ()
+
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        return self._with_state_table_retention(
+            create_sql=super().render_create_consumption_table_sql(
+                database=database, schema=schema
+            ),
+            database=database,
+            schema=schema,
+        )
 
     def render_create_microbatch_state_table_sql(self, *, database: str | None, schema: str) -> str:
         return self._with_state_table_retention(
@@ -1246,6 +1256,9 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "SYSDATE()"
 
     def create_table_as(
         self,
@@ -3548,6 +3561,7 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read ``ROW_COUNT`` from the information schema; views report no count."""
 
@@ -3556,13 +3570,17 @@ class SnowflakeAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
             database=database,
             schema=schema,
             name=name,
-            projection="row_count",
+            projection="row_count,bytes" if metadata_only else "row_count",
         )
         if row is None:
             return RelationRowCountEstimate(row_count=None, detail="relation not found")
-        if row[0] is None:
-            return RelationRowCountEstimate(row_count=None, detail="no row count (view)")
-        return RelationRowCountEstimate(row_count=int(row[0]))
+        byte_count: int | None = int(row[1]) if metadata_only and row[1] is not None else None
+        return RelationRowCountEstimate(
+            row_count=int(row[0]) if row[0] is not None else None,
+            detail="no row count (view)" if row[0] is None else None,
+            byte_count=byte_count,
+            byte_count_basis="information_schema_bytes" if byte_count is not None else None,
+        )
 
     def inspect_row_diff_coverage(
         self,

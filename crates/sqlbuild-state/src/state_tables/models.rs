@@ -7,3 +7,16 @@ pub struct TableColumn {
     pub rendered_type: String,
     pub required: bool,
 }
+
+/// A bounded legacy-compatible history projection, with its optional source event ID.
+#[derive(Clone, Copy, Debug)]
+pub struct HistoryRead<'a> {
+    pub columns: &'a [&'a str],
+    /// Stable identity and timestamp keys omit numeric or evidence payloads from ordering.
+    pub key_columns: Option<&'a [&'a str]>,
+    pub timestamp_column: &'a str,
+    pub observed_since: Option<&'a str>,
+    pub adapter: &'a str,
+    pub has_event_id: bool,
+    pub limit: usize,
+}

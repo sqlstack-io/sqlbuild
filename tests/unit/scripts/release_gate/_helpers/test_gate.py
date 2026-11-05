@@ -1,4 +1,7 @@
+import os
+import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -7,6 +10,7 @@ from scripts.release_gate.models import WorkflowEvent
 from tests.unit.scripts.release_gate._helpers._test_types import (
     GateViolationTestCase,
     RepositoryGateTestCase,
+    VerificationSuitesTestCase,
     VerifyCheckNameTestCase,
 )
 from tests.unit.scripts.release_gate._helpers.helpers import (
@@ -162,6 +166,51 @@ def test_given_workflows_when_checking_release_gate_then_reports_violations(
     )
 
     assert get_release_gate_errors(tmp_path) == test_case.expected_errors
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        VerificationSuitesTestCase("both selected suites pass", "true", "success", "success", 0),
+        VerificationSuitesTestCase(
+            "native failure cannot be masked by static success", "true", "success", "failure", 1
+        ),
+        VerificationSuitesTestCase(
+            "selected native skip fails closed", "true", "success", "skipped", 1
+        ),
+        VerificationSuitesTestCase(
+            "native cancellation fails closed", "true", "success", "cancelled", 1
+        ),
+        VerificationSuitesTestCase(
+            "static failure cannot be masked by native success", "true", "failure", "success", 1
+        ),
+        VerificationSuitesTestCase(
+            "docs-only skips terminate successfully", "false", "skipped", "skipped", 0
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_selected_suites_when_aggregating_then_failures_and_skips_resolve(
+    test_case: VerificationSuitesTestCase,
+) -> None:
+    job: dict[str, Any] = read_verify_job()
+    assert "native_checks" in job["needs"]
+    step: dict[str, Any] = job["steps"][0]
+    environment: dict[str, str] = {name: "success" for name in step["env"]}
+    environment.update(
+        CHECKS_SELECTED=test_case.selected,
+        CHECKS_RESULT=test_case.checks,
+        NATIVE_CHECKS_RESULT=test_case.native_checks,
+    )
+    result: subprocess.CompletedProcess[str] = subprocess.run(
+        ["bash", "-e", "-c", step["run"]],
+        env=os.environ | environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=5,
+    )
+    assert result.returncode == test_case.expected_exit_code, result.stdout + result.stderr
 
 
 if __name__ == "__main__":
