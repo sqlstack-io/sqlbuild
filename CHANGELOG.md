@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.188.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.3...v0.188.0) (2026-11-05)
+
+
+### Features
+
+* add scheduler backend ([#1282](https://github.com/sqlstack-io/sqlbuild/issues/1282)) ([5f451f8](https://github.com/sqlstack-io/sqlbuild/commit/5f451f88acc929a5e9d7cb101f8ad7c4f65bfdc6))
+
 ## [0.187.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.2...v0.187.3) (2026-11-02)
 
 
