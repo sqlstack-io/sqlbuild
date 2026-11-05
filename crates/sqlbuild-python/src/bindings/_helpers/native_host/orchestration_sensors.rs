@@ -32,8 +32,8 @@ pub(crate) fn evaluate_sensor(
     else {
         return Err(PyValueError::new_err("custom sensor work required"));
     };
-    let public = py.import("sqlbuild.orchestration")?;
-    let sensor_class = public.getattr("Sensor")?;
+    let authoring = py.import("sqlbuild.orchestration_declarations.models.authoring")?;
+    let sensor_class = authoring.getattr("Sensor")?;
     let mut matches: Vec<Bound<'_, PyAny>> = Vec::new();
     for declaration in discover_declarations(py, project_dir)? {
         if declaration.is_instance(&sensor_class)?
@@ -67,7 +67,10 @@ pub(crate) fn evaluate_sensor(
     fields.set_item("cursor", &evaluation.cursor.custom)?;
     fields.set_item("target", &evaluation.target)?;
     fields.set_item("evaluation_id", evaluation.evaluation_id.to_string())?;
-    let context = public.getattr("SensorContext")?.call((), Some(&fields))?;
+    let context = py
+        .import("sqlbuild.orchestration")?
+        .getattr("SensorContext")?
+        .call((), Some(&fields))?;
     let providers =
         discover_provider_classes(imported(py, "pathlib", "Path")?.call1((project_dir,))?)?;
     let by_name = provider_by_name(&providers)?;
@@ -91,7 +94,7 @@ pub(crate) fn evaluate_sensor(
             }
         }
         let result = function.call((), Some(&arguments))?;
-        if result.is_instance(&public.getattr("SkipReason")?)? {
+        if result.is_instance(&authoring.getattr("SkipReason")?)? {
             let reason: String = result.getattr("reason")?.extract()?;
             if reason.trim().is_empty() {
                 return Err(PyValueError::new_err("SkipReason needs a nonempty reason"));
@@ -101,7 +104,7 @@ pub(crate) fn evaluate_sensor(
                 reason,
             });
         }
-        let request_class = public.getattr("RunRequest")?;
+        let request_class = authoring.getattr("RunRequest")?;
         let mut run_keys: Vec<String> = Vec::new();
         for request in result
             .try_iter()?
