@@ -1545,8 +1545,7 @@ rule_modules = [
     "scripts.fensu_policy.rules.native_boundary",
     "scripts.fensu_policy.rules.unused_state",
 ]
-select = ["FPRS", "XSB072", "XSB073", "XSB075"]
-warn = ["XSB076", "XSB077"]
+select = ["FPRS", "XSB072", "XSB073", "XSB075", "XSB076", "XSB077"]
 
 [targets.rust.rule_options.XSB076]
 schema_paths = ["crates/sqlbuild-orchestration/src/store"]
