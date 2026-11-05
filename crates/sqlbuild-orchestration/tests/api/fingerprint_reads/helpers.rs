@@ -7,9 +7,7 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::store::errors::ControlError;
-use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::ControlStore;
-use crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor;
 use crate::warehouse_metadata::main::{
     ingest_fingerprints::ingest_fingerprints, read_person_fingerprint::read_person_fingerprint,
 };
@@ -140,11 +138,6 @@ pub(crate) async fn fingerprint_reads(
         .is_none()
     );
     options.name = Some("orders".into());
-    reconstruct_fingerprint_predecessor(store).await;
-    migrate_store(store)
-        .await
-        .expect("populated fingerprint upgrade");
-    migrate_store(store).await.expect("idempotent migration");
     assert!(
         !ingest_fingerprints(store, (location, "development"), &batch)
             .await
@@ -160,7 +153,7 @@ pub(crate) async fn fingerprint_reads(
                 DefaultRole::None
             )
             .await
-            .expect("backfilled index")
+            .expect("indexed fingerprint")
         ),
         serialized
     );

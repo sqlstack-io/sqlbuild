@@ -35,15 +35,6 @@ pub(crate) struct SourceFreshnessObservation {
     pub(crate) record: WarehouseFreshnessRecord,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct StoredSourceFreshnessObservation {
-    pub(crate) event_id: Uuid,
-    pub(crate) location_id: Uuid,
-    pub(crate) target: String,
-    pub(crate) observed_at: DateTime<Utc>,
-    pub(crate) record_json: WarehouseFreshnessRecord,
-}
-
 /// A bounded page from one registered reader of a published location/target generation.
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

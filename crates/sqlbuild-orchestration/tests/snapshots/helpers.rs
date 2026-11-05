@@ -16,9 +16,7 @@ use uuid::Uuid;
 use crate::credentials::tests::location_helpers::create_location;
 use crate::snapshots::tests::test_types::SchemaRejectionCase;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{
-    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor,
-};
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store};
 use crate::store::tests::store_test_types::Backend;
 
 pub(crate) async fn rebuild_snapshot_projections(store: &ControlStore) -> Result<(), ControlError> {
@@ -248,34 +246,15 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     let good = publish_snapshot(&store, &input)
         .await
         .expect("publish good snapshot");
-    reconstruct_warehouse_predecessor(&store).await;
     let connection = rusqlite::Connection::open(&path).expect("open fault injection connection");
-    connection
-        .execute_batch(
-            "DROP TABLE sqb_external_sessions; DROP TABLE sqb_role_assignments; DROP TABLE sqb_admin_initialization; \
-             DROP TABLE sqb_oidc_login_flows; DROP TABLE sqb_authentication_revision; \
-             DROP TABLE sqb_password_sessions; DROP TABLE sqb_password_login_attempts; \
-             DROP TABLE sqb_password_credentials; DROP TABLE sqb_development_locations; DROP TABLE sqb_warehouse_fingerprints; DROP TABLE sqb_warehouse_freshness; \
-             DROP INDEX sqb_node_decisive_history; \
-             DROP INDEX sqb_node_finished_cursor; DROP INDEX sqb_node_started_identity; \
-             DROP INDEX sqb_runs_parent; DROP INDEX sqb_runs_terminal_cursor; \
-             DROP TABLE sqb_run_requests; DROP TABLE sqb_sensor_cursor_commits; \
-             DROP TABLE sqb_sensor_evaluation_events; DROP TABLE sqb_platform_sink_deliveries; \
-             DROP TABLE sqb_location_work_results; DROP TABLE sqb_location_work; \
-             DROP TABLE sqb_location_instances; DELETE FROM sqb_schema_migrations WHERE version>=2",
-        )
-        .expect("reconstruct the previous schema without changing existing facts");
     migrate_store(&store)
         .await
-        .expect("upgrade the previous schema");
-    migrate_store(&store)
-        .await
-        .expect("repeat the migration without changes");
+        .expect("repeat schema creation without changes");
     assert_eq!(
         current_snapshot(&store, location, "development")
             .await
-            .expect("read upgraded store")
-            .expect("snapshot survives upgrade")
+            .expect("read store after repeated startup")
+            .expect("snapshot survives repeated startup")
             .record,
         good
     );
@@ -309,15 +288,11 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
     for case in [
         SchemaRejectionCase {
             description: "minimum server version is newer",
-            update_sql: "UPDATE sqb_schema_migrations SET min_server_version='9999.0.0'",
+            update_sql: "UPDATE sqb_schema_version SET min_server_version='9999.0.0'",
         },
         SchemaRejectionCase {
-            description: "migration checksum changed",
-            update_sql: "UPDATE sqb_schema_migrations SET min_server_version='0.0.0', checksum='different'",
-        },
-        SchemaRejectionCase {
-            description: "migration version is unknown",
-            update_sql: "UPDATE sqb_schema_migrations SET version=999 WHERE version=2",
+            description: "schema checksum changed",
+            update_sql: "UPDATE sqb_schema_version SET min_server_version='0.0.0', checksum='different'",
         },
     ] {
         connection

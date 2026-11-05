@@ -22,9 +22,7 @@ use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::replica_helpers::second_store;
-use crate::store::tests::store_helpers::{
-    close_store, close_test_store, open_test_store, reconstruct_warehouse_predecessor, run,
-};
+use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
@@ -88,31 +86,10 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
             )
             .await
             .expect("unbound password");
-            reconstruct_warehouse_predecessor(store).await;
-            let mut transaction = begin(store, TransactionMode::Write)
-                .await
-                .expect("populated predecessor");
-            for sql in [
-                "DROP TABLE sqb_external_sessions",
-                "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
-                "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
-                "DELETE FROM sqb_schema_migrations WHERE name='external_sessions'",
-            ] {
-                (transaction, _) = query(transaction, sql, vec![])
-                    .await
-                    .expect("reconstruct immediate predecessor");
-            }
-            commit(transaction).await.expect("predecessor committed");
-            migrate_store(&replica)
-                .await
-                .expect("additive session upgrade");
-            migrate_store(store)
-                .await
-                .expect("idempotent session upgrade");
             assert!(
                 verify_password(store, unbound, "products-password-2026")
                     .await
-                    .expect("preserved credential")
+                    .expect("verified credential")
                     .is_some()
             );
             let origin = inputs["origin"].as_str().expect("origin");

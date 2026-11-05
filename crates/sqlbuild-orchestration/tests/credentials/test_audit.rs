@@ -28,9 +28,7 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::test_types::{AuditTestCase, AuditWebhookReceiver};
 use crate::store::errors::ControlError;
-use crate::store::main::{
-    begin::begin, commit::commit, migrate_store::migrate_store, query::query,
-};
+use crate::store::main::{begin::begin, commit::commit, migrate_store::migrate_store};
 use crate::store::models::TransactionMode;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
@@ -128,59 +126,19 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             let existing = read_security_audit(store, (&context, admin_credentials), (0, 100))
                 .await
                 .expect("existing security facts");
-            let mut expected = existing
-                .iter()
-                .map(|event| (event.occurred_at, event.event_id))
-                .collect::<Vec<_>>();
-            expected.sort();
-            crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor(store).await;
-            let mut transaction = begin(store, TransactionMode::Write)
-                .await
-                .expect("predecessor");
-            for sql in [
-                "DROP TABLE sqb_warehouse_catalog",
-                "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
-                "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_catalog'",
-                "DROP TABLE sqb_security_audit_deliveries",
-                "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
-                "DROP INDEX sqb_freshness_source_latest",
-                "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
-                "DROP INDEX recall_warehouse_sources",
-                "DELETE FROM sqb_schema_migrations WHERE name='source_sensors'",
-                "DROP TABLE sqb_warehouse_microbatches",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_microbatches'",
-                "DROP TABLE sqb_warehouse_old_name_views",
-                "DROP TABLE sqb_warehouse_migrations",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_migrations'",
-                "DROP TABLE sqb_warehouse_janitor_events",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_janitor_events'",
-                "DROP TABLE sqb_warehouse_audit_results",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_audit_results'",
-                "DROP INDEX sqb_security_audit_storage_id",
-                "ALTER TABLE sqb_security_audit DROP COLUMN storage_id",
-                "DELETE FROM sqb_schema_migrations WHERE name='audit_storage_order'",
-            ] {
-                (transaction, _) = query(transaction, sql, vec![])
-                    .await
-                    .expect("populated predecessor");
-            }
-            commit(transaction).await.expect("commit predecessor");
-            migrate_store(&replica)
-                .await
-                .expect("additive audit upgrade");
-            migrate_store(store)
-                .await
-                .expect("idempotent audit upgrade");
             let upgraded = read_security_audit(&replica, (&context, admin_credentials), (0, 100))
                 .await
-                .expect("backfilled audit");
+                .expect("replica audit");
             assert_eq!(
                 upgraded
                     .iter()
                     .map(|event| event.event_id)
                     .collect::<Vec<_>>(),
-                expected.into_iter().map(|(_, id)| id).collect::<Vec<_>>()
+                existing
+                    .iter()
+                    .map(|event| event.event_id)
+                    .collect::<Vec<_>>(),
+                "every replica pages security facts in the same commit order"
             );
             assert_eq!(
                 upgraded

@@ -169,54 +169,6 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                         .applied
                 );
             }
-            crate::store::tests::store_helpers::reconstruct_fingerprint_predecessor(store).await;
-            let mut transaction = begin(store, TransactionMode::Write)
-                .await
-                .expect("pre-sensor predecessor");
-            for sql in [
-                "DROP TABLE sqb_warehouse_catalog",
-                "DELETE FROM sqb_schema_migrations WHERE name='custom_roles'",
-                "DELETE FROM sqb_schema_migrations WHERE name='retention_indexes'",
-                "DELETE FROM sqb_schema_migrations WHERE name='warehouse_catalog'",
-                "DROP TABLE sqb_security_audit_deliveries",
-                "DELETE FROM sqb_schema_migrations WHERE name='security_audit_sink'",
-                "DROP INDEX sqb_freshness_source_latest",
-                "DELETE FROM sqb_schema_migrations WHERE name='source_staleness'",
-                "DELETE FROM recall_events WHERE producer='warehouse' AND event_type='warehouse_source_freshness'",
-                "DROP INDEX recall_warehouse_sources",
-                "DELETE FROM sqb_schema_migrations WHERE name='source_sensors'",
-            ] {
-                (transaction, _) = query(transaction, sql, vec![])
-                    .await
-                    .expect("preserve mirror without source sensor receipts");
-            }
-            commit(transaction).await.expect("predecessor committed");
-            install_fault(store, &receipt_fault).await;
-            assert!(migrate_store(store).await.is_err());
-            remove_fault(store, &receipt_fault).await;
-            migrate_store(store)
-                .await
-                .expect("bootstrap preexisting source observations");
-            migrate_store(store)
-                .await
-                .expect("warm bootstrap is idempotent");
-            for page in records.chunks(100) {
-                assert!(
-                    !ingest_source_freshness(
-                        store,
-                        (location, "development"),
-                        &SourceFreshnessBatch {
-                            session_id,
-                            generation: 1,
-                            records: page.to_vec(),
-                            reconciliation: None,
-                        }
-                    )
-                    .await
-                    .expect("already mirrored observation retry")
-                    .applied
-                );
-            }
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("elect")

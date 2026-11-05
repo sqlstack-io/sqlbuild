@@ -259,6 +259,407 @@ CREATE TABLE sqb_security_audit (
     ip_address TEXT,
     scope_json {json} NOT NULL,
     before_json {json} NOT NULL,
-    after_json {json} NOT NULL
+    after_json {json} NOT NULL,
+    storage_id BIGINT
 );
 CREATE INDEX sqb_security_audit_time ON sqb_security_audit(occurred_at, event_id);
+CREATE TABLE sqb_location_instances (
+    instance_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    connected_at {time} NOT NULL,
+    last_seen_at {time} NOT NULL,
+    health_json {json} NOT NULL
+);
+CREATE INDEX sqb_location_instances_location_seen ON sqb_location_instances(location_id, last_seen_at);
+CREATE TABLE sqb_location_work (
+    request_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
+    generation BIGINT NOT NULL,
+    request_json {json} NOT NULL,
+    requested_by TEXT NOT NULL,
+    requested_at {time} NOT NULL,
+    expires_at {time} NOT NULL,
+    claim_id {uuid},
+    session_id {uuid} REFERENCES sqb_location_instances(instance_id),
+    claimed_until {time}
+);
+CREATE INDEX sqb_location_work_pending ON sqb_location_work(location_id, target, requested_at);
+CREATE TABLE sqb_location_work_results (
+    request_id {uuid} PRIMARY KEY REFERENCES sqb_location_work(request_id),
+    result_json {json} NOT NULL,
+    completed_at {time} NOT NULL
+);
+CREATE TABLE sqb_platform_sink_deliveries (
+    sink_id TEXT NOT NULL,
+    storage_id BIGINT NOT NULL,
+    event_id TEXT NOT NULL,
+    delivered_at {time} NOT NULL,
+    PRIMARY KEY (sink_id, storage_id)
+);
+CREATE TABLE sqb_sensor_evaluation_events (
+    event_id {uuid} PRIMARY KEY,
+    storage_id BIGINT NOT NULL UNIQUE,
+    evaluation_id {uuid} NOT NULL,
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    phase TEXT NOT NULL CHECK (phase IN ('requested', 'completed', 'failed', 'timed_out', 'abandoned')),
+    occurred_at {time} NOT NULL,
+    fact_json {json} NOT NULL,
+    UNIQUE (evaluation_id, phase)
+);
+CREATE INDEX sqb_sensor_evaluation_history ON sqb_sensor_evaluation_events(trigger_id, storage_id);
+CREATE TABLE sqb_sensor_cursor_commits (
+    event_id {uuid} PRIMARY KEY,
+    storage_id BIGINT NOT NULL UNIQUE,
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    cursor_json {json} NOT NULL
+);
+CREATE INDEX sqb_sensor_cursor_history ON sqb_sensor_cursor_commits(trigger_id, storage_id);
+CREATE TABLE sqb_run_requests (
+    trigger_id {uuid} NOT NULL REFERENCES sqb_triggers(trigger_id),
+    run_key TEXT NOT NULL,
+    evaluation_id {uuid} NOT NULL,
+    run_id {uuid} NOT NULL REFERENCES sqb_runs(run_id),
+    PRIMARY KEY (trigger_id, run_key)
+);
+CREATE INDEX sqb_runs_terminal_cursor ON sqb_runs(location_id, target, job_key, last_event_storage_id)
+WHERE status IN ('success', 'warn', 'partial', 'failed', 'cancelled', 'presumed_failed');
+CREATE INDEX sqb_runs_parent ON sqb_runs(parent_run_id) WHERE parent_run_id IS NOT NULL;
+CREATE INDEX sqb_node_finished_cursor ON recall_events(storage_id)
+WHERE producer='scheduler' AND event_type='run_node_finished';
+CREATE INDEX sqb_node_started_identity ON recall_events(
+    invocation_id, (payload -> 'change' ->> 'claim_id'),
+    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id
+) WHERE producer='scheduler' AND event_type='run_node_started';
+CREATE TABLE sqb_warehouse_freshness (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT
+);
+CREATE INDEX sqb_warehouse_freshness_scope ON sqb_warehouse_freshness (location_id, target, observed_at, event_id);
+CREATE TABLE sqb_warehouse_fingerprints (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    definition_text_hash TEXT NOT NULL REFERENCES sqb_source_texts(text_hash),
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT,
+    node_type TEXT,
+    node_name TEXT,
+    target_database TEXT,
+    target_schema TEXT,
+    target_name TEXT
+);
+CREATE INDEX sqb_warehouse_fingerprints_scope ON sqb_warehouse_fingerprints (location_id, target, observed_at, event_id);
+CREATE TABLE sqb_development_locations (
+    project_path TEXT NOT NULL,
+    target TEXT NOT NULL,
+    location_id {uuid} NOT NULL UNIQUE REFERENCES sqb_locations(location_id),
+    PRIMARY KEY (project_path, target)
+);
+CREATE INDEX sqb_node_decisive_history ON recall_events(
+    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id DESC
+) WHERE producer='scheduler' AND event_type='run_node_finished'
+AND (payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed');
+CREATE TABLE sqb_password_credentials (
+    principal_id {uuid} PRIMARY KEY REFERENCES sqb_principals(principal_id),
+    credential_id {uuid} NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    changed_at {time} NOT NULL
+);
+CREATE TABLE sqb_password_sessions (
+    session_id {uuid} PRIMARY KEY,
+    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
+    credential_id {uuid} NOT NULL,
+    secret_hash TEXT NOT NULL,
+    csrf_hash TEXT NOT NULL,
+    created_at {time} NOT NULL,
+    expires_at {time} NOT NULL,
+    revoked_at {time}
+);
+CREATE INDEX sqb_password_sessions_person ON sqb_password_sessions(principal_id);
+CREATE TABLE sqb_password_login_attempts (
+    attempt_id {uuid} PRIMARY KEY,
+    identity_key TEXT NOT NULL,
+    peer_address TEXT NOT NULL,
+    attempted_at {time} NOT NULL
+);
+CREATE INDEX sqb_password_login_user_time ON sqb_password_login_attempts(identity_key, attempted_at);
+CREATE INDEX sqb_password_login_peer_time ON sqb_password_login_attempts(peer_address, attempted_at);
+CREATE INDEX sqb_password_login_time ON sqb_password_login_attempts(attempted_at);
+CREATE TABLE sqb_authentication_revision (
+    singleton BIGINT PRIMARY KEY CHECK (singleton = 1),
+    revision BIGINT NOT NULL CHECK (revision >= 0)
+);
+INSERT INTO sqb_authentication_revision (singleton, revision) VALUES (1, 0);
+CREATE TABLE sqb_oidc_login_flows (
+    flow_id {uuid} PRIMARY KEY,
+    configuration_id TEXT NOT NULL,
+    state_hash TEXT NOT NULL UNIQUE,
+    browser_hash TEXT NOT NULL,
+    nonce TEXT NOT NULL,
+    pkce_verifier TEXT NOT NULL,
+    expires_at {time} NOT NULL
+);
+CREATE INDEX sqb_oidc_login_flows_expiry ON sqb_oidc_login_flows(expires_at);
+CREATE TABLE sqb_admin_initialization (
+    singleton BIGINT PRIMARY KEY CHECK (singleton=1),
+    principal_id {uuid} NOT NULL,
+    initialized_at {time} NOT NULL
+);
+CREATE TABLE sqb_role_assignments (
+    assignment_id {uuid} PRIMARY KEY,
+    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
+    role_key TEXT NOT NULL,
+    location_id {uuid} REFERENCES sqb_locations(location_id),
+    target TEXT,
+    source TEXT NOT NULL,
+    granted_by TEXT NOT NULL,
+    granted_at {time} NOT NULL,
+    revoked_by TEXT,
+    revoked_at {time},
+    active_key TEXT UNIQUE
+);
+CREATE INDEX sqb_role_assignments_principal ON sqb_role_assignments(principal_id);
+CREATE TABLE sqb_external_sessions (
+    session_id {uuid} PRIMARY KEY,
+    principal_id {uuid} NOT NULL REFERENCES sqb_principals(principal_id),
+    secret_hash TEXT NOT NULL,
+    csrf_hash TEXT NOT NULL,
+    created_at {time} NOT NULL,
+    expires_at {time} NOT NULL,
+    revoked_at {time}
+);
+CREATE INDEX sqb_external_sessions_person ON sqb_external_sessions(principal_id);
+CREATE INDEX sqb_fingerprints_reconciliation ON sqb_warehouse_fingerprints (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_freshness_reconciliation ON sqb_warehouse_freshness (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_scan_pages (
+    scan_id {uuid} NOT NULL,
+    page BIGINT NOT NULL,
+    scope_hash TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    complete BOOLEAN NOT NULL,
+    received_at {time} NOT NULL,
+    PRIMARY KEY (scan_id,page)
+);
+CREATE TABLE sqb_warehouse_scan_keys (
+    scan_id {uuid} NOT NULL,
+    event_id {uuid} NOT NULL,
+    PRIMARY KEY (scan_id,event_id)
+);
+CREATE UNIQUE INDEX sqb_security_audit_storage_id ON sqb_security_audit(storage_id);
+CREATE TABLE sqb_warehouse_audit_results (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    audit_name TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_audit_results_reconciliation ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_janitor_events (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    relation_database TEXT,
+    relation_schema TEXT NOT NULL,
+    archive_name TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_janitor_events_reconciliation ON sqb_warehouse_janitor_events (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_migrations (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    target_name TEXT,
+    destination_model TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_migrations_reconciliation ON sqb_warehouse_migrations (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_old_name_views (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    target_name TEXT,
+    migration_event_id TEXT NOT NULL,
+    destination_model TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_old_name_views_reconciliation ON sqb_warehouse_old_name_views (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE TABLE sqb_warehouse_microbatches (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    target_name TEXT NOT NULL,
+    scope_kind TEXT NOT NULL,
+    scope_key TEXT NOT NULL,
+    physical_generation_id TEXT NOT NULL,
+    record_type TEXT NOT NULL,
+    origin_run_id TEXT NOT NULL,
+    execution_run_id TEXT NOT NULL,
+    replay_requirement_id TEXT,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_microbatches_reconciliation ON sqb_warehouse_microbatches (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX recall_warehouse_sources ON recall_events (storage_id)
+    WHERE producer='warehouse' AND event_type='warehouse_source_freshness'
+      AND invocation_id LIKE 'warehouse/source-freshness/%';
+CREATE INDEX sqb_freshness_source_latest ON sqb_warehouse_freshness (
+    location_id, target, (record_json ->> 'source_name'),
+    (record_json ->> 'target_database'), (record_json ->> 'target_schema'),
+    (record_json ->> 'target_name'), observed_at DESC, event_id DESC
+);
+CREATE TABLE sqb_security_audit_deliveries (
+    sink_id TEXT NOT NULL,
+    storage_id BIGINT NOT NULL,
+    event_id TEXT NOT NULL,
+    delivered_at {time} NOT NULL,
+    PRIMARY KEY (sink_id, storage_id)
+);
+CREATE TABLE sqb_warehouse_catalog (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_warehouse_catalog_namespace ON sqb_warehouse_catalog
+    (location_id, target, state_schema, state_database, observed_at, event_id);
+CREATE INDEX sqb_fingerprint_node_latest ON sqb_warehouse_fingerprints
+    (location_id,target,node_type,node_name,target_database,target_schema,target_name,observed_at DESC,event_id DESC);
+CREATE TABLE sqb_warehouse_statistics (
+    event_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    state_database TEXT,
+    state_schema TEXT NOT NULL,
+    relation_name TEXT NOT NULL,
+    observed_at {time} NOT NULL,
+    record_json {json} NOT NULL,
+    received_at {time} NOT NULL
+);
+CREATE INDEX sqb_statistics_relation_time ON sqb_warehouse_statistics
+    (location_id,target,state_schema,state_database,relation_name,observed_at,event_id);
+CREATE INDEX sqb_statistics_expiration ON sqb_warehouse_statistics (observed_at,event_id);
+CREATE INDEX sqb_catalog_statistics_scan ON sqb_warehouse_catalog
+    (location_id,target,state_schema,state_database,event_id);
+CREATE INDEX sqb_observed_node_cursor ON recall_events(storage_id)
+WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished');
+CREATE INDEX sqb_observed_node_identity ON recall_events(
+    invocation_id, (payload -> 'change' -> 'change' ->> 'node_key'),
+    (payload -> 'change' ->> 'claim_id'), storage_id DESC
+) WHERE producer='scheduler';
+CREATE INDEX sqb_observed_node_decisive ON recall_events(
+    (payload -> 'change' -> 'change' ->> 'node_key'), storage_id DESC
+) WHERE producer='scheduler' AND event_type IN ('run_node_finished','run_check_finished')
+AND (payload -> 'change' -> 'change' ->> 'outcome') IN ('success','failed');
+CREATE TABLE sqb_trigger_progress (
+    storage_id BIGINT PRIMARY KEY,
+    trigger_id {uuid} NOT NULL,
+    snapshot_id {uuid} NOT NULL REFERENCES sqb_snapshots(snapshot_id),
+    schema_version BIGINT NOT NULL,
+    projection_json {json} NOT NULL
+);
+CREATE INDEX sqb_trigger_progress_latest ON sqb_trigger_progress(trigger_id, storage_id);
+CREATE TABLE sqb_cli_login_flows (
+    flow_id {uuid} PRIMARY KEY,
+    client_hash TEXT NOT NULL,
+    browser_hash TEXT NOT NULL,
+    expires_at {time} NOT NULL,
+    session_id {uuid}
+);
+CREATE INDEX sqb_cli_login_expiry ON sqb_cli_login_flows(expires_at);
+CREATE INDEX IF NOT EXISTS sqb_runs_tick ON sqb_runs(tick_id);
+CREATE INDEX IF NOT EXISTS sqb_ticks_expiry ON sqb_ticks(scheduled_for) WHERE outcome IN ('skipped', 'covered');
+CREATE INDEX IF NOT EXISTS sqb_runs_snapshot ON sqb_runs(snapshot_id);
+CREATE INDEX IF NOT EXISTS sqb_trigger_progress_snapshot ON sqb_trigger_progress(snapshot_id);
+CREATE INDEX IF NOT EXISTS sqb_snapshot_nodes_hash ON sqb_snapshot_nodes(node_hash);
+CREATE INDEX IF NOT EXISTS sqb_snapshot_sources_hash ON sqb_snapshot_sources(text_hash);
+CREATE INDEX IF NOT EXISTS sqb_snapshot_documents_hash ON sqb_snapshot_documents(document_hash);
+CREATE TABLE IF NOT EXISTS sqb_role_definition_versions (
+    location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
+    target TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    definition_digest TEXT NOT NULL,
+    definition_json TEXT NOT NULL,
+    first_seen_snapshot_id {uuid} NOT NULL,
+    first_seen_at {time} NOT NULL,
+    PRIMARY KEY (location_id, target, role_key, definition_digest)
+);
+CREATE TABLE IF NOT EXISTS sqb_role_activation_requests (
+    request_id {uuid} PRIMARY KEY,
+    location_id {uuid} NOT NULL,
+    target TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    definition_digest TEXT NOT NULL,
+    requested_by TEXT NOT NULL,
+    requested_at {time} NOT NULL,
+    reason TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sqb_role_approvals (
+    approval_id {uuid} PRIMARY KEY,
+    request_id {uuid} NOT NULL UNIQUE REFERENCES sqb_role_activation_requests(request_id),
+    location_id {uuid} NOT NULL,
+    target TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    definition_digest TEXT NOT NULL,
+    decision TEXT NOT NULL,
+    decided_by TEXT NOT NULL,
+    decided_at {time} NOT NULL,
+    reason TEXT NOT NULL,
+    signature TEXT,
+    self_approval BOOLEAN NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sqb_effective_roles (
+    location_id {uuid} NOT NULL,
+    target TEXT NOT NULL,
+    role_key TEXT NOT NULL,
+    definition_digest TEXT NOT NULL,
+    resolved_grants_json TEXT NOT NULL,
+    effective_since {time} NOT NULL,
+    PRIMARY KEY (location_id, target, role_key)
+);

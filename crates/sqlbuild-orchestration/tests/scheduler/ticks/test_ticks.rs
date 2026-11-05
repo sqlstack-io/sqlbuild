@@ -18,5 +18,3 @@ mod test_retention;
 mod test_triggers;
 #[path = "test_types.rs"]
 mod test_types;
-#[path = "test_upgrade.rs"]
-mod test_upgrade;
