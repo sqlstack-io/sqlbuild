@@ -30,7 +30,8 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest_source_freshness::ingest_source_freshness;
 use crate::warehouse_metadata::models::{
-    MetadataBatch, WarehouseFreshnessRecord, WarehouseHistoryKind,
+    MetadataBatch, MetadataScan, WarehouseFreshnessRecord, WarehouseHistoryKind,
+    WarehouseStateLocation,
 };
 
 #[test]
@@ -311,6 +312,148 @@ fn given_imported_source_versions_when_consuming_then_late_facts_queue_once_and_
                 list_runs(store, (location, "development"), 100)
                     .await
                     .expect("queued requests")
+                    .len(),
+                test_case.expected_runs,
+                "{}",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_source_version_that_returns_after_a_complete_scan_prunes_history_when_consuming_then_each_change_queues_one_run()
+ {
+    let test_cases = [
+        SensorTestCase {
+            description: "SQLite returning source version",
+            backend: Backend::Sqlite,
+            expected_runs: 3,
+        },
+        SensorTestCase {
+            description: "PostgreSQL returning source version",
+            backend: Backend::Postgres,
+            expected_runs: 3,
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let fixture = open_test_store(test_case.backend)
+                .await
+                .expect("required store");
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let location = create_location(store, "orders", "test-admin")
+                .await
+                .expect("location");
+            let mut input = snapshot(location);
+            input.nodes.insert(
+                "source:raw_orders".into(),
+                SnapshotNode {
+                    kind: "source".into(),
+                    definition: json!({"name": "raw_orders", "database": null, "schema": "main", "table": "raw_orders"}),
+                    raw_sql: None,
+                    compiled_sql: None,
+                    python_source: None,
+                },
+            );
+            input.documents.insert(
+                "triggers".into(),
+                json!({"orders_changed": {
+                    "description": "Refresh orders after source data changes.", "job_key": "orders",
+                    "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
+                    "minimum_interval_seconds": 1
+                }}),
+            );
+            publish_snapshot(store, &input)
+                .await
+                .expect("publish source sensor");
+            let session_id = Uuid::now_v7();
+            report_location_health(
+                store,
+                location,
+                &LocationHealthReport {
+                    event_id: Uuid::now_v7(),
+                    session_id,
+                    target: "development".into(),
+                    health: LocationHealth::Heartbeat {},
+                },
+            )
+            .await
+            .expect("registered reader");
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                "../../benchmarks/duckshop/edge_cases/orchestration/source_version_returns.json",
+            );
+            let data: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(path).expect("DuckShop case"))
+                    .expect("synthetic source versions");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let trigger = list_triggers(store, location, "development")
+                .await
+                .expect("triggers")
+                .remove(0);
+            let steps = data["observations"]
+                .as_array()
+                .expect("observations")
+                .iter()
+                .zip(data["expected_runs_after_each"].as_array().expect("runs"));
+            for (observation, expected) in steps {
+                let mut record = data["record"].as_object().expect("record").clone();
+                record.extend(observation.as_object().expect("observation").clone());
+                let complete = record.remove("complete_scan").expect("scan flag");
+                let scan = complete.as_bool().expect("flag").then(|| MetadataScan {
+                    scan_id: Uuid::now_v7(),
+                    location: WarehouseStateLocation {
+                        database: None,
+                        schema: "main".into(),
+                    },
+                    complete: true,
+                });
+                ingest_source_freshness(
+                    store,
+                    (location, "development"),
+                    &MetadataBatch {
+                        kind: WarehouseHistoryKind::SourceFreshness,
+                        session_id,
+                        generation: 1,
+                        records: vec![json!(record)],
+                        scan,
+                    },
+                )
+                .await
+                .expect("ingest observation");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let request = begin_sensor_evaluation(store, &lease, trigger.trigger_id)
+                    .await
+                    .expect("evaluation")
+                    .expect("due");
+                complete_builtin_sensor(store, &lease, &request)
+                    .await
+                    .expect("complete");
+                assert_eq!(
+                    complete_builtin_sensor(store, &lease, &request)
+                        .await
+                        .expect("lost acknowledgement"),
+                    0
+                );
+                assert_eq!(
+                    list_runs(store, (location, "development"), 100)
+                        .await
+                        .expect("runs")
+                        .len() as u64,
+                    expected.as_u64().expect("run count"),
+                    "{}: {observation}",
+                    test_case.description
+                );
+            }
+            assert_eq!(
+                list_runs(store, (location, "development"), 100)
+                    .await
+                    .expect("runs")
                     .len(),
                 test_case.expected_runs,
                 "{}",
