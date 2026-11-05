@@ -2321,7 +2321,7 @@ pending_budgets = [
     "crates/sqlbuild-python/src/bindings/_helpers/state_rows/timestamps.rs=4",
     "crates/sqlbuild-python/src/bindings/_helpers/type_system/equality.rs=3",
     "crates/sqlbuild-python/src/bindings/_helpers/type_system/normalization.rs=2",
-    "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=8",
+    "crates/sqlbuild-python/src/bindings/_helpers/workspace_commands/commands.rs=5",
     "crates/sqlbuild-python/src/bindings/models.rs=0",
 ]
 

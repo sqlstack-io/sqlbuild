@@ -12,9 +12,10 @@ use sqlbuild_orchestration::warehouse_metadata::models::{
 
 use crate::bindings::_helpers::boundary::python_calls::within;
 use crate::bindings::_helpers::location_command::command::{location_arguments, publish_location};
-use crate::bindings::_helpers::native_host::host::{redirect_stdout_to_stderr, write_console};
+use crate::bindings::_helpers::native_host::host::redirect_stdout_to_stderr;
 use crate::bindings::_helpers::native_host::orchestration_sensors::evaluate_sensor;
 use crate::bindings::_helpers::native_host::warehouse_metadata::read_history;
+use crate::bindings::_helpers::recall::console::write_stderr;
 
 pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResult<i32> {
     options.set_item("action", "publish")?;
@@ -39,9 +40,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 let record = match publish_location(py, &arguments) {
                     Ok(record) => Some(record),
                     Err(error) => {
-                        write_console(
+                        write_stderr(
                             py,
-                            "stderr",
                             &format!("Location compilation/publication failed: {error}\n"),
                         )?;
                         None
@@ -60,11 +60,7 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 let page = match read_history(py, &arguments, &metadata) {
                     Ok(page) => Some(page),
                     Err(_) => {
-                        write_console(
-                            py,
-                            "stderr",
-                            "Warehouse metadata read failed. No page delivered.\n",
-                        )?;
+                        write_stderr(py, "Warehouse metadata read failed. No page delivered.\n")?;
                         None
                     }
                 };
@@ -89,9 +85,8 @@ pub(super) fn run_runtime(py: Python<'_>, options: Bound<'_, PyDict>) -> PyResul
                 let outcome = match evaluate_sensor(py, &directory, &evaluation) {
                     Ok(outcome) => outcome,
                     Err(_) => {
-                        write_console(
+                        write_stderr(
                             py,
-                            "stderr",
                             "Custom sensor evaluation failed. No cursor or run requests committed.\n",
                         )?;
                         CustomSensorOutcome::Failed

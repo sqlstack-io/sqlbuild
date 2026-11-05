@@ -27,11 +27,21 @@ pub(crate) struct NativeOrchestrationWorker {
 }
 
 impl NativeOrchestrationWorker {
-    /// SIGTERM may arrive before the periodic heartbeat observes the durable cancellation fact.
-    pub(crate) fn refresh_cancellation(&self, py: Python<'_>) -> PyResult<bool> {
+    /// Run `work` on the open owner without holding the GIL; a closed worker is unavailable.
+    fn with_owner<T: Send>(
+        &self,
+        py: Python<'_>,
+        work: impl FnOnce(&WorkerOwner) -> PyResult<T> + Send,
+    ) -> PyResult<T> {
         py.detach(|| {
             let owner = self.owner.lock().map_err(|_| unavailable())?;
-            let owner = owner.as_ref().ok_or_else(unavailable)?;
+            work(owner.as_ref().ok_or_else(unavailable)?)
+        })
+    }
+
+    /// SIGTERM may arrive before the periodic heartbeat observes the durable cancellation fact.
+    pub(crate) fn refresh_cancellation(&self, py: Python<'_>) -> PyResult<bool> {
+        self.with_owner(py, |owner| {
             if owner.session.cancel_requested() {
                 return Ok(true);
             }
@@ -47,22 +57,12 @@ impl NativeOrchestrationWorker {
         &self,
         py: Python<'_>,
     ) -> PyResult<sqlbuild_orchestration::runs::models::RunExecution> {
-        py.detach(|| {
-            let owner = self.owner.lock().map_err(|_| unavailable())?;
-            Ok(owner
-                .as_ref()
-                .ok_or_else(unavailable)?
-                .session
-                .execution
-                .clone())
-        })
+        self.with_owner(py, |owner| Ok(owner.session.execution.clone()))
     }
 
     /// A bounded retry keeps the exact event identity across an uncertain acknowledgement.
     pub(crate) fn change(&self, py: Python<'_>, key: &str, change: RunChange) -> PyResult<()> {
-        py.detach(|| {
-            let owner = self.owner.lock().map_err(|_| unavailable())?;
-            let owner = owner.as_ref().ok_or_else(unavailable)?;
+        self.with_owner(py, |owner| {
             let event_id = Uuid::new_v5(&owner.session.execution.claim.claim_id, key.as_bytes());
             owner.runtime.block_on(async {
                 let mut attempts = 0;
@@ -124,9 +124,7 @@ impl NativeOrchestrationWorker {
 impl NativeOrchestrationWorker {
     /// The frozen request supplies selection and settings only after baseline verification.
     fn execution_json(&self, py: Python<'_>) -> PyResult<String> {
-        py.detach(|| {
-            let owner = self.owner.lock().map_err(|_| unavailable())?;
-            let owner = owner.as_ref().ok_or_else(unavailable)?;
+        self.with_owner(py, |owner| {
             serde_json::to_string(&owner.session.execution)
                 .map_err(|error| PyRuntimeError::new_err(error.to_string()))
         })
@@ -149,9 +147,7 @@ impl NativeOrchestrationWorker {
             Uuid::parse_str(event_id).map_err(|error| PyValueError::new_err(error.to_string()))?;
         let change: RunChange = serde_json::from_str(change_json)
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        py.detach(|| {
-            let owner = self.owner.lock().map_err(|_| unavailable())?;
-            let owner = owner.as_ref().ok_or_else(unavailable)?;
+        self.with_owner(py, |owner| {
             owner
                 .runtime
                 .block_on(owner.client.report(event_id, change))
