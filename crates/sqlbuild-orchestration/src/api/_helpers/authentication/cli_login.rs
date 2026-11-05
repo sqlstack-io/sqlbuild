@@ -1,4 +1,4 @@
-//! Only the exchange secret can receive a CLI credential; browser approval returns no bearer.
+//! Only the exchange secret can receive a CLI credential; a browser person approves it.
 
 use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, StatusCode, header};
@@ -6,8 +6,8 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Extension, Json, Router};
 
-use crate::api::_helpers::authentication::password_transport::{browser_cookie, deny};
-use crate::api::constants::{PASSWORD_BODY_BYTES, PASSWORD_COOKIE};
+use crate::api::_helpers::authentication::password_transport::deny;
+use crate::api::constants::PASSWORD_BODY_BYTES;
 use crate::api::errors::ApiError;
 use crate::api::models::{
     AuthenticationDenial, BrowserLoginMethod, CliLoginApprovalRequest, CliLoginClaimRequest,
@@ -18,7 +18,7 @@ use crate::credentials::main::cli_login::{
     approve_login::approve_login, claim_login::claim_login, start_login::start_login,
 };
 use crate::credentials::models::{
-    AuditContext, AuthenticationAttempt, ClaimedLogin, SessionIdentity, StartedLogin,
+    AuditContext, AuthenticatedPerson, AuthenticationAttempt, ClaimedLogin, StartedLogin,
 };
 use crate::store::models::ControlStore;
 
@@ -76,22 +76,22 @@ pub(crate) async fn start(
 }
 
 #[utoipa::path(post, path = "/api/auth/cli/approve", operation_id = "approveCliLogin",
-    request_body = CliLoginApprovalRequest, security(("session" = [])),
+    request_body = CliLoginApprovalRequest, security(("session" = []), ("proxy" = [])),
     responses((status = 204), (status = 401, body = AuthenticationDenial)))]
 pub(crate) async fn approve(
     State(store): State<ControlStore>,
-    (Extension(context), Extension(identity)): (
+    (Extension(context), Extension(person)): (
         Extension<AuditContext>,
-        Extension<SessionIdentity>,
+        Extension<AuthenticatedPerson>,
     ),
     headers: HeaderMap,
     Json(request): Json<CliLoginApprovalRequest>,
 ) -> Result<Response, ApiError> {
-    if browser_cookie(&headers, PASSWORD_COOKIE).is_some()
+    if !headers.contains_key(header::AUTHORIZATION)
         && approve_login(
             &store,
             &context,
-            &identity,
+            person,
             (&request.browser_code, request.approve),
         )
         .await?

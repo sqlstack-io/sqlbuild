@@ -124,7 +124,7 @@ fn given_a_real_http_server_when_locations_and_workers_report_then_scopes_retrie
             );
             assert_eq!(
                 openapi["paths"]["/api/auth/cli/approve"]["post"]["security"],
-                json!([{"session": []}]),
+                json!([{"session": []}, {"proxy": []}]),
                 "browser authorization cannot use a CLI session header"
             );
             assert!(openapi["components"]["schemas"]["SnapshotInput"].is_object());

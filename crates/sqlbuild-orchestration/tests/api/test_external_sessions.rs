@@ -1,4 +1,4 @@
-//! Real HTTP federation sessions retain live roles, final-admin protection and audited revocation.
+//! Per-request proxy identities keep live roles and final-admin protection across replicas.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -12,32 +12,25 @@ use crate::api::tests::test_types::ExternalSessionTestCase;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::{
     identities::create_principal::create_principal, locations::create_location::create_location,
-    sessions::set_password::set_password,
 };
-use crate::credentials::models::{AuditContext, PasswordAuthority};
-use crate::store::main::{
-    begin::begin, commit::commit, migrate_store::migrate_store, query::query,
-};
-use crate::store::models::{Parameter, TransactionMode};
-use crate::store::tests::fault_helpers::{install_fault, remove_fault};
-use crate::store::tests::fault_types::TransactionFault;
+use crate::credentials::models::AuditContext;
+use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
 #[test]
-fn given_federated_people_when_administrators_and_sessions_change_then_live_authority_and_lifetime_hold()
- {
+fn given_proxy_people_when_administrators_and_roles_change_then_live_authority_holds() {
     let test_cases = [
         ExternalSessionTestCase {
-            description: "SQLite federated administrator/session journey",
+            description: "SQLite proxy administrator journey",
             backend: Backend::Sqlite,
-            expected_lifetime: 3600,
+            expected_viewer_statuses: [403, 200, 403],
         },
         ExternalSessionTestCase {
-            description: "PostgreSQL federated administrator/session journey",
+            description: "PostgreSQL proxy administrator journey",
             backend: Backend::Postgres,
-            expected_lifetime: 3600,
+            expected_viewer_statuses: [403, 200, 403],
         },
     ];
     for test_case in test_cases {
@@ -95,72 +88,19 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                 .timeout(std::time::Duration::from_secs(5))
                 .build()
                 .expect("client");
-            let login = |url: &str, subject: &str| {
-                client
-                    .get(format!("{url}/api/auth/proxy"))
-                    .header(header::HOST, "control.example.com")
-                    .header("x-sqb-user", subject)
-            };
-            for condition in [
-                "WHEN NEW.action='session.created'",
-                "WHEN NEW.action='proxy.authenticated'",
-            ] {
-                let fault = TransactionFault {
-                    description: "failed federation publication",
-                    table: "sqb_security_audit",
-                    operation: "INSERT",
-                    condition,
-                    sqlite_body: "SELECT RAISE(ABORT, 'synthetic session audit failure')",
-                    postgres_body: "RAISE EXCEPTION 'synthetic session audit failure'",
-                };
-                install_fault(store, &fault).await;
-                let response = login(&api.url, first_subject)
-                    .send()
-                    .await
-                    .expect("failed session publication");
-                assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-                assert!(!response.headers().contains_key(header::SET_COOKIE));
-                remove_fault(store, &fault).await;
-            }
-            let mut sessions = Vec::new();
-            for subject in [first_subject, second_subject] {
-                let response = login(&api.url, subject).send().await.expect("SSO login");
-                assert_eq!(response.status(), StatusCode::OK);
-                let cookie = response
-                    .headers()
-                    .get_all(header::SET_COOKIE)
-                    .iter()
-                    .map(|value| value.to_str().expect("cookie"))
-                    .find(|value| value.starts_with("__Host-sqb-session="))
-                    .expect("session cookie")
-                    .split(';')
-                    .next()
-                    .expect("cookie pair")
-                    .to_owned();
-                let body = response.json::<Value>().await.expect("session response");
-                sessions.push((
-                    cookie,
-                    body["csrf_token"].as_str().expect("csrf").to_owned(),
-                    body["session_id"]
-                        .as_str()
-                        .expect("id")
-                        .parse::<Uuid>()
-                        .expect("session UUID"),
-                ));
-            }
+            let subjects = [first_subject, second_subject];
             let request = |index: usize, path: &str| {
                 client
                     .post(format!("{}{path}", other.url))
                     .header(header::HOST, "control.example.com")
                     .header(header::ORIGIN, origin)
-                    .header(header::COOKIE, &sessions[index].0)
-                    .header("x-sqb-csrf", &sessions[index].1)
+                    .header("x-sqb-user", subjects[index])
             };
             let read = |index: usize, path: &str| {
                 client
                     .get(format!("{}{path}", other.url))
                     .header(header::HOST, "control.example.com")
-                    .header(header::COOKIE, &sessions[index].0)
+                    .header("x-sqb-user", subjects[index])
             };
             let roles = |principal_id| json!({"principal_id":principal_id,"role":"admin","location_id":null,"target":null});
             let response = request(0, "/api/admin/roles")
@@ -207,14 +147,11 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                 .await
                 .expect("registered location");
             let metadata = format!("/api/control/locations/{location}/targets/development/runs");
-            assert_eq!(
-                read(0, &metadata)
-                    .send()
-                    .await
-                    .expect("no ambient role")
-                    .status(),
-                StatusCode::FORBIDDEN
-            );
+            let no_role = read(0, &metadata)
+                .send()
+                .await
+                .expect("no ambient role")
+                .status();
             let viewer = json!({"principal_id":first,"role":"viewer","location_id":location,"target":"development"});
             assert_eq!(
                 request(1, "/api/admin/roles")
@@ -225,14 +162,11 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                     .status(),
                 StatusCode::OK
             );
-            assert_eq!(
-                read(0, &metadata)
-                    .send()
-                    .await
-                    .expect("live viewer")
-                    .status(),
-                StatusCode::OK
-            );
+            let granted = read(0, &metadata)
+                .send()
+                .await
+                .expect("live viewer")
+                .status();
             let mut revocation = viewer;
             revocation["revoke"] = json!(true);
             assert_eq!(
@@ -244,84 +178,16 @@ fn given_federated_people_when_administrators_and_sessions_change_then_live_auth
                     .status(),
                 StatusCode::OK
             );
+            let revoked = read(0, &metadata)
+                .send()
+                .await
+                .expect("live viewer loss")
+                .status();
             assert_eq!(
-                read(0, &metadata)
-                    .send()
-                    .await
-                    .expect("live viewer loss")
-                    .status(),
-                StatusCode::FORBIDDEN
-            );
-            let (transaction, rows) = query(
-                begin(store, TransactionMode::Read)
-                    .await
-                    .expect("inspect sessions"),
-                "SELECT session_id,created_at,expires_at FROM sqb_sessions WHERE credential_id IS NULL",
-                vec![],
-            )
-            .await
-            .expect("committed sessions only");
-            assert_eq!(rows.len(), 2, "failed audits did not create sessions");
-            for row in rows {
-                let created: chrono::DateTime<chrono::Utc> =
-                    serde_json::from_value(row["created_at"].clone()).expect("created");
-                let expires: chrono::DateTime<chrono::Utc> =
-                    serde_json::from_value(row["expires_at"].clone()).expect("expiry");
-                // Session expiry is truncated to database microsecond precision.
-                assert!(
-                    (test_case.expected_lifetime * 1_000_000 - 1
-                        ..=test_case.expected_lifetime * 1_000_000)
-                        .contains(
-                            &(expires - created)
-                                .num_microseconds()
-                                .expect("bounded lifetime")
-                        ),
-                    "{}",
-                    test_case.description
-                );
-            }
-            commit(transaction).await.expect("inspection committed");
-            let (transaction, _) = query(
-                begin(store, TransactionMode::Write)
-                    .await
-                    .expect("expire session"),
-                "UPDATE sqb_sessions SET expires_at=created_at WHERE session_id=$1",
-                vec![Parameter::Id(sessions[0].2)],
-            )
-            .await
-            .expect("clock boundary");
-            commit(transaction).await.expect("expiry committed");
-            assert_eq!(
-                read(0, "/api/auth/session")
-                    .send()
-                    .await
-                    .expect("expired session")
-                    .status(),
-                StatusCode::UNAUTHORIZED
-            );
-            set_password(
-                store,
-                &context,
-                PasswordAuthority::Operator(second),
-                "customers-password-2026",
-            )
-            .await
-            .expect("owner credential rotation");
-            assert_eq!(
-                read(1, "/api/auth/session")
-                    .send()
-                    .await
-                    .expect("SSO session revoked on reset")
-                    .status(),
-                StatusCode::UNAUTHORIZED
-            );
-            assert_eq!(
-                login(&api.url, second_subject)
-                    .send()
-                    .await
-                    .expect("fresh SSO after reset")
-                    .status(),
-                StatusCode::OK
+                [no_role, granted, revoked].map(|status| status.as_u16()),
+                test_case.expected_viewer_statuses,
+                "{}",
+                test_case.description
             );
             stop_api(other).await;
             stop_api(api).await;

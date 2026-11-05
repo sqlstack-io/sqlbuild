@@ -1,11 +1,11 @@
-//! Explicit federation bindings issue browser sessions without provisioning accounts or roles.
+//! Explicit OIDC bindings issue browser sessions without provisioning accounts or roles.
 
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::credentials::_helpers::browser_sessions::issue_session;
 use crate::credentials::main::audit::append_audit::append_audit;
-use crate::credentials::models::{AuditContext, ExternalIdentityMechanism, IssuedSession};
+use crate::credentials::models::{AuditContext, IssuedSession};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -14,7 +14,6 @@ pub(crate) async fn authenticate_bound_person(
     store: &ControlStore,
     context: &AuditContext,
     principal_id: Uuid,
-    mechanism: ExternalIdentityMechanism,
 ) -> Result<Option<IssuedSession>, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
     let (transaction, rows) = query(
@@ -27,13 +26,9 @@ pub(crate) async fn authenticate_bound_person(
         commit(transaction).await?;
         return Ok(None);
     }
-    let (action, granting_role) = match mechanism {
-        ExternalIdentityMechanism::TrustedProxy => ("proxy.authenticated", "trusted-proxy"),
-        ExternalIdentityMechanism::Oidc => ("oidc.authenticated", "oidc"),
-    };
     let context = AuditContext {
         actor: format!("principal:{principal_id}"),
-        granting_role: granting_role.into(),
+        granting_role: "oidc".into(),
         ..context.clone()
     };
     let (transaction, session) = issue_session(transaction, &context, (principal_id, None)).await?;
@@ -42,7 +37,7 @@ pub(crate) async fn authenticate_bound_person(
         append_audit(
             transaction,
             &context,
-            (context.request_id, action),
+            (context.request_id, "oidc.authenticated"),
             (identity.clone(), json!(null), identity),
         )
         .await?,

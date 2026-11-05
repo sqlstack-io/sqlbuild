@@ -8,7 +8,7 @@ use crate::api::errors::ApiError;
 use crate::api::models::MutationResponse;
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::change_administrator::change_administrator;
-use crate::credentials::models::SessionIdentity;
+use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AdministratorChange, AuditContext, RoleAssignmentRequest};
 use crate::store::models::ControlStore;
 
@@ -20,16 +20,12 @@ use crate::store::models::ControlStore;
 pub(crate) async fn change(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Path(principal_id): Path<Uuid>,
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
     Json(change): Json<AdministratorChange>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: change_administrator(
-            &store,
-            (&context, identity.principal_id),
-            (principal_id, change),
-        )
-        .await?,
+        applied: change_administrator(&store, (&context, principal), (principal_id, change))
+            .await?,
     }))
 }
 
@@ -39,10 +35,10 @@ pub(crate) async fn change(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn assign(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(identity): Extension<SessionIdentity>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
     Json(request): Json<RoleAssignmentRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: assign_builtin_role(&store, (&context, identity.principal_id), &request).await?,
+        applied: assign_builtin_role(&store, (&context, principal), &request).await?,
     }))
 }

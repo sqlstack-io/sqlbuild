@@ -26,9 +26,7 @@ use crate::credentials::main::sessions::authenticate_bound_person::authenticate_
 use crate::credentials::main::sessions::{
     claim_oidc_flow::claim_oidc_flow, create_oidc_flow::create_oidc_flow,
 };
-use crate::credentials::models::{
-    AuditContext, AuthenticationAttempt, ExternalIdentityMechanism, OidcFlowStart,
-};
+use crate::credentials::models::{AuditContext, AuthenticationAttempt, OidcFlowStart};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -131,13 +129,8 @@ pub(crate) async fn callback(
     let mut response = match subject {
         Ok(subject) => match runtime.settings.identities.get(&subject).copied() {
             Some(principal) => {
-                if let Some(session) = authenticate_bound_person(
-                    &store,
-                    &context,
-                    principal,
-                    ExternalIdentityMechanism::Oidc,
-                )
-                .await?
+                if let Some(session) =
+                    authenticate_bound_person(&store, &context, principal).await?
                 {
                     external_session(session)?
                 } else {

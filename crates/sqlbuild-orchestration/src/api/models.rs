@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::_helpers::authentication::password_sessions;
-use crate::api::_helpers::authentication::trusted_proxy;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changes, location_health, location_work, person_location_work,
@@ -35,7 +34,6 @@ use crate::api::_helpers::resources::{
     cli_login::start,
     cli_login::approve,
     cli_login::claim,
-    trusted_proxy::identity,
     oidc::login,
     oidc::callback,
     changes::subscribe,

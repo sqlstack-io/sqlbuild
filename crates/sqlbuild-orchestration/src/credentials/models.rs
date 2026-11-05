@@ -196,6 +196,10 @@ pub enum AdministratorChange {
     Enable,
 }
 
+/// The person a request authenticated as, and their session unless a trusted proxy vouched.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AuthenticatedPerson(pub(crate) Uuid, pub(crate) Option<Uuid>);
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SessionIdentity {
     pub session_id: Uuid,
@@ -230,6 +234,7 @@ pub(crate) enum ClaimedLogin {
 #[derive(Debug, Deserialize)]
 pub(crate) struct StoredLogin {
     pub(crate) client_hash: String,
+    pub(crate) principal_id: Option<Uuid>,
     pub(crate) session_id: Option<Uuid>,
 }
 
@@ -265,12 +270,6 @@ pub enum AuthenticationAttempt<'a> {
     IdentityProvider,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum ExternalIdentityMechanism {
-    TrustedProxy,
-    Oidc,
-}
-
 #[derive(Debug)]
 pub(crate) struct OidcFlowStart {
     pub(crate) state: openidconnect::CsrfToken,
@@ -291,7 +290,6 @@ pub(crate) struct StoredOidcFlow {
 pub(crate) struct StoredSession {
     #[serde(flatten)]
     pub(crate) identity: SessionIdentity,
-    pub(crate) credential_id: Option<Uuid>,
     pub(crate) secret_hash: String,
     pub(crate) csrf_hash: String,
 }
