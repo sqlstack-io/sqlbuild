@@ -4198,7 +4198,6 @@ version = "0.187.3"
 dependencies = [
  "blake3",
  "chrono",
- "command-fds",
  "ctrlc",
  "getrandom 0.4.3",
  "keyring",
@@ -4216,6 +4215,7 @@ dependencies = [
  "sqlbuild-cursor",
  "sqlbuild-model-config",
  "sqlbuild-orchestration",
+ "sqlbuild-process-ownership",
  "sqlbuild-recall",
  "sqlbuild-rules",
  "tempfile",
@@ -4312,6 +4312,18 @@ dependencies = [
  "tokio",
  "utoipa",
  "uuid",
+]
+
+[[package]]
+name = "sqlbuild-process-ownership"
+version = "0.187.3"
+dependencies = [
+ "command-fds",
+ "libc",
+ "rustix",
+ "tempfile",
+ "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

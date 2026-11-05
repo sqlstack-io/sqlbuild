@@ -150,7 +150,7 @@ jobs:
                 ;;
             esac
             case "${path}" in
-              crates/sqlbuild-orchestration/*|crates/sqlbuild-cli/*|Cargo.toml|Cargo.lock|.github/workflows/verify.yml)
+              crates/sqlbuild-orchestration/*|crates/sqlbuild-process-ownership/*|crates/sqlbuild-cli/*|Cargo.toml|Cargo.lock|.github/workflows/verify.yml)
                 recovery=true
                 ;;
             esac
@@ -596,12 +596,65 @@ jobs:
           "${bin}/initdb" -D "${data}" -U postgres --auth=trust -E UTF8 > /dev/null
           "${bin}/pg_ctl" -D "${data}" -o "-p 5433 -c listen_addresses=127.0.0.1" \
             -l "${RUNNER_TEMP}/postgres.log" -w start
+      - name: Worker claim ownership, recovery and stop
+        run: cargo test --locked -p sqlbuild-process-ownership
+      - name: Worker supervision and person credential storage
+        run: cargo test --locked -p sqlbuild-cli --lib -- workers person_login
       - name: Control store, scheduler and recovery contracts on SQLite and PostgreSQL
         env:
           SQLBUILD_TEST_CONTROL_POSTGRES_URL: postgresql://postgres@127.0.0.1:5433/postgres
         run: cargo test --locked -p sqlbuild-orchestration --lib
-      - name: Worker supervision and person credential storage
-        run: cargo test --locked -p sqlbuild-cli --lib -- workers person_login
+      - name: "Temporary diagnostics: commit latency and serial test timings"
+        if: always()
+        env:
+          SQLBUILD_TEST_CONTROL_POSTGRES_URL: postgresql://postgres@127.0.0.1:5433/postgres
+        run: |
+          nproc 2>/dev/null || sysctl -n hw.ncpu || true
+          python3 -c "import sys; print(sys.version)" 2>/dev/null || python -c "import sys; print(sys.version)"
+          py="$(command -v python3 || command -v python)"
+          "${py}" - "${RUNNER_TEMP}" <<'PYEOF'
+          import os, sqlite3, sys, time
+          for sync in ("NORMAL", "FULL"):
+              path = os.path.join(sys.argv[1], f"latency-{sync}.sqlite3")
+              connection = sqlite3.connect(path, isolation_level=None)
+              connection.execute(f"PRAGMA journal_mode=WAL")
+              connection.execute(f"PRAGMA synchronous={sync}")
+              connection.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+              samples = []
+              for index in range(1000):
+                  started = time.perf_counter()
+                  connection.execute("BEGIN IMMEDIATE")
+                  connection.execute("INSERT INTO t (v) VALUES (?)", (str(index),))
+                  connection.execute("COMMIT")
+                  samples.append(time.perf_counter() - started)
+              samples.sort()
+              print(f"sqlite WAL synchronous={sync}: 1000 commits total={sum(samples):.2f}s "
+                    f"p50={samples[500]*1000:.2f}ms p99={samples[990]*1000:.2f}ms max={samples[-1]*1000:.2f}ms")
+          PYEOF
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            bin="$(brew --prefix postgresql@16)/bin"
+          else
+            bin="$(cygpath -u "${PGBIN}")"
+          fi
+          echo "CREATE TABLE IF NOT EXISTS t (id bigserial PRIMARY KEY, v text);" \
+            | "${bin}/psql" -q -h 127.0.0.1 -p 5433 -U postgres postgres
+          echo "INSERT INTO t (v) VALUES ('x');" > "${RUNNER_TEMP}/insert.sql"
+          "${bin}/pgbench" -n -h 127.0.0.1 -p 5433 -U postgres -c 1 -t 1000 \
+            -f "${RUNNER_TEMP}/insert.sql" postgres | grep -E "latency|tps"
+          for name in \
+            platform::tests::test_webhook::given_a_location_outage_when_webhook_delivery_retries_then_all_health_facts_survive_restart_and_lost_acknowledgements \
+            runs::tests::test_group_admission::given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelated_work_has_a_bounded_write_lock \
+            scheduler::tests::contracts::ticks::test_retention::given_expired_covered_ticks_when_pruned_and_cursor_reset_then_run_linked_and_latest_ticks_survive_without_resurrection \
+            sensors::tests::test_nodes::given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queue_once_per_finish \
+            sensors::tests::test_runs::given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_run_keys_are_preserved \
+            sensors::tests::test_transitions::given_independent_check_failures_when_nondecisive_results_arrive_then_only_executed_success_recovers
+          do
+            started=$(date +%s)
+            if cargo test --locked -q -p sqlbuild-orchestration --lib -- --exact "${name}" --test-threads=1 --nocapture \
+                > "${RUNNER_TEMP}/serial.log" 2>&1; then status=pass; else status=FAIL; fi
+            echo "serial ${status} $(( $(date +%s) - started ))s ${name}"
+            grep -E "admissions in|panicked|Fenced|Elapsed" "${RUNNER_TEMP}/serial.log" | head -5 || true
+          done
       - name: PostgreSQL server log
         if: failure()
         run: cat "${RUNNER_TEMP}/postgres.log" || true

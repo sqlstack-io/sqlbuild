@@ -3,6 +3,7 @@ members = [
     "crates/sqlbuild-build-features",
     "crates/sqlbuild-core",
     "crates/sqlbuild-cursor",
+    "crates/sqlbuild-process-ownership",
     "crates/sqlbuild-state",
     "crates/sqlbuild-pysource",
     "crates/sqlbuild-cache",
@@ -33,6 +34,7 @@ order = [
     "sqlbuild-build-features",
     "sqlbuild-core",
     "sqlbuild-cursor",
+    "sqlbuild-process-ownership",
     "sqlbuild-state",
     "sqlbuild-pysource",
     "sqlbuild-cache",
@@ -108,6 +110,7 @@ thiserror = "2"
 # Windows only: `sqb` ignores Ctrl+C while the Python CLI it started handles it.
 ctrlc = "3"
 command-fds = "0.3"
+libc = "0.2"
 quote = "1"
 rayon = "1"
 # Static reading of project Python source; the parser fensu uses.
@@ -117,7 +120,9 @@ ruff_text_size = "=0.0.4"
 # Unix only: `sqb` shares the compute log prune lock with Python's `filelock` through `flock`.
 # Fast deterministic hasher for hot in-memory maps whose iteration order never reaches output.
 rustc-hash = "2"
-# The native SIGTERM handler: sets a flag the CLI watches, without unsafe code in the workspace.
+# The native SIGTERM handler: sets a flag the CLI watches, without unsafe code. The only crate
+# allowed unsafe code is sqlbuild-process-ownership, for the platform calls that prove which
+# process owns a worker claim; every other crate forbids it.
 signal-hook = { version = "0.3", default-features = false }
 # Features signal-hook's registry enables, matched in the sqb build through sqlbuild-build-features.
 errno = "0.3"
@@ -160,6 +165,7 @@ sqlbuild-refactor = { path = "crates/sqlbuild-refactor" }
 sqlbuild-rules = { path = "crates/sqlbuild-rules" }
 sqlbuild-model-config = { path = "crates/sqlbuild-model-config" }
 sqlbuild-orchestration = { path = "crates/sqlbuild-orchestration" }
+sqlbuild-process-ownership = { path = "crates/sqlbuild-process-ownership" }
 sqlbuild-project = { path = "crates/sqlbuild-project" }
 sqlbuild-pysource = { path = "crates/sqlbuild-pysource" }
 sqlbuild-recall = { path = "crates/sqlbuild-recall" }
