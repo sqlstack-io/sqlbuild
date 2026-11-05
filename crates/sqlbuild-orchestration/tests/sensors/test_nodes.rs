@@ -146,7 +146,6 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 [true; 2],
             )
             .await;
-            // Page past nonmatches without borrowing starts from earlier real runs.
             for _ in 0..46 {
                 finish_run(
                     store,
@@ -271,9 +270,9 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     complete_builtin_sensor(&replica, &lease, &pending),
                 )
                 .await
-                .expect("bounded 100-event page")
+                .expect("bounded 100-row page")
                 .expect("first page"),
-                6
+                7
             );
             assert_eq!(
                 complete_builtin_sensor(store, &lease, &pending)
@@ -291,8 +290,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                 complete_builtin_sensor(store, &lease, &next)
                     .await
                     .expect("second page"),
-                1,
-                "the other selected node is still pending"
+                0,
+                "unstarted finishes never fill a page"
             );
             for change in [
                 RunChange::NodeStarted {

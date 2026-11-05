@@ -35,7 +35,7 @@ pub(crate) async fn load_group(
     let (transaction, failures) = query(
         transaction,
         "SELECT n.node_key FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id \
-         WHERE r.parent_run_id=$1 AND n.status='failed'",
+         WHERE r.parent_run_id=$1 AND n.kind='node' AND n.status='failed'",
         vec![Parameter::Id(parent_id)],
     )
     .await?;

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::declarations::models::TriggerStatus;
 use crate::platform::models::PlatformEventKind;
-use crate::runs::models::RunOutcome;
+use crate::runs::models::{NodeOutcome, RunOutcome};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -90,10 +90,10 @@ pub(crate) struct TerminalSensorRun {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct NodeSensorEvent {
-    pub(crate) event_id: Uuid,
     pub(crate) run_id: Uuid,
-    pub(crate) storage_id: i64,
-    pub(crate) payload: serde_json::Value,
+    pub(crate) node_key: String,
+    pub(crate) status: NodeOutcome,
+    pub(crate) finished_storage_id: i64,
 }
 
 #[derive(Debug, Deserialize)]

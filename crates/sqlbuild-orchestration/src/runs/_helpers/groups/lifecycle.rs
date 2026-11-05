@@ -129,7 +129,7 @@ async fn finish_group(
     let parent = &group.parent;
     let parent_id = parent.request_json.run_id;
     let (mut transaction, rows) = query(transaction,
-        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 ORDER BY r.run_id, n.node_key",
+        "SELECT n.* FROM sqb_run_nodes n JOIN sqb_runs r ON r.run_id=n.run_id WHERE r.parent_run_id=$1 AND n.kind='node' ORDER BY r.run_id, n.node_key",
         vec![Parameter::Id(parent_id)]).await?;
     let mut nodes: BTreeMap<String, RunNodeRecord> = BTreeMap::new();
     let rank = |status: &str| match status {

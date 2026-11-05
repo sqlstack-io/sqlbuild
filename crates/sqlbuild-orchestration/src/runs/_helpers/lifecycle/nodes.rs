@@ -39,7 +39,7 @@ pub(crate) async fn project_node(
     let now = transaction.now;
     let (transaction, nodes) = query(
         transaction,
-        "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key=$2 AND attempt=1",
+        "SELECT status FROM sqb_run_nodes WHERE run_id=$1 AND node_key=$2 AND attempt=1 AND kind='node'",
         vec![Parameter::Id(request.run_id), Parameter::Text(node.clone())],
     )
     .await?;
@@ -67,7 +67,7 @@ pub(crate) async fn project_node(
     *counts.entry(status.into()).or_default() += 1;
     let (transaction, _) = query(transaction,
         "UPDATE sqb_run_nodes SET status=$1, started_at=CASE WHEN $1='running' THEN $2 ELSE started_at END, \
-         ended_at=$3, rows_affected=$4, error_code=$5, skipped_because_of=$6 WHERE run_id=$7 AND node_key=$8 AND attempt=1",
+         ended_at=$3, rows_affected=$4, error_code=$5, skipped_because_of=$6 WHERE run_id=$7 AND node_key=$8 AND attempt=1 AND kind='node'",
         vec![Parameter::Text(status.into()), Parameter::Time(now), Parameter::OptionalTime((status != NODE_RUNNING).then_some(now)),
             rows.map_or(Parameter::Null(sqlbuild_recall::schema::models::ColumnType::Integer), Parameter::Integer),
             Parameter::OptionalText(error), Parameter::OptionalText(skipped), Parameter::Id(request.run_id), Parameter::Text(node.clone())]).await?;
