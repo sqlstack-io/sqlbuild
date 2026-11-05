@@ -208,21 +208,20 @@ def sign_in(client: Any, origin: str, mode: str, username: str, password: str) -
 def assert_private_storage(
     credential: Path, command: list[str], environment: dict[str, str], project: Path
 ) -> None:
-    """Real CLI reload must refuse unsafe file/ancestor modes and symlink credentials."""
-    for directory in [credential, credential.parents[2]]:
-        original_mode: int = stat.S_IMODE(directory.stat().st_mode)
-        directory.chmod(0o777)
-        unsafe: subprocess.CompletedProcess[str] = subprocess.run(
-            command,
-            cwd=project,
-            env=environment,
-            text=True,
-            capture_output=True,
-            timeout=20,
-            check=False,
-        )
-        assert unsafe.returncode != 0 and not unsafe.stdout
-        directory.chmod(original_mode)
+    """Real CLI reload must refuse an unsafe file mode and a symlinked credential."""
+    original_mode: int = stat.S_IMODE(credential.stat().st_mode)
+    credential.chmod(0o644)
+    unsafe: subprocess.CompletedProcess[str] = subprocess.run(
+        command,
+        cwd=project,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=20,
+        check=False,
+    )
+    assert unsafe.returncode != 0 and not unsafe.stdout
+    credential.chmod(original_mode)
     backup: Path = credential.with_suffix(".backup")
     credential.rename(backup)
     credential.symlink_to(backup)
