@@ -8,6 +8,7 @@
 
 mod cases;
 mod compare;
+mod engine;
 mod fingerprint;
 
 use std::io::{BufRead, Write};

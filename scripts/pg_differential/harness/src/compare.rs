@@ -9,19 +9,18 @@ use sqlbuild_analysis::semantic_validation::main::validation_json;
 use sqlbuild_analysis::semantic_validation::models::NormalizationInput;
 use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
 use sqlbuild_analysis::type_system::main::same_type::same_type;
-use sqlquack_semantics::dialects::constants::POSTGRES;
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{
     LineageContext, Nullability, OutputLineage, QueryLineage, SchemaColumn, TransformKind,
 };
 use sqlquack_semantics::lineage::types::LineageSchema;
 use sqlquack_semantics::{statement_lineage, statement_name_findings};
+use sqlquack_syntax::Expression;
 
 use crate::cases::{Case, Column, PolyglotResult, Source};
+use crate::engine::{Engine, Parsed};
 use crate::fingerprint::compare_fingerprint;
 
-const ANALYSIS_DIALECT: &str = "postgres";
-const POLYGLOT_DIALECT: &str = "postgresql";
 /// Binding findings both engines report are `E2xx`; Polyglot's unknown-table `E200` comes
 /// from relations the capture has no closed shape for, which the harness leaves out.
 const FINDING_PREFIX: &str = "E2";
@@ -104,16 +103,21 @@ pub fn panicked(case: &Case) -> Comparison {
 
 /// Compare every measure of the case, the migration fingerprint included.
 pub fn compare_case(case: &Case) -> Comparison {
-    let mut comparison: Comparison = analysed_case(case);
-    comparison.fingerprint = compare_fingerprint(&case.query_sql, &mut comparison.differences);
+    let engine: Engine = match Engine::from_polyglot(&case.dialect) {
+        Ok(engine) => engine,
+        Err(error) => return unmeasured(case, "dialect", Some(error), (Vec::new(), Vec::new())),
+    };
+    let mut comparison: Comparison = analysed_case(case, engine);
+    comparison.fingerprint =
+        compare_fingerprint(engine, &case.query_sql, &mut comparison.differences);
     comparison
 }
 
 /// Parse and analyse the case with SQLQuack and compare each measure with Polyglot's results.
-fn analysed_case(case: &Case) -> Comparison {
+fn analysed_case(case: &Case, engine: Engine) -> Comparison {
     let sql: String = match normalize_analysis_sql(NormalizationInput {
         sql: case.query_sql.clone(),
-        dialect: ANALYSIS_DIALECT.to_owned(),
+        dialect: engine.analysis_name().to_owned(),
         stubs: HashMap::new(),
         placeholders: HashMap::new(),
     }) {
@@ -127,28 +131,20 @@ fn analysed_case(case: &Case) -> Comparison {
             );
         }
     };
-    let polyglot_findings: (Vec<String>, Vec<String>) = match polyglot_validation(case, &sql) {
-        Ok(findings) => findings,
-        Err(error) => (Vec::new(), vec![format!("validation failed: {error}")]),
-    };
-    let parsed = match sqlquack_syntax_postgres::parse(&sql) {
-        Ok(parsed) => parsed,
-        Err(error) => {
-            let detail: String = format!("{error:?}");
-            return unmeasured(case, "parse_error", Some(detail), polyglot_findings);
+    let polyglot_findings: (Vec<String>, Vec<String>) =
+        match polyglot_validation(case, engine, &sql) {
+            Ok(findings) => findings,
+            Err(error) => (Vec::new(), vec![format!("validation failed: {error}")]),
+        };
+    let statement: Expression = match engine.parse(&sql) {
+        Parsed::Statement(statement) => statement,
+        Parsed::Unmeasured(reason, detail) => {
+            return unmeasured(case, reason, Some(detail), polyglot_findings);
         }
     };
-    if !parsed.gaps.is_empty() {
-        let names: Vec<&str> = parsed.gaps.iter().map(|gap| gap.construct).collect();
-        return unmeasured(case, "opaque", Some(names.join(",")), polyglot_findings);
-    }
-    let [statement] = parsed.statements.as_slice() else {
-        let count: usize = parsed.statements.len();
-        let detail: String = format!("{count} statements");
-        return unmeasured(case, "parse_error", Some(detail), polyglot_findings);
-    };
-    let profile: &'static dyn DialectProfile = &POSTGRES;
-    let catalog: Catalog = catalog(case, profile);
+    let statement: &Expression = &statement;
+    let profile: &'static dyn DialectProfile = engine.profile();
+    let catalog: Catalog = catalog(case, engine);
     let context = LineageContext {
         profile,
         schema: &catalog,
@@ -167,7 +163,7 @@ fn analysed_case(case: &Case) -> Comparison {
     let (lineage_verdict, types_verdict): (String, String) = match &case.polyglot {
         Some(polyglot) => (
             compare_lineage(polyglot, &lineage, &resources, &mut differences),
-            compare_types(polyglot, &lineage, &mut differences),
+            compare_types(engine, polyglot, &lineage, &mut differences),
         ),
         None => ("not_measured".to_owned(), "not_measured".to_owned()),
     };
@@ -215,10 +211,14 @@ fn is_compared(code: &str) -> bool {
 }
 
 /// Polyglot's validation of the normalized SQL with the options SQLBuild's binding catalog
-/// uses for Postgres (`ProjectCatalog::new`): the project's functions as known, strict, with
+/// uses for every dialect (`ProjectCatalog::new`): the project's functions as known, strict, with
 /// type, reference and semantic checks.
 /// Returns `(compared findings, other errors)` as `<code> <message>`.
-fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<String>), String> {
+fn polyglot_validation(
+    case: &Case,
+    engine: Engine,
+    sql: &str,
+) -> Result<(Vec<String>, Vec<String>), String> {
     let tables: Vec<Value> = case
         .relations
         .iter()
@@ -250,7 +250,7 @@ fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<Strin
         .collect();
     let request: Value = json!({
         "sql": sql,
-        "dialect": POLYGLOT_DIALECT,
+        "dialect": engine.polyglot_name(),
         "schema": {"tables": tables, "strict": true},
         "options": {
             "known_functions": known_functions,
@@ -277,7 +277,8 @@ fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<Strin
     Ok((names, other))
 }
 
-fn catalog(case: &Case, profile: &dyn DialectProfile) -> Catalog {
+fn catalog(case: &Case, engine: Engine) -> Catalog {
+    let profile: &dyn DialectProfile = engine.profile();
     let relations: HashMap<String, Vec<SchemaColumn>> = case
         .relations
         .iter()
@@ -287,7 +288,7 @@ fn catalog(case: &Case, profile: &dyn DialectProfile) -> Catalog {
                 .columns
                 .iter()
                 .map(|column| SchemaColumn {
-                    quoted: column.name != column.name.to_lowercase(),
+                    quoted: engine.exact_name(&column.name),
                     name: column.name.clone(),
                     data_type: column.data_type.clone(),
                     nullability: nullability(&column.nullability),
@@ -467,18 +468,20 @@ fn compare_findings(
     "differ".to_owned()
 }
 
-fn same_type_text(left: &str, right: &str) -> bool {
+fn same_type_text(engine: Engine, left: &str, right: &str) -> bool {
+    let dialect: &str = engine.analysis_name();
     match (
-        normalize_type(left, ANALYSIS_DIALECT),
-        normalize_type(right, ANALYSIS_DIALECT),
+        normalize_type(left, dialect),
+        normalize_type(right, dialect),
     ) {
-        (Ok(left), Ok(right)) => same_type(&left.normalized, &right.normalized, ANALYSIS_DIALECT),
+        (Ok(left), Ok(right)) => same_type(&left.normalized, &right.normalized, dialect),
         _ => left.eq_ignore_ascii_case(right),
     }
 }
 
 /// D: per output, the inferred type and nullability.
 fn compare_types(
+    engine: Engine,
     polyglot_result: &PolyglotResult,
     lineage: &QueryLineage,
     differences: &mut Vec<Difference>,
@@ -497,7 +500,7 @@ fn compare_types(
             continue;
         };
         let kind: Option<&'static str> = match (&column.data_type, &output.data_type) {
-            (Some(left), Some(right)) if same_type_text(left, right) => None,
+            (Some(left), Some(right)) if same_type_text(engine, left, right) => None,
             (None, None) => None,
             (None, Some(_)) => Some(POLYGLOT_UNTYPED),
             (Some(_), None) => Some("sqlquack_untyped"),

@@ -7,6 +7,7 @@ from typing import Any
 
 from scripts.pg_differential.constants import (
     COMPILED_ORIGIN,
+    DIALECT_SEPARATOR,
     EXAMPLES_PER_GROUP,
     GAP_SEPARATOR,
     MEASURES,
@@ -17,8 +18,10 @@ from scripts.pg_differential.constants import (
 
 
 def summarise(*, cases: list[dict[str, Any]], results: list[dict[str, Any]]) -> dict[str, Any]:
-    """The summary of every case, and of each source's cases under `sources`."""
-    source_by_id: dict[str, str] = {case["id"]: case["source"] for case in cases}
+    """The summary of every case, and under `sources` of each `<dialect>/<source>`'s cases."""
+    source_by_id: dict[str, str] = {
+        case["id"]: f"{case['dialect']}{DIALECT_SEPARATOR}{case['source']}" for case in cases
+    }
     by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for result in results:
         by_source[source_by_id[result["id"]]].append(result)

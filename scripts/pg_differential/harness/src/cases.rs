@@ -2,12 +2,14 @@
 
 use serde::Deserialize;
 
-/// One Postgres query: its analysis SQL, the relations it reads and, for a compiled model,
+/// One query: its analysis SQL, the relations it reads and, for a compiled model,
 /// SQLBuild's recorded results.
 #[derive(Debug, Deserialize)]
 pub struct Case {
     /// `<project>/<model>`, with `#<mutation>` for a mutated query.
     pub id: String,
+    /// The capture's Polyglot dialect: `postgresql`, `snowflake` or `duckdb`.
+    pub dialect: String,
     /// The query SQL with SQLBuild's reference markers, as the compile analysed it.
     pub query_sql: String,
     /// The relations the compile's binding catalog knew, by analysis name.

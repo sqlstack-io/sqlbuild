@@ -1,4 +1,4 @@
-"""Read compile captures of Postgres projects into harness cases."""
+"""Read compile captures of Postgres, Snowflake and DuckDB projects into harness cases."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.pg_differential.constants import (
+    ANALYSED_DIALECTS,
     CAPTURE_KEY,
     COLUMN_REFERENCE,
     COMPILED_PROJECT_CAPTURE,
@@ -17,7 +18,6 @@ from scripts.pg_differential.constants import (
     MISSING_SUFFIX,
     MUTATION_SEPARATOR,
     OUTPUT_ALIAS_BEFORE,
-    POSTGRES_DIALECT,
     QUALIFIED_REFERENCE,
     REFERENCE_RESOURCE_TYPES,
     SHARED_KEY,
@@ -72,11 +72,11 @@ def nullability_text(value: dict[str, str] | None) -> str:
 
 
 def project_cases(*, path: Path, source: str) -> Iterator[dict[str, Any]]:
-    """One case per compiled model of the captured project, when it compiled for Postgres."""
+    """One case per compiled model of the captured project, in a dialect the harness analyses."""
     project: dict[str, Any] = load_capture(path)
     project_name: str = path.parents[2].name
     catalog: dict[str, Any] | None = project["binding_catalog"]
-    if catalog is None or catalog["dialect"] != POSTGRES_DIALECT:
+    if catalog is None or catalog["dialect"] not in ANALYSED_DIALECTS:
         return
     schemas: dict[str, dict[str, str]] = dict(catalog["schemas"][UNORDERED_MAPPING_KEY])
     shapes: dict[str, list[dict[str, Any]]] = dict(
@@ -97,6 +97,7 @@ def project_cases(*, path: Path, source: str) -> Iterator[dict[str, Any]]:
         yield {
             "id": f"{source}/{project_name}/{model['name']}",
             "source": source,
+            "dialect": catalog["dialect"],
             "query_sql": model["query_sql"],
             "relations": relations(schemas=schemas, shapes=shapes, resources=resources),
             "functions": functions,
@@ -237,6 +238,7 @@ def mutated(*, case: dict[str, Any], mutation: Mutation, sql: str) -> dict[str, 
     return {
         "id": f"{case['id']}{MUTATION_SEPARATOR}{mutation}",
         "source": case["source"],
+        "dialect": case["dialect"],
         "query_sql": sql,
         "relations": case["relations"],
         "functions": case["functions"],
