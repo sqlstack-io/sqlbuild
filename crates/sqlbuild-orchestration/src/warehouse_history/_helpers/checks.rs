@@ -12,7 +12,8 @@ use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionSc
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query, query_records::query_records};
 use crate::store::models::{ControlTransaction, Parameter};
-use crate::warehouse_metadata::models::{CheckEvidence, WarehouseAuditRecord};
+use crate::warehouse_history::models::CheckEvidence;
+use crate::warehouse_metadata::models::WarehouseAuditRecord;
 
 #[derive(Deserialize)]
 pub(crate) struct AuditRow {

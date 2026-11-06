@@ -2,8 +2,6 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
-#[path = "checks/helpers.rs"]
-pub(crate) mod checks_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
@@ -50,6 +48,8 @@ mod test_external_sessions;
 mod test_location_health;
 #[path = "test_location_work.rs"]
 mod test_location_work;
+#[path = "test_maintenance.rs"]
+mod test_maintenance;
 #[path = "test_oidc.rs"]
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]
@@ -76,6 +76,8 @@ mod test_worker;
 mod warehouse_catalog_helpers;
 #[path = "warehouse_metadata/events/helpers.rs"]
 mod warehouse_events_helpers;
+#[path = "warehouse_history/helpers.rs"]
+pub(crate) mod warehouse_history_helpers;
 #[path = "warehouse_metadata/helpers.rs"]
 mod warehouse_metadata_helpers;
 #[path = "warehouse_metadata/reconciliation/helpers.rs"]

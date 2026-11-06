@@ -6,8 +6,8 @@ use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
     administrators, audit, changes, location_health, location_work, person_checks,
-    person_location_work, person_node_sql, person_operations, run_reads, runs, snapshots,
-    trigger_reads, warehouse_metadata,
+    person_location_work, person_maintenance, person_node_sql, person_operations, run_reads, runs,
+    snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -28,6 +28,7 @@ use crate::api::_helpers::resources::{
     person_checks::history,
     person_checks::sql,
     person_checks::evidence,
+    person_maintenance::read,
     person_location_work::request,
     person_location_work::result,
     person_node_sql::read,
