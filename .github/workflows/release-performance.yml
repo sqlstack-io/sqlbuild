@@ -81,19 +81,6 @@ jobs:
           BASELINE: ${{ inputs.baseline }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          # A main commit that is not itself a release still carries the latest release's version,
-          # so it is compared with that release rather than the one before it. A release commit
-          # bumps the version and is compared with the release before it.
-          if [[ "${EVENT_NAME}" == "push" && -z "${BASELINE}" ]]; then
-            project_version() {
-              python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])'
-            }
-            version="$(project_version < pyproject.toml)"
-            previous="$(git show HEAD^:pyproject.toml | project_version)" || previous=""
-            if [[ "${version}" == "${previous}" ]]; then
-              BASELINE="${version}"
-            fi
-          fi
           wheels=("${RUNNER_TEMP}"/candidate/sqlbuild-*.whl)
           evidence="${RUNNER_TEMP}/release-performance"
           mkdir -p "${evidence}"
@@ -104,6 +91,20 @@ jobs:
           )
           if [[ -n "${BASELINE}" ]]; then
             args+=(--baseline "${BASELINE}")
+          fi
+          # A main commit that is not itself a release still carries the latest release's version,
+          # so it is compared with that release once PyPI serves it, and with the newest published
+          # release before it until then. A release commit bumps the version and is compared with
+          # the newest published release before it.
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            project_version() {
+              python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])'
+            }
+            version="$(project_version < pyproject.toml)"
+            previous="$(git show HEAD^:pyproject.toml | project_version)" || previous=""
+            if [[ "${version}" == "${previous}" ]]; then
+              args+=(--same-version-baseline)
+            fi
           fi
           # The comparison's own exit status, not tee's, decides the outcome.
           set +e

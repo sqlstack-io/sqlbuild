@@ -97,7 +97,7 @@ def _compare(*, options: ComparisonOptions, root: Path) -> ReleaseComparison:
         wait_seconds=0.0,
     )
     baseline_spec: str = options.baseline or resolve_baseline(
-        candidate=candidate.version, repo_dir=REPO_ROOT
+        candidate=candidate.version, same_version=options.same_version_baseline
     )
     print(f"Installing baseline {baseline_spec}", file=sys.stderr)
     baseline: InstalledVersion = _install(
