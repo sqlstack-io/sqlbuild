@@ -49,7 +49,6 @@
 			{#if r}
 				<RoleSourceBadge role={r} />
 				<span class="muted">{roleSummary(r)}</span>
-				{#if r.pendingApprovalId}<a class="pending" href="/admin/roles?tab=approvals">Change waiting for approval</a>{/if}
 			{/if}
 		</div>
 
@@ -136,7 +135,7 @@
 							</Panel>
 
 							{#if r.selectors.length}
-								<Panel title="What the selectors match today" note="Matching more nodes needs no approval, so watch the growth">
+								<Panel title="What the selectors match today" note="Selectors can match more nodes as the project grows, so watch the growth">
 									<ul class="selectors">
 										{#each r.selectors as s (s.selector)}
 											<li>
@@ -211,13 +210,6 @@
 		font-family: var(--font-display);
 		font-size: 17px;
 		font-weight: 600;
-	}
-	.pending {
-		padding: 1px 7px;
-		border-radius: 2px;
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
-		font-size: 11.5px;
 	}
 	.columns {
 		display: grid;

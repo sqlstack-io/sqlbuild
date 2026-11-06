@@ -116,7 +116,6 @@
 								<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
 								<span class="detail">
 									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
-									{#if r.approvalId}<a class="tag link" href="/admin/roles?tab=approvals">needs approval</a>{/if}
 								</span>
 							</div>
 						{/each}
@@ -297,10 +296,6 @@
 		border-radius: 2px;
 		color: var(--muted-foreground);
 		font-size: 11px;
-	}
-	.tag.link {
-		border-color: color-mix(in srgb, var(--sb-warning) 50%, var(--border));
-		color: var(--sb-warning);
 	}
 	.icon-inline {
 		color: var(--muted-foreground);

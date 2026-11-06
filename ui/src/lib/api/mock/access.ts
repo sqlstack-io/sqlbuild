@@ -8,14 +8,11 @@ import type {
 	AccessNearMiss,
 	AccessQuery,
 	Account,
-	ApprovalImpact,
 	BuiltInRole,
 	Capability,
 	EffectiveAccess,
 	EffectiveAccessCell,
 	Location,
-	Principal,
-	RoleApproval,
 	RoleAssignment,
 	RoleDefinition,
 	RoleGrant,
@@ -26,7 +23,7 @@ import { ROLE_CAPABILITIES, SHOP_LOCATIONS } from './fixtures';
 import { jobDef, jobNodes } from './operate';
 import { resolveSelection } from './operate-graph';
 
-export const ADMIN_ONLY: readonly Capability[] = ['location.manage', 'user.manage', 'role.assign', 'token.manage', 'audit.view'];
+export const ADMIN_ONLY: readonly Capability[] = ['location.manage', 'user.manage', 'role.assign', 'audit.view'];
 
 /** Nodes that started matching a selector in the last 7 days (mock history). */
 const RECENTLY_MATCHED: Record<string, string[]> = {
@@ -37,7 +34,6 @@ export type AccessData = {
 	roles: RoleDefinition[];
 	assignments: RoleAssignment[];
 	accounts: Account[];
-	approvals: RoleApproval[];
 	locations: Location[];
 };
 
@@ -123,9 +119,8 @@ const PLAIN: Record<Capability, string> = {
 	'connection.test': 'test warehouse connections',
 	'plan.preview': 'preview build plans',
 	'location.manage': 'manage locations',
-	'user.manage': 'manage people and service accounts',
+	'user.manage': 'manage people',
 	'role.assign': 'give roles',
-	'token.manage': 'manage service-account tokens',
 	'audit.view': 'see the audit log'
 };
 
@@ -205,17 +200,6 @@ export function explain(data: AccessData, query: AccessQuery): AccessExplanation
 		}
 	}
 
-	let pending: AccessExplanation['pending'] = null;
-	if (!grantedBy.length) {
-		for (const approval of data.approvals) {
-			if (approval.state !== 'pending' || approval.locationId !== query.locationId) continue;
-			if (chains(data, query, { role: approval.role, grants: approval.added }).length) {
-				pending = { approvalId: approval.id, role: approval.role };
-				break;
-			}
-		}
-	}
-
 	const assigned = new Set(grantedBy.map((g) => g.role));
 	const wouldBeGrantedBy = data.roles
 		.filter((r) => !assigned.has(r.name) && roleAvailableAt(r, query.locationId) && resolvedGrants(r).some((g) => g.permissions.includes(query.action) && covers(g.selector, query.subject)))
@@ -228,7 +212,7 @@ export function explain(data: AccessData, query: AccessQuery): AccessExplanation
 		: account.disabled
 			? `No: ${who} is disabled.`
 			: `No: ${who} can't ${label(query.action)} on ${where}.`;
-	return { query, allowed, grantedBy, nearMisses, pending, wouldBeGrantedBy, summary };
+	return { query, allowed, grantedBy, nearMisses, wouldBeGrantedBy, summary };
 }
 
 export function effective(data: AccessData, principal: string): EffectiveAccess {
@@ -255,26 +239,6 @@ export function effective(data: AccessData, principal: string): EffectiveAccess 
 		}
 	}
 	return { principal, locationIds, cells };
-}
-
-/** Who gains each added action, per selector, if the change is approved. */
-export function approvalImpact(data: AccessData, approval: RoleApproval): ApprovalImpact[] {
-	const holders = data.assignments.filter((a) => a.role === approval.role && !a.stale && appliesAt(a, approval.locationId));
-	const out: ApprovalImpact[] = [];
-	for (const grant of approval.added) {
-		for (const selector of grant.nodes) {
-			for (const action of grant.permissions) {
-				const principals: Principal[] = [];
-				for (const h of holders) {
-					if (principals.some((p) => p.name === h.principal.name)) continue;
-					const query = { principal: h.principal.name, action, locationId: approval.locationId, subject: selector === '*' ? null : selector };
-					if (!allows(data, query)) principals.push(h.principal);
-				}
-				out.push({ action, selector, locationId: approval.locationId, principals });
-			}
-		}
-	}
-	return out;
 }
 
 export function selectorMatches(role: RoleDefinition): SelectorMatch[] {

@@ -83,8 +83,8 @@ export function checkHref(query: CheckInput): string {
 	return `/admin/check-access?${params}`;
 }
 
-export function personHref(principal: { kind: string; name: string }): string {
-	return principal.kind === 'service_account' ? `/admin/service-accounts/${encodeURIComponent(principal.name)}` : `/admin/people/${encodeURIComponent(principal.name)}`;
+export function personHref(principal: { name: string }): string {
+	return `/admin/people/${encodeURIComponent(principal.name)}`;
 }
 
 export function roleHref(name: string): string {

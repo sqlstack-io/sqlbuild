@@ -45,8 +45,8 @@
 {:else}
 	<div class="intro">
 		<p>
-			Everyone who has signed in, with what they can do in each location. People sign in with single sign-on, or <code>sqb login</code> on the command line; scripts and CI use
-			<a href="/admin/service-accounts">service accounts</a>. Open someone to see their effective access and why.
+			Everyone who has signed in, with what they can do in each location. People sign in with single sign-on, or <code>sqb login</code> on the command line.
+			Open someone to see their effective access and why.
 		</p>
 	</div>
 	<ListToolbar bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
@@ -121,9 +121,6 @@
 		padding: 14px 20px 10px;
 		font-size: 12.5px;
 		line-height: 1.55;
-	}
-	.intro a {
-		color: var(--primary);
 	}
 	code {
 		font-family: var(--font-mono);

@@ -92,8 +92,7 @@ export const tokenLabel: Record<TokenState, string> = { active: 'Active', revoke
 export const accountSourceLabel: Record<AccountSource, string> = {
 	oidc: 'Single sign-on',
 	trusted_proxy: 'Company proxy sign-in',
-	password: 'Password',
-	service_account: 'API tokens'
+	password: 'Password'
 };
 
 /** `SCHEMA.NAME`, or `DB.SCHEMA.NAME` when `withDatabase`. */

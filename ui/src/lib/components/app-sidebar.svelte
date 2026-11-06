@@ -5,7 +5,6 @@
 	import DatabaseIcon from '@lucide/svelte/icons/database';
 	import GitBranchIcon from '@lucide/svelte/icons/git-branch';
 	import GitCompareIcon from '@lucide/svelte/icons/git-compare';
-	import BotIcon from '@lucide/svelte/icons/bot';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import ListIcon from '@lucide/svelte/icons/list';
@@ -59,8 +58,7 @@
 			requires: ADMIN_CAPABILITIES,
 			items: [
 				{ label: 'People', href: '/admin/people', icon: UsersIcon, requires: ['user.manage', 'role.assign'] },
-				{ label: 'Service accounts', href: '/admin/service-accounts', icon: BotIcon, requires: ['user.manage', 'token.manage'] },
-				{ label: 'Roles', href: '/admin/roles', icon: ShieldIcon, requires: ['role.assign'], badge: { value: (c) => c.pendingApprovals, tone: 'warning' } },
+				{ label: 'Roles', href: '/admin/roles', icon: ShieldIcon, requires: ['role.assign'] },
 				{ label: 'Audit log', href: '/admin/audit', icon: ScrollTextIcon, requires: ['audit.view'] }
 			]
 		}

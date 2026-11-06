@@ -292,8 +292,6 @@ export type RoleChange = {
 	detail: string;
 	/** Nodes the role's grants cover before and after. */
 	coverage: { before: number; after: number } | null;
-	/** Widening changes wait for approval. */
-	approvalId: string | null;
 };
 
 /** The environment fingerprint (lock file, Python and `sqb` versions) changed. */
@@ -332,8 +330,7 @@ export type AttentionItem =
 	| { kind: 'stale_sources'; sources: ({ key: string } & SourceFreshness)[] }
 	| { kind: 'platform_event'; event: PlatformEvent }
 	| { kind: 'queue_blocked'; runId: string; jobKey: string | null; queuedAt: Iso; waits: QueueWait[] }
-	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string }
-	| { kind: 'approvals_pending'; count: number; roles: string[] };
+	| { kind: 'calendar_low'; triggerId: string; triggerName: string; detail: string };
 
 export type OverviewMetrics = {
 	models: { total: number; addedThisWeek: number; removedThisWeek: number };

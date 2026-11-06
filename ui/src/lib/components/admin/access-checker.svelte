@@ -3,7 +3,6 @@
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import CircleXIcon from '@lucide/svelte/icons/circle-x';
-	import ClockIcon from '@lucide/svelte/icons/clock-3';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import type { AccessDecision, AccessExplanation, Account, Capability } from '$lib/api';
 	import { builtInLabel, roleHref, scopeWords, type CheckInput } from '$lib/platform/access';
@@ -194,19 +193,13 @@
 						{#each result.nearMisses as m, i (i)}<li>{m.detail}</li>{/each}
 					</ul>
 				{/if}
-				{#if result.pending}
-					<p class="pending">
-						<ClockIcon size={13} /> Would be allowed once the pending change to
-						{#if canSeeRoles}<a href="/admin/roles?tab=approvals">{result.pending.role}</a>{:else}<b>{result.pending.role}</b>{/if} is approved.
-					</p>
-				{/if}
 				{#if result.wouldBeGrantedBy.length}
 					<div class="group-title">Roles that would allow it here</div>
 					<p>
 						{#each result.wouldBeGrantedBy as r, i (r)}{#if i},&nbsp;{/if}{#if canSeeRoles}<a href={roleHref(r)}>{r}</a>{:else}{r}{/if}{/each}
 					</p>
 				{/if}
-				{#if !result.nearMisses.length && !result.pending && !result.wouldBeGrantedBy.length}
+				{#if !result.nearMisses.length && !result.wouldBeGrantedBy.length}
 					<p class="faint">No role in this location allows it.</p>
 				{/if}
 			{/if}
@@ -313,13 +306,6 @@
 	}
 	.chains :global(svg) {
 		color: var(--sb-text-faint);
-	}
-	.pending {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		margin-top: 10px;
-		color: var(--sb-warning);
 	}
 	a,
 	.link {

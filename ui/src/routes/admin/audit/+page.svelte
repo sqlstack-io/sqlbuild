@@ -90,7 +90,7 @@
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
 						<td>
-							{#if e.actor.kind === 'user' || e.actor.kind === 'service_account'}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
+							{#if e.actor.kind === 'user'}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
 							<div class="cell-desc">{e.ip}</div>
 						</td>
 						<td>

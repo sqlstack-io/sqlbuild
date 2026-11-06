@@ -26,21 +26,20 @@ export const CAPABILITIES = [
 	'location.manage',
 	'user.manage',
 	'role.assign',
-	'token.manage',
 	'audit.view'
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export type PrincipalKind = 'user' | 'service_account' | 'scheduler' | 'sensor' | 'system';
+export type PrincipalKind = 'user' | 'scheduler' | 'sensor' | 'system';
 export type Principal = {
 	kind: PrincipalKind;
-	/** Stable handle, e.g. a user name, service account or `scheduler`. */
+	/** Stable handle, e.g. a user name or `scheduler`. */
 	name: string;
 	displayName: string;
 };
 
 export type CurrentUser = Principal & {
-	kind: 'user' | 'service_account';
+	kind: 'user';
 	role: BuiltInRole;
 };
 
@@ -130,7 +129,6 @@ export type NavCounts = {
 	activeRuns: number;
 	pausedTriggers: number;
 	activePlatformEvents: number;
-	pendingApprovals: number;
 };
 
 export * from './types/operate';

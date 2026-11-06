@@ -21,6 +21,5 @@ export const ADMIN_CAPABILITIES: readonly Capability[] = [
 	'location.manage',
 	'user.manage',
 	'role.assign',
-	'token.manage',
 	'audit.view'
 ];

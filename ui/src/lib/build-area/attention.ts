@@ -98,16 +98,6 @@ export function attentionView(item: AttentionItem, now: number): AttentionView {
 				href: `/triggers/${item.triggerId}`,
 				action: 'View trigger'
 			};
-		case 'approvals_pending':
-			return {
-				key: 'approvals',
-				tone: 'warning',
-				title: `${plural(item.count, 'role change')} waiting for approval`,
-				detail: item.roles.join(', '),
-				since: '',
-				href: '/admin/roles?tab=approvals',
-				action: 'Review'
-			};
 	}
 }
 

@@ -87,5 +87,5 @@ export const TOKEN_HELP: Record<TokenKey, string> = {
 	sensor: 'sensor:<sensor name>',
 	node: 'node:<model or source>: runs that build it',
 	id: 'id:<run ID or its start>',
-	by: 'by:<person or service account>'
+	by: 'by:<person>'
 };

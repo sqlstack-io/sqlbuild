@@ -118,8 +118,7 @@ export class MockApiClient implements ApiClient {
 			failingChecks: this.#build.failingCheckCount(scope),
 			activeRuns: this.#operate.activeRunCount(),
 			pausedTriggers: this.#operate.pausedTriggerCount(scope),
-			activePlatformEvents: this.#platformEvents().filter((e) => e.active).length,
-			pendingApprovals: this.#platform.pendingApprovalCount()
+			activePlatformEvents: this.#platformEvents().filter((e) => e.active).length
 		});
 	}
 
@@ -350,21 +349,6 @@ export class MockApiClient implements ApiClient {
 	enableAccount(...args: Parameters<PlatformApi['enableAccount']>) {
 		return this.#platform.enableAccount(...args);
 	}
-	createServiceAccount(...args: Parameters<PlatformApi['createServiceAccount']>) {
-		return this.#platform.createServiceAccount(...args);
-	}
-	listServiceAccountTokens(...args: Parameters<PlatformApi['listServiceAccountTokens']>) {
-		return this.#platform.listServiceAccountTokens(...args);
-	}
-	createServiceAccountToken(...args: Parameters<PlatformApi['createServiceAccountToken']>) {
-		return this.#platform.createServiceAccountToken(...args);
-	}
-	rotateServiceAccountToken(...args: Parameters<PlatformApi['rotateServiceAccountToken']>) {
-		return this.#platform.rotateServiceAccountToken(...args);
-	}
-	revokeServiceAccountToken(...args: Parameters<PlatformApi['revokeServiceAccountToken']>) {
-		return this.#platform.revokeServiceAccountToken(...args);
-	}
 	listRoles(...args: Parameters<PlatformApi['listRoles']>) {
 		return this.#platform.listRoles(...args);
 	}
@@ -376,12 +360,6 @@ export class MockApiClient implements ApiClient {
 	}
 	deleteRoleAssignment(...args: Parameters<PlatformApi['deleteRoleAssignment']>) {
 		return this.#platform.deleteRoleAssignment(...args);
-	}
-	listRoleApprovals(...args: Parameters<PlatformApi['listRoleApprovals']>) {
-		return this.#platform.listRoleApprovals(...args);
-	}
-	decideRoleApproval(...args: Parameters<PlatformApi['decideRoleApproval']>) {
-		return this.#platform.decideRoleApproval(...args);
 	}
 	listAuditEntries(...args: Parameters<PlatformApi['listAuditEntries']>) {
 		return this.#platform.listAuditEntries(...args);

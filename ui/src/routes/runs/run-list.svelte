@@ -1,5 +1,4 @@
 <script lang="ts">
-	import BotIcon from '@lucide/svelte/icons/bot';
 	import CalendarClockIcon from '@lucide/svelte/icons/calendar-clock';
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import UserIcon from '@lucide/svelte/icons/user';
@@ -128,7 +127,7 @@
 								{@render chip('sensor', r.triggerName, r.triggerName, `Show only runs started by the ${r.triggerName} sensor`)}
 								<a class="go" href="/triggers/{r.triggerId}" title="Open the sensor">↗</a>
 							{:else}
-								{#if r.requestedBy.kind === 'service_account'}<BotIcon size={13} />{:else}<UserIcon size={13} />{/if}
+								<UserIcon size={13} />
 								{@render chip('by', r.requestedBy.name, r.requestedBy.displayName, `Show only runs started by ${r.requestedBy.displayName} (${r.requestedBy.name})`)}
 							{/if}
 						</div>

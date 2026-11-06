@@ -30,9 +30,8 @@ export const PERMISSIONS: Record<Capability, PermissionInfo> = {
 	'connection.test': { label: 'Test warehouse connections', description: 'Run the connection check from a location.', risk: 'operate' },
 	'plan.preview': { label: 'Preview build plans', description: 'See what a run would build without running it.', risk: 'read' },
 	'location.manage': { label: 'Manage locations and their tokens', description: 'Register locations and create, rotate or revoke their tokens.', risk: 'administer' },
-	'user.manage': { label: 'Manage people and service accounts', description: 'Disable or enable people and create service accounts.', risk: 'administer' },
-	'role.assign': { label: 'Give roles and approve role changes', description: 'Assign and remove roles, and approve or reject roles that gain actions.', risk: 'administer' },
-	'token.manage': { label: 'Manage service-account tokens', description: 'Create, rotate and revoke API tokens.', risk: 'administer' },
+	'user.manage': { label: 'Manage people', description: 'Disable or enable people.', risk: 'administer' },
+	'role.assign': { label: 'Give roles', description: 'Assign and remove roles.', risk: 'administer' },
 	'audit.view': { label: 'See the audit log', description: 'Read who did what, including denied requests.', risk: 'administer' }
 };
 
@@ -68,14 +67,12 @@ export const PERMISSIONS_BY_RISK: { risk: PermissionRisk; actions: Capability[] 
 	actions: CAPABILITIES.filter((c) => PERMISSIONS[c].risk === risk)
 }));
 
-/** e.g. `Requires "Give roles and approve role changes" (role.assign)`. */
+/** e.g. `Requires "Give roles" (role.assign)`. */
 export function requiresText(action: Capability): string {
 	return `Requires “${PERMISSIONS[action].label}” (${action})`;
 }
 
 const AUDIT_ONLY: Record<Exclude<AuditEntry['action'], Capability>, string> = {
-	'role.approve': 'Approved a role change',
-	'role.reject': 'Rejected a role change',
 	'session.login': 'Signed in'
 };
 
@@ -84,4 +81,4 @@ export function auditActionLabel(action: AuditEntry['action']): string {
 	return action in PERMISSIONS ? PERMISSIONS[action as Capability].label : AUDIT_ONLY[action as keyof typeof AUDIT_ONLY];
 }
 
-export const AUDIT_ACTIONS: AuditEntry['action'][] = [...CAPABILITIES, 'role.approve', 'role.reject', 'session.login'];
+export const AUDIT_ACTIONS: AuditEntry['action'][] = [...CAPABILITIES, 'session.login'];

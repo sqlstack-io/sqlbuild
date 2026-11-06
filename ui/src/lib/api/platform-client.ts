@@ -4,8 +4,6 @@ import type {
 	AccessOverview,
 	AccessQuery,
 	Account,
-	ApiToken,
-	ApiTokenRequest,
 	AuditEntry,
 	AuditQuery,
 	ConnectionTest,
@@ -18,7 +16,6 @@ import type {
 	PlatformEventRecord,
 	PlatformHealth,
 	ProviderConnection,
-	RoleApproval,
 	RoleAssignment,
 	RoleAssignmentRequest,
 	RoleDefinition,
@@ -26,14 +23,13 @@ import type {
 	EffectiveAccess,
 	Scope,
 	ServerSettings,
-	ServiceAccountRequest,
 	SsoMapping,
 	WarehouseConnection
 } from './types';
 
 /**
  * Platform (server status, locations, connections, providers, maintenance)
- * and admin (users, service accounts, roles, audit, settings) endpoints.
+ * and admin (users, roles, audit, settings) endpoints.
  * Part of `ApiClient`.
  *
  * Mutations are audited server-side; the capability noted on each is the
@@ -69,25 +65,15 @@ export interface PlatformApi {
 	// ---- maintenance ----
 	maintenanceHistory(scope: Scope): Promise<MaintenanceHistory>;
 
-	// ---- people, service accounts and their tokens ----
+	// ---- people ----
 	/** `user.manage` */
 	listAccounts(): Promise<Account[]>;
 	/** Blocks sign-in and revokes the account's sessions. You can't disable yourself. `user.manage` */
 	disableAccount(name: string): Promise<Account>;
-	/** Lets a disabled account sign in again. Sessions revoked on disable stay revoked; its unrevoked API tokens work again. `user.manage` */
+	/** Lets a disabled account sign in again. Sessions revoked on disable stay revoked. `user.manage` */
 	enableAccount(name: string): Promise<Account>;
-	/** A non-person account for scripts and CI; it signs in with API tokens only. `user.manage` */
-	createServiceAccount(request: ServiceAccountRequest): Promise<Account>;
-	/** Tokens of every service account; people have none. `token.manage` */
-	listServiceAccountTokens(): Promise<ApiToken[]>;
-	/** Issues a token for a service account; the secret is returned once. `token.manage` */
-	createServiceAccountToken(account: string, request: ApiTokenRequest): Promise<IssuedToken<ApiToken>>;
-	/** Issues a new token with the same label and revokes the old one. `token.manage` */
-	rotateServiceAccountToken(tokenId: string): Promise<IssuedToken<ApiToken>>;
-	/** `token.manage` */
-	revokeServiceAccountToken(tokenId: string): Promise<ApiToken>;
 
-	// ---- roles and approvals ----
+	// ---- roles ----
 	/** Roles available in a location: built-in, server config and the location's project roles. `role.assign` */
 	listRoles(locationId: string): Promise<RoleDefinition[]>;
 	/** A role with what its selectors match today and who holds it. `role.assign` */
@@ -100,10 +86,6 @@ export interface PlatformApi {
 	deleteRoleAssignment(assignmentId: string): Promise<void>;
 	/** SSO group mappings from the server config. Read-only. `role.assign` */
 	listSsoMappings(): Promise<SsoMapping[]>;
-	/** `role.assign` */
-	listRoleApprovals(): Promise<RoleApproval[]>;
-	/** A comment is required. You can't approve a change you committed. `role.assign` */
-	decideRoleApproval(approvalId: string, decision: 'approve' | 'reject', note: string): Promise<RoleApproval>;
 
 	// ---- audit and access ----
 	/** `audit.view` */

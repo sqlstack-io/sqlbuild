@@ -13,7 +13,7 @@
 <div class="px-6 pt-5 pb-8">
 	<p class="lede">
 		Roles in <b>{app.location?.name}</b>. Each custom role is a built-in role plus additions on chosen nodes. Roles are defined in code (the project's policy file or the server
-		config) and are read-only here; giving a role more needs an admin's approval.
+		config) and are read-only here.
 	</p>
 	<table class="sb-list framed">
 		<thead>
@@ -22,7 +22,6 @@
 				<th>Defined in</th>
 				<th>What it gives</th>
 				<th class="num">Who has it</th>
-				<th></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -35,15 +34,12 @@
 					<td><RoleSourceBadge role={r} /></td>
 					<td>
 						{roleSummary(r)}
-						{#if r.recentlyMatched}<div class="cell-desc growth" title="Selectors match more nodes than a week ago; no approval needed">+{plural(r.recentlyMatched, 'node')} matched this week</div>{/if}
+						{#if r.recentlyMatched}<div class="cell-desc growth" title="Selectors match more nodes than a week ago">+{plural(r.recentlyMatched, 'node')} matched this week</div>{/if}
 					</td>
 					<td class="num">{r.holders}</td>
-					<td class="num">
-						{#if r.pendingApprovalId}<a class="pending" href="/admin/roles?tab=approvals" onclick={(e) => e.stopPropagation()}>Change waiting</a>{/if}
-					</td>
 				</tr>
 			{:else}
-				<LoadRow colspan={5} resource={rs.roles} empty="No roles." />
+				<LoadRow colspan={4} resource={rs.roles} empty="No roles." />
 			{/each}
 		</tbody>
 	</table>
@@ -65,13 +61,5 @@
 	}
 	.growth {
 		color: var(--sb-warning) !important;
-	}
-	.pending {
-		padding: 1px 7px;
-		border-radius: 2px;
-		background: color-mix(in srgb, var(--sb-warning) 14%, transparent);
-		color: var(--sb-warning);
-		font-size: 11.5px;
-		white-space: nowrap;
 	}
 </style>

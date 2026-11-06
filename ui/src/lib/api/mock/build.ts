@@ -253,10 +253,6 @@ export class MockBuild {
 		for (const t of triggers.filter((t) => t.kind === 'calendar_schedule' && t.warning)) {
 			attention.push({ kind: 'calendar_low', triggerId: t.id, triggerName: t.name, detail: t.warning! });
 		}
-		if (this.#ctx.can('role.assign')) {
-			const pending = (await this.#ctx.platform.listRoleApprovals()).filter((a) => a.state === 'pending');
-			if (pending.length) attention.push({ kind: 'approvals_pending', count: pending.length, roles: [...new Set(pending.map((a) => a.role))] });
-		}
 
 		const cost = this.#hasCost(scope) ? recent.reduce((s, r) => s + (r.cost?.value ?? 0), 0) : null;
 		const groups = new Map<string, GroupStatus>();

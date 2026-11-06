@@ -390,8 +390,8 @@ export const DEPLOYS: DeploySpec[] = [
 		],
 		orchestration: [{ kind: 'trigger', key: 'revenue_refresh', op: 'changed', detail: 'Cron moved from 06:00 to 05:30' }],
 		roles: [
-			{ role: 'finance_operator', op: 'changed', detail: 'Adds run.rewrite_history and widens view.evidence to tag:finance; drops run.adhoc (already applied)', coverage: { before: 3, after: 3 }, approvalId: 'appr-3' },
-			{ role: 'reporting_operator', op: 'changed', detail: 'Adds trigger.toggle on group:reporting', coverage: { before: 2, after: 2 }, approvalId: 'appr-4' }
+			{ role: 'finance_operator', op: 'changed', detail: 'Adds run.rewrite_history and widens view.evidence to tag:finance; drops run.adhoc', coverage: { before: 3, after: 3 } },
+			{ role: 'reporting_operator', op: 'changed', detail: 'Adds trigger.toggle on group:reporting', coverage: { before: 2, after: 2 } }
 		],
 		environment: null
 	},
@@ -425,7 +425,7 @@ export const DEPLOYS: DeploySpec[] = [
 			{ kind: 'job', key: 'activity_microbatch', op: 'changed', detail: 'Settings: --max-microbatches 4 → 8' },
 			{ kind: 'group', key: 'nightly_all', op: 'changed', detail: 'Member added: reporting_exports' }
 		],
-		roles: [{ role: 'reporting_operator', op: 'added', detail: 'Operates the reporting group', coverage: { before: 0, after: 2 }, approvalId: null }],
+		roles: [{ role: 'reporting_operator', op: 'added', detail: 'Operates the reporting group', coverage: { before: 0, after: 2 } }],
 		environment: null
 	},
 	{

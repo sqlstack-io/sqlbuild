@@ -24,7 +24,7 @@ export function createAccountTable(kind: Account['kind']) {
 		const q = query.trim().toLowerCase();
 		return people.filter((p) => {
 			const mine = relevant(p.name);
-			if (q && !`${p.name} ${p.displayName} ${p.email ?? ''} ${p.owner ?? ''} ${p.description ?? ''} ${mine.map((m) => m.role).join(' ')}`.toLowerCase().includes(q)) return false;
+			if (q && !`${p.name} ${p.displayName} ${p.email ?? ''} ${mine.map((m) => m.role).join(' ')}`.toLowerCase().includes(q)) return false;
 			if (role && !mine.some((m) => m.role === role && !m.stale)) return false;
 			if (locationId && !mine.length) return false;
 			if (source && !mine.some((m) => m.source === source)) return false;

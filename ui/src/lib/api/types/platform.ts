@@ -1,5 +1,5 @@
 // Wire types for the Platform (Locations with server status, Connections,
-// Providers, Maintenance) and Admin (users, service accounts, roles, audit,
+// Providers, Maintenance) and Admin (users, roles, audit,
 // settings) areas.
 
 import type {
@@ -186,25 +186,8 @@ export type LocationToken = {
 	state: TokenState;
 };
 
-/** A long-lived token of a service account. People don't have API tokens: they use `sqb login`. */
-export type ApiToken = {
-	id: string;
-	label: string;
-	/** The service account the token signs in as. */
-	owner: Principal;
-	prefix: string;
-	createdAt: Iso;
-	createdBy: Principal;
-	expiresAt: Iso | null;
-	lastUsedAt: Iso | null;
-	revokedAt: Iso | null;
-	state: TokenState;
-};
-
 /** Returned once on create or rotate; the server stores only a hash. */
 export type IssuedToken<T> = { token: T; secret: string };
-
-export type ApiTokenRequest = { label: string; expiresInDays: number | null };
 
 // ---- connections ----
 
@@ -308,10 +291,10 @@ export type MaintenanceHistory = {
 
 // ---- users and roles ----
 
-export type AccountSource = 'oidc' | 'trusted_proxy' | 'password' | 'service_account';
+export type AccountSource = 'oidc' | 'trusted_proxy' | 'password';
 
 export type Account = Principal & {
-	kind: 'user' | 'service_account';
+	kind: 'user';
 	email: string | null;
 	source: AccountSource;
 	ssoGroups: string[];
@@ -320,13 +303,7 @@ export type Account = Principal & {
 	disabled: boolean;
 	/** Signed-in browser sessions; disabling the account revokes them. */
 	activeSessions: number;
-	/** Service accounts only: the person or team responsible. */
-	owner: string | null;
-	/** Service accounts only: what the account is for. */
-	description: string | null;
 };
-
-export type ServiceAccountRequest = { name: string; description: string };
 
 /** How much an action can do: look, operate runs, change warehouse data, or administer access. */
 export type PermissionRisk = 'read' | 'operate' | 'changes_data' | 'administer';
@@ -346,13 +323,11 @@ export type RoleDefinition = {
 	description: string;
 	/** The built-in role a custom role starts from (flat: no deeper inheritance). Null for built-in roles. */
 	extends: BuiltInRole | null;
-	/** Built-in roles: their actions on every node. Custom roles: the additions on top of the base role. Approved grants only. */
+	/** Built-in roles: their actions on every node. Custom roles: the additions on top of the base role. */
 	grants: RoleGrant[];
-	/** A change giving the role more is waiting for approval. */
-	pendingApprovalId: string | null;
-	/** People and service accounts holding the role somewhere. */
+	/** People holding the role somewhere. */
 	holders: number;
-	/** Nodes the role's selectors started matching in the last 7 days (no approval needed). */
+	/** Nodes the role's selectors started matching in the last 7 days. */
 	recentlyMatched: number;
 };
 
@@ -413,40 +388,6 @@ export type SsoMapping = {
 	lastSyncedAt: Iso | null;
 };
 
-/** People who gain one action on one selector if a change is approved. */
-export type ApprovalImpact = {
-	action: Capability;
-	selector: string;
-	locationId: string;
-	principals: Principal[];
-};
-
-export type ApprovalState = 'pending' | 'approved' | 'rejected' | 'superseded';
-export type RoleApproval = {
-	id: string;
-	role: string;
-	locationId: string;
-	snapshotGeneration: number;
-	gitRevision: string;
-	gitAuthor: string;
-	/** The account the commit author signs in as, when known; they can't approve it. */
-	gitAuthorAccount: string | null;
-	proposedAt: Iso;
-	/** Grants added or widened by the proposal. */
-	added: RoleGrant[];
-	/** Grants removed or narrowed by the same deploy; these already apply. */
-	removed: RoleGrant[];
-	/** The definition in force and as proposed. */
-	definitionBefore: string;
-	definitionAfter: string;
-	/** Who gains what if approved; empty once decided. */
-	impact: ApprovalImpact[];
-	state: ApprovalState;
-	decidedBy: Principal | null;
-	decidedAt: Iso | null;
-	note: string | null;
-};
-
 // ---- audit ----
 
 export type AuditOutcome = 'allowed' | 'denied';
@@ -454,7 +395,7 @@ export type AuditEntry = {
 	id: string;
 	at: Iso;
 	actor: Principal;
-	action: Capability | 'role.approve' | 'role.reject' | 'session.login';
+	action: Capability | 'session.login';
 	outcome: AuditOutcome;
 	scope: AssignmentScope & { subject: string | null };
 	/** Role that granted the action, or for denials null. */
@@ -518,8 +459,6 @@ export type AccessExplanation = {
 	/** Every chain that allows the action (grants add up across roles). */
 	grantedBy: AccessGrantPath[];
 	nearMisses: AccessNearMiss[];
-	/** A change waiting for approval would allow it. */
-	pending: { approvalId: string; role: string } | null;
 	/** Roles that would allow it if assigned here. */
 	wouldBeGrantedBy: string[];
 	summary: string;

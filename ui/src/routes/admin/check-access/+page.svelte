@@ -28,7 +28,7 @@
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-8">
 	<p class="lede">
-		Can someone do something, and why? Pick a person or service account, an action and where. Or paste the denial ID from a “permission denied” message to check that request again.
+		Can someone do something, and why? Pick a person, an action and where. Or paste the denial ID from a “permission denied” message to check that request again.
 		{#if !canCheckOthers}You can check your own access; checking others needs “Give roles” or “See the audit log”.{/if}
 	</p>
 	<div class="max-w-[1100px]">

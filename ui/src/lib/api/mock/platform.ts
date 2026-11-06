@@ -11,8 +11,6 @@ import type {
 	AccessOverview,
 	AccessQuery,
 	Account,
-	ApiToken,
-	ApiTokenRequest,
 	AuditEntry,
 	AuditQuery,
 	BuiltInRole,
@@ -37,7 +35,6 @@ import type {
 	Principal,
 	ProviderConnection,
 	RelationName,
-	RoleApproval,
 	RoleAssignment,
 	RoleAssignmentRequest,
 	RoleDefinition,
@@ -45,14 +42,12 @@ import type {
 	RoleGrant,
 	Scope,
 	ServerSettings,
-	ServiceAccountRequest,
 	SettingField,
 	SsoMapping,
 	WarehouseConnection
 } from '../types';
 import {
 	ADMIN_ONLY,
-	approvalImpact,
 	baseGrantsOf,
 	definitionText,
 	effective,
@@ -100,23 +95,16 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 
 	// ---- accounts ----
 	const accounts: Account[] = [
-		{ ...DEMO_USER, kind: 'user', email: 'demo@example.com', source: 'oidc', ssoGroups: [], createdAt: ago(days(210)), lastSeenAt: ago(0.1), disabled: false, activeSessions: 2, owner: null, description: null },
-		{ ...ALEX, kind: 'user', email: 'alex@example.com', source: 'oidc', ssoGroups: ['analytics-eng'], createdAt: ago(days(180)), lastSeenAt: ago(25), disabled: false, activeSessions: 1, owner: null, description: null },
-		{ ...SAM, kind: 'user', email: 'sam@example.com', source: 'oidc', ssoGroups: ['analytics-eng', 'finance-analysts'], createdAt: ago(days(95)), lastSeenAt: ago(190), disabled: false, activeSessions: 1, owner: null, description: null },
-		{ ...JORDAN, kind: 'user', email: 'jordan@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(40)), lastSeenAt: ago(days(3)), disabled: false, activeSessions: 0, owner: null, description: null },
-		{ ...OPS_USER, kind: 'user', email: 'ops-oncall@example.com', source: 'oidc', ssoGroups: ['data-platform'], createdAt: ago(days(150)), lastSeenAt: ago(1.5), disabled: false, activeSessions: 3, owner: null, description: null },
-		{ ...RILEY, kind: 'user', email: 'riley@example.com', source: 'oidc', ssoGroups: ['support-ops'], createdAt: ago(days(300)), lastSeenAt: ago(days(61)), disabled: true, activeSessions: 0, owner: null, description: null },
-		{ ...CI_ACCOUNT, kind: 'service_account', email: null, source: 'service_account', ssoGroups: [], createdAt: ago(days(200)), lastSeenAt: ago(42), disabled: false, activeSessions: 0, owner: 'data-platform', description: 'Deploys snapshots from CI' },
-		{ ...REPORTING, kind: 'service_account', email: null, source: 'service_account', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0, owner: 'finance-analysts', description: 'Refreshes the reporting dashboards' }
+		{ ...DEMO_USER, kind: 'user', email: 'demo@example.com', source: 'oidc', ssoGroups: [], createdAt: ago(days(210)), lastSeenAt: ago(0.1), disabled: false, activeSessions: 2 },
+		{ ...ALEX, kind: 'user', email: 'alex@example.com', source: 'oidc', ssoGroups: ['analytics-eng'], createdAt: ago(days(180)), lastSeenAt: ago(25), disabled: false, activeSessions: 1 },
+		{ ...SAM, kind: 'user', email: 'sam@example.com', source: 'oidc', ssoGroups: ['analytics-eng', 'finance-analysts'], createdAt: ago(days(95)), lastSeenAt: ago(190), disabled: false, activeSessions: 1 },
+		{ ...JORDAN, kind: 'user', email: 'jordan@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(40)), lastSeenAt: ago(days(3)), disabled: false, activeSessions: 0 },
+		{ ...OPS_USER, kind: 'user', email: 'ops-oncall@example.com', source: 'oidc', ssoGroups: ['data-platform'], createdAt: ago(days(150)), lastSeenAt: ago(1.5), disabled: false, activeSessions: 3 },
+		{ ...RILEY, kind: 'user', email: 'riley@example.com', source: 'oidc', ssoGroups: ['support-ops'], createdAt: ago(days(300)), lastSeenAt: ago(days(61)), disabled: true, activeSessions: 0 },
+		{ ...CI_ACCOUNT, kind: 'user', email: 'ci@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(200)), lastSeenAt: ago(42), disabled: false, activeSessions: 0 },
+		{ ...REPORTING, kind: 'user', email: 'reporting@example.com', source: 'password', ssoGroups: [], createdAt: ago(days(120)), lastSeenAt: ago(300), disabled: false, activeSessions: 0 }
 	];
 
-	// ---- tokens ----
-	const apiTokens: ApiToken[] = [
-		{ id: 'tok-1', label: 'CI deploys', owner: CI_ACCOUNT, prefix: 'sqbt_4c1e', createdAt: ago(days(90)), createdBy: DEMO_USER, expiresAt: ahead(days(275)), lastUsedAt: ago(42), revokedAt: null, state: 'active' },
-		{ id: 'tok-2', label: 'Dashboard refresh', owner: REPORTING, prefix: 'sqbt_9a07', createdAt: ago(300), createdBy: DEMO_USER, expiresAt: ahead(days(30)), lastUsedAt: ago(120), revokedAt: null, state: 'active' },
-		{ id: 'tok-4', label: 'Old CI runner', owner: CI_ACCOUNT, prefix: 'sqbt_51d2', createdAt: ago(days(160)), createdBy: DEMO_USER, expiresAt: null, lastUsedAt: ago(days(70)), revokedAt: ago(days(65)), state: 'revoked' },
-		{ id: 'tok-5', label: 'Load test', owner: CI_ACCOUNT, prefix: 'sqbt_0f8c', createdAt: ago(days(100)), createdBy: DEMO_USER, expiresAt: ago(days(70)), lastUsedAt: ago(days(71)), revokedAt: null, state: 'expired' }
-	];
 	const locationTokens: LocationToken[] = [
 		{ id: 'ltok-1', locationId: LOCATION_SHOP, prefix: 'sqbl_3f9a', createdAt: ago(days(30)), createdBy: DEMO_USER, lastUsedAt: ago(0.2), revokedAt: null, state: 'active' },
 		{ id: 'ltok-0', locationId: LOCATION_SHOP, prefix: 'sqbl_a210', createdAt: ago(days(210)), createdBy: DEMO_USER, lastUsedAt: ago(days(30)), revokedAt: ago(days(30)), state: 'revoked' },
@@ -131,24 +119,22 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		description,
 		extends: null,
 		grants: [{ nodes: ['*'], permissions: ROLE_CAPABILITIES[name] }],
-		pendingApprovalId: null,
 		holders: 0,
 		recentlyMatched: 0
 	});
-	const custom = (role: Pick<RoleDefinition, 'name' | 'source' | 'definedIn' | 'description' | 'extends' | 'grants' | 'pendingApprovalId'>): RoleDefinition => ({ ...role, holders: 0, recentlyMatched: 0 });
+	const custom = (role: Pick<RoleDefinition, 'name' | 'source' | 'definedIn' | 'description' | 'extends' | 'grants'>): RoleDefinition => ({ ...role, holders: 0, recentlyMatched: 0 });
 	const roles: RoleDefinition[] = [
 		builtIn('viewer', 'See everything except SQL and sample rows.'),
 		builtIn('operator', 'Run, cancel and rerun jobs; pause triggers.'),
 		builtIn('developer', 'Operator, plus ad-hoc runs, full refreshes, plan previews, connection tests and sample rows.'),
-		builtIn('admin', 'Everything, including people, roles, tokens, locations and the audit log.'),
+		builtIn('admin', 'Everything, including people, roles, locations and the audit log.'),
 		custom({
 			name: 'support_viewer',
 			source: 'server_config',
 			definedIn: 'sqb-server.toml:31',
 			description: 'Support team: see reporting models and their SQL.',
 			extends: 'viewer',
-			grants: [{ nodes: ['group:reporting'], permissions: ['view.sql'] }],
-			pendingApprovalId: null
+			grants: [{ nodes: ['group:reporting'], permissions: ['view.sql'] }]
 		}),
 		custom({
 			name: 'platform_on_call',
@@ -156,8 +142,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			definedIn: 'sqb-server.toml:38',
 			description: 'Platform on-call: operate everything and check connections and plans.',
 			extends: 'operator',
-			grants: [{ nodes: ['*'], permissions: ['connection.test', 'plan.preview'] }],
-			pendingApprovalId: null
+			grants: [{ nodes: ['*'], permissions: ['connection.test', 'plan.preview'] }]
 		}),
 		custom({
 			name: 'finance_operator',
@@ -168,8 +153,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			grants: [
 				{ nodes: ['tag:finance'], permissions: ['job.run', 'run.cancel', 'view.sql'] },
 				{ nodes: ['tag:finance,group:marts'], permissions: ['view.evidence'] }
-			],
-			pendingApprovalId: 'appr-3'
+			]
 		}),
 		custom({
 			name: 'reporting_operator',
@@ -177,8 +161,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 			definedIn: 'roles.toml:12',
 			description: 'Operates the reporting group.',
 			extends: 'viewer',
-			grants: [{ nodes: ['group:reporting'], permissions: ['job.run', 'run.cancel'] }],
-			pendingApprovalId: 'appr-4'
+			grants: [{ nodes: ['group:reporting'], permissions: ['job.run', 'run.cancel'] }]
 		})
 	];
 
@@ -216,80 +199,6 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		{ group: 'warehouse-admins', role: 'admin', scope: { locationId: null }, definedIn: 'sqb-server.toml:67', membersSynced: 0, lastSyncedAt: null }
 	];
 
-	const approval = (
-		a: Omit<RoleApproval, 'definitionBefore' | 'definitionAfter' | 'impact' | 'decidedBy' | 'decidedAt' | 'note' | 'state'> &
-			Partial<Pick<RoleApproval, 'decidedBy' | 'decidedAt' | 'note' | 'state'>>
-	): RoleApproval => ({ state: 'pending', decidedBy: null, decidedAt: null, note: null, definitionBefore: '', definitionAfter: '', impact: [], ...a });
-	const approvals: RoleApproval[] = [
-		approval({
-			id: 'appr-3',
-			role: 'finance_operator',
-			locationId: LOCATION_SHOP,
-			snapshotGeneration: 42,
-			gitRevision: '7d2e41a',
-			gitAuthor: 'Alex Rivera',
-			gitAuthorAccount: 'alex',
-			proposedAt: ago(190),
-			added: [
-				{ nodes: ['tag:finance'], permissions: ['run.rewrite_history'] },
-				{ nodes: ['tag:finance'], permissions: ['view.evidence'] }
-			],
-			removed: [{ nodes: ['tag:finance'], permissions: ['run.adhoc'] }]
-		}),
-		approval({
-			id: 'appr-4',
-			role: 'reporting_operator',
-			locationId: LOCATION_SHOP,
-			snapshotGeneration: 42,
-			gitRevision: 'e19b3c2',
-			gitAuthor: 'Demo User',
-			gitAuthorAccount: 'demo',
-			proposedAt: ago(190),
-			added: [{ nodes: ['group:reporting'], permissions: ['trigger.toggle'] }],
-			removed: []
-		}),
-		approval({
-			id: 'appr-2',
-			role: 'support_triage',
-			locationId: LOCATION_MARKETING,
-			snapshotGeneration: 16,
-			gitRevision: '2a9e0c4',
-			gitAuthor: 'Sam Okafor',
-			gitAuthorAccount: 'sam',
-			proposedAt: ago(days(9)),
-			added: [{ nodes: ['*'], permissions: ['job.run'] }],
-			removed: [],
-			state: 'rejected',
-			decidedBy: DEMO_USER,
-			decidedAt: ago(days(8)),
-			note: 'Too broad; scope it to group:reporting.'
-		}),
-		approval({
-			id: 'appr-1',
-			role: 'finance_operator',
-			locationId: LOCATION_SHOP,
-			snapshotGeneration: 35,
-			gitRevision: 'c03d1f7',
-			gitAuthor: 'Sam Okafor',
-			gitAuthorAccount: 'sam',
-			proposedAt: ago(days(21)),
-			added: [{ nodes: ['tag:finance'], permissions: ['run.cancel'] }],
-			removed: [],
-			state: 'approved',
-			decidedBy: DEMO_USER,
-			decidedAt: ago(days(20)),
-			note: 'Finance on-call needs to cancel stuck runs.'
-		})
-	];
-	for (const a of approvals) {
-		const r = roles.find((x) => x.name === a.role);
-		const current = r?.grants ?? a.removed;
-		const proposed = applyDiff(current, a);
-		const shape = r ?? { name: a.role, source: 'project' as const, description: '', extends: 'viewer' as const, grants: [] };
-		a.definitionBefore = definitionText({ ...(shape as RoleDefinition) }, a.state === 'approved' ? current.filter((g) => !a.added.some((x) => grantKey(x) === grantKey(g))) : withRemoved(current, a.removed));
-		a.definitionAfter = definitionText({ ...(shape as RoleDefinition) }, a.state === 'approved' ? current : proposed);
-	}
-
 	// ---- audit ----
 	let auditSeq = 0;
 	const entry = (minutesAgo: number, e: Omit<AuditEntry, 'id' | 'at' | 'ip' | 'requestId' | 'decisionId'> & { ip?: string; decisionId?: string }): AuditEntry => {
@@ -311,15 +220,10 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		entry(42, { actor: CI_ACCOUNT, action: 'job.run', outcome: 'allowed', scope: { ...shopProd, subject: 'checks_only' }, grantingRole: 'operator', evidenceRead: false, summary: 'Launched checks_only', before: null, after: 'run-c40e queued', ip: '10.0.2.8' }),
 		entry(55, { actor: ALEX, action: 'trigger.toggle', outcome: 'allowed', scope: { ...shopProd, subject: 'revenue_refresh' }, grantingRole: 'operator', evidenceRead: false, summary: 'Paused revenue_refresh', before: 'running', after: 'paused', ip: '10.0.7.21' }),
 		entry(70, { actor: ALEX, action: 'run.adhoc', outcome: 'denied', decisionId: 'dec-8h3n5w', scope: { ...shopProd, subject: 'daily_revenue+' }, grantingRole: null, evidenceRead: false, summary: 'Denied: operator doesn’t include ad-hoc runs in waffle-shop', before: null, after: null, ip: '10.0.7.21' }),
-		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed giving finance_operator more; held for approval', before: null, after: 'pending appr-3', ip: '—' }),
-		entry(190, { actor: SYSTEM, action: 'role.assign', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'reporting_operator' }, grantingRole: null, evidenceRead: false, summary: 'Snapshot 42 proposed giving reporting_operator more; held for approval', before: null, after: 'pending appr-4', ip: '—' }),
-		entry(300, { actor: DEMO_USER, action: 'token.manage', outcome: 'allowed', scope: { locationId: null, subject: 'tok-2' }, grantingRole: role, evidenceRead: false, summary: 'Rotated token "Dashboard refresh"', before: 'sqbt_77d0', after: 'sqbt_9a07' }),
 		entry(720, { actor: JORDAN, action: 'connection.test', outcome: 'denied', decisionId: 'dec-2p9x6r', scope: { ...shopProd, subject: 'prod' }, grantingRole: null, evidenceRead: false, summary: 'Denied: testing connections needs developer or above', before: null, after: null, ip: '10.0.9.4' }),
 		entry(days(1) + 60, { actor: SAM, action: 'view.evidence', outcome: 'denied', decisionId: 'dec-6t1v8c', scope: { ...shopProd, subject: 'dim_customers' }, grantingRole: null, evidenceRead: false, summary: 'Denied: finance_operator shows sample rows only on tag:finance,group:marts', before: null, after: null, ip: '10.0.7.33' }),
 		entry(days(2), { actor: DEMO_USER, action: 'location.manage', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'ltok-1' }, grantingRole: role, evidenceRead: false, summary: 'Rotated the location token', before: 'sqbl_a210', after: 'sqbl_3f9a' }),
 		entry(days(4), { actor: DEMO_USER, action: 'run.rewrite_history', outcome: 'denied', decisionId: 'dec-5r2w9j', scope: { ...shopProd, subject: 'daily_revenue' }, grantingRole: null, evidenceRead: false, summary: 'Denied: no role allowed a full refresh of daily_revenue at the time', before: null, after: null }),
-		entry(days(8), { actor: DEMO_USER, action: 'role.reject', outcome: 'allowed', scope: { locationId: LOCATION_MARKETING, subject: 'support_triage' }, grantingRole: 'admin', evidenceRead: false, summary: 'Rejected the change to support_triage', before: 'pending', after: 'rejected' }),
-		entry(days(20), { actor: DEMO_USER, action: 'role.approve', outcome: 'allowed', scope: { locationId: LOCATION_SHOP, subject: 'finance_operator' }, grantingRole: 'admin', evidenceRead: false, summary: 'Approved the change to finance_operator (+run.cancel on tag:finance)', before: 'pending', after: 'approved' })
 	];
 
 	// ---- locations ----
@@ -577,7 +481,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		janitor('jan-3', 'archive', days(16), 'STAGING', 'view', 'WAFFLE_SHOP.STAGING.STG_COUPONS', 'WAFFLE_SHOP.STAGING._SQB_ARCHIVE__20261013T040000Z__STG_COUPONS', days(16), 'run-jan-6d0')
 	];
 
-	return { accounts, apiTokens, locationTokens, roles, assignments, ssoMappings, approvals, auditEntries, locationExtras, warehouseByLocation, providers, migrations, oldNameViews, janitorEvents };
+	return { accounts, locationTokens, roles, assignments, ssoMappings, auditEntries, locationExtras, warehouseByLocation, providers, migrations, oldNameViews, janitorEvents };
 }
 
 /** How the platform-event sensor (see `platform_health_webhook` in operate.ts) handled an event. */
@@ -643,10 +547,6 @@ export class MockPlatformApi implements PlatformApi {
 	/** Records an audited read of a check's SQL (`view.sql`). */
 	recordSqlRead(scope: Scope, subject: string, summary: string): void {
 		this.#audit('view.sql', { ...scope, subject }, summary);
-	}
-
-	pendingApprovalCount(): number {
-		return this.#data.approvals.filter((a) => a.state === 'pending').length;
 	}
 
 	// ---- health ----
@@ -803,7 +703,7 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone({ migrations: retarget(migrations), oldNameViews, janitorEvents }));
 	}
 
-	// ---- users and tokens ----
+	// ---- people ----
 
 	async listAccounts(): Promise<Account[]> {
 		this.#require('user.manage');
@@ -834,72 +734,7 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone(account));
 	}
 
-	async createServiceAccount(request: ServiceAccountRequest): Promise<Account> {
-		this.#require('user.manage');
-		const name = request.name.trim();
-		if (!/^[a-z][a-z0-9-]{2,39}$/.test(name)) throw new ApiError('Use 3 to 40 lowercase letters, digits or hyphens, starting with a letter', 422);
-		if (this.#data.accounts.some((a) => a.name === name)) throw new ApiError(`An account named ${name} already exists`, 409);
-		const description = request.description.trim();
-		const account: Account = {
-			kind: 'service_account',
-			name,
-			displayName: description || name,
-			email: null,
-			source: 'service_account',
-			ssoGroups: [],
-			createdAt: new Date().toISOString(),
-			lastSeenAt: null,
-			disabled: false,
-			activeSessions: 0,
-			owner: this.#ctx.user.name,
-			description: description || null
-		};
-		this.#data.accounts.push(account);
-		this.#audit('user.manage', { locationId: null, subject: name }, `Created service account ${name}`, null, name);
-		return this.#ctx.reply(structuredClone(account));
-	}
-
-	async listServiceAccountTokens(): Promise<ApiToken[]> {
-		this.#require('token.manage');
-		return this.#ctx.reply(structuredClone(this.#data.apiTokens));
-	}
-
-	async createServiceAccountToken(account: string, request: ApiTokenRequest): Promise<IssuedToken<ApiToken>> {
-		this.#require('token.manage');
-		const owner = this.#data.accounts.find((a) => a.name === account);
-		if (!owner) throw new ApiError(`Unknown account ${account}`, 404);
-		if (owner.kind !== 'service_account') throw new ApiError('Only service accounts have API tokens; people sign in with sqb login', 422);
-		if (owner.disabled) throw new ApiError(`${account} is disabled; enable it first`, 409);
-		if (!request.label.trim()) throw new ApiError('A label is required', 422);
-		const issued = this.#issueApiToken(request.label.trim(), owner, request.expiresInDays);
-		this.#audit('token.manage', { locationId: null, subject: issued.token.id }, `Created token "${issued.token.label}" for ${owner.name}`, null, issued.token.prefix);
-		return this.#ctx.reply(issued);
-	}
-
-	async rotateServiceAccountToken(tokenId: string): Promise<IssuedToken<ApiToken>> {
-		this.#require('token.manage');
-		const old = this.#data.apiTokens.find((t) => t.id === tokenId && t.state === 'active');
-		if (!old) throw new ApiError('Token not found or not active', 404);
-		old.state = 'revoked';
-		old.revokedAt = new Date().toISOString();
-		const remaining = old.expiresAt ? Math.max(1, Math.round((Date.parse(old.expiresAt) - Date.now()) / DAY)) : null;
-		const owner = this.#data.accounts.find((a) => a.name === old.owner.name) ?? old.owner;
-		const issued = this.#issueApiToken(old.label, owner, remaining);
-		this.#audit('token.manage', { locationId: null, subject: issued.token.id }, `Rotated token "${old.label}"`, old.prefix, issued.token.prefix);
-		return this.#ctx.reply(issued);
-	}
-
-	async revokeServiceAccountToken(tokenId: string): Promise<ApiToken> {
-		this.#require('token.manage');
-		const token = this.#data.apiTokens.find((t) => t.id === tokenId && t.state === 'active');
-		if (!token) throw new ApiError('Token not found or not active', 404);
-		token.state = 'revoked';
-		token.revokedAt = new Date().toISOString();
-		this.#audit('token.manage', { locationId: null, subject: token.id }, `Revoked token "${token.label}"`, token.prefix, null);
-		return this.#ctx.reply(structuredClone(token));
-	}
-
-	// ---- roles and approvals ----
+	// ---- roles ----
 
 	async listRoles(locationId: string): Promise<RoleDefinition[]> {
 		this.#require('role.assign');
@@ -990,35 +825,6 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply(structuredClone(this.#data.ssoMappings));
 	}
 
-	async listRoleApprovals(): Promise<RoleApproval[]> {
-		this.#require('role.assign');
-		const data = this.#access();
-		const approvals = this.#data.approvals.map((a) => ({ ...a, impact: a.state === 'pending' ? approvalImpact(data, a) : [] }));
-		return this.#ctx.reply(structuredClone(approvals));
-	}
-
-	async decideRoleApproval(approvalId: string, decision: 'approve' | 'reject', note: string): Promise<RoleApproval> {
-		this.#require('role.assign');
-		const approval = this.#data.approvals.find((a) => a.id === approvalId);
-		if (!approval) throw new ApiError('Approval not found', 404);
-		if (approval.state !== 'pending') throw new ApiError(`Already ${approval.state}`, 409);
-		if (!note.trim()) throw new ApiError('Add a comment saying why; it goes in the audit log', 422);
-		if (decision === 'approve' && approval.gitAuthorAccount === this.#ctx.user.name) {
-			this.#audit('role.approve', { locationId: approval.locationId, subject: approval.role }, `Refused approving own change to ${approval.role} (commit ${approval.gitRevision})`, 'pending', 'pending', 'denied');
-			throw new ApiError(`You committed this change (${approval.gitRevision}), so you can't approve it. Another admin has to.`, 403);
-		}
-		approval.state = decision === 'approve' ? 'approved' : 'rejected';
-		approval.decidedBy = this.#ctx.user;
-		approval.decidedAt = new Date().toISOString();
-		approval.note = note.trim();
-		const role = this.#data.roles.find((r) => r.name === approval.role);
-		if (role) {
-			role.pendingApprovalId = null;
-			if (decision === 'approve') role.grants = applyDiff(role.grants, approval);
-		}
-		this.#audit(decision === 'approve' ? 'role.approve' : 'role.reject', { locationId: approval.locationId, subject: approval.role }, `${decision === 'approve' ? 'Approved' : 'Rejected'} the change to ${approval.role}`, 'pending', approval.state);
-		return this.#ctx.reply(structuredClone({ ...approval, impact: [] }));
-	}
 
 	// ---- audit and access ----
 
@@ -1044,7 +850,6 @@ export class MockPlatformApi implements PlatformApi {
 		const entry = this.#data.auditEntries.find((e) => e.decisionId === id);
 		if (!entry) throw new ApiError(`No denied request has decision ID ${id}. Check it was copied in full, e.g. dec-4k7q2m.`, 404);
 		if (entry.actor.name !== this.#ctx.user.name && !this.#can('audit.view')) throw new ApiError('That decision belongs to someone else; looking it up requires audit.view', 403);
-		// Approval refusals are checked as the permission behind them.
 		const action: Capability = (CAPABILITIES as readonly string[]).includes(entry.action) ? (entry.action as Capability) : 'role.assign';
 		return this.#ctx.reply({
 			decisionId: id,
@@ -1117,8 +922,8 @@ export class MockPlatformApi implements PlatformApi {
 	}
 
 	#access(): AccessData {
-		const { roles, assignments, accounts, approvals } = this.#data;
-		return { roles, assignments, accounts, approvals, locations: this.#ctx.locations };
+		const { roles, assignments, accounts } = this.#data;
+		return { roles, assignments, accounts, locations: this.#ctx.locations };
 	}
 
 	#withCounts(role: RoleDefinition): RoleDefinition {
@@ -1146,24 +951,6 @@ export class MockPlatformApi implements PlatformApi {
 			state: 'active'
 		};
 		this.#data.locationTokens.unshift(token);
-		return { token: structuredClone(token), secret };
-	}
-
-	#issueApiToken(label: string, owner: Principal, expiresInDays: number | null): IssuedToken<ApiToken> {
-		const secret = `sqbt_${randomHex(40)}`;
-		const token: ApiToken = {
-			id: `tok-${randomHex(6)}`,
-			label,
-			owner: { kind: owner.kind, name: owner.name, displayName: owner.displayName },
-			prefix: secret.slice(0, 9),
-			createdAt: new Date().toISOString(),
-			createdBy: this.#ctx.user,
-			expiresAt: expiresInDays === null ? null : new Date(Date.now() + expiresInDays * DAY).toISOString(),
-			lastUsedAt: null,
-			revokedAt: null,
-			state: 'active'
-		};
-		this.#data.apiTokens.unshift(token);
 		return { token: structuredClone(token), secret };
 	}
 
@@ -1202,28 +989,5 @@ export class MockPlatformApi implements PlatformApi {
 	}
 }
 
-function grantKey(grant: RoleGrant): string {
-	return grant.nodes.join('|');
-}
-
-/** The grants as they were before the deploy's narrowing applied. */
-function withRemoved(grants: RoleGrant[], removed: RoleGrant[]): RoleGrant[] {
-	return applyDiff(grants, { added: removed, removed: [] });
-}
-
 const RISKY: readonly Capability[] = ['run.rewrite_history', 'run.adhoc', ...ADMIN_ONLY];
 
-/** Applies an approved proposal: removals first, then additions merged per selector. */
-function applyDiff(grants: RoleGrant[], approval: Pick<RoleApproval, 'added' | 'removed'>): RoleGrant[] {
-	const next = grants.map((g) => ({ nodes: [...g.nodes], permissions: [...g.permissions] }));
-	for (const removed of approval.removed) {
-		const grant = next.find((g) => grantKey(g) === grantKey(removed));
-		if (grant) grant.permissions = grant.permissions.filter((p) => !removed.permissions.includes(p));
-	}
-	for (const added of approval.added) {
-		const grant = next.find((g) => grantKey(g) === grantKey(added));
-		if (grant) grant.permissions = [...new Set([...grant.permissions, ...added.permissions])];
-		else next.push({ nodes: [...added.nodes], permissions: [...added.permissions] });
-	}
-	return next.filter((g) => g.permissions.length > 0);
-}

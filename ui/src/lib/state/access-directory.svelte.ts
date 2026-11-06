@@ -1,18 +1,17 @@
-import type { AccessOverview, Account, ApiToken, RoleAssignment, RoleDefinition } from '$lib/api';
+import type { AccessOverview, Account, RoleAssignment, RoleDefinition } from '$lib/api';
 import { app } from './app.svelte';
 import { createResource } from './resource.svelte';
 
 /**
  * Accounts with their role assignments, the roles of every location, and
- * per-account risky actions: what the People and Service accounts pages show.
+ * per-account risky actions: what the People pages show.
  * Must be created during component initialisation.
  */
 export function createAccessDirectory() {
 	const canAssign = () => app.can('role.assign');
-	const accounts = createResource((client) => (app.can('user.manage') || app.can('token.manage') || canAssign() ? client.listAccounts().catch(() => [] as Account[]) : Promise.resolve([] as Account[])));
+	const accounts = createResource((client) => (app.can('user.manage') || canAssign() ? client.listAccounts().catch(() => [] as Account[]) : Promise.resolve([] as Account[])));
 	const assignments = createResource((client) => (canAssign() ? client.listRoleAssignments() : Promise.resolve([] as RoleAssignment[])));
 	const overview = createResource((client) => (app.can('user.manage') || canAssign() ? client.listAccessOverview() : Promise.resolve([] as AccessOverview[])));
-	const tokens = createResource((client) => (app.can('token.manage') ? client.listServiceAccountTokens() : Promise.resolve([] as ApiToken[])));
 	const roles = createResource(async (client) => {
 		const map = new Map<string, RoleDefinition[]>();
 		if (!canAssign()) return map;
@@ -30,7 +29,6 @@ export function createAccessDirectory() {
 		accounts,
 		assignments,
 		overview,
-		tokens,
 		roles,
 		get rolesByLocation() {
 			return rolesByLocation;
@@ -40,12 +38,10 @@ export function createAccessDirectory() {
 		},
 		assignmentsOf: (name: string) => (assignments.data ?? []).filter((a) => a.principal.name === name),
 		riskyOf: (name: string) => riskyOf.get(name) ?? [],
-		tokensOf: (name: string) => (tokens.data ?? []).filter((t) => t.owner.name === name),
 		refresh() {
 			accounts.refresh();
 			assignments.refresh();
 			overview.refresh();
-			tokens.refresh();
 			roles.refresh();
 		}
 	};
