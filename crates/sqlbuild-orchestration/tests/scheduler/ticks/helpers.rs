@@ -619,9 +619,12 @@ pub(crate) async fn fault_run(
             .0;
     }
     let settled = Utc::now();
-    scheduler_cycle(&second, survivor)
-        .await
-        .expect("final recovery");
+    for _ in 0..FAULT_TRIGGERS.div_ceil(100) {
+        survivor = scheduler_cycle(&second, survivor)
+            .await
+            .expect("final recovery")
+            .0;
+    }
     let first = started
         .duration_trunc(TimeDelta::minutes(1))
         .expect("minute")
