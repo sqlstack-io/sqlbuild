@@ -154,6 +154,8 @@ jobs:
         env:
           RUSTFLAGS: >-
             ${{ runner.os == 'macOS' && '-C link-arg=-undefined -C link-arg=dynamic_lookup' || '' }}
+          # A wheel must never ship a sqb server without its UI.
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           args: >-

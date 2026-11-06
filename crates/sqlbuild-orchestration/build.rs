@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-env-changed=SQLBUILD_UI_DIST");
+    println!("cargo:rerun-if-env-changed=SQLBUILD_UI_REQUIRED");
     let output = PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR")).join("ui_assets.rs");
     let mut files = Vec::new();
     if std::env::var_os("CARGO_FEATURE_UI").is_some() {
@@ -18,10 +19,15 @@ fn main() {
         if dist.join("index.html").is_file() {
             collect(&dist, &dist, &mut files);
         } else {
-            println!(
-                "cargo:warning=sqb server will not serve the UI: {} has no index.html; run `npm ci && npm run build` in ui/ or set SQLBUILD_UI_DIST",
+            let message = format!(
+                "sqb server will not serve the UI: {} has no index.html; run `npm ci && npm run build` in ui/ or set SQLBUILD_UI_DIST",
                 dist.display()
             );
+            assert!(
+                std::env::var_os("SQLBUILD_UI_REQUIRED").is_none(),
+                "{message}"
+            );
+            println!("cargo:warning={message}");
         }
     }
     files.sort();
