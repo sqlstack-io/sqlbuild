@@ -130,7 +130,6 @@ pub(crate) struct SourceText {
 #[derive(Debug, Default)]
 pub(crate) struct ComparisonFacts {
     pub(crate) span: Option<ComparisonSpan>,
-    pub(crate) generated_sql: String,
     pub(crate) equality: bool,
     pub(crate) value_list: bool,
     pub(crate) binary: bool,

@@ -595,7 +595,7 @@ impl<'a> QueryTokens<'a> {
         operator: ComparisonOperator,
         (left_end, right_start): (Option<usize>, Option<usize>),
         negated: bool,
-        generated: &str,
+        literals: &[&str],
     ) -> Option<ComparisonSpan> {
         let anchor = match (left_end, right_start) {
             (Some(end), _) => (0..self.tokens.len()).find(|index| {
@@ -608,16 +608,18 @@ impl<'a> QueryTokens<'a> {
                     && self.operator(*index, operator)
                     && !self.used.borrow().contains(index)
             }),
-            (None, None) => {
-                let wanted = compact(generated);
-                (0..self.tokens.len()).find(|index| {
-                    self.operator(*index, operator) && !self.used.borrow().contains(index) && {
-                        let (first, last) = self.extent(*index, operator, negated);
-                        self.slice(self.start(first), self.end(last))
-                            .is_some_and(|text| compact(text) == wanted)
-                    }
-                })
-            }
+            (None, None) => (0..self.tokens.len()).find(|index| {
+                self.operator(*index, operator) && !self.used.borrow().contains(index) && {
+                    let (first, last) = self.extent(*index, operator, negated);
+                    self.tokens[first..=last]
+                        .iter()
+                        .filter(|token| {
+                            string_token(token.token_type) || token.token_type == TokenType::Number
+                        })
+                        .map(|token| token.text.as_str())
+                        .eq(literals.iter().copied())
+                }
+            }),
         }?;
         self.used.borrow_mut().insert(anchor);
         let (first, last) = self.extent(anchor, operator, negated);
@@ -683,13 +685,6 @@ impl<'a> QueryTokens<'a> {
         }
         (first, last)
     }
-}
-
-fn compact(text: &str) -> String {
-    text.chars()
-        .filter(|character| !character.is_whitespace())
-        .flat_map(char::to_lowercase)
-        .collect()
 }
 
 fn string_token(token_type: TokenType) -> bool {

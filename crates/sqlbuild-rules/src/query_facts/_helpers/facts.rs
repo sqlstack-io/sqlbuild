@@ -80,7 +80,6 @@ pub(crate) fn query_facts(sql: &str, dialect_name: &str) -> Result<QueryFacts, S
     let builder = Builder {
         selects: tokens.selects(),
         tokens,
-        dialect,
         spans: RefCell::default(),
         cursor: Cell::default(),
         claimed: RefCell::default(),
@@ -104,7 +103,6 @@ fn is_query(expression: &Expression) -> bool {
 struct Builder<'a> {
     tokens: QueryTokens<'a>,
     selects: Vec<SelectTokens>,
-    dialect: Dialect,
     spans: RefCell<HashMap<*const Expression, Option<ComparisonSpan>>>,
     cursor: Cell<usize>,
     claimed: RefCell<HashSet<usize>>,
@@ -303,18 +301,9 @@ impl Builder<'_> {
         let range = item.map(|item| self.tokens.expression_range(item, alias.is_some()));
         let unwrapped = unwrap_paren(value);
         let cast_type = match unwrapped {
-            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => {
-                Some(
-                    range
-                        .as_ref()
-                        .and_then(|range| self.tokens.cast_type(range))
-                        .unwrap_or_else(|| {
-                            self.dialect
-                                .generate(&Expression::DataType(cast.to.clone()))
-                                .unwrap_or_default()
-                        }),
-                )
-            }
+            Expression::Cast(_) | Expression::TryCast(_) | Expression::SafeCast(_) => range
+                .as_ref()
+                .and_then(|range| self.tokens.cast_type(range)),
             _ => None,
         };
         ItemFacts::Expression(ExpressionItem {
@@ -361,15 +350,16 @@ impl Builder<'_> {
         if let Some(span) = self.spans.borrow().get(&key) {
             return *span;
         }
-        let anchors = anchors(parts);
-        let generated = if anchors == (None, None) {
-            self.dialect.generate(node).unwrap_or_default()
-        } else {
-            String::new()
-        };
-        let span = self
-            .tokens
-            .comparison_range(parts.operator, anchors, parts.negated, &generated);
+        let literals: Vec<&str> = node
+            .dfs()
+            .filter_map(|value| match value {
+                Expression::Literal(literal) => Some(literal.value_str()),
+                _ => None,
+            })
+            .collect();
+        let span =
+            self.tokens
+                .comparison_range(parts.operator, anchors(parts), parts.negated, &literals);
         self.spans.borrow_mut().insert(key, span);
         span
     }
@@ -403,11 +393,6 @@ impl Builder<'_> {
         let span = self.span(node, parts);
         let mut fact = ComparisonFacts {
             span,
-            generated_sql: if span.is_none() {
-                self.dialect.generate(node).unwrap_or_default()
-            } else {
-                String::new()
-            },
             equality: operator == ComparisonOperator::Eq
                 || (operator == ComparisonOperator::In && !negated),
             value_list: operator == ComparisonOperator::In,

@@ -856,11 +856,10 @@ fn evaluate_comparison(
     faults: &FaultCollector,
 ) {
     let position = parsed.position(comparison.span.and_then(|span| span.position));
-    let sql = comparison
+    // Without a source span the comparison cannot be shown to be authored, so rule 102 skips it.
+    let sql: Option<&str> = comparison
         .span
-        .map_or(comparison.generated_sql.as_str(), |span| {
-            parsed.source.text(span.start, span.end)
-        });
+        .map(|span| parsed.source.text(span.start, span.end));
     if comparison.binary
         && let Some(rule) = selected.get("SQBRDECLARATION101")
     {
@@ -894,7 +893,9 @@ fn evaluate_comparison(
             faults.push(fault(parsed.model, rule, position.as_ref()));
         }
     }
-    if let Some(rule) = selected.get("SQBRDECLARATION102") {
+    if let Some(rule) = selected.get("SQBRDECLARATION102")
+        && let Some(sql) = sql
+    {
         let magic = comparison.numeric_literals.iter().any(|literal| {
             numeric_decisions::is_authored_decision(numeric_decisions::AuthoredDecision {
                 authored_compact_sql: &parsed.authored_compact_sql,
