@@ -64,7 +64,7 @@ fn retry_limit(shared: &Shared, started: Instant) -> Instant {
         .unwrap_or_else(|| started + Duration::from_millis(RUNNING_RETRY_LIMIT_MS))
 }
 
-/// Each SQLite busy wait ends by `give_up`, so no write outlasts the shutdown budget.
+/// Each SQLite busy wait ends by `give_up`: the shutdown deadline, or 500 ms on for the final rows.
 fn bound_busy_wait(store: &SqliteStore, give_up: Instant) {
     let remaining: Duration = give_up
         .saturating_duration_since(Instant::now())
@@ -396,8 +396,8 @@ pub(crate) fn deliver(shared: &Arc<Shared>, config: &SessionConfig) {
             state.rejecting = true;
             let rows = final_rows(config, &state);
             drop(state);
-            let give_up = (Instant::now() + Duration::from_millis(FINAL_ROWS_BUDGET_MS))
-                .min(retry_limit(shared, Instant::now()));
+            let give_up = retry_limit(shared, Instant::now())
+                .max(Instant::now() + Duration::from_millis(FINAL_ROWS_BUDGET_MS));
             if let Err(error) = write_batch(store.as_ref(), &rows, give_up) {
                 locked(&shared.state).degraded.get_or_insert(error.message);
             }

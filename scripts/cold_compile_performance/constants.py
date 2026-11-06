@@ -1,6 +1,7 @@
 """Constants for fresh-process compile performance guards."""
 
 UNLIMITED_CGROUP_MEMORY_VALUE: str = "max"
+COMPILE_MEMORY_LIMIT_ENV_VAR: str = "SQLBUILD_COMPILE_MEMORY_LIMIT_BYTES"
 COMPILE_MEASUREMENT_FIELD_COUNT: int = 6
 
 DENSE_JOIN_THRESHOLDS: tuple[int, ...] = (55, 75, 90, 99)
