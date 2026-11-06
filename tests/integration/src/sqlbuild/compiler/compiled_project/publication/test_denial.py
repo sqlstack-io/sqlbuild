@@ -53,12 +53,11 @@ def test_given_denied_browser_requests_when_returned_then_only_durable_decision_
         )
         unlisted: str = catalog.replace(api.location_id, str(uuid4()))
         decisions: dict[str, str] = {}
-        listing_denied: str = "missing view on one or more nodes in this location"
-        scope_denied: str = "missing permission in this scope; all requested nodes denied"
+        listing_denied: str = "missing view permission for this target"
         for path, reason in [
             (catalog, listing_denied),
             (unlisted, listing_denied),
-            ("/api/control/audit", scope_denied),
+            ("/api/control/audit", "missing audit.view permission for this target"),
         ]:
             with pytest.raises(HTTPError) as rejected:
                 person_read(api, path, session=session)
@@ -97,8 +96,7 @@ def test_given_denied_browser_requests_when_returned_then_only_durable_decision_
                 body["error"]
                 == {
                     "authorization.denied": (
-                        "missing permission in this scope; all requested nodes denied; decision "
-                        + decision
+                        "missing job.run permission for this target; decision " + decision
                     ),
                     "authentication.denied": "authentication rejected",
                 }[action]

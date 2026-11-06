@@ -11,3 +11,4 @@ pub(crate) mod publish_custom_roles;
 pub(crate) mod publish_group_roles;
 pub(crate) mod read_audit_events;
 pub mod read_security_audit;
+pub(crate) mod refuse_unknown;

@@ -1,10 +1,9 @@
-//! A listing needs view of every node in the current snapshot; its refusal names no node and reads the same for unknown locations.
+//! A location-wide listing needs view coverage of every node in the current snapshot; it is never filtered.
 
 use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::constants::LISTING_DENIED;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
 use crate::store::errors::ControlError;
@@ -31,13 +30,5 @@ pub(crate) async fn authorize_listing(
         target: Some(target.into()),
         nodes,
     };
-    authorize_person(transaction, credentials, &scope, default_role)
-        .await
-        .map_err(|error| match error {
-            ControlError::Denied { decision_id, .. } => ControlError::Denied {
-                reason: LISTING_DENIED.into(),
-                decision_id,
-            },
-            error => error,
-        })
+    authorize_person(transaction, credentials, &scope, default_role).await
 }

@@ -119,11 +119,13 @@ pub(crate) struct CliLoginTestCase {
     pub(crate) expected_exchanges: usize,
 }
 
-pub(crate) struct ListingDenialTestCase {
+/// A refused request's URL and, for writes, its JSON body.
+pub(crate) type DenialRequest = (String, Option<serde_json::Value>);
+
+pub(crate) struct DenialTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) expected_status: u16,
-    pub(crate) expected_error: &'static str,
 }
 
 pub(crate) struct CustomRoleApiTestCase {

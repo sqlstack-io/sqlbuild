@@ -2,12 +2,12 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "denials/helpers.rs"]
+mod denials_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
-#[path = "listing_denials/helpers.rs"]
-mod listing_denials_helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
 #[path = "node_status/helpers.rs"]
@@ -42,12 +42,12 @@ mod test_cli_login;
 mod test_contract;
 #[path = "test_custom_roles.rs"]
 mod test_custom_roles;
+#[path = "test_denials.rs"]
+mod test_denials;
 #[path = "test_development.rs"]
 mod test_development;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
-#[path = "test_listing_denials.rs"]
-mod test_listing_denials;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]

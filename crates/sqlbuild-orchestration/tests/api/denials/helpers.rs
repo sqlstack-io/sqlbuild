@@ -1,4 +1,4 @@
-//! Masked denial responses and the audit detail behind them.
+//! Masked denial responses, person requests, and the audit detail behind them.
 
 use reqwest::header;
 use serde_json::{Value, json};
@@ -40,4 +40,33 @@ pub(crate) async fn audited_scope(store: &ControlStore, decision: Uuid) -> Value
         .find(|row| row["after_json"]["decision_id"] == json!(decision))
         .map(|row| json!([row["scope_json"]["nodes"], row["after_json"]["reason"]]))
         .unwrap_or(Value::Null)
+}
+
+/// A person's browser request with session cookie, origin and CSRF proof.
+pub(crate) async fn person_send(
+    client: &reqwest::Client,
+    (url, session, csrf): (&str, &str, &str),
+    body: Option<Value>,
+) -> reqwest::Response {
+    let request = body.map_or_else(|| client.get(url), |body| client.post(url).json(&body));
+    request
+        .header(header::HOST, "control.example.com")
+        .header(header::ORIGIN, "https://control.example.com")
+        .header(header::COOKIE, format!("__Host-sqb-session={session}"))
+        .header("x-sqb-csrf", csrf)
+        .send()
+        .await
+        .expect("person request")
+}
+
+/// A job request body for a location and job key.
+pub(crate) fn job(location_id: Uuid, job_key: &str) -> Value {
+    json!({"run_id": Uuid::now_v7(), "location_id": location_id, "target": "development",
+        "job_key": job_key, "reason": "Refresh orders", "priority": 0})
+}
+
+/// A trigger change body of the given kind.
+pub(crate) fn trigger(trigger_id: Uuid, change: &str) -> Value {
+    json!({"event_id": Uuid::now_v7(), "trigger_id": trigger_id, "actor": "",
+        "reason": "Hold orders", "change": {"kind": change}})
 }
