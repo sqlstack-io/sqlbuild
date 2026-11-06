@@ -112,3 +112,51 @@ pub struct MaintenanceQuery {
     pub node: Option<String>,
     pub limit: Option<u32>,
 }
+
+/// How one recorded stretch of a microbatch model's cursor stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchState {
+    Complete,
+    /// A hole between completed partitions.
+    Gap,
+    /// Completed at another version than the newest replay requirement covering it.
+    ReplayRequired,
+}
+
+/// One stretch of the cursor, as raw bound texts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CoverageBatch {
+    pub start: String,
+    pub end: String,
+    pub state: BatchState,
+    /// The run that executed the latest completion here; absent for gaps and external completions.
+    pub run_id: Option<String>,
+}
+
+/// Recorded coverage of one model's current relation; tracked only for concurrent microbatch models.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MicrobatchCoverage {
+    pub model: String,
+    pub target_name: String,
+    pub physical_generation_id: String,
+    pub cursor_column: String,
+    pub cursor_type: String,
+    pub batch_size: String,
+    /// Start of the earliest completed partition.
+    pub earliest: String,
+    /// End of the completed range that starts at `earliest` without a hole.
+    pub contiguous_frontier: Option<String>,
+    /// Holes between completed partitions, oldest first.
+    pub known_gaps: Vec<CoverageBatch>,
+    /// The newest batches, oldest first.
+    pub batches: Vec<CoverageBatch>,
+    /// Whether older batches were left out of `batches`.
+    pub batches_truncated: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CoverageQuery {
+    pub limit: Option<u32>,
+}

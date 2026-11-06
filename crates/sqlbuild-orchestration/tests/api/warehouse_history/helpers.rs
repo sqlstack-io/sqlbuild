@@ -212,3 +212,8 @@ pub(crate) fn ids(history: &Value, kind: &str) -> Vec<String> {
         .map(|record| record["event_id"].as_str().expect("event").to_owned())
         .collect()
 }
+
+/// One microbatch coverage batch as the API returns it.
+pub(crate) fn coverage_batch(start: &str, end: &str, state: &str, run_id: Value) -> Value {
+    json!({"start": start, "end": end, "state": state, "run_id": run_id})
+}
