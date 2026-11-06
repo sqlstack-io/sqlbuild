@@ -5,6 +5,7 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import { pageAvailable } from '$lib/nav';
+	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
 
 	let { children } = $props();
@@ -25,9 +26,13 @@
 {:else if app.bootError}
 	<div class="grid h-screen place-items-center p-8">
 		<div class="max-w-md text-center">
-			<h1 class="text-[15px] font-semibold">Can't reach the SQLBuild server</h1>
-			<p class="text-muted-foreground mt-2 text-[13px]">{app.bootError}</p>
-			<button class="mt-4 rounded-md border border-border px-3 py-1.5 text-[13px]" onclick={() => location.reload()}>Retry</button>
+			<h1 class="text-[15px] font-semibold">{app.bootError.title}</h1>
+			<p class="text-muted-foreground mt-2 text-[13px]">{app.bootError.detail}</p>
+			{#if app.bootError.configuration}
+				<a class="link mt-4 inline-block text-[13px]" href={SERVER_DOCS} target="_blank" rel="noreferrer">Set up sign-in</a>
+			{:else}
+				<button class="mt-4 rounded-md border border-border px-3 py-1.5 text-[13px]" onclick={() => location.reload()}>Retry</button>
+			{/if}
 		</div>
 	</div>
 {:else if app.bootstrap && app.bootstrap.locations.length === 0}

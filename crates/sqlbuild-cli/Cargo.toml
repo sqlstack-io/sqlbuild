@@ -15,6 +15,9 @@ path = "src/bin/sqb.rs"
 name = "sqlbuild"
 path = "src/bin/sqlbuild.rs"
 
+[features]
+ui = ["sqlbuild-orchestration/ui"]
+
 [dependencies]
 blake3.workspace = true
 chrono.workspace = true

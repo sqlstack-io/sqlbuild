@@ -80,3 +80,24 @@ pub(crate) async fn read_json(
     assert_eq!(response.headers()["cache-control"], "no-store");
     response.json().await.expect("typed JSON response")
 }
+
+/// Send `GET <path>` byte for byte, so no client normalises dot segments, slashes or encodings.
+pub(crate) fn raw_get(address: &str, path: &str) -> (u16, String) {
+    use std::io::{Read, Write};
+    let mut stream = std::net::TcpStream::connect(address).expect("raw socket");
+    write!(
+        stream,
+        "GET {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"
+    )
+    .expect("raw request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("raw response");
+    let (head, body) = response.split_once("\r\n\r\n").expect("HTTP head");
+    let status = head
+        .split(' ')
+        .nth(1)
+        .expect("status")
+        .parse()
+        .expect("numeric status");
+    (status, body.to_owned())
+}

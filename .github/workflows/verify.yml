@@ -148,13 +148,13 @@ jobs:
               *) docs_only=false ;;
             esac
             case "${path}" in
-              crates/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
+              crates/*|ui/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
                 ;;
             esac
             case "${path}" in
               ui/*|clients/typescript/*|.github/workflows/verify.yml)
-                # The web UI is not packaged; its own checks and unit tests cover it. It compiles
+                # The web UI's own checks and unit tests; the wheels embed its build. It compiles
                 # against the generated control client, so client changes run them too.
                 ui=true
                 ;;
@@ -1144,6 +1144,8 @@ jobs:
         run: npm run check
       - name: Unit tests
         run: npm test
+      - name: Build the static bundle sqb server embeds
+        run: npm run build
 
   verify:
     # The required Verify of a Release Please pull request is the commit status that the trusted

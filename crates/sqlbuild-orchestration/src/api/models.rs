@@ -418,3 +418,10 @@ pub(crate) struct ControlClient {
     pub(crate) authorization: reqwest::header::HeaderValue,
     pub(crate) base_url: reqwest::Url,
 }
+
+/// One file of the built web UI, embedded at compile time and served at `path`.
+#[derive(Debug)]
+pub(crate) struct UiAsset {
+    pub(crate) path: &'static str,
+    pub(crate) body: &'static [u8],
+}
