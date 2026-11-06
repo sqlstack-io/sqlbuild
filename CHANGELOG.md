@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.192.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.191.0...v0.192.0) (2026-11-06)
+
+
+### Features
+
+* add microbatch coverage endpoint ([#1319](https://github.com/sqlstack-io/sqlbuild/issues/1319)) ([d9abd83](https://github.com/sqlstack-io/sqlbuild/commit/d9abd8318654bcc3793e52c41f4e97b4e0a9ea73))
+
 ## [0.191.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.190.0...v0.191.0) (2026-11-06)
 
 
