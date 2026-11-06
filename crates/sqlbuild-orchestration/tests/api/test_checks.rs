@@ -24,6 +24,8 @@ use crate::platform::models::{LocationHealth, LocationHealthReport};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::fault_helpers::{install_fault, remove_fault};
+use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
@@ -164,6 +166,7 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
             let client = Client::new();
             let viewer = login(&client, &api.url, "orders-viewer").await;
             let developer = login(&client, &api.url, "orders-developer").await;
+            let administrator = login(&client, &api.url, "orders-admin").await;
             let base_path = format!("/api/control/locations/{location}/targets/development/checks");
             let orders_key = data["checks"][0]["binding_key"].as_str().expect("key");
             let customers_key = data["checks"][1]["binding_key"].as_str().expect("key");
@@ -299,6 +302,88 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
                     StatusCode::FORBIDDEN
                 );
             }
+            let failed_id = history[1]["event_id"].as_str().expect("event");
+            let evidence_path = format!("{base_path}/{orders_key}/results/{failed_id}/evidence");
+            let (status, _) = get(&client, (&api.url, &developer), &evidence_path).await;
+            assert_eq!(
+                status,
+                StatusCode::FORBIDDEN,
+                "developers lack view.evidence"
+            );
+            let denial = latest_audit(store).await;
+            assert_eq!(denial["scope_json"]["action"], "view.evidence");
+            assert_eq!(denial["scope_json"]["nodes"], json!(["orders"]));
+            let (status, evidence) = get(&client, (&api.url, &administrator), &evidence_path).await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                evidence,
+                json!({"event_id": failed_id, "binding_key": orders_key,
+                    "columns": ["amount", "is_late", "order_id"],
+                    "rows": [[1.5, null, "o-1"], [null, true, "o-2"]], "truncated": "false"}),
+                "sorted keys become columns; missing keys become null cells"
+            );
+            let read = latest_audit(store).await;
+            assert_eq!(read["action"], "evidence.read");
+            assert_eq!(
+                read["after_json"],
+                json!({"binding_key": orders_key, "event_id": failed_id, "found": true})
+            );
+            assert!(
+                !read.to_string().contains("o-1"),
+                "the audit never holds evidence"
+            );
+            let (status, mismatched) = get(
+                &client,
+                (&api.url, &administrator),
+                &evidence_path.replace(orders_key, customers_key),
+            )
+            .await;
+            assert_eq!(
+                (status, mismatched),
+                (StatusCode::OK, Value::Null),
+                "a result is read only under its own check"
+            );
+            let (_, archived) = get(
+                &client,
+                (&api.url, &administrator),
+                &format!("{base_path}/{archived_key}"),
+            )
+            .await;
+            let malformed_path = format!(
+                "{base_path}/{archived_key}/results/{}/evidence",
+                archived[0]["event_id"].as_str().expect("event")
+            );
+            let (status, refusal) = get(&client, (&api.url, &administrator), &malformed_path).await;
+            assert_eq!(
+                (status, refusal),
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    json!({"error": "control-store operation failed"})
+                ),
+                "malformed stored evidence is never echoed"
+            );
+            let fault = TransactionFault {
+                description: "evidence read requires durable audit",
+                table: "sqb_security_audit",
+                operation: "INSERT",
+                condition: "WHEN NEW.action='evidence.read'",
+                sqlite_body: "SELECT RAISE(ABORT, 'synthetic evidence audit failure')",
+                postgres_body: "RAISE EXCEPTION 'synthetic evidence audit failure'",
+            };
+            install_fault(store, &fault).await;
+            let (status, refusal) = get(&client, (&api.url, &administrator), &evidence_path).await;
+            assert_eq!(
+                status,
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "{}",
+                fault.description
+            );
+            assert!(
+                !refusal.to_string().contains("o-1"),
+                "no evidence without its audit"
+            );
+            remove_fault(store, &fault).await;
+
             stop_api(api).await;
             close_test_store(fixture_store).await;
         });

@@ -10,6 +10,7 @@ pub mod ingest_statistics;
 pub(crate) mod prune_statistics;
 pub mod read_person_catalog;
 pub mod read_person_check;
+pub mod read_person_check_evidence;
 pub mod read_person_check_sql;
 pub mod read_person_checks;
 pub mod read_person_fingerprint;

@@ -121,6 +121,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/sql",
             get(crate::api::_helpers::resources::person_checks::sql),
         )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/results/{event_id}/evidence",
+            get(crate::api::_helpers::resources::person_checks::evidence),
+        )
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }
 
