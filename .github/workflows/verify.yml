@@ -153,6 +153,12 @@ jobs:
                 ;;
             esac
             case "${path}" in
+              ui/*|.github/workflows/verify.yml)
+                # The web UI is not packaged; its own checks and unit tests cover it.
+                ui=true
+                ;;
+            esac
+            case "${path}" in
               crates/sqlbuild-orchestration/*|crates/sqlbuild-process-ownership/*|crates/sqlbuild-cli/*|Cargo.toml|Cargo.lock|.github/workflows/verify.yml)
                 recovery=true
                 ;;
@@ -205,8 +211,6 @@ jobs:
               tests/unit/*|tests/integration/*)
                 ;;
               ui/*)
-                # The web UI is not packaged; its own checks and unit tests cover it.
-                ui=true
                 ;;
               .github/workflows/verify.yml|Makefile)
                 performance=true
