@@ -56,6 +56,8 @@ mod test_oidc;
 mod test_oidc_groups;
 #[path = "test_passwords.rs"]
 mod test_passwords;
+#[path = "test_person_live.rs"]
+mod test_person_live;
 #[path = "test_person_location_work.rs"]
 mod test_person_location_work;
 #[path = "test_person_sessions.rs"]

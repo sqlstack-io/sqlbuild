@@ -39,8 +39,8 @@ pub async fn serve_api(
         sender: sender.clone(),
         stopped,
     };
-    let application = router(&store, feed)
-        .merge(authentication_routes)
+    let application = router(&store, feed.clone())
+        .merge(authentication_routes.layer(Extension(feed)))
         .layer(Extension(std::sync::Arc::new(images)))
         .layer(Extension(retention))
         .route(
