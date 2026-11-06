@@ -75,9 +75,12 @@ pub(crate) fn insert_node(
     key: String,
     node: SnapshotNode,
 ) -> PyResult<BTreeMap<String, SnapshotNode>> {
-    if nodes.insert(key, node).is_some() {
-        return Err(PyValueError::new_err("duplicate snapshot node identity"));
+    if nodes.contains_key(&key) {
+        return Err(PyValueError::new_err(format!(
+            "duplicate snapshot node identity {key}"
+        )));
     }
+    nodes.insert(key, node);
     Ok(nodes)
 }
 
