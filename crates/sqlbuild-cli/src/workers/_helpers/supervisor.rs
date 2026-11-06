@@ -19,7 +19,6 @@ use sqlbuild_orchestration::scheduler::main::renew_lease::renew_lease;
 use sqlbuild_orchestration::scheduler::models::SchedulerLease;
 use sqlbuild_orchestration::store::errors::ControlError;
 use sqlbuild_orchestration::store::models::ControlStore;
-#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 use sqlbuild_process_ownership::ownership::main::{
     prepare_worker::prepare_worker, start_worker::start_worker,
 };
@@ -328,19 +327,13 @@ fn prepare_spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
-    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     let (command, ownership) = prepare_worker(command, &location.claim(claim))?;
     let mut command = Command::from(command);
     command.kill_on_drop(true);
-    Ok(LocalSpawn {
-        command,
-        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
-        ownership,
-    })
+    Ok(LocalSpawn { command, ownership })
 }
 
 impl LocalLauncher {
-    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     pub(in crate::workers) fn claim<'a>(
         &'a self,
         claim: &RunClaim,
@@ -357,7 +350,6 @@ impl LocalSpawn {
     /// A child whose ownership could not be completed is killed before the error is returned.
     fn spawn(mut self) -> Result<tokio::process::Child, ControlError> {
         let mut child = self.command.spawn()?;
-        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
         if let Err(error) = child
             .id()
             .ok_or_else(|| std::io::Error::other("worker exited before it was owned"))

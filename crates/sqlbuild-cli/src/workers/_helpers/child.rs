@@ -2,7 +2,6 @@
 
 use sqlbuild_orchestration::store::errors::ControlError;
 
-#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 use sqlbuild_process_ownership::ownership::main::{
     stop_worker::stop_worker, worker_exited::worker_exited,
 };
@@ -28,7 +27,6 @@ impl WorkerChild {
             Self::Local(child) => Ok(child
                 .try_wait()?
                 .map(|exit| WorkerExit::Code(exit_code(exit)))),
-            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
             Self::RecoveredLocal(owner) => Ok(worker_exited(owner)?.then_some(WorkerExit::Absent)),
             Self::Docker(child) => child.try_wait().await,
         }
@@ -49,7 +47,6 @@ impl WorkerChild {
     pub(in crate::workers) async fn terminate(&mut self) -> Result<(), ControlError> {
         match self {
             Self::Local(child) => terminate_child(child),
-            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
             Self::RecoveredLocal(owner) => Ok(stop_worker(owner, false)?),
             Self::Docker(child) => child.signal("SIGTERM").await,
         }
@@ -61,7 +58,6 @@ impl WorkerChild {
                 child.start_kill()?;
                 Ok(())
             }
-            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
             Self::RecoveredLocal(owner) => Ok(stop_worker(owner, true)?),
             Self::Docker(child) => child.signal("SIGKILL").await,
         }
