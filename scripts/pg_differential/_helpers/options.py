@@ -5,7 +5,16 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from scripts.pg_differential.constants import SOURCE_SEPARATOR
 from scripts.pg_differential.models import RunOptions
+
+
+def labelled(text: str) -> tuple[str, Path]:
+    """`LABEL=PATH` as `(LABEL, PATH)`; a bare path is labelled by its directory name."""
+    label, separator, path = text.partition(SOURCE_SEPARATOR)
+    if not separator:
+        return Path(text).name, Path(text)
+    return label, Path(path)
 
 
 def parse_options(argv: list[str] | None) -> RunOptions:
@@ -15,10 +24,12 @@ def parse_options(argv: list[str] | None) -> RunOptions:
     )
     parser.add_argument(
         "--work-dir",
-        type=Path,
         action="append",
         required=True,
-        help="A compiler differential --work-dir run with --stage-captures; repeatable.",
+        help=(
+            "A compiler differential --work-dir run with --stage-captures, as LABEL=PATH to "
+            "report it as its own source; repeatable."
+        ),
     )
     parser.add_argument("--sqlquack", type=Path, required=True, help="A SQLQuack checkout.")
     parser.add_argument("--out", type=Path, required=True, help="Directory for the results.")
@@ -27,7 +38,7 @@ def parse_options(argv: list[str] | None) -> RunOptions:
     )
     arguments: argparse.Namespace = parser.parse_args(argv)
     return RunOptions(
-        work_dirs=tuple(arguments.work_dir),
+        work_dirs=tuple(labelled(text) for text in arguments.work_dir),
         sqlquack=arguments.sqlquack,
         out=arguments.out,
         mutations=not arguments.no_mutations,

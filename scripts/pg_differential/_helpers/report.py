@@ -17,6 +17,21 @@ from scripts.pg_differential.constants import (
 
 
 def summarise(*, cases: list[dict[str, Any]], results: list[dict[str, Any]]) -> dict[str, Any]:
+    """The summary of every case, and of each source's cases under `sources`."""
+    source_by_id: dict[str, str] = {case["id"]: case["source"] for case in cases}
+    by_source: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for result in results:
+        by_source[source_by_id[result["id"]]].append(result)
+    summary: dict[str, Any] = summarise_results(cases=cases, results=results)
+    summary["sources"] = {
+        source: summarise_results(cases=cases, results=items) for source, items in by_source.items()
+    }
+    return summary
+
+
+def summarise_results(
+    *, cases: list[dict[str, Any]], results: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Counts per parse outcome and per measure verdict, and differences grouped by kind."""
     sql_by_id: dict[str, str] = {case["id"]: case["query_sql"] for case in cases}
     parse: Counter[str] = Counter()

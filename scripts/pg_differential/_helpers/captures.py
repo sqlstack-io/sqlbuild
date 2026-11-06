@@ -17,7 +17,7 @@ from scripts.pg_differential.constants import (
     MISSING_SUFFIX,
     MUTATION_SEPARATOR,
     OUTPUT_ALIAS_BEFORE,
-    POSTGRES_PROJECT_SUFFIX,
+    POSTGRES_DIALECT,
     QUALIFIED_REFERENCE,
     REFERENCE_RESOURCE_TYPES,
     SHARED_KEY,
@@ -32,16 +32,15 @@ from scripts.pg_differential.exceptions import PgDifferentialError
 from scripts.pg_differential.types import Mutation
 
 
-def capture_paths(work_dirs: tuple[Path, ...]) -> list[Path]:
-    """Every Postgres compiled-project capture under the compiler differential work dirs."""
+def capture_paths(work_dir: Path) -> list[Path]:
+    """Every compiled-project capture under a compiler differential work dir."""
     paths: list[Path] = []
-    for work_dir in work_dirs:
-        for project in sorted(work_dir.iterdir()):
-            capture: Path = project / COMPILED_PROJECT_CAPTURE
-            if project.name.endswith(POSTGRES_PROJECT_SUFFIX) and capture.is_file():
-                paths.append(capture)
+    for project in sorted(work_dir.iterdir()):
+        capture: Path = project / COMPILED_PROJECT_CAPTURE
+        if capture.is_file():
+            paths.append(capture)
     if not paths:
-        raise PgDifferentialError(f"no Postgres compile captures under {work_dirs}")
+        raise PgDifferentialError(f"no compile captures under {work_dir}")
     return paths
 
 
@@ -72,11 +71,13 @@ def nullability_text(value: dict[str, str] | None) -> str:
     return "unknown" if value is None else enum_member(value).lower()
 
 
-def project_cases(path: Path) -> Iterator[dict[str, Any]]:
-    """One case per compiled model of the captured project."""
+def project_cases(*, path: Path, source: str) -> Iterator[dict[str, Any]]:
+    """One case per compiled model of the captured project, when it compiled for Postgres."""
     project: dict[str, Any] = load_capture(path)
     project_name: str = path.parents[2].name
-    catalog: dict[str, Any] = project["binding_catalog"]
+    catalog: dict[str, Any] | None = project["binding_catalog"]
+    if catalog is None or catalog["dialect"] != POSTGRES_DIALECT:
+        return
     schemas: dict[str, dict[str, str]] = dict(catalog["schemas"][UNORDERED_MAPPING_KEY])
     shapes: dict[str, list[dict[str, Any]]] = dict(
         catalog["analysis_shapes"][UNORDERED_MAPPING_KEY]
@@ -94,7 +95,8 @@ def project_cases(path: Path) -> Iterator[dict[str, Any]]:
             relation: str = TABLE_FUNCTION_PREFIX + name if kind == TABLE_FUNCTION_KIND else name
             resources[relation] = (REFERENCE_RESOURCE_TYPES[kind], name)
         yield {
-            "id": f"{project_name}/{model['name']}",
+            "id": f"{source}/{project_name}/{model['name']}",
+            "source": source,
             "query_sql": model["query_sql"],
             "relations": relations(schemas=schemas, shapes=shapes, resources=resources),
             "functions": functions,
@@ -114,7 +116,7 @@ def relations(
     shapes: dict[str, list[dict[str, Any]]],
     resources: dict[str, tuple[str, str]],
 ) -> list[dict[str, Any]]:
-    """The closed relations: types from `schemas`, nullability from the analysis shapes."""
+    """Closed relations typed from `schemas`, then referenced relations with no closed shape."""
     result: list[dict[str, Any]] = []
     for name in sorted(set(schemas) | set(shapes)):
         shape_types, shape_nullability = shapes.get(name, [{}, {}])
@@ -127,6 +129,7 @@ def relations(
                 "name": name,
                 "resource_type": resource_type,
                 "resource_name": resource_name,
+                "open": False,
                 "columns": [
                     {
                         "name": column,
@@ -137,6 +140,18 @@ def relations(
                 ],
             }
         )
+    closed: set[str] = {relation["name"] for relation in result}
+    for name, (resource_type, resource_name) in sorted(resources.items()):
+        if name not in closed:
+            result.append(
+                {
+                    "name": name,
+                    "resource_type": resource_type,
+                    "resource_name": resource_name,
+                    "open": True,
+                    "columns": [],
+                }
+            )
     return result
 
 
@@ -221,6 +236,7 @@ def mutated(*, case: dict[str, Any], mutation: Mutation, sql: str) -> dict[str, 
     """A copy of `case` with `sql` and no compile results."""
     return {
         "id": f"{case['id']}{MUTATION_SEPARATOR}{mutation}",
+        "source": case["source"],
         "query_sql": sql,
         "relations": case["relations"],
         "functions": case["functions"],

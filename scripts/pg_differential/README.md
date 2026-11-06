@@ -11,8 +11,10 @@ analysis, on the same inputs. It measures three things per compiled model:
 - **Types (D):** each output's inferred type and nullability, against the compile's
   `inferred_columns`.
 
-Inputs are the compile captures of the compiler differential's generated Postgres projects. Each
-model also yields variants with one name broken (an unknown column, an upper-case quoted column,
+Inputs are compile captures from compiler differential work dirs: the generated seed projects, and
+any project compiled with `--project ... --stage-captures`, such as the Postgres e2e projects, the
+waffle-shop templates wired to Postgres, or the analysis failure corpus recompiled for Postgres.
+Only projects whose binding catalog is Postgres yield cases. Each model also yields variants with one name broken (an unknown column, an upper-case quoted column,
 an unknown qualifier, an unqualified column two joined relations share), so binding findings have
 something to find; variants measure only findings.
 
@@ -25,12 +27,18 @@ crates are not published, so the runner takes them from a local SQLQuack checkou
 ```sh
 uv run python -m scripts.run_compiler_differential --corpus seeds --seeds 30 \
   --stage-captures --work-dir /tmp/seeds
-uv run python -m scripts.run_pg_differential --work-dir /tmp/seeds \
-  --sqlquack ../sqlquack --out /tmp/pg-differential
+uv run python -m scripts.run_pg_differential --work-dir seeds=/tmp/seeds \
+  --work-dir e2e=/tmp/e2e-captures --sqlquack ../sqlquack --out /tmp/pg-differential
 ```
 
 The output directory holds `cases.jsonl`, `results.jsonl` (one comparison per case) and
-`summary.json` (counts per measure and grouped differences with examples).
+`summary.json` (counts per measure and grouped differences with examples, overall and per
+`LABEL=` source).
+
+Relations follow SQLBuild's binding catalog: closed relations carry their declared types and
+inferred nullability; referenced relations with no closed shape are open inputs, left out of both
+schemas and kept only to map lineage to their resource. Project functions are declared to both
+engines as SQLBuild declares them to Polyglot, with each scalar UDF typed by its return type.
 
 ## Verdicts
 

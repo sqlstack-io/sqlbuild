@@ -12,7 +12,8 @@ SQLQUACK_CRATES: tuple[str, ...] = (
     "sqlquack-syntax-postgres",
 )
 COMPILED_PROJECT_CAPTURE: str = "captures/0-compile/003-compiled_project.json"
-POSTGRES_PROJECT_SUFFIX: str = "-postgres"
+POSTGRES_DIALECT: str = "postgresql"
+SOURCE_SEPARATOR: str = "="
 
 SHARED_NODES_KEY: str = "__shared_nodes__"
 SHARED_KEY: str = "__shared__"

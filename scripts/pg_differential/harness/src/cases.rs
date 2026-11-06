@@ -25,6 +25,10 @@ pub struct Relation {
     pub name: String,
     pub resource_type: Option<String>,
     pub resource_name: Option<String>,
+    /// A referenced relation the capture has no closed shape for: SQLBuild treats it as an
+    /// open input, so it is left out of both schemas and only maps lineage to its resource.
+    #[serde(default)]
+    pub open: bool,
     pub columns: Vec<Column>,
 }
 

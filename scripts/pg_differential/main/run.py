@@ -19,8 +19,9 @@ def run_pg_differential(argv: list[str] | None = None) -> int:
     options: RunOptions = parse_options(argv)
     cases: list[dict[str, Any]] = []
     try:
-        for path in capture_paths(options.work_dirs):
-            cases.extend(project_cases(path))
+        for source, work_dir in options.work_dirs:
+            for path in capture_paths(work_dir):
+                cases.extend(project_cases(path=path, source=source))
         variants: list[dict[str, Any]] = []
         if options.mutations:
             for case in cases:
@@ -39,5 +40,9 @@ def run_pg_differential(argv: list[str] | None = None) -> int:
     summary: dict[str, Any] = summarise(cases=cases, results=results)
     summary_text: str = json.dumps(summary, indent=2, ensure_ascii=False) + "\n"
     (out / "summary.json").write_text(summary_text, encoding="utf-8")
-    print(json.dumps({key: summary[key] for key in ("cases", "parse", "verdicts")}, indent=2))
+    overview: dict[str, Any] = {}
+    for source, part in summary["sources"].items():
+        overview[source] = {"cases": part["cases"], "parse": part["parse"]}
+        overview[source]["verdicts"] = part["verdicts"]
+    print(json.dumps(overview, indent=2))
     return 0

@@ -10,7 +10,7 @@ from pathlib import Path
 class RunOptions:
     """Where the captures, the SQLQuack checkout and the results are."""
 
-    work_dirs: tuple[Path, ...]
+    work_dirs: tuple[tuple[str, Path], ...]
     sqlquack: Path
     out: Path
     mutations: bool

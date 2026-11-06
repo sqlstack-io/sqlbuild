@@ -210,6 +210,7 @@ fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<Strin
     let tables: Vec<Value> = case
         .relations
         .iter()
+        .filter(|relation| !relation.open)
         .map(|relation| {
             let columns: Vec<Value> = relation
                 .columns
@@ -268,6 +269,7 @@ fn catalog(case: &Case, profile: &dyn DialectProfile) -> Catalog {
     let relations: HashMap<String, Vec<SchemaColumn>> = case
         .relations
         .iter()
+        .filter(|relation| !relation.open)
         .map(|relation| {
             let columns: Vec<SchemaColumn> = relation
                 .columns
