@@ -8,7 +8,7 @@ use crate::runs::main::list_runs::list_runs;
 use crate::runs::models::{
     NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus,
 };
-use crate::scheduler::tests::contracts::helpers::acquire_lease;
+use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -68,6 +68,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 .await
                 .expect("acquire")
                 .expect("leader");
+            let holder = hold_lease(store, &lease);
             let claim = claim_next_run(store, &lease, &BTreeMap::new(), None)
                 .await
                 .expect("claim")
@@ -329,6 +330,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                 "{}",
                 test_case.description
             );
+            holder.abort();
             drop(session);
             stop_api(api).await;
             close_test_store(fixture).await;

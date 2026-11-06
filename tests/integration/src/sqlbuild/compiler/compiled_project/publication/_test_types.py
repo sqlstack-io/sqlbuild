@@ -314,6 +314,15 @@ class SchedulerCrashTestCase:
 
 
 @dataclass(frozen=True)
+class SharedAuditPublicationTestCase:
+    description: str
+    create_project: Callable[[Path], None]
+    target: str
+    expected_audits: frozenset[str]
+    expected_count: int
+
+
+@dataclass(frozen=True)
 class ProjectRolesTestCase:
     description: str
     roles_file: str
