@@ -334,7 +334,7 @@ test-e2e-dense-compile-performance:
 		-n auto --dist loadfile \
 		-m cold_compile_performance -k "models_$(SQLBUILD_BENCHMARK_MODELS)_" \
 		-vv -rP --log-level=INFO --log-cli-level=INFO --color=yes
-# DuckShop 10K runs after the dense guards, alone, so it never shares the memory limit with them.
+# DuckShop 10K runs after the dense guards, alone, so its compile never overlaps theirs.
 	if [ "$(SQLBUILD_BENCHMARK_MODELS)" = "10000" ]; then \
 		env PYTHONUNBUFFERED=1 uv run pytest benchmarks/duckshop-10k/tests -q --color=yes && \
 		env PYTHONUNBUFFERED=1 SQLBUILD_CONCURRENCY=4 uv run pytest \
