@@ -17,7 +17,8 @@ struct Recorded<T> {
     record: T,
 }
 
-async fn records<T: DeserializeOwned>(
+/// The `record` column of every row `sql` selects.
+pub(crate) async fn records<T: DeserializeOwned>(
     transaction: ControlTransaction,
     sql: &str,
     parameters: Vec<Parameter>,

@@ -2,6 +2,8 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "denials/helpers.rs"]
+mod denials_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
@@ -40,6 +42,8 @@ mod test_cli_login;
 mod test_contract;
 #[path = "test_custom_roles.rs"]
 mod test_custom_roles;
+#[path = "test_denials.rs"]
+mod test_denials;
 #[path = "test_development.rs"]
 mod test_development;
 #[path = "test_external_sessions.rs"]
@@ -50,6 +54,8 @@ mod test_location_health;
 mod test_location_work;
 #[path = "test_maintenance.rs"]
 mod test_maintenance;
+#[path = "test_microbatch_coverage.rs"]
+mod test_microbatch_coverage;
 #[path = "test_oidc.rs"]
 mod test_oidc;
 #[path = "test_oidc_groups.rs"]

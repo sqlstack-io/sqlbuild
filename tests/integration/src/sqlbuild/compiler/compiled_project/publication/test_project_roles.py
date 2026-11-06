@@ -33,9 +33,7 @@ from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
                 "Warning: role orders_support grant 2 selects no nodes (tag:support,tag:pii); "
                 "it grants nothing in this snapshot"
             ),
-            expected_denial=(
-                "missing view.sql on nodes model:customers; all requested nodes denied"
-            ),
+            expected_denial="missing view.sql permission for this target",
         )
     ],
     ids=lambda case: case.description,
