@@ -35,6 +35,7 @@ pub async fn ingest_audit_results(
                     columns: vec![
                         ("audit_name", Parameter::Text(record.audit_name.clone())),
                         ("outcome", Parameter::Text(record.outcome.clone())),
+                        ("binding_key", Parameter::Text(record.binding_key.clone())),
                     ],
                     record_json: json!(record),
                 })

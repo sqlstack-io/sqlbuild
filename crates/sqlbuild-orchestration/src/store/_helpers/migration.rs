@@ -20,7 +20,9 @@ pub(crate) fn verify_schema(rows: &[Row], digest: &str) -> Result<(), ControlErr
         .any(|row| row.get("checksum").and_then(|value| value.as_str()) != Some(digest))
     {
         return Err(ControlError::Schema(
-            "control store schema checksum mismatch".into(),
+            "control store schema checksum mismatch; recreate the control store, because \
+             pre-release schemas are not upgraded"
+                .into(),
         ));
     }
     Ok(())

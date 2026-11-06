@@ -1,0 +1,14 @@
+{
+  "audit_name": "not_null",
+  "checks": [
+    {"binding_key": "6f1c0e2a-orders-order-id", "attached_target_name": "orders", "attached_column_name": "order_id"},
+    {"binding_key": "0b9d4c71-customers-customer-id", "attached_target_name": "customers", "attached_column_name": "customer_id"},
+    {"binding_key": "9a3e5d10-archived-orders-order-id", "attached_target_name": "archived_orders", "attached_column_name": "order_id"}
+  ],
+  "results": [
+    {"check": 0, "result_id": "orders-not-null-1", "occurred_at": "2026-02-03T04:05:06Z", "outcome": "fail", "violation_count": 3, "executed_sql": "SELECT order_id FROM orders WHERE order_id IS NULL /* first 'run' 🧾 */"},
+    {"check": 0, "result_id": "orders-not-null-2", "occurred_at": "2026-02-04T04:05:06Z", "outcome": "pass", "violation_count": 0, "executed_sql": "SELECT order_id FROM orders WHERE order_id IS NULL /* second 'run' 🧾 */"},
+    {"check": 1, "result_id": "customers-not-null-1", "occurred_at": "2026-02-03T05:05:06Z", "outcome": "error", "violation_count": null, "executed_sql": "SELECT customer_id FROM customers WHERE customer_id IS NULL", "execution_error": "Binder Error: Referenced column \"customer_id\" not found\n\nLINE 1: SELECT customer_id FROM customers WHERE email = 'private@example.com'"},
+    {"check": 2, "result_id": "archived-orders-not-null-1", "occurred_at": "2026-02-02T04:05:06Z", "outcome": "pass", "violation_count": 0, "executed_sql": "SELECT order_id FROM archived_orders WHERE order_id IS NULL"}
+  ]
+}

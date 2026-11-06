@@ -5,6 +5,7 @@ pub(crate) mod client;
 pub(crate) mod docker_image;
 pub(crate) mod location_health;
 pub(crate) mod location_work;
+pub(crate) mod person_checks;
 pub(crate) mod person_location_work;
 pub(crate) mod person_node_sql;
 pub(crate) mod person_operations;

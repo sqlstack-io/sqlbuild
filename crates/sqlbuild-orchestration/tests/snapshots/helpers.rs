@@ -287,7 +287,8 @@ pub(super) async fn sqlite_failed_publish_and_schema_floor() -> i64 {
             .execute_batch(case.update_sql)
             .expect("apply synthetic schema incompatibility");
         assert!(
-            matches!(migrate_store(&store).await, Err(ControlError::Schema(_))),
+            matches!(migrate_store(&store).await,
+                Err(ControlError::Schema(message)) if message.contains("recreate the control store")),
             "{}",
             case.description
         );

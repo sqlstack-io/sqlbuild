@@ -2,6 +2,8 @@
 
 #[path = "changes/helpers.rs"]
 mod changes_helpers;
+#[path = "checks/helpers.rs"]
+pub(crate) mod checks_helpers;
 #[path = "fingerprint_reads/helpers.rs"]
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
@@ -32,6 +34,8 @@ mod statistics_retention;
 mod test_catalog_reads;
 #[path = "test_changes.rs"]
 mod test_changes;
+#[path = "test_checks.rs"]
+mod test_checks;
 #[path = "test_cli_login.rs"]
 mod test_cli_login;
 #[path = "test_contract.rs"]
