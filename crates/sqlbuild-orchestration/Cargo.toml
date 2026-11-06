@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
+[features]
+ui = []
+
 [dependencies]
 argon2.workspace = true
 axum.workspace = true

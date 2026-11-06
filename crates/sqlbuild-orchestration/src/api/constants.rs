@@ -13,3 +13,10 @@ pub(crate) const OIDC_RESPONSE_BYTES: usize = 1024 * 1024;
 pub(crate) const DOCKER_IMAGE_HEX_LENGTH: usize = 64;
 pub(crate) const HTTPS_SCHEME: &str = "https";
 pub(crate) const ROOT_PATH: &str = "/";
+pub(crate) const UI_INDEX_PATH: &str = "/index.html";
+pub(crate) const UI_IMMUTABLE_PREFIX: &str = "/_app/immutable/";
+/// The page's own meta policy carries every other directive; a meta tag cannot set frame-ancestors.
+pub(crate) const UI_FRAME_POLICY: &str = "frame-ancestors 'none'";
+pub(crate) const API_PATH: &str = "/api";
+pub(crate) const API_PREFIX: &str = "/api/";
+pub(crate) const AUTH_PREFIX: &str = "/auth/";

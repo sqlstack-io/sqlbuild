@@ -4,17 +4,7 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<script>
-			// apply theme before paint to avoid flash; default dark
-			(function () {
-				try {
-					var t = localStorage.getItem('sb-theme') || 'dark';
-					if (t === 'dark') document.documentElement.classList.add('dark');
-				} catch (e) {
-					document.documentElement.classList.add('dark');
-				}
-			})();
-		</script>
+		<script src="/theme.js"></script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

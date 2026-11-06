@@ -1156,6 +1156,8 @@ jobs:
         run: npm run check
       - name: Unit tests
         run: npm test
+      - name: Build the static bundle sqb server embeds
+        run: npm run build
 
   verify:
     # The required Verify of a Release Please pull request is the commit status that the trusted
