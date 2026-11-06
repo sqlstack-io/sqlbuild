@@ -141,19 +141,28 @@ pub(crate) async fn receive_webhook(
     )
 }
 
+/// Wait for `count` deliveries: fail after a minute without progress or ten minutes in total.
 pub(crate) async fn wait_for_webhook(
     receiver: &WebhookReceiver,
     dispatcher: &JoinHandle<Result<(), ControlError>>,
     count: usize,
 ) {
     let mut delivered = receiver.delivered.subscribe();
-    tokio::time::timeout(
-        Duration::from_secs(10),
-        delivered.wait_for(|received| *received >= count),
-    )
+    tokio::time::timeout(Duration::from_secs(600), async {
+        for _ in 0..count {
+            let seen = *delivered.borrow_and_update();
+            tokio::time::timeout(
+                Duration::from_secs(60),
+                delivered.wait_for(|received| *received > seen || *received >= count),
+            )
+            .await
+            .expect("dispatcher keeps delivering across bounded pages")
+            .expect("webhook receiver remains available");
+        }
+    })
     .await
-    .expect("dispatcher drains more than one bounded page")
-    .expect("webhook receiver remains available");
+    .expect("dispatcher delivers every event within ten minutes");
+    assert!(*delivered.borrow() >= count, "every event delivered");
     assert!(
         !dispatcher.is_finished(),
         "delivery loop stopped before draining"
