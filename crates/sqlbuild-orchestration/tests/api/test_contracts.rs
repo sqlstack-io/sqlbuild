@@ -6,6 +6,8 @@ mod changes_helpers;
 mod fingerprint_reads_helpers;
 #[path = "helpers.rs"]
 pub(crate) mod helpers;
+#[path = "listing_denials/helpers.rs"]
+mod listing_denials_helpers;
 #[path = "node_sql/helpers.rs"]
 mod node_sql_helpers;
 #[path = "node_status/helpers.rs"]
@@ -44,6 +46,8 @@ mod test_custom_roles;
 mod test_development;
 #[path = "test_external_sessions.rs"]
 mod test_external_sessions;
+#[path = "test_listing_denials.rs"]
+mod test_listing_denials;
 #[path = "test_location_health.rs"]
 mod test_location_health;
 #[path = "test_location_work.rs"]

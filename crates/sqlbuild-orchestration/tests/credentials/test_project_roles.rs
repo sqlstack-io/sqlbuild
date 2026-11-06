@@ -244,17 +244,13 @@ fn given_view_grant_on_part_of_the_location_when_listing_then_each_listing_is_de
         ProjectRoleTestCase {
             description: "SQLite location listings need view on every node",
             backend: Backend::Sqlite,
-            expected_before: Err(
-                "missing view on nodes customers, inventory, products; all requested nodes denied",
-            ),
+            expected_before: Err("missing view on one or more nodes in this location"),
             expected_after: Ok(SUPPORT_ROLE),
         },
         ProjectRoleTestCase {
             description: "PostgreSQL location listings need view on every node",
             backend: Backend::Postgres,
-            expected_before: Err(
-                "missing view on nodes customers, inventory, products; all requested nodes denied",
-            ),
+            expected_before: Err("missing view on one or more nodes in this location"),
             expected_after: Ok(SUPPORT_ROLE),
         },
     ];
