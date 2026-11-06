@@ -19,7 +19,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
-const ADHOC_DENIED: &str = "missing run.adhoc on nodes customers; all requested nodes denied";
+const ADHOC_DENIED: &str = "missing run.adhoc permission for this target";
 
 #[test]
 fn given_published_selector_when_it_matches_more_nodes_then_coverage_grows_on_publish() {
@@ -103,13 +103,13 @@ fn given_selector_resolving_to_no_nodes_when_published_then_it_grants_nothing() 
             description: "SQLite grants nothing for an empty resolution",
             backend: Backend::Sqlite,
             expected_before: Ok(SUPPORT_ROLE),
-            expected_after: Err("missing permission in this scope; all requested nodes denied"),
+            expected_after: Err("missing view permission for this target"),
         },
         ProjectRoleTestCase {
             description: "PostgreSQL grants nothing for an empty resolution",
             backend: Backend::Postgres,
             expected_before: Ok(SUPPORT_ROLE),
-            expected_after: Err("missing permission in this scope; all requested nodes denied"),
+            expected_after: Err("missing view permission for this target"),
         },
     ];
     for test_case in test_cases {
@@ -149,8 +149,8 @@ fn given_selector_resolving_to_no_nodes_when_published_then_it_grants_nothing() 
                     .await
                     .as_deref()
                     .map_err(String::as_str),
-                Err("missing run.adhoc on nodes orders; all requested nodes denied"),
-                "{}: the denial names the uncovered node",
+                Err("missing run.adhoc permission for this target"),
+                "{}: the denial names no node",
                 test_case.description
             );
             close_test_store(fixture).await;
@@ -165,22 +165,14 @@ fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_tri
         ProjectRoleTestCase {
             description: "SQLite authorizes trigger overrides on the job's write set",
             backend: Backend::Sqlite,
-            expected_before: Err(
-                "missing trigger.toggle on nodes customers; all requested nodes denied",
-            ),
-            expected_after: Err(
-                "missing sensor.reset_cursor on nodes customers; all requested nodes denied",
-            ),
+            expected_before: Err("missing trigger.toggle permission for this target"),
+            expected_after: Err("missing sensor.reset_cursor permission for this target"),
         },
         ProjectRoleTestCase {
             description: "PostgreSQL authorizes trigger overrides on the job's write set",
             backend: Backend::Postgres,
-            expected_before: Err(
-                "missing trigger.toggle on nodes customers; all requested nodes denied",
-            ),
-            expected_after: Err(
-                "missing sensor.reset_cursor on nodes customers; all requested nodes denied",
-            ),
+            expected_before: Err("missing trigger.toggle permission for this target"),
+            expected_after: Err("missing sensor.reset_cursor permission for this target"),
         },
     ];
     for test_case in test_cases {
@@ -244,17 +236,13 @@ fn given_view_grant_on_part_of_the_location_when_listing_then_each_listing_is_de
         ProjectRoleTestCase {
             description: "SQLite location listings need view on every node",
             backend: Backend::Sqlite,
-            expected_before: Err(
-                "missing view on nodes customers, inventory, products; all requested nodes denied",
-            ),
+            expected_before: Err("missing view permission for this target"),
             expected_after: Ok(SUPPORT_ROLE),
         },
         ProjectRoleTestCase {
             description: "PostgreSQL location listings need view on every node",
             backend: Backend::Postgres,
-            expected_before: Err(
-                "missing view on nodes customers, inventory, products; all requested nodes denied",
-            ),
+            expected_before: Err("missing view permission for this target"),
             expected_after: Ok(SUPPORT_ROLE),
         },
     ];
@@ -302,13 +290,13 @@ fn given_role_removed_from_code_when_its_assignment_remains_then_it_grants_nothi
             description: "SQLite stale assignment grants nothing",
             backend: Backend::Sqlite,
             expected_before: Ok(SUPPORT_ROLE),
-            expected_after: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
+            expected_after: Err("missing run.adhoc permission for this target"),
         },
         ProjectRoleTestCase {
             description: "PostgreSQL stale assignment grants nothing",
             backend: Backend::Postgres,
             expected_before: Ok(SUPPORT_ROLE),
-            expected_after: Err("missing run.adhoc on nodes orders; all requested nodes denied"),
+            expected_after: Err("missing run.adhoc permission for this target"),
         },
     ];
     for test_case in test_cases {
@@ -355,7 +343,7 @@ fn given_role_removed_from_code_when_its_assignment_remains_then_it_grants_nothi
                     .await
                     .as_deref()
                     .map_err(String::as_str),
-                Err("missing permission in this scope; all requested nodes denied"),
+                Err("missing view permission for this target"),
                 "{}: nor location-wide",
                 test_case.description
             );
