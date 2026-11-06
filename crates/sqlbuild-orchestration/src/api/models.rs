@@ -27,6 +27,7 @@ use crate::api::_helpers::resources::{
     person_checks::list,
     person_checks::history,
     person_checks::sql,
+    person_checks::evidence,
     person_location_work::request,
     person_location_work::result,
     person_node_sql::read,
@@ -84,6 +85,14 @@ pub(crate) struct ReadAuditQuery {
 pub(crate) struct RunRecallQuery {
     pub(crate) invocation: String,
     pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CheckResultPath {
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) binding_key: String,
+    pub(crate) event_id: uuid::Uuid,
 }
 
 #[derive(Debug, Deserialize)]

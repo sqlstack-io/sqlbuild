@@ -149,6 +149,19 @@ pub struct CheckSql {
     pub evidence_error: Option<String>,
 }
 
+/// One result's stored evidence rows; `view.evidence` reads them, audited.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CheckEvidence {
+    pub event_id: Uuid,
+    pub binding_key: String,
+    /// Every row key, in sorted order; the warehouse stores rows with sorted keys.
+    pub columns: Vec<String>,
+    /// Scalar cells aligned to `columns`; a row without a key holds null there.
+    #[schema(value_type = Vec<Vec<Object>>)]
+    pub rows: Vec<Vec<serde_json::Value>>,
+    pub truncated: Option<String>,
+}
+
 /// Warehouse cleanup facts do not authorize control-plane deletion or worker recovery.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]

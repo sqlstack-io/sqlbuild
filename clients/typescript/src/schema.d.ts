@@ -242,6 +242,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/results/{event_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonCheckEvidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/sql": {
         parameters: {
             query?: never;
@@ -816,6 +832,17 @@ export interface components {
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
             topic: string;
+        };
+        /** @description One result's stored evidence rows; `view.evidence` reads them, audited. */
+        CheckEvidence: {
+            binding_key: string;
+            /** @description Every row key, in sorted order; the warehouse stores rows with sorted keys. */
+            columns: string[];
+            /** Format: uuid */
+            event_id: string;
+            /** @description Scalar cells aligned to `columns`; a row without a key holds null there. */
+            rows: Record<string, never>[][];
+            truncated?: string | null;
         };
         /** @description One stored check result. Its SQL, error texts and evidence rows need their own permissions. */
         CheckResult: {
@@ -2282,6 +2309,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResult"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonCheckEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                binding_key: string;
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["CheckEvidence"];
                 };
             };
             /** @description Session rejected */

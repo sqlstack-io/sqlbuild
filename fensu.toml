@@ -1641,7 +1641,6 @@ construction_required = [
     "Action=A permission is live only when a route requires it; role tables and classifiers do not count.",
 ]
 exceptions = [
-    "Action::ViewEvidence=Kept under D129; reader comes with the UI epic.",
     "InaccessibleReason=Wire enum that serde builds from Python scope records.",
     "ScopeDiagnosticCode=Wire enum that serde builds from Python scope diagnostics.",
     "TickOutcome::Covered=The scheduler writes it as SQL text and serde reads it back.",
