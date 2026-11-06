@@ -94,3 +94,4 @@ class ComparisonOptions:
     work_dir: Path | None
     output: Path | None
     baseline_source: Path | None = None
+    same_version_baseline: bool = False

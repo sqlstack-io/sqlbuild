@@ -23,7 +23,6 @@ from scripts.release_performance.constants import (
     PYPI_REQUEST_TIMEOUT_SECONDS,
     PYPI_SIMPLE_JSON,
     PYPI_SIMPLE_URL,
-    RELEASE_TAG_PATTERN,
     RELEASE_TAG_PREFIX,
     STDERR_TAIL_CHARACTERS,
     UNIVERSAL_WHEEL_MACHINE,
@@ -48,16 +47,13 @@ def release_versions(*, index: dict[str, object]) -> tuple[str, ...]:
     return _index_versions(index=index, include_yanked=False)
 
 
-def choose_baseline(
-    *, candidate: str, index: dict[str, object], tags: tuple[str, ...]
-) -> str | None:
-    """Return the highest installable or still-publishing release below the candidate."""
+def choose_baseline(*, candidate: str, index: dict[str, object], same_version: bool) -> str | None:
+    """Return the highest release on PyPI below the candidate, or its own version when allowed."""
 
-    listed: frozenset[str] = frozenset(_index_versions(index=index, include_yanked=True))
-    publishing: tuple[str, ...] = tuple(tag for tag in tags if tag not in listed)
-    return previous_version(
-        candidate=candidate, versions=(*release_versions(index=index), *publishing)
-    )
+    published: tuple[str, ...] = release_versions(index=index)
+    if same_version and candidate in published:
+        return candidate
+    return previous_version(candidate=candidate, versions=published)
 
 
 def previous_version(*, candidate: str, versions: tuple[str, ...]) -> str | None:
@@ -107,24 +103,6 @@ def fetch_simple_index() -> dict[str, object]:
         return cast(dict[str, object], json.loads(response.read()))
 
 
-def tagged_versions(*, repo_dir: Path) -> tuple[str, ...]:
-    """Return the X.Y.Z versions of the release tags in repo_dir, or none outside a clone."""
-
-    completed: subprocess.CompletedProcess[str] = subprocess.run(
-        ["git", "-C", str(repo_dir), "tag", "--list", RELEASE_TAG_PATTERN],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        return ()
-    return tuple(
-        tag.removeprefix("v")
-        for tag in completed.stdout.split()
-        if _RELEASE_VERSION.fullmatch(tag.removeprefix("v"))
-    )
-
-
 def release_source(*, version: str, repo_dir: Path, destination: Path) -> Path:
     """Extract the source tree of release tag v<version> from repo_dir into destination."""
 
@@ -147,13 +125,11 @@ def release_source(*, version: str, repo_dir: Path, destination: Path) -> Path:
     return destination
 
 
-def resolve_baseline(*, candidate: str, repo_dir: Path) -> str:
-    """Return the highest published or not-yet-published tagged release below the candidate."""
+def resolve_baseline(*, candidate: str, same_version: bool) -> str:
+    """Return the baseline release that PyPI actually serves for the candidate."""
 
     baseline: str | None = choose_baseline(
-        candidate=candidate,
-        index=fetch_simple_index(),
-        tags=tagged_versions(repo_dir=repo_dir),
+        candidate=candidate, index=fetch_simple_index(), same_version=same_version
     )
     if baseline is None:
         raise ReleasePerformanceError(f"No published sqlbuild release precedes {candidate}")
