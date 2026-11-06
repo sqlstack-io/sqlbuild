@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use axum::{Extension, Router};
 
 use crate::api::_helpers::authentication::{oidc, password_sessions, trusted_proxy};
-use crate::api::models::{ApiAuthentication, DevelopmentScope, GroupRole, HumanLogin};
+use crate::api::models::{ApiAuthentication, DevelopmentScope, GroupRole, HumanLogin, LoginMode};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 
@@ -28,6 +28,11 @@ pub(crate) async fn configure(
         HumanLogin::Oidc(settings) => settings.group_roles.clone(),
         _ => Vec::new(),
     };
+    let login_mode = match &login {
+        HumanLogin::Oidc(_) => LoginMode::Oidc,
+        HumanLogin::TrustedProxy(_) => LoginMode::TrustedProxy,
+        _ => LoginMode::Password,
+    };
     let (development, routes) = match login {
         HumanLogin::None => (None, Router::new()),
         HumanLogin::Development(scope) => {
@@ -44,7 +49,9 @@ pub(crate) async fn configure(
     };
     Ok((
         development,
-        routes.layer(Extension(default_role)),
+        routes
+            .layer(Extension(default_role))
+            .layer(Extension(login_mode)),
         group_roles,
     ))
 }

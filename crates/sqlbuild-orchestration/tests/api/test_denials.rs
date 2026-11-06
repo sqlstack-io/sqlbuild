@@ -20,8 +20,9 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 /// Location-scoped reads and the action each needs.
-const READS: [(&str, &str); 8] = [
+const READS: [(&str, &str); 9] = [
     ("runs", "view"),
+    ("changes", "view"),
     ("catalog?schema=orders", "view"),
     ("statistics?schema=orders&name=orders", "view"),
     ("checks", "view"),

@@ -194,6 +194,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/bootstrap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readBootstrap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/catalog": {
         parameters: {
             query?: never;
@@ -202,6 +218,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["readPersonCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["subscribeChanges"];
         put?: never;
         post?: never;
         delete?: never;
@@ -823,6 +855,11 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * @description Closed permission vocabulary; unknown actions fail deserialization.
+         * @enum {string}
+         */
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        /**
          * @description Administrator membership and person eligibility share the final-admin invariant.
          * @enum {string}
          */
@@ -955,6 +992,11 @@ export interface components {
             /** Format: uuid */
             request_id: string;
         };
+        /** @description What the UI needs first: how people sign in, and what this person may see and do. */
+        ControlBootstrap: {
+            access: components["schemas"]["PersonAccess"];
+            login_mode: components["schemas"]["LoginMode"];
+        };
         /** @description One stretch of the cursor, as raw bound texts. */
         CoverageBatch: {
             end: string;
@@ -1056,6 +1098,14 @@ export interface components {
             run_id: string;
             target: string;
             window?: null | components["schemas"]["RunWindow"];
+        };
+        /** @description One location target the person can view, with the actions allowed on at least one of its nodes. */
+        LocationAccess: {
+            actions: components["schemas"]["Action"][];
+            /** Format: uuid */
+            location_id: string;
+            name: string;
+            target: string;
         };
         /** @description Locations report bounded facts, never connection strings or user exception text. */
         LocationHealth: {
@@ -1166,6 +1216,11 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /**
+         * @description How people sign in to this server.
+         * @enum {string}
+         */
+        LoginMode: "password" | "trusted_proxy" | "oidc";
         /** @description Recorded moves, their old-name view steps and janitor cleanups, newest moves first. */
         MaintenanceHistory: {
             /** @description Empty when the history is for one model; cleanups are not tied to models. */
@@ -1291,6 +1346,14 @@ export interface components {
         PasswordSessionResponse: {
             csrf_token: string;
             identity: components["schemas"]["SessionIdentity"];
+        };
+        /** @description The person's name, the actions allowed server-wide, and the location targets they can view. */
+        PersonAccess: {
+            actions: components["schemas"]["Action"][];
+            locations: components["schemas"]["LocationAccess"][];
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
         };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
@@ -2336,6 +2399,32 @@ export interface operations {
             };
         };
     };
+    readBootstrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlBootstrap"];
+                };
+            };
+            /** @description Session rejected or person disabled */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     readPersonCatalog: {
         parameters: {
             query: {
@@ -2386,6 +2475,43 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    subscribeChanges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description changed events: all, runs, ticks, snapshot:<location>, node_status:<target>. Refetch REST on all/reconnect; no durable cursor. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["ChangeNotice"];
+                };
+            };
+            /** @description Session rejected or person disabled */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description View does not cover every node of this target */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

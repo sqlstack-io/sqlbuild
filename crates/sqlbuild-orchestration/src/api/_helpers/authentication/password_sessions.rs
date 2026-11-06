@@ -50,6 +50,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
     Router::new()
         .route("/api/auth/cli/approve", post(super::cli_login::approve))
         .route(
+            "/api/control/bootstrap",
+            get(crate::api::_helpers::resources::person_bootstrap::read),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/changes",
+            get(crate::api::_helpers::resources::changes::subscribe_person),
+        )
+        .route(
             "/api/control/audit",
             get(crate::api::_helpers::resources::audit::read),
         )

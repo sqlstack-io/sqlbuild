@@ -51,6 +51,13 @@ pub(crate) struct ResetProxy {
     pub(crate) task: tokio::task::JoinHandle<()>,
 }
 
+pub(crate) struct PersonLiveTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_denied_feed: reqwest::StatusCode,
+    pub(crate) expected_disabled_bootstrap: reqwest::StatusCode,
+}
+
 pub(crate) struct ChangesTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
