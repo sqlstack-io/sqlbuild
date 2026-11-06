@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.190.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.189.0...v0.190.0) (2026-11-06)
+
+
+### Features
+
+* read check evidence through the control API ([#1317](https://github.com/sqlstack-io/sqlbuild/issues/1317)) ([bf4a2a2](https://github.com/sqlstack-io/sqlbuild/commit/bf4a2a277e628b634da294855885c7d14784c266))
+
 ## [0.189.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.188.0...v0.189.0) (2026-11-06)
 
 
