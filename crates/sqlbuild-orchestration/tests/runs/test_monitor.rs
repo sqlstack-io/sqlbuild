@@ -24,7 +24,7 @@ use crate::runs::tests::test_types::{
     MonitorBacklogTestCase, RunMonitorTestCase, TransactionFault,
 };
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
-use crate::store::tests::lease_helpers::{expire_lease, hold_lease};
+use crate::store::tests::lease_helpers::{expire_lease, extend_lease_through_test};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -290,7 +290,7 @@ fn given_a_silent_worker_backlog_when_monitoring_then_bounded_transactions_conti
                 .await
                 .expect("elect")
                 .expect("leader");
-            let lease = hold_lease(store, elected).await;
+            let lease = extend_lease_through_test(store, elected).await;
             for index in 0..test_case.run_count {
                 let mut input = request(
                     (location, published.snapshot_id),

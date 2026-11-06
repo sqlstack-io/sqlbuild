@@ -26,8 +26,11 @@ pub(crate) async fn expire_lease(store: &ControlStore) {
     .expect("expire PostgreSQL scheduler lease");
 }
 
-/// Keep `lease` live for a day, so slow setup cannot fence a test that is not about lease expiry.
-pub(crate) async fn hold_lease(store: &ControlStore, lease: SchedulerLease) -> SchedulerLease {
+/// Keep `lease` live for a day without a renewer task, so slow setup cannot fence the test.
+pub(crate) async fn extend_lease_through_test(
+    store: &ControlStore,
+    lease: SchedulerLease,
+) -> SchedulerLease {
     let expires_at = Utc::now() + TimeDelta::days(1);
     let ControlStore::Postgres(pool) = store else {
         let ControlStore::Sqlite(path) = store else {

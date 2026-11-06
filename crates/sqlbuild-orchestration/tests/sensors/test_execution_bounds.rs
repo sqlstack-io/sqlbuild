@@ -24,7 +24,7 @@ use crate::sensors::tests::helpers::snapshot;
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
-use crate::store::tests::lease_helpers::hold_lease;
+use crate::store::tests::lease_helpers::extend_lease_through_test;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -83,7 +83,7 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                 .await
                 .expect("elect")
                 .expect("leader");
-            let lease = hold_lease(store, elected).await;
+            let lease = extend_lease_through_test(store, elected).await;
             let limits = std::collections::BTreeMap::new();
             let scope = (location, "development");
             for include_last in [true, false] {
