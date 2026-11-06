@@ -374,6 +374,8 @@ pub(crate) struct SlowFinalRowsTestCase {
 #[derive(Clone, Debug)]
 pub(crate) struct SlowFinalRowsStore {
     pub(crate) delay: Duration,
+    /// The deadline the store was given for the final delivery rows.
+    pub(crate) final_give_up: Arc<Mutex<Option<Instant>>>,
 }
 
 impl RecallStore for SlowFinalRowsStore {
@@ -381,6 +383,10 @@ impl RecallStore for SlowFinalRowsStore {
         if !rows.iter().any(|row| row.table == Table::Delivery) {
             return Ok(InsertOutcome::default());
         }
+        *self
+            .final_give_up
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(give_up);
         let answered: Instant = Instant::now() + self.delay;
         std::thread::sleep(
             answered

@@ -716,10 +716,14 @@ pub(crate) fn left_out_evidence(outcome: &str) -> Vec<RecallValue> {
     ]
 }
 
-/// Seconds `close` took and whether delivery reported complete, when the final delivery rows take `delay`.
-pub(crate) fn close_with_slow_final_rows(shutdown: Duration, delay: Duration) -> (f64, bool) {
+/// Seconds `close` took, whether delivery reported complete, and how long after close began the final rows' deadline fell.
+pub(crate) fn close_with_slow_final_rows(shutdown: Duration, delay: Duration) -> (f64, bool, f64) {
+    let store = SlowFinalRowsStore {
+        delay,
+        final_give_up: Arc::default(),
+    };
     let session = start_recall_session(SessionConfig {
-        store: SessionStore::Hosted(Arc::new(SlowFinalRowsStore { delay })),
+        store: SessionStore::Hosted(Arc::new(store.clone())),
         shutdown_timeout: shutdown,
         maintenance: false,
         ..config(PathBuf::from("unused"), "slow-final-rows")
@@ -727,5 +731,15 @@ pub(crate) fn close_with_slow_final_rows(shutdown: Duration, delay: Duration) ->
     session.append_output(OutputStream::Stdout, b"printed\n");
     let started = std::time::Instant::now();
     let summary = session.close();
-    (started.elapsed().as_secs_f64(), summary.flush_complete)
+    let elapsed = started.elapsed().as_secs_f64();
+    let give_up = store
+        .final_give_up
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .expect("the final rows reached the store");
+    (
+        elapsed,
+        summary.flush_complete,
+        give_up.saturating_duration_since(started).as_secs_f64(),
+    )
 }

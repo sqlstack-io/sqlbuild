@@ -64,7 +64,7 @@ fn retry_limit(shared: &Shared, started: Instant) -> Instant {
         .unwrap_or_else(|| started + Duration::from_millis(RUNNING_RETRY_LIMIT_MS))
 }
 
-/// Each SQLite busy wait ends by `give_up`, so no write outlasts the shutdown budget.
+/// Each SQLite busy wait ends by `give_up`: the shutdown deadline, or 500 ms on for the final rows.
 fn bound_busy_wait(store: &SqliteStore, give_up: Instant) {
     let remaining: Duration = give_up
         .saturating_duration_since(Instant::now())

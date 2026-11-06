@@ -127,8 +127,13 @@ fn given_slow_final_delivery_rows_when_closed_then_the_shutdown_budget_bounds_th
     ];
 
     for test_case in test_cases {
-        let (elapsed, flush_complete) =
+        let (elapsed, flush_complete, final_rows_deadline) =
             close_with_slow_final_rows(test_case.shutdown, test_case.final_rows_delay);
+        assert!(
+            final_rows_deadline <= test_case.shutdown.as_secs_f64() + CLOSE_SLACK_SECONDS,
+            "{}: the final rows may wait {final_rows_deadline:.3}s",
+            test_case.description
+        );
         assert!(
             elapsed <= test_case.shutdown.as_secs_f64() + CLOSE_SLACK_SECONDS,
             "{}: {elapsed:.3}s",
