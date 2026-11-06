@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.191.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.190.0...v0.191.0) (2026-11-06)
+
+
+### Features
+
+* add maintenance history endpoint ([#1318](https://github.com/sqlstack-io/sqlbuild/issues/1318)) ([ec9a3b4](https://github.com/sqlstack-io/sqlbuild/commit/ec9a3b4651f97292454779110d301c6e8f8207e7))
+
 ## [0.190.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.189.0...v0.190.0) (2026-11-06)
 
 
