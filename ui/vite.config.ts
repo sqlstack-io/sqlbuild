@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { loadEnv } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // `SQB_SERVER_URL` proxies `/api` to a running `sqb server` during development.
 // The server only accepts browser sessions from its configured HTTPS origin, so
@@ -11,6 +12,7 @@ export default defineConfig(({ mode }) => {
 	const origin = env.SQB_SERVER_ORIGIN;
 	return {
 		plugins: [tailwindcss(), sveltekit()],
+		test: { include: ['src/**/*.test.ts'], environment: 'node' },
 		server: target
 			? {
 					proxy: {

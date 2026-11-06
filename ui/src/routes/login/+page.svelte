@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { loginWithPassword } from '$lib/api/http-client';
+	import { safeNext } from '$lib/next';
 
 	let username = $state('');
 	let password = $state('');
@@ -15,8 +16,7 @@
 
 	/** Only same-site paths, so a crafted link cannot send people elsewhere after sign-in. */
 	function destination(): string {
-		const next = page.url.searchParams.get('next') ?? '/';
-		return next.startsWith('/') && !next.startsWith('//') ? next : '/';
+		return safeNext(page.url.searchParams.get('next'));
 	}
 
 	async function submit(event: SubmitEvent) {
