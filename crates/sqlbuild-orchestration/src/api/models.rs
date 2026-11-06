@@ -30,6 +30,7 @@ use crate::api::_helpers::resources::{
     person_checks::evidence,
     person_maintenance::read,
     person_bootstrap::read,
+    person_maintenance::coverage,
     person_location_work::request,
     person_location_work::result,
     person_node_sql::read,

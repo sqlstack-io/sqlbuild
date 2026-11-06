@@ -370,6 +370,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/microbatches/{model}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonMicrobatchCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-status": {
         parameters: {
             query?: never;
@@ -861,6 +877,11 @@ export interface components {
             /** Format: uuid */
             request_id: string;
         };
+        /**
+         * @description How one recorded stretch of a microbatch model's cursor stands.
+         * @enum {string}
+         */
+        BatchState: "complete" | "gap" | "replay_required";
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
         /** @description Browser cancellation cannot supply an actor, claim or lifecycle transition. */
@@ -975,6 +996,14 @@ export interface components {
         ControlBootstrap: {
             access: components["schemas"]["PersonAccess"];
             login_mode: components["schemas"]["LoginMode"];
+        };
+        /** @description One stretch of the cursor, as raw bound texts. */
+        CoverageBatch: {
+            end: string;
+            /** @description The run that executed the latest completion here; absent for gaps and external completions. */
+            run_id?: string | null;
+            start: string;
+            state: components["schemas"]["BatchState"];
         };
         /** @description The current successful snapshot, read with a consistent generation and change set. */
         CurrentSnapshot: {
@@ -1216,6 +1245,25 @@ export interface components {
             location: components["schemas"]["WarehouseStateLocation"];
             /** Format: uuid */
             scan_id: string;
+        };
+        /** @description Recorded coverage of one model's current relation; tracked only for concurrent microbatch models. */
+        MicrobatchCoverage: {
+            batch_size: string;
+            /** @description The newest batches, oldest first. */
+            batches: components["schemas"]["CoverageBatch"][];
+            /** @description Whether older batches were left out of `batches`. */
+            batches_truncated: boolean;
+            /** @description End of the completed range that starts at `earliest` without a hole. */
+            contiguous_frontier?: string | null;
+            cursor_column: string;
+            cursor_type: string;
+            /** @description Start of the earliest completed partition. */
+            earliest: string;
+            /** @description Holes between completed partitions, oldest first. */
+            known_gaps: components["schemas"]["CoverageBatch"][];
+            model: string;
+            physical_generation_id: string;
+            target_name: string;
         };
         MutationResponse: {
             applied: boolean;
@@ -2789,6 +2837,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MaintenanceHistory"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonMicrobatchCoverage: {
+        parameters: {
+            query?: {
+                /** @description Maximum newest batches; defaults to 200, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                model: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Null when the model has no tracked coverage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["MicrobatchCoverage"];
                 };
             };
             /** @description Session rejected */
