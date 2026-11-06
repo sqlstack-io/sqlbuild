@@ -6,7 +6,8 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use crate::api::tests::test_types::{ResetProxy, SseConnection, TestApi};
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, TransactionMode};
 
 pub(crate) async fn connect(
     client: &reqwest::Client,
@@ -22,6 +23,32 @@ pub(crate) async fn connect(
         .send()
         .await
         .expect("open scoped SSE connection");
+    opened(response).await
+}
+
+/// A person's feed over a browser session cookie; the caller checks the status.
+pub(crate) async fn request_person_feed(
+    client: &reqwest::Client,
+    api: &TestApi,
+    (location_id, target, session): (Uuid, &str, &str),
+) -> reqwest::Response {
+    client
+        .get(format!(
+            "{}/api/control/locations/{location_id}/targets/{target}/changes",
+            api.url
+        ))
+        .header(reqwest::header::HOST, "control.example.com")
+        .header(
+            reqwest::header::COOKIE,
+            format!("__Host-sqb-session={session}"),
+        )
+        .send()
+        .await
+        .expect("open person SSE connection")
+}
+
+/// An accepted SSE response, after its initial refetch notice.
+pub(crate) async fn opened(response: reqwest::Response) -> SseConnection {
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     assert_eq!(response.headers()["content-type"], "text/event-stream");
     assert_eq!(response.headers()["cache-control"], "no-store");
@@ -95,6 +122,21 @@ pub(crate) async fn restore_snapshot_commits(store: &ControlStore) {
         "DROP TRIGGER sse_reject_snapshot; DROP TABLE sse_commit_guard; DROP TABLE sse_commit_parent;",
         "DROP TRIGGER sse_reject_snapshot ON sqb_snapshots; DROP FUNCTION sse_reject_snapshot(); DROP TABLE sse_commit_guard; DROP TABLE sse_commit_parent;"
     )).await;
+}
+
+pub(crate) async fn audit_events(store: &ControlStore) -> i64 {
+    let transaction = begin(store, TransactionMode::Read)
+        .await
+        .expect("inspect audit");
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT count(*) AS events FROM sqb_security_audit",
+        vec![],
+    )
+    .await
+    .expect("audit count");
+    commit(transaction).await.expect("close inspection");
+    rows[0]["events"].as_i64().expect("count")
 }
 
 async fn execute_fault_sql(store: &ControlStore, (sqlite, postgres): (&str, &str)) {

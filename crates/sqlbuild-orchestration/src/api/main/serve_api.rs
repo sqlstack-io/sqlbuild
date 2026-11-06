@@ -4,6 +4,7 @@ use axum::routing::get;
 use axum::{Extension, Json, Router, middleware};
 
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
+use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{
@@ -39,8 +40,8 @@ pub async fn serve_api(
         sender: sender.clone(),
         stopped,
     };
-    let application = router(&store, feed)
-        .merge(authentication_routes)
+    let application = router(&store, feed.clone())
+        .merge(authentication_routes.layer(Extension(feed)))
         .layer(Extension(std::sync::Arc::new(images)))
         .layer(Extension(retention))
         .route(
@@ -77,6 +78,7 @@ fn development_application(
     scope: Option<DevelopmentScope>,
     address: std::net::SocketAddr,
 ) -> Router {
+    let application = serve_ui(application, UI_ASSETS);
     match scope {
         Some(scope) => application
             .layer(Extension(scope))

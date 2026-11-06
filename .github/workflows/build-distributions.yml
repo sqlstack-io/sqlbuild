@@ -123,6 +123,18 @@ jobs:
         if: inputs.prebuilt-run-id == ''
         with:
           toolchain: stable
+      - uses: actions/setup-node@v4
+        if: inputs.prebuilt-run-id == ''
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Build the web UI that sqb server embeds
+        if: inputs.prebuilt-run-id == ''
+        working-directory: ui
+        run: |
+          npm ci
+          npm run build
       - uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
         with:
@@ -142,10 +154,12 @@ jobs:
         env:
           RUSTFLAGS: >-
             ${{ runner.os == 'macOS' && '-C link-arg=-undefined -C link-arg=dynamic_lookup' || '' }}
+          # A wheel must never ship a sqb server without its UI.
+          SQLBUILD_UI_REQUIRED: "1"
         with:
           command: build
           args: >-
-            --release --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml
+            --release --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -213,6 +227,19 @@ jobs:
           printf 'MODEL();\nSELECT 1 AS id\n' > "${project}/models/orders.sql"
           "${smoke}/sqb" --project-dir "${project}" scope model:orders --json
           "${smoke}/sqlbuild" --project-dir "${project}" scope model:orders
+          # The packaged sqb server must serve the embedded UI, not only the API.
+          server_dir="${RUNNER_TEMP}/ui-server-smoke"
+          mkdir -p "${server_dir}"
+          (cd "${server_dir}" && env -u SQLBUILD_CONTROL_DATABASE_URL \
+            "${smoke}/sqb" server --host 127.0.0.1 --port 8765 --no-scheduler) &
+          server_pid=$!
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:8765/api/openapi.json && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8765/runs | grep -q '/_app/immutable/'
+          curl -sfI http://127.0.0.1:8765/theme.js | grep -qi '^content-type: text/javascript'
+          kill "${server_pid}"
       - uses: actions/upload-artifact@v4
         if: inputs.upload
         with:

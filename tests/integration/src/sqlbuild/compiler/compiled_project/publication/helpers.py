@@ -1221,7 +1221,7 @@ def scheduler_crash_history(directory: Path, fixture: dict[str, Any]) -> dict[st
 
 
 def publish_generation(
-    project: Path, api: SnapshotApi, generation: int
+    project: Path, api: SnapshotApi, generation: int, target: str = "development"
 ) -> subprocess.CompletedProcess[str]:
     """Publish one generation of a project through the installed location command."""
     return subprocess.run(
@@ -1234,7 +1234,7 @@ def publish_generation(
             "--location-id",
             api.location_id,
             "--target",
-            "development",
+            target,
             "--server",
             api.url,
             "--generation",
@@ -1326,3 +1326,29 @@ def request_job_run(worker: ScheduledWorker, job: str) -> dict[str, Any]:
     )
     assert requested.returncode == 0, requested.stderr
     return wait_for_run(worker.api, worker.process, worker.log, run_id=run_id)
+
+
+SHARED_AUDITS: Path = Path("benchmarks/duckshop/edge_cases/orchestration/shared_inline_audits.json")
+
+
+def create_playground(project: Path) -> None:
+    """Create the default playground project with the installed CLI."""
+    created: subprocess.CompletedProcess[str] = subprocess.run(
+        [str(Path(sys.executable).with_name("sqb")), "playground", str(project)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert created.returncode == 0, created.stderr
+
+
+def write_shared_audits(project: Path) -> None:
+    """Write the DuckShop project whose models share inline and named audits."""
+    write_files(project_dir=project, files=json.loads(SHARED_AUDITS.read_text())["files"])
+
+
+def audit_node_keys(api: SnapshotApi, target: str) -> frozenset[str]:
+    """Keys of the current snapshot's audit nodes."""
+    nodes: dict[str, Any] = current_snapshot(api, target)["nodes"]
+    return frozenset(filter(lambda key: nodes[key]["kind"] == "audit", nodes))

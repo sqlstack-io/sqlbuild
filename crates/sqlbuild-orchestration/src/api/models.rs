@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
-    administrators, audit, changes, location_health, location_work, person_checks,
-    person_location_work, person_maintenance, person_node_sql, person_operations, person_reads,
-    run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
+    administrators, audit, changes, location_health, location_work, person_bootstrap,
+    person_checks, person_location_work, person_maintenance, person_node_sql, person_operations,
+    person_reads, run_reads, runs, snapshots, trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -32,6 +32,7 @@ use crate::api::_helpers::resources::{
     person_checks::sql,
     person_checks::evidence,
     person_maintenance::read,
+    person_bootstrap::read,
     person_maintenance::coverage,
     person_location_work::request,
     person_location_work::result,
@@ -46,6 +47,7 @@ use crate::api::_helpers::resources::{
     oidc::login,
     oidc::callback,
     changes::subscribe,
+    changes::subscribe_person,
     location_health::report,
     location_health::recent,
     location_work::poll,
@@ -130,6 +132,22 @@ pub struct ApiErrorBody {
     /// Existing durable denial audit ID; absent when no decision was recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_id: Option<uuid::Uuid>,
+}
+
+/// How people sign in to this server.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LoginMode {
+    Password,
+    TrustedProxy,
+    Oidc,
+}
+
+/// What the UI needs first: how people sign in, and what this person may see and do.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+pub struct ControlBootstrap {
+    pub login_mode: LoginMode,
+    pub access: crate::authorization::models::PersonAccess,
 }
 
 /// SSE invalidation topics; `all` means refetch the authorized REST resources.
@@ -368,11 +386,26 @@ pub(crate) struct ChangeFeed {
     pub(crate) stopped: tokio::sync::watch::Receiver<bool>,
 }
 
+/// Who reads a change stream, rechecked before every event; credentials are sensitive header values.
+#[derive(Debug)]
+pub(crate) enum ChangeSubscriber {
+    /// The loopback development scope, which has no credential to recheck.
+    Development,
+    /// A location token.
+    Location(axum::http::HeaderValue),
+    /// A person, by browser or CLI session or by trusted proxy; sees no run IDs.
+    Person {
+        principal_id: uuid::Uuid,
+        session: Option<axum::http::HeaderValue>,
+        default_role: crate::credentials::models::DefaultRole,
+    },
+}
+
 /// Sensitive headers redact the bearer from Debug output and all wire notifications.
 #[derive(Debug)]
 pub(crate) struct ChangeStream {
     pub(crate) store: crate::store::models::ControlStore,
-    pub(crate) authorization: Option<axum::http::HeaderValue>,
+    pub(crate) subscriber: ChangeSubscriber,
     pub(crate) location_id: uuid::Uuid,
     pub(crate) target: String,
     pub(crate) target_hash: String,
@@ -387,4 +420,11 @@ pub(crate) struct ControlClient {
     pub(crate) client: reqwest::Client,
     pub(crate) authorization: reqwest::header::HeaderValue,
     pub(crate) base_url: reqwest::Url,
+}
+
+/// One file of the built web UI, embedded at compile time and served at `path`.
+#[derive(Debug)]
+pub(crate) struct UiAsset {
+    pub(crate) path: &'static str,
+    pub(crate) body: &'static [u8],
 }

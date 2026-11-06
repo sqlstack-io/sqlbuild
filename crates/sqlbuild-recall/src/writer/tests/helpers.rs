@@ -19,7 +19,7 @@ use crate::writer::models::{
 };
 use crate::writer::tests::test_types::{
     CopyingReplacement, CreatingStore, OutputBytesStore, PartialStore, PrefixReplacement,
-    RecordedSession, RecordingReplacement,
+    RecordedSession, RecordingReplacement, SlowFinalRowsStore,
 };
 
 /// The envelope of invocation `invocation_id`.
@@ -714,4 +714,32 @@ pub(crate) fn left_out_evidence(outcome: &str) -> Vec<RecallValue> {
         RecallValue::Null,
         RecallValue::Null,
     ]
+}
+
+/// Seconds `close` took, whether delivery reported complete, and how long after close began the final rows' deadline fell.
+pub(crate) fn close_with_slow_final_rows(shutdown: Duration, delay: Duration) -> (f64, bool, f64) {
+    let store = SlowFinalRowsStore {
+        delay,
+        final_give_up: Arc::default(),
+    };
+    let session = start_recall_session(SessionConfig {
+        store: SessionStore::Hosted(Arc::new(store.clone())),
+        shutdown_timeout: shutdown,
+        maintenance: false,
+        ..config(PathBuf::from("unused"), "slow-final-rows")
+    });
+    session.append_output(OutputStream::Stdout, b"printed\n");
+    let started = std::time::Instant::now();
+    let summary = session.close();
+    let elapsed = started.elapsed().as_secs_f64();
+    let give_up = store
+        .final_give_up
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .expect("the final rows reached the store");
+    (
+        elapsed,
+        summary.flush_complete,
+        give_up.saturating_duration_since(started).as_secs_f64(),
+    )
 }
