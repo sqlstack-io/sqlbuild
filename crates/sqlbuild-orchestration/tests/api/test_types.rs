@@ -140,3 +140,19 @@ pub(crate) struct CustomRoleApiTestCase {
     pub(crate) backend: Backend,
     pub(crate) expected_statuses: [u16; 2],
 }
+
+pub(crate) struct UiAssetTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) method: reqwest::Method,
+    pub(crate) path: &'static str,
+    pub(crate) expected_status: u16,
+    pub(crate) expected_body: &'static str,
+    pub(crate) expected_cache: Option<&'static str>,
+}
+
+pub(crate) struct UiPathTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) path: &'static str,
+    pub(crate) expected_status: u16,
+    pub(crate) expected_body: &'static str,
+}

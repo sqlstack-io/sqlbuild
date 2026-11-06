@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { logout } from '$lib/api/http-client';
 import { MockApiClient } from '$lib/api/mock/mock-client';
+import { bootFailure, type BootFailure } from '$lib/boot-failure';
 import {
 	ApiError,
 	channelMatches,
@@ -18,10 +19,6 @@ import {
 
 const SCOPE_KEY = 'sb-scope';
 
-function message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * App-wide state: the bootstrap, the selected location, and the
  * shell's live data (navigation counts, platform events, warehouse sync).
@@ -29,7 +26,7 @@ function message(error: unknown): string {
 class AppState {
 	client: ApiClient;
 	bootstrap = $state<Bootstrap | null>(null);
-	bootError = $state<string | null>(null);
+	bootError = $state<BootFailure | null>(null);
 	locationId = $state('');
 	/** Wall clock, ticking every second, for ages and elapsed times. */
 	now = $state(Date.now());
@@ -85,7 +82,7 @@ class AppState {
 		} catch (error) {
 			// A rejected session is already on its way to the login page.
 			if (error instanceof ApiError && error.status === 401) return;
-			this.bootError = message(error);
+			this.bootError = bootFailure(error);
 			return;
 		}
 		this.#restoreScope();

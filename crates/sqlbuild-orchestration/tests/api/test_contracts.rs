@@ -76,6 +76,8 @@ mod test_reads;
 mod test_statistics_recovery;
 #[path = "test_types.rs"]
 mod test_types;
+#[path = "test_ui_assets.rs"]
+mod test_ui_assets;
 #[path = "test_warehouse_metadata.rs"]
 mod test_warehouse_metadata;
 #[path = "test_worker.rs"]
