@@ -905,10 +905,10 @@ export class MockPlatformApi implements PlatformApi {
 		return structuredClone({
 			id: location.id,
 			name: location.name,
-			health: location.health,
+			health: location.health ?? 'healthy',
 			...extras,
 			target: location.target,
-			snapshot: location.snapshot,
+			snapshot: location.snapshot ?? null,
 			connectionTest: this.#connectionTests.get(`${location.id}/${extras.warehouseConnection}`) ?? extras.connectionTest
 		});
 	}

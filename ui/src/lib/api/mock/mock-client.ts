@@ -49,6 +49,10 @@ export type MockOptions = {
 /** In-memory `ApiClient` with neutral example data. Mutations persist per page load. */
 export class MockApiClient implements ApiClient {
 	readonly changes = new LocalChangeBus();
+
+	supports(): boolean {
+		return true;
+	}
 	readonly #options: Required<MockOptions>;
 	readonly #fixtures: Fixtures;
 	readonly #createdAt = Date.now();
@@ -71,7 +75,7 @@ export class MockApiClient implements ApiClient {
 			role: () => this.#options.role,
 			can: (capability) => ROLE_CAPABILITIES[this.#options.role].includes(capability),
 			user: () => DEMO_USER,
-			adapter: (scope) => this.#location(scope).target.adapter,
+			adapter: (scope) => this.#location(scope).target.adapter ?? 'duckdb',
 			target: (scope) => this.#location(scope).target.name,
 			reply: (value) => this.#reply(value)
 		});
@@ -89,7 +93,7 @@ export class MockApiClient implements ApiClient {
 		this.#build = new MockBuild({
 			now: this.#createdAt,
 			can: (capability) => ROLE_CAPABILITIES[this.#options.role].includes(capability),
-			adapter: (scope) => this.#location(scope).target.adapter,
+			adapter: (scope) => this.#location(scope).target.adapter ?? 'duckdb',
 			reply: (value) => this.#reply(value),
 			operate: this.#operate,
 			platform: this.#platform,

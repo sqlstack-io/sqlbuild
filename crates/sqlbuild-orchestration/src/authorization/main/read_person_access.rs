@@ -12,7 +12,7 @@ use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
 /// `None` for a disabled or unknown person; locations without view on any node are left out.
-pub async fn read_person_access(
+pub(crate) async fn read_person_access(
     store: &ControlStore,
     principal_id: Uuid,
     default_role: DefaultRole,

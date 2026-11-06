@@ -11,5 +11,5 @@ pub(crate) mod person_lists_target;
 pub(crate) mod publish_custom_roles;
 pub(crate) mod publish_group_roles;
 pub(crate) mod read_audit_events;
-pub mod read_person_access;
+pub(crate) mod read_person_access;
 pub mod read_security_audit;

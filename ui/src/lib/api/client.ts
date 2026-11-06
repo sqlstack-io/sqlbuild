@@ -48,6 +48,9 @@ import type { PlatformApi } from './platform-client';
  * same interface.
  */
 export interface ApiClient extends PlatformApi {
+	/** Whether the server has an endpoint for `method`; the shell hides what it cannot load. */
+	supports(method: keyof ApiClient): boolean;
+
 	bootstrap(): Promise<Bootstrap>;
 
 	navCounts(scope: Scope): Promise<NavCounts>;

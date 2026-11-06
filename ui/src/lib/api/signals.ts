@@ -1,7 +1,11 @@
+import type { Scope } from './types';
+
 // "Changed" signals: payload-free notifications that something changed on the
 // server. Clients refetch through the normal endpoints when one arrives.
 
 export type ChangedChannel =
+	/** Refetch everything: sent on connect and whenever notices may have been missed. */
+	| 'all'
 	| 'runs'
 	| `run:${string}`
 	| 'ticks'
@@ -22,10 +26,13 @@ export interface ChangeSubscription {
 	subscribe(handler: (signal: ChangedSignal) => void): () => void;
 	/** Calls `handler` with the current connection state and on every change. */
 	onConnectionState(handler: (state: ConnectionState) => void): () => void;
+	/** Follows the selected location's changes; `null` stops following. */
+	follow(scope: Scope | null): void;
 }
 
 /** Whether a signal on `channel` should refresh a view listening to `topics`. */
 export function channelMatches(channel: ChangedChannel, topics: readonly string[]): boolean {
+	if (channel === 'all') return true;
 	return topics.some((topic) => channel === topic || channel.startsWith(`${topic}:`));
 }
 
@@ -44,6 +51,10 @@ export class LocalChangeBus implements ChangeSubscription {
 		this.#stateHandlers.add(handler);
 		handler(this.#state);
 		return () => this.#stateHandlers.delete(handler);
+	}
+
+	follow(): void {
+		// Every mock signal belongs to the one in-process store.
 	}
 
 	emit(channel: ChangedChannel): void {

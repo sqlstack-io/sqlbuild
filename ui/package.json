@@ -42,6 +42,7 @@
 		"@fontsource-variable/space-grotesk": "^5.2.10",
 		"@fontsource/ibm-plex-mono": "^5.2.7",
 		"@xyflow/svelte": "^1.6.0",
+		"openapi-fetch": "0.17.0",
 		"prismjs": "^1.30.0"
 	}
 }

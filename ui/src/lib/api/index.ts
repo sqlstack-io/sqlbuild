@@ -1,4 +1,5 @@
 import type { ApiClient } from './client';
+import { createHttpClient } from './http-client';
 import { MockApiClient, type MockOptions } from './mock/mock-client';
 import type { BuiltInRole } from './types';
 
@@ -13,11 +14,12 @@ const EVENTS: readonly NonNullable<MockOptions['events']>[] = ['default', 'none'
 const LIVE: readonly NonNullable<MockOptions['connection']>[] = ['live', 'reconnecting', 'offline'];
 
 /**
- * The client the app uses. Until the server API exists this is the mock;
- * `?as=<role>`, `?events=none|all` and `?live=reconnecting|offline` on first
- * load adjust the mock for demos.
+ * The client the app uses: the server, or the mock with `?mock` or `VITE_SQB_MOCK=1`.
+ * With the mock, `?as=<role>`, `?events=none|all` and `?live=reconnecting|offline`
+ * adjust it for demos.
  */
-export function createClient(search: URLSearchParams): ApiClient {
+export function createClient(search: URLSearchParams, onUnauthorized: () => void = () => {}): ApiClient {
+	if (!search.has('mock') && import.meta.env.VITE_SQB_MOCK !== '1') return createHttpClient({ onUnauthorized });
 	const role = search.get('as');
 	const events = search.get('events');
 	const live = search.get('live');

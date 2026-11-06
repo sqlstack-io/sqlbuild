@@ -40,7 +40,8 @@ export type Principal = {
 
 export type CurrentUser = Principal & {
 	kind: 'user';
-	role: BuiltInRole;
+	/** The built-in role, when one role describes the person; the server reports actions instead. */
+	role?: BuiltInRole;
 };
 
 export type AuthMode = 'oidc' | 'trusted_proxy' | 'password' | 'disabled';
@@ -68,9 +69,10 @@ export type WarehouseSync = {
 /** The one target a location is deployed against, e.g. `prod` on Snowflake. */
 export type LocationTarget = {
 	name: string;
-	adapter: string;
-	/** Where it builds, e.g. `WAFFLE_SHOP on example-account`; never secrets. */
-	connectionSummary: string;
+	/** Null until snapshots record the adapter. */
+	adapter: string | null;
+	/** Where it builds, e.g. `WAFFLE_SHOP on example-account`; never secrets. Null when unknown. */
+	connectionSummary: string | null;
 };
 
 export type LocationHealth = 'healthy' | 'degraded' | 'falling_back' | 'broken';
@@ -79,11 +81,15 @@ export type Location = {
 	/** Opaque server-generated UUID; the name is a mutable label. */
 	id: string;
 	name: string;
-	health: LocationHealth;
+	/** Null when the server does not report health yet. */
+	health: LocationHealth | null;
 	lastSeenAt: Iso | null;
 	target: LocationTarget;
-	snapshot: Snapshot | null;
+	/** Null when nothing is deployed; absent when the server does not report it here. */
+	snapshot?: Snapshot | null;
 	warehouseSync: WarehouseSync;
+	/** Actions allowed somewhere in this location, added to the server-wide `capabilities`. */
+	capabilities?: Capability[];
 };
 
 export type Scope = { locationId: string };
@@ -91,7 +97,7 @@ export type Scope = { locationId: string };
 // ---- bootstrap ----
 
 export type Bootstrap = {
-	serverVersion: string;
+	serverVersion?: string;
 	authMode: AuthMode;
 	user: CurrentUser;
 	capabilities: Capability[];

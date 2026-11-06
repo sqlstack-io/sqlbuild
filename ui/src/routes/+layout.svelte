@@ -1,13 +1,18 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import { pageAvailable } from '$lib/nav';
 	import { app } from '$lib/state/app.svelte';
 
 	let { children } = $props();
 
+	const signingIn = $derived(page.url.pathname === '/login');
+
 	onMount(() => {
-		void app.start();
+		if (!signingIn) void app.start();
 	});
 </script>
 
@@ -15,7 +20,9 @@
 	<link rel="icon" href="/favicon.png" />
 </svelte:head>
 
-{#if app.bootError}
+{#if signingIn}
+	{@render children()}
+{:else if app.bootError}
 	<div class="grid h-screen place-items-center p-8">
 		<div class="max-w-md text-center">
 			<h1 class="text-[15px] font-semibold">Can't reach the SQLBuild server</h1>
@@ -26,8 +33,8 @@
 {:else if app.bootstrap && app.bootstrap.locations.length === 0}
 	<div class="grid h-screen place-items-center p-8">
 		<div class="max-w-md text-center">
-			<h1 class="text-[15px] font-semibold">No code locations yet</h1>
-			<p class="text-muted-foreground mt-2 text-[13px]">Register a code location with the server, then reload this page.</p>
+			<h1 class="text-[15px] font-semibold">No locations to show</h1>
+			<p class="text-muted-foreground mt-2 text-[13px]">Either nothing is deployed yet, or you have no role on a location. Ask an administrator for access, then reload this page.</p>
 		</div>
 	</div>
 {:else if !app.scope}
@@ -36,7 +43,17 @@
 	<div class="flex h-screen overflow-hidden">
 		<AppSidebar />
 		<div class="flex min-w-0 flex-1 flex-col">
-			{@render children()}
+			{#if pageAvailable(app.client, page.url.pathname)}
+				{@render children()}
+			{:else}
+				<AppTopbar title="Not available" />
+				<div class="text-muted-foreground grid flex-1 place-items-center p-8 text-center text-[13px]">
+					<div>
+						<h1 class="text-foreground text-[15px] font-semibold">Not available on this server yet</h1>
+						<p class="mt-2">This server version doesn't provide this page. Choose another page from the menu.</p>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}

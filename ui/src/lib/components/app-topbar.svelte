@@ -32,7 +32,7 @@
 		offline: 'Offline'
 	};
 
-	const snapshot = $derived(app.location?.snapshot ?? null);
+	const snapshot = $derived(app.location?.snapshot);
 </script>
 
 <div class="app-topbar flex h-[52px] shrink-0 items-center gap-3 border-b border-border px-5">
@@ -41,17 +41,23 @@
 	<div class="ml-auto flex items-center gap-2.5">
 		<span
 			class="text-muted-foreground flex items-center gap-[7px] text-[12px]"
-			title={`${connectionTitle[app.connection]}\n${snapshot
-				? `Version ${snapshot.generation}: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''} by ${snapshot.gitAuthor} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
-				: 'Nothing deployed to this location yet'}`}
+			title={snapshot === undefined
+				? connectionTitle[app.connection]
+				: `${connectionTitle[app.connection]}\n${snapshot
+					? `Version ${snapshot.generation}: commit ${snapshot.gitRevision}${snapshot.gitDirty ? ' (with uncommitted changes)' : ''} by ${snapshot.gitAuthor} (snapshot ${snapshot.id}, generation ${snapshot.generation})`
+					: 'Nothing deployed to this location yet'}`}
 		>
 			<span class="h-[7px] w-[7px] rounded-full" style:background={connectionTone[app.connection]}></span>
 			{connectionLabel[app.connection]}
-			<span class="text-[var(--sb-text-faint)]">·</span>
-			{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}
+			{#if snapshot !== undefined}
+				<span class="text-[var(--sb-text-faint)]">·</span>
+				{snapshot ? `Version ${snapshot.generation}, deployed ${formatAgo(snapshot.publishedAt, app.now)}` : 'nothing deployed yet'}
+			{/if}
 		</span>
-		<span class="text-[var(--sb-text-faint)]">·</span>
-		<WarehouseSyncStatus />
+		{#if app.client.supports('getWarehouseSync')}
+			<span class="text-[var(--sb-text-faint)]">·</span>
+			<WarehouseSyncStatus />
+		{/if}
 		{#if children}<span class="ml-1 flex items-center gap-2.5">{@render children()}</span>{/if}
 		<button
 			class="bg-card text-muted-foreground hover:text-foreground hover:bg-[var(--sb-hover)] grid h-8 w-8 place-items-center rounded-md border border-border"

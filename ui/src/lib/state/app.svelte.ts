@@ -1,5 +1,8 @@
 import { browser } from '$app/environment';
+import { logout } from '$lib/api/http-client';
+import { MockApiClient } from '$lib/api/mock/mock-client';
 import {
+	ApiError,
 	channelMatches,
 	createClient,
 	hasCapability,
@@ -40,13 +43,28 @@ class AppState {
 	/** The selected location's one target. */
 	readonly target = $derived(this.location?.target ?? null);
 	readonly user = $derived(this.bootstrap?.user ?? null);
-	readonly capabilities = $derived(this.bootstrap?.capabilities ?? []);
+	/** Server-wide actions plus those allowed somewhere in the selected location. */
+	readonly capabilities = $derived([...(this.bootstrap?.capabilities ?? []), ...(this.location?.capabilities ?? [])]);
 
 	#started = false;
 
 	constructor() {
-		this.client = createClient(new URLSearchParams(browser ? window.location.search : ''));
+		this.client = createClient(new URLSearchParams(browser ? window.location.search : ''), () => this.#signIn());
+		this.signOut = this.client instanceof MockApiClient ? null : async () => {
+			await logout();
+			this.#signIn();
+		};
 	}
+
+	/** Sends the browser to the login page, which returns here after sign-in. */
+	#signIn() {
+		if (!browser || window.location.pathname === '/login') return;
+		const back = window.location.pathname + window.location.search;
+		window.location.assign(`/login?next=${encodeURIComponent(back)}`);
+	}
+
+	/** Ends the session; only the server client has one. */
+	readonly signOut: (() => Promise<void>) | null;
 
 	can(capability: Capability): boolean {
 		return hasCapability(this.capabilities, capability);
@@ -65,10 +83,13 @@ class AppState {
 		try {
 			this.bootstrap = await this.client.bootstrap();
 		} catch (error) {
+			// A rejected session is already on its way to the login page.
+			if (error instanceof ApiError && error.status === 401) return;
 			this.bootError = message(error);
 			return;
 		}
 		this.#restoreScope();
+		this.client.changes.follow(this.scope);
 		void this.#loadPlatformEvents();
 		this.#loadScoped();
 	}
@@ -86,6 +107,7 @@ class AppState {
 
 	#scopeChanged() {
 		if (browser) localStorage.setItem(SCOPE_KEY, JSON.stringify(this.scope));
+		this.client.changes.follow(this.scope);
 		this.navCounts = null;
 		this.warehouseSync = null;
 		this.#loadScoped();
@@ -113,6 +135,7 @@ class AppState {
 	}
 
 	async #loadNavCounts() {
+		if (!this.client.supports('navCounts')) return;
 		const scope = this.scope;
 		if (!scope) return;
 		try {
@@ -124,6 +147,7 @@ class AppState {
 	}
 
 	async #loadWarehouseSync() {
+		if (!this.client.supports('getWarehouseSync')) return;
 		const scope = this.scope;
 		if (!scope) return;
 		try {
@@ -135,6 +159,7 @@ class AppState {
 	}
 
 	async #loadPlatformEvents() {
+		if (!this.client.supports('listPlatformEvents')) return;
 		try {
 			this.platformEvents = await this.client.listPlatformEvents({ activeOnly: true });
 		} catch {

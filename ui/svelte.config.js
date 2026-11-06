@@ -7,6 +7,8 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
+		// Wire types come from the client generated from the server's OpenAPI document.
+		alias: { $control: '../clients/typescript/src' },
 		// SPA mode: static build with client-side routing. There is no Node
 		// server in production; the SQLBuild server serves the built assets.
 		adapter: adapter({

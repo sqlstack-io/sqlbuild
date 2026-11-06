@@ -15,7 +15,7 @@
 				<span class="value">{app.location?.name ?? '—'}</span>
 				<small>{app.location ? targetWords(app.location.target) : 'Location'}</small>
 			</span>
-			{#if app.location && app.location.health !== 'healthy'}
+			{#if app.location?.health && app.location.health !== 'healthy'}
 				<i class="dot" style:background={healthTone[app.location.health]} title={healthLabel[app.location.health]}></i>
 			{/if}
 			<ChevronsUpDownIcon size={13} class="chev" />
@@ -25,11 +25,13 @@
 			<DropdownMenu.RadioGroup value={app.locationId} onValueChange={(id) => app.selectLocation(id)}>
 				{#each locations as location (location.id)}
 					<DropdownMenu.RadioItem value={location.id}>
-						<i class="dot" style:background={healthTone[location.health]} title={healthLabel[location.health]}></i>
+						{#if location.health}
+							<i class="dot" style:background={healthTone[location.health]} title={healthLabel[location.health]}></i>
+						{/if}
 						<span class="flex min-w-0 flex-col">
 							<span class="truncate">{location.name}</span>
 							<small class="text-muted-foreground text-[11px]">
-								{targetWords(location.target)}{location.snapshot ? ` · version ${location.snapshot.generation}` : ' · nothing deployed'}
+								{targetWords(location.target)}{location.snapshot === undefined ? '' : location.snapshot ? ` · version ${location.snapshot.generation}` : ' · nothing deployed'}
 							</small>
 						</span>
 					</DropdownMenu.RadioItem>

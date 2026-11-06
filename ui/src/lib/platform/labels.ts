@@ -117,9 +117,9 @@ export function formatAssignmentScope(scope: AssignmentScope, locations: readonl
 	return locationName(locations, scope.locationId);
 }
 
-/** A location's one target in words, e.g. `prod · Snowflake`. */
+/** A location's one target in words, e.g. `prod · Snowflake`, or `prod` while the adapter is unknown. */
 export function targetWords(target: Pick<LocationTarget, 'name' | 'adapter'>): string {
-	return `${target.name} · ${adapterLabel(target.adapter)}`;
+	return target.adapter ? `${target.name} · ${adapterLabel(target.adapter)}` : target.name;
 }
 
 const ADAPTER_LABELS: Record<string, string> = { snowflake: 'Snowflake', duckdb: 'DuckDB', postgres: 'Postgres', bigquery: 'BigQuery', databricks: 'Databricks' };
