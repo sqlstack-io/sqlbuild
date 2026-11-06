@@ -19,7 +19,7 @@ use crate::writer::models::{
 };
 use crate::writer::tests::test_types::{
     CopyingReplacement, CreatingStore, OutputBytesStore, PartialStore, PrefixReplacement,
-    RecordedSession, RecordingReplacement,
+    RecordedSession, RecordingReplacement, SlowFinalRowsStore,
 };
 
 /// The envelope of invocation `invocation_id`.
@@ -714,4 +714,18 @@ pub(crate) fn left_out_evidence(outcome: &str) -> Vec<RecallValue> {
         RecallValue::Null,
         RecallValue::Null,
     ]
+}
+
+/// Seconds `close` took and whether delivery reported complete, when the final delivery rows take `delay`.
+pub(crate) fn close_with_slow_final_rows(shutdown: Duration, delay: Duration) -> (f64, bool) {
+    let session = start_recall_session(SessionConfig {
+        store: SessionStore::Hosted(Arc::new(SlowFinalRowsStore { delay })),
+        shutdown_timeout: shutdown,
+        maintenance: false,
+        ..config(PathBuf::from("unused"), "slow-final-rows")
+    });
+    session.append_output(OutputStream::Stdout, b"printed\n");
+    let started = std::time::Instant::now();
+    let summary = session.close();
+    (started.elapsed().as_secs_f64(), summary.flush_complete)
 }

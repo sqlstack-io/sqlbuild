@@ -361,3 +361,56 @@ pub(crate) struct FailedStatementTestCase {
     pub(crate) description: &'static str,
     pub(crate) expected_rows: Vec<Vec<RecallValue>>,
 }
+
+pub(crate) struct SlowFinalRowsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) shutdown: Duration,
+    /// How long the store takes to accept the final delivery rows.
+    pub(crate) final_rows_delay: Duration,
+    pub(crate) expected_flush_complete: bool,
+}
+
+/// A hosted store whose final delivery rows take `delay`, giving up at the deadline like HTTP.
+#[derive(Clone, Debug)]
+pub(crate) struct SlowFinalRowsStore {
+    pub(crate) delay: Duration,
+}
+
+impl RecallStore for SlowFinalRowsStore {
+    fn insert(&self, rows: &[RecallRow], give_up: Instant) -> Result<InsertOutcome, StoreError> {
+        if !rows.iter().any(|row| row.table == Table::Delivery) {
+            return Ok(InsertOutcome::default());
+        }
+        let answered: Instant = Instant::now() + self.delay;
+        std::thread::sleep(
+            answered
+                .min(give_up)
+                .saturating_duration_since(Instant::now()),
+        );
+        if answered > give_up {
+            return Err(StoreError::new(
+                StoreErrorKind::Busy,
+                "the deadline expired",
+            ));
+        }
+        Ok(InsertOutcome::default())
+    }
+}
+
+impl RecallStoreOpener for SlowFinalRowsStore {
+    fn open(
+        &self,
+        _envelope: &RowEnvelope,
+        _give_up: Instant,
+    ) -> Result<Box<dyn RecallStore>, StoreError> {
+        Ok(Box::new(self.clone()))
+    }
+
+    fn batch_rows(&self) -> usize {
+        1_000
+    }
+
+    fn batch_window(&self) -> Duration {
+        Duration::from_millis(10)
+    }
+}

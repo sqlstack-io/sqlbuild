@@ -19,7 +19,7 @@ pub const RUNNING_RETRY_LIMIT_MS: u64 = 30_000;
 pub const SETUP_RETRY_MS: u64 = 50;
 /// Longest wait between wall-clock checks, so a resumed process beats promptly.
 pub const CLOCK_CHECK_MS: u64 = 1_000;
-/// Budget for the final delivery rows, inside the shutdown budget.
+/// Least time the final delivery rows get; otherwise they use what remains of the shutdown budget.
 pub const FINAL_ROWS_BUDGET_MS: u64 = 500;
 /// Maintenance is skipped when less than this remains of the shutdown budget.
 pub const MINIMUM_MAINTENANCE_MS: u64 = 200;

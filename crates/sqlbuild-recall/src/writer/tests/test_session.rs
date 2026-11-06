@@ -8,10 +8,11 @@ use crate::writer::models::{Priority, SetupOutcome};
 #[cfg(unix)]
 use crate::writer::tests::helpers::unwritable_session;
 use crate::writer::tests::helpers::{
-    artifact_counts, close_under_held_lock, creation_notices, event_counts, insert_heartbeat,
-    invocation_during_discovery, output_stored_while_running, partially_inserted,
-    pending_event_counts, record_run, recorded_session, replaced_session, replacement_order,
-    sent_before_the_window, session_on_corrupt_store, written_to_core_release_store,
+    artifact_counts, close_under_held_lock, close_with_slow_final_rows, creation_notices,
+    event_counts, insert_heartbeat, invocation_during_discovery, output_stored_while_running,
+    partially_inserted, pending_event_counts, record_run, recorded_session, replaced_session,
+    replacement_order, sent_before_the_window, session_on_corrupt_store,
+    written_to_core_release_store,
 };
 #[cfg(unix)]
 use crate::writer::tests::test_types::UnwritableTestCase;
@@ -19,7 +20,7 @@ use crate::writer::tests::test_types::{
     ArtifactSizeTestCase, CoreReleaseStoreTestCase, CorruptStoreTestCase, CreationNoticeTestCase,
     DiscoveryTestCase, EarlyBatchTestCase, EventBuildTestCase, HeldLockTestCase,
     PartialInsertTestCase, PendingEventTestCase, RecordedSession, ReplacementOrderTestCase,
-    ReplacementTestCase, SessionTestCase, StoredWhileRunningTestCase,
+    ReplacementTestCase, SessionTestCase, SlowFinalRowsTestCase, StoredWhileRunningTestCase,
 };
 
 const CLOSE_SLACK_SECONDS: f64 = 0.3;
@@ -102,6 +103,39 @@ fn given_a_held_write_lock_when_closed_then_the_shutdown_budget_caps_the_delay()
         );
         assert_eq!(
             degraded, test_case.expected_degraded,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_slow_final_delivery_rows_when_closed_then_the_shutdown_budget_bounds_them() {
+    let test_cases = [
+        SlowFinalRowsTestCase {
+            description: "final rows slower than half a second but inside the budget record complete",
+            shutdown: Duration::from_secs(5),
+            final_rows_delay: Duration::from_millis(1_500),
+            expected_flush_complete: true,
+        },
+        SlowFinalRowsTestCase {
+            description: "final rows slower than the shutdown budget still exit on time",
+            shutdown: Duration::from_millis(1_000),
+            final_rows_delay: Duration::from_secs(10),
+            expected_flush_complete: false,
+        },
+    ];
+
+    for test_case in test_cases {
+        let (elapsed, flush_complete) =
+            close_with_slow_final_rows(test_case.shutdown, test_case.final_rows_delay);
+        assert!(
+            elapsed <= test_case.shutdown.as_secs_f64() + CLOSE_SLACK_SECONDS,
+            "{}: {elapsed:.3}s",
+            test_case.description
+        );
+        assert_eq!(
+            flush_complete, test_case.expected_flush_complete,
             "{}",
             test_case.description
         );

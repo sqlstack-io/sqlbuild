@@ -396,8 +396,8 @@ pub(crate) fn deliver(shared: &Arc<Shared>, config: &SessionConfig) {
             state.rejecting = true;
             let rows = final_rows(config, &state);
             drop(state);
-            let give_up = (Instant::now() + Duration::from_millis(FINAL_ROWS_BUDGET_MS))
-                .min(retry_limit(shared, Instant::now()));
+            let give_up = retry_limit(shared, Instant::now())
+                .max(Instant::now() + Duration::from_millis(FINAL_ROWS_BUDGET_MS));
             if let Err(error) = write_batch(store.as_ref(), &rows, give_up) {
                 locked(&shared.state).degraded.get_or_insert(error.message);
             }
