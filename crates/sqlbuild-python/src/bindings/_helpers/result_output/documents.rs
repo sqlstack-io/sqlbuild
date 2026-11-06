@@ -4,13 +4,19 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{
+    AuditExecutionResult, AuditOutcome, BuildExecutionResult, BuildStatus, ExecutionStatus,
+    LoadExecutionResult, ScenarioLocalRunStatus, ScenarioRunResult, SeedExecutionResult,
+    SqlTestExecutionResult, SqlTestOutcome,
+};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compile_outputs::json_report::indented_json;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::plan_output::values::{any, dict, items, text};
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::result_output::aggregation::aggregated_from_lists;
+use crate::bindings::_helpers::result_output::aggregation::RetainedBuildResults;
 use crate::bindings::_helpers::result_output::assets::{
     clone_asset, function_assets, load_assets, model_assets, python_node_assets, seed_assets,
     without_none,
@@ -24,10 +30,6 @@ const JSON_VERSION: i64 = 1;
 const FAILED: &str = "failed";
 const SUCCESS: &str = "success";
 const SKIPPED: &str = "skipped";
-const ERROR_OUTCOME: &str = "error";
-const PASS_OUTCOME: &str = "pass";
-const TIMEOUT_OUTCOME: &str = "timeout";
-const WARN_OUTCOME: &str = "warn";
 const BUILD_OPTIONS: (&[&str], &[&str]) = (
     &["result", "plan"],
     &[
@@ -48,6 +50,7 @@ const DEGRADABLE_BUILD_OPTIONS: (&[&str], &[&str]) = (
         "cost",
     ],
 );
+const TYPED_BUILD_OPTIONS: (&[&str], &[&str]) = (&["plan", "execution_succeeded"], BUILD_OPTIONS.1);
 const SCENARIO_OPTIONS: (&[&str], &[&str]) = (
     &["results"],
     &["local", "run_namespace", "namespace_source", "duration_ms"],
@@ -56,16 +59,6 @@ const SNAPSHOT_OPTIONS: (&[&str], &[&str]) = (
     &["results"],
     &["refresh", "run_namespace", "namespace_source"],
 );
-const BUILD_RESULT_FIELDS: [&str; 7] = [
-    "model_results",
-    "seed_results",
-    "function_results",
-    "load_results",
-    "test_results",
-    "source_audit_results",
-    "end_audit_results",
-];
-
 /// The optional sections of a document after `checks`.
 #[derive(Default)]
 struct Extras<'py> {
@@ -176,8 +169,10 @@ fn sequence<'py>(py: Python<'py>, value: Option<Bound<'py, PyAny>>) -> Bound<'py
     value.unwrap_or_else(|| PyTuple::empty(py).into_any())
 }
 
-fn count(result: &Bound<'_, PyAny>, field: &str) -> PyResult<usize> {
-    native_field(result, field)?.extract()
+fn count(value: i64) -> PyResult<usize> {
+    usize::try_from(value).map_err(|_| {
+        pyo3::exceptions::PyOverflowError::new_err("can't convert negative int to unsigned")
+    })
 }
 
 /// Format build command execution results as JSON.
@@ -189,21 +184,22 @@ pub(crate) fn format_build_execution_json<'py>(
 ) -> PyResult<String> {
     let arguments: KeywordArguments<'py> =
         KeywordArguments::read(py, "format_build_execution_json", options, BUILD_OPTIONS)?;
-    build_json(py, &arguments, Vec::new())
+    let result = BuildExecutionResult::read(&arguments.value("result")?)?;
+    build_json(py, &arguments, &result, Vec::new())
 }
 
 /// The audit-history projection counts, flagged as degraded when any write failed.
-fn audit_projection<'py>(
-    result: &Bound<'py, PyAny>,
+pub(crate) fn audit_projection<'py>(
+    py: Python<'py>,
+    (attempted, written, failed): (i64, i64, i64),
 ) -> PyResult<Vec<(&'static str, Bound<'py, PyAny>)>> {
-    let py: Python<'py> = result.py();
     let counts: Vec<(&str, Bound<'py, PyAny>)> = [
-        ("attempted_count", "audit_result_projection_attempted_count"),
-        ("written_count", "audit_result_projection_written_count"),
-        ("failed_count", "audit_result_projection_failed_count"),
+        ("attempted_count", attempted),
+        ("written_count", written),
+        ("failed_count", failed),
     ]
     .into_iter()
-    .map(|(key, field)| Ok((key, native_field(result, field)?)))
+    .map(|(key, value)| Ok((key, any(py, value)?)))
     .collect::<PyResult<_>>()?;
     let failed: bool = counts[2].1.is_truthy()?;
     let mut entries: Vec<(&'static str, Bound<'py, PyAny>)> = vec![(
@@ -236,9 +232,40 @@ pub(crate) fn format_degradable_build_execution_json<'py>(
         options,
         DEGRADABLE_BUILD_OPTIONS,
     )?;
+    let result = BuildExecutionResult::read(&arguments.value("result")?)?;
+    degradable_build_json(py, &arguments, &result)
+}
+
+/// Production build completion already owns the converted executor result.
+pub(crate) fn format_build_execution_json_with<'py>(
+    py: Python<'py>,
+    result: &BuildExecutionResult<Bound<'py, PyAny>>,
+    options: Option<Bound<'py, PyDict>>,
+) -> PyResult<String> {
+    let arguments = KeywordArguments::read(
+        py,
+        "format_build_execution_json",
+        options,
+        TYPED_BUILD_OPTIONS,
+    )?;
+    degradable_build_json(py, &arguments, result)
+}
+
+fn degradable_build_json<'py>(
+    py: Python<'py>,
+    arguments: &KeywordArguments<'py>,
+    result: &BuildExecutionResult<Bound<'py, PyAny>>,
+) -> PyResult<String> {
     let execution_succeeded: bool = arguments.flag("execution_succeeded")?;
-    let rendered: PyResult<String> = audit_projection(&arguments.value("result")?)
-        .and_then(|trailing| build_json(py, &arguments, trailing));
+    let rendered: PyResult<String> = audit_projection(
+        py,
+        (
+            result.audit_result_projection_attempted_count,
+            result.audit_result_projection_written_count,
+            result.audit_result_projection_failed_count,
+        ),
+    )
+    .and_then(|trailing| build_json(py, arguments, result, trailing));
     let error: pyo3::PyErr = match rendered {
         Ok(payload) => return Ok(payload),
         Err(error) => error,
@@ -268,9 +295,9 @@ pub(crate) fn format_degradable_build_execution_json<'py>(
 fn build_json<'py>(
     py: Python<'py>,
     arguments: &KeywordArguments<'py>,
+    result: &BuildExecutionResult<Bound<'py, PyAny>>,
     trailing: Vec<(&'static str, Bound<'py, PyAny>)>,
 ) -> PyResult<String> {
-    let result: Bound<'py, PyAny> = arguments.value("result")?;
     let plan: Bound<'py, PyAny> = arguments.value("plan")?;
     let command: String = if arguments.passed("command")? {
         arguments.value("command")?.extract()?
@@ -282,17 +309,10 @@ fn build_json<'py>(
         sequence(py, passed(arguments, "python_node_results")?);
     let python_check_results: Bound<'py, PyAny> =
         sequence(py, passed(arguments, "python_check_results")?);
-    let mut retained: Vec<Vec<Bound<'py, PyAny>>> = Vec::new();
-    let mut partial: bool = false;
-    for field in BUILD_RESULT_FIELDS {
-        let all: Bound<'py, PyAny> = native_field(&result, field)?;
-        let kept: Vec<Bound<'py, PyAny>> = projection.terminal_results(&all)?;
-        partial = partial || kept.len() != all.len()?;
-        retained.push(kept);
-    }
+    let retained = RetainedBuildResults::new(result, &projection)?;
     let nodes: Vec<Bound<'py, PyAny>> = projection.terminal_results(&python_node_results)?;
     let checks_run: Vec<Bound<'py, PyAny>> = projection.terminal_results(&python_check_results)?;
-    partial = partial
+    let partial = retained.is_partial(result)
         || nodes.len() != python_node_results.len()?
         || checks_run.len() != python_check_results.len()?;
     let python_fail: usize = count_status(&nodes, "status", FAILED)?;
@@ -302,61 +322,68 @@ fn build_json<'py>(
     let check_warn: usize = count_truthy(&checks_run, "warned")?;
     let check_pass: usize = count_truthy(&checks_run, "passed")?;
     let mut python_warnings: usize = 0;
-    for warned in nodes.iter().chain(&checks_run).chain(&retained[3]) {
+    for warned in nodes.iter().chain(&checks_run) {
         python_warnings += native_field(warned, "warning_messages")?.len()?;
     }
-    let result_status: String = text(&native_field(&native_field(&result, "status")?, "value")?)?;
-    let status: String = if result_status == FAILED || python_fail > 0 || check_fail > 0 {
-        FAILED.to_owned()
-    } else {
-        result_status
-    };
-    let mut checks: Vec<Bound<'py, PyDict>> = sql_test_checks(&projection, &retained[4])?;
-    for audits in [&retained[5], &retained[6]] {
-        checks.extend(audit_checks(
-            &projection,
-            PyList::new(py, audits)?.as_any(),
-            false,
-        )?);
+    python_warnings += retained
+        .loads
+        .iter()
+        .map(|result| result.warning_messages.len())
+        .sum::<usize>();
+    let status: String =
+        if result.status == BuildStatus::Failed || python_fail > 0 || check_fail > 0 {
+            FAILED.to_owned()
+        } else {
+            SUCCESS.to_owned()
+        };
+    let mut checks: Vec<Bound<'py, PyDict>> = sql_test_checks(&projection, &retained.tests)?;
+    for audits in [&retained.source_audits, &retained.end_audits] {
+        checks.extend(audit_checks(&projection, audits, false)?);
     }
-    for model in &retained[0] {
+    for model in &retained.models {
         checks.extend(audit_checks(
             &projection,
-            &native_field(model, "audit_results")?,
+            &model.audit_results.iter().collect::<Vec<_>>(),
             projection.terminal_recorded(model)?,
         )?);
     }
     checks.extend(python_checks(&projection, &checks_run)?);
-    let mut assets: Vec<Bound<'py, PyDict>> = model_assets(&projection, &retained[0], Some(&plan))?;
-    assets.extend(seed_assets(&projection, &retained[1], Some(&plan))?);
-    assets.extend(function_assets(&projection, &retained[2], Some(&plan))?);
-    assets.extend(load_assets(&projection, &retained[3])?);
+    let mut assets: Vec<Bound<'py, PyDict>> =
+        model_assets(&projection, &retained.models, Some(&plan))?;
+    assets.extend(seed_assets(&projection, &retained.seeds, Some(&plan))?);
+    assets.extend(function_assets(
+        &projection,
+        &retained.functions,
+        Some(&plan),
+    )?);
+    assets.extend(load_assets(&projection, &retained.loads)?);
     assets.extend(python_node_assets(&projection, &nodes)?);
-    let counted: Bound<'py, PyAny> = if partial {
-        aggregated_from_lists(py, &retained)?
+    let counted: [usize; 5] = if partial {
+        let counts = retained.counts();
+        [
+            counts.success,
+            counts.failure,
+            counts.timeout,
+            counts.skipped,
+            counts.warning,
+        ]
     } else {
-        result.clone()
+        [
+            count(result.success_count)?,
+            count(result.failure_count)?,
+            count(result.timeout_count)?,
+            count(result.skipped_count)?,
+            count(result.warning_count)?,
+        ]
     };
     let summary: Bound<'py, PyDict> = summary(
         py,
         &[
-            (
-                "success_count",
-                count(&counted, "success_count")? + python_success,
-            ),
-            (
-                "failure_count",
-                count(&counted, "failure_count")? + python_fail + check_fail,
-            ),
-            ("timeout_count", count(&counted, "timeout_count")?),
-            (
-                "skipped_count",
-                count(&counted, "skipped_count")? + python_skipped,
-            ),
-            (
-                "warning_count",
-                count(&counted, "warning_count")? + check_warn + python_warnings,
-            ),
+            ("success_count", counted[0] + python_success),
+            ("failure_count", counted[1] + python_fail + check_fail),
+            ("timeout_count", counted[2]),
+            ("skipped_count", counted[3] + python_skipped),
+            ("warning_count", counted[4] + check_warn + python_warnings),
             ("python_check_pass_count", check_pass),
             ("python_check_warn_count", check_warn),
             ("python_check_fail_count", check_fail),
@@ -389,8 +416,12 @@ pub(crate) fn format_seed_execution_json<'py>(
     plan: Bound<'py, PyAny>,
 ) -> PyResult<String> {
     let projection: Projection<'py> = Projection::installed(py)?;
-    let results: Vec<Bound<'py, PyAny>> = projection.terminal_results(&results)?;
-    let fail_count: usize = count_status(&results, "status", FAILED)?;
+    let all = Vec::<SeedExecutionResult>::read(&results)?;
+    let results = projection.retained(&all)?;
+    let fail_count = results
+        .iter()
+        .filter(|result| result.status == ExecutionStatus::Failed)
+        .count();
     emitted(
         &projection,
         Document {
@@ -399,7 +430,13 @@ pub(crate) fn format_seed_execution_json<'py>(
             summary: summary(
                 py,
                 &[
-                    ("success_count", count_status(&results, "status", SUCCESS)?),
+                    (
+                        "success_count",
+                        results
+                            .iter()
+                            .filter(|result| result.status == ExecutionStatus::Success)
+                            .count(),
+                    ),
                     ("failure_count", fail_count),
                     ("total_count", results.len()),
                 ],
@@ -419,8 +456,12 @@ pub(crate) fn format_load_execution_json<'py>(
     results: Bound<'py, PyAny>,
 ) -> PyResult<String> {
     let projection: Projection<'py> = Projection::installed(py)?;
-    let results: Vec<Bound<'py, PyAny>> = projection.terminal_results(&results)?;
-    let fail_count: usize = count_status(&results, "status", FAILED)?;
+    let all = Vec::<LoadExecutionResult<_>>::read(&results)?;
+    let results = projection.retained(&all)?;
+    let fail_count = results
+        .iter()
+        .filter(|result| result.status == ExecutionStatus::Failed)
+        .count();
     emitted(
         &projection,
         Document {
@@ -429,9 +470,21 @@ pub(crate) fn format_load_execution_json<'py>(
             summary: summary(
                 py,
                 &[
-                    ("success_count", count_status(&results, "status", SUCCESS)?),
+                    (
+                        "success_count",
+                        results
+                            .iter()
+                            .filter(|result| result.status == ExecutionStatus::Success)
+                            .count(),
+                    ),
                     ("failure_count", fail_count),
-                    ("skipped_count", count_status(&results, "status", SKIPPED)?),
+                    (
+                        "skipped_count",
+                        results
+                            .iter()
+                            .filter(|result| result.status == ExecutionStatus::Skipped)
+                            .count(),
+                    ),
                     ("total_count", results.len()),
                 ],
             )?,
@@ -500,10 +553,25 @@ pub(crate) fn format_test_execution_json<'py>(
     py: Python<'py>,
     results: Bound<'py, PyAny>,
 ) -> PyResult<String> {
+    let all = Vec::<SqlTestExecutionResult<_>>::read(&results)?;
+    test_execution_json(py, &all)
+}
+
+/// The test command's document from the executor's already-converted results.
+pub(crate) fn test_execution_json<'py>(
+    py: Python<'py>,
+    all: &[SqlTestExecutionResult<Bound<'py, PyAny>>],
+) -> PyResult<String> {
     let projection: Projection<'py> = Projection::installed(py)?;
-    let results: Vec<Bound<'py, PyAny>> = projection.terminal_results(&results)?;
-    let pass_count: usize = count_status(&results, "outcome", PASS_OUTCOME)?;
-    let timeout_count: usize = count_status(&results, "outcome", TIMEOUT_OUTCOME)?;
+    let results = projection.retained(all)?;
+    let pass_count = results
+        .iter()
+        .filter(|result| result.outcome == SqlTestOutcome::Pass)
+        .count();
+    let timeout_count = results
+        .iter()
+        .filter(|result| result.outcome == SqlTestOutcome::Timeout)
+        .count();
     let fail_count: usize = results.len() - pass_count;
     emitted(
         &projection,
@@ -535,11 +603,25 @@ pub(crate) fn format_audit_execution_json<'py>(
     configured_concurrency: Option<Bound<'py, PyAny>>,
     worker_count: Option<Bound<'py, PyAny>>,
 ) -> PyResult<String> {
+    let all = Vec::<AuditExecutionResult<_>>::read(&results)?;
+    audit_execution_json(py, &all, (configured_concurrency, worker_count), Vec::new())
+}
+
+/// Audit reporting from already-converted executor results, before the document is serialized.
+pub(crate) fn audit_execution_json<'py>(
+    py: Python<'py>,
+    all: &[AuditExecutionResult<Bound<'py, PyAny>>],
+    (configured_concurrency, worker_count): (Option<Bound<'py, PyAny>>, Option<Bound<'py, PyAny>>),
+    trailing: Vec<(&'static str, Bound<'py, PyAny>)>,
+) -> PyResult<String> {
     let configured_concurrency: Bound<'py, PyAny> =
         configured_concurrency.map_or_else(|| any(py, 1_i64), Ok)?;
     let projection: Projection<'py> = Projection::installed(py)?;
-    let results: Vec<Bound<'py, PyAny>> = projection.terminal_results(&results)?;
-    let fail_count: usize = count_status(&results, "outcome", ERROR_OUTCOME)?;
+    let results = projection.retained(all)?;
+    let fail_count = results
+        .iter()
+        .filter(|result| result.outcome == AuditOutcome::Error)
+        .count();
     let workers: Bound<'py, PyAny> = match worker_count.filter(|count| !count.is_none()) {
         Some(workers) => workers,
         None => py
@@ -557,18 +639,24 @@ pub(crate) fn format_audit_execution_json<'py>(
                 &[
                     (
                         "pass_count",
-                        count_status(&results, "outcome", PASS_OUTCOME)?,
+                        results
+                            .iter()
+                            .filter(|result| result.outcome == AuditOutcome::Pass)
+                            .count(),
                     ),
                     (
                         "warn_count",
-                        count_status(&results, "outcome", WARN_OUTCOME)?,
+                        results
+                            .iter()
+                            .filter(|result| result.outcome == AuditOutcome::Warn)
+                            .count(),
                     ),
                     ("fail_count", fail_count),
                     ("total_count", results.len()),
                 ],
             )?,
             assets: Vec::new(),
-            checks: audit_checks(&projection, PyList::new(py, &results)?.as_any(), false)?,
+            checks: audit_checks(&projection, &results, false)?,
         },
         Extras {
             execution: Some(dict(
@@ -578,6 +666,7 @@ pub(crate) fn format_audit_execution_json<'py>(
                     ("worker_count", workers),
                 ],
             )?),
+            trailing,
             ..Extras::default()
         },
     )
@@ -600,16 +689,14 @@ fn namespace_execution<'py>(
     )
 }
 
-fn scenario_failed(result: &Bound<'_, PyAny>, local: bool) -> PyResult<bool> {
+fn scenario_failed(result: &ScenarioRunResult<Bound<'_, PyAny>>, local: bool) -> bool {
     if !local {
-        return native_field(&native_field(result, "status")?, "value")?.eq(FAILED);
+        return result.status == ExecutionStatus::Failed;
     }
-    let local_status: Bound<'_, PyAny> = native_field(result, "local_status")?;
-    if local_status.is_none() {
-        return Ok(false);
-    }
-    let value: Bound<'_, PyAny> = native_field(&local_status, "value")?;
-    Ok(value.eq("FAIL")? || value.eq("ERROR")?)
+    matches!(
+        result.local_status,
+        Some(ScenarioLocalRunStatus::Fail | ScenarioLocalRunStatus::Error)
+    )
 }
 
 /// Format scenario test command execution results as JSON.
@@ -625,42 +712,65 @@ pub(crate) fn format_scenario_execution_json<'py>(
         options,
         SCENARIO_OPTIONS,
     )?;
-    let results: Bound<'py, PyAny> = arguments.value("results")?;
+    let results = Vec::<ScenarioRunResult<_>>::read(&arguments.value("results")?)?;
+    scenario_json(py, &arguments, &results)
+}
+
+/// Production scenario completion already owns its converted executor results.
+pub(crate) fn format_scenario_execution_json_with<'py>(
+    py: Python<'py>,
+    results: &[ScenarioRunResult<Bound<'py, PyAny>>],
+    options: Option<Bound<'py, PyDict>>,
+) -> PyResult<String> {
+    let arguments = KeywordArguments::read(
+        py,
+        "format_scenario_execution_json",
+        options,
+        (&[], SCENARIO_OPTIONS.1),
+    )?;
+    scenario_json(py, &arguments, results)
+}
+
+fn scenario_json<'py>(
+    py: Python<'py>,
+    arguments: &KeywordArguments<'py>,
+    results: &[ScenarioRunResult<Bound<'py, PyAny>>],
+) -> PyResult<String> {
     let local: bool = arguments.passed("local")? && arguments.flag("local")?;
-    let run_namespace: Option<Bound<'py, PyAny>> = passed(&arguments, "run_namespace")?;
-    let namespace_source: Option<Bound<'py, PyAny>> = passed(&arguments, "namespace_source")?;
+    let run_namespace: Option<Bound<'py, PyAny>> = passed(arguments, "run_namespace")?;
+    let namespace_source: Option<Bound<'py, PyAny>> = passed(arguments, "namespace_source")?;
     let duration_ms: Option<f64> = arguments.value("duration_ms")?.extract()?;
     let mut projection: Projection<'py> = Projection::installed(py)?;
-    let mut kept: Vec<Bound<'py, PyAny>> = Vec::new();
-    for result in items(&results)? {
-        let name: String = text(&native_field(&result, "scenario_name")?)?;
-        if projection.resource_terminal_recorded(&name, &format!("sql_scenario:{name}"))? {
+    let mut kept: Vec<&ScenarioRunResult<Bound<'py, PyAny>>> = Vec::new();
+    for result in results {
+        let name = &result.scenario_name;
+        if projection.resource_terminal_recorded(name, &format!("sql_scenario:{name}"))? {
             kept.push(result);
         }
     }
     let mut fail_count: usize = 0;
     let (mut assets, mut checks, mut scenarios) = (Vec::new(), Vec::new(), Vec::new());
     for result in &kept {
-        fail_count += usize::from(scenario_failed(result, local)?);
-        projection.scenario = Some(text(&native_field(result, "scenario_name")?)?);
+        fail_count += usize::from(scenario_failed(result, local));
+        projection.scenario = Some(result.scenario_name.clone());
         assets.extend(seed_assets(
             &projection,
-            &items(&native_field(result, "seed_results")?)?,
+            &result.seed_results.iter().collect::<Vec<_>>(),
             None,
         )?);
         assets.extend(function_assets(
             &projection,
-            &items(&native_field(result, "function_results")?)?,
+            &result.function_results.iter().collect::<Vec<_>>(),
             None,
         )?);
         assets.extend(model_assets(
             &projection,
-            &items(&native_field(result, "model_results")?)?,
+            &result.model_results.iter().collect::<Vec<_>>(),
             None,
         )?);
         projection.scenario = None;
-        checks.push(scenario_check(result)?);
-        scenarios.push(scenario_result(result)?);
+        checks.push(scenario_check(py, result)?);
+        scenarios.push(scenario_result(py, result)?);
     }
     let mut summary: Bound<'py, PyDict> = summary(
         py,

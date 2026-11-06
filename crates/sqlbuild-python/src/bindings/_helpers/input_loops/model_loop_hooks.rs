@@ -386,6 +386,7 @@ impl<'py> HookRun<'_, '_, 'py> {
                 hooks.environment.clone(),
                 Some(self.context_values.clone()),
                 hooks.render_project_var.clone(),
+                Some(self.context.syntax.clone()),
             ),
             sql,
             scope.file_path,
@@ -487,7 +488,7 @@ impl<'py> HookRun<'_, '_, 'py> {
         declarations: &Bound<'py, PyAny>,
         scope: &Scope<'_, 'py>,
     ) -> PyResult<ExpandedDeclarations<'py>> {
-        let (references, stop) = declaration_scan(sql);
+        let (references, stop) = declaration_scan(sql, Some(&self.model_loop.syntax));
         let classes: ExpansionClasses<'py> = ExpansionClasses {
             usage_record: self.context.classes.usage_record.clone(),
             compile_error: self.context.classes.compile_error.clone(),
@@ -515,6 +516,7 @@ impl<'py> HookRun<'_, '_, 'py> {
                 ),
                 origin: None,
                 scopes: Some(&self.context.classes.visibility),
+                syntax: Some(self.context.syntax),
             }),
         })
     }

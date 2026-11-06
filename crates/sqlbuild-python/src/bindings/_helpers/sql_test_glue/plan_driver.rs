@@ -13,8 +13,22 @@ use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::sql_test_glue::models::SqlTestPlanOptions;
 use crate::bindings::_helpers::sql_test_glue::plan_values::tuple;
 use crate::bindings::_helpers::sql_test_glue::planning::{
-    ChainRequest, PlanningRequest, plan_compiled_sql_tests, resolve_compiled_sql_test_chains,
+    ChainRequest, PlanRow, PlanningRequest, plan_compiled_sql_tests,
+    resolve_compiled_sql_test_chains,
 };
+
+impl PlanRow {
+    /// Rendered SQL for an artifact, or the planning error shared by native and Python consumers.
+    pub(crate) fn rendered_sql(&self, py: Python<'_>) -> PyResult<&str> {
+        let Some(sql) = self.plan.sql.as_deref() else {
+            return Err(PyErr::from_value(
+                error_class(py, ErrorId::NativeSqlTestPlanning)?
+                    .call1(("native SQL-test planning omitted rendered SQL",))?,
+            ));
+        };
+        Ok(sql)
+    }
+}
 
 pub(super) fn chains<'py>(
     project: &Bound<'py, PyAny>,
@@ -58,16 +72,16 @@ pub(crate) fn resolve_sql_test_model_chains<'py>(
     chains(project, tests)
 }
 
-/// Plans of one SQL-test batch, or their compiled artifacts.
-pub(crate) fn planned<'py>(
+/// Native plans of one SQL-test batch, with adapter rendering and timing accounted for.
+pub(crate) fn planned_rows<'py>(
     (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     tests: &Bound<'py, PyAny>,
     options: &SqlTestPlanOptions<'py>,
-) -> PyResult<Bound<'py, PyTuple>> {
+) -> PyResult<Vec<PlanRow>> {
     let py = project.py();
     let artifact = options.artifact;
     if !tests.is_truthy()? {
-        return Ok(PyTuple::empty(py));
+        return Ok(Vec::new());
     }
     let start: u64 = imported(py, "time", "perf_counter_ns")?
         .call0()?
@@ -125,17 +139,27 @@ pub(crate) fn planned<'py>(
     ] {
         add_compile_timing(phase, elapsed);
     }
+    if artifact {
+        for row in &rows {
+            row.rendered_sql(py)?;
+        }
+    }
+    Ok(rows)
+}
+
+/// Plans of one SQL-test batch, or their compiled artifacts, for Python consumers.
+pub(crate) fn planned<'py>(
+    (project, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    tests: &Bound<'py, PyAny>,
+    options: &SqlTestPlanOptions<'py>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let py = project.py();
+    let rows = planned_rows((project, adapter), tests, options)?;
     let mut plans: Vec<Bound<'py, PyAny>> = Vec::new();
     for row in rows {
         let plan = super::plan_rows::plan(py, row)?;
-        if artifact {
+        if options.artifact {
             let sql = native_field(&plan, "sql")?;
-            if sql.is_none() {
-                return Err(PyErr::from_value(
-                    error_class(py, ErrorId::NativeSqlTestPlanning)?
-                        .call1(("native SQL-test planning omitted rendered SQL",))?,
-                ));
-            }
             plans.push(new_record_with(
                 py,
                 RecordId::NativeSqlTestArtifact,

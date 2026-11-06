@@ -25,17 +25,17 @@ type RecordsByLocation<'py> = Vec<(
 )>;
 
 /// The names of the selected models that built successfully.
-fn successful_model_names<'py>(result: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let py: Python<'py> = result.py();
-    let success: Bound<'py, PyAny> =
+fn successful_model_names(result: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    let py = result.py();
+    let success: Bound<'_, PyAny> =
         host::entry(py, ExecutorHost::ExecutionStatus)?.getattr("SUCCESS")?;
-    let mut names: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut names: Vec<String> = Vec::new();
     for model_result in native_field(result, "model_results")?.try_iter()? {
-        let model_result: Bound<'py, PyAny> = model_result?;
-        let status: Bound<'py, PyAny> = native_field(&model_result, "status")?;
-        let value: Bound<'py, PyAny> = status.getattr_opt("value")?.unwrap_or(status);
+        let model_result: Bound<'_, PyAny> = model_result?;
+        let status: Bound<'_, PyAny> = native_field(&model_result, "status")?;
+        let value: Bound<'_, PyAny> = status.getattr_opt("value")?.unwrap_or(status);
         if value.eq(&success)? {
-            names.push(native_field(&model_result, "model_name")?);
+            names.push(native_field(&model_result, "model_name")?.extract()?);
         }
     }
     Ok(names)
@@ -104,7 +104,7 @@ fn contains_location(
 /// The observed records to publish, keyed by the schema of each affected model.
 fn eligible_records<'py>(
     plan: &Bound<'py, PyAny>,
-    result: &Bound<'py, PyAny>,
+    successful_models: &[String],
     run_id: &Bound<'py, PyAny>,
 ) -> PyResult<RecordsByLocation<'py>> {
     let py: Python<'py> = plan.py();
@@ -121,8 +121,7 @@ fn eligible_records<'py>(
         return Ok(Vec::new());
     }
     let selected: Bound<'py, PyFrozenSet> = PyFrozenSet::new(py, entries_by_name.keys())?;
-    let successful: Bound<'py, PyFrozenSet> =
-        PyFrozenSet::new(py, successful_model_names(result)?)?;
+    let successful: Bound<'py, PyFrozenSet> = PyFrozenSet::new(py, successful_models)?;
     let observed: Bound<'py, PyDict> = PyDict::new(py);
     for record in native_field(&freshness, "observed_records")?.try_iter()? {
         let record: Bound<'py, PyAny> = record?;
@@ -177,6 +176,11 @@ fn renderers<'py>(adapter: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
             (
                 "render_create_index_sqls",
                 native_field(adapter, "render_create_source_freshness_index_sqls")?,
+            ),
+            ("read_columns", native_field(adapter, "get_columns")?),
+            (
+                "render_add_columns",
+                native_field(adapter, "render_add_columns")?,
             ),
         ],
     )
@@ -247,13 +251,13 @@ fn write_records<'py>(
 
 /// Append observed source freshness only after the affected selected models succeed.
 pub(crate) fn append_freshness_records<'py>(
-    (plan, result): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (plan, successful_models): (&Bound<'py, PyAny>, &[String]),
     adapter: &Bound<'py, PyAny>,
     connection_config: &Bound<'py, PyAny>,
     run_id: &Bound<'py, PyAny>,
 ) -> PyResult<()> {
     let py: Python<'py> = plan.py();
-    let grouped: RecordsByLocation<'py> = eligible_records(plan, result, run_id)?;
+    let grouped: RecordsByLocation<'py> = eligible_records(plan, successful_models, run_id)?;
     let record_count: usize = grouped.iter().map(|(_, records)| records.len()).sum();
     if record_count == 0 {
         return Ok(());
@@ -310,7 +314,10 @@ fn append_eligible_direct_source_freshness_records<'py>(
         ),
     )?;
     append_freshness_records(
-        (&arguments.value("plan")?, &arguments.value("result")?),
+        (
+            &arguments.value("plan")?,
+            &successful_model_names(&arguments.value("result")?)?,
+        ),
         &arguments.value("adapter")?,
         &arguments.value("connection_config")?,
         &arguments.value("run_id")?,

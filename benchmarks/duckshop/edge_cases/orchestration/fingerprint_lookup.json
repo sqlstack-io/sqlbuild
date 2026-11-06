@@ -1,0 +1,21 @@
+{
+  "record": {
+    "event_id": "orders-build-latest",
+    "state_database": null,
+    "state_schema": "build_history",
+    "node_type": "model",
+    "node_name": "orders",
+    "target_database": null,
+    "target_schema": "main",
+    "target_name": "orders",
+    "run_id": "orders-run-latest",
+    "definition_hash": "orders-definition-latest",
+    "version_hash": "orders-version-latest",
+    "schema_fingerprint": "orders-schema-latest",
+    "definition": "SELECT order_id FROM orders",
+    "metadata_json": "{\"private_note\":\"not part of the person response\"}",
+    "ts": "2026-01-03T10:00:00Z"
+  },
+  "older_ts": "2026-01-01T10:00:00Z",
+  "distractor_ts": "2026-01-04T10:00:00Z"
+}

@@ -1,3 +1,4 @@
+use crate::project::errors::ConfigFailure;
 use crate::project::main::load_git_base_ref::load_git_base_ref;
 use crate::project::main::load_review_config::load_review_config;
 use crate::project::models::ConfigFile;
@@ -18,6 +19,22 @@ fn given_project_files_when_loading_then_rejections_match_python_loader() {
                       [targets.dev]\nschema = 'analytics'\n[sinks.lifecycle]\nshutdown_timeout = '10m'\n",
             local: "target = 'dev'\n[settings]\nmax_concurrency = 2\n",
             expected_failure: None,
+        },
+        ProjectFailureTestCase {
+            description: "a blank catalog connection is rejected",
+            project: "name = 'orders'\nadapter = 'duckdb'\n[targets.dev]\ncatalog_connection = ' '\n",
+            local: "",
+            expected_failure: Some(ConfigFailure::plain(
+                "Expected 'catalog_connection' to be a non-empty string when provided",
+            )),
+        },
+        ProjectFailureTestCase {
+            description: "a catalog connection must be a name, not credential overrides",
+            project: "name = 'orders'\nadapter = 'duckdb'\n",
+            local: "[targets.dev]\ncatalog_connection = { user = 'catalog-reader' }\n",
+            expected_failure: Some(ConfigFailure::plain(
+                "Expected 'catalog_connection' to be a non-empty string when provided",
+            )),
         },
         ProjectFailureTestCase {
             description: "an unknown key suggests the nearest supported key",

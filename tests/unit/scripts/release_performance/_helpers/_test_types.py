@@ -73,7 +73,7 @@ class ChooseBaselineTestCase:
     description: str
     candidate: str
     files: tuple[dict[str, object], ...]
-    tags: tuple[str, ...]
+    same_version: bool
     expected_baseline: str | None
 
 

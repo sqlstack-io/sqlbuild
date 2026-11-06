@@ -1,4 +1,4 @@
-//! Built-in rules, SQL lint, quality checks and formatting, with their configuration.
+//! Built-in Rules and their configuration, hosting SQLClean's SQL lint, quality Rules and formatter.
 
 #![forbid(unsafe_code)]
 
@@ -14,11 +14,10 @@ pub mod lint_text;
 pub mod models;
 pub mod project_tree;
 pub mod query_facts;
+pub mod relation_keys;
 pub mod rule_cache;
 pub mod rule_catalogue;
 pub mod rule_results;
 pub mod rules;
 pub mod scope_metadata;
-pub mod sql_lint;
-pub mod sql_quality;
 pub mod types;

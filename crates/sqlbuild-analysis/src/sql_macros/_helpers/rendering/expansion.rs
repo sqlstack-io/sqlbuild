@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::sql_macros::_helpers::parsing::body::{expand_body, with_line_comment_closed};
 use crate::sql_macros::_helpers::parsing::lexing::{AtConstruct, at_constructs, outer_sql_calls};
-use crate::sql_macros::_helpers::parsing::lexing::{Token, line_column, tokens};
+use crate::sql_macros::_helpers::parsing::lexing::{Token, line_column, tokens, tokens_with};
 use crate::sql_macros::_helpers::parsing::literal_positions::{
     LiteralRules, literal_error, non_literal_use,
 };
@@ -31,10 +31,14 @@ use crate::sql_macros::models::{
     SqlMacroForm, SqlMacroLocation, TextContext, TypedCall,
 };
 use crate::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// The outer SQL macro calls of `text`, or why its `@` constructs could not be read.
-pub(crate) fn sql_macro_calls(text: &str) -> Result<Vec<SqlMacroCall>, SqlMacroError> {
-    let constructs: Vec<AtConstruct> = at_constructs(text).map_err(|_| {
+pub(crate) fn sql_macro_calls(
+    text: &str,
+    syntax: Option<&LexicalSyntax>,
+) -> Result<Vec<SqlMacroCall>, SqlMacroError> {
+    let constructs: Vec<AtConstruct> = at_constructs(text, syntax).map_err(|_| {
         SqlMacroError::new(
             INVALID_DEFINITION_CODE,
             "SQL has an unclosed quote or comment",
@@ -62,7 +66,7 @@ pub(crate) fn sql_macro_calls(text: &str) -> Result<Vec<SqlMacroCall>, SqlMacroE
     if calls.iter().all(|call| call.in_python) {
         return Ok(calls);
     }
-    let Ok(scanned) = tokens(text) else {
+    let Ok(scanned) = tokens_with(text, syntax) else {
         return Ok(calls);
     };
     Ok(calls
@@ -128,14 +132,15 @@ pub(crate) fn expand_text<H: SqlMacroHost>(
     host: &H,
     context: &TextContext<'_>,
 ) -> Result<ExpandedText, ExpansionFailure<H::Error>> {
-    let calls: Vec<SqlMacroCall> = sql_macro_calls(context.text)?;
+    let syntax: Option<&LexicalSyntax> = host.lexical_syntax();
+    let calls: Vec<SqlMacroCall> = sql_macro_calls(context.text, syntax)?;
     if calls.is_empty() {
         return Ok(ExpandedText {
             sql: host.render_declarations(context.scope, context.text)?.sql,
             calls: Vec::new(),
         });
     }
-    let scanned: Vec<Token> = tokens(context.text).map_err(|_| {
+    let scanned: Vec<Token> = tokens_with(context.text, syntax).map_err(|_| {
         SqlMacroError::new(
             INVALID_DEFINITION_CODE,
             "SQL has an unclosed quote or comment",

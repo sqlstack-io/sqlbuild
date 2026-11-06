@@ -1,5 +1,6 @@
 //! Resolve discovery, target, adapter, limits, connection and reporters for one build.
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
@@ -19,6 +20,7 @@ use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_settings_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_name;
@@ -38,6 +40,7 @@ pub(crate) struct BuildContext<'py> {
     pub(crate) verbose: bool,
     pub(crate) started: Instant,
     pub(crate) tracker: Bound<'py, PyAny>,
+    pub(crate) worker: Option<Arc<WorkerBuild>>,
 }
 
 impl<'py> BuildContext<'py> {
@@ -241,5 +244,6 @@ pub(crate) fn resolve_build_context<'py>(
         verbose: native_field(request, "verbose")?.is_truthy()? || debug,
         started,
         tracker: tracker.clone(),
+        worker: None,
     })
 }

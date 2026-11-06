@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -34,6 +35,7 @@ from tests.unit.src.sqlbuild.adapters.snowflake._test_types import (
     SnowflakeLoadSeedTestCase,
     SnowflakeMergeExclusionTestCase,
     SnowflakeMoveOrCopyRelationTestCase,
+    SnowflakePlatformDetectionTestCase,
     SnowflakePruneSqlTestCase,
     SnowflakeQualifiedColumnInspectionTestCase,
     SnowflakeQueryColumnNamesTestCase,
@@ -333,6 +335,35 @@ def test_given_connection_config_when_connecting_then_uses_expected_connector_an
 
     assert captured_kwargs == test_case.expected_connect_kwargs
     assert tuple(raw_connection.executed_sql) == test_case.expected_session_statements
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakePlatformDetectionTestCase(
+            description="connector platform detection is turned off when the user has not chosen",
+            environment={},
+            expected_value="true",
+        ),
+        SnowflakePlatformDetectionTestCase(
+            description="the user's own platform detection setting is kept",
+            environment={"SNOWFLAKE_DISABLE_PLATFORM_DETECTION": "false"},
+            expected_value="false",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_platform_detection_setting_when_connecting_then_user_choice_wins(
+    test_case: SnowflakePlatformDetectionTestCase,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    environment: dict[str, str] = dict(test_case.environment)
+    monkeypatch.setattr(os, "environ", environment)
+    _ = install_fake_snowflake_connector(monkeypatch)
+
+    SnowflakeAdapter().connect({"account": "acct"})
+
+    assert environment["SNOWFLAKE_DISABLE_PLATFORM_DETECTION"] == test_case.expected_value
 
 
 @pytest.mark.parametrize(

@@ -1,5 +1,8 @@
-use crate::compiler::tests::helpers::{scanned_references, scanned_usages};
+use crate::compiler::tests::helpers::{
+    scanned_dialect_references, scanned_references, scanned_usages,
+};
 use crate::compiler::tests::test_types::DeclarationReferenceScanTestCase;
+use crate::sql_scan::models::LexicalSyntax;
 
 #[test]
 fn given_sql_when_scanning_declaration_references_then_python_offsets_are_returned() {
@@ -202,6 +205,43 @@ fn given_sql_when_walking_declaration_usages_then_malformed_references_are_skipp
     for test_case in test_cases {
         assert_eq!(
             scanned_usages(test_case.sql).as_deref(),
+            test_case.expected_references,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_backslash_escapes_when_scanning_declaration_references_then_dialect_quotes_are_text() {
+    let syntax = LexicalSyntax {
+        backslash_escape_quotes: vec!["'".to_owned()],
+        line_comment_prefixes: vec!["--".to_owned(), "//".to_owned()],
+        ..LexicalSyntax::default()
+    };
+    let test_cases = [
+        DeclarationReferenceScanTestCase {
+            description: "an escaped quote stays inside the string",
+            sql: "SELECT 'O\\'Brien @const(\"a\")', @const(\"b\")",
+            expected_references: Some("const:b@31..42"),
+        },
+        DeclarationReferenceScanTestCase {
+            description: "a backslash at the end of a literal escapes itself",
+            sql: "SELECT 'C:\\\\', @const(\"b\")",
+            expected_references: Some("const:b@15..26"),
+        },
+        DeclarationReferenceScanTestCase {
+            description: "a dialect line comment is text",
+            sql: "SELECT 1 // it's @const(\"a\")\n, @const(\"b\")",
+            expected_references: Some("const:b@31..42"),
+        },
+    ];
+
+    for test_case in test_cases {
+        let scanned = scanned_dialect_references(test_case.sql, &syntax);
+
+        assert_eq!(
+            scanned.as_deref(),
             test_case.expected_references,
             "{}",
             test_case.description

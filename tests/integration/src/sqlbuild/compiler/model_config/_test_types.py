@@ -18,6 +18,15 @@ class HeaderMetadataParityTestCase:
 
 
 @dataclass(frozen=True)
+class HeaderAuditArgumentsTestCase:
+    """Python-supplied audit arguments and the compiled audit targets they produce."""
+
+    description: str
+    header: dict[object, object]
+    expected_audits: list[tuple[str, str | None]]
+
+
+@dataclass(frozen=True)
 class ModelConfigTierTestCase:
     """How often the model loop calls each native model config entry."""
 

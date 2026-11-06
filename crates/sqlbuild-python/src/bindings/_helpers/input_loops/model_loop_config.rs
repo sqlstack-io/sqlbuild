@@ -2,20 +2,26 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
+use sqlbuild_discovery::model_files::main::config_value::config_value;
 use sqlbuild_discovery::model_files::models::HeaderFacts;
 use sqlbuild_model_config::config_presence::main::blocks_config_reuse::blocks_config_reuse;
 use sqlbuild_model_config::config_presence::main::contains_template::contains_template;
 use sqlbuild_model_config::config_presence::main::mutable_config_value::mutable_config_value;
+use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
+use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::input_loops::model_loop::{LoopContext, config_error};
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use crate::bindings::_helpers::model_config::config_classes::{ConfigClasses, config_fields, view};
+use crate::bindings::_helpers::model_config::config_nodes::carried_node;
 use crate::bindings::_helpers::model_config::model_config_builder::{
     BuiltConfig, ConfigBuild, NativeModelConfigBuilder,
 };
+use crate::bindings::_helpers::model_config::typed_config::BuiltConfigValues;
 
 const COLUMNS_KEY: &str = "columns";
 const DESCRIPTION_KEY: &str = "description";
@@ -30,6 +36,7 @@ struct InheritedLayer<'py> {
 struct ReusedConfig<'py> {
     values: Bound<'py, PyDict>,
     fields: Bound<'py, PyDict>,
+    nodes: Option<BuiltConfigValues>,
 }
 
 /// `_ReusableModelConfigCache` for one compile.
@@ -44,18 +51,22 @@ impl<'py> ModelConfigs<'py> {
     pub(crate) fn effective(
         &self,
         context: &LoopContext<'_, 'py>,
-        header: &Bound<'py, PyDict>,
+        model_file: &NativeModelFile,
         model: (&str, &str),
         facts: Option<&HeaderFacts>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let (name, relative_path) = model;
-        let py: Python<'py> = header.py();
+        let py: Python<'py> = context.host.py();
+        let header = model_file.header_value_dict(py)?;
+        let authored = model_file
+            .native_header_values()
+            .map(|values| values.as_ref());
         let classes: &ConfigClasses<'py> = &context.classes.config;
         let builder: &NativeModelConfigBuilder = classes.builder.get();
         let matched: Option<String> = builder
             .selected_path_default(py, relative_path)?
             .map_err(|error| config_error(error.bind(py).as_any(), None))?;
-        let metadata: Option<Bound<'py, PyDict>> = reusable_metadata(header, facts)?;
+        let metadata: Option<Bound<'py, PyDict>> = reusable_metadata(&header, facts)?;
         let reusable: bool = match metadata {
             Some(_) => self.reusable(context, &matched)?,
             None => false,
@@ -66,10 +77,11 @@ impl<'py> ModelConfigs<'py> {
         {
             let values: Bound<'py, PyDict> = cached.values.copy()?;
             values.update(metadata.as_mapping())?;
-            return view(classes, &values, &cached.fields);
+            let nodes = metadata_nodes(cached.nodes.as_ref(), metadata, metadata, authored)?;
+            return view(classes, &values, &cached.fields, nodes.as_ref());
         }
         let built: ConfigBuild<'py> =
-            builder.built(py, (header, facts), matched.as_deref(), name)?;
+            builder.built(py, (&header, facts, authored), matched.as_deref(), name)?;
         let built: BuiltConfig<'py> = match built {
             ConfigBuild::Built(built) => built,
             ConfigBuild::Rejected(error) => {
@@ -78,9 +90,9 @@ impl<'py> ModelConfigs<'py> {
         };
         let fields: Bound<'py, PyDict> = config_fields(classes, &built, matched.as_deref())?;
         if reusable && let Some(metadata) = &metadata {
-            self.remember(&matched, metadata, &built.values, &fields)?;
+            self.remember(&matched, metadata, &built, &fields)?;
         }
-        view(classes, &built.values, &fields)
+        view(classes, &built.values, &fields, built.nodes.as_ref())
     }
 
     /// `_is_reusable`: no templates in the inherited values or the target namespace, nothing mutable.
@@ -116,9 +128,10 @@ impl<'py> ModelConfigs<'py> {
         &self,
         matched: &Option<String>,
         metadata: &Bound<'py, PyDict>,
-        values: &Bound<'py, PyDict>,
+        built: &BuiltConfig<'py>,
         fields: &Bound<'py, PyDict>,
     ) -> PyResult<()> {
+        let values = &built.values;
         let py: Python<'py> = values.py();
         let layers = self.layers.borrow();
         let Some(inherited) = layers.get(matched) else {
@@ -140,10 +153,42 @@ impl<'py> ModelConfigs<'py> {
             ReusedConfig {
                 values: reusable_values,
                 fields: fields.clone(),
+                nodes: metadata_nodes(built.nodes.as_ref(), metadata, &inherited.values, None)?,
             },
         );
         Ok(())
     }
+}
+
+/// Replace only one model's metadata in a reused tree, without opening unused containers.
+fn metadata_nodes(
+    base: Option<&BuiltConfigValues>,
+    metadata: &Bound<'_, PyDict>,
+    replacements: &Bound<'_, PyDict>,
+    authored: Option<&[(String, AuthoredValue)]>,
+) -> PyResult<Option<BuiltConfigValues>> {
+    let Some(base) = base else {
+        return Ok(None);
+    };
+    let mut nodes = base.as_ref().clone();
+    for key in metadata.keys() {
+        let Ok(text) = key.downcast_exact::<PyString>() else {
+            return Ok(None);
+        };
+        let text = text.to_str()?;
+        nodes.remove(text);
+        if let Some(value) = replacements.get_item(&key)? {
+            let native = authored
+                .and_then(|entries| entries.iter().rev().find(|(key, _)| key == text))
+                .and_then(|(_, value)| config_value(value));
+            let node = match native {
+                Some(node) => node,
+                None => carried_node(&value)?,
+            };
+            nodes.insert(text.to_owned(), Arc::new(node));
+        }
+    }
+    Ok(Some(Arc::new(nodes)))
 }
 
 /// `_reusable_metadata`: the header when only plain columns and description vary, else `None`.

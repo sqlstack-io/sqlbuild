@@ -1,5 +1,7 @@
 //! `sqb query`: run ad hoc SQL on the project connection and print the rows.
 
+use std::time::Duration;
+
 use pyo3::exceptions::PyException;
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -7,12 +9,14 @@ use pyo3::prelude::{
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyString, PyStringMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::json::models::JsonValue;
+use sqlbuild_core::progress::main::connection_start_message::connection_start_message;
 use sqlbuild_core::query_command::main::render_query_json::render_query_json;
 use sqlbuild_core::query_command::models::QueryDisplay;
 use sqlbuild_host::entries::models::AdapterHost;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
+use crate::bindings::_helpers::build_progress::transient_status::delayed_status;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::native_host::connections::connection_failure;
 use crate::bindings::_helpers::native_host::host;
@@ -30,6 +34,9 @@ use crate::bindings::_helpers::records::ids::ErrorId;
 const JSON_FORMAT: &str = "json";
 const STATEMENT_OK: &str = "OK\n";
 const DEFAULT_LIMIT: i64 = 20;
+/// How long a step runs before its transient progress line appears.
+const SLOW_STEP: Duration = Duration::from_millis(300);
+const RUNNING_QUERY_MESSAGE: &str = "Running query...";
 
 /// A `CliUserError` with its code and optional help.
 fn user_error(py: Python<'_>, message: &str, code: Option<&str>, help: Option<&str>) -> PyErr {
@@ -160,22 +167,32 @@ fn run_sql<'py>(
             ],
         )?),
     )?;
-    let connection: Bound<'py, PyAny> = project
-        .adapter
-        .call_method1("connect", (connection_config,))
-        .map_err(|error| connection_failure(&project.adapter, &error))?;
+    let adapter_name: String = native_field(&project.adapter, "adapter_name")?.extract()?;
+    let connection: Bound<'py, PyAny> = delayed_status(
+        py,
+        (&connection_start_message(&adapter_name, 1), SLOW_STEP),
+        || {
+            project
+                .adapter
+                .call_method1("connect", (connection_config,))
+                .map_err(|error| connection_failure(&project.adapter, &error))
+        },
+    )?;
     let limit_value: Bound<'py, PyAny> = match limit {
         Some(limit) => PyInt::new(py, limit).into_any(),
         None => py.None().into_bound(py),
     };
-    let queried: PyResult<Bound<'py, PyAny>> = call_with(
-        &native_field(&project.adapter, "query")?,
-        &[
-            ("connection", connection.clone()),
-            ("sql", sql),
-            ("limit", limit_value),
-        ],
-    );
+    let queried: PyResult<Bound<'py, PyAny>> =
+        delayed_status(py, (RUNNING_QUERY_MESSAGE, SLOW_STEP), || {
+            call_with(
+                &native_field(&project.adapter, "query")?,
+                &[
+                    ("connection", connection.clone()),
+                    ("sql", sql),
+                    ("limit", limit_value),
+                ],
+            )
+        });
     let queried: PyResult<Bound<'py, PyAny>> = queried.map_err(|error| {
         let adapter_error: bool = host::entry(py, AdapterHost::AdapterUserError)
             .is_ok_and(|class| error.value(py).is_instance(&class).unwrap_or(false));

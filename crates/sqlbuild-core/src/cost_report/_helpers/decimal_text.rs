@@ -1,6 +1,7 @@
 //! Fixed-point text of Python `Decimal` values and byte sizes, rounded half to even.
 
 use crate::cost_report::constants::{BYTE_SCALE, BYTE_UNITS};
+use crate::cost_report::models::DecimalSortKey;
 
 /// The digits and power of ten of a finite decimal text, with its sign.
 struct DecimalParts {
@@ -42,6 +43,24 @@ fn parts(text: &str) -> Option<DecimalParts> {
 /// Whether the text is a finite decimal Python's `Decimal` reads.
 pub(crate) fn is_decimal(text: &str) -> bool {
     parts(text).is_some()
+}
+
+/// Exact finite-decimal ordering without rounding or expanding powers of ten.
+pub(crate) fn sort_key(text: &str) -> Option<DecimalSortKey> {
+    let value = parts(text)?;
+    let digits = value.digits.trim_start_matches('0');
+    if digits.is_empty() {
+        return Some(DecimalSortKey::Zero);
+    }
+    let magnitude = (
+        i128::from(value.exponent) + digits.len() as i128,
+        digits.trim_end_matches('0').to_owned(),
+    );
+    Some(if value.negative {
+        DecimalSortKey::Negative(std::cmp::Reverse(magnitude))
+    } else {
+        DecimalSortKey::Positive(magnitude)
+    })
 }
 
 /// Round the digit string half to even after removing its last `dropped` digits.

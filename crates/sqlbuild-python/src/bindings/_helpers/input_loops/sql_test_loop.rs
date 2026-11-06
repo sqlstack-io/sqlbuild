@@ -418,7 +418,9 @@ impl<'py> TestScope<'_, 'py> {
                 )));
             }
             let mut names: Vec<String> = with_list_macros.to_vec();
-            for name in top_level_macro_names(&actual.1).map_err(|message| self.error(message))? {
+            for name in top_level_macro_names(&actual.1, &self.model_loop.syntax)
+                .map_err(|message| self.error(message))?
+            {
                 if !names.contains(&name) {
                     names.push(name);
                 }
@@ -519,6 +521,7 @@ impl<'py> TestScope<'_, 'py> {
             sqlbuild_sqltext::compiler::main::declaration_references::scan_declaration_references(
                 &[sql.to_owned()],
                 true,
+                Some(&self.model_loop.syntax),
             );
         if let Some(stop) = scans.iter().find_map(|scan| scan.stop) {
             let problem: &str = match stop {
@@ -560,7 +563,9 @@ impl<'py> TestScope<'_, 'py> {
             native_field(declarations, MACRO_RECORDS)?.downcast_into()?;
         let macro_visibility: Bound<'py, PyDict> =
             native_field(declarations, MACRO_VISIBILITY)?.downcast_into()?;
-        for name in top_level_macro_names(sql).map_err(|message| self.error(message))? {
+        for name in top_level_macro_names(sql, &self.model_loop.syntax)
+            .map_err(|message| self.error(message))?
+        {
             let Some(record) = macro_records.get_item(&name)? else {
                 continue;
             };
@@ -1021,8 +1026,8 @@ fn test_visibility<'py>(records: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, 
 }
 
 /// `find_macro_call_names`: top-level macro call names, declaration calls excluded.
-fn top_level_macro_names(sql: &str) -> Result<Vec<String>, &'static str> {
-    Ok(macro_call_names(sql, false)
+fn top_level_macro_names(sql: &str, syntax: &LexicalSyntax) -> Result<Vec<String>, &'static str> {
+    Ok(macro_call_names(sql, false, Some(syntax))
         .map_err(sqlbuild_render::macro_calls::errors::ScanError::message)?
         .into_iter()
         .filter(|name| !DECLARATION_CALLS.contains(&name.as_str()))

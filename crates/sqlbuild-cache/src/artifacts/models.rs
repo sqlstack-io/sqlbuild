@@ -59,17 +59,6 @@ impl SqlTestRecordMiss {
     }
 }
 
-/// The fields of one cache file record, already checked to be strings and non-negative integers.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StoredSqlTestRecord {
-    pub identity: String,
-    /// The `relative_path` text as stored.
-    pub relative_path: String,
-    pub size: u64,
-    pub mtime_ns: i64,
-    pub content_sha256: String,
-}
-
 impl SqlTestArtifactRecord {
     /// The relative path's `as_posix()` text, as the cache file stores it.
     #[must_use]

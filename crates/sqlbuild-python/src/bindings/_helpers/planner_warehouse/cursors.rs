@@ -272,7 +272,7 @@ fn lineage_reference<'py>(
     resolve_lineage_reference(
         model,
         &input_name.extract::<String>()?,
-        maps.models.clone().into_any(),
+        maps.models.clone().into_any().into(),
         maps.functions.clone().into_any(),
     )
 }

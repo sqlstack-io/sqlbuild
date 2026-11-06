@@ -10,6 +10,7 @@ rust-version.workspace = true
 [dependencies]
 sqlbuild-cache.workspace = true
 sqlbuild-core.workspace = true
+sqlbuild-sqltext.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

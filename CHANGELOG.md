@@ -1,5 +1,79 @@
 # Changelog
 
+## [0.190.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.189.0...v0.190.0) (2026-11-06)
+
+
+### Features
+
+* read check evidence through the control API ([#1317](https://github.com/sqlstack-io/sqlbuild/issues/1317)) ([bf4a2a2](https://github.com/sqlstack-io/sqlbuild/commit/bf4a2a277e628b634da294855885c7d14784c266))
+
+## [0.189.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.188.0...v0.189.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* control stores created by 0.188.x are not upgraded. The server refuses them with an error saying to recreate the control store; create a new one when upgrading.
+
+### Features
+
+* read checks through the control API ([#1315](https://github.com/sqlstack-io/sqlbuild/issues/1315)) ([865f8f7](https://github.com/sqlstack-io/sqlbuild/commit/865f8f79f5f9e10969420649ed5df41e48eb98f5))
+
+## [0.188.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.3...v0.188.0) (2026-11-05)
+
+
+### Features
+
+* add scheduler backend ([#1282](https://github.com/sqlstack-io/sqlbuild/issues/1282)) ([5f451f8](https://github.com/sqlstack-io/sqlbuild/commit/5f451f88acc929a5e9d7cb101f8ad7c4f65bfdc6))
+
+## [0.187.3](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.2...v0.187.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* Snowflake time and timestamp precision no longer fails source contracts ([#1294](https://github.com/sqlstack-io/sqlbuild/issues/1294)) ([9c41a61](https://github.com/sqlstack-io/sqlbuild/commit/9c41a61825c3dd5db34f91447143821684bc718c))
+
+## [0.187.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.1...v0.187.2) (2026-11-02)
+
+
+### Performance Improvements
+
+* **rules:** pin SQLClean 0.4.3 for cheaper unused-CTE facts ([#1296](https://github.com/sqlstack-io/sqlbuild/issues/1296)) ([1ba0a3d](https://github.com/sqlstack-io/sqlbuild/commit/1ba0a3df837cdf34c4ef81f9a163127fe62841a9))
+
+## [0.187.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.0...v0.187.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **duckshop:** declare the columns staging models output and downstream models read ([#1297](https://github.com/sqlstack-io/sqlbuild/issues/1297)) ([43448ef](https://github.com/sqlstack-io/sqlbuild/commit/43448ef00b7150c5c4c60be60a0d1927c2c71ab5))
+
+## [0.187.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.2...v0.187.0) (2026-11-02)
+
+
+### Features
+
+* **rules:** run SQL Rules through the SQLClean engine ([#1283](https://github.com/sqlstack-io/sqlbuild/issues/1283)) ([f7c1e76](https://github.com/sqlstack-io/sqlbuild/commit/f7c1e7662333908bd834eb874df0b313da2cb3e8))
+
+## [0.186.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.1...v0.186.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* retain native planner data through graph traversal ([#1280](https://github.com/sqlstack-io/sqlbuild/issues/1280)) ([90b3a9b](https://github.com/sqlstack-io/sqlbuild/commit/90b3a9b1ca6a895b1f511188448f2114daab472d))
+
+## [0.186.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.186.0...v0.186.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* match configured snapshot keys and cursors to quoted columns ([#1273](https://github.com/sqlstack-io/sqlbuild/issues/1273)) ([2116208](https://github.com/sqlstack-io/sqlbuild/commit/2116208e354c27cf946c0252f494d0404ab1cf76))
+
+## [0.186.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.185.0...v0.186.0) (2026-10-29)
+
+
+### Features
+
+* support quoted mixed-case columns and read SQL with adapter lexical rules ([#1270](https://github.com/sqlstack-io/sqlbuild/issues/1270)) ([c3a2295](https://github.com/sqlstack-io/sqlbuild/commit/c3a2295864bb52432093ec9cedb7cfcc775d75fd))
+
 ## [0.185.0](https://github.com/chio-labs/sqlbuild/compare/v0.184.1...v0.185.0) (2026-10-28)
 
 

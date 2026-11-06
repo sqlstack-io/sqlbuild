@@ -2,71 +2,36 @@
 
 use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyBool, PyFloat, PyInt};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt};
 use sqlbuild_core::integration_results::errors::IntegrationRecordError;
 use sqlbuild_core::integration_results::main::encode_integration_value::encode_integration_value;
 use sqlbuild_core::integration_results::main::normalize_integration_record::normalize_integration_record;
 use sqlbuild_core::json::models::{JsonInteger, JsonValue};
+use sqlbuild_host::models::{
+    AuditEvaluationMode, AuditExecutionResult, AuditOutcome, FunctionExecutionResult,
+    LoadExecutionResult, ModelExecutionResult, SeedExecutionResult, SqlTestExecutionResult,
+    SqlTestOutcome,
+};
+use sqlbuild_host::types::ResultEnum;
 
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::plan_output::safety::{future_cursor_safety, maximum_start_safety};
-use crate::bindings::_helpers::plan_output::values::items;
+use crate::bindings::_helpers::plan_output::values::any;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
+use crate::bindings::_helpers::result_output::assets::microbatch_summary;
 use crate::bindings::_helpers::result_output::checks::{
-    audit_passed, measurement_evidence, measurement_thresholds, python_check_status,
+    measured_value, measurement_thresholds, python_check_status,
 };
 use crate::bindings::_helpers::result_output::integration_values::{
     Checked, bounded_metadata, optional_text, required_json, text, text_or_empty,
 };
 use crate::bindings::_helpers::result_output::projection::{
-    ResultKind, audit_check_id, result_kind, sql_test_check_id,
+    ResultIdentity, ResultKind, result_kind,
 };
 
 const FAILED_EVENT: &str = "resource_attempt_failed";
 const SKIPPED_EVENT: &str = "resource_attempt_skipped";
-const PASS_OUTCOME: &str = "pass";
-const MICROBATCH_FIELDS: [(&str, &str); 19] = [
-    ("strategy", "microbatch_strategy"),
-    ("reason", "microbatch_plan_reason"),
-    ("batch_count", "batch_count"),
-    ("batch_size", "batch_size"),
-    ("recovery_batch_count", "microbatch_recovery_batch_count"),
-    ("known_gap_count", "microbatch_known_gap_count"),
-    (
-        "unaccounted_interval_count",
-        "microbatch_unaccounted_interval_count",
-    ),
-    (
-        "synthetic_completion_count",
-        "microbatch_synthetic_completion_count",
-    ),
-    (
-        "unknown_fingerprint_count",
-        "microbatch_unknown_fingerprint_count",
-    ),
-    ("contiguous_frontier", "microbatch_contiguous_frontier"),
-    (
-        "unaccounted_partition_policy",
-        "microbatch_unaccounted_partition_policy",
-    ),
-    ("replay_requirement_id", "microbatch_replay_requirement_id"),
-    (
-        "required_model_version_hash",
-        "microbatch_required_model_version_hash",
-    ),
-    (
-        "physical_generation_id",
-        "microbatch_physical_generation_id",
-    ),
-    ("concurrent_enabled", "microbatch_concurrent_enabled"),
-    ("batch_concurrency", "microbatch_batch_concurrency"),
-    ("global_concurrency", "microbatch_global_concurrency"),
-    (
-        "replay_requirement_state",
-        "microbatch_replay_requirement_state",
-    ),
-    ("limit", "microbatch_limit"),
-];
 
 type Entries = Vec<(String, JsonValue)>;
 
@@ -86,15 +51,6 @@ fn value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py, Py
     native_field(&native_field(result, field)?, "value")
 }
 
-/// `<field>.value` when it is truthy, else `None`.
-fn truthy_value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(result, field)?;
-    if !value.is_truthy()? {
-        return Ok(result.py().None().into_bound(result.py()));
-    }
-    native_field(&value, "value")
-}
-
 /// `plan.<field>[name].qualified_name` when the plan locates the resource.
 fn planned_target<'py>(
     plan: &Bound<'py, PyAny>,
@@ -112,27 +68,29 @@ fn planned_target<'py>(
     native_field(&locations.get_item(name)?, "qualified_name")
 }
 
-fn model_microbatch(result: &Bound<'_, PyAny>) -> PyResult<JsonValue> {
-    let py: Python<'_> = result.py();
-    let run_type: Bound<'_, PyAny> = native_field(result, "microbatch_run_type")?;
-    if run_type.is_none() {
+fn model_microbatch<'py>(
+    py: Python<'py>,
+    result: &ModelExecutionResult<Bound<'py, PyAny>>,
+) -> PyResult<JsonValue> {
+    let rendered: Bound<'py, PyAny> = microbatch_summary(py, result)?;
+    if rendered.is_none() {
         return Ok(JsonValue::Object(Vec::new()));
     }
-    let values: Bound<'_, pyo3::types::PyDict> = pyo3::types::PyDict::new(py);
-    pyo3::types::PyDictMethods::set_item(&values, "run_type", run_type)?;
-    for (key, field) in MICROBATCH_FIELDS {
-        let item: Bound<'_, PyAny> = native_field(result, field)?;
+    let values: Bound<'py, PyDict> = PyDict::new(py);
+    for (key, item) in rendered.downcast::<PyDict>()?.iter() {
+        let key: String = key.extract()?;
         if !item.is_none() {
-            pyo3::types::PyDictMethods::set_item(&values, key, item)?;
+            values.set_item(key, item)?;
         }
     }
-    let count: Bound<'_, PyAny> = native_field(result, "microbatch_limit_count")?;
-    if !count.is_none() {
-        pyo3::types::PyDictMethods::set_item(&values, "count", count)?;
+    if let Some(limit) = result.microbatch_limit {
+        values.set_item("limit", limit)?;
     }
-    let action: Bound<'_, PyAny> = native_field(result, "microbatch_limit_action")?;
-    if !action.is_none() {
-        pyo3::types::PyDictMethods::set_item(&values, "action", native_field(&action, "value")?)?;
+    if let Some(count) = result.microbatch_limit_count {
+        values.set_item("count", count)?;
+    }
+    if let Some(action) = result.microbatch_limit_action {
+        values.set_item("action", action.value())?;
     }
     bounded_metadata(values.as_any())
 }
@@ -143,25 +101,27 @@ fn asset<'py>(result: &Bound<'py, PyAny>, plan: &Bound<'py, PyAny>) -> Checked<O
     let none = || py.None().into_bound(py);
     let values: Vec<(&str, Bound<'py, PyAny>)> = match result_kind(result)? {
         ResultKind::Model => {
-            let name: Bound<'py, PyAny> = native_field(result, "model_name")?;
+            let native: ModelExecutionResult<Bound<'py, PyAny>> =
+                ModelExecutionResult::read(result)?;
+            let name: Bound<'py, PyAny> = any(py, &native.model_name)?;
             let planned: Bound<'py, PyAny> = planned_target(plan, "model_locations", &name)?;
             let mut values: Vec<(&str, Bound<'py, PyAny>)> = vec![
                 ("kind", "model".into_pyobject(py)?.into_any()),
                 ("name", name),
-                ("status", value(result, "status")?),
+                ("status", any(py, native.status.value())?),
                 (
                     "target",
                     if planned.is_truthy()? {
                         planned
                     } else {
-                        native_field(result, "promoted_relation")?
+                        any(py, &native.promoted_relation)?
                     },
                 ),
+                ("staging_relation", any(py, &native.staging_relation)?),
                 (
-                    "staging_relation",
-                    native_field(result, "staging_relation")?,
+                    "failed_phase",
+                    any(py, native.failed_phase.map(ResultEnum::value))?,
                 ),
-                ("failed_phase", truthy_value(result, "failed_phase")?),
             ];
             let mut converted: Entries = match entries(std::mem::take(&mut values))? {
                 Ok(converted) => converted,
@@ -170,11 +130,11 @@ fn asset<'py>(result: &Bound<'py, PyAny>, plan: &Bound<'py, PyAny>) -> Checked<O
             for (key, evidence) in [
                 (
                     "future_cursor_safety",
-                    future_cursor_safety(&native_field(result, "future_cursor_safety")?)?,
+                    future_cursor_safety(&any(py, &native.future_cursor_safety)?)?,
                 ),
                 (
                     "maximum_start_safety",
-                    maximum_start_safety(&native_field(result, "maximum_start_safety")?)?,
+                    maximum_start_safety(&any(py, &native.maximum_start_safety)?)?,
                 ),
             ] {
                 let evidence: Bound<'py, PyAny> = if evidence.is_none() {
@@ -184,39 +144,41 @@ fn asset<'py>(result: &Bound<'py, PyAny>, plan: &Bound<'py, PyAny>) -> Checked<O
                 };
                 converted.push((key.to_owned(), bounded_metadata(&evidence)?));
             }
-            converted.push(("microbatch".to_owned(), model_microbatch(result)?));
+            converted.push(("microbatch".to_owned(), model_microbatch(py, &native)?));
             return Ok(Ok(Some(converted)));
         }
         ResultKind::Seed => {
-            let name: Bound<'py, PyAny> = native_field(result, "seed_name")?;
+            let native = SeedExecutionResult::read(result)?;
+            let name: Bound<'py, PyAny> = any(py, &native.seed_name)?;
             vec![
                 ("kind", "seed".into_pyobject(py)?.into_any()),
                 ("target", planned_target(plan, "seed_locations", &name)?),
                 ("name", name),
-                ("status", value(result, "status")?),
+                ("status", any(py, native.status.value())?),
             ]
         }
         ResultKind::Function => {
-            let name: Bound<'py, PyAny> = native_field(result, "function_name")?;
+            let native = FunctionExecutionResult::read(result)?;
+            let name: Bound<'py, PyAny> = any(py, &native.function_name)?;
             vec![
-                ("kind", native_field(result, "function_kind")?),
+                ("kind", any(py, &native.function_kind)?),
                 ("target", planned_target(plan, "function_locations", &name)?),
                 ("name", name),
-                ("status", value(result, "status")?),
+                ("status", any(py, native.status.value())?),
             ]
         }
-        ResultKind::Load => vec![
-            ("kind", value(result, "resource_kind")?),
-            ("name", native_field(result, "source_name")?),
-            ("status", value(result, "status")?),
-            ("target", native_field(result, "target")?),
-            (
-                "staging_relation",
-                native_field(result, "staging_relation")?,
-            ),
-            ("loader", native_field(result, "loader_name")?),
-            ("rows_loaded", native_field(result, "rows_loaded")?),
-        ],
+        ResultKind::Load => {
+            let native: LoadExecutionResult<Bound<'py, PyAny>> = LoadExecutionResult::read(result)?;
+            vec![
+                ("kind", any(py, native.resource_kind.value())?),
+                ("name", any(py, &native.source_name)?),
+                ("status", any(py, native.status.value())?),
+                ("target", any(py, &native.target)?),
+                ("staging_relation", any(py, &native.staging_relation)?),
+                ("loader", any(py, &native.loader_name)?),
+                ("rows_loaded", any(py, native.rows_loaded)?),
+            ]
+        }
         ResultKind::PythonNode => vec![
             ("kind", value(result, "kind")?),
             ("name", native_field(result, "node_name")?),
@@ -233,51 +195,64 @@ fn asset<'py>(result: &Bound<'py, PyAny>, plan: &Bound<'py, PyAny>) -> Checked<O
 
 fn audit_check<'py>(result: &Bound<'py, PyAny>) -> Checked<Entries> {
     let py: Python<'py> = result.py();
-    let check_id: Bound<'py, PyAny> = audit_check_id(result)?.into_pyobject(py)?.into_any();
-    let (evidence_count, evidence_truncated) = measurement_evidence(result)?;
+    let native: AuditExecutionResult<Bound<'py, PyAny>> = AuditExecutionResult::read(result)?;
+    let check_id = any(py, native.identity()?.map(|(_, id)| id))?;
+    let measurement = native.evaluation_mode == AuditEvaluationMode::Measurement;
     entries(vec![
         ("kind", "audit".into_pyobject(py)?.into_any()),
-        ("name", native_field(result, "audit_name")?),
+        ("name", any(py, &native.audit_name)?),
         ("check_id", check_id.clone()),
         ("dag_check_id", check_id),
         (
             "passed",
-            PyBool::new(py, audit_passed(result)?).to_owned().into_any(),
+            any(
+                py,
+                matches!(
+                    native.outcome,
+                    AuditOutcome::Pass | AuditOutcome::Insufficient
+                ),
+            )?,
         ),
-        ("status", value(result, "outcome")?),
-        ("severity", value(result, "severity")?),
-        ("row_count", native_field(result, "row_count")?),
-        ("attachment_kind", value(result, "attachment_kind")?),
-        ("asset_name", native_field(result, "attached_target_name")?),
+        ("status", any(py, native.outcome.value())?),
+        ("severity", any(py, native.severity.value())?),
+        ("row_count", any(py, native.row_count)?),
+        ("attachment_kind", any(py, native.attachment_kind.value())?),
+        ("asset_name", any(py, &native.attached_target_name)?),
         (
             "attached_column_name",
-            native_field(result, "attached_column_name")?,
+            any(py, &native.attached_column_name)?,
         ),
         (
             "attached_target_name",
-            native_field(result, "attached_target_name")?,
+            any(py, &native.attached_target_name)?,
         ),
-        ("run_scope_phase", value(result, "run_scope_phase")?),
-        ("reused", native_field(result, "reused")?),
-        ("evaluation_mode", value(result, "evaluation_mode")?),
-        ("measured_value", native_field(result, "measured_value")?),
-        ("sample_count", native_field(result, "sample_count")?),
-        ("sample_unit", native_field(result, "sample_unit")?),
-        ("minimum_samples", native_field(result, "minimum_samples")?),
+        ("run_scope_phase", any(py, native.run_scope_phase.value())?),
+        ("reused", any(py, native.reused)?),
+        ("evaluation_mode", any(py, native.evaluation_mode.value())?),
+        (
+            "measured_value",
+            measured_value(py, native.measured_value.as_ref())?,
+        ),
+        ("sample_count", any(py, native.sample_count)?),
+        ("sample_unit", any(py, &native.sample_unit)?),
+        ("minimum_samples", any(py, native.minimum_samples)?),
         (
             "thresholds",
-            measurement_thresholds(&native_field(result, "thresholds")?)?,
+            measurement_thresholds(&any(py, &native.thresholds)?)?,
         ),
-        ("evidence_count", evidence_count),
-        ("evidence_truncated", evidence_truncated),
+        (
+            "evidence_count",
+            any(py, measurement.then_some(native.evidence_rows.len()))?,
+        ),
+        (
+            "evidence_truncated",
+            any(py, measurement.then_some(native.evidence_truncated))?,
+        ),
         (
             "audit_definition_name",
-            native_field(result, "audit_definition_name")?,
+            any(py, &native.audit_definition_name)?,
         ),
-        (
-            "audit_description",
-            native_field(result, "audit_description")?,
-        ),
+        ("audit_description", any(py, &native.audit_description)?),
     ])
 }
 
@@ -290,26 +265,20 @@ fn checks<'py>(result: &Bound<'py, PyAny>) -> Checked<Vec<Entries>> {
     match result_kind(result)? {
         ResultKind::Audit => single(audit_check(result)),
         ResultKind::SqlTest => {
-            let check_id: Bound<'py, PyAny> =
-                sql_test_check_id(result)?.into_pyobject(py)?.into_any();
-            let steps: Vec<Bound<'py, PyAny>> = items(&native_field(result, "step_results")?)?;
-            let outcome: Bound<'py, PyAny> = value(result, "outcome")?;
+            let native: SqlTestExecutionResult<Bound<'py, PyAny>> =
+                SqlTestExecutionResult::read(result)?;
+            let check_id = any(py, native.identity()?.map(|(_, id)| id))?;
             single(entries(vec![
                 ("kind", "sql_test".into_pyobject(py)?.into_any()),
-                ("name", native_field(result, "test_name")?),
+                ("name", any(py, &native.test_name)?),
                 ("check_id", check_id.clone()),
                 ("dag_check_id", check_id),
-                (
-                    "passed",
-                    PyBool::new(py, outcome.eq(PASS_OUTCOME)?)
-                        .to_owned()
-                        .into_any(),
-                ),
-                ("status", outcome),
+                ("passed", any(py, native.outcome == SqlTestOutcome::Pass)?),
+                ("status", any(py, native.outcome.value())?),
                 (
                     "asset_name",
-                    match steps.first() {
-                        Some(step) => native_field(step, "model_name")?,
+                    match native.step_results.first() {
+                        Some(step) => any(py, &step.model_name)?,
                         None => py.None().into_bound(py),
                     },
                 ),

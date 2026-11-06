@@ -54,10 +54,12 @@ from tests.integration.src.sqlbuild.cli.commands.main.helpers import (
     write_project_scratch_rules,
 )
 
-_CACHE_RULES_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n'
+_CACHE_RULES_TOML: str = (
+    'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n'
+)
 _CACHE_THRESHOLD_TOML: str = _CACHE_RULES_TOML + "thresholds = { max_literal_length = 7 }\n"
 _CACHE_SELECTION_TOML: str = _CACHE_THRESHOLD_TOML.replace(
-    '"SQBRSQL004"', '"SQBRSQL004", "SQBRSQL001"'
+    '"SQLCLEAN004"', '"SQLCLEAN004", "SQLCLEAN001"'
 )
 _CACHE_MODEL_SQL: str = 'MODEL (description "Orders");\nSELECT order_id FROM orders LIMIT 1\n'
 _CACHE_EDITED_SQL: str = _CACHE_MODEL_SQL.replace("LIMIT 1", "LIMIT 2")
@@ -188,7 +190,7 @@ _EARLY_LINT_SLOW_HOOKS: int = 8
 _EARLY_LINT_SLOW_EXPANSION_S: float = 0.5
 _EARLY_LINT_EXPANSION_DELAYS_S: dict[str, float] = {"orders": 0.0}
 _EARLY_LINT_FINDINGS: tuple[tuple[str, str, int | None, int | None], ...] = (
-    ("SQBRSQL005", "models/order_cents.sql", 2, 119),
+    ("SQLCLEAN005", "models/order_cents.sql", 2, 119),
 )
 
 
@@ -646,7 +648,7 @@ def test_given_proven_dynamic_pivot_when_compiling_contract_rules_then_wildcard_
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "snowflake"\n\n[rules]\n'
-        'select = ["SQBRMODEL102", "SQBRSQL021", "SQBRCONTRACT101", '
+        'select = ["SQBRMODEL102", "SQLCLEAN021", "SQBRCONTRACT101", '
         '"SQBRCONTRACT105", "SQBRCONTRACT106"]\n\n'
         "[defaults]\n"
         'contract = "enforced"\n',
@@ -706,7 +708,7 @@ def test_given_proven_dynamic_pivot_when_compiling_contract_rules_then_wildcard_
 
     assert invalid_exit_code == test_case.expected_invalid_exit_code
     assert invalid_codes.count("SQBRMODEL102") == test_case.expected_invalid_model_findings
-    assert invalid_codes.count("SQBRSQL021") == test_case.expected_invalid_sql_findings
+    assert invalid_codes.count("SQLCLEAN021") == test_case.expected_invalid_sql_findings
 
 
 @pytest.mark.parametrize(
@@ -765,7 +767,7 @@ def test_given_contract_rules_when_compiling_then_contract_is_enforced_typed_and
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("selected SQL rule blocks artifacts", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("selected SQL rule blocks artifacts", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_artifacts(
@@ -774,7 +776,7 @@ def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
     model: Path = tmp_path / "models" / "orders.sql"
@@ -809,7 +811,7 @@ def test_given_selected_sql_rule_when_compiling_then_authored_diagnostic_blocks_
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("SQL rule cache follows the native build", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("SQL rule cache follows the native build", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_sql_rule_cache_from_another_native_build_when_compiling_then_rules_rerun(
@@ -853,7 +855,7 @@ def test_given_sql_rule_cache_from_another_native_build_when_compiling_then_rule
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("warm SQL rules track non-model file edits", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("warm SQL rules track non-model file edits", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_cached_sql_test_rules_when_test_or_macro_changes_then_findings_are_current(
@@ -904,7 +906,7 @@ def test_given_cached_sql_test_rules_when_test_or_macro_changes_then_findings_ar
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("warm SQL rules reuse compiler declaration scope", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("warm SQL rules reuse compiler declaration scope", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_warm_scoped_macro_sql_test_when_compiling_then_rules_reuse_compiler_scope(
@@ -942,7 +944,7 @@ def test_given_warm_scoped_macro_sql_test_when_compiling_then_rules_reuse_compil
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("cold SQL rules rebind the compiler scope index", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("cold SQL rules rebind the compiler scope index", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_cold_scoped_macro_sql_test_when_compiling_then_early_lint_uses_private_macros(
@@ -989,7 +991,7 @@ def test_given_cold_scoped_macro_sql_test_when_compiling_then_early_lint_uses_pr
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("early file read gives the cached findings", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("early file read gives the cached findings", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_cold_non_model_sql_finding_when_compiling_twice_then_warm_findings_match(
@@ -1087,7 +1089,7 @@ def test_given_graph_error_when_compiling_then_early_lint_is_stopped_instead_of_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL005"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN005"]\n',
         encoding="utf-8",
     )
     models_dir: Path = tmp_path / "models"
@@ -1149,7 +1151,7 @@ def test_given_sql_and_custom_rules_when_compiling_twice_then_custom_host_runs_o
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n'
-        f'[rules]\nselect = ["SQBRSQL004", "{test_case.expected_code}"]\n\n'
+        f'[rules]\nselect = ["SQLCLEAN004", "{test_case.expected_code}"]\n\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n",
         encoding="utf-8",
     )
@@ -1189,7 +1191,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
     assert warm == cold
     assert {
         f"models/orders.sql:{test_case.expected_code}",
-        "tests/unit/test_orders.sql:SQBRSQL004",
+        "tests/unit/test_orders.sql:SQLCLEAN004",
     } <= cold
 
 
@@ -1451,7 +1453,7 @@ def final_directory(*, model: Model, ctx: RuleContext) -> list[Finding]:
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("focused SQL rule reports requested code", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("focused SQL rule reports requested code", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_project_when_running_focused_rule_family_then_only_that_family_runs(
@@ -1476,7 +1478,7 @@ def test_given_project_when_running_focused_rule_family_then_only_that_family_ru
             "rules",
             "--json",
             "run",
-            "SQBRSQL004",
+            "SQLCLEAN004",
         ]
     )
 
@@ -1484,12 +1486,12 @@ def test_given_project_when_running_focused_rule_family_then_only_that_family_ru
     captured: CaptureResult[str] = capsys.readouterr()
     payload: dict[str, object] = json.loads(captured.out)
     assert test_case.expected_code in json.dumps(payload["findings"])
-    assert "Rule selection SQBRSQL004 failed with 1 finding(s)." in captured.err
+    assert "Rule selection SQLCLEAN004 failed with 1 finding(s)." in captured.err
 
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("inline join query is rejected", 1, "SQBRSQL039")],
+    [RulesIntegrationTestCase("inline join query is rejected", 1, "SQLCLEAN039")],
     ids=lambda case: case.description,
 )
 def test_given_inline_query_relation_when_running_readability_rule_then_finding_is_reported(
@@ -1538,7 +1540,7 @@ FULL OUTER JOIN (
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("scalar query internals are excluded", 0, "SQBRSQL039")],
+    [RulesIntegrationTestCase("scalar query internals are excluded", 0, "SQLCLEAN039")],
     ids=lambda case: case.description,
 )
 def test_given_scalar_query_with_derived_relation_when_running_readability_rule_then_no_finding_is_reported(
@@ -1583,7 +1585,7 @@ SELECT (
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("SQL function arguments are not columns", 0, "SQBRSQL027")],
+    [RulesIntegrationTestCase("SQL function arguments are not columns", 0, "SQLCLEAN027")],
     ids=lambda case: case.description,
 )
 def test_given_sql_function_argument_when_running_qualification_rule_then_argument_is_not_reported(
@@ -1629,7 +1631,7 @@ WHERE current_orders.created_at >= start_date
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("table function argument preserves left alias", 0, "SQBRSQL023")],
+    [RulesIntegrationTestCase("table function argument preserves left alias", 0, "SQLCLEAN023")],
     ids=lambda case: case.description,
 )
 def test_given_table_function_argument_when_running_alias_rule_then_left_alias_is_preserved(
@@ -1749,7 +1751,7 @@ def test_given_implicit_table_alias_when_running_alias_rule_then_usage_decides_f
         'MODEL (description "Order customers");\n' + test_case.query_sql, encoding="utf-8"
     )
 
-    exit_code: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQBRSQL023"])
+    exit_code: int = main(["--project-dir", str(tmp_path), "rules", "--json", "run", "SQLCLEAN023"])
 
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
     findings: list[dict[str, object]] = cast(list[dict[str, object]], payload["findings"])
@@ -1762,7 +1764,7 @@ def test_given_implicit_table_alias_when_running_alias_rule_then_usage_decides_f
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("ceremonial SQL test passes terminal rule", 0, "SQBRSQL035")],
+    [RulesIntegrationTestCase("ceremonial SQL test passes terminal rule", 0, "SQLCLEAN035")],
     ids=lambda case: case.description,
 )
 def test_given_ceremonial_sql_test_when_compiling_with_rule_035_then_project_is_valid(
@@ -1771,7 +1773,7 @@ def test_given_ceremonial_sql_test_when_compiling_with_rule_035_then_project_is_
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL035"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN035"]\n',
         encoding="utf-8",
     )
     model: Path = tmp_path / "models" / "orders.sql"
@@ -1804,7 +1806,7 @@ SELECT 1
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("contextual keywords are plain terminal columns", 0, "SQBRSQL035")],
+    [RulesIntegrationTestCase("contextual keywords are plain terminal columns", 0, "SQLCLEAN035")],
     ids=lambda case: case.description,
 )
 def test_given_keyword_named_columns_when_running_terminal_rule_then_projection_is_accepted(
@@ -1973,7 +1975,7 @@ FROM __seed("order_statuses")
         RulesIntegrationTestCase(
             "dependency import star is compatible with output-shape rule",
             0,
-            "SQBRSQL021",
+            "SQLCLEAN021",
         )
     ],
     ids=lambda case: case.description,
@@ -2027,7 +2029,7 @@ FROM final
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("invocation-dependent stars are accepted", 0, "SQBRSQL021")],
+    [RulesIntegrationTestCase("invocation-dependent stars are accepted", 0, "SQLCLEAN021")],
     ids=lambda case: case.description,
 )
 def test_given_invocation_dependent_shapes_when_running_output_shape_rule_then_stars_are_accepted(
@@ -2256,7 +2258,7 @@ FROM final
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("cross join used by filter is not unused", 0, "SQBRSQL032")],
+    [RulesIntegrationTestCase("cross join used by filter is not unused", 0, "SQLCLEAN032")],
     ids=lambda case: case.description,
 )
 def test_given_cross_join_used_by_filter_when_running_unused_join_rule_then_no_finding_is_reported(
@@ -2298,7 +2300,7 @@ WHERE orders.created_at < cutoff.created_at
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("ceremonial SQL test select is ignored", 0, "SQBRSQL022")],
+    [RulesIntegrationTestCase("ceremonial SQL test select is ignored", 0, "SQLCLEAN022")],
     ids=lambda case: case.description,
 )
 def test_given_ceremonial_test_select_when_running_alias_rule_then_control_projection_is_not_reported(
@@ -2341,7 +2343,7 @@ def test_given_ceremonial_test_select_when_running_alias_rule_then_control_proje
     "test_case",
     [
         RulesIntegrationTestCase(
-            "direct ceremonial select satisfies terminal shape", 0, "SQBRSQL035"
+            "direct ceremonial select satisfies terminal shape", 0, "SQLCLEAN035"
         )
     ],
     ids=lambda case: case.description,
@@ -2384,7 +2386,7 @@ def test_given_direct_ceremonial_select_when_running_terminal_rule_then_test_is_
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("scalar subquery after prior CTE is stable", 0, "SQBRSQL022")],
+    [RulesIntegrationTestCase("scalar subquery after prior CTE is stable", 0, "SQLCLEAN022")],
     ids=lambda case: case.description,
 )
 def test_given_prior_cte_when_scalar_subquery_is_aliased_then_inner_aggregate_is_not_reported(
@@ -2432,7 +2434,7 @@ SELECT * FROM ticket_totals
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("cast type is not a self alias", 0, "SQBRSQL016")],
+    [RulesIntegrationTestCase("cast type is not a self alias", 0, "SQLCLEAN016")],
     ids=lambda case: case.description,
 )
 def test_given_cast_and_relation_aliases_when_running_self_alias_rule_then_no_finding_is_reported(
@@ -2472,7 +2474,7 @@ FROM orders AS orders
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("upstream graph selector scopes an ignore", 1, "SQBRSQL021")],
+    [RulesIntegrationTestCase("upstream graph selector scopes an ignore", 1, "SQLCLEAN021")],
     ids=lambda case: case.description,
 )
 def test_given_graph_scoped_rule_ignore_when_running_rules_then_only_matched_resources_are_ignored(
@@ -2483,7 +2485,7 @@ def test_given_graph_scoped_rule_ignore_when_running_rules_then_only_matched_res
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n'
         "[[rules.rule_ignores]]\n"
-        'rules = ["SQBRSQL021"]\n'
+        'rules = ["SQLCLEAN021"]\n'
         'selectors = ["+orders*"]\n'
         'reason = "Reviewed upstream interface boundary"\n',
         encoding="utf-8",
@@ -2570,7 +2572,7 @@ def forbidden_name(*, model: Model, ctx: RuleContext) -> list[Finding]:
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("SQL rule exception suppresses finding", 0, "SQBRSQL004")],
+    [RulesIntegrationTestCase("SQL rule exception suppresses finding", 0, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_sql_rule_exception_when_compiling_then_unified_suppression_is_applied(
@@ -2580,8 +2582,8 @@ def test_given_sql_rule_exception_when_compiling_then_unified_suppression_is_app
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\n\n'
-        '[rules]\nselect = ["SQBRSQL004"]\n\n'
-        '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\n'
+        '[rules]\nselect = ["SQLCLEAN004"]\n\n'
+        '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\n'
         'path = "models/orders.sql"\nreason = "The fixture intentionally selects one row."\n',
         encoding="utf-8",
     )
@@ -2701,7 +2703,7 @@ def two_models(*, project: Project, ctx: RuleContext) -> list[Finding]:
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("default compile evaluates audit SQL", 1, "SQBRSQL004")],
+    [RulesIntegrationTestCase("default compile evaluates audit SQL", 1, "SQLCLEAN004")],
     ids=lambda case: case.description,
 )
 def test_given_non_model_sql_violation_when_compiling_then_compile_is_authoritative(
@@ -2710,7 +2712,7 @@ def test_given_non_model_sql_violation_when_compiling_then_compile_is_authoritat
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
     model: Path = tmp_path / "models" / "orders.sql"
@@ -2747,8 +2749,8 @@ def test_given_exception_for_other_model_when_compiling_selection_then_exception
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n\n'
-        '[[rules.rule_exceptions]]\nrule = "SQBRSQL004"\npath = "models/customers.sql"\n'
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n\n'
+        '[[rules.rule_exceptions]]\nrule = "SQLCLEAN004"\npath = "models/customers.sql"\n'
         'reason = "The fixture intentionally selects one row."\n',
         encoding="utf-8",
     )
@@ -2888,7 +2890,11 @@ def test_given_subject_before_layer_when_running_folder_rule_then_canonical_move
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("relative project path retains cached SQL finding", 1, "SQBRSQL004")],
+    [
+        RulesIntegrationTestCase(
+            "relative project path retains cached SQL finding", 1, "SQLCLEAN004"
+        )
+    ],
     ids=lambda case: case.description,
 )
 def test_given_relative_project_path_when_compiling_twice_then_sql_finding_remains_cached(
@@ -2900,7 +2906,7 @@ def test_given_relative_project_path_when_compiling_twice_then_sql_finding_remai
     project_dir: Path = tmp_path / "project"
     project_dir.mkdir()
     (project_dir / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
     model: Path = project_dir / "models" / "orders.sql"
@@ -2923,7 +2929,7 @@ def test_given_relative_project_path_when_compiling_twice_then_sql_finding_remai
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("inline directive without a finding fails", 1, "SQBRSQL000")],
+    [RulesIntegrationTestCase("inline directive without a finding fails", 1, "SQBRSUPPRESSION000")],
     ids=lambda case: case.description,
 )
 def test_given_inline_directive_without_finding_when_compiling_then_directive_is_reported(
@@ -2932,13 +2938,13 @@ def test_given_inline_directive_without_finding_when_compiling_then_directive_is
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     (tmp_path / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL004"]\n',
+        'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN004"]\n',
         encoding="utf-8",
     )
     model: Path = tmp_path / "models" / "orders.sql"
     model.parent.mkdir()
     model.write_text(
-        "MODEL (description 'Test model orders.');\n-- sqb: ignore SQBRSQL004 because this fixture checks stale directives\n"
+        "MODEL (description 'Test model orders.');\n-- sqb: ignore SQLCLEAN004 because this fixture checks stale directives\n"
         "SELECT 1 AS order_id\n",
         encoding="utf-8",
     )
@@ -3030,10 +3036,24 @@ def required_prefix(*, model: Model, ctx: RuleContext) -> list[Finding]:
             ("rule-ignore selector matches no rules: SQBRZZZ",),
         ),
         EmptyRuleSelectionTestCase(
-            "unknown built-in rule option is rejected",
-            "[rules.rule_options.SQBRSQL004]\nnope = 3\n",
+            "missing literal ignore path is rejected",
+            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models/orders.sql", "models/gone.sql"]\n'
+            'reason = "Legacy."\n',
             1,
-            ("rule SQBRSQL004 has unknown options: nope",),
+            ("rule ignore path does not exist: models/gone.sql",),
+        ),
+        EmptyRuleSelectionTestCase(
+            "ignore paths naming a folder or a glob that matches nothing compile",
+            '[[rules.rule_ignores]]\nrules = ["SQLCLEAN"]\npaths = ["models", "models/legacy/**"]\n'
+            'reason = "Legacy."\n',
+            0,
+            (),
+        ),
+        EmptyRuleSelectionTestCase(
+            "unknown built-in rule option is rejected",
+            "[rules.rule_options.SQLCLEAN004]\nnope = 3\n",
+            1,
+            ("rule SQLCLEAN004 has unknown options: nope",),
         ),
     ],
     ids=lambda case: case.description,

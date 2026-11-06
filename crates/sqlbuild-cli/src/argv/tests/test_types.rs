@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+
+use serde_json::Value as Json;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 
 use sqlbuild_core::dbt_cli::models::DbtParsedFlags;
@@ -62,4 +65,19 @@ pub(super) struct DbtExecutionTestCase {
     pub(super) description: &'static str,
     pub(super) args: &'static [&'static str],
     pub(super) expected_parsed: Result<DbtParsedFlags, DbtExecutionFailure>,
+}
+
+/// Authored settings and the build namespace or validation failure they produce.
+pub(super) struct JobSettingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: BTreeMap<String, Json>,
+    pub(super) expected_values: Vec<(&'static str, Value)>,
+    pub(super) expected_empty: bool,
+}
+
+/// Mutually exclusive authored options rejected before a snapshot is published.
+pub(super) struct JobSettingsRejectionTestCase {
+    pub(super) description: &'static str,
+    pub(super) settings: BTreeMap<String, Json>,
+    pub(super) expected_error: &'static str,
 }

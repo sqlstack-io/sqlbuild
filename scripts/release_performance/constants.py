@@ -30,7 +30,6 @@ PYPI_SIMPLE_JSON: str = "application/vnd.pypi.simple.v1+json"
 PYPI_REQUEST_TIMEOUT_SECONDS: float = 60.0
 BASELINE_PUBLICATION_WAIT_SECONDS: float = 1_800.0
 BASELINE_PUBLICATION_POLL_SECONDS: float = 30.0
-RELEASE_TAG_PATTERN: str = "v*"
 WHEEL_PLATFORM_FAMILIES: dict[str, str] = {"linux": "linux", "darwin": "macosx", "win32": "win"}
 WHEEL_MACHINE_ALIASES: dict[str, str] = {"amd64": "x86_64", "arm64": "aarch64"}
 UNIVERSAL_WHEEL_MACHINE: str = "universal2"

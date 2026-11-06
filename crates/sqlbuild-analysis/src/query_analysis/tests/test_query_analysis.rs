@@ -1,5 +1,4 @@
-use crate::query_analysis::main::analyze::analyze_json;
-use crate::query_analysis::main::analyze_project::analyze_project_json;
+use crate::query_analysis::engine::{analyze_json, analyze_project_json};
 use crate::query_analysis::tests::helpers::{
     binding_warnings_preserve_declared_relationship_evidence,
     borrowed_facts_preserve_named_outputs_and_terminal_sources,

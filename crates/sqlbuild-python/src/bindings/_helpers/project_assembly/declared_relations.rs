@@ -255,7 +255,7 @@ pub(crate) fn declared_relations<'py>(
             Some(contract) => contract.eq(ENFORCED_CONTRACT)?,
             None => false,
         };
-        if enforced && !columns.is_empty() && !schema.dynamic_columns.is_truthy()? {
+        if enforced && !columns.is_empty() && schema.dynamic_columns.is_empty() {
             declared.complete(&maps, &name, (&columns, false))?;
         }
     }

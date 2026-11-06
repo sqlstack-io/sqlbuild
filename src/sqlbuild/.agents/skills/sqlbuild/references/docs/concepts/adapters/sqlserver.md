@@ -6,7 +6,7 @@
 
 Online: https://sqlbuild.com/docs/concepts/adapters/sqlserver/
 
-The SQL Server adapter is in beta: builds, tests and plans work, but it has had less production use so far. Please [report issues](https://github.com/chio-labs/sqlbuild/issues).
+The SQL Server adapter is in beta: builds, tests and plans work, but it has had less production use so far. Please [report issues](https://github.com/sqlstack-io/sqlbuild/issues).
 
 SQL Server requires the optional `pymssql` dependency:
 

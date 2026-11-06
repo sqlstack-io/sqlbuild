@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from sqlbuild._native import (
     SqlValue,
     SqlValueKind,
     format_audit_execution_json,
+    format_build_footer,
     format_parameterized_test_label,
 )
 from sqlbuild.adapter.contract.models import LifeCycleEvent
@@ -33,6 +35,8 @@ from sqlbuild.compiler.auditing.types import (
 )
 from sqlbuild.compiler.compile.types import AttachedAuditTargetKind
 from sqlbuild.executor.auditing.models import AuditExecutionResult
+from sqlbuild.executor.build.models import BuildExecutionResult
+from sqlbuild.executor.build.types import BuildStatus
 from sqlbuild.executor.run.models import (
     MicrobatchAccountingInterval,
     ModelExecutionResult,
@@ -548,3 +552,12 @@ def test_given_parameterized_sql_test_result_when_formatting_json_then_case_meta
         )
         == test_case.expected_text_label
     )
+    footer: str = format_build_footer(
+        result=BuildExecutionResult(
+            status=BuildStatus.FAILED,
+            test_results=(replace(result, outcome=SqlTestOutcome.FAIL),),
+        ),
+        elapsed=1.0,
+        use_color=False,
+    )
+    assert test_case.expected_text_label in footer

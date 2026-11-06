@@ -5,11 +5,11 @@ use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::records::compiled_model_record;
+use crate::bindings::_helpers::graph::keys::KeyCache;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
 use crate::bindings::_helpers::planner_entries::model_entries::plan_model;
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
-use crate::bindings::_helpers::planner_identity::graph::build_execution_upstream_deps;
-use crate::bindings::_helpers::planner_identity::graph::topologically_order_keys;
+use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
 use crate::bindings::_helpers::planner_scenario::constants::{
@@ -99,15 +99,15 @@ pub(crate) fn build_scenario_execution_plan<'py>(
     let models = by_attribute(&project_reads::models(&project)?, "name")?;
     let functions = by_attribute(&project_reads::functions(&project)?, "key")?;
     let locations = build_function_locations(&project_reads::functions(&project)?)?.into_any();
-    let upstream = build_execution_upstream_deps(&project)?.into_any();
-    let ordered = object(py, topologically_order_keys(&upstream, None)?)?;
+    let upstream = execution_deps(&project)?;
+    let ordered = execution_order(py, &upstream, &[])?;
+    let ordered = KeyCache::new(py)?.keys(&ordered)?;
     let mut model_keys: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in ordered.try_iter()? {
-        let key = key?;
-        if native_field(&key, "resource_type")?.eq("model")?
-            && native_field(&graph, "model_names")?.contains(native_field(&key, "name")?)?
+    for key in &ordered {
+        if native_field(key, "resource_type")?.eq("model")?
+            && native_field(&graph, "model_names")?.contains(native_field(key, "name")?)?
         {
-            model_keys.push(key);
+            model_keys.push(key.clone());
         }
     }
     let overrides = if analysis {
@@ -118,9 +118,8 @@ pub(crate) fn build_scenario_execution_plan<'py>(
     let fixtures = fixture_plans(&scenario, &graph, &context, &overrides)?;
     let seeds = seed_entries(&project, &graph, &context.relations)?;
     let mut function_entries: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in ordered.try_iter()? {
-        let key = key?;
-        if native_field(&graph, "function_deps")?.contains(&key)?
+    for key in &ordered {
+        if native_field(&graph, "function_deps")?.contains(key)?
             && let Some(function) = functions.get_item(key)?
         {
             function_entries.push(function_entry(&function, &context, &locations, &columns)?);
@@ -271,7 +270,7 @@ fn model_context<'py>(
         py,
         ModelPlanContext {
             model_locations: native_field(&context.relations, "model_locations")?.unbind(),
-            models_by_name: models.clone().into_any().unbind(),
+            models_by_name: models.clone().into_any().into(),
             functions_by_name: by_attribute(&project_reads::functions(project)?, "name")?
                 .into_any()
                 .unbind(),

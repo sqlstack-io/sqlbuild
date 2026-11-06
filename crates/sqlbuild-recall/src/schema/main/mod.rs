@@ -1,5 +1,7 @@
 pub mod add_column_statement;
 pub mod clickhouse_relation;
+pub mod control_table_statements;
+pub mod control_view_statements;
 pub mod create_database_statement;
 pub mod ddl_script;
 pub mod ddl_statements;

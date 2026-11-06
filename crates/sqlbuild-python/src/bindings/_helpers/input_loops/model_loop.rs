@@ -209,6 +209,8 @@ pub(crate) struct LoopContext<'a, 'py> {
     pub(crate) host: &'a Bound<'py, ConstantRendering>,
     pub(crate) classes: &'a LoopClasses<'py>,
     pub(crate) contracts: &'a ContractClasses<'py>,
+    /// The lexical rules the project's SQL is authored in.
+    pub(crate) syntax: &'a LexicalSyntax,
 }
 
 /// The declarations a model sees and the identity its usages are recorded for.
@@ -295,7 +297,7 @@ fn index_sql_hook_definitions(loop_classes: &Bound<'_, PyDict>) -> PyResult<()> 
 /// Each model's `@@`-interpolated query and declaration scan, all interpolated before any runs.
 fn prepared_rows<'py>(
     py: Python<'py>,
-    classes: &LoopClasses<'py>,
+    (classes, syntax): (&LoopClasses<'py>, &LexicalSyntax),
     model_files: Vec<Py<NativeModelFile>>,
 ) -> PyResult<Vec<ModelLoopRow>> {
     let hooks = &classes.sql_hooks;
@@ -313,6 +315,7 @@ fn prepared_rows<'py>(
             hooks.environment.clone(),
             None,
             hooks.render_project_var.clone(),
+            Some(syntax.clone()),
         ),
         &sqls,
     )?;
@@ -330,7 +333,9 @@ fn prepared_rows<'py>(
             error,
         } = interpolated;
         let sql: String = rendered.unwrap_or(authored);
-        let scan: Option<DeclarationScan> = error.is_none().then(|| declaration_scan(&sql));
+        let scan: Option<DeclarationScan> = error
+            .is_none()
+            .then(|| declaration_scan(&sql, Some(syntax)));
         let reads: Vec<(String, String)> = reads
             .into_iter()
             .map(|(kind, name)| (kind.to_owned(), name))
@@ -360,6 +365,7 @@ impl NativeModelLoop {
             host: &host,
             classes: &classes,
             contracts: &contracts,
+            syntax: &self.syntax,
         };
         project
             .borrow_mut()
@@ -385,12 +391,8 @@ impl NativeModelLoop {
                     local: (enums.as_any(), constants.as_any()),
                 },
             )?;
-            let config: Bound<'py, PyAny> = configs.effective(
-                &context,
-                &record.header_value_dict(py)?,
-                (name, relative_path),
-                row.header.as_ref(),
-            )?;
+            let config: Bound<'py, PyAny> =
+                configs.effective(&context, record, (name, relative_path), row.header.as_ref())?;
             let model: LoopModel<'_, 'py> = LoopModel {
                 row: &row,
                 config,
@@ -427,7 +429,8 @@ impl NativeModelLoop {
     ) -> PyResult<Vec<Bound<'py, NativeModelInput>>> {
         let py: Python<'py> = slf.py();
         let classes: LoopClasses<'py> = slf.get().loop_classes.bind(py).extract()?;
-        let mut models: Vec<ModelLoopRow> = prepared_rows(py, &classes, model_files)?;
+        let mut models: Vec<ModelLoopRow> =
+            prepared_rows(py, (&classes, &slf.get().syntax), model_files)?;
         let headers: Vec<Option<NativeHeader>> = models.iter().map(native_header).collect();
         let facts: Vec<Option<HeaderFacts>> = py
             .compiler_detach(|| Ok(all_header_facts(&headers)))
@@ -456,6 +459,7 @@ impl NativeModelLoop {
             host,
             classes: &classes,
             contracts: &contracts,
+            syntax: &self.syntax,
         };
         let attached: Vec<AttachedSource> = attached_sources(self, &context, rows, settings)?;
         Ok(retain_sources(project, attached))
@@ -476,6 +480,7 @@ impl NativeModelLoop {
             host,
             classes: &classes,
             contracts: &contracts,
+            syntax: &self.syntax,
         };
         attached_audits(self, &context, (files, owners), settings)
     }
@@ -495,6 +500,7 @@ impl NativeModelLoop {
             host,
             classes: &classes,
             contracts: &contracts,
+            syntax: &self.syntax,
         };
         let validator: Bound<'py, NativeModelValidator> =
             self.validator.bind(py).downcast()?.clone();
@@ -562,6 +568,7 @@ impl NativeModelLoop {
             host,
             classes: &classes,
             contracts: &contracts,
+            syntax: &self.syntax,
         };
         let attached: Vec<AttachedFunction> = attached_functions(self, &context, rows, settings)?;
         checked_table_function_arities(&context, models, &attached)?;
@@ -645,6 +652,7 @@ impl NativeModelLoop {
                         query: authored_query,
                     }),
                     scopes: Some(&context.classes.visibility),
+                    syntax: Some(context.syntax),
                 }),
             })?;
         let macros: Option<ExpandedMacros> = if calls_macros(&declarations.spliced.sql) {
@@ -772,6 +780,7 @@ impl NativeModelLoop {
         let source: HeaderSource<'_, 'py> = HeaderSource {
             name,
             values: &values,
+            config: &config,
             model_file: model_file.get(),
             relative_path,
             visible: (&visible.declarations, &visible.consumer),

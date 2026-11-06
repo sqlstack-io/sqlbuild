@@ -92,8 +92,9 @@ jobs:
         if: steps.release.outputs.prs_created == 'true'
         env:
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.name }}
-        # Release Please only bumps workspace versions, so updating the workspace entries of
-        # Cargo.lock is enough and needs no compile; metadata --locked proves the lock is complete.
+        # Release Please only bumps the sqlbuild-cli and sqlbuild-python crate versions, so updating
+        # the workspace entries of Cargo.lock is enough and needs no compile; metadata --locked
+        # proves the lock is complete.
         run: |
           cargo update --workspace
           cargo metadata --locked --format-version 1 > /dev/null
@@ -198,7 +199,7 @@ jobs:
 
           # Keep this allowlist in sync with the release metadata check in verify.yml.
           unexpected_files="$(gh pr view "${RELEASE_PR}" --repo "${GITHUB_REPOSITORY}" \
-            --json files --jq '[.files[].path | select(. != ".release-please-manifest.json" and . != "CHANGELOG.md" and . != "pyproject.toml" and . != "uv.lock" and . != "Cargo.lock" and . != "Cargo.toml")] | join("\n")')"
+            --json files --jq '[.files[].path | select(. != ".release-please-manifest.json" and . != "CHANGELOG.md" and . != "pyproject.toml" and . != "uv.lock" and . != "Cargo.lock" and . != "crates/sqlbuild-cli/Cargo.toml" and . != "crates/sqlbuild-python/Cargo.toml")] | join("\n")')"
           if [[ -n "${unexpected_files}" ]]; then
             echo "Release pull request contains non-metadata changes:" >&2
             echo "${unexpected_files}" >&2

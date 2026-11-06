@@ -47,6 +47,7 @@ from sqlbuild._native import (
     Fingerprint,
     FunctionArgument,
     PlannerChangeResults,
+    PlannerScope,
     PlanOutput,
     PlanReason,
     ScenarioArtifactIdentity,
@@ -1395,8 +1396,13 @@ def detect_function_reason(
         sql_analysis_dialect=None,
         hook_functions=(),
     )
-    scope: Mock = Mock(
-        selected_keys=frozenset({function.key}), execution_order=(), models_by_name={}
+    scope: PlannerScope = PlannerScope(
+        upstream_deps={},
+        downstream_deps={},
+        all_keys={},
+        selected_keys=frozenset({function.key}),
+        execution_order=(),
+        models_by_name={},
     )
     snapshot: Mock = Mock(fingerprints=SimpleNamespace(functions=fingerprints), column_dialect=None)
     changes: PlannerChangeResults = detect_changes(

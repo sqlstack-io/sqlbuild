@@ -2,6 +2,7 @@
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_migrations::column_objects::config;
 use crate::bindings::_helpers::planner_migrations::column_objects::native;
 use crate::bindings::_helpers::planner_migrations::discovery_events::{
@@ -10,6 +11,7 @@ use crate::bindings::_helpers::planner_migrations::discovery_events::{
 use crate::bindings::_helpers::planner_migrations::models::{
     ModelMigrationDeclaration, ModelMigrationRequest,
 };
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::enum_member;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -113,9 +115,13 @@ pub(super) fn automatic<'py>(
     matches: (&Bound<'py, PyAny>, &Bound<'py, PyDict>),
 ) -> PyResult<Vec<ModelMigrationRequest<'py>>> {
     let py = runtime.py();
+    let scope = scope_data(scope)?;
     let mut requests: Vec<ModelMigrationRequest<'py>> = Vec::new();
     for item in models {
-        if !native_field(scope, "selected_keys")?.contains(model_reads::model_key(item)?)? {
+        if !scope
+            .selected
+            .contains(&native_key(&model_reads::model_key(item)?)?)
+        {
             continue;
         }
         let name = model_reads::name_object(item)?;
@@ -161,9 +167,13 @@ pub(super) fn warnings<'py>(
     ambiguous: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py = scope.py();
+    let scope = scope_data(scope)?;
     let selected = PySet::empty(py)?;
     for item in models {
-        if native_field(scope, "selected_keys")?.contains(model_reads::model_key(item)?)? {
+        if scope
+            .selected
+            .contains(&native_key(&model_reads::model_key(item)?)?)
+        {
             selected.add(model_reads::name_object(item)?)?;
         }
     }

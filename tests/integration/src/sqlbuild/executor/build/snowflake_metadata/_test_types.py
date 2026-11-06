@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -82,3 +83,63 @@ class ExternalChangeTestCase:
     change: Callable[[SimulatedSnowflakeWarehouse], None]
     before_statement: str
     expected_table_types: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PlannerListingReuseTestCase:
+    """Two real ``sqb build`` runs and the schema listings each issues.
+
+    Each external change runs once, when a build reaches its statement pattern, as another
+    session changing the schema between planning and the run.
+    """
+
+    description: str
+    expected_listings: tuple[dict[str, int], ...]
+    expected_table_types: tuple[str, ...]
+    listing_max_age_seconds: float = 60.0
+    external_changes: tuple[
+        tuple[re.Pattern[str], Callable[[SimulatedSnowflakeWarehouse], None]], ...
+    ] = ()
+
+
+@dataclass(frozen=True)
+class QuotedColumnBuildTestCase:
+    """A source stored with quoted mixed-case column names, built twice through the real CLI."""
+
+    description: str
+    stored_columns: tuple[str, ...]
+    expected_fragment: str
+
+
+@dataclass(frozen=True)
+class QuotedContractBuildTestCase:
+    """An enforced contract declaring a name the model's quoted mixed-case alias produces."""
+
+    description: str
+    declared_name: str
+    produced_columns: tuple[str, ...]
+    expected_exit_code: int = 0
+
+
+@dataclass(frozen=True)
+class QuotedConfiguredColumnTestCase:
+    """A snapshot key and a microbatch cursor configured for quoted mixed-case columns."""
+
+    description: str
+    unique_key: str
+    updated_at: str
+    cursor: str
+    expected_exit_code: int
+    expected_fragments: tuple[str, ...] = ()
+    expected_errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class TemporalSourceContractTestCase:
+    """An enforced source contract's temporal type and the column type the warehouse holds."""
+
+    description: str
+    declared_type: str
+    warehouse_type: str
+    expected_models: tuple[str, ...]
+    expected_error: str = ""

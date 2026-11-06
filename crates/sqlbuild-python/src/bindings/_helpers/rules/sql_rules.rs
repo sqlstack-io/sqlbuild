@@ -19,6 +19,7 @@ use sqlbuild_rules::rule_results::models::RuleFinding;
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::{
     NativeCompiledModel, SqlRuleInputs, SqlRuleKey,
 };
@@ -28,11 +29,13 @@ use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::rules::constants::SAFE_RULE_FIX_CODES;
 use crate::bindings::_helpers::rules::constants::SQL_RULE_PREFIX;
 use crate::bindings::_helpers::rules::early_sql_lint::{
-    EarlyLintResult, EarlySqlLint, PreparedSqlLint, sql_lint_settings, sql_rule_cache_path,
+    EarlyLintResult, EarlySqlLint, ExpansionReuse, PreparedSqlLint, sql_lint_settings,
+    sql_rule_cache_path,
 };
 use crate::bindings::_helpers::rules::fact_replay::project_attribute;
 use crate::bindings::_helpers::rules::lint_expansion::{
@@ -52,7 +55,7 @@ const DATACLASSES_MODULE: &str = "dataclasses";
 const JSON_MODULE: &str = "json";
 const BUILTINS_MODULE: &str = "builtins";
 const PATHLIB_MODULE: &str = "pathlib";
-const SQL_RULE_SUPPRESSION_CODE: &str = "SQBRSQL000";
+const SQL_RULE_SUPPRESSION_CODE: &str = "SQBRSUPPRESSION000";
 const DEFAULT_REMEDIATION: &str = "Update the authored SQL to satisfy this rule.";
 const UTF8: &str = "utf-8";
 
@@ -277,6 +280,35 @@ fn model_posix_path(model: &Bound<'_, PyAny>) -> PyResult<String> {
         .extract()
 }
 
+/// Audit and SQL test files whose every block sets `sql_analysis false` in its header.
+fn opted_out_resource_paths(
+    project: &Bound<'_, PyAny>,
+    project_dir: &Path,
+) -> PyResult<HashSet<PathBuf>> {
+    let excluded: Bound<'_, PyAny> = false.into_bound_py_any(project.py())?;
+    let mut opted_out: HashMap<PathBuf, bool> = HashMap::new();
+    for (collection, file_field, block_field) in [
+        ("audits", "audit_file", "audit_block"),
+        ("sql_tests", "test_file", "test_block"),
+    ] {
+        for resource in project_attribute(project, collection)?.try_iter()? {
+            let resource: Bound<'_, PyAny> = resource?;
+            let relative: String =
+                native_field(&native_field(&resource, file_field)?, "relative_path")?
+                    .str()?
+                    .extract()?;
+            let values: Bound<'_, PyAny> =
+                native_field(&native_field(&resource, block_field)?, "header_values")?;
+            let opts_out: bool = mapping_get(&values, "sql_analysis")?.is(&excluded);
+            *opted_out.entry(project_dir.join(relative)).or_insert(true) &= opts_out;
+        }
+    }
+    Ok(opted_out
+        .into_iter()
+        .filter_map(|(path, opts_out)| opts_out.then_some(path))
+        .collect())
+}
+
 /// Whether the model's config values set `sql_analysis` to `False`.
 fn python_excluded(model: &Bound<'_, PyAny>) -> PyResult<bool> {
     let excluded: Bound<'_, PyAny> = false.into_bound_py_any(model.py())?;
@@ -407,14 +439,15 @@ fn evaluated_sql_rules(
     let mut project_files: Option<Vec<LintFile>> = None;
     let compiled: HashMap<PathBuf, CompiledSource> = project_sql_expansions(&run.project)?;
     if !run.model_selection {
-        let mut model_paths: HashSet<PathBuf> = HashSet::new();
+        let mut skipped_paths: HashSet<PathBuf> =
+            opted_out_resource_paths(&run.project, project_dir)?;
         for model in project_attribute(&run.project, "models")?.try_iter()? {
-            model_paths.insert(project_dir.join(model_posix_path(&model?)?));
+            skipped_paths.insert(project_dir.join(model_posix_path(&model?)?));
         }
         let files: Vec<LintFile> = linted_files(run, prepared_files)?;
         let mut file_keys: Vec<(PathBuf, String, Option<String>)> = Vec::new();
         for file in &files {
-            if model_paths.contains(&file.path) {
+            if skipped_paths.contains(&file.path) {
                 continue;
             }
             let Ok(relative) = file.path.strip_prefix(project_dir) else {
@@ -610,23 +643,29 @@ fn path_rows(outcome: LintOutcome) -> Vec<(PathBuf, LintViolationRow)> {
         .collect()
 }
 
-/// Build lint expansion, reusing the compiler's scope only for the same discovery.
+/// Build lint expansion with the compiled target and vars, reusing the compiler's scope only for the same discovery.
 fn lint_expansion_context(
     run: &SqlRun<'_, '_>,
 ) -> PyResult<crate::bindings::_helpers::render::authored_sql::SqlExpansionInputs> {
     let py: Python<'_> = run.project.py();
-    let declaration_scope: Option<Bound<'_, PyAny>> = run
+    let reuse: Option<&ExpansionReuse> = match run
         .early_lint
         .as_ref()
         .and_then(|early| early.expansion_reuse())
-        .filter(|reuse| reuse.discovered_inputs.bind(py).is(&run.discovered_inputs))
-        .map(|reuse| reuse.declaration_scope.bind(py).clone());
+    {
+        Some(reuse) if reuse.discovered_inputs(py)?.is(&run.discovered_inputs) => Some(reuse),
+        _ => None,
+    };
     lint_expansion_inputs(LintExpansionSources {
         project_dir: run.project_dir.clone().into_pyobject(py)?.into_any(),
-        value_renderer: None,
+        value_renderer: reuse.map(|reuse| reuse.value_renderer(py)),
+        vars: ExpansionVars::Compile {
+            target_name: native_field(&run.project, "effective_target_name")?,
+            vars: native_field(&run.project, "effective_vars")?,
+        },
         discovered_inputs: (!run.discovered_inputs.is_none())
             .then(|| run.discovered_inputs.clone()),
-        declaration_scope,
+        declaration_scope: reuse.map(|reuse| reuse.declaration_scope(py)).transpose()?,
         static_declaration_scope: None,
     })
 }

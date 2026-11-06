@@ -23,12 +23,12 @@ pub(crate) fn discover_project_configuration<'py>(
     configuration_inputs(py, project_dir, false)
 }
 
-/// `discover_project_configuration` with the target warehouses and connections validated.
+/// The validated configuration without a discovery lifecycle, which reading two files never needs.
 pub(crate) fn discover_connection_configuration<'py>(
     py: Python<'py>,
     project_dir: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    configuration_inputs(py, project_dir, true)
+    loaded_configuration(py, project_dir, true)
 }
 
 fn configuration_inputs<'py>(
@@ -47,25 +47,32 @@ fn configuration_inputs<'py>(
         ],
     )?;
     within(&lifecycle, |_| {
-        let project_config: Bound<'py, PyAny> =
-            load_project_config_file(py, project_dir)?.into_bound(py);
-        let local_config: Bound<'py, PyAny> =
-            load_local_config_file(py, project_dir)?.into_bound(py);
-        if validate_connections {
-            reject_invalid_connection_configuration(&ProjectConfiguration {
-                project_dir,
-                project_config: &project_config,
-                local_config: &local_config,
-            })?;
-        }
-        new_record_with(
-            py,
-            RecordId::DiscoveredProjectInputs,
-            &[
-                ("project_dir", project_dir.clone()),
-                ("project_config", project_config),
-                ("local_config", local_config),
-            ],
-        )
+        loaded_configuration(py, project_dir, validate_connections)
     })
+}
+
+fn loaded_configuration<'py>(
+    py: Python<'py>,
+    project_dir: &Bound<'py, PyAny>,
+    validate_connections: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let project_config: Bound<'py, PyAny> =
+        load_project_config_file(py, project_dir)?.into_bound(py);
+    let local_config: Bound<'py, PyAny> = load_local_config_file(py, project_dir)?.into_bound(py);
+    if validate_connections {
+        reject_invalid_connection_configuration(&ProjectConfiguration {
+            project_dir,
+            project_config: &project_config,
+            local_config: &local_config,
+        })?;
+    }
+    new_record_with(
+        py,
+        RecordId::DiscoveredProjectInputs,
+        &[
+            ("project_dir", project_dir.clone()),
+            ("project_config", project_config),
+            ("local_config", local_config),
+        ],
+    )
 }

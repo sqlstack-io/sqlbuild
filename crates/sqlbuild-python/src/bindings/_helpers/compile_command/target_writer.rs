@@ -23,7 +23,7 @@ use crate::bindings::_helpers::boundary::python_calls::{
 use crate::bindings::_helpers::compile_command::artifact_batch::ArtifactBatch;
 use crate::bindings::_helpers::compile_command::constants::RACY_WINDOW_NS;
 use crate::bindings::_helpers::compile_command::reuse_recording::{
-    ArtifactRecorder, CompileArtifactWrites, artifact_kept, artifact_moved, artifact_tree_moved,
+    ArtifactRecorder, artifact_kept, artifact_moved, artifact_tree_moved,
 };
 use crate::bindings::_helpers::compile_command::test_artifact_cache::{
     IdentityContext, artifact_identity_payload, artifact_record_key_payload, identity_context,
@@ -46,8 +46,10 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::records::fields::path_posix_text;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::_helpers::sql_test_glue::plan_driver::plan_compiled_sql_test_artifacts;
+use crate::bindings::_helpers::sql_test_glue::models::SqlTestPlanOptions;
+use crate::bindings::_helpers::sql_test_glue::plan_driver::planned_rows;
 use crate::bindings::_helpers::sql_test_glue::plan_driver::sql_test_model_chain_names_by_key;
+use crate::bindings::_helpers::sql_test_glue::planning::PlanRow;
 
 const COMPILED_DIR: &str = "compiled";
 const MODELS_DIR: &str = "models";
@@ -352,24 +354,24 @@ pub(crate) struct Prepared<'a, 'py> {
 type PendingTest = (Py<PyAny>, Option<String>, Option<String>);
 
 /// The managed SQL test artifact paths and the planning diagnostics of one write.
-type WrittenTests<'py> = (Vec<Bound<'py, PyAny>>, Vec<Bound<'py, PyAny>>);
+type WrittenTests<'py> = (Vec<PathBuf>, Vec<Bound<'py, PyAny>>);
 
 /// SQL tests whose cached artifacts cannot be reused, planned, beside the reusable ones.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct PlannedStaticSqlTests {
-    tests_root: Py<PyAny>,
+    tests_root: PathBuf,
     /// Each pending test with its cache slot and artifact identity, when caching.
     pending: Vec<PendingTest>,
-    /// One planned `NativeSqlTestArtifact` per pending test.
-    artifacts: Vec<Py<PyAny>>,
-    cached_paths: Vec<Py<PyAny>>,
+    /// One native plan per pending test, with rendered SQL already validated.
+    artifacts: Vec<PlanRow>,
+    cached_paths: Vec<PathBuf>,
     cached_records: Vec<(String, SqlTestArtifactRecord)>,
 }
 
 /// `zip(pending, artifacts, strict=True)`.
 fn zipped(
     planned: &PlannedStaticSqlTests,
-) -> PyResult<impl Iterator<Item = (&PendingTest, &Py<PyAny>)>> {
+) -> PyResult<impl Iterator<Item = (&PendingTest, &PlanRow)>> {
     if planned.pending.len() != planned.artifacts.len() {
         let relation: &str = if planned.artifacts.len() < planned.pending.len() {
             "shorter"
@@ -388,7 +390,7 @@ fn planned_artifacts<'py>(
     adapter: &Bound<'py, PyAny>,
     project: &Bound<'py, PyAny>,
     tests: Vec<Bound<'py, PyAny>>,
-) -> PyResult<Vec<Py<PyAny>>> {
+) -> PyResult<Vec<PlanRow>> {
     let py: Python<'py> = project.py();
     if tests.is_empty() {
         return Ok(Vec::new());
@@ -402,24 +404,19 @@ fn planned_artifacts<'py>(
     )?;
     within(&lifecycle, |entered| {
         count_stage(py, SQL_TEST_ARTIFACT_PLANS, 1)?;
-        let artifacts: Vec<Py<PyAny>> = plan_compiled_sql_test_artifacts(
-            py,
-            Some(keywords(
-                py,
-                &[
-                    ("project", project.clone()),
-                    ("tests", PyTuple::new(py, tests)?.into_any()),
-                    ("adapter", adapter.clone()),
-                    (
-                        "sql_analysis_enabled",
-                        native_field(&native_field(project, "settings")?, "sql_analysis")?,
-                    ),
-                ],
-            )?),
-        )?
-        .try_iter()?
-        .map(|artifact| artifact.map(Bound::unbind))
-        .collect::<PyResult<_>>()?;
+        let artifacts = planned_rows(
+            (project, adapter),
+            &PyTuple::new(py, tests)?.into_any(),
+            &SqlTestPlanOptions {
+                sql_analysis_enabled: native_field(
+                    &native_field(project, "settings")?,
+                    "sql_analysis",
+                )?,
+                render_sql: true,
+                include_plan: false,
+                artifact: true,
+            },
+        )?;
         let metadata: Bound<'py, PyDict> = PyDict::new(py);
         metadata.set_item("item_count", artifacts.len())?;
         let _ = call_with(
@@ -433,7 +430,7 @@ fn planned_artifacts<'py>(
 /// Each test's cache slot and artifact identity, hashed together without holding the interpreter.
 fn test_identities<'py>(
     tests: &[Bound<'py, PyAny>],
-    context: &IdentityContext<'py>,
+    context: &IdentityContext,
     chains: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<(String, String)>> {
     let Some(first) = tests.first() else {
@@ -471,7 +468,7 @@ fn log_cache_misses(py: Python<'_>, misses: &BTreeMap<&'static str, usize>) -> P
 }
 
 /// Plan every SQL test whose cached artifact under `target_dir` cannot be reused.
-fn plan_tests<'py>(
+pub(crate) fn plan_tests<'py>(
     target_dir: &Bound<'py, PyAny>,
     (adapter, project): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     recorder: ArtifactRecorder<'_>,
@@ -482,10 +479,10 @@ fn plan_tests<'py>(
     let cache_dir: Bound<'py, PyAny> = native_field(project, "compile_cache_dir")?;
     let cached: HashMap<String, SqlTestArtifactRecord> = read_cache(&cache_dir)?;
     let tests: Bound<'py, PyAny> = native_field(project, "sql_tests")?;
-    let caching: Option<(IdentityContext<'py>, Bound<'py, PyAny>)> = if cache_dir.is_none() {
+    let caching: Option<(IdentityContext, Bound<'py, PyAny>)> = if cache_dir.is_none() {
         None
     } else {
-        let context: IdentityContext<'py> = identity_context(project, adapter)?;
+        let context: IdentityContext = identity_context(project, adapter)?;
         count_stage(py, SQL_TEST_MODEL_CHAINS, 1)?;
         let chains: Bound<'py, PyAny> =
             sql_test_model_chain_names_by_key(project, &tests)?.into_any();
@@ -503,7 +500,7 @@ fn plan_tests<'py>(
             .collect(),
     };
     let mut pending: Vec<PendingTest> = Vec::new();
-    let mut cached_paths: Vec<Py<PyAny>> = Vec::new();
+    let mut cached_paths: Vec<PathBuf> = Vec::new();
     let mut cached_records: Vec<(String, SqlTestArtifactRecord)> = Vec::new();
     let mut misses: BTreeMap<&'static str, usize> = BTreeMap::new();
     for (index, (test, identity)) in tests.into_iter().zip(identities).enumerate() {
@@ -522,9 +519,9 @@ fn plan_tests<'py>(
             *misses.entry(reason).or_default() += 1;
         }
         if let Ok(record) = reusable {
-            let path: Bound<'py, PyAny> = tests_root.div(&record.relative_path)?;
-            artifact_kept(recorder, &path, (record.size, record.mtime_ns))?;
-            cached_paths.push(path.unbind());
+            let path = tests_root_path.join(&record.relative_path);
+            artifact_kept(py, recorder, &path, (record.size, record.mtime_ns))?;
+            cached_paths.push(path);
             cached_records.push((record_key, record));
         } else {
             pending.push((test.unbind(), Some(record_key), Some(identity)));
@@ -538,9 +535,9 @@ fn plan_tests<'py>(
         .iter()
         .map(|(test, _, _)| test.bind(py).clone())
         .collect();
-    let artifacts: Vec<Py<PyAny>> = planned_artifacts(adapter, project, pending_tests)?;
+    let artifacts = planned_artifacts(adapter, project, pending_tests)?;
     Ok(PlannedStaticSqlTests {
-        tests_root: tests_root.unbind(),
+        tests_root: tests_root_path,
         pending,
         artifacts,
         cached_paths,
@@ -562,7 +559,8 @@ fn resolved_plan<'py>(
             if planned
                 .get()
                 .tests_root
-                .bind(py)
+                .clone()
+                .into_bound_py_any(py)?
                 .eq(joined(target_dir, &[COMPILED_DIR, TESTS_DIR])?)?
             {
                 return Ok(planned);
@@ -578,11 +576,11 @@ fn resolved_plan<'py>(
 /// The planning errors of one test's artifact, as SQL test diagnostics.
 fn artifact_diagnostics<'py>(
     test: &Bound<'py, PyAny>,
-    artifact: &Bound<'py, PyAny>,
+    artifact: &PlanRow,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py: Python<'py> = test.py();
     let mut diagnostics: Vec<Bound<'py, PyAny>> = Vec::new();
-    for message in native_field(artifact, "error_messages")?.try_iter()? {
+    for message in &artifact.error_messages {
         diagnostics.push(new_record_with(
             py,
             RecordId::CompilerDiagnostic,
@@ -593,7 +591,7 @@ fn artifact_diagnostics<'py>(
                     "code",
                     native_field(&error_class(py, ErrorId::PlannerInput)?, "code")?,
                 ),
-                ("message", message?),
+                ("message", message.into_bound_py_any(py)?),
                 ("resource_type", "sql_test".into_bound_py_any(py)?),
                 ("resource_name", native_field(test, "name")?),
                 ("path", native_field(test, "source_path")?),
@@ -614,39 +612,32 @@ fn write_static_tests<'py>(
     let planned: Bound<'py, PlannedStaticSqlTests> =
         resolved_plan(target_dir, (adapter, project), prepared)?;
     let planned: &PlannedStaticSqlTests = planned.get();
-    let tests_root: &Bound<'py, PyAny> = planned.tests_root.bind(py);
-    let tests_root_path: PathBuf = tests_root.extract()?;
-    let mut managed: Vec<Bound<'py, PyAny>> = planned
-        .cached_paths
-        .iter()
-        .map(|path| path.bind(py).clone())
-        .collect();
+    let tests_root = &planned.tests_root;
+    let mut managed = planned.cached_paths.clone();
     let mut records: Vec<(String, SqlTestArtifactRecord)> = planned.cached_records.clone();
-    let mut test_paths: Vec<Bound<'py, PyAny>> = Vec::new();
+    let mut test_paths: Vec<PathBuf> = Vec::new();
     for ((test, _, _), artifact) in zipped(planned)? {
-        let artifact: &Bound<'py, PyAny> = artifact.bind(py);
-        let path: Bound<'py, PyAny> = tests_root.div(compiled_sql_test_path(
+        let path = tests_root.join(compiled_sql_test_path(
             test.bind(py),
-            &native_field(artifact, "model_names")?,
-        )?)?;
-        batch.queue_sql(&path, &native_field(artifact, "sql")?.extract::<String>()?)?;
+            artifact.plan.model_names.clone(),
+        )?);
+        batch.queue_sql_at(py, path.clone(), artifact.rendered_sql(py)?)?;
         managed.push(path.clone());
         test_paths.push(path);
     }
     batch.flush(py)?;
     let mut diagnostics: Vec<Bound<'py, PyAny>> = Vec::new();
     for (((test, record_key, identity), artifact), path) in zipped(planned)?.zip(&test_paths) {
-        let found: Vec<Bound<'py, PyAny>> = artifact_diagnostics(test.bind(py), artifact.bind(py))?;
+        let found: Vec<Bound<'py, PyAny>> = artifact_diagnostics(test.bind(py), artifact)?;
         if !found.is_empty() {
             diagnostics.extend(found);
             continue;
         }
-        if let (Some(record_key), Some(identity)) = (record_key, identity) {
-            let artifact_path: PathBuf = path.extract()?;
-            if let Some(record) = new_sql_test_record(&tests_root_path, &artifact_path, identity) {
-                records.retain(|(key, _)| key != record_key);
-                records.push((record_key.clone(), record));
-            }
+        if let (Some(record_key), Some(identity)) = (record_key, identity)
+            && let Some(record) = new_sql_test_record(tests_root, path, identity)
+        {
+            records.retain(|(key, _)| key != record_key);
+            records.push((record_key.clone(), record));
         }
     }
     let cache_dir: Bound<'py, PyAny> = native_field(project, "compile_cache_dir")?;
@@ -727,7 +718,7 @@ pub(crate) fn write_static_target<'py>(
         write_static_tests(target_dir, (adapter, project), prepared, &mut batch)
     })();
     let (test_paths, diagnostics) = batch.settle(py, queued)?;
-    managed.extend(test_paths);
+    managed_models.extend(test_paths);
     if remove_stale_files {
         let mut paths: Vec<PathBuf> = managed_models;
         paths.extend(extracted(&managed)?);
@@ -927,7 +918,7 @@ pub(crate) fn planning_diagnostics<'py>(
         resolved_plan(target_dir, (adapter, project), prepared)?;
     let mut diagnostics: Vec<Bound<'py, PyAny>> = Vec::new();
     for ((test, _, _), artifact) in zipped(planned.get())? {
-        diagnostics.extend(artifact_diagnostics(test.bind(py), artifact.bind(py))?);
+        diagnostics.extend(artifact_diagnostics(test.bind(py), artifact)?);
     }
     PyTuple::new(py, diagnostics)
 }
@@ -1039,55 +1030,7 @@ pub(crate) fn write_compile_target<'py>(
     )
 }
 
-/// Plan uncached SQL tests and report their errors without writing artifacts or cache.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn static_sql_test_planning_diagnostics<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<Bound<'py, PyTuple>> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "static_sql_test_planning_diagnostics",
-        options,
-        (&["target_dir", "adapter", "project"], &[]),
-    )?;
-    planning_diagnostics(
-        &arguments.value("target_dir")?,
-        (&arguments.value("adapter")?, &arguments.value("project")?),
-        Prepared::default(),
-    )
-}
-
-/// Plan every SQL test whose cached artifact under `target_dir` cannot be reused.
-#[pyfunction]
-#[pyo3(signature = (**options))]
-pub(crate) fn plan_static_sql_tests<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
-) -> PyResult<PlannedStaticSqlTests> {
-    let arguments: KeywordArguments<'py> = KeywordArguments::read(
-        py,
-        "plan_static_sql_tests",
-        options,
-        (&["target_dir", "adapter", "project"], &["artifact_writes"]),
-    )?;
-    let recorder: Option<Py<CompileArtifactWrites>> =
-        arguments.value("artifact_writes")?.extract()?;
-    plan_tests(
-        &arguments.value("target_dir")?,
-        (&arguments.value("adapter")?, &arguments.value("project")?),
-        recorder.as_ref(),
-    )
-}
-
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<PlannedStaticSqlTests>()?;
     module.add_function(wrap_pyfunction!(write_static_compile_target, module)?)?;
-    module.add_function(wrap_pyfunction!(write_compile_target, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        static_sql_test_planning_diagnostics,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(plan_static_sql_tests, module)?)
+    module.add_function(wrap_pyfunction!(write_compile_target, module)?)
 }

@@ -7,6 +7,7 @@ from typing import Any
 from sqlbuild._native import ContractPolicy, SourceEntry
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.type_system.main.types_equal import types_equal
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
@@ -25,12 +26,12 @@ def validate_and_evolve_existing_target(
         connection=connection, relation=target
     )
     target_by_name: dict[str, ColumnInfo] = {
-        column.name.lower(): column for column in target_columns
+        column_name_key(column.name): column for column in target_columns
     }
     new_columns: list[ColumnInfo] = []
     staging_column: ColumnInfo
     for staging_column in staging_columns:
-        target_column: ColumnInfo | None = target_by_name.get(staging_column.name.lower())
+        target_column: ColumnInfo | None = target_by_name.get(column_name_key(staging_column.name))
         if target_column is None:
             if source_entry.contract == ContractPolicy.ENFORCED:
                 raise ExecutorInputError(

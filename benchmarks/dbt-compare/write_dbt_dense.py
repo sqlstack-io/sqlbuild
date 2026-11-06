@@ -66,7 +66,7 @@ def write_norules(project: Path) -> Path:
     shutil.copytree(project, target)
     toml = target / "sqlbuild_project.toml"
     text = toml.read_text()
-    new = text.replace('select = ["SQBR", "XSQBR"]', "select = []")
+    new = text.replace('select = ["SQBR", "SQLCLEAN", "XSQBR"]', "select = []")
     assert new != text
     toml.write_text(new)
     return target

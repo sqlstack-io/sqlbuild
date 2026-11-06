@@ -2,10 +2,11 @@
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced_keywords;
 use pyo3::exceptions::PyValueError;
-use pyo3::prelude::{Bound, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_migrations::main::{migration_fingerprint, migration_ref_names};
@@ -83,38 +84,29 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 /// Attach persisted migration identities through the existing cache boundary.
 pub(crate) fn with_migration_fingerprints<'py>(
-    py: Python<'py>,
-    options: Option<Bound<'py, PyDict>>,
+    entries: &Bound<'py, PyAny>,
+    models: &ModelLookup,
+    cache: &Bound<'py, PyAny>,
+    dialect: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     use crate::bindings::_helpers::boundary::python_calls::call_with;
-    let arguments = KeywordArguments::read(
-        py,
-        "with_migration_fingerprints",
-        options,
-        (
-            &["entries", "models_by_name", "fingerprints", "dialect"],
-            &[],
-        ),
-    )?;
-    let cache = arguments.value("fingerprints")?;
+    let py = entries.py();
     let mut attached: Vec<Bound<'py, pyo3::PyAny>> = Vec::new();
-    for entry in arguments.value("entries")?.try_iter()? {
+    for entry in entries.try_iter()? {
         let entry = entry?;
-        let model = arguments
-            .value("models_by_name")?
-            .call_method1("get", (native_field(&entry, "name")?,))?;
+        let model = models.get(py, &native_field(&entry, "name")?.extract::<String>()?)?;
         let metadata = native_field(&entry, "fingerprint_metadata_json")?;
         if model.is_none() || metadata.is_none() || native_field(&entry, "action")?.eq("skip")? {
             attached.push(entry);
             continue;
         }
         let fingerprint = call_with(
-            &native_field(&cache, "fingerprint")?,
+            &native_field(cache, "fingerprint")?,
             &[
                 ("query_sql", model_reads::query_sql(&model)?),
                 ("metadata_json", metadata),
                 ("ref_identities", PyDict::new(py).into_any()),
-                ("dialect", arguments.value("dialect")?),
+                ("dialect", dialect.clone()),
             ],
         )?;
         let kwargs = PyDict::new(py);

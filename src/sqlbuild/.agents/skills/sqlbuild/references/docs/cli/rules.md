@@ -22,7 +22,7 @@ Add `--json` after `rules` for machine-readable list or run output:
 
 ```bash
 sqb rules --json list
-sqb rules --json run SQBRSQL
+sqb rules --json run SQLCLEAN
 ```
 
 Lifecycle progress is written to stderr so stdout remains valid JSON.

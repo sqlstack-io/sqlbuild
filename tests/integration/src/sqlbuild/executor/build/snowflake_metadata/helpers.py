@@ -13,14 +13,19 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from sqlbuild._native import (
     CompilePipelineOptions,
     CompilePipelineResult,
     DiscoveredProjectInputs,
     discover_project_inputs,
+    run_cli,
     run_compile_pipeline,
 )
 from sqlbuild.adapter.contract.types import TablePromotionMode
+from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
+from sqlbuild.adapters.snowflake.classes.snowflake_connection import _SnowflakeConnection
 from sqlbuild.executor.build.models import BuildExecutionResult, BuildRuntimeParams
 from sqlbuild.executor.pipeline.main.run import run_build_pipeline
 from sqlbuild.executor.scheduling.types import ExecutionStatus
@@ -93,6 +98,15 @@ _COPY_SOURCE_PATTERN: re.Pattern[str] = re.compile(
 _RETENTION_PATTERN: re.Pattern[str] = re.compile(r"DATA_RETENTION_TIME_IN_DAYS = (?P<days>\d+)")
 _DEFAULT_COLUMNS: tuple[FakeColumn, ...] = (FakeColumn(name="ID", data_type="NUMBER"),)
 _STATUS_DESCRIPTION: tuple[tuple[str], ...] = (("status",),)
+_SHIFTS_PROJECT: str = (
+    'name = "catalog"\nadapter = "snowflake"\n\n[connection]\n'
+    'account = "example"\nuser = "example"\ndatabase = "analytics"\nschema = "marts"\n\n'
+    '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
+)
+_SHIFTS_MODEL: str = (
+    "MODEL (description 'Shift report.');\n"
+    'SELECT shift_id, starts_at FROM __source("raw_shifts")\n'
+)
 
 
 type _Identity = tuple[str, str, str]
@@ -766,3 +780,114 @@ def write_model_copies(
             'SELECT order_id, ordered_at, amount FROM __ref("orders_table")\n',
             encoding="utf-8",
         )
+
+
+def build_with_cli(
+    *, project_dir: Path, warehouse: SimulatedSnowflakeWarehouse, monkeypatch: pytest.MonkeyPatch
+) -> tuple[int, tuple[str, ...]]:
+    """Run the real ``sqb build`` against the simulated warehouse; its exit code and statements."""
+
+    monkeypatch.setattr(
+        SnowflakeAdapter,
+        "connect",
+        lambda _adapter, _config: _SnowflakeConnection(warehouse.raw_connection()),
+    )
+    warehouse.reset()
+    exit_code: int = run_cli(["--project-dir", str(project_dir), "--no-color", "build"])
+    return exit_code, tuple(warehouse.attempted_sql)
+
+
+_SCHEMA_LISTING_STATEMENT: re.Pattern[str] = re.compile(
+    r"^SHOW (?P<kind>TABLES|VIEWS) IN SCHEMA (?P<scope>\S+)"
+)
+
+
+def schema_listing_counts(statements: tuple[str, ...]) -> dict[str, int]:
+    """How often each schema was listed, keyed by ``TABLES``/``VIEWS`` and the schema."""
+
+    searches: list[re.Match[str] | None] = [
+        _SCHEMA_LISTING_STATEMENT.search(statement) for statement in statements
+    ]
+    matches: list[re.Match[str]] = list(filter(None, searches))
+    return dict(Counter(f"{match['kind']} {match['scope']}" for match in matches))
+
+
+def quoted_configured_column_files(
+    *, unique_key: str, updated_at: str, cursor: str
+) -> dict[str, str]:
+    """A snapshot and a microbatch model over listings stored with quoted camelCase columns."""
+
+    return {
+        "sqlbuild_project.toml": (
+            'name = "partner_feed"\nadapter = "snowflake"\n\n'
+            '[connection]\naccount = "example"\nuser = "example"\n'
+            'database = "analytics"\nschema = "marts"\n\n'
+            '[defaults]\ndatabase = "analytics"\nschema = "marts"\nmaterialized = "table"\n'
+        ),
+        "sources/raw.yml": (
+            "sources:\n"
+            "  - name: raw_listings\n    description: Partner listings in quoted camelCase.\n"
+            "    database: analytics\n    schema: raw\n    table: listings\n"
+            "  - name: raw_listing_events\n    description: Partner listing events.\n"
+            "    database: analytics\n    schema: raw\n    table: listing_events\n"
+        ),
+        "models/listing_history.sql": (
+            "MODEL (\n  description 'Listing price history.',\n  materialized snapshot,\n"
+            f"  unique_key [{unique_key}],\n  snapshot_strategy timestamp,\n"
+            f"  updated_at {updated_at},\n);\n\n"
+            'SELECT "listingId", "unitPrice", "updatedAt" FROM __source("raw_listings")\n'
+        ),
+        "models/listing_activity.sql": (
+            "MODEL (\n  description 'Listing events by hour.',\n  materialized incremental,\n"
+            "  incremental_strategy delete_insert,\n  incremental_mode microbatch,\n"
+            "  microbatch_strategy watermark,\n  cursor_watermark_mode all,\n"
+            f"  cursor {cursor},\n  cursor_type timestamp,\n  cursor_grain day,\n"
+            "  cursor_start '2026-01-01',\n  cursor_end '2026-01-03',\n"
+            "  cursor_inputs (\n"
+            "    raw_listing_events (column '\"eventAt\"', roles [filter, watermark]),\n  ),\n"
+            "  batch_size 1d,\n);\n\n"
+            'SELECT "listingId", "eventAt" FROM __source("raw_listing_events")\n'
+        ),
+    }
+
+
+def shifts_warehouse(warehouse_type: str) -> SimulatedSnowflakeWarehouse:
+    """Return a simulated warehouse holding a shifts source whose start column has a type."""
+
+    return SimulatedSnowflakeWarehouse(
+        relations=(
+            FakeRelation(
+                database="ANALYTICS",
+                schema="RAW",
+                name="SHIFTS",
+                columns=(
+                    FakeColumn(
+                        name="SHIFT_ID", data_type="NUMBER", numeric_precision=38, numeric_scale=0
+                    ),
+                    FakeColumn(name="STARTS_AT", data_type=warehouse_type),
+                ),
+            ),
+        )
+    )
+
+
+def write_shifts_project(*, project_dir: Path, declared_type: str) -> None:
+    """Write one model reading a shifts source whose enforced contract declares a start type."""
+
+    files: dict[str, str] = {
+        "sqlbuild_project.toml": _SHIFTS_PROJECT,
+        "sources/raw.yml": (
+            "sources:\n  - name: raw_shifts\n    description: Shift rows.\n"
+            "    database: analytics\n    schema: raw\n    table: shifts\n"
+            "    contract: enforced\n    columns:\n"
+            "      - name: shift_id\n        type: NUMBER(38,0)\n"
+            f"      - name: starts_at\n        type: {declared_type}\n"
+        ),
+        "models/shift_report.sql": _SHIFTS_MODEL,
+    }
+    relative: str
+    content: str
+    for relative, content in files.items():
+        path: Path = project_dir / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _ = path.write_text(content, encoding="utf-8")

@@ -23,8 +23,40 @@ use polyglot_sql::{
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 const ANALYSIS_WORKERS: usize = 4;
+
 const ANALYSIS_WORKER_STACK_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_BINDING_MESSAGE: &str = "SQL binding failed";
+
+/// Names some projection quotes, as a CTE's `AS "listingId"` read by `SELECT *`, and none leaves bare.
+fn nested_quoted_aliases(parsed: &[polyglot_sql::Expression]) -> HashMap<String, String> {
+    use polyglot_sql::{Expression, ExpressionWalk};
+    let mut quoted: HashMap<String, String> = HashMap::new();
+    let mut unquoted: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for expression in parsed {
+        for node in expression.dfs() {
+            let Expression::Select(select) = node else {
+                continue;
+            };
+            for projection in &select.expressions {
+                let identifier = match projection {
+                    Expression::Alias(alias) => &alias.alias,
+                    Expression::Column(column) => &column.name,
+                    _ => continue,
+                };
+                if identifier.quoted {
+                    quoted.insert(
+                        identifier.name.clone(),
+                        format!("\"{}\"", identifier.name.replace('"', "\"\"")),
+                    );
+                } else {
+                    unquoted.insert(identifier.name.clone());
+                }
+            }
+        }
+    }
+    quoted.retain(|name, _| !unquoted.contains(name));
+    quoted
+}
 
 impl ProjectCatalog {
     /// Map inferred column types onto the binding names the query projects, in column order.
@@ -62,6 +94,7 @@ impl ProjectCatalog {
                 break;
             }
         }
+        let nested_quoted: HashMap<String, String> = nested_quoted_aliases(&parsed);
         let mut exact_inputs: HashMap<String, String> = HashMap::new();
         for shape in inputs.values() {
             for (name, _) in &shape.0 {
@@ -76,6 +109,7 @@ impl ProjectCatalog {
         for (name, column_type) in columns.0 {
             let binding_name = identifiers
                 .get(&name)
+                .or_else(|| nested_quoted.get(&name))
                 .or_else(|| exact_inputs.get(&name))
                 .cloned()
                 .unwrap_or(name);

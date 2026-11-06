@@ -13,10 +13,11 @@ use crate::ddl_effects::_helpers::names::{UnquotedPart, part_name_key, qualified
 use crate::ddl_effects::constants::{
     ALTER_FOLLOWING_WORDS, ALTER_SESSION_SET, ALTER_SESSION_UNSET, COMPUTE_ONLY_STATEMENTS,
     COPY_INTO, CREATE_FOLLOWING_WORDS, CREATE_SCHEMA_IF_NOT_EXISTS, DROP_FOLLOWING_WORDS,
-    FROM_WORD, IF_EXISTS, IF_NOT_EXISTS, INTO, NEUTRAL_OBJECT_KINDS, NEUTRAL_OBJECT_LEADS,
-    NEUTRAL_OBJECT_MODIFIERS, NEUTRAL_SESSION_PARAMETERS, OR_REPLACE, QUERY_STATEMENTS,
-    READ_OR_DATA_STATEMENTS, RELATION_DDL_STATEMENTS, RELATION_KIND_MODIFIERS, RELATION_KINDS,
-    RENAMING_ALTERS, STATEMENT_SEPARATOR, TRANSACTION_END_STATEMENTS,
+    FROM_WORD, IF_EXISTS, IF_NOT_EXISTS, INTO, NAME_RESOLUTION_SETTINGS, NEUTRAL_OBJECT_KINDS,
+    NEUTRAL_OBJECT_LEADS, NEUTRAL_OBJECT_MODIFIERS, NEUTRAL_SESSION_PARAMETERS, OR_REPLACE,
+    QUERY_STATEMENTS, READ_OR_DATA_STATEMENTS, RELATION_DDL_STATEMENTS, RELATION_KIND_MODIFIERS,
+    RELATION_KINDS, RENAMING_ALTERS, SET_SCOPE_MODIFIERS, SET_WORD, STATEMENT_SEPARATOR,
+    TRANSACTION_END_STATEMENTS,
 };
 use crate::ddl_effects::models::StatementMetadataEffect;
 
@@ -240,6 +241,15 @@ fn sets_neutral_session_parameter(statement: &str) -> bool {
         .is_some_and(|end| only_whitespace(statement, end))
 }
 
+/// Whether the statement is `SET [SESSION|LOCAL|GLOBAL] search_path|schema ...`.
+fn sets_name_resolution(statement: &str) -> bool {
+    let Some(after_set) = phrase_then_whitespace(statement, 0, &[SET_WORD]) else {
+        return false;
+    };
+    let start: usize = repeated_modifiers(statement, after_set, SET_SCOPE_MODIFIERS);
+    bounded_phrase(statement, start, NAME_RESOLUTION_SETTINGS).is_some()
+}
+
 /// Whether the statement changes only session state that relations and name resolution ignore.
 fn is_session_only(statement: &str) -> bool {
     bounded_phrase(statement, 0, COMPUTE_ONLY_STATEMENTS)
@@ -264,6 +274,9 @@ pub(crate) fn code_effect(code: Option<&str>) -> StatementMetadataEffect {
     let keyword: String = statement[..first_length].to_ascii_uppercase();
     if QUERY_STATEMENTS.contains(&keyword.as_str()) {
         return select_into_effect(statement);
+    }
+    if sets_name_resolution(statement) {
+        return all_relations();
     }
     if READ_OR_DATA_STATEMENTS.contains(&keyword.as_str()) {
         return StatementMetadataEffect::default();

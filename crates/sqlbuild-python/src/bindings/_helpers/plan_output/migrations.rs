@@ -129,15 +129,6 @@ pub(crate) fn migration_lines(
     ))
 }
 
-#[pyfunction(name = "format_model_migrations", signature = (*, lines, plan, display_options))]
-fn format_migrations(
-    lines: Vec<String>,
-    plan: &Bound<'_, PyAny>,
-    display_options: &Bound<'_, PyAny>,
-) -> PyResult<Vec<String>> {
-    migration_lines(lines, plan, display_options)
-}
-
 fn days(value: &Bound<'_, PyAny>) -> PyResult<Option<i64>> {
     value.extract()
 }
@@ -213,7 +204,6 @@ fn render_old_name(entry: &Bound<'_, PyAny>, style: &Bound<'_, PyAny>) -> PyResu
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(format_migrations, module)?)?;
     module.add_function(wrap_pyfunction!(format_pre_build, module)?)?;
     module.add_function(wrap_pyfunction!(render_old_name, module)?)
 }

@@ -4,20 +4,14 @@ use std::collections::{HashMap, HashSet};
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::constants::{MODEL_ROOT, MODEL_ROOT_PREFIX, SQL_TEST_RESOURCE};
-use crate::graph::models::{GraphIndexes, GraphResource, ProjectGraph};
+use crate::graph::main::downstream_edges::downstream_edges;
+use crate::graph::models::{GraphIndexes, GraphResource, OrderedEdges, ProjectGraph};
 
 type Edges = Vec<(ObjectKey, Vec<ObjectKey>)>;
 
-/// Insertion-ordered key lists, as Python's `dict.setdefault(key, []).append(...)` builds them.
-#[derive(Default)]
-struct OrderedEdges {
-    entries: Edges,
-    index: HashMap<ObjectKey, usize>,
-}
-
 impl OrderedEdges {
     /// The list stored for `key`, appended empty in insertion order when the key is new.
-    fn list(&mut self, key: &ObjectKey) -> &mut Vec<ObjectKey> {
+    pub(crate) fn list(&mut self, key: &ObjectKey) -> &mut Vec<ObjectKey> {
         let position: usize = match self.index.get(key) {
             Some(&position) => position,
             None => {
@@ -27,6 +21,13 @@ impl OrderedEdges {
             }
         };
         &mut self.entries[position].1
+    }
+
+    /// The dependencies already stored for `key`, without inserting a missing target.
+    pub(crate) fn get(&self, key: &ObjectKey) -> Option<&Vec<ObjectKey>> {
+        self.index
+            .get(key)
+            .map(|&position| &self.entries[position].1)
     }
 }
 
@@ -70,7 +71,7 @@ pub(crate) fn build(resources: &[GraphResource]) -> ProjectGraph {
     {
         *upstream.list(&resource.key) = lineage_deps(&resource.deps);
     }
-    let downstream: Edges = downstream(&upstream.entries);
+    let downstream: Edges = downstream_edges(&upstream.entries);
     let mut tags: OrderedTags = OrderedTags::default();
     let mut graph = ProjectGraph {
         downstream_index: positions(&downstream),
@@ -123,24 +124,6 @@ fn lineage_deps(deps: &[ObjectKey]) -> Vec<ObjectKey> {
         .filter(|dep| dep.0 != SQL_TEST_RESOURCE)
         .cloned()
         .collect()
-}
-
-/// Inverted edges keyed in upstream order, each list sorted by `(resource type, name)`.
-fn downstream(upstream: &[(ObjectKey, Vec<ObjectKey>)]) -> Edges {
-    let mut inverted: OrderedEdges = OrderedEdges::default();
-    for (key, _) in upstream {
-        let _ = inverted.list(key);
-    }
-    for (key, deps) in upstream {
-        for dep in deps {
-            inverted.list(dep).push(key.clone());
-        }
-    }
-    let mut entries: Edges = inverted.entries;
-    for (_, keys) in &mut entries {
-        keys.sort();
-    }
-    entries
 }
 
 fn positions(entries: &[(ObjectKey, Vec<ObjectKey>)]) -> HashMap<ObjectKey, usize> {

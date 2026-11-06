@@ -1,5 +1,7 @@
 //! Compiled project assembly: the project's models, resources, checks and semantic diagnostics.
 
+use std::path::PathBuf;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyString, PyStringMethods, PyTuple};
 
@@ -29,7 +31,7 @@ use crate::bindings::_helpers::model_config::template_data::early_model_template
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
+use crate::bindings::_helpers::records::fields::{mapping_get, path_posix};
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::scope_errors::report_scope_index_errors;
 use crate::bindings::_helpers::scopes::scope_validation::scope_index_with_compile_usages;
@@ -287,6 +289,26 @@ fn project_fields<'py>(
     for name in ["loader_functions", "hook_functions"] {
         fields.set_item(name, native_field(&discovered, name)?)?;
     }
+    let python_inputs: Bound<'py, PyDict> = PyDict::new(py);
+    for (kind, collection) in [
+        ("task", "task_functions"),
+        ("asset", "asset_functions"),
+        ("check", "check_functions"),
+    ] {
+        for function in native_field(&discovered, collection)?.try_iter()? {
+            let function = function?;
+            let name: String = native_field(&function, "name")?.extract()?;
+            let path: PathBuf = native_field(&function, "file_path")?.extract()?;
+            python_inputs.set_item(
+                format!("{kind}:{name}"),
+                (
+                    path_posix(&native_field(&function, "relative_path")?)?,
+                    path,
+                ),
+            )?;
+        }
+    }
+    fields.set_item("python_execution_inputs", python_inputs)?;
     fields.set_item(
         "enforce_explicit_references",
         native_field(&project_config, "references")?.getattr("enforce_explicit")?,

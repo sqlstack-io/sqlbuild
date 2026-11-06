@@ -121,7 +121,7 @@ def test_given_state_table_when_rendering_on_snowflake_then_permanent_with_90_da
                 "target_schema VARCHAR, target_name VARCHAR, run_id VARCHAR NOT NULL, "
                 "definition_hash VARCHAR NOT NULL, version_hash VARCHAR NOT NULL, "
                 "schema_fingerprint VARCHAR NOT NULL, definition_b64 VARCHAR NOT NULL, "
-                "metadata_json_b64 VARCHAR NOT NULL, ts TIMESTAMP NOT NULL"
+                "metadata_json_b64 VARCHAR NOT NULL, ts TIMESTAMP NOT NULL, event_id VARCHAR"
                 ") DATA_RETENTION_TIME_IN_DAYS = 90"
             ),
         )

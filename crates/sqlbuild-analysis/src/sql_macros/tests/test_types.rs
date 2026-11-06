@@ -114,3 +114,11 @@ pub(super) struct ExpandedAnalysisTestCase {
     pub(super) sql: &'static str,
     pub(super) expected_sql: &'static str,
 }
+
+/// A query read under one adapter's lexical rules, with the SQL macro calls it holds.
+pub(super) struct LexicalRulesCallsTestCase {
+    pub(super) description: &'static str,
+    pub(super) syntax: sqlbuild_sqltext::sql_scan::models::LexicalSyntax,
+    pub(super) sql: &'static str,
+    pub(super) expected_calls: &'static [&'static str],
+}

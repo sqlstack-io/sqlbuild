@@ -2,41 +2,28 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
+use sqlbuild_core::json::models::JsonValue;
+use sqlbuild_host::models::{
+    AuditEvaluationMode, AuditExecutionResult, AuditOutcome, ExecutionStatus, MeasuredValue,
+    ScenarioRunResult, SqlTestDifferenceSample, SqlTestExecutionResult, SqlTestOutcome, StepResult,
+};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::plan_output::values::{any, dict, items, text};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::result_output::assets::{or_none, without_none};
-use crate::bindings::_helpers::result_output::projection::{
-    Projection, audit_check_id, rounded, sql_test_check_id,
-};
+use crate::bindings::_helpers::result_output::projection::{Projection, ResultIdentity, rounded};
+use crate::bindings::_helpers::scopes::scope_report_objects::json_to_python;
 
-const PASS_OUTCOME: &str = "pass";
-const INSUFFICIENT_OUTCOME: &str = "insufficient";
-const MEASUREMENT_MODE: &str = "measurement";
-const SUCCESS_STATUS: &str = "success";
 const DECIMAL_KIND: &str = "decimal";
 const SCALAR_KINDS: [&str; 5] = ["string", "integer", "boolean", "float", "null"];
 const COLLECTION_KINDS: [&str; 2] = ["list", "set"];
 const ERROR_FIELDS: [&str; 3] = ["error_code", "error_help", "error_message"];
-const EXPECTED_COUNT_FIELDS: [&str; 4] = [
-    "actual_row_count",
-    "expected_row_count",
-    "mismatched_row_count",
-    "missing_row_count",
-];
 const COMPARISON_COMPLETED: &str = "completed";
 const COMPARISON_NOT_RUN: &str = "not_run";
 
 fn value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py, PyAny>> {
     native_field(&native_field(result, field)?, "value")
-}
-
-fn optional_value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py, PyAny>> {
-    let value: Bound<'py, PyAny> = native_field(result, field)?;
-    if value.is_none() {
-        return Ok(value);
-    }
-    native_field(&value, "value")
 }
 
 fn fields<'py>(
@@ -81,131 +68,140 @@ fn sql_value_json<'py>(value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>>
 
 /// The case, schema and parameter values of a parameterized SQL test.
 fn case_metadata<'py>(
-    result: &Bound<'py, PyAny>,
+    py: Python<'py>,
+    result: &SqlTestExecutionResult<Bound<'py, PyAny>>,
 ) -> PyResult<Vec<(&'static str, Bound<'py, PyAny>)>> {
-    let py: Python<'py> = result.py();
-    let source_path: Bound<'py, PyAny> = native_field(result, "source_path")?;
-    if native_field(result, "case_name")?.is_none() || source_path.is_none() {
+    let Some(source_path) = result
+        .source_path
+        .as_ref()
+        .filter(|_| result.case_name.is_some())
+    else {
         return Ok(Vec::new());
-    }
+    };
     let parameter_types: Bound<'py, PyDict> = PyDict::new(py);
     let mut schema: Vec<Bound<'py, PyDict>> = Vec::new();
-    for parameter in items(&native_field(result, "parameter_schema")?)? {
-        let parameter_type: Bound<'py, PyAny> = value(&parameter, "value_type")?;
-        parameter_types.set_item(native_field(&parameter, "name")?, &parameter_type)?;
+    for parameter in &result.parameter_schema {
+        let parameter_type: Bound<'py, PyAny> = value(parameter, "value_type")?;
+        parameter_types.set_item(native_field(parameter, "name")?, &parameter_type)?;
         schema.push(dict(
             py,
             vec![
-                ("name", native_field(&parameter, "name")?),
+                ("name", native_field(parameter, "name")?),
                 ("type", parameter_type),
-                ("nullable", native_field(&parameter, "nullable")?),
+                ("nullable", native_field(parameter, "nullable")?),
             ],
         )?);
     }
     let mut parameters: Vec<Bound<'py, PyDict>> = Vec::new();
-    for item in items(&native_field(result, "parameter_values")?)? {
-        let (name, parameter_value): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item.extract()?;
-        let parameter_type: Bound<'py, PyAny> = parameter_types.as_any().get_item(&name)?;
+    for (name, parameter_value) in &result.parameter_values {
+        let parameter_type: Bound<'py, PyAny> = parameter_types.as_any().get_item(name)?;
         parameters.push(dict(
             py,
             vec![
-                ("name", name),
+                ("name", any(py, name)?),
                 ("type", parameter_type),
-                ("value", sql_value_json(&parameter_value)?),
+                ("value", sql_value_json(parameter_value)?),
             ],
         )?);
     }
-    let mut metadata: Vec<(&'static str, Bound<'py, PyAny>)> =
-        vec![("source_path", source_path.call_method0("as_posix")?)];
-    metadata.extend(fields(
-        result,
-        &[
-            "block_index",
-            "parent_name",
-            "case_name",
-            "case_index",
-            "case_fingerprint",
-        ],
-    )?);
+    let mut metadata: Vec<(&'static str, Bound<'py, PyAny>)> = vec![
+        (
+            "source_path",
+            any(
+                py,
+                source_path
+                    .to_string_lossy()
+                    .replace(std::path::MAIN_SEPARATOR, "/"),
+            )?,
+        ),
+        ("block_index", any(py, result.block_index)?),
+        ("parent_name", any(py, &result.parent_name)?),
+        ("case_name", any(py, &result.case_name)?),
+        ("case_index", any(py, result.case_index)?),
+        ("case_fingerprint", any(py, &result.case_fingerprint)?),
+    ];
     metadata.push(("parameter_schema", tuple_of(py, schema)?));
     metadata.push(("parameters", tuple_of(py, parameters)?));
     Ok(metadata)
 }
 
-fn difference_samples<'py>(samples: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = samples.py();
+fn difference_samples<'py>(
+    py: Python<'py>,
+    samples: &[SqlTestDifferenceSample],
+) -> PyResult<Bound<'py, PyAny>> {
     let formatted: Bound<'py, PyList> = PyList::empty(py);
-    for sample in items(samples)? {
+    for sample in samples {
         let pairs: Bound<'py, PyList> = PyList::empty(py);
-        for pair in items(&native_field(&sample, "values")?)? {
-            let (name, sample_value): (Bound<'py, PyAny>, Bound<'py, PyAny>) = pair.extract()?;
-            pairs.append(dict(py, vec![("name", name), ("value", sample_value)])?)?;
+        for (name, sample_value) in &sample.values {
+            pairs.append(dict(
+                py,
+                vec![("name", any(py, name)?), ("value", any(py, sample_value)?)],
+            )?)?;
         }
         formatted.append(pairs)?;
     }
     or_none(formatted.into_any())
 }
 
-fn sql_test_step<'py>(step: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = step.py();
+fn sql_test_step<'py>(py: Python<'py>, step: &StepResult) -> PyResult<Bound<'py, PyDict>> {
     let differences: Bound<'py, PyList> = PyList::empty(py);
-    for difference in items(&native_field(step, "column_differences")?)? {
+    for difference in &step.column_differences {
         differences.append(dict(
             py,
-            fields(&difference, &["name", "actual", "expected"])?,
+            vec![
+                ("name", any(py, &difference.name)?),
+                ("actual", any(py, &difference.actual)?),
+                ("expected", any(py, &difference.expected)?),
+            ],
         )?)?;
     }
     let mut entries: Vec<(&str, Bound<'py, PyAny>)> = vec![
-        ("model_name", native_field(step, "model_name")?),
-        ("status", value(step, "outcome")?),
+        ("model_name", any(py, &step.model_name)?),
+        ("status", any(py, step.outcome.value())?),
+        ("actual_row_count", any(py, step.actual_row_count)?),
+        ("expected_row_count", any(py, step.expected_row_count)?),
+        ("mismatched_row_count", any(py, step.mismatched_row_count)?),
+        ("unexpected_row_count", any(py, step.unexpected_row_count)?),
+        ("missing_row_count", any(py, step.missing_row_count)?),
     ];
-    entries.extend(fields(
-        step,
-        &[
-            "actual_row_count",
-            "expected_row_count",
-            "mismatched_row_count",
-            "unexpected_row_count",
-            "missing_row_count",
-        ],
-    )?);
     entries.push((
         "unexpected_samples",
-        difference_samples(&native_field(step, "unexpected_samples")?)?,
+        difference_samples(py, &step.unexpected_samples)?,
     ));
     entries.push((
         "missing_samples",
-        difference_samples(&native_field(step, "missing_samples")?)?,
+        difference_samples(py, &step.missing_samples)?,
     ));
     entries.push(("column_differences", or_none(differences.into_any())?));
-    entries.extend(fields(
-        step,
-        &["error_code", "error_help", "error_message"],
-    )?);
+    entries.extend([
+        ("error_code", any(py, &step.error_code)?),
+        ("error_help", any(py, &step.error_help)?),
+        ("error_message", any(py, &step.error_message)?),
+    ]);
     without_none(py, entries)
 }
 
 /// SQL test checks with their steps and parameterized case metadata.
 pub(crate) fn sql_test_checks<'py>(
     projection: &Projection<'py>,
-    results: &[Bound<'py, PyAny>],
+    results: &[&SqlTestExecutionResult<Bound<'py, PyAny>>],
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let mut checks: Vec<Bound<'py, PyDict>> = Vec::new();
     for result in results {
         if !projection.terminal_recorded(result)? {
             continue;
         }
-        let py: Python<'py> = result.py();
-        let steps: Vec<Bound<'py, PyAny>> = items(&native_field(result, "step_results")?)?;
-        let outcome: Bound<'py, PyAny> = value(result, "outcome")?;
+        let py: Python<'py> = projection.py;
+        let steps = &result.step_results;
+        let outcome = result.outcome;
         let mut entries: Vec<(&str, Bound<'py, PyAny>)> = vec![
             ("kind", any(py, "sql_test")?),
-            ("name", native_field(result, "test_name")?),
-            ("check_id", any(py, sql_test_check_id(result)?)?),
+            ("name", any(py, &result.test_name)?),
+            ("check_id", any(py, result.identity()?.map(|(_, id)| id))?),
         ];
-        entries.extend(case_metadata(result)?);
-        entries.push(("passed", any(py, outcome.eq(PASS_OUTCOME)?)?));
-        entries.push(("status", outcome));
+        entries.extend(case_metadata(py, result)?);
+        entries.push(("passed", any(py, outcome == SqlTestOutcome::Pass)?));
+        entries.push(("status", any(py, outcome.value())?));
         entries.push((
             "duration_ms",
             projection.result_duration(result, &py.None().into_bound(py))?,
@@ -213,19 +209,23 @@ pub(crate) fn sql_test_checks<'py>(
         entries.push((
             "asset_name",
             match steps.first() {
-                Some(step) => native_field(step, "model_name")?,
+                Some(step) => any(py, &step.model_name)?,
                 None => py.None().into_bound(py),
             },
         ));
-        entries.extend(fields(
-            result,
-            &["error_code", "error_help", "error_message"],
-        )?);
+        entries.extend([
+            ("error_code", any(py, &result.error_code)?),
+            ("error_help", any(py, &result.error_help)?),
+            ("error_message", any(py, &result.error_message)?),
+        ]);
         entries.push((
             "steps",
             tuple_of(
                 py,
-                steps.iter().map(sql_test_step).collect::<PyResult<_>>()?,
+                steps
+                    .iter()
+                    .map(|step| sql_test_step(py, step))
+                    .collect::<PyResult<_>>()?,
             )?,
         ));
         checks.push(without_none(py, entries)?);
@@ -263,79 +263,103 @@ pub(crate) fn measurement_thresholds<'py>(
     Ok(rendered.into_any())
 }
 
-/// `len(evidence_rows)` and `evidence_truncated` of a measurement audit, else `None`.
-pub(crate) fn measurement_evidence<'py>(
-    result: &Bound<'py, PyAny>,
-) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-    let py: Python<'py> = result.py();
-    if !value(result, "evaluation_mode")?.eq(MEASUREMENT_MODE)? {
-        return Ok((py.None().into_bound(py), py.None().into_bound(py)));
+/// Keep integer measurements exact across both JSON output contracts.
+pub(crate) fn measured_value<'py>(
+    py: Python<'py>,
+    value: Option<&MeasuredValue>,
+) -> PyResult<Bound<'py, PyAny>> {
+    match value {
+        Some(MeasuredValue::Integer(value)) => {
+            Ok(json_to_python(py, JsonValue::Integer(value.clone()), false)?.into_bound(py))
+        }
+        Some(MeasuredValue::Float(value)) => any(py, *value),
+        None => Ok(py.None().into_bound(py)),
     }
-    Ok((
-        any(py, native_field(result, "evidence_rows")?.len()?)?,
-        native_field(result, "evidence_truncated")?,
-    ))
-}
-
-/// Whether an audit outcome counts as passed.
-pub(crate) fn audit_passed(result: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let outcome: Bound<'_, PyAny> = value(result, "outcome")?;
-    Ok(outcome.eq(PASS_OUTCOME)? || outcome.eq(INSUFFICIENT_OUTCOME)?)
 }
 
 /// Audit checks; `terminal_evidence` keeps results whose model already has a terminal.
 pub(crate) fn audit_checks<'py>(
     projection: &Projection<'py>,
-    results: &Bound<'py, PyAny>,
+    results: &[&AuditExecutionResult<Bound<'py, PyAny>>],
     terminal_evidence: bool,
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let mut checks: Vec<Bound<'py, PyDict>> = Vec::new();
-    for result in items(results)? {
+    for result in results {
         if !terminal_evidence && !projection.terminal_recorded(&result)? {
             continue;
         }
-        let py: Python<'py> = result.py();
-        let (evidence_count, evidence_truncated) = measurement_evidence(&result)?;
+        let py: Python<'py> = projection.py;
+        let measurement = result.evaluation_mode == AuditEvaluationMode::Measurement;
+        let measured = measured_value(py, result.measured_value.as_ref())?;
+        let meta = match &result.audit_meta {
+            Some(meta) => dict(
+                py,
+                meta.iter()
+                    .map(|(key, value)| (key.as_str(), value.clone()))
+                    .collect(),
+            )?
+            .into_any(),
+            None => py.None().into_bound(py),
+        };
         let mut entries: Vec<(&str, Bound<'py, PyAny>)> = vec![("kind", any(py, "audit")?)];
-        entries.push(("name", native_field(&result, "audit_name")?));
-        entries.extend(fields(
-            &result,
-            &["audit_definition_name", "audit_description", "audit_meta"],
-        )?);
-        entries.push(("check_id", any(py, audit_check_id(&result)?)?));
-        entries.push(("passed", any(py, audit_passed(&result)?)?));
-        entries.push(("status", value(&result, "outcome")?));
-        entries.push(("severity", value(&result, "severity")?));
-        entries.push(("row_count", native_field(&result, "row_count")?));
-        entries.push(("attachment_kind", value(&result, "attachment_kind")?));
+        entries.push(("name", any(py, &result.audit_name)?));
+        entries.extend([
+            (
+                "audit_definition_name",
+                any(py, &result.audit_definition_name)?,
+            ),
+            ("audit_description", any(py, &result.audit_description)?),
+            ("audit_meta", meta),
+        ]);
+        entries.push(("check_id", any(py, result.identity()?.map(|(_, id)| id))?));
+        entries.push((
+            "passed",
+            any(
+                py,
+                matches!(
+                    result.outcome,
+                    AuditOutcome::Pass | AuditOutcome::Insufficient
+                ),
+            )?,
+        ));
+        entries.push(("status", any(py, result.outcome.value())?));
+        entries.push(("severity", any(py, result.severity.value())?));
+        entries.push(("row_count", any(py, result.row_count)?));
+        entries.push(("attachment_kind", any(py, result.attachment_kind.value())?));
         entries.push((
             "attached_target_kind",
-            optional_value(&result, "attached_target_kind")?,
+            any(py, result.attached_target_kind.map(ResultEnum::value))?,
         ));
-        entries.push(("asset_name", native_field(&result, "attached_target_name")?));
+        entries.push(("asset_name", any(py, &result.attached_target_name)?));
         entries.push((
             "attached_column_name",
-            native_field(&result, "attached_column_name")?,
+            any(py, &result.attached_column_name)?,
         ));
-        entries.push(("run_scope_phase", value(&result, "run_scope_phase")?));
-        entries.push(("reused", native_field(&result, "reused")?));
-        entries.push(("evaluation_mode", value(&result, "evaluation_mode")?));
-        entries.extend(fields(
-            &result,
-            &[
-                "measured_value",
-                "sample_count",
-                "sample_unit",
-                "minimum_samples",
-            ],
-        )?);
+        entries.push(("run_scope_phase", any(py, result.run_scope_phase.value())?));
+        entries.push(("reused", any(py, result.reused)?));
+        entries.push(("evaluation_mode", any(py, result.evaluation_mode.value())?));
+        entries.extend([
+            ("measured_value", measured),
+            ("sample_count", any(py, result.sample_count)?),
+            ("sample_unit", any(py, &result.sample_unit)?),
+            ("minimum_samples", any(py, result.minimum_samples)?),
+        ]);
         entries.push((
             "thresholds",
-            measurement_thresholds(&native_field(&result, "thresholds")?)?,
+            measurement_thresholds(&any(py, &result.thresholds)?)?,
         ));
-        entries.push(("evidence_count", evidence_count));
-        entries.push(("evidence_truncated", evidence_truncated));
-        entries.extend(fields(&result, &["execution_error", "skip_reason"])?);
+        entries.push((
+            "evidence_count",
+            any(py, measurement.then_some(result.evidence_rows.len()))?,
+        ));
+        entries.push((
+            "evidence_truncated",
+            any(py, measurement.then_some(result.evidence_truncated))?,
+        ));
+        entries.extend([
+            ("execution_error", any(py, &result.execution_error)?),
+            ("skip_reason", any(py, &result.skip_reason)?),
+        ]);
         checks.push(without_none(py, entries)?);
     }
     Ok(checks)
@@ -395,17 +419,23 @@ fn with_errors<'py>(
 }
 
 /// The scenario check with its expected-result and assertion outcomes.
-pub(crate) fn scenario_check<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = result.py();
-    let name: String = text(&native_field(result, "scenario_name")?)?;
-    let status: Bound<'py, PyAny> = value(result, "status")?;
+pub(crate) fn scenario_check<'py>(
+    py: Python<'py>,
+    result: &ScenarioRunResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let name = &result.scenario_name;
     let mut expected: Vec<Bound<'py, PyDict>> = Vec::new();
-    for item in items(&native_field(result, "expected_results")?)? {
-        let counts: Vec<(&'static str, Bound<'py, PyAny>)> = fields(&item, &EXPECTED_COUNT_FIELDS)?;
-        let compared: bool = counts.iter().all(|(_, count)| !count.is_none());
+    for item in &result.expected_results {
+        let counts = [
+            ("actual_row_count", item.actual_row_count),
+            ("expected_row_count", item.expected_row_count),
+            ("mismatched_row_count", item.mismatched_row_count),
+            ("missing_row_count", item.missing_row_count),
+        ];
+        let compared = counts.iter().all(|(_, count)| count.is_some());
         let mut entries: Vec<(&'static str, Bound<'py, PyAny>)> = vec![
-            ("model_name", native_field(&item, "model_name")?),
-            ("status", value(&item, "status")?),
+            ("model_name", any(py, &item.model_name)?),
+            ("status", any(py, item.status.value())?),
             (
                 "comparison_status",
                 any(
@@ -418,9 +448,14 @@ pub(crate) fn scenario_check<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<
                 )?,
             ),
         ];
-        entries.extend(counts);
+        for (name, count) in counts {
+            entries.push((name, any(py, count)?));
+        }
         let result: Bound<'py, PyDict> = dict(py, entries)?;
-        for (name, error) in fields(&item, &ERROR_FIELDS)? {
+        for (name, error) in scenario_errors(
+            py,
+            (&item.error_code, &item.error_help, &item.error_message),
+        )? {
             if !error.is_none() {
                 result.set_item(name, error)?;
             }
@@ -428,9 +463,8 @@ pub(crate) fn scenario_check<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<
         expected.push(result);
     }
     let mut assertions: Vec<Bound<'py, PyDict>> = Vec::new();
-    for item in items(&native_field(result, "assertion_results")?)? {
-        let failing: Bound<'py, PyAny> = native_field(&item, "failing_row_count")?;
-        let ran: &str = if failing.is_none() {
+    for item in &result.assertion_results {
+        let ran: &str = if item.failing_row_count.is_none() {
             COMPARISON_NOT_RUN
         } else {
             COMPARISON_COMPLETED
@@ -438,72 +472,95 @@ pub(crate) fn scenario_check<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<
         let result: Bound<'py, PyDict> = dict(
             py,
             vec![
-                ("name", native_field(&item, "name")?),
-                ("status", value(&item, "status")?),
+                ("name", any(py, &item.name)?),
+                ("status", any(py, item.status.value())?),
                 ("query_status", any(py, ran)?),
-                ("failing_row_count", failing),
-                ("sample_rows", native_field(&item, "sample_rows")?),
+                ("failing_row_count", any(py, item.failing_row_count)?),
+                ("sample_rows", any(py, &item.sample_rows)?),
             ],
         )?;
-        for (name, error) in fields(&item, &ERROR_FIELDS)? {
+        for (name, error) in scenario_errors(
+            py,
+            (&item.error_code, &item.error_help, &item.error_message),
+        )? {
             if !error.is_none() {
                 result.set_item(name, error)?;
             }
         }
         assertions.push(result);
     }
-    with_errors(
-        result,
-        vec![
-            ("kind", any(py, "scenario")?),
-            ("name", any(py, name.as_str())?),
-            ("check_id", any(py, format!("sql_scenario:{name}"))?),
-            ("passed", any(py, status.eq(SUCCESS_STATUS)?)?),
-            ("status", status),
-            ("expected_results", tuple_of(py, expected)?),
-            ("assertion_results", tuple_of(py, assertions)?),
-        ],
-    )
+    let mut entries = vec![
+        ("kind", any(py, "scenario")?),
+        ("name", any(py, name.as_str())?),
+        ("check_id", any(py, format!("sql_scenario:{name}"))?),
+        (
+            "passed",
+            any(py, result.status == ExecutionStatus::Success)?,
+        ),
+        ("status", any(py, result.status.value())?),
+        ("expected_results", tuple_of(py, expected)?),
+        ("assertion_results", tuple_of(py, assertions)?),
+    ];
+    entries.extend(scenario_errors(
+        py,
+        (
+            &result.error_code,
+            &result.error_help,
+            &result.error_message,
+        ),
+    )?);
+    without_none(py, entries)
 }
 
-fn rounded_duration<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let duration: Bound<'py, PyAny> = native_field(result, "duration_ms")?;
-    if duration.is_none() {
-        return Ok(duration);
-    }
-    rounded(result.py(), duration.extract()?)
+fn scenario_errors<'py>(
+    py: Python<'py>,
+    (code, help, message): (&Option<String>, &Option<String>, &Option<String>),
+) -> PyResult<Vec<(&'static str, Bound<'py, PyAny>)>> {
+    Ok(vec![
+        ("error_code", any(py, code)?),
+        ("error_help", any(py, help)?),
+        ("error_message", any(py, message)?),
+    ])
 }
 
 /// The run outcome of one scenario.
-pub(crate) fn scenario_result<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = result.py();
-    let path: Bound<'py, PyAny> = native_field(result, "local_duckdb_path")?;
-    let local_status: Bound<'py, PyAny> = native_field(result, "local_status")?;
-    with_errors(
-        result,
-        vec![
-            ("name", native_field(result, "scenario_name")?),
-            ("status", value(result, "status")?),
-            ("duration_ms", rounded_duration(result)?),
-            (
-                "local_status",
-                if local_status.is_truthy()? {
-                    native_field(&local_status, "value")?
-                } else {
-                    py.None().into_bound(py)
-                },
-            ),
-            ("retained", native_field(result, "retained")?),
-            (
-                "local_duckdb_path",
-                if path.is_truthy()? {
-                    path.str()?.into_any()
-                } else {
-                    py.None().into_bound(py)
-                },
-            ),
-        ],
-    )
+pub(crate) fn scenario_result<'py>(
+    py: Python<'py>,
+    result: &ScenarioRunResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let duration = match result.duration_ms {
+        Some(duration) => rounded(py, duration)?,
+        None => py.None().into_bound(py),
+    };
+    let mut entries = vec![
+        ("name", any(py, &result.scenario_name)?),
+        ("status", any(py, result.status.value())?),
+        ("duration_ms", duration),
+        (
+            "local_status",
+            any(py, result.local_status.map(|status| status.value()))?,
+        ),
+        ("retained", any(py, result.retained)?),
+        (
+            "local_duckdb_path",
+            any(
+                py,
+                result
+                    .local_duckdb_path
+                    .as_ref()
+                    .map(|path| path.as_os_str()),
+            )?,
+        ),
+    ];
+    entries.extend(scenario_errors(
+        py,
+        (
+            &result.error_code,
+            &result.error_help,
+            &result.error_message,
+        ),
+    )?);
+    without_none(py, entries)
 }
 
 /// The capture outcome of one scenario snapshot sync or refresh.

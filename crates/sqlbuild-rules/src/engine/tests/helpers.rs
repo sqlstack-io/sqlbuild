@@ -800,7 +800,7 @@ pub(crate) fn published_layer_faults(
 /// The model path the relation-exception cases use.
 pub(crate) const CROSS_JOIN_MODEL_PATH: &str = "models/orders.sql";
 /// The Rule whose findings name a joined relation.
-pub(crate) const CROSS_JOIN_CODE: &str = "SQBRSQL038";
+pub(crate) const CROSS_JOIN_CODE: &str = "SQLCLEAN038";
 
 fn cross_join_fault(message: &str, line: u64) -> Fault {
     Fault {

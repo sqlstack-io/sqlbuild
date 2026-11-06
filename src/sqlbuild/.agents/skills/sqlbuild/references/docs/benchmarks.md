@@ -18,7 +18,7 @@ Online: https://sqlbuild.com/docs/benchmarks/
 
 SQLBuild 0.164.3 and dbt 2.0.9 compiling the same generated [10,000-model DuckDB project](#the-project), on a
 GitHub-hosted runner with 4 CPUs and 15 GiB RAM. Each cell is the median of three rounds from
-[run 39543189999](https://github.com/chio-labs/sqlbuild/actions/runs/39543189999) (October 21, 2026).
+[run 39543189999](https://github.com/sqlstack-io/sqlbuild/actions/runs/39543189999) (October 21, 2026).
 
 ## SQLBuild vs dbt v2
 
@@ -121,7 +121,7 @@ compiles in full.
 ## Reproduce
 
 The harness and the exact command for every variant are in
-[`benchmarks/dbt-compare/`](https://github.com/chio-labs/sqlbuild/tree/main/benchmarks/dbt-compare).
+[`benchmarks/dbt-compare/`](https://github.com/sqlstack-io/sqlbuild/tree/main/benchmarks/dbt-compare).
 To rerun it on GitHub Actions:
 
 ```bash

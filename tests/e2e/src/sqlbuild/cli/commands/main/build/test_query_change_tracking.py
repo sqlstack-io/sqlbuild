@@ -146,7 +146,10 @@ def test_given_unchanged_project_when_planning_after_build_then_models_are_not_q
     try:
         stale_row: tuple[object, ...] = tuple(fingerprint_rows[0])
         connection.execute(
-            "INSERT INTO main._sqlbuild_fingerprints VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO main._sqlbuild_fingerprints "
+            "(node_type, node_name, target_database, target_schema, target_name, run_id, "
+            "definition_hash, version_hash, schema_fingerprint, definition_b64, "
+            "metadata_json_b64, ts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 stale_row[0],
                 stale_row[1],

@@ -410,3 +410,10 @@ class SnowflakeRunListingTestCase:
     relations: tuple[FakeRelation, ...]
     lookups: tuple[str, ...]
     expected_listings: tuple[int, int]
+
+
+@dataclass(frozen=True)
+class SnowflakePlatformDetectionTestCase:
+    description: str
+    environment: dict[str, str]
+    expected_value: str

@@ -9,8 +9,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
 use sqlbuild_discovery::project_validation::main::at_most_one_csv_data_row::at_most_one_csv_data_row;
 use sqlbuild_discovery::project_validation::models::CsvSettings;
-use sqlbuild_rules::sql_quality::main::declared_relation_keys::declared_relation_keys as derive_keys;
-use sqlbuild_rules::sql_quality::models::{DeclaredKeyColumn, DeclaredRelation};
+use sqlbuild_rules::relation_keys::main::declared_relation_keys::declared_relation_keys as derive_keys;
+use sqlbuild_rules::relation_keys::models::{DeclaredKeyColumn, DeclaredRelation};
 
 use crate::bindings::_helpers::compiled_project::schema_facts::python_column_facts;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
@@ -31,6 +31,9 @@ const UNIQUE_KEY_CONFIG: &str = "unique_key";
 const UNIQUE_AUDIT_COLUMN_ARGUMENT: &str = "column";
 const RELATION_KIND_SEED: &str = "seed";
 const RELATION_KIND_SOURCE: &str = "source";
+
+/// Native declared columns and model audits used to derive relation keys.
+type DeclaredKeyFacts<'a> = (&'a [SchemaColumnFact], Vec<(String, Option<String>)>);
 
 positional_record! {
     extract, into;
@@ -53,7 +56,7 @@ pub(crate) fn relation_key_row(
     kind: &str,
     name: String,
     values: &Bound<'_, PyDict>,
-    declared: Option<(&[SchemaColumnFact], &Bound<'_, PyAny>)>,
+    declared: Option<DeclaredKeyFacts<'_>>,
 ) -> PyResult<RelationKeyRow> {
     let mut columns: Vec<(String, Vec<String>, bool)> = Vec::new();
     let mut audits: Vec<(String, Option<String>)> = Vec::new();
@@ -65,7 +68,7 @@ pub(crate) fn relation_key_row(
                 column.nullable == Some(false),
             ));
         }
-        audits = audit_key_rows(declared_audits)?;
+        audits = declared_audits;
     }
     Ok(RelationKeyRow {
         kind: kind.to_owned(),
@@ -168,8 +171,6 @@ fn unique_key(values: &Bound<'_, PyDict>) -> PyResult<Option<Vec<String>>> {
 }
 
 /// The key row of a seed, source or hand-built model from its config values and schema entry.
-#[pyfunction(name = "relation_key_row")]
-#[pyo3(signature = (kind, name, values, entry))]
 pub(crate) fn entry_relation_key_row(
     kind: &str,
     name: String,
@@ -182,7 +183,12 @@ pub(crate) fn entry_relation_key_row(
     let columns: Vec<SchemaColumnFact> =
         python_column_facts(&declared_specs(entry, "columns")?, None)?;
     let audits: Bound<'_, PyAny> = declared_specs(entry, "audits")?;
-    relation_key_row(kind, name, values, Some((&columns, &audits)))
+    relation_key_row(
+        kind,
+        name,
+        values,
+        Some((&columns, audit_key_rows(&audits)?)),
+    )
 }
 
 /// `getattr(entry, name, None) or ()`.
@@ -347,7 +353,6 @@ fn declared_relation(row: RelationKeyRow) -> DeclaredRelation {
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(entry_relation_key_row, module)?)?;
     module.add_function(wrap_pyfunction!(declared_relation_keys, module)?)?;
     module.add_function(wrap_pyfunction!(compiled_relation_keys, module)?)
 }

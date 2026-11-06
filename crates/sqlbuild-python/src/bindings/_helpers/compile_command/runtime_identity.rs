@@ -1,9 +1,11 @@
 //! Interpreter, native build and invocation facts that decide whether a stored compile is reusable.
 
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
-use sqlbuild_cli::replay::main::output_file_identities::output_file_identities;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -46,19 +48,19 @@ fn interpreter_identity(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> {
 }
 
 /// The interpreter and native build identity that produced a compile.
-pub(crate) fn runtime_identity(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(crate) fn runtime_identity(py: Python<'_>) -> PyResult<BTreeMap<String, OsString>> {
     let [version, executable, platform, cache_tag] = interpreter_values(py)?;
-    let identity: Bound<'_, PyDict> = PyDict::new(py);
-    identity.set_item("format", REUSE_FORMAT_VERSION)?;
-    identity.set_item("python", version)?;
-    identity.set_item("executable", executable)?;
-    identity.set_item("platform", platform)?;
-    identity.set_item("cache_tag", cache_tag)?;
-    identity.set_item(
-        "native_build",
-        registry::native(py, NativeAttr::BuildIdentity)?.str()?,
-    )?;
-    Ok(identity)
+    let native_build: String = registry::native(py, NativeAttr::BuildIdentity)?
+        .str()?
+        .extract()?;
+    Ok(BTreeMap::from([
+        ("format".to_owned(), REUSE_FORMAT_VERSION.into()),
+        ("python".to_owned(), version.into()),
+        ("executable".to_owned(), executable.into()),
+        ("platform".to_owned(), platform.into()),
+        ("cache_tag".to_owned(), cache_tag.into()),
+        ("native_build".to_owned(), native_build.into()),
+    ]))
 }
 
 fn listed<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
@@ -102,11 +104,6 @@ pub(crate) fn invocation_identity<'py>(
         .getattr("dumps")?
         .call((payload,), Some(&options))?;
     text.call_method1("encode", ("utf-8", "surrogateescape"))
-}
-
-/// Device and inode pairs of stdout and stderr files, which hold output rather than inputs.
-pub(crate) fn redirected_output_files(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
-    PyList::new(py, output_file_identities())
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

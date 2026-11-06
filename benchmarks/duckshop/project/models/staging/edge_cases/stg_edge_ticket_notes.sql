@@ -1,8 +1,9 @@
 MODEL (
   description """
     One row per support ticket note with order references and reasons found by regular expressions,
-    written with escaped and dollar-quoted patterns, campaign and discount codes matched by pattern
-    lists and escapes, and SKUs split at edge positions
+    written with escaped and dollar-quoted patterns, a SKU normalised by a macro after an escaped
+    quote, campaign and discount codes matched by pattern lists and escapes, and SKUs split at edge
+    positions; the note text and tags are passed on as written
   """,
   tags [edge_case],
   columns (
@@ -16,6 +17,7 @@ MODEL (
     refund_word (type VARCHAR),
     body_collapsed (type VARCHAR),
     quotes_customer (type BOOLEAN),
+    sku_canonical (type VARCHAR),
     second_hash_tag (type VARCHAR),
     is_newsletter_visit (type BOOLEAN),
     is_customer_code (type BOOLEAN),
@@ -27,6 +29,8 @@ MODEL (
     sku_from_zero (type VARCHAR),
     sku_last_two (type VARCHAR),
     sku_before_start (type VARCHAR),
+    body (type VARCHAR),
+    tags_text (type VARCHAR),
   ),
 );
 
@@ -48,8 +52,9 @@ final AS (
     REGEXP_COUNT(s.body, 'DS-O-\\d+')::INT AS order_ref_count,
     REGEXP_SUBSTR(s.body, 'refund(ed)?', 1, 1, 'i')::VARCHAR AS refund_word,
     REGEXP_REPLACE(s.body, '\\s+', ' ')::VARCHAR AS body_collapsed,
-    // A backslash-escaped quote inside a single-quoted literal
+    // A backslash-escaped quote inside a single-quoted literal, then a macro call to expand
     CONTAINS(s.body, 'O\'Brien')::BOOLEAN AS quotes_customer,
+    @sql.normalise_sku(s.sku) AS sku_canonical,
     SPLIT_PART(s.tags_text, '#', 2)::VARCHAR AS second_hash_tag,
     (
       s.utm_source ILIKE ANY ('%mail%', 'news%')
@@ -64,7 +69,9 @@ final AS (
     SPLIT_PART(s.sku, '', 1)::VARCHAR AS sku_part_no_delimiter,
     SUBSTR(s.sku, 0, 3)::VARCHAR AS sku_from_zero,
     SUBSTR(s.sku, -2)::VARCHAR AS sku_last_two,
-    SUBSTR(s.sku, -10, 3)::VARCHAR AS sku_before_start
+    SUBSTR(s.sku, -10, 3)::VARCHAR AS sku_before_start,
+    s.body,
+    s.tags_text
   FROM src AS s
 )
 

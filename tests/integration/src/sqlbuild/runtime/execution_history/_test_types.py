@@ -38,6 +38,12 @@ class SQLiteTransactionFailureCase:
 
 
 @dataclass(frozen=True)
+class SQLiteInterruptCase:
+    description: str
+    expected_stdout: str
+
+
+@dataclass(frozen=True)
 class PostgresHistoryCase:
     description: str
     expected_event_count: int

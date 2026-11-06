@@ -17,7 +17,6 @@ use crate::bindings::_helpers::analysis_session::session::{
     CacheStatsRow, FamilyRow, ModelRow, NativeModelAnalysisSession, RequestRow,
     start_model_analysis_session,
 };
-use crate::bindings::_helpers::analysis_session::stage_functions::family_rows;
 use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
 use crate::bindings::_helpers::cache::native_store::{content_digest, current_code_identity};
 use crate::bindings::_helpers::compile_driver::analysis_cache::{
@@ -34,6 +33,7 @@ use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::shapes::{VALID_FROM_DEFAULT, VALID_TO_DEFAULT};
+use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 
 const LOGGING_MODULE: &str = "logging";
@@ -50,7 +50,7 @@ pub(crate) struct ModelAnalysisRequest<'a, 'py> {
     pub(crate) column_types: Bound<'py, PyAny>,
     pub(crate) nullability: Bound<'py, PyAny>,
     pub(crate) complete_schemas: Bound<'py, PyAny>,
-    pub(crate) dynamic_families: Bound<'py, PyAny>,
+    pub(crate) dynamic_families: &'a [(String, Vec<DynamicFamily>)],
     pub(crate) rich_type_inference: bool,
     /// The `AnalysisCacheContext`, or `None` when the analysis store is bypassed.
     pub(crate) cache: Bound<'py, PyAny>,
@@ -104,11 +104,16 @@ fn session_request<'py>(
     rules: Vec<(String, String)>,
 ) -> PyResult<RequestRow> {
     let profile: &Bound<'py, PyAny> = &request.profile;
-    let mut families: Vec<(String, Vec<FamilyRow>)> = Vec::new();
-    for item in mapping_items(&request.dynamic_families)?.try_iter()? {
-        let (name, declared): (String, Bound<'py, PyAny>) = item?.extract()?;
-        families.push((name, family_rows(&declared)?));
-    }
+    let families: Vec<(String, Vec<FamilyRow>)> = request
+        .dynamic_families
+        .iter()
+        .map(|(name, declared)| {
+            (
+                name.clone(),
+                declared.iter().cloned().map(FamilyRow::from).collect(),
+            )
+        })
+        .collect();
     let shapes: RelationShapes = match declared_rows(request, catalog)? {
         Some(rows) => rows,
         None => RelationShapes {
@@ -352,7 +357,7 @@ fn model_rows<'py>(
             }
         }
         let references: Vec<(String, String)> = analysed_references(model_input)?;
-        let schema: Option<AttachedSchema<'py>> = attached_schema(model_input)?;
+        let schema: Option<AttachedSchema> = attached_schema(model_input)?;
         let recovers: bool = get("contract")?.eq(&enforced)?
             || schema
                 .as_ref()
@@ -366,7 +371,12 @@ fn model_rows<'py>(
             None
         };
         let families = match &schema {
-            Some(schema) => family_rows(&schema.dynamic_columns)?,
+            Some(schema) => schema
+                .dynamic_columns
+                .iter()
+                .cloned()
+                .map(FamilyRow::from)
+                .collect(),
             None => Vec::new(),
         };
         rows.push(ModelRow {

@@ -1,5 +1,6 @@
 //! Detect how each selected model and function changed since its recorded build.
 
+use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
 use crate::bindings::_helpers::compiled_views::function_reads;
@@ -8,7 +9,7 @@ use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::contracts::spec_resolution::matching_dynamic_families;
 use crate::bindings::_helpers::model_config::typed_config::{config_text, model_values};
 use crate::bindings::_helpers::planner_changes::results::native_enum;
-use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
+use crate::bindings::_helpers::records::construct::new_record_with;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
@@ -43,6 +44,7 @@ use crate::bindings::_helpers::planner_identity::metadata::{
     compiled_function_fingerprint_sql, function_local_hashes, model_declared_columns_hash,
     model_version_identity_metadata_json,
 };
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_items;
@@ -103,7 +105,7 @@ pub(crate) fn detect_changes<'py>(
     let models: Bound<'py, PyDict> =
         scope_model_changes((project, scope, snapshot), None, expected)?;
     let functions: Bound<'py, PyDict> = PyDict::new(py);
-    let selected: Bound<'py, PyAny> = native_field(scope, "selected_keys")?;
+    let selected = scope_data(scope)?;
     let recorded: Bound<'py, PyAny> =
         native_field(&native_field(snapshot, "fingerprints")?, "functions")?;
     let query_change_tracking: bool =
@@ -117,7 +119,12 @@ pub(crate) fn detect_changes<'py>(
             "fingerprint_sql",
             PyString::new(py, &fingerprint_sql).into_any(),
         )];
-        if selected.contains(function_reads::key(&function)?)? {
+        if selected
+            .selected
+            .contains(&crate::bindings::_helpers::graph::keys::native_key(
+                &function_reads::key(&function)?,
+            )?)
+        {
             let reason: &str = if full_refresh {
                 "full_refresh"
             } else {
@@ -239,19 +246,15 @@ pub(crate) fn scope_model_changes<'py>(
         function_local_hashes,
         hook_version_hashes: hook_version_hashes.into_any(),
     };
-    let model_kind: Bound<'py, PyAny> = enum_member(py, RecordId::CompiledResourceType, "MODEL")?;
-    let selected: Bound<'py, PyAny> = native_field(scope, "selected_keys")?;
-    let models_by_name: Bound<'py, PyAny> = native_field(scope, "models_by_name")?;
+    let scope = scope_data(scope)?;
     let changes: Bound<'py, PyDict> = PyDict::new(py);
-    for key in native_field(scope, "execution_order")?.try_iter()? {
-        let key: Bound<'py, PyAny> = key?;
-        if !selected.contains(&key)? || !native_field(&key, "resource_type")?.eq(&model_kind)? {
+    for key in &scope.order {
+        if !scope.selected.contains(key) || key.0 != MODEL {
             continue;
         }
-        let model: Bound<'py, PyAny> = mapping_get(&models_by_name, native_field(&key, "name")?)?;
-        if model.is_none() {
+        let Some(model) = scope.model(py, &key.1) else {
             continue;
-        }
+        };
         let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
         let expected: (Option<String>, Option<String>) = (
             lookup(&version_hashes, &name)?,

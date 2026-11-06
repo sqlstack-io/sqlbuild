@@ -8,7 +8,8 @@ use crate::bindings::_helpers::planner_phases::contexts::class_field;
 use crate::bindings::_helpers::planner_phases::models::IdentityWork;
 use crate::bindings::_helpers::planner_phases::models::PlannerIdentityContext;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
-use crate::bindings::_helpers::planner_phases::objects::{frozenset, native, replace};
+use crate::bindings::_helpers::planner_phases::objects::native;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -18,6 +19,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyDict, PyDictMethods};
 use pyo3::{Py, PyRefMut, Python};
+use sqlbuild_analysis::planner_scope::constants::MODEL;
 use std::collections::{BTreeMap, HashSet};
 
 static IDENTITY_WORK: PyOnceLock<Py<IdentityWork>> = PyOnceLock::new();
@@ -159,37 +161,27 @@ pub(crate) fn detect_stale_warning_changes<'py>(
         native_field(&native_field(project, "settings")?, "query_change_tracking")?.is_truthy()?,
     )?;
     let stale_scope = class_field(scopes, |s: &PlannerScopeResolution| &s.stale_warning_scope)?;
-    let mut remaining: Vec<_> = Vec::new();
-    for key in native_field(&stale_scope, "all_keys")?
-        .call_method0("values")?
-        .try_iter()?
-    {
-        let key = key?;
-        if native_field(&key, "resource_type")?.eq("model")?
-            && !reusable.contains(&native_field(&key, "name")?.extract::<String>()?)
-        {
-            remaining.push(key);
-        }
-    }
+    let stale_scope = scope_data(&stale_scope)?;
+    let remaining: HashSet<_> = stale_scope
+        .names
+        .iter()
+        .map(|(_, key)| key)
+        .filter(|key| key.0 == MODEL && !reusable.contains(&key.1))
+        .cloned()
+        .collect();
     let stale_identities = class_field(identities, |i: &PlannerIdentityContext| {
         &i.stale_warning_identities
     })?;
     {
         let mut work = identity_work(py)?;
         for key in &remaining {
-            *work
-                .stale_detections
-                .entry(native_field(key, "name")?.extract()?)
-                .or_default() += 1;
+            *work.stale_detections.entry(key.1.clone()).or_default() += 1;
         }
     }
     let remaining_changes = scope_model_changes(
         (
             project,
-            &replace(
-                &stale_scope,
-                &[("selected_keys", frozenset(py, &remaining)?)],
-            )?,
+            &stale_scope.with_selected(py, remaining).object(py)?,
             snapshot,
         ),
         Some(true),

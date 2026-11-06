@@ -4,22 +4,23 @@ use std::sync::Arc;
 
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{
-    PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyString, PyTuple, PyTupleMethods,
-};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyString, PyTuple};
 use sqlbuild_analysis::semantic_checks::main::check_semantic_metadata::check_semantic_metadata;
 use sqlbuild_analysis::semantic_checks::models::{
     AuditValue, MetadataAudit, MetadataFinding, MetadataFunction, MetadataModel, MetadataRequest,
     MetadataSource, MetadataSqlTest, ModelMetadataFindings,
 };
 use sqlbuild_analysis::semantic_validation::models as validation;
+use sqlbuild_model_config::header_metadata::constants::ACCEPTED_VALUES_ARGUMENT;
 
 use crate::bindings::_helpers::boundary::panics::compiler_error;
 use crate::bindings::_helpers::compiled_views::compiled_model_view::NativeCompiledModel;
 use crate::bindings::_helpers::compiled_views::model_reads::binding_validated;
+use crate::bindings::_helpers::model_config::config_nodes::PyConfigNode;
+use crate::bindings::_helpers::model_config::header_audits::AuditInstance;
+use crate::bindings::_helpers::model_config::header_metadata::HeaderValue;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
-use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::semantic_checks::failures::semantic_error;
 use crate::bindings::_helpers::semantic_checks::inputs::{
@@ -29,6 +30,7 @@ use crate::bindings::_helpers::semantic_checks::stage_objects::StageClasses;
 use crate::bindings::_helpers::semantic_checks::type_recovery::items;
 use crate::bindings::_helpers::semantic_shapes::shapes::project_shapes;
 use crate::bindings::types::CompilerDetach;
+use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_project::models::ModelMetadataTexts;
 
 /// `SqlReferenceKind.UDF` and `SqlReferenceKind.TABLE_FUNCTION` values.
@@ -509,7 +511,7 @@ fn metadata_model(classes: &StageClasses<'_>, model: &Bound<'_, PyAny>) -> PyRes
 
 fn metadata_audits(model: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataAudit>> {
     let py: Python<'_> = model.py();
-    let mut attached: Vec<(Option<String>, Bound<'_, PyAny>)> = Vec::new();
+    let mut attached: Vec<(Option<String>, AuditInstance<'_>)> = Vec::new();
     match model.downcast::<NativeCompiledModel>() {
         Ok(view) => {
             let Some((entry_audits, columns, audited)) =
@@ -517,12 +519,12 @@ fn metadata_audits(model: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataAudit>> {
             else {
                 return Ok(Vec::new());
             };
-            for audit in entry_audits.bind(py).iter() {
+            for audit in entry_audits.instances(py) {
                 attached.push((None, audit));
             }
             for (index, name) in audited {
-                for audit in columns.specs[index].field(py, "audits")?.try_iter()? {
-                    attached.push((Some(name.clone()), audit?));
+                for audit in columns.specs[index].audit_instances(py)? {
+                    attached.push((Some(name.clone()), audit));
                 }
             }
         }
@@ -532,13 +534,13 @@ fn metadata_audits(model: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataAudit>> {
                 return Ok(Vec::new());
             }
             for audit in native_field(&entry, "audits")?.try_iter()? {
-                attached.push((None, audit?));
+                attached.push((None, AuditInstance::Python(audit?)));
             }
             for column in native_field(&entry, "columns")?.try_iter()? {
                 let column: Bound<'_, PyAny> = column?;
                 let name: String = native_field(&column, "name")?.extract()?;
                 for audit in native_field(&column, "audits")?.try_iter()? {
-                    attached.push((Some(name.clone()), audit?));
+                    attached.push((Some(name.clone()), AuditInstance::Python(audit?)));
                 }
             }
         }
@@ -546,31 +548,75 @@ fn metadata_audits(model: &Bound<'_, PyAny>) -> PyResult<Vec<MetadataAudit>> {
     let empty: Bound<'_, PyAny> = PyString::new(py, "").into_any();
     let mut audits: Vec<MetadataAudit> = Vec::with_capacity(attached.len());
     for (column, audit) in attached {
-        let arguments: Bound<'_, PyAny> = native_field(&audit, "arguments")?;
-        let values: Bound<'_, PyAny> = mapping_get(&arguments, "values")?;
-        let values: Option<Vec<AuditValue>> =
-            if values.is_instance_of::<PyList>() || values.is_instance_of::<PyTuple>() {
-                Some(
-                    values
-                        .try_iter()?
-                        .map(|value| audit_value(&value?))
-                        .collect::<PyResult<_>>()?,
-                )
-            } else {
-                None
-            };
+        let values = audit_values(py, &audit)?;
         audits.push(MetadataAudit {
             column,
-            definition: native_field(&audit, "definition_name")?.extract()?,
-            expression: text(&mapping_get(&arguments, "expression")?)?,
-            target: mapping_get_or(&arguments, "to", &empty)?.str()?.extract()?,
-            field: mapping_get_or(&arguments, "field", &empty)?
+            definition: audit.field("definition_name")?.extract()?,
+            expression: text(
+                &audit
+                    .argument("expression")?
+                    .unwrap_or_else(|| py.None().into_bound(py)),
+            )?,
+            target: audit
+                .argument("to")?
+                .unwrap_or_else(|| empty.clone())
+                .str()?
+                .extract()?,
+            field: audit
+                .argument("field")?
+                .unwrap_or_else(|| empty.clone())
                 .str()?
                 .extract()?,
             values,
         });
     }
     Ok(audits)
+}
+
+fn audit_values(py: Python<'_>, audit: &AuditInstance<'_>) -> PyResult<Option<Vec<AuditValue>>> {
+    if let AuditInstance::Native(spec, _) = audit {
+        for (key, value) in &spec.arguments {
+            match key {
+                ConfigNode::Str(key) if key == ACCEPTED_VALUES_ARGUMENT => {}
+                ConfigNode::Host(_) => break,
+                _ => continue,
+            }
+            match value {
+                ConfigNode::List(values) | ConfigNode::Tuple(values) => {
+                    return values
+                        .iter()
+                        .map(|value| config_audit_value(py, value))
+                        .collect::<PyResult<_>>()
+                        .map(Some);
+                }
+                ConfigNode::Host(_) => break,
+                _ => return Ok(None),
+            }
+        }
+    }
+    let Some(values) = audit.argument("values")? else {
+        return Ok(None);
+    };
+    if values.is_instance_of::<PyList>() || values.is_instance_of::<PyTuple>() {
+        values
+            .try_iter()?
+            .map(|value| audit_value(&value?))
+            .collect::<PyResult<_>>()
+            .map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+fn config_audit_value(py: Python<'_>, value: &PyConfigNode) -> PyResult<AuditValue> {
+    Ok(match value {
+        ConfigNode::Null => AuditValue::Null,
+        ConfigNode::Bool(value) => AuditValue::Bool(*value),
+        ConfigNode::Int(value) => AuditValue::Number(value.to_string()),
+        ConfigNode::Str(value) => AuditValue::Text(value.clone()),
+        ConfigNode::Float(_) | ConfigNode::Host(_) => return audit_value(&value.object(py)?),
+        _ => AuditValue::Other,
+    })
 }
 
 /// An accepted value by Python type: null, bool, number, text or other.

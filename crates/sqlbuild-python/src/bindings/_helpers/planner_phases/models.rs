@@ -91,7 +91,7 @@ pub(crate) struct PlannerWarehouseState {
 }
 
 /// Resolved planner scopes for one plan build.
-#[pyclass(module = "sqlbuild._native", frozen, get_all)]
+#[pyclass(module = "sqlbuild._native", frozen)]
 #[derive(Debug)]
 pub(crate) struct PlannerScopeResolution {
     pub(crate) selected_scope: Py<PyAny>,

@@ -28,6 +28,7 @@ use crate::bindings::_helpers::semantic_shapes::shapes::{
     model_inputs, project_shapes, published_shape,
 };
 use crate::bindings::models::BindingPositions;
+use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 const BINDING_UNKNOWN_TABLE_INTERNAL_CODE: &str = "B000";
 const GRAPHLIB_MODULE: &str = "graphlib";
@@ -37,7 +38,7 @@ const UNKNOWN: &str = "UNKNOWN";
 const GENERIC_DIALECT: &str = "generic";
 /// Dialects whose unquoted identifiers already bind with their exact case.
 const EXACT_UNQUOTED_DIALECTS: [&str; 1] = ["clickhouse"];
-/// The dialect whose unquoted identifiers resolve as upper case; the adapter lists them lowercased.
+/// The upper-case folding dialect; the adapter lists folded names lowercased and others quoted.
 const UPPERCASE_FOLDING_DIALECT: &str = "snowflake";
 
 type Object<'py> = Bound<'py, PyAny>;
@@ -109,7 +110,11 @@ pub(crate) fn source_binding_diagnostics<'py>(
         }
         let quoted: Bound<'py, PyDict> = PyDict::new(py);
         for (column, column_type) in physical {
-            let name: String = if exact_unquoted || (folds_upper && is_folded_identifier(&column)) {
+            let listed_quoted: bool = folds_upper && unquoted_column_name(&column) != column;
+            let name: String = if exact_unquoted
+                || listed_quoted
+                || (folds_upper && is_folded_identifier(&column))
+            {
                 column
             } else {
                 format!("\"{}\"", column.replace('"', "\"\""))

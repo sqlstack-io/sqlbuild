@@ -15,7 +15,7 @@ use sqlbuild_cli::dispatch::models::{ExportSummary, ExporterLoss};
 use sqlbuild_core::event_export::constants::DEFAULT_EVENT_EXPORT_SHUTDOWN_TIMEOUT_SECONDS;
 use sqlbuild_host::entries::models::{ExecutorHost, UserCodeHost};
 
-use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords};
+use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::progress::NativeProgressProjector;
 use crate::bindings::_helpers::build_progress::progress::machine_output_mode;
 use crate::bindings::_helpers::cli::launch_state::withhold_launch_record;
@@ -337,10 +337,17 @@ impl Observed {
     ) -> PyResult<()> {
         let mut command_output_sinks: bool = false;
         if native_field(args, "command")?.ne(LINEAGE_COMMAND)? {
-            let extensions: Bound<'_, PyAny> = call_with(
-                &host::entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
-                &[("project_dir", project_dir.clone())],
-            )?;
+            let discover = || {
+                call_with(
+                    &host::entry(py, UserCodeHost::DiscoverRuntimeExtensions)?,
+                    &[("project_dir", project_dir.clone())],
+                )
+            };
+            let extensions: Bound<'_, PyAny> = if machine_output_mode(args)? {
+                within(&host::redirect_stdout_to_stderr(py)?, |_| discover())?
+            } else {
+                discover()?
+            };
             let lifecycle_replacement: Bound<'_, PyAny> =
                 native_field(&extensions, "recall_lifecycle_sink")?;
             let output_replacement: Bound<'_, PyAny> =

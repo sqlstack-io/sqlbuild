@@ -484,3 +484,13 @@ class CustomQueryChangeTestCase:
     description: str
     reason: PlanReason
     expected_query_changed: bool
+
+
+@dataclass(frozen=True)
+class QuotedSpellingTestCase:
+    """A configured column name, the warehouse-listed names, and whether it is rejected."""
+
+    description: str
+    configured: str
+    listed_names: tuple[str, ...]
+    expected_error: str | None = None

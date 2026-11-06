@@ -14,43 +14,11 @@ fn query_fingerprint(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<Strin
     .map_err(value_error)
 }
 
-#[pyfunction]
-fn analyze_queries_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
-    py.compiler_detach(|| {
-        sqlbuild_analysis::query_analysis::main::analyze::analyze_json(request_json)
-    })
-    .map_err(value_error)
-}
-
-#[pyfunction]
-fn analyze_project_queries_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
-    py.compiler_detach(|| {
-        sqlbuild_analysis::query_analysis::main::analyze_project::analyze_project_json(request_json)
-    })
-    .map_err(value_error)
-}
-
-#[pyfunction]
-fn analyze_project_queries_compact_json(py: Python<'_>, request_json: &str) -> PyResult<String> {
-    py.compiler_detach(|| {
-        sqlbuild_analysis::query_analysis::main::analyze_project_compact::analyze_project_compact_json(
-            request_json,
-        )
-    })
-    .map_err(value_error)
-}
-
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::bindings::_helpers::analysis::binding_catalog::register(module)?;
     crate::bindings::_helpers::analysis::required_columns::register(module)?;
     crate::bindings::_helpers::references::explicit_references::register(module)?;
     crate::bindings::_helpers::analysis::binding_locations::register(module)?;
     module.add_function(wrap_pyfunction!(query_fingerprint, module)?)?;
-    module.add_function(wrap_pyfunction!(analyze_queries_json, module)?)?;
-    module.add_function(wrap_pyfunction!(analyze_project_queries_json, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        analyze_project_queries_compact_json,
-        module
-    )?)?;
     Ok(())
 }

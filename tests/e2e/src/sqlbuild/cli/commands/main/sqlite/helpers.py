@@ -75,11 +75,12 @@ _MODELS: dict[str, str] = {
   ),
 );
 
-SELECT order_id, customer_id, amount_cents, ordered_at, status
-FROM (
+WITH ranked AS (
   SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY event_seq DESC) AS event_rank
   FROM __seed("orders")
-) AS ranked
+)
+SELECT order_id, customer_id, amount_cents, ordered_at, status
+FROM ranked
 WHERE event_rank = 1
 """,
     "models/marts/customer_totals.sql": """MODEL (
@@ -170,7 +171,11 @@ def build_orders_project_files(*, adapter: str) -> dict[str, str]:
             "[targets.prod.clone]\n"
             "allow_as_clone_destination = true\n\n"
             "[defaults]\n"
-            'materialized = "table"\n'
+            'materialized = "table"\n\n'
+            "[[rules.rule_ignores]]\n"
+            'rules = ["SQLCLEAN018"]\n'
+            'paths = ["models/staging/stg_orders.sql"]\n'
+            'reason = "Seed event_seq is unique by construction; seeds declare no keys."\n'
         ),
         "seeds/customers.csv": _CUSTOMERS_CSV,
         "seeds/orders.csv": "event_seq,order_id,customer_id,amount_cents,ordered_at,status\n"

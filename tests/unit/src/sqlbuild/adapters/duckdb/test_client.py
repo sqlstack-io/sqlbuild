@@ -359,7 +359,18 @@ def test_given_subquery_source_when_rendering_freshness_query_then_duckdb_omits_
                 'VALUES (__source."order_id", __source."line_id", __source."status", '
                 '__source."updated_at")'
             ),
-        )
+        ),
+        DuckDbMergeExclusionTestCase(
+            description="a quoted camelCase key matches its listed column",
+            expected_update_clause='"status" = __source."status"',
+            expected_insert_clause=(
+                'INSERT ("orderId", "line_id", "status", "updated_at") '
+                'VALUES (__source."orderId", __source."line_id", __source."status", '
+                '__source."updated_at")'
+            ),
+            unique_key=('"orderId"', "line_id"),
+            source_columns=("orderId", "line_id", "status", "updated_at"),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -371,8 +382,8 @@ def test_given_composite_keys_when_rendering_merge_then_uses_expected_columns(
     (merge_sql,) = adapter.render_merge(
         destination="analytics.orders",
         sql="SELECT order_id, line_id, status, updated_at FROM staging_orders",
-        unique_key=("order_id", "line_id"),
-        source_columns=("order_id", "line_id", "status", "updated_at"),
+        unique_key=test_case.unique_key,
+        source_columns=test_case.source_columns,
         exclude_columns=("UPDATED_AT",),
     )
 

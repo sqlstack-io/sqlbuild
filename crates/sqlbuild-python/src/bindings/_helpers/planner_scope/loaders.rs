@@ -11,6 +11,7 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, IntoPyObject, PyAny, PyAnyMethods, PyResult, pyfunction};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_analysis::planner_scope::main::{
     expand_loaders::expand_loaders, intermediate_sources::intermediate_sources,
 };
@@ -71,11 +72,11 @@ pub(crate) fn loader_to_source_entry<'py>(
 
 pub(crate) fn intermediate_map<'py>(
     project: &Bound<'py, PyAny>,
-    selected: &Bound<'py, PyAny>,
+    selected: &[ObjectKey],
     upstream: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let graph = project_graph(project)?;
-    let names = intermediate_sources(&graph, &keys(selected)?, upstream);
+    let names = intermediate_sources(&graph, selected, upstream);
     let loaders = PyDict::new(project.py());
     for loader in native_field(project, "loader_functions")?.try_iter()? {
         let loader = loader?;
@@ -96,14 +97,14 @@ pub(crate) fn build_intermediate_source_map<'py>(
     project: &Bound<'py, PyAny>,
     selected_keys: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    intermediate_map(project, selected_keys, false)
+    intermediate_map(project, &keys(selected_keys)?, false)
 }
 
 pub(crate) fn build_upstream_intermediate_source_map<'py>(
     project: &Bound<'py, PyAny>,
     selected_keys: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    intermediate_map(project, selected_keys, true)
+    intermediate_map(project, &keys(selected_keys)?, true)
 }
 
 #[pyfunction]

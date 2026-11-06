@@ -1,4 +1,0 @@
-# Databricks reserves no keywords as identifiers:
-# https://docs.databricks.com/sql/language-manual/sql-ref-reserved-words
-# ('Databricks does not formally disallow any specific literals from being used as identifiers').
-

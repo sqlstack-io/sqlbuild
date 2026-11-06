@@ -28,6 +28,11 @@ pub const ABOVE_OPERATOR: &str = "above";
 pub const AUDIT_SEVERITIES: [&str; 2] = ["warn", "error"];
 /// The audit that contradicts `nullable = true`.
 pub const NOT_NULL_AUDIT_NAME: &str = "not_null";
+/// The enum membership audit and its ordered values argument.
+pub const ACCEPTED_VALUES_AUDIT: &str = "accepted_values";
+pub const ACCEPTED_VALUES_ARGUMENT: &str = "values";
+/// The audit collection on a schema column or model.
+pub const AUDITS_KEY: &str = "audits";
 /// The help every `ResourceIdentityError` shows.
 pub const IDENTITY_HELP: &str = "Rename the authored identity and update its references, selectors, \
 and integration keys. SQLBuild does not silently normalize resource identities. Double \

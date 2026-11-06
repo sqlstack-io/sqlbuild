@@ -429,26 +429,6 @@ pub(crate) fn constant_declaration_sql<'py>(
     Err(PyErr::from_value(compile_error))
 }
 
-/// Render one validated constant with the active adapter's typed-value contract.
-#[pyfunction]
-#[pyo3(signature = (*, declaration, value_renderer, collection_rendering, file_path=None))]
-fn render_constant_declaration<'py>(
-    declaration: &Bound<'py, PyAny>,
-    value_renderer: &Bound<'py, PyAny>,
-    collection_rendering: &Bound<'py, PyAny>,
-    file_path: Option<Bound<'py, PyAny>>,
-) -> PyResult<String> {
-    let location: Option<String> = match file_path {
-        Some(file_path) => Some(file_path.str()?.to_string()),
-        None => None,
-    };
-    constant_declaration_sql(
-        declaration,
-        value_renderer,
-        (collection_rendering, location.as_deref()),
-    )
-}
-
 /// The adapter's constant rendering a compile's declaration expansions share.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct ConstantRendering {
@@ -511,7 +491,6 @@ fn resolve_declaration_context<'py>(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(build_native_declaration_contexts, module)?)?;
-    module.add_function(wrap_pyfunction!(render_constant_declaration, module)?)?;
     module.add_function(wrap_pyfunction!(render_enum_member_value, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_declaration_context, module)?)?;
     Ok(())

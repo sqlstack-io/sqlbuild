@@ -44,13 +44,13 @@ _STATUS_TEST: str = (
     [
         ParameterisedTestLintTestCase(
             description="compile lints the parameterised test instead of failing with L005",
-            selected_rules='"SQBRSQL004"',
+            selected_rules='"SQLCLEAN004"',
             command=("--no-color", "compile"),
             expected_fragment="0 errors",
         ),
         ParameterisedTestLintTestCase(
             description="the cases still run once the test file is linted",
-            selected_rules='"SQBRSQL004"',
+            selected_rules='"SQLCLEAN004"',
             command=("--no-color", "test"),
             expected_fragment="PASS=2  FAIL=0  TOTAL=2",
         ),

@@ -1,14 +1,15 @@
 use crate::sql_macros::_helpers::parsing::lexing::{AtConstruct, at_constructs};
 use crate::sql_macros::constants::NON_ASCII_BYTE;
 use sqlbuild_render::macro_calls::main::opens_bare_call::opens_bare_call;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// The name and byte offset of each `@name(...)` call in `text` that names no macro kind.
 #[must_use]
-pub fn bare_macro_calls(text: &str) -> Vec<(String, usize)> {
+pub fn bare_macro_calls(text: &str, syntax: Option<&LexicalSyntax>) -> Vec<(String, usize)> {
     if !may_hold_bare_call(text) {
         return Vec::new();
     }
-    at_constructs(text)
+    at_constructs(text, syntax)
         .unwrap_or_default()
         .into_iter()
         .filter_map(|construct| match construct {

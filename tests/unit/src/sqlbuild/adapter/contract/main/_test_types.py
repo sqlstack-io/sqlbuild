@@ -23,3 +23,12 @@ class RelationProbeClassificationTestCase:
     expected_status: RelationReadStatus | None
     expected_role: str | None = None
     role: str | None = None
+
+
+@dataclass(frozen=True)
+class ColumnNameKeyTestCase:
+    """One declared or listed column name and the key it matches by."""
+
+    description: str
+    name: str
+    expected_key: str

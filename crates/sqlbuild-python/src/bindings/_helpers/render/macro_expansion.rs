@@ -16,6 +16,7 @@ use sqlbuild_render::macro_calls::main::splice_macro_calls::splice_macro_calls a
 use sqlbuild_render::macro_calls::models::{
     MacroCallEntry, MacroCallEvent, MacroCallScan, MacroCallSite, MacroScanFailure, MacroSpliceSpan,
 };
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::records::construct::new_helped_error;
 use crate::bindings::_helpers::records::fields::{field as native_field, field_text};
@@ -31,9 +32,11 @@ use crate::bindings::_helpers::render::macro_expansion_facts::{ExpansionFacts, R
 use crate::bindings::_helpers::render::macro_generated_references::{
     GeneratedOrigin, GeneratedReferenceClasses, report_generated_references,
 };
+use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 
 const RELATION_PREFIX: &str = "__sqlbuild_relation_";
 const MEMO_ATTRIBUTE: &str = "memo";
+const LEXICAL_SYNTAX_ATTRIBUTE: &str = "_lexical_syntax";
 const OBSERVE_MODULES_METHOD: &str = "observe_modules";
 const RELATION_SUFFIX: &str = "__";
 const CONSTANT_KIND: &str = "constant";
@@ -121,6 +124,8 @@ pub(crate) struct NativeMacroExpansion {
     enforce_explicit: bool,
     classes: Py<PyDict>,
     pub(crate) facts: RefCell<ExpansionFacts>,
+    /// The lexical rules the authored SQL is written in, from the macro context, if it has them.
+    pub(crate) syntax: Option<LexicalSyntax>,
 }
 
 positional_record! {
@@ -151,7 +156,14 @@ impl NativeMacroExpansion {
             declarations,
             consumer,
         } = state;
+        let context: &Bound<'_, PyAny> = macro_context.bind(file_path.py());
+        let syntax: Option<LexicalSyntax> = if context.is_none() {
+            None
+        } else {
+            optional_record_syntax(&native_field(context, LEXICAL_SYNTAX_ATTRIBUTE)?)?
+        };
         Ok(Self {
+            syntax,
             file_path: file_path.clone().unbind(),
             file_label: file_path.str()?.to_string(),
             loaded_macros,
@@ -728,7 +740,7 @@ pub(crate) fn expanded<'py>(
         classes: &classes,
     };
     let text: CallText<'_> = CallText::new(sql);
-    let scan: MacroCallScan = scan_sites(text.text);
+    let scan: MacroCallScan = scan_sites(text.text, this.syntax.as_ref());
     let memo: Option<Bound<'py, MacroCallMemo>> = if bridge.is_none() {
         None
     } else {

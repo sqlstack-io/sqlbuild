@@ -186,3 +186,28 @@ pub(super) fn untyped_calls(sql: &str, texts: &[&str]) -> Vec<TypedCall> {
         })
         .collect()
 }
+
+pub(super) fn escape_prefix_rules() -> sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+    sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+        escape_string_prefix: true,
+        line_comment_prefixes: vec!["--".to_owned()],
+        ..sqlbuild_sqltext::sql_scan::models::LexicalSyntax::default()
+    }
+}
+
+pub(super) fn backslash_rules() -> sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+    sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+        backslash_escape_quotes: vec!["'".to_owned()],
+        line_comment_prefixes: vec!["--".to_owned(), "//".to_owned()],
+        ..sqlbuild_sqltext::sql_scan::models::LexicalSyntax::default()
+    }
+}
+
+pub(super) fn raw_prefix_rules() -> sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+    sqlbuild_sqltext::sql_scan::models::LexicalSyntax {
+        backslash_escape_quotes: vec!["'".to_owned(), "\"".to_owned()],
+        raw_string_prefix: true,
+        line_comment_prefixes: vec!["--".to_owned(), "#".to_owned()],
+        ..sqlbuild_sqltext::sql_scan::models::LexicalSyntax::default()
+    }
+}

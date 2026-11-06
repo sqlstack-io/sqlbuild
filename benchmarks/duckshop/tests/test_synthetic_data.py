@@ -477,6 +477,12 @@ def test_given_any_data_scale_when_building_edge_rows_then_they_are_fixed(scale:
         "edge__ticket_notes": _edge_cases.ticket_notes(),
         "edge__partner_listings": _edge_cases.partner_listings(),
         "edge__delivery_updates": _edge_cases.delivery_updates(),
+        "edge__basket_lines": _edge_cases.basket_lines(),
+        "edge__date_texts": _edge_cases.date_texts(),
+        "edge__amount_checks": _edge_cases.amount_checks(),
+        "edge__variant_values": _edge_cases.variant_values(),
+        "edge__category_links": _edge_cases.category_links(),
+        "edge__supplier_notes": _edge_cases.supplier_notes(),
     }
 
     assert {name: _digest(rows) for name, rows in rebuilt.items()} == {

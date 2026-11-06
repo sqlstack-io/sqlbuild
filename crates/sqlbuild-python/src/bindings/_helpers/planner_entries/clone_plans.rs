@@ -7,16 +7,16 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
+use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::node_set::PyNodeSet;
 use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
+use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
 use crate::bindings::_helpers::planner_entries::models::ModelPlanContext;
 use crate::bindings::_helpers::planner_entries::values::{
     native, planner_model, planner_type, string,
 };
-use crate::bindings::_helpers::planner_identity::graph::topologically_order_keys;
-use crate::bindings::_helpers::planner_identity::graph::{
-    build_downstream_deps, build_execution_upstream_deps,
-};
+use crate::bindings::_helpers::planner_identity::graph::{execution_deps, execution_order};
 use crate::bindings::_helpers::planner_identity::metadata::build_compiled_function_fingerprint_sql;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
@@ -35,6 +35,9 @@ use pyo3::PyRef;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
+use sqlbuild_core::graph_walk::main::clone_ancestors::clone_ancestors;
+use sqlbuild_core::graph_walk::models::ClonePolicy;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 
 const ENABLED_KEY: &str = "enabled";
@@ -81,8 +84,11 @@ fn clone_plan_output<'py>(
     exclude: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = project.py();
-    let upstream = build_execution_upstream_deps(project)?.into_any();
-    let downstream = build_downstream_deps(&upstream)?.into_any();
+    let upstream = execution_deps(project)?;
+    let order = execution_order(py, &upstream, &[])?;
+    let cache = KeyCache::new(py)?;
+    let downstream = edge_dict(&cache, &downstream_edges(&upstream))?.into_any();
+    let upstream = edge_dict(&cache, &upstream)?.into_any();
     let selected = object(
         py,
         resolve_graph_selection(
@@ -97,7 +103,7 @@ fn clone_plan_output<'py>(
         &[
             (
                 "execution_order",
-                object(py, topologically_order_keys(&upstream, None)?)?,
+                PyTuple::new(py, cache.keys(&order)?)?.into_any(),
             ),
             ("selected_keys", selected),
             ("upstream_deps", upstream),
@@ -256,7 +262,7 @@ fn clone_model_entries<'py>(
                 py,
                 ModelPlanContext {
                     model_locations: resolution.model_locations.clone().unbind(),
-                    models_by_name: PyDict::new(py).into_any().unbind(),
+                    models_by_name: PyDict::new(py).into_any().into(),
                     functions_by_name: functions.into_any().unbind(),
                     seed_locations: resolution.seed_locations.clone().unbind(),
                     function_locations: resolution.function_locations.clone().unbind(),
@@ -644,44 +650,20 @@ impl<'py> CloneGraph<'py> {
     /// Depth-first walk from every selected node in Python's recursion order.
     fn walk(&self, skipped_views: bool) -> PyResult<Bound<'py, PyFrozenSet>> {
         let py = self.selected.py();
-        let visited = PySet::empty(py)?;
-        let found = PySet::empty(py)?;
-        for start in self.selected.try_iter()? {
-            let start = start?;
-            if visited.contains(&start)? {
-                continue;
-            }
-            visited.add(&start)?;
-            let mut stack: Vec<(Vec<Bound<'py, PyAny>>, usize)> = vec![(self.parents(&start)?, 0)];
-            while let Some((parents, index)) = stack.last_mut() {
-                let Some(parent) = parents.get(*index).cloned() else {
-                    stack.pop();
-                    continue;
-                };
-                *index += 1;
-                let descend = if self.selected.contains(&parent)? {
-                    true
-                } else if skipped_views {
-                    let view = self.holds(&self.is_view, &parent)?;
-                    if view && self.holds(&self.is_clonable, &parent)? {
-                        found.add(&parent)?;
-                    }
-                    view
-                } else if self.holds(&self.is_view, &parent)? {
-                    true
-                } else {
-                    if self.holds(&self.is_clonable, &parent)? {
-                        found.add(&parent)?;
-                    }
-                    false
-                };
-                if descend && !visited.contains(&parent)? {
-                    visited.add(&parent)?;
-                    stack.push((self.parents(&parent)?, 0));
-                }
-            }
-        }
-        PyFrozenSet::new(py, found.iter())
+        let mut visited = PyNodeSet(PySet::empty(py)?);
+        let mut found = PyNodeSet(PySet::empty(py)?);
+        clone_ancestors(
+            self.selected.try_iter()?,
+            (&mut visited, &mut found),
+            |node| self.parents(node),
+            ClonePolicy {
+                selected: |node: &Bound<'py, PyAny>| self.selected.contains(node),
+                clonable: |node: &Bound<'py, PyAny>| self.holds(&self.is_clonable, node),
+                view: |node: &Bound<'py, PyAny>| self.holds(&self.is_view, node),
+                skipped_views,
+            },
+        )?;
+        PyFrozenSet::new(py, found.0.iter())
     }
 }
 

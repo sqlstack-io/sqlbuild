@@ -22,12 +22,12 @@ use sqlbuild_cursor::algebra::main::next_boundary::next_boundary;
 use sqlbuild_cursor::algebra::main::normalize_timestamp_text::normalize_timestamp_text;
 use sqlbuild_cursor::algebra::main::parse_integer_text::parse_integer_text;
 use sqlbuild_cursor::algebra::main::render::render;
-use sqlbuild_cursor::algebra::models::{Extreme, Grain, Scalar, ScalarValue, SortKey, ZoneOffset};
+use sqlbuild_cursor::algebra::models::{Extreme, Grain, Scalar, SortKey};
 use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cursor::conversion::{CursorSession, algebra_error};
-use crate::bindings::_helpers::cursor::values::{DATETIME_MODULE, naive_date_time};
+use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -35,7 +35,6 @@ use crate::bindings::_helpers::records::ids::RecordId;
 
 const DECIMAL_MODULE: &str = "decimal";
 const INTEGER_CURSOR: &str = "integer";
-const UTC_OFFSET: i64 = 0;
 const TIMESTAMP_CURSOR: &str = "timestamp";
 
 /// `CursorAlgebraError(message)` raised from `cause`.
@@ -254,34 +253,6 @@ pub(crate) fn compare_values(left: &Bound<'_, PyAny>, right: &Bound<'_, PyAny>) 
     })
 }
 
-/// The key as `int` or naive `datetime`; converting from UTC itself keeps the fold.
-fn python_key<'py>(py: Python<'py>, key: &SortKey, fold: bool) -> PyResult<Bound<'py, PyAny>> {
-    match key {
-        SortKey::Integer(number) => Ok(number.into_pyobject(py)?.into_any()),
-        SortKey::Moment(local) => naive_date_time(py, local, fold),
-    }
-}
-
-/// The canonical sortable key of one raw cursor bound.
-#[pyfunction(name = "cursor_sort_key")]
-#[pyo3(signature = (*, raw, cursor_type))]
-fn sortable_key<'py>(
-    raw: &Bound<'py, PyAny>,
-    cursor_type: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let session: CursorSession<'py> = CursorSession::new(raw.py())?;
-    let scalar: Scalar = as_scalar(&session, raw, cursor_type)?;
-    let key: SortKey = session.checked(sort_key(&scalar, &session))?;
-    let ScalarValue::Timestamp(timestamp) = &scalar.value else {
-        return python_key(raw.py(), &key, false);
-    };
-    match (timestamp.offset, timestamp.template) {
-        (ZoneOffset::Naive, Some(template)) => Ok(session.held(template)),
-        (ZoneOffset::Fixed(UTC_OFFSET), _) => python_key(raw.py(), &key, timestamp.fold),
-        _ => python_key(raw.py(), &key, false),
-    }
-}
-
 fn extreme_bound<'py>(
     values: &Bound<'py, PyAny>,
     cursor_type: &Bound<'py, PyAny>,
@@ -403,7 +374,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(sentinel_to_token, module)?)?;
     module.add_function(wrap_pyfunction!(sentinel_from_token, module)?)?;
     module.add_function(wrap_pyfunction!(compare_values, module)?)?;
-    module.add_function(wrap_pyfunction!(sortable_key, module)?)?;
     module.add_function(wrap_pyfunction!(max_bound, module)?)?;
     module.add_function(wrap_pyfunction!(min_bound, module)?)?;
     module.add_function(wrap_pyfunction!(floor_value, module)?)?;

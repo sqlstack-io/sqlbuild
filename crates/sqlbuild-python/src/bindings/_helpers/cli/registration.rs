@@ -28,6 +28,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     janitor::registration::register(module)?;
     plan_command::registration::register(module)?;
     freshness::registration::register(module)?;
+    crate::bindings::_helpers::native_host::consumption_state::register(module)?;
     clone::registration::register(module)?;
     compute_logs::registration::register(module)?;
     execution_history::registration::register(module)?;

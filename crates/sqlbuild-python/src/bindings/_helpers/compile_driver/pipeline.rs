@@ -13,6 +13,7 @@ use crate::bindings::_helpers::diagnostics::trackers::current_tracker;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 
 /// The current build's phase timing tracker, when one is recording.
@@ -51,6 +52,7 @@ pub(crate) fn compile_project_phase<'py>(
         ),
         &arguments.value("options")?,
         &arguments.value("on_progress")?,
+        None,
     )
 }
 
@@ -59,6 +61,7 @@ pub(crate) fn compiled_phase<'py>(
     (discovered, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     options: &Bound<'py, PyAny>,
     on_progress: &Bound<'py, PyAny>,
+    on_inputs_ready: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
     let options: Bound<'py, PyAny> = if options.is_truthy()? {
@@ -72,6 +75,7 @@ pub(crate) fn compiled_phase<'py>(
             discovered,
             Some(native_field(&options, "selected_target")?),
             Some(native_field(&options, "cli_vars")?),
+            false,
         )?
     } else {
         configured
@@ -80,6 +84,10 @@ pub(crate) fn compiled_phase<'py>(
     let started: f64 = monotonic(py)?;
     let compiled: PyResult<Bound<'py, PyAny>> = (|| {
         let selection: Bound<'py, PyAny> = compile_analysis_selection(&options, discovered)?;
+        let selection: Bound<'py, PyAny> = match on_inputs_ready {
+            Some(hook) => replaced(&selection, &[("on_inputs_ready", hook.clone())])?,
+            None => selection,
+        };
         build_compiled_project(
             py,
             Some(keywords(
@@ -102,6 +110,10 @@ pub(crate) fn compiled_phase<'py>(
                     ),
                     ("resolved_connection", connection_config.clone()),
                     ("analysis_selection", selection),
+                    (
+                        "source_lexical_syntax",
+                        native_field(&options, "source_lexical_syntax")?,
+                    ),
                 ],
             )?),
         )

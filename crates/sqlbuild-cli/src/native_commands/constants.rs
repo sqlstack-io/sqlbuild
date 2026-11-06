@@ -34,10 +34,16 @@ pub(crate) const HOME_VARIABLE: &str = "HOME";
 pub(crate) const HOME_VARIABLE: &str = "USERPROFILE";
 /// The command name compute logs record for a bare `sqb`.
 pub(crate) const UNKNOWN_COMMAND: &str = "unknown";
+/// The supported Python ISO grammar, independent of whether a Python process is started.
+pub(crate) const COST_ISO_PYTHON_MINOR: u8 = 12;
+pub(crate) const RUNNING_BUILD_STATUS: &str = "running";
 /// Commands with no handler: observed, then successful.
 pub(crate) const CLEAN_COMMAND: &str = "clean";
 pub(crate) const INIT_COMMAND: &str = "init";
 pub(crate) const SKILLS_COMMAND: &str = "skills";
+pub(crate) const SERVER_COMMAND: &str = "server";
+pub(crate) const SCHEDULER_COMMAND: &str = "scheduler";
+pub(crate) const ADMIN_COMMAND: &str = "admin";
 pub(crate) const RULES_COMMAND: &str = "rules";
 pub(crate) const RULES_LIST_ACTION: &str = "list";
 pub(crate) const RULES_SHOW_ACTION: &str = "show";
@@ -84,3 +90,16 @@ pub(crate) const EXIT_FLUSH_FAILURE: &str =
     "Exception ignored in: <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>";
 pub(crate) const EXIT_FLUSH_FAILURE_STATUS: i32 = 120;
 pub(crate) const UNCAUGHT_EXCEPTION_STATUS: i32 = 1;
+/// Reserve half the location work claim for acknowledgement retries after killing a callback.
+pub(crate) const SENSOR_EVALUATION_SECONDS: u64 = 30;
+pub(crate) const SENSOR_RESULT_BYTES: u64 = 1_048_576;
+/// Independent read timeout and delay between automatic history polls.
+pub(crate) const METADATA_POLL_SECONDS: u64 = 30;
+/// Full key-set reconciliation is independent of the incremental poll and overlap window.
+pub(crate) const METADATA_RECONCILE_SECONDS: u32 = 300;
+pub(crate) const METADATA_OVERLAP_SECONDS: i64 = 300;
+/// A source-key cursor can repeat the last row's base64-encoded definition beside the records.
+pub(crate) const METADATA_REPLY_BYTES: u64 =
+    3 * sqlbuild_orchestration::api::constants::BODY_BYTES as u64;
+/// Bound piped terminal input independently of the credential owner's password policy.
+pub(crate) const PASSWORD_INPUT_BYTES: u64 = 4096;

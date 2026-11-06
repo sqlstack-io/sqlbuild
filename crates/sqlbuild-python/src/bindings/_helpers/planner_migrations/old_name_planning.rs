@@ -13,9 +13,12 @@ use crate::bindings::_helpers::planner_migrations::old_names::old_name_claim_err
 use crate::bindings::_helpers::planner_migrations::old_names::old_name_schemas_to_read;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
-use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods, PyTuple};
+use pyo3::types::{PySet, PySetMethods, PyTuple};
+use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
+use std::collections::HashMap;
 
 fn schemas<'py>(
     (phase, migration_entries): (&MigrationPhase<'py>, &Bound<'py, PyAny>),
@@ -75,23 +78,22 @@ pub(crate) fn plan_old_name_views<'py>(
 ) -> PyResult<OldNameViewPlanning<'py>> {
     let py = phase.runtime.py();
     let runtime = phase.runtime.clone();
-    let scope = phase.scope.clone();
+    let scope = scope_data(&phase.scope)?;
     let project = runtime_field(&runtime, |runtime| &runtime.project)?;
     let models: Vec<Bound<'py, PyAny>> = project_reads::models(&project)?
         .try_iter()?
         .collect::<PyResult<_>>()?;
-    let by_name = PyDict::new(py);
+    let mut by_name: HashMap<String, Bound<'py, PyAny>> = HashMap::new();
     for item in &models {
-        by_name.set_item(model_reads::name_object(item)?, item)?;
+        by_name.insert(model_reads::model_name(item)?, item.clone());
     }
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in native_field(&scope, "execution_order")?.try_iter()? {
-        let key = key?;
-        if native_field(&scope, "selected_keys")?.contains(&key)?
-            && native_field(&key, "resource_type")?.eq("model")?
-            && let Some(item) = by_name.get_item(native_field(&key, "name")?)?
+    for key in &scope.order {
+        if scope.selected.contains(key)
+            && key.0 == MODEL_RESOURCE
+            && let Some(item) = by_name.get(&key.1)
         {
-            selected.push(item);
+            selected.push(item.clone());
         }
     }
     let state = super::state_inspection::inspection(&runtime, None)?;
@@ -130,8 +132,8 @@ pub(crate) fn plan_old_name_views<'py>(
     for entry in moves.0.try_iter()? {
         let entry = entry?;
         let name = native_field(&entry, "model_name")?;
-        if let Some(item) = by_name.get_item(&name)?
-            && let Some(planned) = planner.for_migration(&entry, &item)?
+        if let Some(item) = by_name.get(&name.extract::<String>()?)
+            && let Some(planned) = planner.for_migration(&entry, item)?
         {
             entries.push(planned);
             covered.add(name)?;

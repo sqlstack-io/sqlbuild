@@ -17,6 +17,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_sqltext::resolution::main::column_name_key::column_name_key;
 use sqlbuild_sqltext::resolution::main::{
     reference_spans::reference_spans, source_alias::source_alias,
 };
@@ -49,11 +50,11 @@ fn check_columns(
     let available = rows(columns)?;
     let available: std::collections::HashMap<String, Option<String>> = available
         .into_iter()
-        .map(|(name, kind)| (name.to_lowercase(), kind))
+        .map(|(name, kind)| (column_name_key(&name), kind))
         .collect();
     let missing = declared
         .iter()
-        .filter(|(name, _)| !available.contains_key(&name.to_lowercase()))
+        .filter(|(name, _)| !available.contains_key(&column_name_key(name)))
         .map(|(name, _)| name.as_str())
         .collect::<Vec<_>>();
     if !missing.is_empty() {
@@ -77,7 +78,7 @@ fn check_columns(
         let Some(kind) = kind else {
             continue;
         };
-        let Some(Some(actual)) = available.get(&name.to_lowercase()) else {
+        let Some(Some(actual)) = available.get(&column_name_key(&name)) else {
             continue;
         };
         if actual.is_empty() {
@@ -158,11 +159,11 @@ fn cast_source(
     if expression {
         let name_map: std::collections::HashMap<String, &str> = names
             .iter()
-            .map(|name| (name.to_lowercase(), *name))
+            .map(|name| (column_name_key(name), *name))
             .collect();
         let missing = declared
             .iter()
-            .filter(|(name, _)| !name_map.contains_key(&name.to_lowercase()))
+            .filter(|(name, _)| !name_map.contains_key(&column_name_key(name)))
             .map(|(name, _)| name.as_str())
             .collect::<Vec<_>>();
         if !missing.is_empty() {

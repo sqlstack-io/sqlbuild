@@ -1,3 +1,4 @@
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 
 from sqlbuild._native import InferredNullability, SeedCsvSettings
@@ -39,6 +40,15 @@ class ConnectTestCase:
     description: str
     config: dict[str, object]
     expected_connects: bool
+
+
+@dataclass(frozen=True)
+class ContendedConnectTestCase:
+    description: str
+    read_only: bool
+    release_key: str
+    expected_connection: AbstractContextManager[object]
+    expected_rows: list[tuple[int]]
 
 
 @dataclass(frozen=True)
@@ -292,3 +302,13 @@ class QualifiedViewDefinitionTestCase:
     name: str
     sql: str
     expected_match: bool
+
+
+@dataclass(frozen=True)
+class SearchPathCacheTestCase:
+    """An unqualified existence lookup cached before and after a statement changes the path."""
+
+    description: str
+    hook_sql: str
+    expected_before: bool
+    expected_after: bool

@@ -122,7 +122,7 @@ fn delivering_thread(py: Python<'_>) -> PyResult<bool> {
 /// Stop every capture worker and join it before finalization ends it inside native code.
 #[pyfunction]
 fn stop_output_capture_threads(py: Python<'_>) -> PyResult<()> {
-    signal_interpreter_exit(py)?;
+    signal_interpreter_exit();
     let mut threads: Vec<Bound<'_, PyAny>> = Vec::new();
     for thread in imported(py, "threading", "enumerate")?
         .call0()?

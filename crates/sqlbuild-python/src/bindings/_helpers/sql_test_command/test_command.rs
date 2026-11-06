@@ -19,6 +19,7 @@ use sqlbuild_core::test_command::main::test_name_width::test_name_width;
 use sqlbuild_core::test_command::main::test_outcome_status::test_outcome_status;
 use sqlbuild_core::test_command::models::{TestFailure, TestInspectionEntry, TestPlanWarning};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
@@ -28,7 +29,7 @@ use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionPro
 use crate::bindings::_helpers::build_progress::progress_text::{
     format_expectation_detail, format_expectation_name, write_execution_header,
 };
-use crate::bindings::_helpers::build_progress::result_text::test_label;
+use crate::bindings::_helpers::build_progress::result_text::{test_label, test_result_label};
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::change_selection::base_snapshot::{
     BaseComparison, base_comparison, base_variant,
@@ -43,21 +44,20 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_test_command_plan;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
-use crate::bindings::_helpers::result_output::documents::format_test_execution_json;
+use crate::bindings::_helpers::result_output::documents::test_execution_json;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 use crate::bindings::_helpers::result_output::resource_ids::sql_test_identity;
 use crate::bindings::_helpers::sql_test_command::timeouts::{
     RunTimeout, TimeoutKind, resolve_run_timeout,
 };
-
-const PASS_OUTCOME: &str = "pass";
 
 /// Why `--since` selected each test, by inspection label.
 type SelectionReasons = HashMap<String, Vec<String>>;
@@ -482,7 +482,7 @@ fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
     (concurrency, timeout): (i64, &RunTimeout),
-) -> PyResult<Vec<Bound<'py, PyAny>>> {
+) -> PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
     let use_color: Bound<'py, PyAny> = invocation.getattr("use_color")?;
@@ -561,7 +561,7 @@ fn run_tests<'py>(
             connection: connection.clone().unbind(),
         },
     )?;
-    let executed: PyResult<Vec<Bound<'py, PyAny>>> = (|| {
+    let executed: PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> = (|| {
         let callbacks: Bound<'py, PyAny> = call_with(
             &host::entry(py, ExecutorHost::TestPipelineCallbacks)?,
             &[
@@ -598,10 +598,11 @@ fn run_tests<'py>(
             ],
         )?
         .try_iter()?
+        .map(|result| SqlTestExecutionResult::read(&result?))
         .collect()
     })();
     let closed: PyResult<Bound<'py, PyAny>> = event_writer.call_method0("close");
-    let results: Vec<Bound<'py, PyAny>> = executed?;
+    let results: Vec<SqlTestExecutionResult<Bound<'py, PyAny>>> = executed?;
     closed?;
     Ok(results)
 }
@@ -618,21 +619,19 @@ pub(crate) fn timeout_record<'py>(
 fn complete(
     request: &Bound<'_, PyAny>,
     invocation: &Bound<'_, PyAny>,
-    (results, since_json): (&[Bound<'_, PyAny>], Option<&str>),
+    (results, since_json): (&[SqlTestExecutionResult<Bound<'_, PyAny>>], Option<&str>),
 ) -> PyResult<i32> {
     let py: Python<'_> = request.py();
     let mut failures: Vec<TestFailure> = Vec::new();
     for result in results {
-        if native_field(&native_field(result, "outcome")?, "value")?.extract::<String>()?
-            == PASS_OUTCOME
-        {
+        if result.outcome == SqlTestOutcome::Pass {
             continue;
         }
         failures.push(TestFailure {
-            label: test_label(result, "test_name")?,
-            error_message: result.getattr("error_message")?.extract()?,
-            error_code: result.getattr("error_code")?.extract()?,
-            error_help: result.getattr("error_help")?.extract()?,
+            label: test_result_label(result)?,
+            error_message: result.error_message.clone(),
+            error_code: result.error_code.clone(),
+            error_help: result.error_help.clone(),
         });
     }
     let passed: usize = results.len() - failures.len();
@@ -649,10 +648,9 @@ fn complete(
         ),),
     )?;
     stream.call_method0("flush")?;
-    let tuple: Bound<'_, PyAny> = PyTuple::new(py, results)?.into_any();
     let payload: Bound<'_, PyAny> = PyString::new(
         py,
-        &with_since_section(format_test_execution_json(py, tuple)?, since_json)?,
+        &with_since_section(test_execution_json(py, results)?, since_json)?,
     )
     .into_any();
     write_execution_json_output(
@@ -730,7 +728,7 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         request.getattr("test_timeout")?.extract()?,
         TimeoutKind::Test,
     )?;
-    let results: Vec<Bound<'_, PyAny>> =
+    let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> =
         run_tests(&invocation, &pipeline, (concurrency, &timeout))?;
     write_test_runtime_target(
         (
@@ -739,7 +737,7 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
             &invocation.getattr("adapter")?,
         ),
         &pipeline.getattr("plan_output")?,
-        &PyTuple::new(py, &results)?.into_any(),
+        &results,
     )?;
     complete(request, &invocation, (&results, since_json.as_deref()))
 }

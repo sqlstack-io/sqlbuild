@@ -45,7 +45,6 @@ use crate::bindings::_helpers::planner_strategy::strategy::{
 use crate::bindings::_helpers::planner_strategy::values::text;
 use crate::bindings::_helpers::records::construct::enum_member;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use crate::bindings::_helpers::semantic_shapes::source_bindings::source_binding_diagnostics;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
@@ -73,7 +72,7 @@ impl<'py> ContextReads<'py> {
         let field = |value: &Py<PyAny>| value.bind(py).clone();
         Ok(Self {
             lookups: CursorInputLookups {
-                models_by_name: field(&fields.models_by_name),
+                models_by_name: fields.models_by_name.clone_ref(py),
                 functions_by_name: field(&fields.functions_by_name),
                 source_map: field(&fields.source_map),
                 source_warehouse_columns: field(&fields.source_warehouse_columns),
@@ -155,7 +154,7 @@ fn plan_model_from_change<'py>(
     let (future_config, start_config) = cursor_safety_configs(model, context)?;
     reject_capped_watermark_inputs(
         model,
-        reads.lookups.models_by_name.clone(),
+        reads.lookups.models_by_name.clone_ref(py),
         Some(reads.lookups.functions_by_name.clone()),
     )?;
     let cursor_input_relations =
@@ -433,12 +432,15 @@ pub(crate) fn plan_entries<'py>(
         functions_by_name.set_item(function_reads::name(&function)?, function)?;
     }
     let settings = native_field(&project, "settings")?;
-    let models_by_name = native_field(&scope, "models_by_name")?;
+    let scope_data = crate::bindings::_helpers::planner_scope::retained::scope_data(&scope)?;
     let context = Bound::new(
         py,
         ModelPlanContext {
             model_locations: relations_context.model_locations.clone_ref(py),
-            models_by_name: models_by_name.clone().unbind(),
+            models_by_name:
+                crate::bindings::_helpers::native_host::model_lookup::ModelLookup::Native(
+                    scope_data.clone(),
+                ),
             functions_by_name: functions_by_name.into_any().unbind(),
             seed_locations: relations_context.seed_locations.clone_ref(py),
             function_locations: relations_context.function_locations.clone_ref(py),
@@ -462,17 +464,15 @@ pub(crate) fn plan_entries<'py>(
     let microbatch = enum_member(py, RecordId::IncrementalMode, "MICROBATCH")?;
     let mut entries: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut warnings: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in native_field(&scope, "execution_order")?.try_iter()? {
-        let key = key?;
-        let name = native_field(&key, "name")?;
-        if !selected_keys.contains(&key)? || !models.contains(&name)? {
+    for key in &scope_data.order {
+        let name = &key.1;
+        if !scope_data.selected.contains(key) || !models.contains(name)? {
             continue;
         }
-        let model = mapping_get(&models_by_name, &name)?;
-        let resolved = models.get_item(&name)?;
-        if model.is_none() {
+        let Some(model) = scope_data.model(py, name) else {
             continue;
-        }
+        };
+        let resolved = models.get_item(name)?;
         let overrides = model_cursor_overrides(
             &model,
             &cursor_overrides,
@@ -487,8 +487,8 @@ pub(crate) fn plan_entries<'py>(
             full_refresh: effective_full_refresh,
             overrides,
             change_result: native_field(&resolved, "change")?,
-            protect_full_refresh: !freshness_blocked.contains(&name)?
-                && !external_blocked.contains(&name)?,
+            protect_full_refresh: !freshness_blocked.contains(name)?
+                && !external_blocked.contains(name)?,
         })?;
         let entry_name = native_field(&entry, "name")?;
         if freshness_blocked.contains(&entry_name)? {

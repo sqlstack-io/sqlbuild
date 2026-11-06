@@ -7,6 +7,7 @@ use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::discovery::locations::yaml_entry_line;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_phases::objects::{planner_error, tuple};
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::{
     MISSING_SOURCE_TABLE_CODE, RUN_BOUNDED, WILDCARD_TABLE_CHARACTER,
 };
@@ -18,7 +19,8 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::PyString;
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_analysis::planner_scope::constants::SOURCE;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_help::missing_source_tables_help;
 use sqlbuild_analysis::planner_warehouse::main::missing_source_tables_message::missing_source_tables_message;
 use sqlbuild_analysis::planner_warehouse::models::MissingSourceTable;
@@ -26,18 +28,21 @@ use std::collections::HashMap;
 
 fn selected_source_readers(scope: &Bound<'_, PyAny>) -> PyResult<HashMap<String, Vec<String>>> {
     let mut readers: HashMap<String, Vec<String>> = HashMap::new();
-    let deps = native_field(scope, "upstream_deps")?;
-    for key in native_field(scope, "selected_keys")?.try_iter()? {
-        let key = key?;
-        if native_field(&key, "resource_type")?.eq("source")? {
+    let scope = scope_data(scope)?;
+    let deps: HashMap<_, _> = scope
+        .upstream
+        .iter()
+        .map(|(key, deps)| (key, deps))
+        .collect();
+    for key in &scope.selected {
+        if key.0 == SOURCE {
             continue;
         }
-        let reader: String = native_field(&key, "name")?.extract()?;
-        for dep in mapping_get_or(&deps, &key, PyTuple::empty(key.py()))?.try_iter()? {
-            let dep = dep?;
-            if native_field(&dep, "resource_type")?.eq("source")? {
+        let reader = &key.1;
+        for dep in deps.get(key).into_iter().flat_map(|deps| deps.iter()) {
+            if dep.0 == SOURCE {
                 readers
-                    .entry(native_field(&dep, "name")?.extract()?)
+                    .entry(dep.1.clone())
                     .or_default()
                     .push(reader.clone());
             }

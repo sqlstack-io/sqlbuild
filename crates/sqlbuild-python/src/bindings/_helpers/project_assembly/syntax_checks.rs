@@ -3,6 +3,7 @@
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::bindings::_helpers::attachments::cursor_intrinsics::analysis_cursor_sql;
@@ -11,6 +12,9 @@ use crate::bindings::_helpers::project_assembly::syntax_validation::hook_sql_sta
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 const HOOK_NAMES: [&str; 2] = ["pre_hooks", "post_hooks"];
+
+/// Native SQL and dynamic family specs indexed by their model's position.
+type PivotModelRows = Vec<(usize, (String, Vec<DynamicFamily>))>;
 
 fn config_value<'py>(model_input: &Bound<'py, PyAny>, key: &str) -> PyResult<Bound<'py, PyAny>> {
     native_field(&native_field(model_input, "config")?, "values")?.call_method1("get", (key,))
@@ -110,13 +114,27 @@ pub(crate) fn standalone_pivot_models<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = model_inputs.py();
     let models: Bound<'py, PyDict> = PyDict::new(py);
+    for (index, (sql, _)) in standalone_pivot_rows(model_inputs, analysed)? {
+        let model = model_inputs.get_item(index)?;
+        let entry = native_field(&model, "schema_entry")?;
+        models.set_item(index, (sql, native_field(&entry, "dynamic_columns")?))?;
+    }
+    Ok(models)
+}
+
+/// Native-only pivot requests; the public wrapper alone projects contract records.
+pub(crate) fn standalone_pivot_rows(
+    model_inputs: &Bound<'_, PyAny>,
+    analysed: &Bound<'_, PyAny>,
+) -> PyResult<PivotModelRows> {
+    let mut models: PivotModelRows = Vec::new();
     for (index, model_input) in model_inputs.try_iter()?.enumerate() {
-        let model_input: Bound<'py, PyAny> = model_input?;
+        let model_input = model_input?;
         let Some(schema) = attached_schema(&model_input)? else {
             continue;
         };
-        let families: Bound<'py, PyAny> = schema.dynamic_columns;
-        if !families.is_truthy()? || analysed.contains(model_name(&model_input)?)? {
+        let families = schema.dynamic_columns;
+        if families.is_empty() || analysed.contains(model_name(&model_input)?)? {
             continue;
         }
         let query_sql: String = analysis_sql(&model_input)?.extract()?;
@@ -130,7 +148,7 @@ pub(crate) fn standalone_pivot_models<'py>(
             }
             _ => query_sql,
         };
-        models.set_item(index, (sql, families))?;
+        models.push((index, (sql, families)));
     }
     Ok(models)
 }

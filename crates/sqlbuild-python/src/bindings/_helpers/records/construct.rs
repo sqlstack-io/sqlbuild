@@ -54,6 +54,26 @@ pub(crate) fn new_error(py: Python<'_>, id: ErrorId, message: String, code: &str
     }
 }
 
+/// A raisable native `id` error carrying `message`, with each `(name, value)` attribute set on it.
+pub(crate) fn new_annotated_error(
+    py: Python<'_>,
+    id: ErrorId,
+    message: String,
+    attributes: &[(&str, String)],
+) -> PyErr {
+    let raised = (|| {
+        let error: Bound<'_, PyAny> = error_class(py, id)?.call1((message,))?;
+        for (name, value) in attributes {
+            error.setattr(*name, value)?;
+        }
+        Ok::<_, PyErr>(error)
+    })();
+    match raised {
+        Ok(error) => PyErr::from_value(error),
+        Err(error) => error,
+    }
+}
+
 /// A raisable native `id` error carrying `message`, the diagnostic `code` and optional `help`.
 pub(crate) fn new_helped_error(
     py: Python<'_>,

@@ -146,10 +146,11 @@ fn attachment_owners<'py>(
             continue;
         };
         owners.push(model_owner(
+            py,
             record.name.clone(),
             record.host.model_file.get().relative_text(py)?,
             (
-                schema.host.audits.bind(py),
+                schema.host.audits.as_ref(),
                 (schema.host.columns.as_ref(), &fact.columns),
             ),
         )?);

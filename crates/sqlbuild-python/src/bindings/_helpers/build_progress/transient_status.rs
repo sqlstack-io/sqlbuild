@@ -1,6 +1,8 @@
 //! One transient status line with a spinner on a terminal and plain lines elsewhere.
 
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
@@ -315,21 +317,54 @@ pub(crate) fn progress_spinners_disabled() -> bool {
         .is_ok_and(|value| PROGRESS_DISABLED_VALUES.contains(&value.trim().to_lowercase().as_str()))
 }
 
+/// A spinner reporter on stderr, or `None` when stderr is not a terminal or progress is off.
+fn stderr_reporter(py: Python<'_>) -> PyResult<Option<Py<TransientStatusReporter>>> {
+    let stderr: Bound<'_, PyAny> = py.import("sys")?.getattr("stderr")?;
+    if progress_spinners_disabled() || !tty_flag(&stderr)? {
+        return Ok(None);
+    }
+    Py::new(py, TransientStatusReporter::new(py, &stderr, false, true)?).map(Some)
+}
+
 /// Run `body` under a stderr spinner when `enabled` and stderr is an interactive terminal.
 pub(crate) fn maybe_status<'py, T>(
     py: Python<'py>,
     (message, enabled): (&str, bool),
     body: impl FnOnce() -> PyResult<T>,
 ) -> PyResult<T> {
-    let stderr: Bound<'py, PyAny> = py.import("sys")?.getattr("stderr")?;
-    if !enabled || progress_spinners_disabled() || !tty_flag(&stderr)? {
+    let Some(reporter) = enabled.then(|| stderr_reporter(py)).transpose()?.flatten() else {
         return body();
-    }
-    let reporter: Bound<'py, TransientStatusReporter> =
-        Bound::new(py, TransientStatusReporter::new(py, &stderr, false, true)?)?;
+    };
+    let reporter: Bound<'py, TransientStatusReporter> = reporter.into_bound(py);
     TransientStatusReporter::start(&reporter, message.to_owned())?;
     let result: PyResult<T> = body();
     TransientStatusReporter::close(&reporter)?;
+    result
+}
+
+/// Run `body`, drawing a stderr spinner named `message` only once it has run for `delay`.
+pub(crate) fn delayed_status<'py, T>(
+    py: Python<'py>,
+    (message, delay): (&str, Duration),
+    body: impl FnOnce() -> PyResult<T>,
+) -> PyResult<T> {
+    let Some(reporter) = stderr_reporter(py)? else {
+        return body();
+    };
+    let (finished, waiting) = mpsc::channel::<()>();
+    let pending: Py<TransientStatusReporter> = reporter.clone_ref(py);
+    let message: String = message.to_owned();
+    let timer = std::thread::spawn(move || -> PyResult<()> {
+        if waiting.recv_timeout(delay) != Err(RecvTimeoutError::Timeout) {
+            return Ok(());
+        }
+        Python::attach(|py| TransientStatusReporter::start(pending.bind(py), message))
+    });
+    let result: PyResult<T> = body();
+    let _ = finished.send(());
+    let started: PyResult<()> = py.detach(|| timer.join()).unwrap_or_else(|_| Ok(()));
+    TransientStatusReporter::close(reporter.bind(py))?;
+    started?;
     result
 }
 

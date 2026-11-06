@@ -1,0 +1,64 @@
+---
+title: "sqb login and logout"
+description: "Authorize a bounded CLI session through your server's browser sign-in."
+sidebar:
+  label: "login / logout"
+---
+
+Sign in to a SQLBuild server using its configured password, SSO or organization authentication:
+
+```bash
+sqb login --server https://control.example.com
+```
+
+Only authorize a request you started yourself. Compare the browser's verification code with
+your terminal, sign in, and choose **Authorize CLI**. Return to the terminal for the completion
+message. Choose **Cancel** to refuse the request.
+
+The browser confirmation expires after five minutes and can be exchanged once. The CLI receives
+its own bounded person session, not your browser cookie or a personal API token. Your existing
+permissions still apply; signing in does not create a person, assign a role or grant access.
+
+## Use a browser on another device
+
+```bash
+sqb login --server https://control.example.com --no-browser
+```
+
+Open the printed URL in your browser and compare its verification code with the terminal.
+Keep the terminal running until it confirms completion. If the request expires or is cancelled,
+start `sqb login` again.
+
+## Check your saved session
+
+```bash
+sqb login status --server https://control.example.com
+```
+
+This command verifies the saved session with the live server and prints only your person and
+session identity as JSON. Disabled people, revoked sessions and password changes are enforced
+by the server. If the session is unavailable, sign in again.
+
+## Sign out
+
+```bash
+sqb logout --server https://control.example.com
+```
+
+Logout revokes the current CLI session and removes its local credential. It does not sign your
+browser out. If the server cannot be reached, local cleanup still runs and the command reports
+that remote revocation could not be confirmed.
+
+Credentials use your OS credential store. On headless Linux without a desktop session, an
+unavailable credential service permits a private fallback under
+`~/.config/sqlbuild/credentials`, restricted to your user. A locked or ambiguous OS credential
+store is an error: unlock it and retry. Credentials are never printed or written into a project.
+
+| Option | Purpose |
+| --- | --- |
+| `--server HTTPS_ORIGIN` | Required server origin, without a path, query or embedded credentials |
+| `--ca-cert PEM` | Trust an additional CA certificate for this server; certificate and hostname verification remain enabled |
+| `--no-browser` | Print the confirmation URL without opening a browser; applies to sign-in |
+
+Lifecycle messages go to stderr. Successful login and logout leave stdout empty; status writes
+identity JSON to stdout. A failure exits nonzero and never prints a credential.

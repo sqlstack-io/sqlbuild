@@ -62,3 +62,11 @@ pub struct BreakdownOptions {
     pub terminal_width: usize,
     pub show_run_id: bool,
 }
+
+/// Canonical exact-decimal order, without expanding scientific exponents.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DecimalSortKey {
+    Negative(std::cmp::Reverse<(i128, String)>),
+    Zero,
+    Positive((i128, String)),
+}

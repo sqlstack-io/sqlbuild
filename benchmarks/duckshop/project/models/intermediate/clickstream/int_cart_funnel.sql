@@ -1,7 +1,8 @@
 MODEL (
   description """
     One row per web session with its cart activity worked out from event item arrays using FILTER
-    and TRANSFORM lambdas: items added, removed, net units, and the checkout steps reached.
+    and TRANSFORM lambdas: items added (distinct SKUs in sorted order), removed, net units, and the
+    checkout steps reached.
   """,
   columns (
     session_id (type VARCHAR, nullable false, audits [not_null, unique]),
@@ -91,10 +92,13 @@ final AS (
     s.session_id,
     s.anonymous_id,
     s.session_start_utc,
-    ARRAY_DISTINCT(TRANSFORM(
-      ARRAY_FLATTEN(COALESCE(sc.added_item_lists, ARRAY_CONSTRUCT())),
-      i -> UPPER(i:sku::VARCHAR)
-    ))::ARRAY AS added_skus,
+    -- ARRAY_AGG and ARRAY_DISTINCT leave element order unspecified; sort for a stable result.
+    ARRAY_SORT(
+      ARRAY_DISTINCT(TRANSFORM(
+        ARRAY_FLATTEN(COALESCE(sc.added_item_lists, ARRAY_CONSTRUCT())),
+        i -> UPPER(i:sku::VARCHAR)
+      ))
+    )::ARRAY AS added_skus,
     COALESCE(sc.removed_sku_count, 0)::INT AS removed_sku_count,
     COALESCE(sc.net_units, 0)::INT AS net_units,
     sc.max_added_unit_minor::INT AS max_added_unit_minor,

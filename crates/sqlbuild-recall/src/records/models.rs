@@ -3,13 +3,28 @@
 use crate::schema::models::Table;
 
 /// One stored value.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum RecallValue {
     Null,
     Integer(i64),
     Real(f64),
     Text(String),
     Blob(Vec<u8>),
+}
+
+impl RecallValue {
+    /// Human-readable conflict-key text, before dialect-specific timestamp normalization.
+    #[must_use]
+    pub fn key_text(&self) -> String {
+        match self {
+            Self::Text(text) => text.clone(),
+            Self::Integer(number) => number.to_string(),
+            Self::Real(number) => number.to_string(),
+            Self::Blob(_) => "<blob>".to_owned(),
+            Self::Null => String::new(),
+        }
+    }
 }
 
 /// One row bound for a Recall table: named values, without `ingested_at`, which the store sets.
@@ -20,6 +35,15 @@ pub struct RecallRow {
 }
 
 impl RecallRow {
+    /// Validate schema-typed values and rebuild the receiver-owned envelope and content digest.
+    pub fn from_values(
+        envelope: &RowEnvelope,
+        table: Table,
+        values: &std::collections::BTreeMap<String, RecallValue>,
+    ) -> Result<Self, crate::records::errors::RecordError> {
+        crate::records::_helpers::record_row::record_row(envelope, table, values)
+    }
+
     /// The value of `column`, if the row has it.
     #[must_use]
     pub fn value(&self, column: &str) -> Option<&RecallValue> {
@@ -48,7 +72,10 @@ pub struct RowEnvelope {
 }
 
 /// A process output stream.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum OutputStream {
     Stdout,
     Stderr,
@@ -75,7 +102,8 @@ impl OutputStream {
 }
 
 /// One exact-byte output chunk.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OutputChunk {
     /// Per invocation, from 0, shared by both streams.
     pub sequence: u64,
@@ -91,7 +119,18 @@ pub struct OutputChunk {
 }
 
 /// Output of one stream that was not recorded because it exceeded `max_output_bytes`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(deny_unknown_fields)]
 pub struct OmittedOutput {
     pub bytes: u64,
     /// Sequences this gap accounts for, its own included.

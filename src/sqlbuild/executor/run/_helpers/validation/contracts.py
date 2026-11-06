@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sqlbuild._native import ModelPlanEntry, SchemaDynamicColumnFamily, matching_dynamic_families
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.contract.types import TypeDialect
 from sqlbuild.adapter.type_system.main.types_equal import types_equal
@@ -32,16 +33,16 @@ def validate_runtime_contract(
         )
 
     declared_by_name: dict[str, ColumnInfo] = {
-        column.name.lower(): column for column in entry.contract_columns
+        column_name_key(column.name): column for column in entry.contract_columns
     }
     actual_by_name: dict[str, ColumnInfo] = {
-        column.name.lower(): column for column in actual_columns
+        column_name_key(column.name): column for column in actual_columns
     }
 
     missing_names: tuple[str, ...] = tuple(
         column.name
         for column in entry.contract_columns
-        if column.name.lower() not in actual_by_name
+        if column_name_key(column.name) not in actual_by_name
     )
     if missing_names:
         raise ExecutorInputError(
@@ -50,7 +51,7 @@ def validate_runtime_contract(
         )
 
     extra_columns: tuple[ColumnInfo, ...] = tuple(
-        column for column in actual_columns if column.name.lower() not in declared_by_name
+        column for column in actual_columns if column_name_key(column.name) not in declared_by_name
     )
     extra_names: tuple[str, ...] = tuple(
         column.name
@@ -86,7 +87,9 @@ def validate_runtime_contract(
 
     actual_column: ColumnInfo
     for actual_column in actual_columns:
-        declared_column: ColumnInfo | None = declared_by_name.get(actual_column.name.lower())
+        declared_column: ColumnInfo | None = declared_by_name.get(
+            column_name_key(actual_column.name)
+        )
         if declared_column is None:
             continue
         if not declared_column.type or not actual_column.type:

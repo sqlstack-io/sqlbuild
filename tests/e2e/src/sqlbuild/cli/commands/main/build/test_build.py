@@ -136,7 +136,7 @@ def test_given_changed_unselected_upstream_when_building_leaf_then_warns_and_noo
             "models/b.sql": "MODEL (description 'Test model b.', materialized table);\n\nselect 1 as id\n",
             "models/c.sql": (
                 "MODEL (description 'Test model c.', materialized table);\n\n"
-                'select * from __ref("a") union all select * from __ref("b")\n'
+                'select id from __ref("a") union all select id from __ref("b")\n'
             ),
         },
     )

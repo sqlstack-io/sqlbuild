@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use pyo3::exceptions::PyOSError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
+use pyo3::types::PyTuple;
 use sqlbuild_core::scenario_command::main::build_local_runtime_artifacts::build_local_runtime_artifacts;
 use sqlbuild_core::scenario_command::main::build_runtime_artifacts::build_runtime_artifacts;
 use sqlbuild_core::scenario_command::main::write_runtime_artifacts::write_runtime_artifacts;
@@ -15,15 +16,14 @@ use sqlbuild_core::scenario_command::models::{
     NamedStatements, RetainedInputs, RetainedRelation, ScenarioResultRow, WarehouseRuntimeInputs,
 };
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::enum_from_value;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::ids::RecordId;
 
 const SUCCESS_STATUS: &str = "success";
-const FAILED_STATUS: &str = "failed";
 const SQL_EVENT_KIND: &str = "sql";
 const PASS_STATUS: &str = "PASS";
 const FAIL_STATUS: &str = "FAIL";
@@ -66,88 +66,86 @@ fn coded_error(result: &Bound<'_, PyAny>) -> PyResult<Option<CodedText>> {
     }))
 }
 
-fn expected_row(expected: &Bound<'_, PyAny>) -> PyResult<ExpectedRow> {
-    Ok(ExpectedRow {
-        model_name: native_field(expected, "model_name")?.extract()?,
-        failed: matching_status(expected, FAILED_STATUS)?,
-        actual_row_count: native_field(expected, "actual_row_count")?.extract()?,
-        expected_row_count: native_field(expected, "expected_row_count")?.extract()?,
-        mismatched_row_count: native_field(expected, "mismatched_row_count")?.extract()?,
-        missing_row_count: native_field(expected, "missing_row_count")?.extract()?,
-        error: coded_error(expected)?,
+fn result_error(
+    (code, message, help): (&Option<String>, &Option<String>, &Option<String>),
+) -> Option<CodedText> {
+    message.as_ref().map(|message| CodedText {
+        code: code.clone(),
+        message: message.clone(),
+        help: help.clone(),
     })
-}
-
-fn assertion_row(assertion: &Bound<'_, PyAny>) -> PyResult<AssertionRow> {
-    let samples: Vec<Bound<'_, PyAny>> = items(&native_field(assertion, "sample_rows")?)?;
-    Ok(AssertionRow {
-        name: native_field(assertion, "name")?.extract()?,
-        failed: matching_status(assertion, FAILED_STATUS)?,
-        failing_row_count: native_field(assertion, "failing_row_count")?.extract()?,
-        first_sample: samples
-            .first()
-            .map(|sample| sample.str()?.extract())
-            .transpose()?,
-        error: coded_error(assertion)?,
-    })
-}
-
-fn retained_relations(relation_map: &Bound<'_, PyAny>) -> PyResult<Vec<RetainedRelation>> {
-    let py: Python<'_> = relation_map.py();
-    items(&native_field(relation_map, "artifacts")?)?
-        .iter()
-        .map(|artifact| {
-            let identity: Bound<'_, PyAny> = native_field(artifact, "identity")?;
-            Ok(RetainedRelation {
-                kind: enum_value(&enum_from_value(
-                    py,
-                    RecordId::ScenarioArtifactKind,
-                    native_field(&identity, "kind")?,
-                )?)?,
-                logical_name: native_field(&identity, "logical_name")?.extract()?,
-                physical_name: native_field(artifact, "physical_name")?.extract()?,
-            })
-        })
-        .collect()
 }
 
 /// One `ScenarioRunResult` as its result row shows it.
-pub(crate) fn scenario_result_row(result: &Bound<'_, PyAny>) -> PyResult<ScenarioResultRow> {
-    let local_status: Bound<'_, PyAny> = native_field(result, "local_status")?;
-    let local: bool = !local_status.is_none();
-    let status: String = if local {
-        enum_value(&local_status)?
-    } else if succeeded(result)? {
-        PASS_STATUS.to_owned()
-    } else {
-        FAIL_STATUS.to_owned()
-    };
-    let relation_map: Bound<'_, PyAny> = native_field(result, "relation_map")?;
-    let duckdb_path: Bound<'_, PyAny> = native_field(result, "local_duckdb_path")?;
+pub(crate) fn scenario_result_row(
+    py: Python<'_>,
+    result: &ScenarioRunResult<Bound<'_, PyAny>>,
+) -> PyResult<ScenarioResultRow> {
     Ok(ScenarioResultRow {
-        name: native_field(result, "scenario_name")?.extract()?,
-        status,
-        local,
-        duration_ms: native_field(result, "duration_ms")?.extract()?,
-        error: coded_error(result)?,
-        retained: native_field(result, "retained")?.is_truthy()?,
-        retained_relations: if relation_map.is_none() {
-            None
-        } else {
-            Some(retained_relations(&relation_map)?)
-        },
-        local_duckdb_path: if duckdb_path.is_none() {
-            None
-        } else {
-            Some(posix(&duckdb_path)?)
-        },
-        expected: items(&native_field(result, "expected_results")?)?
+        name: result.scenario_name.clone(),
+        status: result
+            .local_status
+            .map_or_else(
+                || {
+                    if result.status == ExecutionStatus::Success {
+                        PASS_STATUS
+                    } else {
+                        FAIL_STATUS
+                    }
+                },
+                |status| status.value(),
+            )
+            .to_owned(),
+        local: result.local_status.is_some(),
+        duration_ms: result.duration_ms,
+        error: result_error((
+            &result.error_code,
+            &result.error_message,
+            &result.error_help,
+        )),
+        retained: result.retained,
+        retained_relations: result.retained_relations.clone(),
+        local_duckdb_path: result.local_duckdb_path.as_ref().map(|path| {
+            path.to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/")
+        }),
+        expected: result
+            .expected_results
             .iter()
-            .map(expected_row)
-            .collect::<PyResult<_>>()?,
-        assertions: items(&native_field(result, "assertion_results")?)?
+            .map(|expected| ExpectedRow {
+                model_name: expected.model_name.clone(),
+                failed: expected.status == ExecutionStatus::Failed,
+                actual_row_count: expected.actual_row_count,
+                expected_row_count: expected.expected_row_count,
+                mismatched_row_count: expected.mismatched_row_count,
+                missing_row_count: expected.missing_row_count,
+                error: result_error((
+                    &expected.error_code,
+                    &expected.error_message,
+                    &expected.error_help,
+                )),
+            })
+            .collect(),
+        assertions: result
+            .assertion_results
             .iter()
-            .map(assertion_row)
+            .map(|assertion| {
+                let first_sample = match assertion.sample_rows.first() {
+                    Some(row) => Some(PyTuple::new(py, row)?.str()?.extract()?),
+                    None => None,
+                };
+                Ok(AssertionRow {
+                    name: assertion.name.clone(),
+                    failed: assertion.status == ExecutionStatus::Failed,
+                    failing_row_count: assertion.failing_row_count,
+                    first_sample,
+                    error: result_error((
+                        &assertion.error_code,
+                        &assertion.error_message,
+                        &assertion.error_help,
+                    )),
+                })
+            })
             .collect::<PyResult<_>>()?,
     })
 }

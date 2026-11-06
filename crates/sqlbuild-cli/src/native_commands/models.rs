@@ -2,6 +2,57 @@
 
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
+use sqlbuild_cache::project_snapshot::models::{PathStamp, SnapshotRules};
+use sqlbuild_orchestration::credentials::models::CredentialScope;
+use sqlbuild_orchestration::declarations::models::TriggerChange;
+use sqlbuild_orchestration::platform::models::LocationWorkRequest;
+use sqlbuild_orchestration::runs::models::{JobRunRequest, RerunRequest};
+use sqlbuild_orchestration::warehouse_metadata::models::{
+    MetadataBatch, StatisticsRead, WarehouseHistoryKind, WarehouseStateLocation,
+};
+use uuid::Uuid;
+
+use crate::argv::models::Namespace;
+use crate::native_commands::types::LocationPublication;
+
+/// Privileged local operations require direct ownership of the control database.
+pub(crate) enum ControlAdmin {
+    CreateLocation(String),
+    CreatePrincipal(String),
+    BootstrapUser(String),
+    IssueToken(CredentialScope, DateTime<Utc>),
+    RevokeToken(Uuid),
+    RotateToken(Uuid),
+    SetPassword(Uuid, String),
+    GrantAdmin(Uuid),
+    RequestJobRun(JobRunRequest),
+    Rerun(RerunRequest),
+    RequestLocationWork(LocationWorkRequest),
+    LocationWork(Uuid),
+    CancelRun {
+        event_id: Uuid,
+        run_id: Uuid,
+        reason: String,
+    },
+    ChangeTrigger {
+        event_id: Uuid,
+        trigger_id: Uuid,
+        change: TriggerChange,
+        reason: String,
+    },
+}
+
+/// Parsing can finish an invocation before package discovery or any Python handoff.
+#[derive(Debug)]
+pub(crate) enum NativeParse {
+    Exit(i32),
+    Invocation {
+        namespace: Namespace,
+        use_color: bool,
+    },
+}
+
 /// What `sqb skills` installs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SkillsOptions {
@@ -25,6 +76,21 @@ pub(crate) struct RulesOptions {
     pub(crate) json: bool,
 }
 
+/// Raw `sqb cost` options; only a pending warehouse refresh needs the Python adapter edge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CostOptions {
+    pub(crate) selector: String,
+    pub(crate) limit: Option<i64>,
+    pub(crate) no_limit: bool,
+    pub(crate) sort: Option<String>,
+    pub(crate) descending: bool,
+    pub(crate) since: Option<String>,
+    pub(crate) until: Option<String>,
+    pub(crate) json: bool,
+    pub(crate) json_path: Option<PathBuf>,
+    pub(crate) no_color: bool,
+}
+
 /// A command that runs without Python.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NativeCommand {
@@ -33,6 +99,7 @@ pub(crate) enum NativeCommand {
     Init,
     Skills(SkillsOptions),
     Rules(RulesOptions),
+    Cost(CostOptions),
 }
 
 /// One parsed invocation `sqb` serves without Python.
@@ -70,6 +137,101 @@ pub(crate) struct ProjectLocation {
     pub(crate) given: PathBuf,
     /// `Path(--project-dir).resolve()`, or `Path.cwd()`.
     pub(crate) resolved: PathBuf,
+}
+
+/// A long-running location owns no control-store credentials or executable user objects.
+#[derive(Debug)]
+pub(crate) struct LocationServe {
+    pub(crate) project_dir: PathBuf,
+    pub(crate) server_url: String,
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) image_id: Option<String>,
+    pub(crate) metadata_reconcile_seconds: u32,
+}
+
+/// Retained source observations survive compilation; warehouse exclusions never replace them.
+#[derive(Debug)]
+pub(crate) struct LocationWatch {
+    pub(crate) rules: SnapshotRules,
+    pub(crate) local_files: Vec<PathBuf>,
+    pub(crate) observed: (Vec<PathStamp>, Option<String>),
+    pub(crate) attempted: Option<(Vec<PathStamp>, Option<String>)>,
+    pub(crate) changed_at: tokio::time::Instant,
+    pub(crate) retry_at: Option<tokio::time::Instant>,
+}
+
+/// A bounded supervisor request; dropping the reply cancels and reaps an active compiler.
+#[derive(Debug)]
+pub(crate) struct LocationCompileRequest {
+    pub(crate) generation: i64,
+    pub(crate) python_sources: Vec<PathStamp>,
+    pub(crate) reply: tokio::sync::oneshot::Sender<Result<Option<LocationPublication>, String>>,
+}
+
+/// Only this task owns the isolated interpreter and its private stdio protocol.
+#[derive(Debug)]
+pub(crate) struct LocationCompiler {
+    pub(crate) child: tokio::process::Child,
+    pub(crate) stdin: tokio::process::ChildStdin,
+    pub(crate) stdout: tokio::io::BufReader<tokio::process::ChildStdout>,
+    pub(crate) python_sources: Vec<PathStamp>,
+}
+
+/// A delivered source page remains frozen until the API acknowledges it.
+#[derive(Debug)]
+pub(crate) struct LocationMetadataPage {
+    pub(crate) batch: MetadataBatch,
+    pub(crate) next_source_after: Option<Vec<Option<String>>>,
+}
+
+/// Only local retry and navigation state; the control store keeps no scan progress.
+#[derive(Debug)]
+pub(crate) struct LocationMetadataSync {
+    pub(crate) locations: Vec<WarehouseStateLocation>,
+    pub(crate) generation: i64,
+    pub(crate) index: usize,
+    pub(crate) scan_id: Uuid,
+    pub(crate) source_after: Option<Vec<Option<String>>>,
+    pub(crate) observed_since: Option<DateTime<Utc>>,
+    pub(crate) watermark_loaded: bool,
+    pub(crate) statistics: Option<StatisticsRead>,
+    pub(crate) reconcile: bool,
+    pub(crate) reconcile_at: tokio::time::Instant,
+    pub(crate) reconcile_seconds: u32,
+    pub(crate) limit: usize,
+    pub(crate) pending: Option<LocationMetadataPage>,
+    pub(crate) next_at: tokio::time::Instant,
+}
+
+impl LocationMetadataSync {
+    /// Failed samples revisit catalog before retrying; no frozen delivery is discarded.
+    pub(crate) fn retry_read(&mut self) {
+        self.limit = (self.limit / 2).max(1);
+        self.statistics = None;
+        if self.kind() == WarehouseHistoryKind::Statistics {
+            self.index -= 1;
+            self.source_after = None;
+            self.scan_id = Uuid::now_v7();
+            self.observed_since = None;
+            self.watermark_loaded = false;
+        }
+        self.next_at = tokio::time::Instant::now()
+            + std::time::Duration::from_secs(super::constants::METADATA_POLL_SECONDS);
+    }
+
+    pub(crate) fn reconciling(&self) -> bool {
+        self.kind() != WarehouseHistoryKind::Statistics
+            && (self.reconcile || self.kind() == WarehouseHistoryKind::Catalog)
+    }
+
+    pub(crate) fn kind(&self) -> WarehouseHistoryKind {
+        WarehouseHistoryKind::ALL[self.index % WarehouseHistoryKind::ALL.len()]
+    }
+
+    pub(crate) fn location(&self) -> &WarehouseStateLocation {
+        &self.locations[self.index / WarehouseHistoryKind::ALL.len()]
+    }
 }
 
 /// What Python's buffered stdout does with output its reader no longer takes.

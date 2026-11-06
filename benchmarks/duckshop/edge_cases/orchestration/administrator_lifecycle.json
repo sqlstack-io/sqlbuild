@@ -1,0 +1,32 @@
+{
+  "first_person": "orders-admin",
+  "second_person": "customers-admin",
+  "password": "orders-bootstrap-password-2026",
+  "disabled_person_sequence": ["assign", "disable", "revoke", "enable", "deny_run"],
+  "run_control_sequence": ["request", "cancel", "confirm_stopped", "rerun_frozen", "retry", "revoke", "deny_retry"],
+  "connection_test_roles": [
+    {"role": null, "allowed": false},
+    {"role": "viewer", "allowed": false},
+    {"role": "operator", "allowed": false},
+    {"role": "admin", "allowed": true},
+    {"role": "developer", "allowed": true}
+  ],
+  "session_roles": [
+    {"role": null, "expected_metadata": 403, "expected_connection": 403, "expected_job": 403, "expected_sql": 403},
+    {"role": "viewer", "expected_metadata": 200, "expected_connection": 403, "expected_job": 403, "expected_sql": 403},
+    {"role": "operator", "expected_metadata": 200, "expected_connection": 403, "expected_job": 200, "expected_sql": 403},
+    {"role": "developer", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200},
+    {"role": "admin", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200}
+  ],
+  "job_settings": [
+    {"full_refresh": false},
+    {"full_refresh": true},
+    {"start_cursor_int": "3", "end_cursor_int": "8"},
+    {"start_cursor": "3"},
+    {"end_cursor": "8"},
+    {"start_cursor_ts": "2026-01-03T00:00:00Z"},
+    {"end_cursor_ts": "2026-01-08T00:00:00Z"},
+    {"start_cursor_int": "3"},
+    {"end_cursor_int": "8"}
+  ]
+}

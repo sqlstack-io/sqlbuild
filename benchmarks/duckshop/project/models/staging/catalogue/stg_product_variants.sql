@@ -11,6 +11,9 @@ MODEL (
     is_fragile (type BOOLEAN),
     pack_size (type INT),
     attributes (type OBJECT),
+    barcodes (type ARRAY),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

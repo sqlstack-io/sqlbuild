@@ -5,25 +5,28 @@ use std::collections::{HashMap, HashSet};
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
-use pyo3::types::{
-    PyDict, PyDictMethods, PyFrozenSet, PyList, PyListMethods, PySet, PySetMethods, PyString,
-    PyTuple,
-};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySetMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 
-use sqlbuild_analysis::planner_identity::constants::{
-    MODEL_RESOURCE, TABLE_FN_RESOURCE, UDF_RESOURCE,
-};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::main::edge_keys::edge_keys;
+use sqlbuild_analysis::graph::models::EdgeDirection;
+use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
+use sqlbuild_analysis::planner_identity::main::execution_upstream::execution_upstream;
 use sqlbuild_analysis::planner_identity::main::missing_upstream_message::missing_upstream_message as message_of;
 use sqlbuild_analysis::planner_identity::main::missing_upstreams::missing_upstreams;
 use sqlbuild_analysis::planner_identity::main::topological_order::topological_order;
-use sqlbuild_analysis::planner_identity::models::{AvailableUpstreams, GraphKey, MissingUpstream};
+use sqlbuild_analysis::planner_identity::models::{
+    AvailableUpstreams, ExecutionTest, GraphKey, MissingUpstream,
+};
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::graph::algorithms::{closure, inverted};
-use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
+use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::planner_identity::hashing::graph_key;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::new_record_with;
@@ -72,11 +75,6 @@ impl<'py> KeyObjects<'py> {
     }
 }
 
-fn function_resource(key: &Bound<'_, PyAny>) -> PyResult<bool> {
-    let kind: String = native_field(key, "resource_type")?.str()?.extract()?;
-    Ok(kind == UDF_RESOURCE || kind == TABLE_FN_RESOURCE)
-}
-
 fn hook_label(hook_name: &str, kind: &str) -> String {
     if kind == INLINE_SQL_HOOK {
         return format!("inline SQL hook {hook_name}");
@@ -89,9 +87,15 @@ fn hook_label(hook_name: &str, kind: &str) -> String {
 pub(crate) fn build_execution_upstream_deps<'py>(
     project: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = project.py();
-    let upstream: Bound<'py, PyDict> = PyDict::new(py);
-    let collections: [Bound<'py, PyAny>; 4] = [
+    edge_dict(&KeyCache::new(project.py())?, &execution_deps(project)?)
+}
+
+/// Execution dependencies kept native until a public graph or plan asks for its dict view.
+pub(crate) fn execution_deps(
+    project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<(ObjectKey, Vec<ObjectKey>)>> {
+    let mut resources: Vec<(ObjectKey, Vec<ObjectKey>)> = Vec::new();
+    let collections: [Bound<'_, PyAny>; 4] = [
         project_reads::models(project)?,
         project_reads::sources(project)?,
         project_reads::seeds(project)?,
@@ -99,78 +103,30 @@ pub(crate) fn build_execution_upstream_deps<'py>(
     ];
     for collection in collections {
         for resource in collection.try_iter()? {
-            let resource: Bound<'py, PyAny> = resource?;
-            upstream.set_item(
-                resource_reads::key(&resource)?,
-                PyList::new(
-                    py,
-                    resource_reads::deps(&resource)?
-                        .try_iter()?
-                        .collect::<PyResult<Vec<_>>>()?,
-                )?,
-            )?;
+            let row = resource_reads::graph_row(&resource?)?;
+            resources.push((row.key, row.deps));
         }
     }
+    let mut tests: Vec<ExecutionTest> = Vec::new();
     for test in project_reads::sql_tests(project)?.try_iter()? {
-        let test: Bound<'py, PyAny> = test?;
-        let test_key: Bound<'py, PyAny> = native_field(&test, "key")?;
-        let scope_deps: Bound<'py, PyAny> = native_field(&test, "scope_deps")?;
-        let deps: Bound<'py, PyList> = PyList::empty(py);
-        if native_field(&test, "mode")?.str()?.extract::<String>()? == TABLE_FN_TEST_MODE {
-            for scope_dep in scope_deps.try_iter()? {
-                let scope_dep: Bound<'py, PyAny> = scope_dep?;
-                if function_resource(&scope_dep)? {
-                    deps.append(scope_dep)?;
-                }
-            }
-            upstream.set_item(test_key, deps)?;
-            continue;
-        }
-        let seen: Bound<'py, PySet> = PySet::empty(py)?;
-        for target_key in scope_deps.try_iter()? {
-            let Some(target_deps) = upstream.get_item(target_key?)? else {
-                continue;
-            };
-            for dep_key in target_deps.try_iter()? {
-                let dep_key: Bound<'py, PyAny> = dep_key?;
-                if !function_resource(&dep_key)? || seen.contains(&dep_key)? {
-                    continue;
-                }
-                seen.add(&dep_key)?;
-                deps.append(dep_key)?;
-            }
-        }
-        upstream.set_item(&test_key, deps)?;
-        for target_key in scope_deps.try_iter()? {
-            if let Some(target_deps) = upstream.get_item(target_key?)? {
-                target_deps.downcast::<PyList>()?.append(&test_key)?;
-            }
-        }
+        let test = test?;
+        tests.push(ExecutionTest {
+            key: native_key(&native_field(&test, "key")?)?,
+            scope_deps: native_field(&test, "scope_deps")?
+                .try_iter()?
+                .map(|key| native_key(&key?))
+                .collect::<PyResult<_>>()?,
+            table_function: native_field(&test, "mode")?.str()?.extract::<String>()?
+                == TABLE_FN_TEST_MODE,
+        });
     }
     let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
-    let cache: KeyCache<'py> = KeyCache::new(py)?;
-    let mut extra: Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)> = Vec::new();
-    for gate in &gates {
-        extra.push((cache.key(&gate.gated)?, cache.key(&gate.read)?));
-    }
-    for hook in &hooks {
-        extra.push((cache.key(&hook.gated)?, cache.key(&hook.read)?));
-    }
-    for (gated, read) in extra {
-        let gated_upstream: Bound<'py, PyAny> =
-            upstream.call_method1("setdefault", (gated, PyList::empty(py)))?;
-        if !gated_upstream.contains(&read)? {
-            gated_upstream.downcast::<PyList>()?.append(read)?;
-        }
-    }
-    let result: Bound<'py, PyDict> = PyDict::new(py);
-    for (key, deps) in upstream.iter() {
-        result.set_item(
-            key,
-            PyTuple::new(py, deps.try_iter()?.collect::<PyResult<Vec<_>>>()?)?,
-        )?;
-    }
-    Ok(result)
+    let injected: Vec<_> = gates
+        .into_iter()
+        .map(|gate| (gate.gated, gate.read))
+        .chain(hooks.into_iter().map(|hook| (hook.gated, hook.read)))
+        .collect();
+    Ok(execution_upstream(resources, &tests, &injected))
 }
 
 /// Human-readable origins for execution edges injected beyond pure lineage.
@@ -179,27 +135,39 @@ pub(crate) fn build_execution_edge_origins<'py>(
     project: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = project.py();
-    let origins: Bound<'py, PyDict> = PyDict::new(py);
+    let result = PyDict::new(py);
+    let cache = KeyCache::new(py)?;
+    for ((gated, read), origin) in execution_origins(project)? {
+        result.set_item((cache.key(&gated)?, cache.key(&read)?), origin)?;
+    }
+    Ok(result)
+}
+
+/// Injected-edge descriptions remain native for cycle and buildability diagnostics.
+pub(crate) fn execution_origins(
+    project: &Bound<'_, PyAny>,
+) -> PyResult<Vec<((ObjectKey, ObjectKey), String)>> {
+    let mut origins: Vec<((ObjectKey, ObjectKey), String)> = Vec::new();
     for test in project_reads::sql_tests(project)?.try_iter()? {
-        let test: Bound<'py, PyAny> = test?;
+        let test = test?;
         let test_name: String = native_field(&test, "name")?.extract()?;
         for target_key in native_field(&test, "scope_deps")?.try_iter()? {
-            let target_key: Bound<'py, PyAny> = target_key?;
-            let target_name: String = native_field(&target_key, "name")?.extract()?;
-            origins.set_item(
-                (target_key, native_field(&test, "key")?),
-                format!("SQL test '{test_name}' runs before '{target_name}'"),
-            )?;
+            let target_key = native_key(&target_key?)?;
+            let target_name = &target_key.1;
+            let description = format!("SQL test '{test_name}' runs before '{target_name}'");
+            origins.push((
+                (target_key, native_key(&native_field(&test, "key")?)?),
+                description,
+            ));
         }
     }
     let (gates, hooks): (Vec<GateRow>, Vec<HookRow>) = native_execution_gate_edges(project)?;
-    let cache: KeyCache<'py> = KeyCache::new(py)?;
-    let lineage: Bound<'py, PyAny> = native_field(project, "lineage_graph")?;
-    let is_lineage = |gated: &(String, String), read: &(String, String)| -> PyResult<bool> {
-        lineage
-            .call_method1("upstream", (gated.clone(),))?
-            .contains(read.clone())
+    let lineage = native_field(project, "lineage_graph")?;
+    let lineage = lineage.cast::<NativeProjectGraph>()?.borrow();
+    let is_lineage = |gated: &ObjectKey, read: &ObjectKey| {
+        edge_keys(lineage.graph(), gated, EdgeDirection::Upstream).contains(read)
     };
+    let mut seen: HashSet<_> = origins.iter().map(|(edge, _)| edge.clone()).collect();
     for GateRow {
         audit_name,
         target,
@@ -207,16 +175,13 @@ pub(crate) fn build_execution_edge_origins<'py>(
         read,
     } in &gates
     {
-        if is_lineage(gated, read)? {
+        if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
         }
-        let _ = origins.call_method1(
-            "setdefault",
-            (
-                (cache.key(gated)?, cache.key(read)?),
-                format!("audit '{audit_name}' on '{}' reads '{}'", target.1, read.1),
-            ),
-        )?;
+        origins.push((
+            (gated.clone(), read.clone()),
+            format!("audit '{audit_name}' on '{}' reads '{}'", target.1, read.1),
+        ));
     }
     for HookRow {
         hook_name,
@@ -226,23 +191,45 @@ pub(crate) fn build_execution_edge_origins<'py>(
         ..
     } in &hooks
     {
-        if is_lineage(gated, read)? {
+        if is_lineage(gated, read) || !seen.insert((gated.clone(), read.clone())) {
             continue;
         }
-        let _ = origins.call_method1(
-            "setdefault",
-            (
-                (cache.key(gated)?, cache.key(read)?),
-                format!(
-                    "{} on '{}' reads '{}'",
-                    hook_label(hook_name, kind),
-                    gated.1,
-                    read.1
-                ),
+        origins.push((
+            (gated.clone(), read.clone()),
+            format!(
+                "{} on '{}' reads '{}'",
+                hook_label(hook_name, kind),
+                gated.1,
+                read.1
             ),
-        )?;
+        ));
     }
     Ok(origins)
+}
+
+/// Stable native execution order, projecting no Python graph or key objects.
+pub(crate) fn execution_order(
+    py: Python<'_>,
+    upstream: &[(ObjectKey, Vec<ObjectKey>)],
+    origins: &[((ObjectKey, ObjectKey), String)],
+) -> PyResult<Vec<ObjectKey>> {
+    let key = |(kind, name): &ObjectKey| GraphKey {
+        kind: kind.clone(),
+        name: name.clone(),
+    };
+    let edges: Vec<_> = upstream
+        .iter()
+        .map(|(node, deps)| (key(node), deps.iter().map(key).collect()))
+        .collect();
+    let origins: HashMap<(GraphKey, GraphKey), String> = origins
+        .iter()
+        .map(|((gated, read), origin)| ((key(gated), key(read)), origin.clone()))
+        .collect();
+    Ok(topological_order(&edges, &origins)
+        .map_err(|message| planner_input_error(py, message))?
+        .into_iter()
+        .map(|key| (key.kind, key.name))
+        .collect())
 }
 
 /// Downstream edges keyed by upstream key, each list sorted by `(resource_type, name)`.

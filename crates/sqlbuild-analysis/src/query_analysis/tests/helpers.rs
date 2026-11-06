@@ -1,4 +1,4 @@
-use crate::query_analysis::main::analyze_project_compact::analyze_project_compact_json;
+use crate::query_analysis::engine::analyze_project_compact_json;
 use serde_json::{Value, json};
 
 pub(crate) fn borrowed_facts_preserve_named_outputs_and_terminal_sources() -> bool {

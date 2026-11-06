@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chio-labs/sqlbuild/main/.github/sqlbuild-logo-clean.png" alt="SQLBuild" width="100%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/website/public/assets/logo-dark.png">
+    <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/website/public/assets/logo-light.png" alt="SQLBuild" width="600">
+  </picture>
 </p>
 
 <p align="center">
@@ -21,7 +24,7 @@ no external state database, no manifest files and no paid tier.
 Its compiler and planner run in Rust. Warehouse execution and extensions use Python.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chio-labs/sqlbuild/main/.github/demos/rename.gif" alt="Moving and renaming an incremental model with sqb mv: sqb plan migrates the existing table instead of rebuilding it" width="100%">
+  <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/.github/demos/rename.gif" alt="Moving and renaming an incremental model with sqb mv: sqb plan migrates the existing table instead of rebuilding it" width="100%">
 </p>
 
 Move an incremental model to a new folder and name with `sqb mv`, and `sqb plan` migrates its table
@@ -100,7 +103,7 @@ running on local DuckDB.
 `SELECT` fails at compile time, before anything reaches the warehouse.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chio-labs/sqlbuild/main/.github/demos/contract.gif" alt="sqb compile fails because units_sold is not in the enforced contract and the declared waffles_sold column is missing" width="100%">
+  <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/.github/demos/contract.gif" alt="sqb compile fails because units_sold is not in the enforced contract and the declared waffles_sold column is missing" width="100%">
 </p>
 
 Both sides are reported: the new column isn't in the contract, and the declared one is gone.
@@ -133,7 +136,7 @@ A mart that reads `__source("raw__payments")` directly now fails, and so does th
 has no mock for it:
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chio-labs/sqlbuild/main/.github/demos/rules.gif" alt="sqb compile reports the custom rule XSQBRARCH001 on the line that reads a raw source, and a unit test with no mock for that source" width="100%">
+  <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/.github/demos/rules.gif" alt="sqb compile reports the custom rule XSQBRARCH001 on the line that reads a raw source, and a unit test with no mock for that source" width="100%">
 </p>
 
 See [rules](https://sqlbuild.com/docs/concepts/rules/).
@@ -143,7 +146,7 @@ See [rules](https://sqlbuild.com/docs/concepts/rules/).
 `sqb scope --as-path` previews moving a model before you move it.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chio-labs/sqlbuild/main/.github/demos/scope.gif" alt="sqb scope previews moving daily_revenue: the enum and macro it uses would be lost, so both usages are invalidated" width="100%">
+  <img src="https://raw.githubusercontent.com/sqlstack-io/sqlbuild/main/.github/demos/scope.gif" alt="sqb scope previews moving daily_revenue: the enum and macro it uses would be lost, so both usages are invalidated" width="100%">
 </p>
 
 Look at `Lost` and `Invalidated usages`: the model uses an enum and a macro that are private to

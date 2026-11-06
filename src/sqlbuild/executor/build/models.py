@@ -23,7 +23,7 @@ from sqlbuild.adapter.contract.models import LifeCycleEvent, RelationInfo
 from sqlbuild.adapter.contract.types import TablePromotionMode
 from sqlbuild.cost.models import StatementExecutionTelemetry
 from sqlbuild.executor.auditing.models import AuditExecutionResult
-from sqlbuild.executor.build.types import BeforeModelMaterializeCallback, BuildStatus
+from sqlbuild.executor.build.types import BeforeNodeWriteCallback, BuildStatus
 from sqlbuild.executor.custom.models import MaterializationResult
 from sqlbuild.executor.load.models import LoadExecutionResult
 from sqlbuild.executor.python_nodes.types import PythonIdentityRecorder
@@ -107,7 +107,7 @@ class BuildCallbacks:
     on_batch_complete: Callable[[MicrobatchBatchProgress], None] | None = None
     on_node_start: NodeStartCallback | None = None
     on_node_complete: Callable[[object], None] | None = None
-    before_model_materialize: BeforeModelMaterializeCallback | None = None
+    before_node_write: BeforeNodeWriteCallback | None = None
     on_connection_start: Callable[[int], None] | None = None
     on_connection_complete: ConnectionElapsedCallback | None = None
     on_connection_error: ConnectionElapsedCallback | None = None

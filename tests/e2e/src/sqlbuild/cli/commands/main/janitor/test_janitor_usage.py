@@ -50,7 +50,7 @@ FIVE_READERS: tuple[str, ...] = ("svc_reporting", "alice", "bob", "carol", "dave
                 "  relations to archive   3\n",
                 "\n  usage not checked: unsupported adapter\n",
                 "Relations to archive",
-                "\u2713 Janitor completed  archived 3, deleted 1, pruned 1",
+                "\u2713 Janitor completed  archived 3, deleted 1, pruned 2",
             ),
             expected_archived=3,
         ),
@@ -61,7 +61,7 @@ FIVE_READERS: tuple[str, ...] = ("svc_reporting", "alice", "bob", "carol", "dave
                 "  usage not checked: unsupported adapter\n"
                 "  nothing kept in use: no usage could be checked, so relations in use are "
                 "archived too\n",
-                "\u2713 Janitor completed  archived 3, deleted 1, pruned 1",
+                "\u2713 Janitor completed  archived 3, deleted 1, pruned 2",
             ),
             expected_archived=3,
         ),
@@ -151,7 +151,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
                 "(40 queries in 7 days); frozen since 2026-09-01, still in use\n",
                 "  main.old_orders_view  queried 2026-10-21 by svc_reporting "
                 "(14 queries in 7 days)\n",
-                "\u2713 Janitor completed  archived 4, deleted 1, pruned 1",
+                "\u2713 Janitor completed  archived 4, deleted 1, pruned 2",
             ),
             unexpected_fragments=(
                 "Kept (in use)",
@@ -174,7 +174,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
                 "Checked relation usage: 2 of 4 in use. (",
                 "  relations to archive   2\n  kept (in use)          2\n",
                 "\nKept (in use)\n  main.old_orders_000  queried 2026-10-21",
-                "\u2713 Janitor completed  archived 2, deleted 1, pruned 1",
+                "\u2713 Janitor completed  archived 2, deleted 1, pruned 2",
             ),
             unexpected_fragments=(
                 "\nIn use\n",
@@ -210,7 +210,7 @@ def test_given_duckdb_when_running_janitor_json_then_usage_check_is_not_checked(
                 "  kept (in use)          1\n",
                 "  main.old_orders_001  queried 2026-10-21 by alice (1 query in 36 hours); "
                 "frozen since 2026-09-01, still in use\n",
-                "\u2713 Janitor completed  archived 3, deleted 1, pruned 1",
+                "\u2713 Janitor completed  archived 3, deleted 1, pruned 2",
             ),
             unexpected_fragments=("main.old_orders_001  ->",),
             expected_remaining=("old_orders_001",),
@@ -332,7 +332,7 @@ def test_given_usage_source_when_janitor_prints_json_then_candidates_carry_in_us
             reads={"old_orders_000": (("alice",), 3)},
             unavailable=None,
             expected_fragments=(
-                "Janitor will archive 3 and delete 2 items from default.\r\n"
+                "Janitor will archive 3 and delete 3 items from default.\r\n"
                 "3 relations will be archived; 1 of them is in use.\r\n",
                 "Janitor cancelled.",
             ),

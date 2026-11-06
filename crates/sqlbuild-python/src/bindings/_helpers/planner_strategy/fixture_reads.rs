@@ -1,7 +1,7 @@
 //! Boundary conversion for native fixture read analysis.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult};
-use pyo3::types::{PyDictMethods, PyFrozenSet};
+use pyo3::types::PyFrozenSet;
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_analysis::planner_fixtures::main::required_columns::required_columns;
 use sqlbuild_analysis::planner_fixtures::main::star_keys::star_keys;
@@ -52,12 +52,12 @@ pub(crate) fn required_fixture_columns(
         .call_method0("expression_inference_profile")?
         .getattr("sql_analysis_dialect")?
         .extract::<Option<String>>()?;
-    let models_by_name = context.models_by_name.bind(py);
     let mut models: Vec<FixtureReadModel> = Vec::new();
     for name in ordered_model_names {
-        let Some(model) = models_by_name.get_item(name)? else {
+        let Some(model) = context.models_by_name.get(name) else {
             continue;
         };
+        let model = model.bind(py);
         let Some(facts) = context.model_facts(py, name)? else {
             continue;
         };

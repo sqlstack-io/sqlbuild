@@ -4,16 +4,19 @@ use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::planner_entries::models::{
     PlannerRelationsContext, RelationsRequest,
 };
-use crate::bindings::_helpers::planner_entries::values::{none, planner_model};
+use crate::bindings::_helpers::planner_entries::values::planner_model;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_resolution::locations::build_function_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_model_locations;
 use crate::bindings::_helpers::planner_resolution::locations::build_seed_locations;
 use crate::bindings::_helpers::planner_resolution::refs::apply_deferred_locations;
-use crate::bindings::_helpers::planner_scope::sources::build_source_load_map;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
+use crate::bindings::_helpers::planner_scope::sources::source_load_map;
+use crate::bindings::_helpers::planner_scope::values::keys;
 use crate::bindings::_helpers::planner_strategy::audit_entries::audit_is_selected;
 use crate::bindings::_helpers::planner_warehouse::semantic_sources::semantic_source_columns;
 use crate::bindings::_helpers::planner_warehouse::source_columns::gather_source_inspection;
@@ -23,25 +26,26 @@ use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_values;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use std::collections::HashSet;
 
 /// Relation keys needed to render selected audits without selecting those relations.
-fn selected_audit_relation_keys<'py>(
-    project: &Bound<'py, PyAny>,
-    selected_keys: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let py = project.py();
-    let keys = PySet::empty(py)?;
+fn selected_audit_relation_keys(
+    project: &Bound<'_, PyAny>,
+    selected_keys: &HashSet<ObjectKey>,
+) -> PyResult<HashSet<ObjectKey>> {
+    let mut keys: HashSet<ObjectKey> = HashSet::new();
     for audit in project_reads::audits(project)?.try_iter()? {
         let audit = audit?;
         if audit_is_selected(&audit, selected_keys)? {
             for dependency in audit_reads::scope_deps(&audit)?.try_iter()? {
-                keys.add(dependency?)?;
+                keys.insert(native_key(&dependency?)?);
             }
         }
     }
-    Ok(PyFrozenSet::new(py, keys.iter())?.into_any())
+    Ok(keys)
 }
 
 /// Reuse already-gathered source columns for the read map, or gather them once.
@@ -122,23 +126,20 @@ pub(crate) fn planner_relations_context<'py>(
         model_locations = applied.get_item(0)?;
         seed_locations = applied.get_item(1)?;
     }
-    let audit_keys = selected_audit_relation_keys(&project, &selected_keys)?;
+    let scope = scope_data(&scope)?;
     let load_keys = if relation_keys.is_none() {
-        selected_keys.call_method1("__or__", (&audit_keys,))?
+        let mut relevant = selected_audit_relation_keys(&project, &scope.selected)?;
+        relevant.extend(scope.selected.iter().cloned());
+        relevant.into_iter().collect()
     } else {
-        relation_keys
+        keys(&relation_keys)?
     };
     let source_map = object(
         py,
-        build_source_load_map(
+        source_load_map(
             &project,
             &load_keys,
-            Some(&if native_field(&scope, "all_keys")?.is_truthy()? {
-                native_field(&scope, "upstream_deps")?
-            } else {
-                none(py)
-            })
-            .filter(|value| !value.is_none()),
+            (!scope.names.is_empty()).then_some(scope.upstream.as_slice()),
         )?,
     )?;
     let deferral_enabled = native_field(&deferral, "source_deferral_enabled")?.is_truthy()?;
@@ -170,7 +171,7 @@ pub(crate) fn planner_relations_context<'py>(
         with_declared_source_reads(
             &project,
             source_map.downcast::<PyDict>()?,
-            &native_field(&scope, "python_read_source_names")?,
+            &scope.field(py, "python_read_source_names")?,
         )?,
     )?;
     let python_names = PyFrozenSet::new(

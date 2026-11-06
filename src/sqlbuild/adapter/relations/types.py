@@ -24,6 +24,17 @@ class RelationLocation(Protocol):
 
 
 @runtime_checkable
+class RelationListingScoper(Protocol):
+    """Adapter whose builds keep schema listings under a stored database and schema name."""
+
+    def relation_listing_scope(
+        self, *, connection: Any, database: str | None, schema: str
+    ) -> SchemaListingScope:
+        """The stored names that key a build's listing of one schema."""
+        ...
+
+
+@runtime_checkable
 class SchemaScopedMetadataReader(Protocol):
     """Adapter able to list a whole schema's relations and columns in one read each."""
 

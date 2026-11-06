@@ -1,5 +1,7 @@
 //! Unit-test selector splitting, analysis and rule selection, and static command compilation.
 
+use std::sync::Arc;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::PyFrozenSet;
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -8,10 +10,10 @@ use crate::bindings::_helpers::boundary::python_calls::{imported, keywords};
 use crate::bindings::_helpers::compile_driver::assembly::assemble_project;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::compile_analysis_selection;
 use crate::bindings::_helpers::planner_phases::scopes::resolve_planner_scopes;
+use crate::bindings::_helpers::planner_scope::retained::{ScopeData, scope_data};
 use crate::bindings::_helpers::planner_selection::unit_tests::split_project_unit_test_selectors;
 use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_values;
 use crate::bindings::_helpers::records::ids::RecordId;
 
 const DATACLASSES_MODULE: &str = "dataclasses";
@@ -85,9 +87,9 @@ fn planner_scopes<'py>(
     )
 }
 
-/// The stale-warning scope's models of `scopes`.
-fn scoped_models<'py>(scopes: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    native_field(scopes, "stale_warning_scope")?.getattr("models_by_name")
+/// The native scope whose models receive deep analysis.
+fn analysis_scope(scopes: &Bound<'_, PyAny>) -> PyResult<Arc<ScopeData>> {
+    scope_data(&native_field(scopes, "stale_warning_scope")?)
 }
 
 /// Return options whose selectors name only resources, with unit tests selected apart.
@@ -119,10 +121,11 @@ pub(crate) fn resolve_configured_rule_selection<'py>(
     if selection.is_none() || unselective(&selection)? {
         return Ok(py.None().into_bound(py));
     }
-    let models: Bound<'py, PyAny> = scoped_models(&planner_scopes(project, &selection)?)?;
-    let keys: Vec<Bound<'py, PyAny>> = mapping_values(&models)?
-        .try_iter()?
-        .map(|model| native_field(&model?, "key"))
+    let scope = analysis_scope(&planner_scopes(project, &selection)?)?;
+    let keys: Vec<Bound<'py, PyAny>> = scope
+        .models
+        .values()
+        .map(|model| native_field(&model.bind(py), "key"))
         .collect::<PyResult<_>>()?;
     Ok(PyFrozenSet::new(py, keys)?.into_any())
 }
@@ -154,9 +157,8 @@ pub(crate) fn resolve_analysis_model_names<'py>(
             ],
         )?),
     )?;
-    let models: Bound<'py, PyAny> =
-        scoped_models(&planner_scopes(&structural_project, selection)?)?;
-    Ok(PyFrozenSet::new(py, models.try_iter()?.collect::<PyResult<Vec<_>>>()?)?.into_any())
+    let scope = analysis_scope(&planner_scopes(&structural_project, selection)?)?;
+    Ok(PyFrozenSet::new(py, scope.models.keys())?.into_any())
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

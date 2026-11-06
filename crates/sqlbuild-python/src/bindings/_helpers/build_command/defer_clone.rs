@@ -1,5 +1,6 @@
 //! `sqb build --defer-clone-from`: clone out-of-selection boundaries before build planning.
 
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use pyo3::prelude::{
@@ -7,7 +8,10 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyCFunction, PyDict, PyFrozenSet, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObject, IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
 use sqlbuild_core::build_command::constants::EXECUTION_LIMIT_BUILD_NOTE;
+use sqlbuild_core::graph_walk::main::clone_ancestors::clone_ancestors;
+use sqlbuild_core::graph_walk::models::ClonePolicy;
 
 use sqlbuild_core::build_command::errors::BuildCommandError;
 use sqlbuild_host::entries::models::ExecutorHost;
@@ -21,14 +25,11 @@ use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_target_config;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_entries::clone_plans::{
-    resolve_clone_boundary, resolve_skipped_view_chain,
-};
+use crate::bindings::_helpers::planner_scope::retained::{ScopeData, scope_data};
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::planner_selection::unit_tests::split_unit_test_selectors;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::RecordId;
 
@@ -52,19 +53,14 @@ fn user_error(py: Python<'_>, message: String, code: &str) -> PyErr {
     )
 }
 
-fn resource_type(key: &Bound<'_, PyAny>) -> PyResult<String> {
-    native_field(key, "resource_type")?
-        .getattr("value")?
-        .extract()
-}
-
 /// Functions and view models are recreated over cloned boundaries instead of cloned.
-fn recreated_over_clones(scope: &Bound<'_, PyAny>, key: &Bound<'_, PyAny>) -> PyResult<bool> {
-    if RECREATED_TYPES.contains(&resource_type(key)?.as_str()) {
+fn recreated_over_clones(py: Python<'_>, scope: &ScopeData, key: &ObjectKey) -> PyResult<bool> {
+    if RECREATED_TYPES.contains(&key.0.as_str()) {
         return Ok(true);
     }
-    let model: Bound<'_, PyAny> = native_field(scope, "models_by_name")?
-        .call_method1("get", (native_field(key, "name")?,))?;
+    let Some(model) = scope.model(py, &key.1) else {
+        return Ok(false);
+    };
     if model.is_none() {
         return Ok(false);
     }
@@ -76,83 +72,59 @@ fn recreated_over_clones(scope: &Bound<'_, PyAny>, key: &Bound<'_, PyAny>) -> Py
 }
 
 /// Every key the scope's traversal can visit: the selection and the upstream graph.
-fn scope_keys<'py>(scope: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let mut keys: Vec<Bound<'py, PyAny>> = native_field(scope, "selected_keys")?
-        .try_iter()?
-        .collect::<PyResult<_>>()?;
-    for item in native_field(scope, "upstream_deps")?
-        .call_method0("items")?
-        .try_iter()?
-    {
-        let (key, upstream): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-        keys.push(key);
-        for upstream_key in upstream.try_iter()? {
-            keys.push(upstream_key?);
-        }
+fn scope_keys(scope: &ScopeData) -> Vec<ObjectKey> {
+    let mut keys: Vec<_> = scope.selected.iter().cloned().collect();
+    for (key, upstream) in &scope.upstream {
+        keys.push(key.clone());
+        keys.extend(upstream.iter().cloned());
     }
-    Ok(keys)
+    keys
 }
 
-/// `frozenset.__contains__` over the keys a predicate accepts, as the traversal callback.
-fn membership<'py>(
-    py: Python<'py>,
-    keys: &[Bound<'py, PyAny>],
-    accepted: impl Fn(&Bound<'py, PyAny>) -> PyResult<bool>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let mut members: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in keys {
-        if accepted(key)? {
-            members.push(key.clone());
-        }
-    }
-    PyFrozenSet::new(py, &members)?.getattr("__contains__")
-}
-
-/// A clone-plan traversal from selected keys over upstream dependencies.
-type TraversalFunction =
-    for<'py> fn(Python<'py>, Option<Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyFrozenSet>>;
-
-fn traversed_names<'py>(
-    scope: &Bound<'py, PyAny>,
-    function: TraversalFunction,
-    (is_clonable, is_view): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
-) -> PyResult<Vec<String>> {
-    let py: Python<'py> = scope.py();
-    let keys: Bound<'py, PyFrozenSet> = function(
-        py,
-        Some(keywords(
-            py,
-            &[
-                ("selected", native_field(scope, "selected_keys")?),
-                ("upstream", native_field(scope, "upstream_deps")?),
-                ("is_clonable", is_clonable.clone()),
-                ("is_view", is_view.clone()),
-            ],
-        )?),
-    )?;
-    let mut names: Vec<String> = Vec::new();
-    for key in keys.try_iter()? {
-        names.push(native_field(&key?, "name")?.extract()?);
-    }
+/// Clone boundaries or recreated ancestors, without Python graph or predicate projections.
+fn traversed_names(
+    scope: &ScopeData,
+    upstream: &HashMap<&ObjectKey, &Vec<ObjectKey>>,
+    recreated: &HashSet<ObjectKey>,
+    skipped_views: bool,
+) -> Vec<String> {
+    let mut visited: HashSet<ObjectKey> = HashSet::new();
+    let mut found: HashSet<ObjectKey> = HashSet::new();
+    let Ok(()) = clone_ancestors(
+        scope.selected.iter().cloned().map(Ok),
+        (&mut visited, &mut found),
+        |node| {
+            Ok(upstream
+                .get(node)
+                .map_or_else(Vec::new, |parents| (*parents).clone()))
+        },
+        ClonePolicy {
+            selected: |node: &ObjectKey| Ok(scope.selected.contains(node)),
+            clonable: |node: &ObjectKey| Ok(CLONABLE_TYPES.contains(&node.0.as_str())),
+            view: |node: &ObjectKey| Ok(recreated.contains(node)),
+            skipped_views,
+        },
+    );
+    let mut names: Vec<_> = found.into_iter().map(|key| key.1).collect();
     names.sort();
-    Ok(names)
+    names
 }
 
 /// Selected models except those explicitly disabled.
-fn selected_executable_model_count(scope: &Bound<'_, PyAny>) -> PyResult<usize> {
-    let models: Bound<'_, PyAny> = native_field(scope, "models_by_name")?;
+fn selected_executable_model_count(py: Python<'_>, scope: &ScopeData) -> PyResult<usize> {
     let mut count: usize = 0;
-    for key in native_field(scope, "selected_keys")?.try_iter()? {
-        let key: Bound<'_, PyAny> = key?;
-        if resource_type(&key)? != MODEL_TYPE {
+    for key in &scope.selected {
+        if key.0 != MODEL_TYPE {
             continue;
         }
-        let model: Bound<'_, PyAny> = mapping_get(&models, native_field(&key, "name")?)?;
+        let model = scope
+            .model(py, &key.1)
+            .unwrap_or_else(|| py.None().into_bound(py));
         if !model.is_none()
             && native_field(&model, "config")?
                 .getattr("values")?
                 .call_method1("get", ("enabled",))?
-                .is(false.into_pyobject(scope.py())?.to_owned().into_any())
+                .is(false.into_pyobject(py)?.to_owned().into_any())
         {
             continue;
         }
@@ -164,16 +136,22 @@ fn selected_executable_model_count(scope: &Bound<'_, PyAny>) -> PyResult<usize> 
 /// Boundary clone selectors, rebuilt view-chain selectors and the selected model count.
 fn defer_clone_selection(scope: &Bound<'_, PyAny>) -> PyResult<(Vec<String>, Vec<String>, usize)> {
     let py: Python<'_> = scope.py();
-    let keys: Vec<Bound<'_, PyAny>> = scope_keys(scope)?;
-    let is_clonable: Bound<'_, PyAny> = membership(py, &keys, |key| {
-        Ok(CLONABLE_TYPES.contains(&resource_type(key)?.as_str()))
-    })?;
-    let is_view: Bound<'_, PyAny> = membership(py, &keys, |key| recreated_over_clones(scope, key))?;
-    let callbacks: (&Bound<'_, PyAny>, &Bound<'_, PyAny>) = (&is_clonable, &is_view);
+    let scope = scope_data(scope)?;
+    let mut recreated: HashSet<ObjectKey> = HashSet::new();
+    for key in scope_keys(&scope) {
+        if recreated_over_clones(py, &scope, &key)? {
+            recreated.insert(key);
+        }
+    }
+    let upstream: HashMap<&ObjectKey, &Vec<ObjectKey>> = scope
+        .upstream
+        .iter()
+        .map(|(key, parents)| (key, parents))
+        .collect();
     Ok((
-        traversed_names(scope, resolve_clone_boundary, callbacks)?,
-        traversed_names(scope, resolve_skipped_view_chain, callbacks)?,
-        selected_executable_model_count(scope)?,
+        traversed_names(&scope, &upstream, &recreated, false),
+        traversed_names(&scope, &upstream, &recreated, true),
+        selected_executable_model_count(py, &scope)?,
     ))
 }
 

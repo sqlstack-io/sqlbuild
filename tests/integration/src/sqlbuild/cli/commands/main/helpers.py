@@ -89,7 +89,7 @@ def write_prepared_artifacts_project(*, project_dir: Path, model_count: int) -> 
     """Write a DuckDB project large enough to stage compile artifacts in the background."""
 
     (project_dir / "sqlbuild_project.toml").write_text(
-        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQBRSQL021"]\n',
+        'name = "orders"\nadapter = "duckdb"\n[rules]\nselect = ["SQLCLEAN021"]\n',
         encoding="utf-8",
     )
     models: Path = project_dir / "models"
@@ -103,7 +103,8 @@ def write_prepared_artifacts_project(*, project_dir: Path, model_count: int) -> 
         )
 
 
-SELECTED_RULES_CONFIG: str = '[rules]\nselect = ["SQBRSQL021"]\n'
+SELECTED_RULES_CONFIG: str = '[rules]\nselect = ["SQLCLEAN021"]\n'
+NO_RULES_CONFIG: str = "[rules]\nselect = []\n"
 TEST_PLANNING_MODELS: int = 6
 
 
@@ -271,7 +272,7 @@ def write_from_values_format_project(*, tmp_path: Path, adapter: str) -> tuple[P
     project_dir: Path = tmp_path / adapter
     project_dir.mkdir()
     (project_dir / "sqlbuild_project.toml").write_text(
-        f'name = "orders"\nadapter = "{adapter}"\n\n[rules]\nselect = ["SQBRSQL039"]\n',
+        f'name = "orders"\nadapter = "{adapter}"\n\n[rules]\nselect = ["SQLCLEAN039"]\n',
         encoding="utf-8",
     )
     models: Path = project_dir / "models"
@@ -637,17 +638,15 @@ def dropped_relation_microbatch_sql(*, batch_concurrency: int) -> str:
     )
 
 
-def compile_duckdb_projection(
-    *, tmp_path: Path, capsys: pytest.CaptureFixture[str], projection: str
+def compile_duckdb_query(
+    *, tmp_path: Path, capsys: pytest.CaptureFixture[str], query: str
 ) -> tuple[int, tuple[object, ...]]:
-    """Compile one DuckDB model projection and return the exit and diagnostic codes."""
+    """Compile one DuckDB model query and return the exit and diagnostic codes."""
 
     (tmp_path / "sqlbuild_project.toml").write_text('name = "orders"\nadapter = "duckdb"\n')
     models: Path = tmp_path / "models"
     models.mkdir()
-    (models / "orders.sql").write_text(
-        f"MODEL (description 'Test model orders.');\nSELECT {projection}"
-    )
+    (models / "orders.sql").write_text(f"MODEL (description 'Test model orders.');\n{query}")
     exit_code: int = main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"])
     result: dict[str, object] = json.loads(capsys.readouterr().out)
     diagnostics: list[dict[str, object]] = cast(list[dict[str, object]], result["diagnostics"])
@@ -705,10 +704,10 @@ _OUTPUT_LOCATIONS: tuple[str, ...] = ("output_column_locations",)
 def write_repeated_json_parse_project(
     *, tmp_path: Path, test_case: RepeatedJsonParseTestCase
 ) -> None:
-    """Write a one-model project that selects only SQBRSQL045."""
+    """Write a one-model project that selects only SQLCLEAN045."""
 
     (tmp_path / "sqlbuild_project.toml").write_text(
-        f'name = "orders"\nadapter = "{test_case.adapter}"\n\n[rules]\nselect = ["SQBRSQL045"]\n',
+        f'name = "orders"\nadapter = "{test_case.adapter}"\n\n[rules]\nselect = ["SQLCLEAN045"]\n',
         encoding="utf-8",
     )
     files: tuple[tuple[str, str], ...] = (
@@ -856,7 +855,7 @@ def write_project_files(*, project_dir: Path, files: dict[str, str]) -> None:
 EARLY_LINT_PROJECT_FILES: dict[str, str] = {
     "sqlbuild_project.toml": (
         'name = "orders"\nadapter = "duckdb"\n\n[vars]\nfloor = "2"\n\n'
-        '[rules]\nselect = ["SQBRSQL005"]\n'
+        '[rules]\nselect = ["SQLCLEAN005"]\n'
     ),
     "models/_macros/python/cents.py": (
         'def cents(expression: str) -> str:\n    """Convert to cents."""\n'
@@ -1025,19 +1024,20 @@ def diagnostics_by_model(diagnostics: list[dict[str, object]]) -> dict[str, str]
 
 
 def typed_config_reads(*, project_dir: Path, extra_header: str) -> int:
-    """How many config values planning converted into typed nodes for three cursor models."""
+    """Config conversions for a fresh build, an inherited build and a reused config."""
 
     project_dir.mkdir(parents=True)
     (project_dir / "sqlbuild_project.toml").write_text(
         'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
-        '[connections.local]\ndatabase = ":memory:"\n\n[targets.dev]\nschema = "main"\n',
+        '[connections.local]\ndatabase = ":memory:"\n\n[defaults]\nmaterialized = "table"\n\n'
+        '[targets.dev]\nschema = "main"\n',
         encoding="utf-8",
     )
     models_dir: Path = project_dir / "models"
     models_dir.mkdir()
-    for index in range(3):
+    for index, own_config in enumerate((', materialized table, tags ["daily"]', "", "")):
         (models_dir / f"orders_{index}.sql").write_text(
-            f'MODEL (description "Orders.", materialized table, tags ["daily"]{extra_header});\n\n'
+            f'MODEL (description "Orders {index}."{own_config}{extra_header});\n\n'
             f"SELECT {index} AS order_id, 1 AS loaded_at\n",
             encoding="utf-8",
         )

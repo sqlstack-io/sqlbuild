@@ -333,7 +333,7 @@ fn limits(options: &KeywordArguments<'_>) -> PyResult<Limits> {
 /// Stop every live dispatcher's threads and join them before finalization ends them inside native code.
 #[pyfunction]
 pub(crate) fn stop_event_exporter_threads(py: Python<'_>) -> PyResult<()> {
-    signal_interpreter_exit(py)?;
+    signal_interpreter_exit();
     let mut threads: Vec<Bound<'_, PyAny>> = Vec::new();
     for thread in imported(py, "threading", "enumerate")?
         .call0()?
@@ -483,7 +483,7 @@ impl Shared {
         let threads: Vec<Py<PyAny>> = {
             let _held = self.hold(py)?;
             loop {
-                if interpreter_exiting(py)? {
+                if interpreter_exiting() {
                     return Ok(());
                 }
                 let state = self.locked()?;
@@ -597,7 +597,7 @@ impl Shared {
                 Err(error) if error.is_instance(py, &empty) => {}
                 Err(error) => return Err(error),
             }
-            if interpreter_exiting(py)? {
+            if interpreter_exiting() {
                 return Ok(Delivery::Abandoned);
             }
         }

@@ -1,11 +1,15 @@
 //! Sentinel spellings, suppression texts and fixture-null markers.
 
 /// Sentinel standing in for one interpolation site in lint and format SQL.
-pub const LINT_SENTINEL_PREFIX: &str = "__sqb_lint_";
+pub const LINT_SENTINEL_PREFIX: &str = sqlclean::constants::INTERPOLATION_PLACEHOLDER_PREFIX;
 pub(crate) const SENTINEL_SUFFIX: &str = "__";
-pub(crate) const AUDIT_PARAMETER_SENTINEL_PREFIX: &str = "__sqlbuild_audit_parameter_";
-pub(crate) const CONTEXT_SENTINEL_PREFIX: &str = "__sqlbuild_context_parameter_";
-pub(crate) const SQL_MACRO_PARAMETER_SENTINEL_PREFIX: &str = "__sqlbuild_macro_parameter_";
+/// An audit's relation parameter, which a `SELECT *` may read alone.
+pub(crate) const AUDIT_PARAMETER_SENTINEL_PREFIX: &str =
+    sqlclean::constants::RELATION_PARAMETER_PLACEHOLDER_PREFIX;
+pub(crate) const CONTEXT_SENTINEL_PREFIX: &str =
+    sqlclean::constants::VALUE_PARAMETER_PLACEHOLDER_PREFIX;
+pub(crate) const SQL_MACRO_PARAMETER_SENTINEL_PREFIX: &str =
+    sqlclean::constants::MACRO_PARAMETER_PLACEHOLDER_PREFIX;
 pub(crate) const CONTEXT_INTERPOLATION_TOKEN: &str = "@@CTX:";
 pub(crate) const TEST_PARAMETER_SENTINEL_PREFIX: &str = "__sqlbuild_test_parameter_";
 pub(crate) const TEST_PARAMETER_TOKEN: &str = "@param";
@@ -29,8 +33,11 @@ pub(crate) const LINT_SITE_PATTERN: &str =
     r"^(?:@@|\$\{|@|(?:__dbt_ref|__ref|__seed|__source|__table_fn|__udf)\()";
 pub(crate) const FORMAT_SITE_PATTERN: &str = r"(?i)^(?:@@|\$\{|@|(?:__cursor_end|__cursor_start|__dbt_ref|__empty_fixture|__ref|__seed|__source|__table_fn|__udf)\s*\()";
 
+/// SQLCLEAN044 advice pointing at SQLBuild constants, in place of SQLClean's generic advice.
+pub(crate) const LONG_LITERAL_GUIDANCE: &str = "Define the value once as a constant and reference it with `@const`, in the narrowest scope that covers every use. (1) Only this model: add `constants (_status_pattern '<value>')` to its `MODEL (...)` header and write `@const(\"_status_pattern\")`. (2) Other files use the same value: declare `CONSTANT (name status_pattern, value '<value>');` in `_sqlbuild/_constants/` of the nearest folder that contains every use when they all sit directly in that folder, or in its `_sqlbuild/constants/` to include subfolders, and write `@const(\"status_pattern\")`. (3) Use top-level `constants/` only when the value is needed project-wide. Otherwise shorten the literal.";
+
 /// Diagnostic code of every inline suppression directive finding.
-pub const SUPPRESSION_CODE: &str = "SQBRSQL000";
+pub const SUPPRESSION_CODE: &str = "SQBRSUPPRESSION000";
 /// Text every directive contains, checked before scanning a file's comments.
 pub(crate) const DIRECTIVE_MARKER: &[u8] = b"sqb:";
 pub(crate) const BLOCK_COMMENT_OPENER: &str = "/*";
@@ -39,7 +46,7 @@ pub(crate) const BLOCK_COMMENT_CLOSER: &str = "*/";
 pub(crate) const COMMENT_OPENER_BYTES: usize = 2;
 pub(crate) const DIRECTIVE_PATTERN: &str =
     r"(?i)sqb:\s*ignore\b\s*(?P<code>[A-Za-z0-9_-]*)(?:\s+because\s+(?P<reason>.*\S))?";
-pub(crate) const CROSS_JOIN_CODE: &str = "SQBRSQL038";
+pub(crate) const CROSS_JOIN_CODE: &str = "SQLCLEAN038";
 pub(crate) const CROSS_JOIN_RELATION_PATTERN: &str = r#"(?i)\bcross\s+join\s+(?:__(?:ref|seed|source)\s*\(\s*['"](?P<dependency>[^'"]+)['"]\s*\)|(?P<identifier>[A-Za-z_][A-Za-z0-9_$.]*))"#;
 pub(crate) const DIRECTIVE_MESSAGE: &str =
     "Inline Rule suppressions are not supported; declare the exception in sqlbuild_project.toml";
@@ -91,9 +98,9 @@ pub(crate) const GROUPED_NAMED_ROLES: [(&[&str], bool); 9] = [
 ];
 
 pub(crate) const LINT_API_VERSION: i64 = 1;
-pub(crate) const UNUSED_CTE_CODE: &str = "SQBRSQL005";
-pub(crate) const LONG_LITERAL_CODE: &str = "SQBRSQL044";
-pub(crate) const MIXED_QUALIFICATION_CODE: &str = "SQBRSQL028";
+pub(crate) const UNUSED_CTE_CODE: &str = "SQLCLEAN005";
+pub(crate) const LONG_LITERAL_CODE: &str = "SQLCLEAN044";
+pub(crate) const MIXED_QUALIFICATION_CODE: &str = "SQLCLEAN028";
 /// The reserved argument naming a CTE-list call's CTEs; it passes no relation.
 pub(crate) const CTE_ARGUMENT: &str = "__cte";
 /// The help for mixed qualification in a SQL macro body, where slot reads are qualified through an alias.
@@ -116,6 +123,22 @@ pub(crate) const HARNESS_CTE_PREFIXES: [&str; 13] = [
     "__table_fn_actual__",
     "__table_fn_expected__",
 ];
+/// The CTE names a test or macro harness generates, which stay reachable when the body does not read them.
+pub(crate) const FIXTURE_HARNESS_CTE_PREFIXES: [&str; 11] = [
+    "__expected__",
+    "__assert__",
+    "__ref__",
+    "__source__",
+    "__seed__",
+    "__dbt_ref__",
+    "__macro_actual__",
+    "__macro_expected__",
+    "__udf_actual__",
+    "__udf_expected__",
+    "__table_fn_",
+];
+/// The table function an empty fixture input reads, as `SELECT * FROM __empty_fixture()`.
+pub(crate) const EMPTY_FIXTURE_RELATION: &str = "__empty_fixture";
 pub(crate) const PARSE_FAILURE_PREFIX: &str = "Native SQL parser could not analyze this body: ";
 pub(crate) const PARSE_FAILURE_REMEDIATION: &str =
     "Use SQL syntax supported by the native parser or report the parser gap.";
@@ -182,3 +205,6 @@ pub(crate) const EXPRESSION_SELECT_PREFIX: &str = "SELECT ";
 pub(crate) const LINTED_EXPRESSION_ALIAS: &str = "__sqlbuild_macro_expression__";
 /// The characters that open a quoted string or identifier in formatted SQL.
 pub(crate) const STRING_QUOTES: [char; 3] = ['\'', '"', '`'];
+
+/// A CTE definition, capturing its `name`.
+pub(crate) const CTE_DEFINITION_PATTERN: &str = r#"(?is)(?:\bWITH(?:\s+RECURSIVE)?|,)\s*["`\[]?(?P<name>[A-Za-z_][A-Za-z0-9_]*)["`\]]?(?:\s*\([^)]*\))?\s+AS\s*\("#;

@@ -6,12 +6,14 @@ use pyo3::BoundObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use sqlbuild_analysis::compiled_project::models::SchemaColumnFact;
-use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 
 use crate::bindings::_helpers::input_loops::model_loop::LoopContext;
 use crate::bindings::_helpers::input_loops::model_loop_schema::DeclaredColumns;
+use crate::bindings::_helpers::model_config::config_nodes::{PyConfigNode, config_node};
 use crate::bindings::_helpers::model_config::header_metadata::{HeaderColumn, HeaderColumns};
 use crate::bindings::_helpers::records::fields::field as native_field;
+use sqlbuild_model_config::config_values::models::ConfigNode;
+use sqlbuild_model_config::header_metadata::models::ParsedAudit;
 
 const CASES_ATTRIBUTE: &str = "cases";
 const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";
@@ -20,7 +22,6 @@ const DEFINITION_ATTRIBUTE: &str = "definition";
 const DEFINITION_NAME_FIELD: &str = "definition_name";
 const ARGUMENTS_FIELD: &str = "arguments";
 const NAME_FIELD: &str = "name";
-const TYPE_FIELD: &str = "type";
 const AUDITS_FIELD: &str = "audits";
 const MEMBERS_FIELD: &str = "members";
 const VALUE_FIELD: &str = "value";
@@ -48,10 +49,6 @@ const COPIED_CASE_FIELDS: [&str; 9] = [
     "evidence_limit",
     "meta",
 ];
-const PIVOT_COLUMN_FIELD: &str = "pivot_column";
-const VALUE_COLUMN_FIELD: &str = "value_column";
-const AGGREGATE_FIELD: &str = "aggregate";
-const NAME_PATTERN_FIELD: &str = "name_pattern";
 
 /// A model's enum-typed columns resolved to scalar types, and the usages they generate.
 pub(crate) struct EnumColumns<'py> {
@@ -118,42 +115,6 @@ fn audit_identity(audit: &Bound<'_, PyAny>) -> PyResult<String> {
     native_field(audit, DEFINITION_NAME_FIELD)?.extract()
 }
 
-/// The parsed families as `SchemaDynamicColumnFamily` objects.
-pub(crate) fn dynamic_family_objects<'py>(
-    py: Python<'py>,
-    context: &LoopContext<'_, 'py>,
-    families: &[DynamicFamily],
-) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    families
-        .iter()
-        .map(|family| {
-            keywords(
-                &context.contracts.schema_dynamic_column_family,
-                &[
-                    (NAME_FIELD, family.name.as_str().into_pyobject_any(py)?),
-                    (
-                        PIVOT_COLUMN_FIELD,
-                        family.pivot_column.as_str().into_pyobject_any(py)?,
-                    ),
-                    (
-                        VALUE_COLUMN_FIELD,
-                        family.value_column.as_str().into_pyobject_any(py)?,
-                    ),
-                    (
-                        AGGREGATE_FIELD,
-                        family.aggregate.as_str().into_pyobject_any(py)?,
-                    ),
-                    (TYPE_FIELD, family.data_type.as_str().into_pyobject_any(py)?),
-                    (
-                        NAME_PATTERN_FIELD,
-                        family.name_pattern.as_deref().into_pyobject_any(py)?,
-                    ),
-                ],
-            )
-        })
-        .collect()
-}
-
 /// `resolve_enum_contract_columns` and `_generated_enum_usages` for a header schema entry.
 pub(crate) fn enum_columns<'py>(
     context: &LoopContext<'_, 'py>,
@@ -189,6 +150,47 @@ pub(crate) fn enum_columns<'py>(
             continue;
         };
         resolved.set_item(&fact.name, &declaration)?;
+        if column.retains_audits() && context.contracts.uses_default_classes()? {
+            let mut generated = None;
+            if enforced {
+                let members = native_field(&declaration, MEMBERS_FIELD)?
+                    .try_iter()?
+                    .map(|member| config_node(&native_field(&member?, VALUE_FIELD)?))
+                    .collect::<PyResult<Vec<PyConfigNode>>>()?;
+                let mut present = false;
+                for audit in column.audit_instances(py)? {
+                    if audit.accepts_enum(&members)? {
+                        present = true;
+                        break;
+                    }
+                }
+                if !present {
+                    generated = Some(ParsedAudit {
+                        definition_name: ConfigNode::Str(ACCEPTED_VALUES_AUDIT.to_owned()),
+                        arguments: vec![(
+                            ConfigNode::Str(VALUES_ARGUMENT.to_owned()),
+                            ConfigNode::Tuple(members),
+                        )],
+                        name: None,
+                        description: None,
+                        severity: None,
+                        run_scope: None,
+                        always_run: None,
+                        thresholds: None,
+                        minimum_samples: None,
+                        evidence_limit: None,
+                        meta: None,
+                    });
+                    fact.audit_definitions
+                        .push(ACCEPTED_VALUES_AUDIT.to_owned());
+                }
+            }
+            let scalar_type = native_field(&declaration, SCALAR_TYPE_ATTRIBUTE)?;
+            fact.data_type = scalar_type.extract()?;
+            resolved_columns.push(column.enum_type(py, scalar_type, generated)?);
+            facts.push(fact);
+            continue;
+        }
         let mut audits: Vec<Bound<'py, PyAny>> = column
             .field(py, AUDITS_FIELD)?
             .try_iter()?

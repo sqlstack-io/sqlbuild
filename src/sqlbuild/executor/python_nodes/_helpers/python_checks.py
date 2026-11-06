@@ -148,6 +148,8 @@ def _execute_one_python_check(
         ) as lifecycle,
     ):
         if blocked is None:
+            if callbacks.on_check_start is not None:
+                callbacks.on_check_start(check_function.name)
             node: DiscoveredPythonNode = python_graph.nodes_by_name[check_function.name]
             warnings: list[str] = []
             context: CheckContext = CheckContext(

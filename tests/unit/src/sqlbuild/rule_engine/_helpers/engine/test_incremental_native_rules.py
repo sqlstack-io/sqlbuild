@@ -92,8 +92,8 @@ EDIT_SEQUENCE: tuple[IncrementalRulesStep, ...] = (
         IncrementalRulesModeTestCase(
             description="suppressions deferred with initial findings",
             defer_suppressions=True,
-            expected_observed_codes=("SQBRSQL034", "SQBRGRAPH102", "SQBRCONTRACT101"),
-            initial_codes=("SQBRSQL034",),
+            expected_observed_codes=("SQLCLEAN034", "SQBRGRAPH102", "SQBRCONTRACT101"),
+            initial_codes=("SQLCLEAN034",),
         ),
     ),
     ids=lambda case: case.description,

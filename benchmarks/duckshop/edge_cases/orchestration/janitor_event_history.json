@@ -1,0 +1,33 @@
+{
+  "record": {
+    "state_database": null,
+    "state_schema": "main",
+    "event_id": "event-000",
+    "schema_version": 1,
+    "event_type": "archive",
+    "occurred_at": "2026-02-03T04:05:06Z",
+    "run_id": "cleanup-run",
+    "relation_database": null,
+    "relation_schema": "main",
+    "relation_type": "BASE TABLE",
+    "original_name": "orders",
+    "original_qualified_name": "main.orders",
+    "archive_name": "_sqb_archive_orders_🧾",
+    "archive_qualified_name": "main.\"_sqb_archive_orders_🧾\"",
+    "archived_at": "2026-01-02T03:04:05Z"
+  },
+  "source_rows": 104,
+  "duplicate_rows": 105,
+  "later_time": "2026-02-03T04:05:06.000001Z",
+  "retained_result": "event-103",
+  "kind": "janitor_events",
+  "source_key": "event_id",
+  "id_prefix": "event",
+  "page_lengths": [100, 4],
+  "later_index": 103,
+  "later_record": {"event_id": "event-103", "event_type": "delete", "occurred_at": "2026-02-03T04:05:06.000001Z"},
+  "last_record": {"event_id": "event-103", "event_type": "delete", "occurred_at": "2026-02-03T04:05:06.000001Z"},
+  "record_overrides": {"event-103": {"event_type": "delete", "occurred_at": "2026-02-03T04:05:06.000001Z"}},
+  "source_count": 104,
+  "model": "MODEL (description 'Orders.', materialized table); SELECT 1 AS order_id"
+}

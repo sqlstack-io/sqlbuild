@@ -22,7 +22,6 @@ use sqlbuild_model_config::errors::ConfigError;
 use sqlbuild_model_config::header_metadata::main::parse_measurement_policy::parse_measurement_policy;
 use sqlbuild_sqltext::sql_references::models::SqlReference;
 
-use crate::bindings::_helpers::attachments::argument_values::argument_pairs;
 use crate::bindings::_helpers::compile_context::delta::record_source_reads;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::{
     AuditBlockRow, AuditFileRow, AuditSettings,
@@ -40,11 +39,11 @@ use crate::bindings::_helpers::input_loops::source_loop::{
     AuthoredExpansion, expanded_authored_sql, file_declarations,
 };
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
+use crate::bindings::_helpers::model_config::header_audits::{AuditInstance, HeaderAudits};
 use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
 use crate::bindings::_helpers::model_config::header_metadata::thresholds;
 use crate::bindings::_helpers::model_config::model_validator::NativeModelValidator;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::result_output::integration_values::json_value;
 use sqlbuild_project::models::AttachedTarget;
 use sqlbuild_project::models::ReferenceRow;
 
@@ -81,7 +80,7 @@ pub(crate) struct AttachmentOwner<'py> {
     pub(crate) relation: String,
     pub(crate) path: String,
     /// `(owner file, column, instance)` in attachment order.
-    pub(crate) instances: Vec<(String, Option<String>, Bound<'py, PyAny>)>,
+    pub(crate) instances: Vec<(String, Option<String>, AuditInstance<'py>)>,
 }
 
 /// Every singular audit, then each owner's attached audits, and the built-in shadow warnings.
@@ -342,12 +341,11 @@ impl<'py> AuditScope<'_, 'py> {
     }
 
     /// The instance's `meta` as JSON, or `None`; a value JSON cannot carry fails the compile.
-    fn meta(&self, instance: &Bound<'py, PyAny>, label: &str) -> PyResult<Option<JsonValue>> {
-        let meta: Bound<'py, PyAny> = native_field(instance, "meta")?;
-        if meta.is_none() {
+    fn meta(&self, instance: &AuditInstance<'py>, label: &str) -> PyResult<Option<JsonValue>> {
+        if !instance.meta_present()? {
             return Ok(None);
         }
-        match json_value(&meta)? {
+        match instance.meta()? {
             Some(value) => Ok(Some(value)),
             None => {
                 let message: String = format!("{label}: 'meta' must be a mapping of JSON values");
@@ -362,11 +360,11 @@ impl<'py> AuditScope<'_, 'py> {
         definitions: &HashMap<String, Definition<'_>>,
         owner: &AttachmentOwner<'py>,
         attachment: (&str, Option<&str>),
-        instance: &Bound<'py, PyAny>,
+        instance: &AuditInstance<'py>,
     ) -> PyResult<AttachedAudit> {
         let py: Python<'py> = self.context.host.py();
         let (owner_file, column) = attachment;
-        let definition_name: String = native_field(instance, "definition_name")?.extract()?;
+        let definition_name: String = instance.field("definition_name")?.extract()?;
         let Some(definition) = definitions.get(&definition_name) else {
             let message: String =
                 format!("{owner_file} references unknown generic audit '{definition_name}'");
@@ -383,9 +381,9 @@ impl<'py> AuditScope<'_, 'py> {
             &consumer,
             (owner.kind, &owner.name, &owner.path),
         )?;
-        let thresholds: Bound<'py, PyAny> = native_field(instance, "thresholds")?;
-        let minimum_samples: Bound<'py, PyAny> = native_field(instance, "minimum_samples")?;
-        let instance_severity: Option<String> = native_field(instance, "severity")?.extract()?;
+        let (has_thresholds, threshold_error) = instance.threshold_policy()?;
+        let minimum_samples = instance.field("minimum_samples")?;
+        let instance_severity: Option<String> = instance.field("severity")?.extract()?;
         let label: String = format!("{owner_file} audit '{definition_name}'");
         let measurement: bool = definition.block.measurement;
         if measurement {
@@ -396,13 +394,13 @@ impl<'py> AuditScope<'_, 'py> {
                 );
                 return Err(compile_error(self.context.classes, &message, None));
             }
-            if thresholds.is_none() {
+            if !has_thresholds {
                 let message: String = format!(
                     "{label}: measurement audit attachments must define at least one threshold"
                 );
                 return Err(compile_error(self.context.classes, &message, None));
             }
-        } else if !thresholds.is_none() || !minimum_samples.is_none() {
+        } else if has_thresholds || !minimum_samples.is_none() {
             let message: String = format!(
                 "{label}: thresholds and minimum_samples are only valid for measurement audits"
             );
@@ -422,13 +420,12 @@ impl<'py> AuditScope<'_, 'py> {
             sql_body: definition.block.sql_body.clone(),
             evidence_sql: definition.block.evidence_sql.clone(),
             implicit_arguments: implicit,
-            explicit_arguments: argument_pairs(native_field(instance, "arguments")?.downcast()?)?,
-            has_thresholds: !thresholds.is_none(),
-            threshold_error: !thresholds.is_none()
-                && !native_field(&thresholds, "error")?.is_none(),
+            explicit_arguments: instance.arguments()?,
+            has_thresholds,
+            threshold_error,
             instance_severity,
             default_severity: self.settings.default_severity.clone(),
-            instance_run_scope: native_field(instance, "run_scope")?.extract()?,
+            instance_run_scope: instance.field("run_scope")?.extract()?,
             default_run_scope: self.settings.default_run_scope.clone(),
         });
         let rendered = match rendering {
@@ -454,7 +451,7 @@ impl<'py> AuditScope<'_, 'py> {
             .policies
             .map_err(|message| compile_error(self.context.classes, &message, None))?;
         let run_scope: String = match source {
-            PolicySource::Instance => native_field(instance, "run_scope")?.extract()?,
+            PolicySource::Instance => instance.field("run_scope")?.extract()?,
             PolicySource::Default => self.settings.default_run_scope.clone().unwrap_or_default(),
             PolicySource::Fallback => "delta_and_final".to_owned(),
         };
@@ -464,11 +461,11 @@ impl<'py> AuditScope<'_, 'py> {
             return Err(compile_error(self.context.classes, &message, None));
         }
         usages.extend(expanded.usages);
-        let evidence_limit: Py<PyAny> = native_field(instance, "evidence_limit")?.unbind();
-        let always_run: bool = native_field(instance, ALWAYS_RUN_KEY)?.is_truthy()?;
+        let evidence_limit: Py<PyAny> = instance.field("evidence_limit")?.unbind();
+        let always_run: bool = instance.field(ALWAYS_RUN_KEY)?.is_truthy()?;
         let usages: Py<PyTuple> = PyTuple::new(py, usages)?.unbind();
-        let name: Option<String> = native_field(instance, "name")?.extract()?;
-        let description: Option<String> = native_field(instance, "description")?.extract()?;
+        let name: Option<String> = instance.field("name")?.extract()?;
+        let description: Option<String> = instance.field("description")?.extract()?;
         let meta: Option<JsonValue> = self.meta(instance, &label)?;
         Ok(AttachedAudit {
             definition_name: definition
@@ -494,7 +491,7 @@ impl<'py> AuditScope<'_, 'py> {
             host: AuditHandles {
                 audit_file: definition.file.file.clone_ref(py),
                 audit_block: definition.block.block.clone_ref(py),
-                thresholds: thresholds.unbind(),
+                thresholds: instance.field("thresholds")?.unbind(),
                 minimum_samples: minimum_samples.unbind(),
                 evidence_limit,
                 usages,
@@ -703,13 +700,14 @@ fn header_text(header: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<String>
 
 /// The attachment owners of every model, source and seed, as the audit loop reads them.
 pub(crate) fn model_owner<'py>(
+    py: Python<'py>,
     name: String,
     path: String,
-    schema: (&Bound<'py, PyTuple>, (&HeaderColumns, &[SchemaColumnFact])),
+    schema: (&HeaderAudits, (&HeaderColumns, &[SchemaColumnFact])),
 ) -> PyResult<AttachmentOwner<'py>> {
     let (audits, (columns, facts)) = schema;
-    let mut instances: Vec<(String, Option<String>, Bound<'py, PyAny>)> = Vec::new();
-    for audit in audits.iter() {
+    let mut instances: Vec<(String, Option<String>, AuditInstance<'py>)> = Vec::new();
+    for audit in audits.instances(py) {
         instances.push((path.clone(), explicit_column(&audit)?, audit));
     }
     for (index, fact) in facts.iter().enumerate() {
@@ -717,11 +715,7 @@ pub(crate) fn model_owner<'py>(
             continue;
         }
         let column_owner: &str = fact.location_path.as_deref().unwrap_or(&path);
-        for audit in columns.specs[index]
-            .field(audits.py(), "audits")?
-            .try_iter()?
-        {
-            let audit: Bound<'py, PyAny> = audit?;
+        for audit in columns.specs[index].audit_instances(py)? {
             let owner_file: String =
                 location_path(&audit)?.unwrap_or_else(|| column_owner.to_owned());
             instances.push((owner_file, Some(fact.name.clone()), audit));
@@ -745,9 +739,9 @@ pub(crate) fn resource_owner<'py>(
 ) -> PyResult<AttachmentOwner<'py>> {
     let (path, owner_file) = paths;
     let (audits, columns) = schema;
-    let mut instances: Vec<(String, Option<String>, Bound<'py, PyAny>)> = Vec::new();
+    let mut instances: Vec<(String, Option<String>, AuditInstance<'py>)> = Vec::new();
     for audit in audits.try_iter()? {
-        let audit: Bound<'py, PyAny> = audit?;
+        let audit = AuditInstance::Python(audit?);
         let column: Option<String> = if kind == SEED_TARGET {
             explicit_column(&audit)?
         } else {
@@ -759,7 +753,11 @@ pub(crate) fn resource_owner<'py>(
         let column: Bound<'py, PyAny> = column?;
         let column_name: String = native_field(&column, "name")?.extract()?;
         for audit in native_field(&column, "audits")?.try_iter()? {
-            instances.push((owner_file.clone(), Some(column_name.clone()), audit?));
+            instances.push((
+                owner_file.clone(),
+                Some(column_name.clone()),
+                AuditInstance::Python(audit?),
+            ));
         }
     }
     let function: &str = if kind == SOURCE_TARGET {
@@ -777,14 +775,17 @@ pub(crate) fn resource_owner<'py>(
 }
 
 /// `_explicit_audit_column_name`: the instance's `column` argument when it is a string.
-fn explicit_column(audit: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    let arguments: Bound<'_, PyDict> = native_field(audit, "arguments")?.downcast_into()?;
-    header_text(&arguments, COLUMN_ARGUMENT)
+fn explicit_column(audit: &AuditInstance<'_>) -> PyResult<Option<String>> {
+    audit
+        .argument(COLUMN_ARGUMENT)?
+        .filter(|value| value.is_instance_of::<PyString>())
+        .map(|value| value.extract())
+        .transpose()
 }
 
 /// The path of a spec's authored location, if it has one.
-fn location_path(spec: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
-    let location: Bound<'_, PyAny> = native_field(spec, "location")?;
+fn location_path(spec: &AuditInstance<'_>) -> PyResult<Option<String>> {
+    let location = spec.field("location")?;
     if location.is_none() {
         return Ok(None);
     }

@@ -8,6 +8,7 @@ use sqlbuild_core::build_command::constants::{
     SNAPSHOT_FULL_REFRESH_DBT_HELP, TABLE_TYPE_DOWNGRADE_DBT_HELP,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{BuildExecutionResult, BuildStatus};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, keywords};
 use crate::bindings::_helpers::build_command::policies::enforce_plan_safety_policies_binding;
@@ -17,11 +18,13 @@ use crate::bindings::_helpers::build_command::support::{
 use crate::bindings::_helpers::build_progress::build_callbacks::{
     BuildProgressCallbacks, batch_complete_callback,
 };
-use crate::bindings::_helpers::build_progress::footer::format_build_footer;
+use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::progress_text::format_execution_header;
+use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_runtime_target;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::presentation_text::style::PythonCliStyle;
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -239,22 +242,23 @@ pub(crate) fn execute_dbt_sqlbuild_work<'py>(
             ("callbacks", hooks),
         ],
     )?;
+    let result = BuildExecutionResult::read(&result)?;
     write_runtime_target(
         &joined(&args.value("project_dir")?, &["target"])?,
         &plan,
         &result,
     )?;
-    let footer = format_build_footer(
-        &result.clone(),
-        native_field(&callbacks, "elapsed")?.extract::<f64>()?,
-        color.extract::<bool>()?,
+    let footer = format_build_footer_with(
+        &build_result_text(py, &result)?,
+        (
+            native_field(&callbacks, "elapsed")?.extract::<f64>()?,
+            color.extract::<bool>()?,
+        ),
         None,
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
-    emit(&output, &format!("\n{}\n", footer.extract::<String>()?))?;
-    Ok(i64::from(!native_field(&result, "status")?.eq(
-        host::entry(py, ExecutorHost::BuildStatus)?.getattr("SUCCESS")?,
-    )?))
+        Vec::new(),
+    )?;
+    emit(&output, &format!("\n{footer}\n"))?;
+    Ok(i64::from(result.status != BuildStatus::Success))
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

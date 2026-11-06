@@ -12,12 +12,14 @@ use sqlbuild_core::scenario_command::main::render_snapshot_sync_result::render_s
 use sqlbuild_core::scenario_command::main::scenario_activity_message::scenario_activity_message;
 use sqlbuild_core::scenario_command::models::ScenarioNamespace;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::ScenarioRunResult;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::build_progress::progress_reporters::ConnectionProgressReporter;
 use crate::bindings::_helpers::build_progress::transient_status::status_reporter;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::scenario_command::conversions::{
     capture_row, scenario_result_row, write_local_runtime_target, write_warehouse_runtime_target,
@@ -86,7 +88,10 @@ impl ScenarioProgressRelay {
                         write_local_runtime_target(target_dir, (adapter, plan, &result))?;
                     }
                 }
-                render_scenario_result(&scenario_result_row(&result)?, style)
+                render_scenario_result(
+                    &scenario_result_row(py, &ScenarioRunResult::read(&result)?)?,
+                    style,
+                )
             }
             CompletionKind::Capture => {
                 render_capture_result(&capture_row(&result, (project_dir, plan))?, style)

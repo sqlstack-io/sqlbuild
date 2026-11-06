@@ -7,7 +7,7 @@ use std::sync::Mutex;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::{FromPyObject, pyclass, pyfunction, pymethods, wrap_pyfunction};
+use pyo3::{FromPyObject, IntoPyObject, pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_cache::digest::main::bytes_digest::bytes_digest;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 use sqlbuild_cache::project_reuse::constants::{NATIVE_DIGEST_PREFIX, REUSE_STORE_SUFFIX};
@@ -27,40 +27,40 @@ use crate::bindings::_helpers::boundary::panics::compiler_guard;
 positional_record! {
     extract;
     /// Settings case sensitivity, names, prefixes, env files and secrets directories.
-    struct SettingsRow {
-        case_sensitive: bool,
-        names: Vec<String>,
-        prefixes: Vec<String>,
-        env_files: Vec<String>,
-        secrets_dirs: Vec<String>,
+    pub(crate) struct SettingsRow {
+        pub(crate) case_sensitive: bool,
+        pub(crate) names: Vec<String>,
+        pub(crate) prefixes: Vec<String>,
+        pub(crate) env_files: Vec<String>,
+        pub(crate) secrets_dirs: Vec<String>,
     }
 }
 type ReplayRow = (String, Vec<String>, i64);
 type LaunchIdentityRow = (String, BTreeMap<String, String>, Vec<String>);
 /// A written artifact's digest, or a kept artifact's size and mtime.
-type ArtifactRow = (Option<String>, Option<u64>, Option<i64>);
+pub(crate) type ArtifactRow = (Option<String>, Option<u64>, Option<i64>);
 
 /// The host constants the walk, environment and store checks use.
-#[derive(FromPyObject)]
+#[derive(FromPyObject, IntoPyObject)]
 #[pyo3(from_item_all)]
-struct ReuseRulesPy {
-    excluded: Vec<String>,
-    excluded_root: Vec<String>,
-    presence_suffixes: Vec<String>,
-    output_files: Vec<(u64, u64)>,
-    tracked_prefixes: Vec<String>,
-    untracked_names: Vec<String>,
-    disabling_variables: Vec<(String, String)>,
-    config_filenames: Vec<String>,
-    racy_window_ns: i64,
-    max_stored_entries: usize,
-    max_entry_bytes: usize,
-    missing_environment_value: String,
-    missing_file_digest: String,
-    missing_path_mtime_ns: i64,
-    project_root_path_mtime_ns: i64,
-    compiled_root: PathBuf,
-    retired_directories: Vec<String>,
+pub(crate) struct ReuseRulesPy {
+    pub(crate) excluded: Vec<String>,
+    pub(crate) excluded_root: Vec<String>,
+    pub(crate) presence_suffixes: Vec<String>,
+    pub(crate) output_files: Vec<(u64, u64)>,
+    pub(crate) tracked_prefixes: Vec<String>,
+    pub(crate) untracked_names: Vec<String>,
+    pub(crate) disabling_variables: Vec<(String, String)>,
+    pub(crate) config_filenames: Vec<String>,
+    pub(crate) racy_window_ns: i64,
+    pub(crate) max_stored_entries: usize,
+    pub(crate) max_entry_bytes: usize,
+    pub(crate) missing_environment_value: String,
+    pub(crate) missing_file_digest: String,
+    pub(crate) missing_path_mtime_ns: i64,
+    pub(crate) project_root_path_mtime_ns: i64,
+    pub(crate) compiled_root: PathBuf,
+    pub(crate) retired_directories: Vec<String>,
 }
 
 impl From<ReuseRulesPy> for ReuseRules {
@@ -93,34 +93,34 @@ impl From<ReuseRulesPy> for ReuseRules {
 #[derive(FromPyObject)]
 #[pyo3(from_item_all)]
 pub(crate) struct ReuseCheckPy {
-    project_dir: PathBuf,
-    store_directory: PathBuf,
-    selected_target: Option<OsString>,
-    invocation: Vec<u8>,
-    runtime: BTreeMap<String, OsString>,
-    search_path: Vec<OsString>,
-    bypass_requested: bool,
-    json_output: bool,
-    rules: ReuseRulesPy,
+    pub(crate) project_dir: PathBuf,
+    pub(crate) store_directory: PathBuf,
+    pub(crate) selected_target: Option<OsString>,
+    pub(crate) invocation: Vec<u8>,
+    pub(crate) runtime: BTreeMap<String, OsString>,
+    pub(crate) search_path: Vec<OsString>,
+    pub(crate) bypass_requested: bool,
+    pub(crate) json_output: bool,
+    pub(crate) rules: ReuseRulesPy,
 }
 
 /// What a full compile leaves for recording; `artifacts` maps a path to `(digest, size, mtime)`.
 #[derive(FromPyObject)]
 #[pyo3(from_item_all)]
-struct CompileRecordPy {
-    stdout: Option<String>,
-    stderr_lines: Vec<String>,
-    exit_code: i64,
-    compile_cache_enabled: bool,
-    read_run_id: bool,
-    settings_inputs: Option<Vec<SettingsRow>>,
-    template_environment_names: Vec<String>,
-    module_paths: Vec<OsString>,
-    artifacts: HashMap<String, ArtifactRow>,
-    artifacts_written: bool,
-    dag_path: Option<String>,
-    json_output: bool,
-    rules: ReuseRulesPy,
+pub(crate) struct CompileRecordPy {
+    pub(crate) stdout: Option<String>,
+    pub(crate) stderr_lines: Vec<String>,
+    pub(crate) exit_code: i64,
+    pub(crate) compile_cache_enabled: bool,
+    pub(crate) read_run_id: bool,
+    pub(crate) settings_inputs: Option<Vec<SettingsRow>>,
+    pub(crate) template_environment_names: Vec<String>,
+    pub(crate) module_paths: Vec<OsString>,
+    pub(crate) artifacts: HashMap<String, ArtifactRow>,
+    pub(crate) artifacts_written: bool,
+    pub(crate) dag_path: Option<String>,
+    pub(crate) json_output: bool,
+    pub(crate) rules: ReuseRulesPy,
 }
 
 /// One invocation's native reuse state, from the check to the record.
@@ -202,7 +202,11 @@ impl NativeReuseAttempt {
     }
 
     /// Store this compile or clear the slot; a failure clears the slot and raises `OSError`.
-    fn record(&self, py: Python<'_>, record: CompileRecordPy) -> PyResult<(&'static str, usize)> {
+    pub(crate) fn record(
+        &self,
+        py: Python<'_>,
+        record: CompileRecordPy,
+    ) -> PyResult<(&'static str, usize)> {
         compiler_guard(|| {
             let rules: ReuseRules = record.rules.into();
             let mut compile: CompileRecord = CompileRecord {

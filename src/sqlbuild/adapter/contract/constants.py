@@ -23,3 +23,5 @@ UNSUPPORTED_RELATION_USAGE_REASON: str = "unsupported adapter"
 
 DUCKDB_STORAGE_VERSION_KEY: str = "storage_compatibility_version"
 LATEST_DUCKDB_STORAGE_VERSION: str = "latest"
+QUOTED_IDENTIFIER_DELIMITER: str = '"'
+MIN_QUOTED_IDENTIFIER_LENGTH: int = 3

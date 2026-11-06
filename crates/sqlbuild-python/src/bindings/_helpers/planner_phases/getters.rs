@@ -6,11 +6,16 @@ use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use crate::bindings::_helpers::planner_phases::models::{
     PlannerIdentityContext, PlannerRuntime, PlannerScopeResolution, PlannerWarehouseState,
 };
+use crate::bindings::_helpers::planner_scope::retained::RetainedScope;
 use crate::bindings::_helpers::records::getters::class_of;
 use crate::bindings::_helpers::records::models::GetterEntry;
 
 /// The getter readers of this module's native pyclasses.
 pub(crate) const GETTERS: &[GetterEntry] = &[
+    GetterEntry {
+        class: class_of::<RetainedScope>,
+        read: read_retained_scope,
+    },
     GetterEntry {
         class: class_of::<PlannerIdentityContext>,
         read: read_planner_identity_context,
@@ -28,6 +33,16 @@ pub(crate) const GETTERS: &[GetterEntry] = &[
         read: read_planner_warehouse_state,
     },
 ];
+
+fn read_retained_scope<'py>(
+    value: &Bound<'py, PyAny>,
+    name: &str,
+) -> Option<PyResult<Bound<'py, PyAny>>> {
+    let Ok(cell) = value.cast::<RetainedScope>() else {
+        return None;
+    };
+    Some(cell.get().data.field(value.py(), name))
+}
 
 fn read_planner_identity_context<'py>(
     value: &Bound<'py, PyAny>,

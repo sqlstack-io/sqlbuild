@@ -1035,6 +1035,26 @@ class StrictAdapter(
         ...
 
     @abstractmethod
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        """Render DDL that creates the consumption table when it is missing."""
+        ...
+
+    @abstractmethod
+    def render_create_consumption_index_sqls(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+    ) -> tuple[str, ...]:
+        """Render optional consumption table index DDL statements."""
+        ...
+
+    @abstractmethod
+    def render_current_utc_timestamp(self) -> str:
+        """Render the warehouse clock as a UTC timestamp expression."""
+        ...
+
+    @abstractmethod
     def render_insert_source_freshness_records_sql(
         self,
         *,
@@ -1114,6 +1134,17 @@ class StrictAdapter(
         retain_versions: int,
     ) -> str:
         """Render SQL that prunes old source freshness history rows."""
+        ...
+
+    @abstractmethod
+    def render_prune_consumption_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old consumption executions."""
         ...
 
     @abstractmethod

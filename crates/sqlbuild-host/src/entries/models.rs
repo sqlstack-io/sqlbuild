@@ -106,6 +106,7 @@ pub enum AdapterHost {
     RunRecallCommand,
     InsertRecallRows,
     CloseRecallStore,
+    RelationMetadataCacheScope,
 }
 
 impl AdapterHost {
@@ -139,6 +140,7 @@ pub enum UserCodeHost {
     LoadProviderModule,
     LoadPythonNodeModule,
     LoadSinkModule,
+    LoadOrchestrationModule,
     ModuleFunctions,
     ModuleProviderClasses,
     ParameterAnnotations,

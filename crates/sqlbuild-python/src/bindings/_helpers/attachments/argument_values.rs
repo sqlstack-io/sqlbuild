@@ -1,11 +1,42 @@
 //! Python audit argument values read as plain argument values.
 
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use crate::bindings::_helpers::model_config::config_nodes::{PyConfigNode, config_object};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{
     PyBool, PyDict, PyDictMethods, PyFloat, PyInt, PyList, PyListMethods, PyString,
     PyStringMethods, PyTuple, PyTupleMethods,
 };
 use sqlbuild_attachments::audits::models::ArgumentValue;
+use sqlbuild_model_config::config_values::models::ConfigNode;
+
+/// Native-built argument containers need no intermediate Python list or tuple.
+pub(crate) fn config_argument_value(
+    py: Python<'_>,
+    value: &PyConfigNode,
+) -> PyResult<ArgumentValue> {
+    Ok(match value {
+        ConfigNode::Null => ArgumentValue::Null,
+        ConfigNode::Bool(value) => ArgumentValue::Boolean(*value),
+        ConfigNode::Int(value) => ArgumentValue::Number(value.to_string()),
+        ConfigNode::Str(value) => ArgumentValue::Text(value.clone()),
+        ConfigNode::List(items) => ArgumentValue::List(
+            items
+                .iter()
+                .map(|item| config_argument_value(py, item))
+                .collect::<PyResult<_>>()?,
+        ),
+        ConfigNode::Tuple(items) => ArgumentValue::Tuple(
+            items
+                .iter()
+                .map(|item| config_argument_value(py, item))
+                .collect::<PyResult<_>>()?,
+        ),
+        ConfigNode::Map(_) => ArgumentValue::Opaque,
+        ConfigNode::Float(_) | ConfigNode::Host(_) => {
+            return argument_value(&config_object(py, value)?);
+        }
+    })
+}
 
 /// Read a `dict[str, object]` in insertion order, leaving out keys no parameter can name.
 pub(crate) fn argument_pairs(

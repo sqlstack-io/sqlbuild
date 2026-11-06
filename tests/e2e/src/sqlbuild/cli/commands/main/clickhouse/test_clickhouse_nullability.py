@@ -100,10 +100,10 @@ _FIRST_SELECT: str = (
                 ");\n\n"
             ),
             edited_select=(
+                "WITH r AS (SELECT toInt64(1) AS order_id, 'one' AS note)\n"
                 "SELECT o.order_id AS order_id, o.amount AS amount, r.note AS note\n"
                 'FROM __source("raw_orders") AS o\n'
-                "LEFT JOIN (SELECT toInt64(1) AS order_id, 'one' AS note) AS r "
-                "ON o.order_id = r.order_id\n"
+                "LEFT JOIN r ON o.order_id = r.order_id\n"
             ),
             expected_return_code=1,
             expected_output_fragment="A713",

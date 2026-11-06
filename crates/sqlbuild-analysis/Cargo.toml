@@ -7,11 +7,6 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
-[features]
-default = []
-# Expose test-only helpers to the tests of dependent crates.
-test-support = []
-
 [dependencies]
 memchr.workspace = true
 polyglot-sql.workspace = true
@@ -30,6 +25,7 @@ sqlbuild-model-config.workspace = true
 sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
+sqlclean.workspace = true
 
 [lints]
 workspace = true

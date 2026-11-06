@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from io import StringIO
 
 import pytest
@@ -19,9 +20,10 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.models import LifeCycleEvent
 from sqlbuild.adapter.contract.types import LifeCycleEventKind
-from sqlbuild.compiler.auditing.types import AuditOutcome
+from sqlbuild.compiler.auditing.types import AuditEvaluationMode, AuditOutcome
 from sqlbuild.compiler.python_nodes.types import SkipMode
 from sqlbuild.cost.models import StatementExecutionTelemetry
+from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.build.models import (
     BuildExecutionResult,
     FunctionExecutionResult,
@@ -37,6 +39,7 @@ from sqlbuild.executor.testing.models import SqlTestExecutionResult, StepResult
 from sqlbuild.executor.testing.types import SqlTestOutcome
 from sqlbuild.runtime.contracts.types import ExecutionResourceKind
 from tests.unit.src.sqlbuild.cli.commands.shared._helpers._test_types import (
+    BuildFooterMeasurementTestCase,
     BuildFooterTestCase,
     BuildProgressActiveSpinnerTestCase,
     BuildProgressFailureOutputTestCase,
@@ -538,6 +541,48 @@ def test_given_failed_resource_result_when_formatting_footer_then_includes_error
     unexpected_fragment: str
     for unexpected_fragment in test_case.unexpected_fragments:
         assert unexpected_fragment not in footer
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        BuildFooterMeasurementTestCase(description="integer text", value=1, expected_text="1"),
+        BuildFooterMeasurementTestCase(
+            description="whole float text", value=1.0, expected_text="1.0"
+        ),
+        BuildFooterMeasurementTestCase(
+            description="scientific notation", value=0.000001, expected_text="1e-06"
+        ),
+        BuildFooterMeasurementTestCase(description="signed zero", value=-0.0, expected_text="-0.0"),
+        BuildFooterMeasurementTestCase(
+            description="missing measurement", value=None, expected_text="None"
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_measurement_warning_when_formatting_footer_then_preserves_numeric_text(
+    test_case: BuildFooterMeasurementTestCase,
+) -> None:
+    audit: AuditExecutionResult = replace(
+        build_audit_result(name="order_count", outcome=AuditOutcome.WARN),
+        evaluation_mode=AuditEvaluationMode.MEASUREMENT,
+        measured_value=test_case.value,
+    )
+    result: BuildExecutionResult = BuildExecutionResult(
+        status=BuildStatus.SUCCESS,
+        model_results=(
+            ModelExecutionResult(
+                model_name="orders",
+                status=ExecutionStatus.SUCCESS,
+                audit_results=(audit,),
+            ),
+        ),
+        warning_count=1,
+    )
+
+    footer: str = format_build_footer(result=result, elapsed=1.25, use_color=False)
+
+    assert f"audit order_count measured {test_case.expected_text}\n" in footer
 
 
 @pytest.mark.parametrize(

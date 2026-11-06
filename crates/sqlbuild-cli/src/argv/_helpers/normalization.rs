@@ -77,24 +77,10 @@ impl Run<'_> {
                 .map_err(|message| self.error(parser, &message))?;
             namespace.set("concurrency", concurrency);
         }
-        if CURSOR_COMMANDS.contains(&command) {
-            let untyped: bool = ["start_cursor", "end_cursor"]
-                .iter()
-                .any(|name| namespace.value(name) != Value::None);
-            let typed: bool = [
-                "start_cursor_ts",
-                "end_cursor_ts",
-                "start_cursor_int",
-                "end_cursor_int",
-            ]
-            .iter()
-            .any(|name| namespace.value(name) != Value::None);
-            if untyped && typed {
-                return Err(self.error(
-                    parser,
-                    "--start-cursor/--end-cursor cannot be combined with the -ts or -int cursor flags",
-                ));
-            }
+        if CURSOR_COMMANDS.contains(&command)
+            && let Some(message) = cursor_error(|name| namespace.value(name) != Value::None)
+        {
+            return Err(self.error(parser, message));
         }
         if command == RENAME_COMMAND
             && let Some(message) = rename_error(&namespace)
@@ -154,6 +140,24 @@ impl Run<'_> {
         }
         Ok(value)
     }
+}
+
+/// The command line and authored job settings share the same cursor-family restriction.
+pub(crate) fn cursor_error(present: impl Fn(&str) -> bool) -> Option<&'static str> {
+    let untyped = ["start_cursor", "end_cursor"]
+        .iter()
+        .any(|name| present(name));
+    let typed = [
+        "start_cursor_ts",
+        "end_cursor_ts",
+        "start_cursor_int",
+        "end_cursor_int",
+    ]
+    .iter()
+    .any(|name| present(name));
+    (untyped && typed).then_some(
+        "--start-cursor/--end-cursor cannot be combined with the -ts or -int cursor flags",
+    )
 }
 
 /// The first rule `--since` and `--explain` break, on the commands that accept them.

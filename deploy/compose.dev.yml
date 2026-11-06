@@ -1,0 +1,11 @@
+# Opt in with: docker compose -f compose.yml -f deploy/compose.dev.yml up -d
+services:
+  location:
+    volumes:
+      - ./deploy/project:/project
+      - development-cache:/project/target
+      - development-logs:/project/logs
+
+volumes:
+  development-cache:
+  development-logs:

@@ -1,5 +1,8 @@
 //! A compiled project, read from the native compiled project that owns its models.
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
@@ -46,6 +49,8 @@ struct BoundaryInputs {
     compile_cache_dir: Py<PyAny>,
     /// Discovered loader functions, user callables.
     loader_functions: Py<PyAny>,
+    /// Task/asset/check source locations, without retaining additional Python callables.
+    python_execution_inputs: BTreeMap<String, (String, PathBuf)>,
     /// Discovered Python hooks, user callables.
     hook_functions: Py<PyAny>,
     /// Discovered SQL hook files.
@@ -123,6 +128,7 @@ impl ProjectFields {
                 sql_lexical_syntax: required(fields, "sql_lexical_syntax")?.unbind(),
                 compile_cache_dir: required(fields, "compile_cache_dir")?.unbind(),
                 loader_functions: required(fields, "loader_functions")?.unbind(),
+                python_execution_inputs: required(fields, "python_execution_inputs")?.extract()?,
                 hook_functions: required(fields, "hook_functions")?.unbind(),
                 sql_hook_files: required(fields, "sql_hook_files")?.unbind(),
                 materialization_files: required(fields, "materialization_files")?.unbind(),
@@ -195,6 +201,10 @@ impl ProjectFields {
             self.boundary.compile_cache_dir.bind(py),
         )?;
         fields.set_item("loader_functions", self.boundary.loader_functions.bind(py))?;
+        fields.set_item(
+            "python_execution_inputs",
+            &self.boundary.python_execution_inputs,
+        )?;
         fields.set_item("hook_functions", self.boundary.hook_functions.bind(py))?;
         fields.set_item("sql_hook_files", self.boundary.sql_hook_files.bind(py))?;
         fields.set_item(
@@ -389,6 +399,11 @@ impl NativeProjectView {
     #[getter]
     pub(crate) fn loader_functions(&self, py: Python<'_>) -> Py<PyAny> {
         self.fields.boundary.loader_functions.clone_ref(py)
+    }
+
+    #[getter]
+    pub(crate) fn python_execution_inputs(&self) -> BTreeMap<String, (String, PathBuf)> {
+        self.fields.boundary.python_execution_inputs.clone()
     }
 
     #[getter]

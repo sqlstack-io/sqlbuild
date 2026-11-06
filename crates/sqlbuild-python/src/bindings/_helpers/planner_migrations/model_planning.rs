@@ -19,12 +19,14 @@ use crate::bindings::_helpers::planner_migrations::planning_origin::{
 };
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get_or;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyString, PyTuple};
+use sqlbuild_analysis::planner_identity::constants::MODEL_RESOURCE;
 use sqlbuild_model_config::config_values::models::ConfigNode;
 
 const MIGRATE_FROM_KEY: &str = "migrate_from";
@@ -55,16 +57,16 @@ fn declared<'py>(item: &Bound<'py, PyAny>) -> PyResult<Option<ModelMigrationRequ
 fn manual_migration_requests<'py>(
     scope: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<ModelMigrationRequest<'py>>> {
+    let py = scope.py();
+    let scope = scope_data(scope)?;
     let mut requests: Vec<ModelMigrationRequest<'py>> = Vec::new();
-    for key in native_field(scope, "execution_order")?.try_iter()? {
-        let key = key?;
-        if !native_field(scope, "selected_keys")?.contains(&key)?
-            || !native_field(&key, "resource_type")?.eq("model")?
-        {
+    for key in &scope.order {
+        if !scope.selected.contains(key) || key.0 != MODEL_RESOURCE {
             continue;
         }
-        let item = native_field(scope, "models_by_name")?
-            .call_method1("get", (native_field(&key, "name")?,))?;
+        let Some(item) = scope.model(py, &key.1) else {
+            continue;
+        };
         if !item.is_none()
             && let Some(request) = declared(&item)?
         {

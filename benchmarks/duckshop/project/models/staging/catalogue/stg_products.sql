@@ -15,6 +15,8 @@ MODEL (
     is_active (type BOOLEAN),
     spec_key_count (type INT),
     specs (type OBJECT),
+    source_seq (type NUMBER(38, 0), nullable false),
+    source_loaded_at (type TIMESTAMP_NTZ, nullable false),
   ),
 );
 

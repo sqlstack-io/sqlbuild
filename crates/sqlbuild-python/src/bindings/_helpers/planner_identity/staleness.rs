@@ -20,6 +20,7 @@ use sqlbuild_analysis::planner_identity::models::{
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
 use crate::bindings::_helpers::planner_changes::detect::{ModelPass, model_change};
 use crate::bindings::_helpers::planner_identity::hashing::graph_key;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_items;
@@ -37,17 +38,6 @@ const OWN_CHANGE_KINDS: [&str; 5] = [
 fn own_change(change: &Bound<'_, PyAny>) -> PyResult<bool> {
     let kind: String = native_field(change, "change_kind")?.str()?.extract()?;
     Ok(OWN_CHANGE_KINDS.contains(&kind.as_str()))
-}
-
-fn names_of_kind(keys: &Bound<'_, PyAny>, kind: &str) -> PyResult<HashSet<String>> {
-    let mut names: HashSet<String> = HashSet::new();
-    for key in keys.try_iter()? {
-        let key: GraphKey = graph_key(&key?)?;
-        if key.kind == kind {
-            names.insert(key.name);
-        }
-    }
-    Ok(names)
 }
 
 fn upstream_graph(upstream_deps: &Bound<'_, PyAny>) -> PyResult<HashMap<GraphKey, Vec<GraphKey>>> {
@@ -93,15 +83,15 @@ fn changed_model_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>
         function_local_hashes: py.None().into_bound(py),
         hook_version_hashes: py.None().into_bound(py),
     };
-    let models_by_name: Bound<'_, PyAny> = native_field(&inputs.original_scope, "models_by_name")?;
-    for item in mapping_items(&models_by_name)?.try_iter()? {
-        let (name, model): (String, Bound<'_, PyAny>) = item?.extract()?;
-        let selected_change: Bound<'_, PyAny> = mapping_get(&models, &name)?;
+    let scope = scope_data(&inputs.original_scope)?;
+    for (name, model) in &scope.models {
+        let model = model.bind(py);
+        let selected_change: Bound<'_, PyAny> = mapping_get(&models, name)?;
         if !selected_change.is_none()
             && (inputs.model_changes_complete || own_change(&selected_change)?)
         {
             if own_change(&selected_change)? {
-                changed.insert(name);
+                changed.insert(name.clone());
             }
             continue;
         }
@@ -112,12 +102,12 @@ fn changed_model_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>
             &pass,
             &model,
             (
-                mapping_get(&version_hashes, &name)?.extract()?,
-                mapping_get(&metadata_jsons, &name)?.extract()?,
+                mapping_get(&version_hashes, name)?.extract()?,
+                mapping_get(&metadata_jsons, name)?.extract()?,
             ),
         )?;
         if own_change(&change)? {
-            changed.insert(name);
+            changed.insert(name.clone());
         }
     }
     Ok(changed)
@@ -137,7 +127,7 @@ fn changed_seed_names(inputs: &StalenessInputs<'_>) -> PyResult<HashSet<String>>
         }
         let fingerprint: Bound<'_, PyAny> = mapping_get(&recorded, &name)?;
         if fingerprint.is_none() || !native_field(&fingerprint, "version_hash")?.eq(&expected)? {
-            changed.insert(name);
+            changed.insert(name.clone());
         }
     }
     Ok(changed)
@@ -203,9 +193,15 @@ pub(crate) fn build_stale_out_of_selection_warnings<'py>(
         identities: arguments.value("version_identities")?,
         model_changes_complete: arguments.flag("model_changes_complete")?,
     };
-    let run_keys: Bound<'py, PyAny> = arguments
-        .value("execution_scope")?
-        .getattr("selected_keys")?;
+    let run = scope_data(&arguments.value("execution_scope")?)?;
+    let original = scope_data(&inputs.original_scope)?;
+    let names = |kind: &str| -> HashSet<String> {
+        run.selected
+            .iter()
+            .filter(|key| key.0 == kind)
+            .map(|key| key.1.clone())
+            .collect()
+    };
     let source_freshness: Bound<'py, PyAny> = arguments.value("source_freshness")?;
     let mut changed_sources: HashSet<String> = HashSet::new();
     if include_sources && !source_freshness.is_none() {
@@ -214,17 +210,26 @@ pub(crate) fn build_stale_out_of_selection_warnings<'py>(
         }
     }
     let graph = StalenessGraph {
-        upstream_deps: upstream_graph(&native_field(&inputs.original_scope, "upstream_deps")?)?,
-        selected_model_names: names_of_kind(
-            &native_field(&inputs.original_scope, "selected_keys")?,
-            MODEL_RESOURCE,
-        )?
-        .into_iter()
-        .collect(),
+        upstream_deps: original
+            .upstream
+            .iter()
+            .map(|(key, deps)| {
+                (
+                    GraphKey::from(key),
+                    deps.iter().map(GraphKey::from).collect(),
+                )
+            })
+            .collect(),
+        selected_model_names: original
+            .selected
+            .iter()
+            .filter(|key| key.0 == MODEL_RESOURCE)
+            .map(|key| key.1.clone())
+            .collect(),
         run: StalenessNames {
-            models: names_of_kind(&run_keys, MODEL_RESOURCE)?,
-            seeds: names_of_kind(&run_keys, SEED_RESOURCE)?,
-            sources: names_of_kind(&run_keys, SOURCE_RESOURCE)?,
+            models: names(MODEL_RESOURCE),
+            seeds: names(SEED_RESOURCE),
+            sources: names(SOURCE_RESOURCE),
         },
         changed: StalenessNames {
             models: changed_model_names(&inputs)?,

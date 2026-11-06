@@ -4,15 +4,18 @@ use sqlbuild_host::entries::models::ExecutorHost;
 
 use crate::bindings::_helpers::compiled_views::project_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
-use crate::bindings::_helpers::graph::algorithms::closure;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_scope::loaders::intermediate_map;
+use crate::bindings::_helpers::planner_scope::values::{edges, keys};
 use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, pyfunction};
+use pyo3::types::PyDictMethods;
 use pyo3::types::{PyBool, PyDict, PyTuple};
-use pyo3::types::{PyDictMethods, PySetMethods};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 use sqlbuild_analysis::planner_scope::constants::SOURCE;
 
 #[pyfunction]
@@ -22,20 +25,25 @@ pub(crate) fn build_source_load_map<'py>(
     selected_keys: &Bound<'py, PyAny>,
     upstream_deps: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let relevant = upstream_deps
-        .map(|edges| {
-            closure(
-                selected_keys.try_iter()?.collect::<PyResult<Vec<_>>>()?,
-                edges,
-                (true, None),
-            )
-        })
-        .transpose()?;
+    source_load_map(
+        project,
+        &keys(selected_keys)?,
+        upstream_deps.map(edges).transpose()?.as_deref(),
+    )
+}
+
+/// Select source entries from native reachability; the resulting entries cross the executor edge.
+pub(crate) fn source_load_map<'py>(
+    project: &Bound<'py, PyAny>,
+    selected: &[ObjectKey],
+    upstream_deps: Option<&[(ObjectKey, Vec<ObjectKey>)]>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let relevant = upstream_deps.map(|edges| reachable_keys(selected, edges));
     let result = PyDict::new(project.py());
     for source in project_reads::sources(project)?.try_iter()? {
         let source = source?;
         if let Some(keys) = &relevant
-            && !keys.contains(source_reads::key(&source)?)?
+            && !keys.contains(&native_key(&source_reads::key(&source)?)?)
         {
             continue;
         }
@@ -43,7 +51,7 @@ pub(crate) fn build_source_load_map<'py>(
         result.set_item(native_field(&entry, "name")?, entry)?;
     }
     for upstream in [false, true] {
-        for (key, entry) in intermediate_map(project, selected_keys, upstream)?.iter() {
+        for (key, entry) in intermediate_map(project, selected, upstream)?.iter() {
             result.set_item(key, entry)?;
         }
     }

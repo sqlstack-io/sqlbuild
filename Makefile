@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
+.PHONY: verify verify-quick verify-pg coverage cli-preview rust-check check-native-layering check-dupes-new check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill \
 	check-e2e-shards test-e2e-duckdb test-e2e-duckdb-build-core \
 	test-e2e-duckdb-build-incremental \
 	test-e2e-duckdb-cli-data test-e2e-duckdb-cli test-e2e-duckdb-inspection \
@@ -37,9 +37,31 @@ dev-native:
 fast-native:
 	uv run --no-sync maturin develop --profile fast --skip-install
 
+COMPOSE_BUILD_PROFILE ?= release
+COMPOSE_BUILD_NETWORK ?= default
+COMPOSE_PYTHON_VERSION ?= 3.12
+
+.PHONY: test-compose
+test-compose:
+	uv run --no-sync maturin build --profile $(COMPOSE_BUILD_PROFILE) --compatibility linux --out dist
+	uv run --no-sync maturin build --manifest-path crates/sqlbuild-cli/Cargo.toml --profile $(COMPOSE_BUILD_PROFILE) --compatibility linux --out dist
+	$(MAKE) test-compose-packaged
+
+.PHONY: test-compose-packaged
+test-compose-packaged:
+	docker build --network $(COMPOSE_BUILD_NETWORK) --file deploy/Dockerfile --target server --build-arg PYTHON_VERSION=$(COMPOSE_PYTHON_VERSION) --tag sqlbuild-server:test .
+	docker build --network $(COMPOSE_BUILD_NETWORK) --file deploy/Dockerfile --target location --build-arg PYTHON_VERSION=$(COMPOSE_PYTHON_VERSION) --build-arg SQLBUILD_GIT_REVISION=$$(git rev-parse HEAD) --tag sqlbuild-location:test .
+	SQLBUILD_REQUIRE_COMPOSE_TESTS=1 uv run --no-sync pytest tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py -n auto --dist loadfile -vv
+
 rust-check: rust-lint
 	uv run fensu check
-	cargo test --workspace --all-features
+	$(MAKE) test-native
+
+NATIVE_TEST_ARGS ?= --workspace --all-features
+
+.PHONY: test-native
+test-native:
+	uv run --no-sync python -m scripts.run_native_tests $(NATIVE_TEST_ARGS)
 
 .PHONY: rust-lint
 rust-lint:
@@ -116,12 +138,14 @@ E2E_DUCKDB_BUILD_CORE_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_python_check_outcomes.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_duckdb_attach.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_unbuilt_dependencies.py \
-	tests/e2e/src/sqlbuild/cli/commands/main/build/test_validation_failures.py
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_validation_failures.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_quoted_mixed_case_columns.py
 
 E2E_DUCKDB_BUILD_INCREMENTAL_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/own_change_replay \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_append_cursor_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_capped_microbatch_build.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/build/test_changed_builds.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_concurrent_microbatch_build.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_cursor_runtime_failures.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/build/test_dropped_relation_rebuild.py \
@@ -156,6 +180,7 @@ E2E_DUCKDB_CLI_DATA_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_fixture_columns.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_variant.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_lambda.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_escaped_quotes.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_snapshot_staleness.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_unmocked_inputs.py
 
@@ -560,6 +585,18 @@ dupes:
 	uv run fensu dupes
 
 
+# Fails on duplicated code new since DUPES_BASE. A missing base fails too, so the check cannot
+# silently disappear.
+DUPES_BASE ?= origin/main
+
+check-dupes-new:
+	@if ! git rev-parse --verify --quiet "$(DUPES_BASE)^{commit}" >/dev/null; then \
+		echo "error: new-duplicate check needs base $(DUPES_BASE); fetch it or set DUPES_BASE" >&2; \
+		exit 2; \
+	fi; \
+	uv run fensu dupes --since "$(DUPES_BASE)" --fail-on-new
+
+
 check:
 	uv run ruff format .
 	uv run ruff check --fix .
@@ -669,7 +706,7 @@ verify-quick:
 	exit $$status
 
 
-check-ci: check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill rust-lint
+check-ci: check-dupes-new check-e2e-shards check-native-layering check-native-stub check-build-features check-python-boundary check-release-gate check-docs-skill rust-lint
 	uv run ruff format --check .
 	uv run ruff check .
 	uv run ty check src tests

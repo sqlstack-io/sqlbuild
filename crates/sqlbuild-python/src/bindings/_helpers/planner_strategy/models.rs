@@ -5,12 +5,15 @@ use std::sync::{Arc, Mutex};
 
 use pyo3::prelude::{Bound, Py};
 use pyo3::pyclass;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::PyAny;
 use sqlbuild_analysis::planner_fixtures::models::{
     FixtureColumn, FixtureReadCache, FixtureTypeProjection,
 };
 use sqlbuild_analysis::required_columns::models::ColumnRead;
 
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
+use crate::bindings::_helpers::native_host::model_lookup::ModelHandle;
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_strategy::types::FixtureKey;
 
 /// Per-extension cache replacing the Python fixture resolver's LRU.
@@ -42,7 +45,7 @@ pub(crate) struct ModelFixtureFacts {
 #[pyclass(module = "sqlbuild._native", frozen)]
 #[derive(Debug)]
 pub(crate) struct RelationFixturePlanningContext {
-    pub(crate) models_by_name: Py<PyDict>,
+    pub(crate) models_by_name: HashMap<String, ModelHandle>,
     pub(crate) relations: HashMap<FixtureKey, FixtureRelation>,
     pub(crate) authoritative_columns: HashMap<FixtureKey, BTreeSet<String>>,
     pub(crate) expected_types: HashMap<FixtureKey, Vec<(String, String)>>,
@@ -86,7 +89,7 @@ pub(crate) struct ModelEntryDecisions<'py> {
 /// The project lookups that resolve one model's cursor inputs.
 #[derive(Debug)]
 pub(crate) struct CursorInputLookups<'py> {
-    pub(crate) models_by_name: Bound<'py, PyAny>,
+    pub(crate) models_by_name: ModelLookup,
     pub(crate) functions_by_name: Bound<'py, PyAny>,
     pub(crate) source_map: Bound<'py, PyAny>,
     pub(crate) source_warehouse_columns: Bound<'py, PyAny>,
@@ -103,6 +106,5 @@ pub(crate) struct AuditPlanning<'py> {
     pub(crate) source_map: Bound<'py, PyAny>,
     pub(crate) adapter: Bound<'py, PyAny>,
     pub(crate) model_materializations: Bound<'py, PyAny>,
-    pub(crate) lineage_upstream_deps: Bound<'py, PyAny>,
-    pub(crate) lineage_downstream_deps: Bound<'py, PyAny>,
+    pub(crate) lineage: Py<NativeProjectGraph>,
 }

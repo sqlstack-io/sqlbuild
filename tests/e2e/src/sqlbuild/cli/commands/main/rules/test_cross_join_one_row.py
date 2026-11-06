@@ -1,4 +1,4 @@
-"""E2E coverage of SQBRSQL038 inferring that one side of a CROSS JOIN holds at most one row."""
+"""E2E coverage of SQLCLEAN038 inferring that one side of a CROSS JOIN holds at most one row."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
     write_one_row_cross_join_project,
 )
 
-_PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQBRSQL038"]\n'
+_PROJECT_TOML: str = 'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = ["SQLCLEAN038"]\n'
 _SEED_YAML: str = (
     "seeds:\n"
     "  - name: order_policy\n"
@@ -141,7 +141,7 @@ def test_given_cross_join_when_compiling_then_only_multiplying_joins_are_reporte
 
     result: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
 
-    assert diagnostic_messages(result, "SQBRSQL038") == test_case.expected_messages, (
+    assert diagnostic_messages(result, "SQLCLEAN038") == test_case.expected_messages, (
         result.stdout + result.stderr
     )
     assert result.returncode == test_case.expected_exit, result.stderr
@@ -180,8 +180,8 @@ def test_given_one_row_seed_when_a_row_is_added_then_the_cached_compile_reports_
     second: subprocess.CompletedProcess[str] = run_compile_cli(tmp_path)
 
     assert first.returncode == 0, first.stdout + first.stderr
-    assert diagnostic_messages(first, "SQBRSQL038") == ()
-    assert diagnostic_messages(second, "SQBRSQL038") == test_case.expected_messages, (
+    assert diagnostic_messages(first, "SQLCLEAN038") == ()
+    assert diagnostic_messages(second, "SQLCLEAN038") == test_case.expected_messages, (
         second.stdout + second.stderr
     )
     assert second.returncode == test_case.expected_exit

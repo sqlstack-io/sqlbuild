@@ -1,9 +1,12 @@
 //! The native model config build handed Python inputs once, and its results projected for Python.
 
+use std::collections::HashMap;
+
 use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use pyo3::{PyErr, pyclass, pymethods};
+use sqlbuild_discovery::model_files::main::config_value::config_value;
 use sqlbuild_discovery::model_files::models::{EntryFacts, HeaderFacts};
 use sqlbuild_model_config::config_presence::models::MacroPath;
 use sqlbuild_model_config::config_values::models::ConfigNode;
@@ -18,6 +21,7 @@ use sqlbuild_model_config::model_config_build::types::ConfigBuildHost;
 use sqlbuild_model_config::model_validation::models::{RetentionOverride, TableTypeOverride};
 use sqlbuild_model_config::path_defaults::main::select_path_default::select_path_default;
 use sqlbuild_model_config::path_defaults::models::PathDefaultChoice;
+use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
 use crate::bindings::_helpers::authored_values::project_vars::project_var_text;
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
@@ -25,15 +29,23 @@ use crate::bindings::_helpers::model_config::config_classes::{ConfigClasses, bui
 use crate::bindings::_helpers::model_config::config_errors::config_exception;
 use crate::bindings::_helpers::model_config::config_errors::native_config_error;
 use crate::bindings::_helpers::model_config::config_nodes::{
-    HostHandle, PyConfigEntries, PyConfigNode, config_dict, config_entries, config_node,
-    config_object, hook_entry, is_exact_container, opaque_container,
+    HostHandle, PyConfigEntries, PyConfigNode, carried_node, config_dict, config_entries,
+    config_node, config_object, hook_entry, is_exact_container,
 };
 use crate::bindings::_helpers::model_config::errors::NativeConfigError;
 use crate::bindings::_helpers::model_config::project_defaults::project_defaults_mapping;
+use crate::bindings::_helpers::model_config::typed_config::{BuiltConfigValues, built_values};
 
 /// The config keys a model's context values read.
 const CONTEXT_KEYS: [&str; 3] = ["database", "schema", "alias"];
 const BUILD_STOPPED: &str = "a config value read as text without an error";
+
+/// A header's public mapping, parsed facts and native authored values.
+type HeaderBuildInputs<'a, 'py> = (
+    &'a Bound<'py, PyDict>,
+    Option<&'a HeaderFacts>,
+    Option<&'a [(String, AuthoredValue)]>,
+);
 
 /// The project-wide inputs every model's config build reads, converted once per compile.
 #[pyclass(module = "sqlbuild._native", frozen)]
@@ -46,6 +58,7 @@ pub(crate) struct NativeModelConfigBuilder {
 /// One model's built config before Python wraps it in `CompileModelConfig`.
 pub(crate) struct BuiltConfig<'py> {
     pub(crate) values: Bound<'py, PyDict>,
+    pub(crate) nodes: Option<BuiltConfigValues>,
     pub(crate) header_keys: Vec<String>,
     pub(crate) logical_schema: Option<Bound<'py, PyAny>>,
     pub(crate) layer_schema_configured: bool,
@@ -151,15 +164,32 @@ fn carried_whole(key: &str, facts: Option<&[(String, HeaderEntryFacts)]>) -> boo
 fn header_entries(
     header: &Bound<'_, PyDict>,
     facts: Option<&[(String, HeaderEntryFacts)]>,
+    authored: Option<&[(String, AuthoredValue)]>,
 ) -> PyResult<PyConfigEntries> {
+    let authored: HashMap<&str, &AuthoredValue> = authored
+        .into_iter()
+        .flatten()
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
     let mut entries: PyConfigEntries = Vec::with_capacity(header.len());
     for (key, value) in header.iter() {
+        let native: Option<PyConfigNode> = match key.downcast_exact::<PyString>() {
+            Ok(key) => match key.to_str() {
+                Ok(key) => authored.get(key).and_then(|value| config_value(value)),
+                Err(_) => None,
+            },
+            Err(_) => None,
+        };
+        if let Some(native) = native {
+            entries.push((config_node(&key)?, native));
+            continue;
+        }
         let whole: bool = is_exact_container(&value)
             && key
                 .downcast_exact::<PyString>()
                 .is_ok_and(|key| key.to_str().is_ok_and(|key| carried_whole(key, facts)));
         let node: PyConfigNode = if whole {
-            opaque_container(&value)?
+            carried_node(&value)?
         } else {
             config_node(&value)?
         };
@@ -232,7 +262,7 @@ impl NativeModelConfigBuilder {
         let (matched_path_default, model_name) = model;
         let matched_path_default: Option<&str> = matched_path_default.as_deref();
         compiler_guard(|| {
-            match self.built(py, (&header, None), matched_path_default, &model_name)? {
+            match self.built(py, (&header, None, None), matched_path_default, &model_name)? {
                 ConfigBuild::Built(built) => {
                     Ok(built_config(&classes, &built, matched_path_default)?.unbind())
                 }
@@ -297,6 +327,7 @@ fn projected_build<'py>(
     let py: Python<'py> = header.py();
     Ok(BuiltConfig {
         values: own_values_dict(header, &built)?,
+        nodes: built_values(built.values),
         header_keys: built.header_keys,
         logical_schema: projected(py, built.logical_schema)?,
         layer_schema_configured: built.layer_schema_configured,
@@ -337,13 +368,13 @@ impl NativeModelConfigBuilder {
     pub(crate) fn built<'py>(
         &self,
         py: Python<'py>,
-        (header, facts): (&Bound<'py, PyDict>, Option<&HeaderFacts>),
+        (header, facts, authored): HeaderBuildInputs<'_, 'py>,
         matched_path_default: Option<&str>,
         model_name: &str,
     ) -> PyResult<ConfigBuild<'py>> {
         let facts: Option<Vec<(String, HeaderEntryFacts)>> =
             facts.map(|facts| facts.entries.iter().map(entry_facts).collect());
-        let entries: PyConfigEntries = header_entries(header, facts.as_deref())?;
+        let entries: PyConfigEntries = header_entries(header, facts.as_deref(), authored)?;
         let model_header = ModelHeader {
             entries: &entries,
             facts: facts.as_deref(),

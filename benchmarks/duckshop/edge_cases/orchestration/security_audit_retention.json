@@ -1,0 +1,12 @@
+{
+  "undelivered_past_horizon": {
+    "server_arguments": ["--audit-retention-days", "1"],
+    "rows": [
+      {"action": "orders.delivered", "age_days": 2},
+      {"action": "orders.undelivered", "age_days": 2},
+      {"action": "orders.newest", "age_days": 0}
+    ],
+    "delivered_actions": ["orders.delivered"],
+    "expected_actions": ["orders.undelivered", "orders.newest"]
+  }
+}

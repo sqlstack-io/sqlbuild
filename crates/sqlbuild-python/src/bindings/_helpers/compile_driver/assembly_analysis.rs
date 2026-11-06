@@ -38,6 +38,10 @@ use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::semantic_shapes::declarations::{declared_types, function_names};
+use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
+use sqlbuild_model_config::header_metadata::models::DynamicFamily;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
+use std::collections::HashMap;
 
 const GENERIC_DIALECT: &str = "generic";
 const UDF_PREFIX: &str = "__sqlbuild_udf_";
@@ -50,11 +54,13 @@ pub(crate) struct AnalysisContext<'py> {
     pub(crate) column_types: Bound<'py, PyAny>,
     pub(crate) nullability: Bound<'py, PyAny>,
     pub(crate) complete_schemas: Bound<'py, PyAny>,
-    pub(crate) dynamic_families: Bound<'py, PyAny>,
+    pub(crate) dynamic_families: Vec<(String, Vec<DynamicFamily>)>,
     /// The model analyses, or `None` when SQL analysis does not run.
     pub(crate) analyses: Option<ModelAnalyses<'py>>,
     /// The native rows of `column_types`, `nullability` and `complete_schemas`.
     pub(crate) declared: DeclaredShapes,
+    /// The lexical rules the project's SQL is authored in.
+    pub(crate) syntax: Option<LexicalSyntax>,
 }
 
 /// Whether `model_input` is selected for analysis by `names` (`None` selects every model).
@@ -110,7 +116,7 @@ pub(crate) fn analysis_context<'py>(
         nullability.into_any(),
         complete_schemas.into_any(),
     );
-    let dynamic_families: Bound<'py, PyAny> = dynamic_families_by_table(inputs)?.into_any();
+    let dynamic_families = dynamic_families_by_table(inputs)?;
     let profile: Bound<'py, PyAny> =
         profile_with_catalog(inputs, request.inference_profile.bind(py), &column_types)?;
     let mut context: AnalysisContext<'py> = AnalysisContext {
@@ -122,6 +128,7 @@ pub(crate) fn analysis_context<'py>(
         dynamic_families,
         analyses: None,
         declared,
+        syntax: optional_record_syntax(&native_field(inputs, "sql_lexical_syntax")?)?,
     };
     if context.sql_analysis_enabled.is_truthy()? {
         let declared: DeclaredShapes = std::mem::take(&mut context.declared);
@@ -136,10 +143,13 @@ pub(crate) fn analysis_context<'py>(
 }
 
 /// `_build_dynamic_families_by_table`: enforced contract models' dynamic column families.
-fn dynamic_families_by_table<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+fn dynamic_families_by_table<'py>(
+    inputs: &Bound<'py, PyAny>,
+) -> PyResult<Vec<(String, Vec<DynamicFamily>)>> {
     let py: Python<'py> = inputs.py();
     let enforced: Bound<'py, PyAny> = enum_member(py, RecordId::ContractPolicy, "ENFORCED")?;
-    let families: Bound<'py, PyDict> = PyDict::new(py);
+    let mut families: Vec<(String, Vec<DynamicFamily>)> = Vec::new();
+    let mut positions: HashMap<String, usize> = HashMap::new();
     for model_input in native_field(inputs, "model_inputs")?.try_iter()? {
         let model_input: Bound<'py, PyAny> = model_input?;
         let contract: Bound<'py, PyAny> = native_field(&model_input, "config")?
@@ -151,8 +161,13 @@ fn dynamic_families_by_table<'py>(inputs: &Bound<'py, PyAny>) -> PyResult<Bound<
         let Some(schema) = attached_schema(&model_input)? else {
             continue;
         };
-        if schema.dynamic_columns.is_truthy()? {
-            families.set_item(schema.name, schema.dynamic_columns)?;
+        if !schema.dynamic_columns.is_empty() {
+            if let Some(&index) = positions.get(&schema.name) {
+                families[index].1 = schema.dynamic_columns;
+            } else {
+                positions.insert(schema.name.clone(), families.len());
+                families.push((schema.name, schema.dynamic_columns));
+            }
         }
     }
     Ok(families)
@@ -408,7 +423,7 @@ fn model_analyses<'py>(
                 column_types: context.column_types.clone(),
                 nullability: context.nullability.clone(),
                 complete_schemas: context.complete_schemas.clone(),
-                dynamic_families: context.dynamic_families.clone(),
+                dynamic_families: &context.dynamic_families,
                 rich_type_inference: rich,
                 cache,
                 declared: Some(&context.declared),

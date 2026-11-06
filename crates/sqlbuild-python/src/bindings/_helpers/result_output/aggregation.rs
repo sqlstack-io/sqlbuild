@@ -1,16 +1,125 @@
 //! Build `BuildExecutionResult` with aggregate counts and overall status from typed results.
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::PyDict;
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_core::build_aggregate::main::aggregate_build_counts::aggregate_build_counts;
 use sqlbuild_core::build_aggregate::models::{BuildCounts, BuildResultFacts, ModelResultFacts};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{
+    AuditExecutionResult, BuildExecutionResult, FunctionExecutionResult, LoadExecutionResult,
+    ModelExecutionResult, SeedExecutionResult, SqlTestExecutionResult,
+};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::result_output::projection::Projection;
+
+/// Borrowed executor results with canonical terminals, used by the build JSON projection.
+pub(crate) struct RetainedBuildResults<'a, V> {
+    pub(crate) models: Vec<&'a ModelExecutionResult<V>>,
+    pub(crate) seeds: Vec<&'a SeedExecutionResult>,
+    pub(crate) functions: Vec<&'a FunctionExecutionResult>,
+    pub(crate) loads: Vec<&'a LoadExecutionResult<V>>,
+    pub(crate) tests: Vec<&'a SqlTestExecutionResult<V>>,
+    pub(crate) source_audits: Vec<&'a AuditExecutionResult<V>>,
+    pub(crate) end_audits: Vec<&'a AuditExecutionResult<V>>,
+}
+
+impl<'a, V> RetainedBuildResults<'a, V> {
+    pub(crate) fn new(
+        result: &'a BuildExecutionResult<V>,
+        projection: &Projection<'_>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            models: projection.retained(&result.model_results)?,
+            seeds: projection.retained(&result.seed_results)?,
+            functions: projection.retained(&result.function_results)?,
+            loads: projection.retained(&result.load_results)?,
+            tests: projection.retained(&result.test_results)?,
+            source_audits: projection.retained(&result.source_audit_results)?,
+            end_audits: projection.retained(&result.end_audit_results)?,
+        })
+    }
+
+    pub(crate) fn is_partial(&self, result: &BuildExecutionResult<V>) -> bool {
+        [
+            self.models.len(),
+            self.seeds.len(),
+            self.functions.len(),
+            self.loads.len(),
+            self.tests.len(),
+            self.source_audits.len(),
+            self.end_audits.len(),
+        ] != [
+            result.model_results.len(),
+            result.seed_results.len(),
+            result.function_results.len(),
+            result.load_results.len(),
+            result.test_results.len(),
+            result.source_audit_results.len(),
+            result.end_audit_results.len(),
+        ]
+    }
+
+    pub(crate) fn counts(&self) -> BuildCounts {
+        let mut models: Vec<ModelResultFacts> = Vec::new();
+        for model in &self.models {
+            let audit_outcomes: Vec<String> = model
+                .audit_results
+                .iter()
+                .map(|audit| audit.outcome.value().to_owned())
+                .collect();
+            models.push(ModelResultFacts {
+                status: model.status.value().to_owned(),
+                error_code: model.error_code.clone(),
+                warning_count: model.warning_messages.len(),
+                audit_outcomes,
+            });
+        }
+        aggregate_build_counts(&BuildResultFacts {
+            models,
+            seed_statuses: self
+                .seeds
+                .iter()
+                .map(|result| result.status.value().to_owned())
+                .collect(),
+            functions: self
+                .functions
+                .iter()
+                .map(|result| {
+                    (
+                        result.status.value().to_owned(),
+                        result.warning_messages.len(),
+                    )
+                })
+                .collect(),
+            load_statuses: self
+                .loads
+                .iter()
+                .map(|result| result.status.value().to_owned())
+                .collect(),
+            test_outcomes: self
+                .tests
+                .iter()
+                .map(|result| result.outcome.value().to_owned())
+                .collect(),
+            source_audit_outcomes: self
+                .source_audits
+                .iter()
+                .map(|result| result.outcome.value().to_owned())
+                .collect(),
+            end_audit_outcomes: self
+                .end_audits
+                .iter()
+                .map(|result| result.outcome.value().to_owned())
+                .collect(),
+        })
+    }
+}
 
 const RESULT_FIELDS: [&str; 7] = [
     "model_results",
@@ -102,18 +211,6 @@ fn aggregate_build_result<'py>(
         .map(|field| request.get(field))
         .collect::<PyResult<_>>()?;
     aggregated_build_result(request.py(), &sections)
-}
-
-/// `aggregate_build_result` over retained result lists, as tuples.
-pub(crate) fn aggregated_from_lists<'py>(
-    py: Python<'py>,
-    retained: &[Vec<Bound<'py, PyAny>>],
-) -> PyResult<Bound<'py, PyAny>> {
-    let sections: Vec<Bound<'py, PyAny>> = retained
-        .iter()
-        .map(|kept| Ok(PyTuple::new(py, kept)?.into_any()))
-        .collect::<PyResult<_>>()?;
-    aggregated_build_result(py, &sections)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

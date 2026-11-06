@@ -57,3 +57,17 @@ pub(crate) struct ReusableRecordTestCase {
     pub(crate) identity: &'static str,
     pub(crate) expected_outcome: Result<(), crate::artifacts::models::SqlTestRecordMiss>,
 }
+
+/// A cache snapshot's externally visible encoding and recovered records.
+pub(crate) struct SqlTestSnapshotWriteTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) expected_text: &'static str,
+    pub(crate) expected_record_count: usize,
+}
+
+/// A disposable on-disk snapshot, including absent and malformed files.
+pub(crate) struct SqlTestSnapshotReadTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) contents: &'static str,
+    pub(crate) expected_records: &'static [(&'static str, u64)],
+}

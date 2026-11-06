@@ -12,7 +12,7 @@ use crate::bindings::_helpers::boundary::python_calls::{
 };
 use crate::bindings::_helpers::compile_command::reuse_recording::CompileArtifactWrites;
 use crate::bindings::_helpers::compile_command::target_writer::{
-    PlannedStaticSqlTests, plan_static_sql_tests,
+    PlannedStaticSqlTests, plan_tests,
 };
 use crate::bindings::_helpers::compile_command::target_writer::{
     Prepared, planning_diagnostics, publish_staged_target, staging_changed, write_static_target,
@@ -293,23 +293,10 @@ impl PreparedCompileArtifacts {
               -> PyResult<Py<PyAny>> {
             let py: Python<'_> = arguments.py();
             count_stage(py, BACKGROUND_SQL_TEST_PLANS, 1)?;
-            let planned: PlannedStaticSqlTests = plan_static_sql_tests(
-                py,
-                Some(keywords(
-                    py,
-                    &[
-                        ("target_dir", planned_target.bind(py).clone()),
-                        ("adapter", planned_adapter.bind(py).clone()),
-                        ("project", planned_project.bind(py).clone()),
-                        (
-                            "artifact_writes",
-                            recorder.as_ref().map_or_else(
-                                || py.None().into_bound(py),
-                                |recorder| recorder.bind(py).clone().into_any(),
-                            ),
-                        ),
-                    ],
-                )?),
+            let planned: PlannedStaticSqlTests = plan_tests(
+                planned_target.bind(py),
+                (planned_adapter.bind(py), planned_project.bind(py)),
+                recorder.as_ref(),
             )?;
             Ok(Py::new(py, planned)?.into_any())
         };

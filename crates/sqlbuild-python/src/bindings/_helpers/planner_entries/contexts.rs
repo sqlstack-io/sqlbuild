@@ -96,7 +96,7 @@ impl ModelPlanContext {
         )?;
         Ok(Self {
             model_locations: args.value("model_locations")?.unbind(),
-            models_by_name: args.value("models_by_name")?.unbind(),
+            models_by_name: args.value("models_by_name")?.into(),
             seed_locations: args.value("seed_locations")?.unbind(),
             function_locations: args.value("function_locations")?.unbind(),
             source_map: args.value("source_map")?.unbind(),

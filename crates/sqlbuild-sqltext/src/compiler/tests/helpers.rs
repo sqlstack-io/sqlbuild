@@ -10,6 +10,7 @@ use crate::compiler::models::{
     InterpolationRead,
 };
 use crate::compiler::tests::test_types::{HeaderNestingTestCase, MapHost};
+use crate::sql_scan::models::LexicalSyntax;
 use std::collections::BTreeMap;
 use std::thread;
 
@@ -139,17 +140,22 @@ pub(crate) fn batch_sizes_bound_workers_by_contract() -> bool {
 
 /// Spell a scan as `kind:name[.member]@start..end, ...` plus ` | stop:<error>` when it stops.
 pub(crate) fn scanned_references(sql: &str) -> Option<String> {
-    spelled_scan(sql, false)
+    spelled_scan(sql, false, None)
+}
+
+/// The same spelling of a scan under an adapter's lexical rules.
+pub(crate) fn scanned_dialect_references(sql: &str, syntax: &LexicalSyntax) -> Option<String> {
+    spelled_scan(sql, false, Some(syntax))
 }
 
 /// The same spelling of the usage walk, which steps past malformed references.
 pub(crate) fn scanned_usages(sql: &str) -> Option<String> {
-    spelled_scan(sql, true)
+    spelled_scan(sql, true, None)
 }
 
-fn spelled_scan(sql: &str, skip_malformed: bool) -> Option<String> {
+fn spelled_scan(sql: &str, skip_malformed: bool, syntax: Option<&LexicalSyntax>) -> Option<String> {
     let scan: DeclarationReferenceScan =
-        scan_declaration_references(&[sql.to_owned()], skip_malformed).pop()?;
+        scan_declaration_references(&[sql.to_owned()], skip_malformed, syntax).pop()?;
     let references: String = scan
         .references
         .iter()

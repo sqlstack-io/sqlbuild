@@ -11,34 +11,11 @@ use sqlbuild_sqltext::sql_scan::main::unsupported_line_comment_prefixes::unsuppo
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::records::construct::error_class;
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::ErrorId;
+use crate::bindings::_helpers::sqltext::lexical_syntax::{record_syntax, sorted_texts};
 
 /// `SqlLexicalSyntax.line_comment_prefixes` position.
 const LINE_COMMENT_PREFIXES_FIELD: usize = 5;
-
-/// The sorted texts of a set of strings.
-fn sorted_texts(values: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let mut texts: Vec<String> = values
-        .try_iter()?
-        .map(|value| value?.extract::<String>())
-        .collect::<PyResult<_>>()?;
-    texts.sort_unstable();
-    Ok(texts)
-}
-
-/// The lexical rules a `SqlLexicalSyntax` record holds.
-fn record_syntax(instance: &Bound<'_, PyAny>) -> PyResult<LexicalSyntax> {
-    let flag = |name: &str| -> PyResult<bool> { native_field(instance, name)?.is_truthy() };
-    Ok(LexicalSyntax {
-        backslash_escape_quotes: sorted_texts(&native_field(instance, "backslash_escape_quotes")?)?,
-        escape_string_prefix: flag("escape_string_prefix")?,
-        raw_string_prefix: flag("raw_string_prefix")?,
-        triple_quoted_strings: flag("triple_quoted_strings")?,
-        nested_block_comments: flag("nested_block_comments")?,
-        line_comment_prefixes: sorted_texts(&native_field(instance, "line_comment_prefixes")?)?,
-    })
-}
 
 /// `SqlLexicalSyntax`: reject line comment prefixes the scanners cannot read.
 pub(crate) fn finish_lexical_syntax(

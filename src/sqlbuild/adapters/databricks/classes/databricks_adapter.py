@@ -26,6 +26,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_ansi_typed_scalar,
     _render_typed_value_list,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -140,7 +141,7 @@ from sqlbuild.diagnostics.main.log_sql import log_sql
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """Databricks adapter backed by databricks-sql-connector."""
 
     def get_columns_for_relations(
@@ -850,6 +851,9 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "current_timestamp()"
 
     def sql_analysis_dialect(self) -> str | None:
         """Return the SQL analysis dialect name for this adapter, if any."""
@@ -2565,6 +2569,7 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read ``ANALYZE TABLE`` statistics; ``DESCRIBE DETAIL`` has no row count."""
 
@@ -2596,12 +2601,19 @@ class DatabricksAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         statistics_match: re.Match[str] | None = re.search(
             r"(\d+)\s+rows", details.get("statistics", "")
         )
-        if statistics_match is None:
-            return RelationRowCountEstimate(
-                row_count=None,
-                detail="table statistics not collected; run ANALYZE TABLE ... COMPUTE STATISTICS",
-            )
-        return RelationRowCountEstimate(row_count=int(statistics_match.group(1)))
+        bytes_match: re.Match[str] | None = (
+            re.search(r"(\d+)\s+bytes", details.get("statistics", "")) if metadata_only else None
+        )
+        return RelationRowCountEstimate(
+            row_count=int(statistics_match.group(1)) if statistics_match is not None else None,
+            detail=(
+                "table statistics not collected; run ANALYZE TABLE ... COMPUTE STATISTICS"
+                if statistics_match is None
+                else None
+            ),
+            byte_count=int(bytes_match.group(1)) if bytes_match is not None else None,
+            byte_count_basis="describe_table_statistics_bytes" if bytes_match is not None else None,
+        )
 
     def inspect_row_diff_coverage(
         self,

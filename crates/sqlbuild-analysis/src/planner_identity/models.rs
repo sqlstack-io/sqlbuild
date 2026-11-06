@@ -2,11 +2,30 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::assembly::project::types::ObjectKey;
+
 /// A graph node identity: resource type (or fingerprint node type) and name, ordered as Python's `(resource_type, name)`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GraphKey {
     pub kind: String,
     pub name: String,
+}
+
+impl From<&ObjectKey> for GraphKey {
+    fn from((kind, name): &ObjectKey) -> Self {
+        Self {
+            kind: kind.clone(),
+            name: name.clone(),
+        }
+    }
+}
+
+/// One SQL test woven into its targets' execution dependencies.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExecutionTest {
+    pub key: ObjectKey,
+    pub scope_deps: Vec<ObjectKey>,
+    pub table_function: bool,
 }
 
 /// One node of an identity graph: its upstream keys in order and its local hash.

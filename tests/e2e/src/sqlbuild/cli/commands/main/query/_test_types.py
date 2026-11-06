@@ -62,3 +62,12 @@ class QueryConnectionConfigErrorTestCase:
     project_toml: str
     expected_stderr_fragment: str
     expected_returncode: int = 1
+
+
+@dataclass(frozen=True)
+class QueryProgressTestCase:
+    description: str
+    sql: str
+    use_pty: bool
+    expected_fragments: tuple[str, ...]
+    unexpected_fragments: tuple[str, ...]

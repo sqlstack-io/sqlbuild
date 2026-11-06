@@ -114,6 +114,8 @@ Bundled copies of every page on the SQLBuild documentation site, matching the in
 - [sqb init](cli/init.md) (`cli/init`) - Scaffold a new SQLBuild project.
 - [sqb playground](cli/playground.md) (`cli/playground`) - Create a self-contained SQLBuild project to explore locally.
 - [sqb skills](cli/skills.md) (`cli/skills`) - Install SQLBuild skill files for AI coding agents.
+- [sqb server](cli/server.md) (`cli/server`) - Run the control service and scheduler.
+- [sqb login and logout](cli/login.md) (`cli/login`) - Authorize a bounded CLI session through your server's browser sign-in.
 - [sqb compile](cli/compile.md) (`cli/compile`) - Compile models into resolved SQL, validate contracts, and write target artifacts - fully offline.
 - [sqb format](cli/format.md) (`cli/format`) - Apply canonical SQLBuild SQL formatting.
 - [sqb contract](cli/contract.md) (`cli/contract`) - Compare or generate repository contracts from physical warehouse schemas.

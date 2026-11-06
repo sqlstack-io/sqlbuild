@@ -113,7 +113,7 @@ A model with Rule errors starts with a header that marks it not buildable and li
 
 ```sql
 -- sqb: compile failed for this model; not buildable
--- SQBRSQL028 at models/open_orders.sql:6:20: Single-relation query mixes qualified and unqualified columns
+-- SQLCLEAN028 at models/open_orders.sql:6:20: Single-relation query mixes qualified and unqualified columns
 SELECT o.order_id, status FROM __ref("orders") AS o
 ```
 

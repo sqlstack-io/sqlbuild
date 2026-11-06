@@ -38,7 +38,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parameter_before_words_and_a_parenthesis",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "@value IS NULL OR TRIM(@value) = ''"),
                 **_CHECK_STATUS,
             },
@@ -50,7 +50,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parameter_before_in_inside_case",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro(
                     "value VARCHAR",
                     "CASE WHEN @value IN ('open', 'closed') THEN TRUE ELSE FALSE END",
@@ -67,7 +67,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parameter_before_and_a_parenthesised_predicate",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "@value IS NULL AND (@value IS NULL)"),
                 **_CHECK_STATUS,
             },
@@ -79,7 +79,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parameter_before_in_alone",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "@value IN ('', ' ')"),
                 **_CHECK_STATUS,
             },
@@ -91,7 +91,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parameter_compared_then_trimmed",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "@value = '' OR TRIM(@value) = ''"),
                 **_CHECK_STATUS,
             },
@@ -103,7 +103,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="parenthesised_parameter",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "(@value) IS NULL OR TRIM(@value) = ''"),
                 **_CHECK_STATUS,
             },
@@ -115,7 +115,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="body_opening_with_two_parentheses",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro(
                     "value VARCHAR", "((@value) IS NULL AND (@value) IS NULL) OR TRIM(@value) = ''"
                 ),
@@ -131,7 +131,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="spaced_enum_and_constant_references_in_a_body_are_declarations",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 "constants/fee_divisor.sql": "CONSTANT (name fee_divisor, value 100);\n",
                 **check_macro(
                     "value VARCHAR, cents BIGINT",
@@ -161,7 +161,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="two_parameters_before_and_a_parenthesised_predicate",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("x VARCHAR, y VARCHAR", "@x IS NULL AND (@y IS NULL)"),
                 **orders_model(
                     "SELECT order_id, @sql.check(status, country_code) AS checked "
@@ -176,18 +176,18 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
         SqlMacroCompileTestCase(
             description="a_finding_in_a_macro_body_is_reported_in_the_macro_file",
             files={
-                **with_rules("SQBRSQL001"),
+                **with_rules("SQLCLEAN001"),
                 **check_macro("value VARCHAR", "((@value) IS NULL) OR @value = NULL"),
                 **_CHECK_STATUS,
             },
             expected_returncode=1,
-            expected_fragments=("[SQBRSQL001]", f"--> {CHECK_MACRO_PATH}:7:"),
+            expected_fragments=("[SQLCLEAN001]", f"--> {CHECK_MACRO_PATH}:7:"),
             unexpected_fragments=_RULE_FAILURES,
         ),
         SqlMacroCompileTestCase(
             description="a_cte_list_body_lints_without_parse_or_unused_cte_findings",
             files={
-                **with_rules("SQBRSQL001", "SQBRSQL005"),
+                **with_rules("SQLCLEAN001", "SQLCLEAN005"),
                 "macros/sql/live_orders.sql": (
                     'MACRO (\n  description "Live orders",\n'
                     "  arguments (src RELATION (order_id BIGINT, is_deleted BOOLEAN)),\n);\n\n"
@@ -201,7 +201,7 @@ _COMMAND: tuple[str, ...] = ("compile", "--no-cache")
             },
             expected_returncode=0,
             expected_fragments=("Project compiled",),
-            unexpected_fragments=(*_RULE_FAILURES, "SQBRSQL005"),
+            unexpected_fragments=(*_RULE_FAILURES, "SQLCLEAN005"),
         ),
     ],
     ids=lambda case: case.description,
@@ -375,7 +375,7 @@ def test_given_a_sql_macro_call_in_python_macro_arguments_when_compiling_then_py
         SqlMacroCompileTestCase(
             description="comments_from_a_macro_expansion_are_not_judged_in_the_caller",
             files={
-                **with_rules("SQBRSQL033"),
+                **with_rules("SQLCLEAN033"),
                 **_COMMENTED_CHECK,
                 **orders_model(
                     "SELECT order_id, NOT @sql.check(status) AS plain, "
@@ -389,7 +389,7 @@ def test_given_a_sql_macro_call_in_python_macro_arguments_when_compiling_then_py
         SqlMacroCompileTestCase(
             description="comments_a_python_macro_returns_are_judged_in_the_caller",
             files={
-                **with_rules("SQBRSQL033"),
+                **with_rules("SQLCLEAN033"),
                 **WRAPPING_MACROS,
                 **orders_model(
                     "SELECT order_id, @py.noted('status') AS noted FROM __ref(\"stg_orders\")\n"
@@ -397,7 +397,7 @@ def test_given_a_sql_macro_call_in_python_macro_arguments_when_compiling_then_py
             },
             expected_returncode=1,
             expected_fragments=(
-                "[SQBRSQL033]",
+                "[SQLCLEAN033]",
                 "(in SQL generated by @py.noted('status'))",
                 "--> models/marts/orders.sql:3:",
             ),
@@ -405,14 +405,14 @@ def test_given_a_sql_macro_call_in_python_macro_arguments_when_compiling_then_py
         SqlMacroCompileTestCase(
             description="the_same_comments_written_in_a_model_are_judged",
             files={
-                **with_rules("SQBRSQL033"),
+                **with_rules("SQLCLEAN033"),
                 **orders_model(
                     "SELECT order_id, NOT -- a status holding an at sign is flagged\n"
                     "CONTAINS(status, /* the sign */ '@') AS plain FROM __ref(\"stg_orders\")\n"
                 ),
             },
             expected_returncode=1,
-            expected_fragments=("[SQBRSQL033]", "--> models/marts/orders.sql:3:"),
+            expected_fragments=("[SQLCLEAN033]", "--> models/marts/orders.sql:3:"),
         ),
     ],
     ids=lambda case: case.description,

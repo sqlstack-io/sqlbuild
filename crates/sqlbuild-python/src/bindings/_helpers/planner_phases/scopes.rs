@@ -1,16 +1,14 @@
 //! Resolve the selected, stale-warning and inspection scopes of one plan.
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
 use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
-use crate::bindings::_helpers::planner_phases::objects::object;
-use crate::bindings::_helpers::planner_phases::objects::{replace, tuple};
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_scope::scope::build_planner_scope;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use pyo3::prelude::{Bound, PyAny, PyResult};
 use pyo3::pyfunction;
-use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use pyo3::types::PyTuple;
+use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 
 #[pyfunction]
 #[pyo3(signature = (*, project, selection, policies))]
@@ -55,53 +53,20 @@ pub(crate) fn resolve_planner_scopes<'py>(
             ],
         )?),
     )?;
-    let stale_keys = object(
-        py,
-        transitive_closure_many(
-            &native_field(&selected, "selected_keys")?,
-            &native_field(&full, "upstream_deps")?,
-            true,
-            None,
-        )?,
-    )?;
-    let all_keys = PyDict::new(py);
-    for (name, key) in native_field(&full, "all_keys")?
-        .downcast::<PyDict>()?
-        .iter()
-    {
-        if stale_keys.contains(&key)? {
-            all_keys.set_item(name, key)?;
-        }
-    }
-    let models = PyDict::new(py);
-    for (name, model) in native_field(&full, "models_by_name")?
-        .downcast::<PyDict>()?
-        .iter()
-    {
-        if stale_keys.contains(model_reads::model_key(&model)?)? {
-            models.set_item(name, model)?;
-        }
-    }
-    let mut order: Vec<_> = Vec::new();
-    for key in native_field(&full, "execution_order")?.try_iter()? {
-        let key = key?;
-        if stale_keys.contains(&key)? {
-            order.push(key);
-        }
-    }
-    let stale_scope = replace(
-        &full,
-        &[
-            ("all_keys", all_keys.into_any()),
-            ("models_by_name", models.into_any()),
-            ("selected_keys", native_field(&selected, "selected_keys")?),
-            ("execution_order", tuple(py, order)?),
-            (
-                "user_selected_keys",
-                native_field(&selected, "user_selected_keys")?,
-            ),
-        ],
-    )?;
+    let selected_data = scope_data(&selected)?;
+    let full_data = scope_data(&full)?;
+    let stale_keys = reachable_keys(
+        &selected_data.selected.iter().cloned().collect::<Vec<_>>(),
+        &full_data.upstream,
+    );
+    let mut stale = full_data.with_selected(py, selected_data.selected.clone());
+    stale.names.retain(|(_, key)| stale_keys.contains(key));
+    stale
+        .models
+        .retain(|name, _| stale_keys.contains(&("model".to_owned(), name.clone())));
+    stale.order.retain(|key| stale_keys.contains(key));
+    stale.user_selected = selected_data.user_selected.clone();
+    let stale_scope = stale.object(py)?;
     Ok(Bound::new(
         py,
         PlannerScopeResolution {

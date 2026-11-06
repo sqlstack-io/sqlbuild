@@ -6,10 +6,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 use pyo3::exceptions::{PyException, PyOSError};
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
+use pyo3::prelude::{
+    Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRef, PyResult, Python,
+};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyStringMethods};
-use pyo3::{IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
+use pyo3::{IntoPyObject, IntoPyObjectExt, pyclass, pyfunction, pymethods, wrap_pyfunction};
 
+use sqlbuild_cache::project_reuse::models::RecordedArtifact;
 use sqlbuild_core::posix_path::main::posix_abspath::posix_abspath;
 use sqlbuild_host::entries::models::{FacadeHost, UserCodeHost};
 
@@ -22,7 +25,9 @@ use crate::bindings::_helpers::compile_command::constants::{
     REUSE_STORE_NOTICE_PATHS, REUSE_STORE_SKIPPED_PREFIX,
 };
 use crate::bindings::_helpers::compile_command::reuse_attempt::{reuse_rules, write_launch_record};
-use crate::bindings::_helpers::compile_outputs::reuse::artifact_digest;
+use crate::bindings::_helpers::compile_outputs::reuse::{
+    ArtifactRow, CompileRecordPy, NativeReuseAttempt, SettingsRow, artifact_digest,
+};
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
@@ -31,13 +36,6 @@ const HIT_OUTCOME: &str = "hit";
 const BYPASS_OUTCOME: &str = "bypass";
 const STORED: &str = "stored";
 const SKIPPED: &str = "skipped";
-
-/// What a compile left at one artifact path: its digest, or the size and mtime it kept.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum RecordedArtifact {
-    Written(String),
-    Kept { size: u64, mtime_ns: i64 },
-}
 
 /// Artifacts one compile wrote or kept, by absolute path, following staged moves.
 #[pyclass(module = "sqlbuild._native", frozen)]
@@ -88,10 +86,26 @@ impl CompileArtifactWrites {
             .iter()
             .map(|(path, artifact)| {
                 let digest: Option<String> = match artifact {
-                    RecordedArtifact::Written(digest) => Some(digest.clone()),
+                    RecordedArtifact::Written { digest } => Some(digest.clone()),
                     RecordedArtifact::Kept { .. } => None,
                 };
                 (path.clone(), digest)
+            })
+            .collect()
+    }
+
+    /// The Python-facing artifact rows, built natively for recording or the public view.
+    fn artifact_rows(&self) -> HashMap<String, ArtifactRow> {
+        self.locked()
+            .iter()
+            .map(|(path, artifact)| {
+                let row = match artifact {
+                    RecordedArtifact::Written { digest } => (Some(digest.clone()), None, None),
+                    RecordedArtifact::Kept { size, mtime_ns } => {
+                        (None, Some(*size), Some(*mtime_ns))
+                    }
+                };
+                (path.clone(), row)
             })
             .collect()
     }
@@ -102,18 +116,7 @@ impl CompileArtifactWrites {
     /// Every recorded artifact by absolute path, as `(digest, size, mtime_ns)`.
     #[getter]
     pub(crate) fn artifacts<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let rows: Bound<'py, PyDict> = PyDict::new(py);
-        for (path, artifact) in self.locked().iter() {
-            match artifact {
-                RecordedArtifact::Written(digest) => {
-                    rows.set_item(path, (digest, py.None(), py.None()))?;
-                }
-                RecordedArtifact::Kept { size, mtime_ns } => {
-                    rows.set_item(path, (py.None(), size, mtime_ns))?;
-                }
-            }
-        }
-        Ok(rows)
+        self.artifact_rows().into_pyobject(py)
     }
 }
 
@@ -165,7 +168,9 @@ pub(crate) fn artifact_written(
     };
     recorder.get().record(
         absolute(path)?,
-        RecordedArtifact::Written(artifact_digest(contents)),
+        RecordedArtifact::Written {
+            digest: artifact_digest(contents),
+        },
     );
     Ok(())
 }
@@ -182,23 +187,27 @@ pub(crate) fn artifact_written_at(
     };
     recorder.get().record(
         absolute_path(py, path)?,
-        RecordedArtifact::Written(artifact_digest(contents)),
+        RecordedArtifact::Written {
+            digest: artifact_digest(contents),
+        },
     );
     Ok(())
 }
 
 /// Note an earlier artifact kept as-is after its size and mtime were validated.
 pub(crate) fn artifact_kept(
+    py: Python<'_>,
     recorder: ArtifactRecorder<'_>,
-    path: &Bound<'_, PyAny>,
+    path: &Path,
     (size, mtime_ns): (u64, i64),
 ) -> PyResult<()> {
     let Some(recorder) = recorder else {
         return Ok(());
     };
-    recorder
-        .get()
-        .record(absolute(path)?, RecordedArtifact::Kept { size, mtime_ns });
+    recorder.get().record(
+        absolute_path(py, path)?,
+        RecordedArtifact::Kept { size, mtime_ns },
+    );
     Ok(())
 }
 
@@ -455,75 +464,55 @@ fn record<'py>(facts: &CompileFacts<'py>) -> PyResult<bool> {
     } else {
         None
     };
-    let settings_inputs: Bound<'_, PyAny> = if unsupported.is_none() {
-        let rows: Bound<'_, PyList> = PyList::empty(py);
-        let list = |value: Bound<'py, PyAny>| -> PyResult<Bound<'py, PyAny>> {
-            Ok(PyList::new(py, value.try_iter()?.collect::<PyResult<Vec<_>>>()?)?.into_any())
-        };
+    let strings = |value: Bound<'py, PyAny>| -> PyResult<Vec<String>> {
+        value.try_iter()?.map(|item| item?.extract()).collect()
+    };
+    let settings_inputs: Option<Vec<SettingsRow>> = if unsupported.is_none() {
+        let mut rows: Vec<SettingsRow> = Vec::new();
         for item in native_field(&settings, "inputs")?.try_iter()? {
             let item: Bound<'_, PyAny> = item?;
-            rows.append((
-                native_field(&item, "case_sensitive")?,
-                list(native_field(&item, "names")?)?,
-                list(native_field(&item, "prefixes")?)?,
-                list(native_field(&item, "env_files")?)?,
-                list(native_field(&item, "secrets_dirs")?)?,
-            ))?;
+            rows.push(SettingsRow {
+                case_sensitive: native_field(&item, "case_sensitive")?.extract()?,
+                names: strings(native_field(&item, "names")?)?,
+                prefixes: strings(native_field(&item, "prefixes")?)?,
+                env_files: strings(native_field(&item, "env_files")?)?,
+                secrets_dirs: strings(native_field(&item, "secrets_dirs")?)?,
+            });
         }
-        rows.into_any()
+        Some(rows)
     } else {
-        py.None().into_bound(py)
+        None
     };
-    let dag_path: Bound<'_, PyAny> = if facts.dag_artifact_path.is_none() {
-        py.None().into_bound(py)
+    let dag_path: Option<String> = if facts.dag_artifact_path.is_none() {
+        None
     } else {
-        imported(py, "os.path", "abspath")?.call1((&facts.dag_artifact_path,))?
+        Some(
+            imported(py, "os.path", "abspath")?
+                .call1((&facts.dag_artifact_path,))?
+                .extract()?,
+        )
     };
-    let payload: Bound<'_, PyDict> = keywords(
-        py,
-        &[
-            ("stdout", stdout),
-            (
-                "stderr_lines",
-                PyList::new(
-                    py,
-                    native_field(&facts.output, "stderr_lines")?
-                        .try_iter()?
-                        .collect::<PyResult<Vec<_>>>()?,
-                )?
-                .into_any(),
-            ),
-            ("exit_code", facts.exit_code.clone()),
-            (
-                "compile_cache_enabled",
-                facts.compile_cache_enabled.into_bound_py_any(py)?,
-            ),
-            ("read_run_id", read_run_id),
-            ("settings_inputs", settings_inputs),
-            (
-                "template_environment_names",
-                PyList::new(
-                    py,
-                    native_field(&facts.input_reads, "environment_names")?
-                        .try_iter()?
-                        .collect::<PyResult<Vec<_>>>()?,
-                )?
-                .into_any(),
-            ),
-            ("module_paths", module_paths(py)?.into_any()),
-            (
-                "artifacts",
-                native_field(&facts.artifact_writes, "artifacts")?,
-            ),
-            (
-                "artifacts_written",
-                facts.artifacts_written.into_bound_py_any(py)?,
-            ),
-            ("dag_path", dag_path),
-            ("json_output", facts.json_output.clone()),
-            ("rules", reuse_rules(py, true)?.into_any()),
-        ],
-    )?;
+    let payload = CompileRecordPy {
+        stdout: stdout.extract()?,
+        stderr_lines: strings(native_field(&facts.output, "stderr_lines")?)?,
+        exit_code: facts.exit_code.extract()?,
+        compile_cache_enabled: facts.compile_cache_enabled,
+        read_run_id: read_run_id.extract()?,
+        settings_inputs,
+        template_environment_names: strings(native_field(
+            &facts.input_reads,
+            "environment_names",
+        )?)?,
+        module_paths: module_paths(py)?.extract()?,
+        artifacts: facts
+            .artifact_writes
+            .extract::<PyRef<'_, CompileArtifactWrites>>()?
+            .artifact_rows(),
+        artifacts_written: facts.artifacts_written,
+        dag_path,
+        json_output: facts.json_output.extract()?,
+        rules: reuse_rules(py)?,
+    };
     if let Some(mut capture) = crate::bindings::_helpers::compile_context::delta::take_capture() {
         capture.environment_names =
             native_field(&facts.input_reads, "environment_names")?.extract()?;
@@ -547,8 +536,10 @@ fn record<'py>(facts: &CompileFacts<'py>) -> PyResult<bool> {
             }
         }
     }
-    let (outcome, digested): (String, Bound<'_, PyAny>) =
-        facts.native.call_method1("record", (payload,))?.extract()?;
+    let (outcome, digested): (&str, usize) = facts
+        .native
+        .extract::<PyRef<'_, NativeReuseAttempt>>()?
+        .record(py, payload)?;
     let _ = reuse_logger(py)?.call_method1(
         "debug",
         ("Compile reuse record digested %d project files", digested),

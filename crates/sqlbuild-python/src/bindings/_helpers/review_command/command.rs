@@ -4,11 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::Instant;
 
+use pyo3::IntoPyObject;
 use pyo3::exceptions::PyException;
-use pyo3::prelude::{
-    Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
-};
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use sqlbuild_analysis::review_command::constants::{
     AUDIT_FINDING, BUILT_NODE, FAILED_NODE, FINDING_NODE, MARKDOWN_WRITE_CODE, MODEL_KIND,
     NO_COMPARISON_MODE, NOT_VALIDATED_NODE, OK_NODE, PASSES_LIMIT, PLANNED_STATUS, SEED_KIND,
@@ -702,8 +700,6 @@ fn with_markdown_failure(report: ReviewReport, failure: Option<&String>) -> Revi
 }
 
 /// Run one `sqb review` request.
-#[pyfunction]
-#[pyo3(signature = (*, request))]
 pub(crate) fn run_review_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
     let started: Instant = Instant::now();
     let machine: bool = native_field(request, "json_output")?.is_truthy()?;
@@ -746,8 +742,4 @@ pub(crate) fn run_review_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> 
         ));
     }
     Ok(review_outcome(&report).1)
-}
-
-pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_function(wrap_pyfunction!(run_review_command, module)?)
 }

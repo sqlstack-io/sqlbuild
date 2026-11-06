@@ -18,6 +18,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     NormalizedType,
@@ -56,6 +57,7 @@ from sqlbuild.executor.run._helpers.materializations.full_refresh import (
     resolve_full_refresh_relations,
 )
 from sqlbuild.executor.run._helpers.reuse.fingerprinting import try_write_fingerprint
+from sqlbuild.executor.run._helpers.validation.configured_columns import require_quoted_spelling
 from sqlbuild.executor.run._helpers.validation.contracts import validate_runtime_contract
 from sqlbuild.executor.run.constants import (
     SNAPSHOT_ALL_CHECK_COLUMNS,
@@ -634,7 +636,9 @@ def _validate_delta_columns(
     delta_columns: tuple[ColumnInfo, ...],
     check_columns: tuple[str, ...],
 ) -> None:
-    column_names: frozenset[str] = frozenset(column.name.lower() for column in delta_columns)
+    column_names: frozenset[str] = frozenset(
+        column_name_key(column.name) for column in delta_columns
+    )
     required_columns: tuple[str, ...]
     if entry.snapshot_strategy == SnapshotStrategy.TIMESTAMP:
         required_columns = (*entry.unique_key, _require_updated_at(entry))
@@ -654,17 +658,35 @@ def _validate_delta_columns(
     ):
         required_columns = (*required_columns, entry.observed_at_column)
     missing_columns: list[str] = [
-        column for column in required_columns if column.lower() not in column_names
+        column for column in required_columns if column_name_key(column) not in column_names
     ]
     if missing_columns:
         raise ExecutorInputError(
             f"snapshot model '{entry.name}' query output is missing required columns: "
             f"{', '.join(missing_columns)}"
         )
+    setting: str
+    configured: tuple[str | None, ...]
+    for setting, configured in (
+        ("unique_key", entry.unique_key),
+        ("updated_at", (entry.updated_at_column,)),
+        ("observed_at", (entry.observed_at_column,)),
+        ("check_columns", check_columns),
+    ):
+        require_quoted_spelling(
+            model_name=entry.name,
+            setting=setting,
+            configured=tuple(
+                name for name in configured if name is not None and name in required_columns
+            ),
+            listed_columns=delta_columns,
+        )
     valid_from_column: str = _valid_from_column(entry)
     valid_to_column: str = _valid_to_column(entry)
     generated_collisions: list[str] = [
-        column for column in (valid_from_column, valid_to_column) if column.lower() in column_names
+        column
+        for column in (valid_from_column, valid_to_column)
+        if column_name_key(column) in column_names
     ]
     if generated_collisions:
         raise ExecutorInputError(
@@ -941,16 +963,18 @@ def _expanded_check_columns(
     ):
         return entry.check_columns
 
-    excluded_names: set[str] = {column.lower() for column in entry.unique_key}
-    excluded_names.add(_valid_from_column(entry).lower())
-    excluded_names.add(_valid_to_column(entry).lower())
+    excluded_names: set[str] = {column_name_key(column) for column in entry.unique_key}
+    excluded_names.add(column_name_key(_valid_from_column(entry)))
+    excluded_names.add(column_name_key(_valid_to_column(entry)))
     if entry.observed_at_column is not None:
-        excluded_names.add(entry.observed_at_column.lower())
+        excluded_names.add(column_name_key(entry.observed_at_column))
     if entry.updated_at_column is not None:
-        excluded_names.add(entry.updated_at_column.lower())
+        excluded_names.add(column_name_key(entry.updated_at_column))
 
     expanded_columns: tuple[str, ...] = tuple(
-        column.name for column in delta_columns if column.name.lower() not in excluded_names
+        column.name
+        for column in delta_columns
+        if column_name_key(column.name) not in excluded_names
     )
     if not expanded_columns:
         raise ExecutorInputError(

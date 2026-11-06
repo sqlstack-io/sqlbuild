@@ -1,7 +1,7 @@
 //! Shared CLI text helpers as `_native` functions; styles are read from a `CliStyle`'s `use_color`.
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyList, PyListMethods, PySlice};
+use pyo3::types::{PyDict, PyList, PyListMethods};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_core::cli_text::main::format_aligned_name_value::format_aligned_name_value as aligned;
 use sqlbuild_core::cli_text::main::format_completion_line::format_completion_line as completion;
@@ -135,21 +135,6 @@ fn append_overflow_line<'py>(
     Ok(lines)
 }
 
-/// Return entries visible under the current display cap.
-#[pyfunction]
-#[pyo3(signature = (*, entries, options))]
-fn visible_entries<'py>(
-    entries: Bound<'py, PyAny>,
-    options: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let limit: Bound<'py, PyAny> = native_field(options, "max_entries_per_section")?;
-    if limit.is_none() {
-        return Ok(entries);
-    }
-    let slice: Bound<'py, PySlice> = PySlice::new(entries.py(), 0, limit.extract()?, 1);
-    entries.get_item(slice)
-}
-
 /// A header style that renders `Title (count)` as a styled title and a dim count.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct CountHeaderStyle {
@@ -199,6 +184,5 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(format_aligned_name_value, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_name_column_width, module)?)?;
     module.add_function(wrap_pyfunction!(append_overflow_line, module)?)?;
-    module.add_function(wrap_pyfunction!(visible_entries, module)?)?;
     module.add_function(wrap_pyfunction!(count_header_style, module)?)
 }

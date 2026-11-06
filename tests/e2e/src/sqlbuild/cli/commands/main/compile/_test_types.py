@@ -39,6 +39,7 @@ class SemanticCorpusCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     pending_native: bool
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -186,6 +187,7 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     expected_cold_max_wall_seconds: float
     expected_warm_max_wall_seconds: float
     expected_edit_max_wall_seconds: float
+    expected_project_config_edit_max_wall_seconds: float
     expected_max_warm_to_cold_ratio: float
     expected_max_edit_to_cold_ratio: float
     expected_max_cache_write_cpu_overhead_ratio: float
@@ -199,6 +201,8 @@ class FreshProcessCompileCachePerformanceGuardTestCase:
     macro_call_interval: int
     scoped_macros: bool
     expected_macro_edit_misses: int
+    # `select = []`: the compiler alone, without the default SQL Rules.
+    compiler_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -1252,6 +1256,16 @@ class BenchmarkProjectCompileTestCase:
 
 
 @dataclass(frozen=True)
+class BenchmarkProjectTestPlanTestCase:
+    """A benchmark project whose unit tests must plan without a warehouse connection."""
+
+    description: str
+    project_dir: Path
+    expected_final_line_prefix: str
+    expected_final_line_suffix: str
+
+
+@dataclass(frozen=True)
 class BenchmarkCoreCopyCompileTestCase:
     """A script that copies a benchmark project without an area, and the copy's compiled output.
 
@@ -1360,6 +1374,7 @@ class DialectSyntaxCompileE2ETestCase:
     expected_exit_code: int
     expected_codes: tuple[str, ...]
     expected_column_counts: dict[str, int]
+    ignored_rules: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1369,3 +1384,22 @@ class SqlTestCacheMissE2ETestCase:
     description: str
     change: Callable[[Path], None]
     expected_debug_line: str
+
+
+@dataclass(frozen=True)
+class SqlMacroStringEscapeTestCase:
+    """A model whose SQL macro call follows a string the adapter ends with its own rules."""
+
+    description: str
+    adapter_config: str
+    string_sql: str
+    expected_compiled_fragment: str
+
+
+@dataclass(frozen=True)
+class PythonMacroArgumentErrorTestCase:
+    """An invalid `@py` argument span on Snowflake and the error compile reports for it."""
+
+    description: str
+    call_sql: str
+    expected_message: str

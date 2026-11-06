@@ -139,7 +139,7 @@ pub(crate) const PLAN_ROUTE: Route = routed(
     REQUEST_KEYWORD_SHAPE,
 );
 
-const BUILD_FIELDS: [Field; 35] = [
+const BUILD_FIELDS: [Field; 36] = [
     PROJECT_DIR,
     NO_SQL_VALIDATION,
     same("no_cache"),
@@ -151,6 +151,7 @@ const BUILD_FIELDS: [Field; 35] = [
     NO_COLOR,
     same("fail_fast"),
     same("full_refresh"),
+    same("changed"),
     same("load_sources"),
     attr("reload_sources", "reload"),
     same("include_python"),
@@ -509,6 +510,27 @@ pub(crate) const DEBUG_ROUTE: Route = routed(
     "run_debug",
     "run_debug_command",
     &DEBUG_ARGUMENTS,
+    CallShape {
+        slot_positional: 0,
+        implementation_keywords: true,
+    },
+);
+
+const LOCATION_ARGUMENTS: [Field; 9] = [
+    field("project_dir", Source::EffectiveProjectDir),
+    SELECTED_TARGET,
+    same("location_id"),
+    attr("server_url", "location_server_url"),
+    attr("generation", "location_generation"),
+    attr("image_id", "location_image_id"),
+    attr("action", "location_command"),
+    attr("run_id", "location_run_id"),
+    attr("claim_id", "location_claim_id"),
+];
+pub(crate) const LOCATION_ROUTE: Route = routed(
+    "run_location",
+    "run_location_command",
+    &LOCATION_ARGUMENTS,
     CallShape {
         slot_positional: 0,
         implementation_keywords: true,

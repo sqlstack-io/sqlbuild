@@ -4,6 +4,9 @@ MODEL (
     and prices in major units
   """,
   tags [edge_case],
+  columns (
+    "listingId" (nullable false, audits [not_null, unique]),
+  ),
 );
 
 WITH listings AS (

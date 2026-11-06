@@ -1,0 +1,8 @@
+name = "orders"
+adapter = "duckdb"
+
+[connections.local]
+database = "/warehouse/orders.duckdb"
+
+[targets.development]
+schema = "main"

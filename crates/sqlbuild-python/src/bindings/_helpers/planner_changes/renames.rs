@@ -16,6 +16,7 @@ use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::planner_identity::hashing::model_query_hash;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_items;
@@ -219,11 +220,10 @@ fn changed_referencing_query(
     snapshot: &Bound<'_, PyAny>,
 ) -> PyResult<bool> {
     let py: Python<'_> = scope.py();
-    let models_by_name: Bound<'_, PyAny> = native_field(scope, "models_by_name")?;
+    let scope = scope_data(scope)?;
     let mut selected: Vec<Bound<'_, PyAny>> = Vec::new();
-    for key in native_field(scope, "selected_keys")?.try_iter()? {
-        let model: Bound<'_, PyAny> = mapping_get(&models_by_name, native_field(&key?, "name")?)?;
-        if !model.is_none() {
+    for (_, name) in &scope.selected {
+        if let Some(model) = scope.model(py, name) {
             selected.push(model);
         }
     }

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
-use pyo3::exceptions::PySystemExit;
+use pyo3::exceptions::{PyKeyboardInterrupt, PySystemExit};
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
@@ -17,6 +17,7 @@ use sqlbuild_cli::dispatch::main::invocation_policy::invocation_policy;
 use sqlbuild_cli::dispatch::models::{CommandFacts, CommandFailure, InvocationPolicy};
 
 use sqlbuild_host::entries::models::{ExecutorHost, FacadeHost};
+use sqlbuild_orchestration::runs::models::RunOutcome;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, imported, keywords, within};
 use crate::bindings::_helpers::build_progress::transient_lines::shared_transient_line_coordinator;
@@ -32,12 +33,15 @@ use crate::bindings::_helpers::cli::termination::{
     CommandTerminated, TERMINATED_MESSAGE, TerminationHandler, handle_sigterm, interrupting_signal,
     signal_exit_code, terminated, terminated_exit,
 };
+use crate::bindings::_helpers::compile_command::constants::COMPILE_COMMAND_NAME;
 use crate::bindings::_helpers::compile_command::report::format_compile_error_json;
 use crate::bindings::_helpers::cost_report::attribution::take_cost_status;
 use crate::bindings::_helpers::diff_report::output::render_diff_error_json;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::interrupt::{InterruptHandler, interrupted};
 use crate::bindings::_helpers::output_capture::records::invocation_context;
 use crate::bindings::_helpers::presentation_text::terminal::stdout_supports_color;
+use crate::bindings::_helpers::recall::console::write_stderr;
 use crate::bindings::_helpers::recall::constants::{JSON_FORMAT, RECALL_SETTINGS_CODE};
 use crate::bindings::_helpers::recall::events::escaped_text;
 use crate::bindings::_helpers::recall::session::{
@@ -48,6 +52,7 @@ use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::construct::{error_class, new_error};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
+use crate::bindings::_helpers::rules::constants::DEFAULT_RULES_NOTICE_ATTR;
 use crate::bindings::_helpers::workspace_commands::commands::maintain_sqlbuild_skills;
 use sqlbuild_cli::launcher::constants::LAUNCH_RECORD_OPTION;
 use sqlbuild_core::cli_text::main::format_coded_error::format_coded_error;
@@ -122,9 +127,7 @@ fn print_object(value: &Bound<'_, PyAny>, stream: Option<&str>, end: Option<&str
     if let Some(end) = end {
         keywords.set_item("end", end)?;
     }
-    py.import("builtins")?
-        .getattr("print")?
-        .call((value,), Some(&keywords))?;
+    imported(py, "builtins", "print")?.call((value,), Some(&keywords))?;
     Ok(())
 }
 
@@ -176,11 +179,27 @@ fn print_expected_error(
             use_color: invocation.use_color,
         },
     );
+    let notice: Option<String> = match error.getattr_opt(DEFAULT_RULES_NOTICE_ATTR)? {
+        Some(notice) if !machine_output(invocation)? => Some(notice.extract()?),
+        _ => None,
+    };
+    let text: String = match notice {
+        Some(notice) => format!("{text}\n\n{notice}"),
+        None => text,
+    };
     print_object(
         &PyString::new(py, &format!("{text}\n")).into_any(),
         Some("stderr"),
         None,
     )
+}
+
+/// Whether the command was asked for JSON output.
+fn machine_output(invocation: &Invocation<'_>) -> PyResult<bool> {
+    match invocation.args.getattr_opt("json")? {
+        Some(json) => json.is_truthy(),
+        None => Ok(false),
+    }
 }
 
 /// The compile JSON error document `sqb compile --json` prints for a failure.
@@ -547,9 +566,18 @@ fn observed_dispatch<'py>(
         if let Some(session) = &invocation.recall.session {
             session.publish_context(false);
         }
-        return dispatch_command(&invocation.args, invocation.handlers.clone());
+        return dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        );
     }
     let command: String = invocation.command_name();
+    let _interrupt: Option<InterruptHandler> = if command == COMPILE_COMMAND_NAME {
+        InterruptHandler::install(py)?
+    } else {
+        None
+    };
     drop(take_failure_cause());
     drop(take_cost_status());
     let started: Instant = Instant::now();
@@ -603,11 +631,15 @@ fn observed_dispatch<'py>(
             "invocation_started",
             started_payload()?,
         )?)?;
-        let dispatched: PyResult<Bound<'py, PyAny>> =
-            match dispatch_command(&invocation.args, invocation.handlers.clone()) {
-                Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
-                dispatched => dispatched,
-            };
+        let dispatched: PyResult<Bound<'py, PyAny>> = match dispatch_command(
+            &invocation.args,
+            invocation.handlers.clone(),
+            &invocation.recall,
+        ) {
+            Ok(_) if terminated() => Err(CommandTerminated::new_err(TERMINATED_MESSAGE)),
+            Ok(_) if interrupted() => Err(PyKeyboardInterrupt::new_err(())),
+            dispatched => dispatched,
+        };
         match dispatched {
             Ok(exit_code) => {
                 let payload: Bound<'py, PyDict> = PyDict::new(py);
@@ -766,6 +798,33 @@ fn parsed_invocation<'py>(
             Ok(exit_code)
         };
     }
+    let namespace = args.getattr("__dict__")?.cast_into::<PyDict>()?;
+    let command: Option<String> = namespace
+        .get_item("command")?
+        .map(|value| value.extract::<Option<String>>())
+        .transpose()?
+        .flatten();
+    let location_command: Option<String> = namespace
+        .get_item("location_command")?
+        .map(|value| value.extract::<Option<String>>())
+        .transpose()?
+        .flatten();
+    if command.as_deref() == Some("location") && location_command.as_deref() == Some("runtime") {
+        return within(&host::redirect_stdout_to_stderr(py)?, |_| {
+            execute_parsed_invocation(args, handlers, identity, use_color)
+        });
+    }
+    execute_parsed_invocation(args, handlers, identity, use_color)
+}
+
+/// Runtime stream routing must cover extension discovery, invocation scopes and their teardown.
+fn execute_parsed_invocation<'py>(
+    args: Bound<'py, PyAny>,
+    handlers: Option<Bound<'py, PyAny>>,
+    identity: &Bound<'py, PyAny>,
+    use_color: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let py = args.py();
     let facts: CommandFacts = command_facts(&args)?;
     let policy: InvocationPolicy = invocation_policy(&facts);
     let recall: InvocationRecall = if policy.recalled {
@@ -841,6 +900,29 @@ fn parsed_invocation<'py>(
         Ok(_) | Err(_) => None,
     };
     let finished: PyResult<()> = finish_invocation_recall(py, &recall, exit_status);
+    let worker = recall
+        .worker
+        .lock()
+        .map_err(|_| {
+            pyo3::exceptions::PyRuntimeError::new_err("worker completion lock is unavailable")
+        })?
+        .take();
+    if let Some(worker) = worker {
+        let code = match &finished {
+            Ok(()) => exit_status.unwrap_or(1),
+            Err(_) => 1,
+        };
+        let outcome = worker.finish(py, i32::try_from(code).unwrap_or(1))?;
+        write_stderr(
+            py,
+            &format!("Worker execution completed: {}\n", outcome.as_str()),
+        )?;
+        if !matches!(outcome, RunOutcome::Success | RunOutcome::Warn) {
+            dispatched?;
+            finished?;
+            return exit(py, code.max(1));
+        }
+    }
     let exit_code: Bound<'py, PyAny> = dispatched?;
     finished?;
     Ok(exit_code)

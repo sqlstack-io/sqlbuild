@@ -94,19 +94,25 @@ fn resolved<'py>(
     graph: &ProjectGraph,
     (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
+    compiled_keys(select.py(), &resolve_graph_keys(graph, (select, exclude))?)
+}
+
+/// Resolve graph keys for native planning without building a public frozenset.
+pub(crate) fn resolve_graph_keys<'py>(
+    graph: &ProjectGraph,
+    (select, exclude): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+) -> PyResult<Vec<ObjectKey>> {
     let py: Python<'py> = select.py();
     let select: Vec<Bound<'py, PyString>> = py_strings(select)?;
     let exclude: Vec<Bound<'py, PyString>> = py_strings(exclude)?;
     let texts: Vec<Bound<'py, PyString>> = select.iter().chain(&exclude).cloned().collect();
     let carrier: Carrier<'py> = Carrier::new(py, &texts, || Ok(graph_names(graph)))?;
-    selected(
-        &carrier,
-        resolve_selectors(
-            graph,
-            &carrier.send_all(&select)?,
-            &carrier.send_all(&exclude)?,
-        ),
+    resolve_selectors(
+        graph,
+        &carrier.send_all(&select)?,
+        &carrier.send_all(&exclude)?,
     )
+    .map_err(|error| carrier.error(error))
 }
 
 fn view_graph(mappings: GraphViewMappings<'_, '_>) -> PyResult<NativeProjectGraph> {

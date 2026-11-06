@@ -3,6 +3,7 @@
 use crate::compiler::models::CharSpan;
 use crate::compiler::models::{InterpolatedSql, InterpolationFailure, InterpolationRead};
 use crate::compiler::types::InterpolationHost;
+use crate::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use crate::sql_scan::main::non_code_end::non_code_end;
 use crate::sql_scan::models::{QuotePolicy, Unclosed};
 use sqlbuild_core::text::main::is_letter::is_letter;
@@ -70,7 +71,11 @@ impl<H: InterpolationHost> Interpolation<'_, H> {
         let bytes = sql.as_bytes();
         let mut index = 0;
         while index < bytes.len() {
-            let text_end = match python_non_code_end(bytes, index) {
+            let non_code = match self.host.lexical_syntax() {
+                Some(syntax) if bytes[index] != b'`' => dialect_non_code_end(bytes, index, syntax),
+                _ => python_non_code_end(bytes, index),
+            };
+            let text_end = match non_code {
                 Ok(Some(end)) => end,
                 Ok(None) => index,
                 Err(Unclosed::BlockComment) => {
@@ -81,8 +86,7 @@ impl<H: InterpolationHost> Interpolation<'_, H> {
                 }
             };
             if text_end > index {
-                let comment =
-                    bytes[index..].starts_with(b"--") || bytes[index..].starts_with(b"/*");
+                let comment = !matches!(bytes[index], b'\'' | b'"' | b'`' | b'$');
                 if comment {
                     self.output.push_str(&sql[index..text_end]);
                 } else {

@@ -3,17 +3,19 @@
 use std::sync::Arc;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple, PyTupleMethods};
+use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods};
 use sqlbuild_analysis::compiled_project::models::{
     DynamicFamilyFact, ModelSchemaFact, SchemaColumnFact,
 };
 use sqlbuild_discovery::models::LineColumnSpan;
+use sqlbuild_model_config::config_values::models::ConfigNode;
 use sqlbuild_model_config::header_metadata::main::audit_factory_references::audit_factory_references;
 use sqlbuild_model_config::header_metadata::main::merged_audit_identities::merged_audit_identities;
 use sqlbuild_model_config::header_metadata::main::parse_dynamic_columns::parse_dynamic_columns;
 use sqlbuild_model_config::header_metadata::main::parse_header_metadata::parse_header_metadata;
-use sqlbuild_model_config::header_metadata::models::{DynamicFamily, ParsedColumn};
+use sqlbuild_model_config::header_metadata::models::ParsedColumn;
 use sqlbuild_model_config::model_validation::models::ColumnMigration;
+use sqlbuild_model_config::types::NodeKind;
 
 use crate::bindings::_helpers::compile_driver::stage_work::{
     NATIVE_HEADER_COLUMNS, PARSED_HEADER_COLUMNS, count_stage,
@@ -24,19 +26,21 @@ use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, compile_error, config_error,
 };
 use crate::bindings::_helpers::input_loops::model_loop_contracts::{
-    EnumColumns, dynamic_family_objects, enum_columns, factory_audits,
+    EnumColumns, enum_columns, factory_audits,
 };
 use crate::bindings::_helpers::input_loops::model_loop_inputs::present;
 use crate::bindings::_helpers::input_loops::model_loop_schema::{
     DeclaredColumns, ModelSchema, merged_columns, schema_enums,
 };
-use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
 use crate::bindings::_helpers::model_config::column_migrations::column_migration_error;
 use crate::bindings::_helpers::model_config::config_errors::native_config_error;
+use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
+use crate::bindings::_helpers::model_config::header_families::HeaderFamilies;
 use crate::bindings::_helpers::model_config::header_metadata::{
-    HeaderColumn, HeaderColumns, NativeColumnSpec, audit_instances, native_schema_column,
+    HeaderColumn, HeaderColumns, HeaderValue, NativeColumnSpec, native_schema_column,
     parsed_audit_identity,
 };
+use crate::bindings::_helpers::model_config::typed_config::{config_node_of, typed_values};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use sqlbuild_discovery::model_files::models::{HeaderFacts, NativeColumn};
 
@@ -52,6 +56,7 @@ const ENUMS_FIELD: &str = "enums";
 pub(crate) struct HeaderSource<'a, 'py> {
     pub(crate) name: &'a str,
     pub(crate) values: &'a Bound<'py, PyDict>,
+    pub(crate) config: &'a Bound<'py, PyAny>,
     pub(crate) model_file: &'a NativeModelFile,
     pub(crate) relative_path: &'a str,
     /// The model's visible declarations and the identity its usages are recorded for.
@@ -71,8 +76,8 @@ pub(crate) struct AttachedHeader<'py> {
 /// A header schema entry's Python contract objects, enum columns and retained fact.
 pub(crate) struct HeaderSchema<'py> {
     pub(crate) columns: Arc<HeaderColumns>,
-    pub(crate) audits: Bound<'py, PyTuple>,
-    pub(crate) dynamic_columns: Bound<'py, PyTuple>,
+    pub(crate) audits: Arc<HeaderAudits>,
+    pub(crate) dynamic_columns: Arc<HeaderFamilies>,
     pub(crate) type_enforcement: bool,
     pub(crate) enum_columns: Bound<'py, PyDict>,
     pub(crate) generated_usages: Vec<Bound<'py, PyAny>>,
@@ -106,8 +111,7 @@ pub(crate) fn header_schema<'py>(
             schema: None,
         });
     }
-    let none: Bound<'py, PyAny> = py.None().into_bound(py);
-    let node = |value: Option<Bound<'py, PyAny>>| PyNode(value.unwrap_or_else(|| none.clone()));
+    let typed = typed_values(source.config)?;
     let model: (&str, &str) = (source.name, source.relative_path);
     let native: Option<&[NativeColumn]> = native_columns(context, source, columns.as_ref())?;
     if columns.is_some() {
@@ -117,9 +121,17 @@ pub(crate) fn header_schema<'py>(
         };
         count_stage(py, stage, 1)?;
     }
-    let python_columns: Option<Bound<'py, PyAny>> = if native.is_some() { None } else { columns };
-    let metadata =
-        parse_header_metadata(&node(python_columns), &node(audits), source.relative_path);
+    let columns_node = if native.is_some() {
+        Arc::new(ConfigNode::Null)
+    } else {
+        config_node_of(&typed, COLUMNS_KEY)?
+    };
+    let audits_node = config_node_of(&typed, AUDITS_KEY)?;
+    let metadata = parse_header_metadata(
+        &columns_node.as_ref(),
+        &audits_node.as_ref(),
+        source.relative_path,
+    );
     let parsed_columns = metadata
         .columns
         .map_err(|error| raised_config_error(py, error))?;
@@ -133,7 +145,7 @@ pub(crate) fn header_schema<'py>(
                     .iter()
                     .map(|column| native_schema_column(py, context.contracts, column, &locations))
                     .collect::<PyResult<_>>()?,
-                facts: local_column_facts(&parsed_columns)?,
+                facts: local_column_facts(py, &parsed_columns)?,
             }
         }
     };
@@ -146,24 +158,31 @@ pub(crate) fn header_schema<'py>(
         )?,
         None => local_columns,
     };
-    let families = dynamic_families(py, &node(dynamic), model)?;
+    let dynamic_node = config_node_of(&typed, DYNAMIC_COLUMNS_KEY)?;
+    let families = parse_dynamic_columns(&dynamic_node.as_ref(), model)
+        .map_err(|error| raised_config_error(py, error))?;
     let parsed_audits = metadata
         .audits
         .map_err(|error| raised_config_error(py, error))?;
     let references: Vec<String> = match factories {
-        Some(factories) => {
+        Some(_) => {
             let available: Vec<String> = context.classes.audit_factories.keys().extract()?;
-            audit_factory_references(&PyNode(factories), model, &available)
+            let factories = config_node_of(&typed, AUDIT_FACTORIES_KEY)?;
+            audit_factory_references(&factories.as_ref(), model, &available)
                 .map_err(|error| raised_config_error(py, error))?
         }
         None => Vec::new(),
     };
-    let mut direct_audits: Vec<Bound<'py, PyAny>> =
-        audit_instances(py, context.contracts, &parsed_audits)?;
+    let mut audits = HeaderAudits::new(
+        py,
+        context.contracts,
+        &parsed_audits,
+        &py.None().into_bound(py),
+    )?;
     let (generated, generated_identities) = factory_audits(py, context, &references)?;
     let direct_identities: Vec<String> = parsed_audits
         .iter()
-        .map(parsed_audit_identity)
+        .map(|audit| parsed_audit_identity(py, audit))
         .collect::<PyResult<_>>()?;
     merged_audit_identities(&direct_identities, &generated_identities, model)
         .map_err(|error| raised_config_error(py, error))?;
@@ -185,9 +204,12 @@ pub(crate) fn header_schema<'py>(
             .iter()
             .any(|column| column.data_type.is_some());
     let family_facts: Vec<DynamicFamilyFact> = families.iter().map(family_fact).collect();
-    direct_audits.extend(generated);
-    let audits: Bound<'py, PyTuple> = PyTuple::new(py, direct_audits)?;
-    let families: Vec<Bound<'py, PyAny>> = dynamic_family_objects(py, context, &families)?;
+    audits.extend(generated);
+    let audits = Arc::new(audits);
+    let families = Arc::new(HeaderFamilies::new(
+        &context.contracts.schema_dynamic_column_family,
+        families,
+    )?);
     let enums: Bound<'py, PyDict> = native_field(source.visible.0, ENUMS_FIELD)?.downcast_into()?;
     let enums: Bound<'py, PyDict> = match source.schema {
         Some(schema) => {
@@ -211,7 +233,7 @@ pub(crate) fn header_schema<'py>(
         schema: Some(HeaderSchema {
             columns: resolved.columns,
             audits,
-            dynamic_columns: PyTuple::new(py, families)?,
+            dynamic_columns: families,
             type_enforcement,
             enum_columns: resolved.declarations,
             generated_usages: resolved.usages,
@@ -237,9 +259,10 @@ fn native_columns<'a>(
         return Ok(None);
     };
     let header: Bound<'_, PyDict> = source.model_file.header_value_dict(columns.py())?;
-    let own: bool = header
-        .get_item(COLUMNS_KEY)?
-        .is_some_and(|value| value.is(columns));
+    let own: bool = match header.get_item(COLUMNS_KEY)? {
+        Some(value) => value.is(columns) || value.eq(columns)?,
+        None => false,
+    };
     Ok(own.then_some(parsed.as_slice()))
 }
 
@@ -283,15 +306,6 @@ fn native_declared_columns(
     Ok(DeclaredColumns { specs, facts })
 }
 
-/// The header's dynamic column families, each `name_pattern` compiled natively.
-fn dynamic_families(
-    py: Python<'_>,
-    raw: &PyNode<'_>,
-    model: (&str, &str),
-) -> PyResult<Vec<DynamicFamily>> {
-    parse_dynamic_columns(raw, model).map_err(|error| raised_config_error(py, error))
-}
-
 /// The header description: absent, or a non-blank string by Python's `str.strip`.
 fn description(
     context: &LoopContext<'_, '_>,
@@ -323,26 +337,28 @@ fn raised_config_error(
 }
 
 /// The facts of the header's own columns, which are declared in the model file.
-fn local_column_facts(parsed: &[ParsedColumn<PyNode<'_>>]) -> PyResult<Vec<SchemaColumnFact>> {
+fn local_column_facts<N: HeaderValue>(
+    py: Python<'_>,
+    parsed: &[ParsedColumn<N>],
+) -> PyResult<Vec<SchemaColumnFact>> {
     let mut facts: Vec<SchemaColumnFact> = Vec::with_capacity(parsed.len());
     for column in parsed {
-        let text = |node: Option<&PyNode<'_>>| -> PyResult<Option<String>> {
-            node.map(|node| node.0.extract()).transpose()
+        let text = |node: Option<&N>| -> PyResult<Option<String>> {
+            node.map(|node| node.exact_text(py)).transpose()
         };
         facts.push(SchemaColumnFact {
-            name: column.name.0.str()?.extract()?,
+            name: column.name.exact_text(py)?,
             data_type: text(column.column_type.as_ref())?,
             nullable: column
                 .nullable
                 .as_ref()
-                .map(|node| node.0.extract())
-                .transpose()?,
+                .map(|node| node.kind() == NodeKind::Bool(true)),
             described: column.description.is_some(),
             migrate_from: text(column.migrate_from.as_ref())?,
             audit_definitions: column
                 .audits
                 .iter()
-                .map(|audit| audit.definition_name.0.extract())
+                .map(|audit| audit.definition_name.exact_text(py))
                 .collect::<PyResult<_>>()?,
             location_path: None,
         });

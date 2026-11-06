@@ -36,11 +36,6 @@ pub(crate) fn clickhouse_type(column: &ColumnSpec) -> String {
     }
 }
 
-/// `"name"` for SQLite.
-pub(crate) fn sqlite_identifier(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
 /// `` `name` `` for ClickHouse.
 pub(crate) fn clickhouse_identifier(name: &str) -> String {
     format!("`{}`", name.replace('\\', "\\\\").replace('`', "\\`"))
@@ -71,6 +66,22 @@ pub(crate) fn on_cluster(options: &DdlOptions) -> String {
 pub(crate) fn clickhouse_ttl(spec: &TableSpec, options: &DdlOptions) -> String {
     let days: u32 = options.retention_days.saturating_add(spec.ttl_extra_days);
     format!("{} + INTERVAL {days} DAY", spec.expiry_column)
+}
+
+pub(crate) fn json_field(postgres: bool, (column, path): (&str, &str), cast: &str) -> String {
+    if postgres {
+        format!("({column} #>> '{{{}}}'){cast}", path.replace('.', ","))
+    } else {
+        format!("json_extract({column}, '$.{path}')")
+    }
+}
+
+pub(crate) fn relational_cast(postgres: bool, (expression, kind): (&str, &str)) -> String {
+    if postgres {
+        format!("CAST({expression} AS {kind})")
+    } else {
+        expression.into()
+    }
 }
 
 /// The engine clause, replicated with one shard and every replica on a cluster.

@@ -296,6 +296,10 @@ fn target_context<'py>(
                 native_field(adapter_context, "collection_rendering")?,
             ),
             (
+                "_lexical_syntax",
+                native_field(adapter_context, "sql_lexical_syntax")?,
+            ),
+            (
                 "_enforce_explicit_references",
                 native_field(&project_config, "references")?.getattr("enforce_explicit")?,
             ),

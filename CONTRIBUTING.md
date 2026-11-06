@@ -42,6 +42,19 @@ For a change confined to one Rust crate, run its focused tests before rebuilding
 cargo test -p sqlbuild-sqltext given_model_files_when_matching_headers_then_offsets_follow_the_python_pattern
 ```
 
+Control-plane integration tests require Docker and run both SQLite and PostgreSQL:
+
+```bash
+make test-native NATIVE_TEST_ARGS='-p sqlbuild-orchestration --lib'
+```
+
+The same Testcontainers harness runs under `make rust-check` in CI. Each invocation starts one
+digest-pinned PostgreSQL container, waits for database readiness, shares it across the suite with
+an isolated schema per fixture, and removes it after success or failure. No host PostgreSQL setup
+is needed. Missing Docker, startup failures or missing database configuration fail the gate;
+PostgreSQL cases never silently skip. `NATIVE_TEST_ARGS` accepts Cargo test arguments; its default
+runs the workspace with all features.
+
 Keep the toolchain, `CARGO_TARGET_DIR`, profile and `RUSTFLAGS` consistent between iterations.
 Changing them can invalidate compiled artifacts. Coordinate builds that share a target directory;
 do not delete another task's artifacts or change global compiler-cache settings. The first build
@@ -110,6 +123,28 @@ uv run fensu dupes --since origin/main
 - Keep examples reproducible and avoid environment-specific assumptions.
 - Use project-local config files for local overrides, and do not commit credentials or personal settings.
 - Follow existing code style and module organization before introducing new patterns.
+
+### Native ownership and Python interfaces
+
+Compiler and planner algorithms belong in the Rust crates. Keep parsed header metadata, config
+nodes, dependency graphs and selections native between their producers and consumers. Constructing
+a Python container or public record only to extract it again is not an interface requirement.
+
+The supported Python interfaces have specific owners:
+
+| Interface | Why Python remains | Ownership rule |
+| --- | --- | --- |
+| Adapters and warehouse execution | Projects subclass adapters; the executor runs warehouse operations | Call through the adapter/executor boundary, retaining their public inputs and results |
+| User functions, factories, hooks, rules and custom constructors | These execute project-authored Python | Preserve invocation timing, errors and opaque return values; do not execute them speculatively |
+| Public records and caller-authored protocol objects | Python callers access, replace, compare and serialize documented records | Project native values on public access; import caller-authored values at entry, not repeatedly inside native algorithms |
+| Config and sample values | Python can supply values without a lossless native representation | Retain opaque values and their Python semantics; keep ordinary builtin containers native |
+| Streams, progress, logging and interpreter shutdown | These integrate with Python's runtime and caller-owned resources | Keep resource lifetime and error propagation at the owning boundary |
+
+`python-boundary.toml` lists the Python source that intentionally stays. The native crossing,
+storage and layer rules in `fensu.toml` prevent new accidental dependencies; pending budgets are
+an inventory to reduce, not permission to add callbacks. `native_host` owns genuine host edges,
+not a destination for movable compiler or planner algorithms. Remove an obsolete private
+interface with its last caller, while retaining supported public facades and stubs.
 
 ## Commits And Pull Requests
 

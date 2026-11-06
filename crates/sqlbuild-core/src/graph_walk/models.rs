@@ -6,6 +6,15 @@ use std::hash::Hash;
 
 use crate::graph_walk::types::NodeSet;
 
+/// Caller-owned selection and materialization predicates, and the ancestor kind to collect.
+#[derive(Debug)]
+pub struct ClonePolicy<P, C, V> {
+    pub selected: P,
+    pub clonable: C,
+    pub view: V,
+    pub skipped_views: bool,
+}
+
 /// Distinct nodes in the order a walk first recorded them.
 #[derive(Debug, Clone)]
 pub struct VisitOrder<K> {

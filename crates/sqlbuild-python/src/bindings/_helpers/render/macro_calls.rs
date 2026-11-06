@@ -18,6 +18,7 @@ use crate::bindings::_helpers::render::macro_call_rows::{
 };
 use crate::bindings::_helpers::render::macro_expansion::raised;
 use crate::bindings::types::CompilerDetach;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 const DECLARATION_CALLS: [&str; 2] = ["enum", "const"];
 
@@ -31,7 +32,7 @@ pub(crate) fn scan_macro_call_sites(
     sql: &str,
 ) -> PyResult<(Vec<SiteRow>, Option<FailureRow>)> {
     let MacroCallScan { sites, failure } = py
-        .compiler_detach(|| Ok(scan_sites(sql)))
+        .compiler_detach(|| Ok(scan_sites(sql, None)))
         .map_err(compiler_error)?;
     Ok((
         sites.into_iter().map(site_row).collect(),
@@ -49,9 +50,10 @@ pub(crate) fn scan_macro_call_sites(
 pub(crate) fn top_level_macro_call_names<'py>(
     py: Python<'py>,
     sql: &str,
+    syntax: Option<&LexicalSyntax>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let names = py
-        .compiler_detach(|| Ok(scan_names(sql, false)))
+        .compiler_detach(|| Ok(scan_names(sql, false, syntax)))
         .map_err(compiler_error)?;
     match names {
         Ok(names) => PyTuple::new(
@@ -71,7 +73,7 @@ pub(crate) fn top_level_macro_call_names<'py>(
 /// Unique authored macro call names in encounter order, declaration calls excluded.
 #[pyfunction]
 fn find_macro_call_names<'py>(py: Python<'py>, sql: &str) -> PyResult<Bound<'py, PyTuple>> {
-    top_level_macro_call_names(py, sql)
+    top_level_macro_call_names(py, sql, None)
 }
 
 /// Splice rendered macro outputs over their call sites, returning the SQL and substitution spans.

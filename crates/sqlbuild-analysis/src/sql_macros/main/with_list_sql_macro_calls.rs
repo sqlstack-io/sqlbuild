@@ -6,7 +6,7 @@ use crate::sql_macros::models::{CallPosition, SqlMacroCall};
 /// The SQL macro calls standing between the CTEs of the top-level `WITH` list of `text`.
 #[must_use]
 pub fn with_list_sql_macro_calls(text: &str) -> Vec<SqlMacroCall> {
-    let Ok(calls) = sql_macro_calls(text) else {
+    let Ok(calls) = sql_macro_calls(text, None) else {
         return Vec::new();
     };
     if calls.is_empty() {

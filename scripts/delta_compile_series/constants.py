@@ -24,6 +24,16 @@ RANDOM_VALUE_LIMIT: int = 10**6
 FULL_COPY_SUFFIX: str = "_full_copy"
 DURATION_PATTERN: re.Pattern[str] = re.compile(r"\s*\(\d+(?:\.\d+)?s\)")
 COMPILE_TIMINGS_PATTERN: re.Pattern[str] = re.compile(r'\n  "compile_timings": \{[^{}]*\n  \}')
+MAX_FAILURES: int = 4
+MAX_STEP_BYTES: int = 4 * 1024 * 1024
+MAX_FILE_BYTES: int = 512 * 1024
+MAX_ENTRIES: int = 2048
+MAX_READ_BYTES: int = 16 * 1024 * 1024
+MAX_CACHE_PATHS: int = 16
+COMPARISON_MANIFEST_FILE: str = "manifest.json"
+MAX_EVIDENCE_FILES: int = 9
+MAX_ENCRYPTED_FAILURES: int = 12
+MAX_ENCRYPTED_BYTES: int = MAX_STEP_BYTES + 64 * 1024
 
 EDITS: tuple[DeltaCompileEdit, ...] = (
     DeltaCompileEdit("body_constant", r"COALESCE\(b\.amount, \d+\)", "COALESCE(b.amount, {value})"),

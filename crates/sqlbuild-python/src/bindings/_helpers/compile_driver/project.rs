@@ -19,6 +19,8 @@ use crate::bindings::_helpers::compile_driver::targets::{
 };
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
+use crate::bindings::_helpers::sqltext::lexical_syntax::{optional_record_syntax, syntax_record};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_driver::assembly::assemble_project;
@@ -59,6 +61,8 @@ struct ProjectRequest {
     external_sql_reference_resolver: Py<PyAny>,
     resolved_connection: Py<PyAny>,
     analysis_selection: Py<PyAny>,
+    /// Rules the project's SQL is authored in where they differ from the adapter's, as in replay.
+    source_lexical_syntax: Option<LexicalSyntax>,
 }
 
 /// `column_lineage_mode`, defaulting to `ColumnLineageMode.FAST` when not passed.
@@ -97,6 +101,7 @@ pub(crate) fn build_compiled_project<'py>(
                 "external_sql_reference_resolver",
                 "resolved_connection",
                 "analysis_selection",
+                "source_lexical_syntax",
             ],
         ),
     )?;
@@ -119,7 +124,20 @@ impl ProjectRequest {
                 .unbind(),
             resolved_connection: arguments.value("resolved_connection")?.unbind(),
             analysis_selection: arguments.value("analysis_selection")?.unbind(),
+            source_lexical_syntax: optional_record_syntax(
+                &arguments.value("source_lexical_syntax")?,
+            )?,
         })
+    }
+}
+
+impl ProjectRequest {
+    /// The lexical rules the project's SQL is read with: the source syntax, else the adapter's.
+    fn lexical_syntax<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match &self.source_lexical_syntax {
+            Some(syntax) => syntax_record(py, syntax),
+            None => native_field(self.adapter.bind(py), "sql_lexical_syntax"),
+        }
     }
 }
 
@@ -264,10 +282,7 @@ fn frontier_compile_inputs<'py>(
                 "python_functions_inherit_default_namespace",
                 adapter.call_method0("python_functions_inherit_default_namespace")?,
             ),
-            (
-                "sql_lexical_syntax",
-                native_field(adapter, "sql_lexical_syntax")?,
-            ),
+            ("sql_lexical_syntax", request.lexical_syntax(py)?),
         ],
     )?;
     let inputs: InputsRequest = InputsRequest {

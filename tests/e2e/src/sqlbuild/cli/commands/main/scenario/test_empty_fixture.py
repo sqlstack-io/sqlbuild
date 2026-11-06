@@ -63,14 +63,14 @@ def test_given_empty_fixture_scenario_when_running_rules_and_scenario_then_types
     )
 
     rules: subprocess.CompletedProcess[str] = run_sqb(
-        command=("--no-color", "rules", "run", "SQBRSQL021"), project_dir=project_dir
+        command=("--no-color", "rules", "run", "SQLCLEAN021"), project_dir=project_dir
     )
     scenario: subprocess.CompletedProcess[str] = run_sqb(
         command=("--no-color", "scenario", "test"), project_dir=project_dir
     )
 
     assert rules.returncode == 0, rules.stdout + rules.stderr
-    assert "SQBRSQL021" not in rules.stdout.replace("Rule selection SQBRSQL021 passed", "")
+    assert "SQLCLEAN021" not in rules.stdout.replace("Rule selection SQLCLEAN021 passed", "")
     assert scenario.returncode == test_case.expected_exit_code, scenario.stdout + scenario.stderr
     for fragment in test_case.expected_fragments:
         assert fragment in scenario.stdout, scenario.stdout

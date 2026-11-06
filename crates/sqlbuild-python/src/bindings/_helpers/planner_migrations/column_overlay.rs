@@ -3,6 +3,7 @@
 use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::model_reads;
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_migrations::column_objects::{
     config, definition_hash, lower, native, replace,
 };
@@ -12,6 +13,7 @@ use crate::bindings::_helpers::planner_migrations::models::{
 };
 use crate::bindings::_helpers::planner_migrations::projections::renames_explain_change;
 use crate::bindings::_helpers::planner_phases::objects::object;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -131,12 +133,11 @@ pub(super) fn cursors<'py>(
     entries: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
     let py = snapshot.py();
-    let scope = phase.scope.clone();
-    let models = native_field(&scope, "models_by_name")?;
+    let models = ModelLookup::Native(scope_data(&phase.scope)?);
     let origins = PyDict::new(py);
     for entry in entries {
         let name = native_field(entry, "model_name")?;
-        let model = mapping_get(&models, &name)?;
+        let model = models.get(py, &name.extract::<String>()?)?;
         let cursor = if model.is_truthy()? {
             config(&model, "cursor")?
         } else {
@@ -159,7 +160,7 @@ pub(super) fn cursors<'py>(
             physical
         } else {
             let qualified = native_field(
-                &native_field(&models.get_item(&name)?, "destination")?,
+                &model_reads::destination(&models.get(py, &name.extract::<String>()?)?)?,
                 "qualified_name",
             )?;
             if qualified.is_truthy()? {

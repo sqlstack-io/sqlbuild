@@ -65,7 +65,7 @@ def test_given_reserved_harness_cte_when_linting_then_framework_input_is_not_rep
                 "ELSE FALSE END AS actionable "
                 "FROM support_tickets"
             ),
-            expected_code="SQBRSQL030",
+            expected_code="SQLCLEAN030",
         )
     ],
     ids=lambda case: case.description,
@@ -104,7 +104,7 @@ def test_given_multi_branch_boolean_case_when_linting_then_partial_fix_is_withhe
         NativeSqlFixTestCase(
             description="equal-length expansion wholly inside an unused CTE",
             sql="WITH unused AS (SELECT 42 AS order_id) SELECT 1 AS order_id",
-            expected_code="SQBRSQL005",
+            expected_code="SQLCLEAN005",
         )
     ],
     ids=lambda case: case.description,
@@ -155,7 +155,7 @@ def test_given_generated_interior_with_authored_boundaries_when_linting_then_fix
                 "CROSS JOIN processing_cutoff AS cutoff "
                 "WHERE orders.created_at < cutoff.created_at"
             ),
-            selected_rule="SQBRSQL032",
+            selected_rule="SQLCLEAN032",
             expected_violation_count=0,
         ),
         NativeSqlFindingTestCase(
@@ -166,7 +166,7 @@ def test_given_generated_interior_with_authored_boundaries_when_linting_then_fix
                 "CROSS JOIN LATERAL UNNEST(orders.product_ids) AS item "
                 "INNER JOIN products ON (products.product_id = item.product_id)"
             ),
-            selected_rule="SQBRSQL032",
+            selected_rule="SQLCLEAN032",
             expected_violation_count=0,
         ),
     ],
@@ -207,7 +207,7 @@ def test_given_cross_join_used_downstream_when_linting_then_no_unused_join_is_re
             prefix="-- orders header\n-- second header line\n\n",
             unused_cte_count=40,
             file_count=3,
-            expected_code="SQBRSQL005",
+            expected_code="SQLCLEAN005",
         ),
     ],
     ids=lambda case: case.description,

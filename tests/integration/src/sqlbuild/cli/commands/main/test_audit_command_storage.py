@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -55,12 +56,29 @@ def test_given_a_target_schema_when_auditing_alone_then_history_is_stored_where_
     (tmp_path / "models").mkdir()
     _ = (tmp_path / "models" / "orders.sql").write_text(_ORDERS_MODEL, encoding="utf-8")
     assert main(["--no-color", "--project-dir", str(tmp_path), "build"]) == 0
+    _ = capsys.readouterr()
 
-    exit_code: int = main(["--no-color", "--project-dir", str(tmp_path), "audit"])
+    exit_code: int = main(["--no-color", "--project-dir", str(tmp_path), "audit", "--json"])
 
-    output: str = "".join(capsys.readouterr())
+    captured: tuple[str, str] = capsys.readouterr()
+    output: str = "".join(captured)
     assert exit_code == 0, output
     assert "warning:" not in output
+    payload: dict[str, object] = json.loads(captured[0])
+    assert payload["command"] == "audit"
+    assert payload["status"] == "success"
+    assert payload["summary"] == {
+        "pass_count": 1,
+        "warn_count": 0,
+        "fail_count": 0,
+        "total_count": 1,
+    }
+    assert payload["audit_result_projection"] == {
+        "attempted_count": 1,
+        "written_count": 1,
+        "failed_count": 0,
+    }
+    assert "projection_degraded" not in payload
     db_path: Path = tmp_path / "shop.duckdb"
     assert query_duckdb_rows(
         db_path=db_path,

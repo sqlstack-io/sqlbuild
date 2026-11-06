@@ -4,6 +4,13 @@ use std::collections::HashMap;
 
 use crate::assembly::project::types::ObjectKey;
 
+/// Dependency lists indexed without losing project insertion order.
+#[derive(Debug, Default)]
+pub(crate) struct OrderedEdges {
+    pub(crate) entries: Vec<(ObjectKey, Vec<ObjectKey>)>,
+    pub(crate) index: HashMap<ObjectKey, usize>,
+}
+
 /// One graph resource in project order: its key, upstream keys, tags and model folder.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GraphResource {

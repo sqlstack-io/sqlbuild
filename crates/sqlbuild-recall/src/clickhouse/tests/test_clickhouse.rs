@@ -16,6 +16,7 @@ const OPTIONS: fn() -> DdlOptions = || DdlOptions {
     database: Some("observability".to_owned()),
     retention_days: 30,
     cluster: None,
+    producer_version: "9.8.7".to_owned(),
 };
 
 #[test]

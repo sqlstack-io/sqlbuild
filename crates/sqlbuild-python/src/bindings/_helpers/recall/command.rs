@@ -338,6 +338,7 @@ fn run_schema_ddl(py: Python<'_>, settings: &RecallSettings) -> PyResult<i32> {
                 database: None,
                 retention_days: settings.retention_days,
                 cluster: None,
+                producer_version: env!("CARGO_PKG_VERSION").to_owned(),
             };
             let statements = if path.exists() {
                 open_sqlite_store(path, OpenMode::ReadOnly)

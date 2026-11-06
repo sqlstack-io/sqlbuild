@@ -23,7 +23,7 @@ def write_unevaluated_rules_project(
     model_options: str = "",
     configuration: str = "",
     adapter: str = "duckdb",
-    selected_rules: tuple[str, ...] = ("SQBRSQL035",),
+    selected_rules: tuple[str, ...] = ("SQLCLEAN035",),
     resource_path: str = "models/staging/orders.sql",
     resource_template: str = (
         "MODEL (description 'Test model orders.', {options});\nSELECT {expression} AS order_id"
@@ -317,7 +317,7 @@ def help_fragment_presence(
 
 
 def long_literal_hints(result: subprocess.CompletedProcess[str]) -> dict[str, str]:
-    """Map each finding path of a SQBRSQL044-only run to the help before the generic guidance."""
+    """Map each finding path of a SQLCLEAN044-only run to the help before the generic guidance."""
 
     return {
         str(item["path"]): str(item["remediation"]).partition("Define the value once")[0].strip()
@@ -331,7 +331,7 @@ INCREMENTAL_RULES_PROJECT: dict[str, str] = {
         '[connection]\ndatabase = "warehouse.duckdb"\n\n'
         '[targets.dev]\nschema = "dev"\n\n[targets.prod]\nschema = "prod"\n\n'
         '[vars]\ndiscount_rate = "0.1"\n\n'
-        '[rules]\nselect = ["SQBR", "XSQBR"]\n\n'
+        '[rules]\nselect = ["SQBR", "SQLCLEAN", "XSQBR"]\n\n'
         "[rules.thresholds]\nmin_custom_rule_test_cases = 0\n"
     ),
     "models/staging/stg_orders.sql": (

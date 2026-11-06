@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -51,9 +52,12 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_count=500,
             test_count=2_945,
             audit_count=5_056,
-            expected_cold_max_wall_seconds=9.0,
+            # Default SQL Rules scale 9.0 s by the CI cost over select = []: 1.17x cold and
+            # 1.24x for the project-config edit, which reruns every rule.
+            expected_cold_max_wall_seconds=10.5,
             expected_warm_max_wall_seconds=4.5,
             expected_edit_max_wall_seconds=4.5,
+            expected_project_config_edit_max_wall_seconds=11.2,
             expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
             expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
             expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
@@ -77,6 +81,43 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             expected_macro_edit_misses=1,
         ),
         FreshProcessCompileCachePerformanceGuardTestCase(
+            description="models_3000_fresh_process_compiler_only_compile_cache_stays_incremental",
+            model_count=3_000,
+            source_count=713,
+            seed_count=141,
+            function_count=71,
+            macro_count=500,
+            test_count=2_945,
+            audit_count=5_056,
+            # The one select = [] guard: the same runner as its default Rules twin, previous budgets.
+            expected_cold_max_wall_seconds=9.0,
+            expected_warm_max_wall_seconds=4.5,
+            expected_edit_max_wall_seconds=4.5,
+            expected_project_config_edit_max_wall_seconds=9.0,
+            expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
+            expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
+            expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
+            expected_max_cache_write_wall_overhead_ratio=_MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO,
+            expected_max_rss_bytes=1152 * _MIB,
+            expected_max_cache_bytes=96 * _MIB,
+            expected_cold_fingerprint=(
+                "1914b788abcb452422eaf6c3a2c240ff390bab9530217285a5ca93334db7b6c3"
+            ),
+            expected_leaf_edit_fingerprint=(
+                "3a9480f952f11e16177274185e8bfda7eb0e65953a8ed1c8b21ad3cdb7d0b07d"
+            ),
+            expected_macro_edit_fingerprint=(
+                "552931889359ce882b18d4fb11fdc87341e60a8a4d2b26ad0f1635138c8b9ad8"
+            ),
+            expected_project_config_fingerprint=(
+                "6bf4f742469eee2be7eb5bbf2411564c924011fea0bd43becd80db4027022dac"
+            ),
+            macro_call_interval=6,
+            scoped_macros=True,
+            expected_macro_edit_misses=1,
+            compiler_only=True,
+        ),
+        FreshProcessCompileCachePerformanceGuardTestCase(
             description="models_5000_fresh_process_compile_cache_stays_incremental",
             model_count=5_000,
             source_count=1_189,
@@ -85,9 +126,12 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_count=834,
             test_count=4_908,
             audit_count=8_427,
-            expected_cold_max_wall_seconds=14.5,
+            # Default SQL Rules scale 14.5 s by the CI cost over select = []: 1.18x cold and
+            # 1.24x for the project-config edit, which reruns every rule.
+            expected_cold_max_wall_seconds=17.1,
             expected_warm_max_wall_seconds=7.0,
             expected_edit_max_wall_seconds=7.0,
+            expected_project_config_edit_max_wall_seconds=18.0,
             expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
             expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
             expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
@@ -119,9 +163,12 @@ _MAX_CACHE_WRITE_WALL_OVERHEAD_RATIO: float = 1.35
             macro_count=1_667,
             test_count=9_816,
             audit_count=16_855,
-            expected_cold_max_wall_seconds=28.0,
+            # Default SQL Rules scale 28.0 s by the CI cost over select = []: 1.20x cold and
+            # 1.32x for the project-config edit, which reruns every rule.
+            expected_cold_max_wall_seconds=33.6,
             expected_warm_max_wall_seconds=14.0,
             expected_edit_max_wall_seconds=13.5,
+            expected_project_config_edit_max_wall_seconds=37.0,
             expected_max_warm_to_cold_ratio=_MAX_WARM_TO_COLD_RATIO,
             expected_max_edit_to_cold_ratio=_MAX_EDIT_TO_COLD_RATIO,
             expected_max_cache_write_cpu_overhead_ratio=_MAX_CACHE_WRITE_CPU_OVERHEAD_RATIO,
@@ -165,8 +212,12 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
         expected_cold_max_wall_seconds=test_case.expected_cold_max_wall_seconds,
         expected_warm_max_wall_seconds=test_case.expected_warm_max_wall_seconds,
         expected_edit_max_wall_seconds=test_case.expected_edit_max_wall_seconds,
+        expected_project_config_edit_max_wall_seconds=(
+            test_case.expected_project_config_edit_max_wall_seconds
+        ),
         macro_call_interval=test_case.macro_call_interval,
         scoped_macros=test_case.scoped_macros,
+        compiler_only=test_case.compiler_only,
     )
     measurements: dict[str, FreshProcessCompileBenchmarkResult] = {
         "cache_disabled": result.cache_disabled,
@@ -230,10 +281,17 @@ def test_given_semantic_project_when_compiling_across_processes_then_cache_is_in
             measurement.elapsed_seconds / result.cold.elapsed_seconds
             <= test_case.expected_max_edit_to_cold_ratio
         )
-    assert result.project_config_edit.elapsed_seconds < test_case.expected_cold_max_wall_seconds
+    assert (
+        result.project_config_edit.elapsed_seconds
+        < test_case.expected_project_config_edit_max_wall_seconds
+    )
     assert result.cache_bytes < test_case.expected_max_cache_bytes
 
     assert result.cache_disabled.semantic_fingerprint == test_case.expected_cold_fingerprint
+    cold_timings: dict[str, int] = cast(
+        dict[str, int], result.cache_disabled.payload["compile_timings"]
+    )
+    assert (cold_timings["rule_cache_misses"] > 0) is not test_case.compiler_only
     assert result.cold.semantic_fingerprint == test_case.expected_cold_fingerprint
     assert result.warm.semantic_fingerprint == test_case.expected_cold_fingerprint
     assert result.leaf_edit.semantic_fingerprint == test_case.expected_leaf_edit_fingerprint

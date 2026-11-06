@@ -6,9 +6,16 @@ use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods};
 use sqlbuild_analysis::planner_fixtures::models::FixtureColumn;
+use sqlbuild_core::text::main::python_casefold::python_casefold;
+use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name;
 
 pub(crate) fn folded(value: &Bound<'_, PyAny>) -> PyResult<String> {
-    value.call_method0("casefold")?.extract()
+    Ok(folded_name(&value.extract::<String>()?))
+}
+
+/// The case-folded column name, without the quotes of a quoted identifier such as `"listingId"`.
+pub(crate) fn folded_name(name: &str) -> String {
+    python_casefold(unquoted_column_name(name))
 }
 
 pub(crate) fn columns(values: &Bound<'_, PyAny>, inferred: bool) -> PyResult<Vec<FixtureColumn>> {

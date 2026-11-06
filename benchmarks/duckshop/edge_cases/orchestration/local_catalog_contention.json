@@ -1,0 +1,6 @@
+{
+  "setup_sql": "CREATE TABLE orders AS SELECT 23 AS amount",
+  "query": "SELECT amount FROM orders",
+  "release_after_seconds": 0.5,
+  "persistent_release_after_seconds": 6.0
+}

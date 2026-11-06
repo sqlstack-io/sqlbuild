@@ -9,7 +9,6 @@ use crate::bindings::_helpers::model_config::typed_config::{config_text, model_v
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
-use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::replaced_keywords;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -115,18 +114,6 @@ pub(crate) fn frozenset<'py>(
     items: &[Bound<'py, PyAny>],
 ) -> PyResult<Bound<'py, PyAny>> {
     Ok(PyFrozenSet::new(py, items)?.into_any())
-}
-
-/// Names of model keys among `keys`.
-pub(crate) fn model_key_names(keys: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let mut names: Vec<_> = Vec::new();
-    for key in keys.try_iter()? {
-        let key = key?;
-        if native_field(&key, "resource_type")?.eq("model")? {
-            names.push(native_field(&key, "name")?.extract()?);
-        }
-    }
-    Ok(names)
 }
 
 /// `sorted(items)` as a tuple of strings.

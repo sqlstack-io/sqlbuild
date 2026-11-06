@@ -17,10 +17,6 @@ from tests.e2e.src.sqlbuild.cli.commands.main.scenario.helpers import (
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="needs the polyglot-sql-chio wheel that writes DuckDB lambdas as LAMBDA x : body",
-)
 @pytest.mark.parametrize(
     "test_case",
     [

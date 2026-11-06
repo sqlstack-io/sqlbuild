@@ -174,9 +174,13 @@ fn convert(value: &Bound<'_, PyAny>, open: &[usize]) -> PyResult<Option<PyConfig
     }))
 }
 
-/// An exact `list`, `tuple` or `dict` carried as its own object, its items never converted.
-pub(crate) fn opaque_container(value: &Bound<'_, PyAny>) -> PyResult<PyConfigNode> {
-    host(value, HostChildren::None)
+/// Carry an uninspected value: exact containers keep their own objects without opening items.
+pub(crate) fn carried_node(value: &Bound<'_, PyAny>) -> PyResult<PyConfigNode> {
+    if is_exact_container(value) {
+        host(value, HostChildren::None)
+    } else {
+        config_node(value)
+    }
 }
 
 /// Whether `value` is an exact `list`, `tuple` or `dict`.

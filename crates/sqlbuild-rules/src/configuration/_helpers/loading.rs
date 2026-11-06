@@ -237,7 +237,7 @@ pub(crate) fn validate(config: &RulesConfig) -> Result<(), String> {
         }
     }
     let grammar = crate::models::RulesCodeGrammar;
-    for selector in config.select.iter().chain(&config.ignore) {
+    for selector in config.select.iter().flatten().chain(&config.ignore) {
         if !grammar.rule_selector_is_valid(selector) {
             return Err(format!("malformed rule selector: {selector}"));
         }

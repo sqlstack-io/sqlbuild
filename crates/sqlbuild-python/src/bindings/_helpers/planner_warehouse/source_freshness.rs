@@ -8,19 +8,18 @@ use crate::bindings::_helpers::freshness::planning::{
     build_direct_source_freshness_planning_result, build_direct_source_freshness_propagation_result,
 };
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_phases::objects::{
-    model_key_names, native, replace, text, tuple,
-};
+use crate::bindings::_helpers::planner_phases::objects::{native, replace, text, tuple};
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::constants::RUN_SCOPE;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{destination_nodes, lower};
 use crate::bindings::_helpers::records::construct::enum_member;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::PyDict as KeywordDict;
 use pyo3::types::{PyBool, PyDict, PyDictMethods};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::planner_scope::constants::MODEL;
 use sqlbuild_analysis::planner_warehouse::main::freshness_unknown_message::freshness_unknown_message;
 use std::collections::BTreeSet;
 
@@ -87,12 +86,14 @@ fn state_schemas(
         }
     }
     if schemas.is_empty() {
-        let models = native_field(scope, "models_by_name")?;
-        for name in model_key_names(&native_field(scope, "selected_keys")?)? {
-            let model = mapping_get(&models, name)?;
-            if model.is_none() {
+        let data = scope_data(scope)?;
+        for (kind, name) in &data.selected {
+            if kind != MODEL {
                 continue;
             }
+            let Some(model) = data.model(scope.py(), name) else {
+                continue;
+            };
             let schema = native_field(&model_reads::destination(&model)?, "schema")?;
             if !schema.is_none() {
                 schemas.insert(schema.extract()?);

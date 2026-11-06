@@ -69,6 +69,10 @@ pub fn format_compile_text(report: &CompileTextReport) -> String {
         lines.push(diagnostics_text(&report.diagnostics, style));
         lines.push(String::new());
     }
+    if let Some(notice) = report.default_rules_notice.as_deref() {
+        lines.push(notice.to_owned());
+        lines.push(String::new());
+    }
     let summary: String = [
         count_label(report.models.len(), "model"),
         count_label(report.seed_count, "seed"),

@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 
 use pyo3::IntoPyObjectExt;
-use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python, pyclass, pymethods};
+use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python, pyclass, pymethods};
 use pyo3::types::{PyDict, PyTuple};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_state::execution_history::constants::{
@@ -41,7 +41,6 @@ use sqlbuild_state::execution_history::models::{
 use sqlbuild_state::execution_history::types::UtcTime;
 
 use crate::bindings::_helpers::boundary::python_calls::imported;
-use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::execution_history::appends::prepared_batch;
 use crate::bindings::_helpers::execution_history::conversion::{
     checked, event_filter_spec, exact_int, history_error_of_kind, new_namespace, now,
@@ -50,15 +49,16 @@ use crate::bindings::_helpers::execution_history::conversion::{
     text_of, utc_time,
 };
 use crate::bindings::_helpers::execution_history::statements::{
-    column, execute, execute_plain, execute_query, fetch_one, locked, tuple_of,
+    column, execute, execute_plain, execute_query, fetch_one, tuple_of,
 };
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, sqlite_params};
+use crate::bindings::_helpers::native_host::sqlite_cursor::SqliteCursor;
+use crate::bindings::_helpers::native_threads::reentrant_lock::ReentrantLock;
 use crate::bindings::_helpers::records::fields::field as native_field;
 
 const SQLITE_MODULE: &str = "sqlite3";
 const PATHLIB_MODULE: &str = "pathlib";
-const THREADING_MODULE: &str = "threading";
-const MILLIS_PER_SECOND: f64 = 1000.0;
 const CLOSED: &str = "SQLite execution history storage is closed";
 const NOT_AWARE: &str = "SQLite history timestamp is not timezone-aware";
 const INTEGRITY_CONFLICT: ExecutorHost = ExecutorHost::IntegrityConflictError;
@@ -188,7 +188,7 @@ fn stored_run(row: &Bound<'_, PyAny>) -> PyResult<RunRow> {
 )]
 pub(crate) struct SqliteExecutionHistory {
     path: OnceLock<String>,
-    lock: OnceLock<Py<PyAny>>,
+    lock: ReentrantLock,
     closed: AtomicBool,
     project_calls: AtomicI64,
 }
@@ -203,10 +203,7 @@ impl SqliteExecutionHistory {
         py: Python<'py>,
         body: impl FnOnce() -> PyResult<T>,
     ) -> PyResult<T> {
-        let Some(lock) = self.lock.get() else {
-            return Err(storage_error(py, CLOSED));
-        };
-        locked(lock.bind(py), body)
+        self.lock.with_lock(py, body)
     }
 
     fn ensure_open(&self, py: Python<'_>) -> PyResult<()> {
@@ -236,7 +233,10 @@ impl SqliteExecutionHistory {
             };
             if let Err(error) = execute_plain(&connection, SQLITE_COMMIT) {
                 if sqlite_failure(py, &error)?
-                    && native_field(&connection, "in_transaction")?.is_truthy()?
+                    && match connection.cast::<SqliteConnection>() {
+                        Ok(connection) => connection.get().in_transaction(py)?,
+                        Err(_) => native_field(&connection, "in_transaction")?.is_truthy()?,
+                    }
                 {
                     let _ = execute_plain(&connection, SQLITE_ROLLBACK);
                 }
@@ -313,6 +313,16 @@ impl SqliteExecutionHistory {
     fn replace_projection(connection: &Bound<'_, PyAny>, projected: &[RunRow]) -> PyResult<()> {
         let py: Python<'_> = connection.py();
         execute_plain(connection, SQLITE_DELETE_RUNS)?;
+        if let Ok(connection) = connection.cast::<SqliteConnection>() {
+            for run in projected {
+                connection.get().execute_native(
+                    py,
+                    SQLITE_RUN_INSERT,
+                    &sqlite_params(&run_insert_query(Dialect::Sqlite, run).params)?,
+                )?;
+            }
+            return Ok(());
+        }
         let rows: Vec<Bound<'_, PyAny>> = projected
             .iter()
             .map(|run| {
@@ -350,10 +360,16 @@ impl SqliteExecutionHistory {
                 None => {
                     let query = event_insert_query(Dialect::Sqlite, event, &now(py)?);
                     let cursor: Bound<'py, PyAny> = execute_query(connection, &query)?;
-                    let storage_id: Bound<'py, PyAny> = native_field(&cursor, "lastrowid")?;
-                    connection
-                        .call_method1("execute", (SQLITE_EVENT_BY_STORAGE_ID, (storage_id,)))?
-                        .call_method0("fetchone")?
+                    let storage_id: i64 = match cursor.cast::<SqliteCursor>() {
+                        Ok(cursor) => cursor.get().last_row_id,
+                        Err(_) => native_field(&cursor, "lastrowid")?.extract()?,
+                    };
+                    fetch_one(&execute(
+                        connection,
+                        SQLITE_EVENT_BY_STORAGE_ID,
+                        &[SqlParam::Integer(storage_id)],
+                    )?)?
+                    .unwrap_or_else(|| py.None().into_bound(py))
                 }
             };
             if namespace.is_none() {
@@ -453,7 +469,7 @@ impl SqliteExecutionHistory {
     fn new(_args: &Bound<'_, PyTuple>, _kwargs: Option<&Bound<'_, PyDict>>) -> Self {
         Self {
             path: OnceLock::new(),
-            lock: OnceLock::new(),
+            lock: ReentrantLock::default(),
             closed: AtomicBool::new(true),
             project_calls: AtomicI64::new(0),
         }
@@ -490,31 +506,14 @@ impl SqliteExecutionHistory {
         let database: String = checked(py, sqlite_database_path(&location))?;
         let busy_timeout_ms: i64 = location.busy_timeout_ms.unwrap_or(SQLITE_BUSY_TIMEOUT_MS);
         let _ = this.path.set(database.clone());
-        let lock: Bound<'_, PyAny> = imported(py, THREADING_MODULE, "RLock")?.call0()?;
-        let _ = this.lock.set(lock.unbind());
         this.closed.store(false, Ordering::SeqCst);
         let mut connection: Option<Bound<'_, PyAny>> = None;
         let opened: PyResult<()> = (|| {
             prepare_history_directory(&database)?;
-            let sqlite = py.import(SQLITE_MODULE)?;
-            let opened: Bound<'_, PyAny> = native_field(&sqlite, "connect")?.call(
-                (database.as_str(),),
-                Some(&keywords(
-                    py,
-                    &[
-                        (
-                            "timeout",
-                            (busy_timeout_ms as f64 / MILLIS_PER_SECOND).into_bound_py_any(py)?,
-                        ),
-                        ("isolation_level", py.None().into_bound(py)),
-                        ("check_same_thread", false.into_bound_py_any(py)?),
-                    ],
-                )?),
-            )?;
+            let opened = Bound::new(py, SqliteConnection::open(py, &database)?)?.into_any();
             connection = Some(opened.clone());
             slf.setattr("_connection", &opened)?;
             this.with_lock(py, || {
-                opened.setattr("row_factory", native_field(&sqlite, "Row")?)?;
                 execute_plain(&opened, &format!("PRAGMA busy_timeout = {busy_timeout_ms}"))?;
                 execute_plain(&opened, SQLITE_FOREIGN_KEYS)?;
                 if database != MEMORY_PATH {
@@ -842,9 +841,6 @@ impl SqliteExecutionHistory {
     fn close(slf: &Bound<'_, Self>) -> PyResult<()> {
         let py: Python<'_> = slf.py();
         let this: &Self = slf.get();
-        if this.lock.get().is_none() {
-            return Ok(());
-        }
         this.with_lock(py, || {
             if this.closed.load(Ordering::SeqCst) {
                 return Ok(());

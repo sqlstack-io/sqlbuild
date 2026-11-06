@@ -852,7 +852,7 @@ fn given_a_sql_macro_call_in_python_macro_arguments_when_expanding_then_python_r
             panic!("{} does not expand", test_case.description);
         };
 
-        let scan = scan_macro_call_sites(&expanded);
+        let scan = scan_macro_call_sites(&expanded, None);
         let arguments: Option<String> = scan.sites.first().map(|site| {
             expanded
                 .chars()

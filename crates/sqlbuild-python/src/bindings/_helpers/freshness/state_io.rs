@@ -4,7 +4,10 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
-use sqlbuild_state::freshness::constants::{REQUIRED_STATE_COLUMNS, SOURCE_FRESHNESS_COLUMN_TYPES};
+use sqlbuild_state::freshness::constants::{
+    REQUIRED_STATE_COLUMNS, SOURCE_FRESHNESS_COLUMN_TYPES, SOURCE_FRESHNESS_EVENT_ID,
+    STRING_STATE_VALUE_TYPE,
+};
 use sqlbuild_state::freshness::main::read_latest_sql::read_latest_sql;
 use sqlbuild_state::freshness::main::relevant_sources_sql::relevant_sources_sql;
 
@@ -13,6 +16,8 @@ use crate::bindings::_helpers::cursor::values::DATETIME_MODULE;
 use crate::bindings::_helpers::freshness::support::{
     INPUT_ERROR, exception_text, freshness_error, optional_str, presumed_utc_datetime, text,
 };
+use crate::bindings::_helpers::native_host::consumption_state::state_table_name;
+use crate::bindings::_helpers::native_host::state_column_evolution::ensure_event_id_column;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
@@ -24,25 +29,17 @@ const MISSING_SCHEMA_MESSAGE: &str = "source freshness table requires a target s
 /// The qualified state table name the adapter renders for one target schema.
 pub(crate) fn qualified_table_name(
     render_qualified_name: &Bound<'_, PyAny>,
-    (database, schema): (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
+    location: (&Bound<'_, PyAny>, &Bound<'_, PyAny>),
 ) -> PyResult<String> {
-    let py: Python<'_> = render_qualified_name.py();
-    let name: Bound<'_, PyAny> = call_with(
-        render_qualified_name,
-        &[
-            ("database", database.clone()),
-            ("schema", schema.clone()),
-            ("name", text(py, SOURCE_FRESHNESS_TABLE_NAME)),
-        ],
-    )?;
-    if name.is_none() {
-        return Err(freshness_error(
-            py,
-            (INPUT_ERROR, MISSING_SCHEMA_MESSAGE),
-            None,
-        ));
-    }
-    name.extract()
+    state_table_name(render_qualified_name, location, SOURCE_FRESHNESS_TABLE_NAME)?.ok_or_else(
+        || {
+            freshness_error(
+                render_qualified_name.py(),
+                (INPUT_ERROR, MISSING_SCHEMA_MESSAGE),
+                None,
+            )
+        },
+    )
 }
 
 /// SQL selecting the latest source freshness row per identity.
@@ -82,12 +79,20 @@ fn create_table_sql<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = database.py();
     let qualified_name: String = qualified_table_name(render_qualified_name, (database, schema))?;
-    let columns: Bound<'py, PyAny> =
-        PyTuple::new(py, SOURCE_FRESHNESS_COLUMN_TYPES.map(|(column, _)| column))?.into_any();
+    let columns: Bound<'py, PyAny> = PyTuple::new(
+        py,
+        SOURCE_FRESHNESS_COLUMN_TYPES
+            .iter()
+            .map(|(column, _)| *column)
+            .chain([SOURCE_FRESHNESS_EVENT_ID])
+            .collect::<Vec<_>>(),
+    )?
+    .into_any();
     let column_types: Bound<'py, PyDict> = PyDict::new(py);
     for (column, declared) in SOURCE_FRESHNESS_COLUMN_TYPES {
         column_types.set_item(column, declared)?;
     }
+    column_types.set_item(SOURCE_FRESHNESS_EVENT_ID, STRING_STATE_VALUE_TYPE)?;
     let column_types: Bound<'py, PyAny> = column_types.into_any();
     let required: Bound<'py, PyAny> = PyFrozenSet::new(py, REQUIRED_STATE_COLUMNS)?.into_any();
     let sql: String = state_table_create_sql(
@@ -180,7 +185,7 @@ freshness table to regenerate source freshness state."
     )
 }
 
-fn row_record<'py>(row: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+pub(crate) fn row_record<'py>(row: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = row.py();
     let raw_observed_at: Bound<'py, PyAny> = row.get_item(9)?;
     let observed_at: Bound<'py, PyAny> = if date_time_typed(&raw_observed_at)? {
@@ -306,6 +311,20 @@ pub(crate) fn write_source_freshness_records<'py>(
         call_with(&render_create, &location())?
     };
     execute_sql((execute, connection), create_sql)?;
+    let qualified = qualified_table_name(
+        &native_field(renderers, "render_qualified_name")?,
+        (database, schema),
+    )?;
+    ensure_event_id_column(
+        (connection, execute),
+        (database, schema),
+        (SOURCE_FRESHNESS_TABLE_NAME, &qualified),
+        (
+            &native_field(renderers, "read_columns")?,
+            &native_field(renderers, "render_add_columns")?,
+            &native_field(renderers, "render_framework_type")?,
+        ),
+    )?;
     let render_indexes: Bound<'py, PyAny> = native_field(renderers, "render_create_index_sqls")?;
     if !render_indexes.is_none() {
         for index_sql in call_with(&render_indexes, &location())?.try_iter()? {

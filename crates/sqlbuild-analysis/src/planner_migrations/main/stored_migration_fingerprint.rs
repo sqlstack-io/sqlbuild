@@ -1,6 +1,6 @@
 //! Read persisted migration hashes without changing their representation.
 
-use crate::planner_changes::constants::MIGRATION_FINGERPRINT_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::constants::MIGRATION_FINGERPRINT_METADATA_KEY;
 
 /// Read only string migration fingerprints from object metadata.
 pub fn stored_migration_fingerprint(metadata: &str) -> Option<String> {

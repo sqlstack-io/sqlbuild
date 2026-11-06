@@ -60,7 +60,7 @@ fn given_repeated_long_literals_when_hinting_then_matches_python_wording() {
             .paths
             .iter()
             .map(|path| RuleFinding {
-                code: "SQBRSQL044".to_owned(),
+                code: "SQLCLEAN044".to_owned(),
                 path: (*path).to_owned(),
                 line: 1,
                 column: 8,
@@ -89,16 +89,16 @@ fn given_rules_result_when_formatting_then_matches_python_text_and_json() {
         ResultTestCase {
             description: "text lists affected rules, the fix note and unevaluated resources",
             json_output: false,
-            expected_text: "models/o.sql:3:4 [SQBRSQL001] bad \u{e9}\n  Remediation: Fix it.\n  Affected Rules: A, B\n  Fix available: `sqb format --fix` applies it after compiler verification\nFound 1 Rules findings\n2 models evaluated, 1 resources could not be evaluated",
+            expected_text: "models/o.sql:3:4 [SQLCLEAN001] bad \u{e9}\n  Remediation: Fix it.\n  Affected Rules: A, B\n  Fix available: `sqb format --fix` applies it after compiler verification\nFound 1 Rules findings\n2 models evaluated, 1 resources could not be evaluated",
         },
         ResultTestCase {
             description: "JSON is indented, key-sorted and ASCII-escaped",
             json_output: true,
-            expected_text: "{\n  \"cache_hits\": 1,\n  \"cache_misses\": 1,\n  \"evaluated_models\": 2,\n  \"finding_count\": 1,\n  \"findings\": [\n    {\n      \"affected_rules\": [\n        \"A\",\n        \"B\"\n      ],\n      \"code\": \"SQBRSQL001\",\n      \"column\": 4,\n      \"fixable\": true,\n      \"line\": 3,\n      \"message\": \"bad \\u00e9\",\n      \"path\": \"models/o.sql\",\n      \"remediation\": \"Fix it.\"\n    }\n  ],\n  \"unevaluated_resources\": 1\n}",
+            expected_text: "{\n  \"cache_hits\": 1,\n  \"cache_misses\": 1,\n  \"evaluated_models\": 2,\n  \"finding_count\": 1,\n  \"findings\": [\n    {\n      \"affected_rules\": [\n        \"A\",\n        \"B\"\n      ],\n      \"code\": \"SQLCLEAN001\",\n      \"column\": 4,\n      \"fixable\": true,\n      \"line\": 3,\n      \"message\": \"bad \\u00e9\",\n      \"path\": \"models/o.sql\",\n      \"remediation\": \"Fix it.\"\n    }\n  ],\n  \"unevaluated_resources\": 1\n}",
         },
     ];
     let finding = RuleFinding {
-        code: "SQBRSQL001".to_owned(),
+        code: "SQLCLEAN001".to_owned(),
         path: "models/o.sql".to_owned(),
         line: 3,
         column: 4,

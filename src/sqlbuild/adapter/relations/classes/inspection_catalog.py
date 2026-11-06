@@ -9,9 +9,14 @@ from typing import Any, cast
 
 from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
 from sqlbuild.adapter.relations._helpers.inspection_context import emit_inspection_record
+from sqlbuild.adapter.relations._helpers.relation_metadata_context import (
+    current_relation_metadata_cache,
+)
+from sqlbuild.adapter.relations.classes.relation_metadata_cache import RelationMetadataCache
 from sqlbuild.adapter.relations.constants import (
     INSPECTION_DESCRIBED_NAME_LIMIT,
     INSPECTION_IN_LIST_LIMIT,
+    SCHEMA_LISTING_MAX_AGE_SECONDS,
 )
 from sqlbuild.adapter.relations.main.run_bounded_inspections import run_bounded_inspections
 from sqlbuild.adapter.relations.models import (
@@ -19,7 +24,11 @@ from sqlbuild.adapter.relations.models import (
     SchemaColumnListing,
     SchemaRelationListing,
 )
-from sqlbuild.adapter.relations.types import SchemaScopedMetadataReader, ViewDefinitionBatchReader
+from sqlbuild.adapter.relations.types import (
+    RelationListingScoper,
+    SchemaScopedMetadataReader,
+    ViewDefinitionBatchReader,
+)
 
 type _RelationIdentity = tuple[str | None, str | None, str]
 type _SchemaKey = tuple[str | None, str]
@@ -301,15 +310,37 @@ class InspectionCatalog:
     ) -> Callable[[], SchemaRelationListing | None]:
         def read_listing() -> SchemaRelationListing | None:
             try:
-                return reader.read_schema_relation_listing(
-                    connection=self.connection, database=database, schema=schema
-                )
+                return self._read_relation_listing(reader=reader, database=database, schema=schema)
             except Exception:
                 if best_effort:
                     return None
                 raise
 
         return read_listing
+
+    def _read_relation_listing(
+        self, *, reader: SchemaScopedMetadataReader, database: str | None, schema: str
+    ) -> SchemaRelationListing:
+        """Read one schema's relations, and keep them for the build's run when one is open."""
+
+        cache: RelationMetadataCache | None = current_relation_metadata_cache(adapter=self.adapter)
+        if cache is None or not isinstance(self.adapter, RelationListingScoper):
+            return reader.read_schema_relation_listing(
+                connection=self.connection, database=database, schema=schema
+            )
+        versions: tuple[int, dict[str, int]] = cache.listing_versions()
+        listing: SchemaRelationListing = reader.read_schema_relation_listing(
+            connection=self.connection, database=database, schema=schema
+        )
+        _ = cache.keep_schema_listing(
+            scope=self.adapter.relation_listing_scope(
+                connection=self.connection, database=database, schema=schema
+            ),
+            relations={entry.stored_name: entry.relation for entry in listing.entries},
+            versions=versions,
+            max_age_seconds=SCHEMA_LISTING_MAX_AGE_SECONDS,
+        )
+        return listing
 
     def _read_columns_directly(self, *, relations: tuple[RelationInfo, ...]) -> None:
         started: float = time.monotonic()

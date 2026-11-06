@@ -1,10 +1,13 @@
 pub mod build_project_graph;
 pub mod build_resources;
+pub mod downstream_edges;
 pub mod edge_keys;
 pub mod graph_from_indexes;
 pub mod match_selector;
 pub mod model_layer_count;
 pub mod parse_selector;
+pub mod reachable_graph_keys;
+pub mod reachable_keys;
 pub mod resolve_selector_tokens;
 pub mod resolve_selectors;
 pub mod selector_name_help;

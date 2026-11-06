@@ -5,6 +5,7 @@ pub(crate) mod constants;
 pub mod errors;
 pub mod main;
 pub(crate) mod models;
+pub(crate) mod types;
 
 #[cfg(test)]
 mod tests;

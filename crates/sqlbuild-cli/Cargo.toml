@@ -1,6 +1,6 @@
 [package]
 name = "sqlbuild-cli"
-version.workspace = true
+version = "0.190.0"
 description = "The native `sqb` executable: reused compiles and Python-free commands served without Python, every other command handed to the Python CLI."
 edition.workspace = true
 license-file = "LICENSE"
@@ -17,22 +17,35 @@ path = "src/bin/sqlbuild.rs"
 
 [dependencies]
 blake3.workspace = true
+chrono.workspace = true
 getrandom.workspace = true
+keyring = { workspace = true, features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
+reqwest.workspace = true
+rpassword.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
 sqlbuild-build-features.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-config.workspace = true
 sqlbuild-core.workspace = true
+sqlbuild-cursor.workspace = true
+sqlbuild-model-config.workspace = true
+sqlbuild-orchestration.workspace = true
+sqlbuild-process-ownership.workspace = true
+sqlbuild-recall.workspace = true
 sqlbuild-rules.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 rustix.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 ctrlc.workspace = true
+same-file.workspace = true
 
 [dev-dependencies]
+rusqlite.workspace = true
 tempfile.workspace = true
 
 [lints]

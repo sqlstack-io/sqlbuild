@@ -5,6 +5,7 @@ use std::sync::Arc;
 use pyo3::FromPyObject;
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
+use sqlbuild_analysis::compiled_project::main::header_metadata_keys::is_header_metadata_key;
 use sqlbuild_analysis::compiled_project::main::plain_model_facts::plain_model_facts;
 use sqlbuild_analysis::compiled_project::models::{
     CompiledModelFacts, ModelConfigFacts, PlainModel,
@@ -23,7 +24,11 @@ use crate::bindings::_helpers::compiled_views::model_input_view::{
 };
 use crate::bindings::_helpers::discovery::model_file_record::{ModelFileTexts, NativeModelFile};
 use crate::bindings::_helpers::input_loops::model_loop_header::AttachedHeader;
-use crate::bindings::_helpers::input_loops::model_loop_inputs::{reference_fact, stripped_values};
+use crate::bindings::_helpers::input_loops::model_loop_inputs::{
+    HOOK_KEYS, reference_fact, stripped_values,
+};
+use crate::bindings::_helpers::model_config::config_nodes::carried_node;
+use crate::bindings::_helpers::model_config::typed_config::{retain_values, typed_values};
 use crate::bindings::_helpers::records::fields::{field as native_field, replaced_keywords};
 use crate::bindings::_helpers::render::declaration_expansion::{ExpandedDeclarations, span_rows};
 use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_row};
@@ -169,6 +174,17 @@ pub(crate) fn finished_record<'py>(
     let replaced: Bound<'py, PyDict> = PyDict::new(py);
     replaced.set_item(VALUES_ARGUMENT, &stripped)?;
     let config: Bound<'py, PyAny> = replaced_keywords(&finished.config, &replaced)?;
+    let (_, typed) = typed_values(&finished.config)?;
+    if let Some(built) = &typed.get().built {
+        let mut nodes = built.as_ref().clone();
+        nodes.retain(|key, _| !is_header_metadata_key(key));
+        for key in HOOK_KEYS {
+            if let Some(value) = stripped.get_item(key)? {
+                nodes.insert(key.to_owned(), Arc::new(carried_node(&value)?));
+            }
+        }
+        retain_values(&config, Some(&Arc::new(nodes)))?;
+    }
     let mut declaration_usages: Vec<Bound<'py, PyAny>> = unique(py, usages)?;
     declaration_usages.extend(finished.named_usages);
     let sql_macro_names: Vec<String> = finished.declarations.sql_macros.clone();
@@ -221,8 +237,8 @@ pub(crate) fn finished_record<'py>(
         model_schema: schema.model_schema.clone(),
         host: SchemaHandles {
             columns: schema.columns.clone(),
-            audits: schema.audits.clone().unbind(),
-            dynamic_columns: schema.dynamic_columns.clone().unbind(),
+            audits: schema.audits.clone(),
+            dynamic_columns: schema.dynamic_columns.clone(),
         },
     });
     let authored: Arc<str> = authored_query_sql.clone();

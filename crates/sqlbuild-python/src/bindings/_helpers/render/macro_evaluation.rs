@@ -226,8 +226,8 @@ fn final_sql(run: &Evaluation<'_, '_>, name: &str, value: &Bound<'_, PyAny>) -> 
         return Err(PyErr::from_value(raised_error));
     }
     let sql: String = value.extract()?;
-    let names: Vec<String> =
-        scan_names(&sql, false).map_err(|error| raised(&classes.compile_error, error.message()))?;
+    let names: Vec<String> = scan_names(&sql, false, expansion.syntax.as_ref())
+        .map_err(|error| raised(&classes.compile_error, error.message()))?;
     if names.is_empty() {
         return Ok(sql);
     }
@@ -256,7 +256,7 @@ fn call_arguments<'py>(
         return Ok((PyTuple::empty(py), PyDict::new(py)));
     }
     let text: CallText<'_> = CallText::new(args_source);
-    let scan: MacroCallScan = scan_sites(args_source);
+    let scan: MacroCallScan = scan_sites(args_source, run.expansion.syntax.as_ref());
     let mut values: Vec<Bound<'py, PyAny>> = Vec::with_capacity(scan.sites.len());
     for site in &scan.sites {
         values.push(evaluate_call(run, (&text, site), false)?);

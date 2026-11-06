@@ -6,6 +6,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::model_config::template_data::record_reads;
@@ -28,10 +29,13 @@ use crate::bindings::_helpers::render::macro_call_rows::{span_row, span_tuple};
 use crate::bindings::_helpers::render::macro_expansion_result::{ExpansionRequest, macro_output};
 use crate::bindings::_helpers::render::sql_macro_host::SqlMacroSource;
 use crate::bindings::_helpers::sqltext::declaration_references::declaration_scan;
+use crate::bindings::_helpers::sqltext::lexical_syntax::optional_record_syntax;
 use crate::bindings::_helpers::sqltext::static_sql::{
     InterpolationRow, InterpolationSources, interpolation_batch,
 };
 
+/// The macro context field holding the project's `SqlLexicalSyntax`.
+const LEXICAL_SYNTAX_FIELD: &str = "_lexical_syntax";
 const DECLARATION_FIELDS: [&str; 4] = [
     "enums",
     "constants",
@@ -39,11 +43,20 @@ const DECLARATION_FIELDS: [&str; 4] = [
     "inaccessible_constants",
 ];
 
+/// The project's lexical rules the macro context holds, if any.
+fn context_syntax(macro_context: &Bound<'_, PyAny>) -> PyResult<Option<LexicalSyntax>> {
+    if macro_context.is_none() {
+        return Ok(None);
+    }
+    optional_record_syntax(&native_field(macro_context, LEXICAL_SYNTAX_FIELD)?)
+}
+
 /// `sql` with `@@` tokens interpolated and each substitution's span, raising its error.
 fn substituted<'py>(
     sql: &Bound<'py, PyAny>,
     file_path: &Bound<'py, PyAny>,
     (effective_vars, context_values): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    syntax: Option<&LexicalSyntax>,
 ) -> PyResult<(String, Vec<SpanRow>)> {
     let py: Python<'py> = sql.py();
     let sources = InterpolationSources(
@@ -55,6 +68,7 @@ fn substituted<'py>(
             Some(context_values.downcast()?.clone())
         },
         registry::native(py, NativeAttr::RenderProjectVarText)?,
+        syntax.cloned(),
     );
     let text: String = sql.extract()?;
     let path: String = file_path.str()?.extract()?;
@@ -123,9 +137,10 @@ fn declarations_expanded<'py>(
         &Bound<'py, PyAny>,
         &Bound<'py, PyAny>,
     ),
+    syntax: Option<&LexicalSyntax>,
 ) -> PyResult<(String, Vec<SpanRow>)> {
     let py: Python<'py> = file_path.py();
-    let (references, stop) = declaration_scan(sql);
+    let (references, stop) = declaration_scan(sql, syntax);
     if references.is_empty() && stop.is_none() {
         return Ok((sql.to_owned(), Vec::new()));
     }
@@ -155,6 +170,7 @@ fn declarations_expanded<'py>(
             loaded_macros: Some(loaded_macros),
             origin: None,
             scopes: None,
+            syntax,
         }),
     })?;
     let spans: Vec<SpanRow> = span_rows(&expanded.spliced);
@@ -184,10 +200,12 @@ struct AuthoredSources<'a, 'py> {
 
 fn authored_expansion(sources: AuthoredSources<'_, '_>) -> PyResult<AuthoredExpansion> {
     let py: Python<'_> = sources.sql.py();
+    let syntax: Option<LexicalSyntax> = context_syntax(sources.macro_context)?;
     let (interpolated, interpolation_spans) = substituted(
         sources.sql,
         sources.file_path,
         (sources.effective_vars, sources.context_values),
+        syntax.as_ref(),
     )?;
     let (declared, declaration_spans) = declarations_expanded(
         &interpolated,
@@ -197,6 +215,7 @@ fn authored_expansion(sources: AuthoredSources<'_, '_>) -> PyResult<AuthoredExpa
             sources.value_renderer,
             sources.collection_rendering,
         ),
+        syntax.as_ref(),
     )?;
     let request: ExpansionRequest<'_> = ExpansionRequest {
         sql: PyString::new(py, &declared),
@@ -368,7 +387,8 @@ fn substitute_sql_vars_with_spans<'py>(
     let py: Python<'py> = sql.py();
     let context_values: Bound<'py, PyAny> =
         context_values.unwrap_or_else(|| py.None().into_bound(py));
-    let (substituted_sql, spans) = substituted(sql, file_path, (effective_vars, &context_values))?;
+    let (substituted_sql, spans) =
+        substituted(sql, file_path, (effective_vars, &context_values), None)?;
     Ok((substituted_sql, span_objects(py, &spans)?))
 }
 

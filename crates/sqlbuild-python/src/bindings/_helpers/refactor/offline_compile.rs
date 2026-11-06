@@ -8,7 +8,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyString, PyTuple};
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::compile_command::target_writer::static_sql_test_planning_diagnostics;
+use crate::bindings::_helpers::compile_command::target_writer::{Prepared, planning_diagnostics};
 use crate::bindings::_helpers::compile_driver::analysis::analyze_compile_project;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record, new_record_with};
@@ -171,22 +171,13 @@ pub(crate) fn compile_for_refactor<'py>(
         only_rule_failures &= native_field(error, "phase")?.is(&rule_phase);
     }
     if only_rule_failures {
-        let planned: PyResult<Bound<'py, PyTuple>> = static_sql_test_planning_diagnostics(
-            py,
-            Some(keywords(
-                py,
-                &[
-                    (
-                        "target_dir",
-                        project_dir.join("target").into_pyobject(py)?.into_any(),
-                    ),
-                    ("adapter", native_field(&analysis, "adapter")?),
-                    (
-                        "project",
-                        native_field(&native_field(&analysis, "graph")?, "project")?,
-                    ),
-                ],
-            )?),
+        let planned: PyResult<Bound<'py, PyTuple>> = planning_diagnostics(
+            &project_dir.join("target").into_pyobject(py)?.into_any(),
+            (
+                &native_field(&analysis, "adapter")?,
+                &native_field(&native_field(&analysis, "graph")?, "project")?,
+            ),
+            Prepared::default(),
         );
         match planned {
             Ok(diagnostics) => errors.extend(error_diagnostics(diagnostics.into_any())?),

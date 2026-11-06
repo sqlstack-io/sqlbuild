@@ -17,6 +17,13 @@ class BuildFooterTestCase:
 
 
 @dataclass(frozen=True)
+class BuildFooterMeasurementTestCase:
+    description: str
+    value: int | float | None
+    expected_text: str
+
+
+@dataclass(frozen=True)
 class ExecutionHeaderTestCase:
     description: str
     command: str

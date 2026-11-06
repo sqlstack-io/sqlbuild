@@ -5,6 +5,8 @@ use pyo3::types::PyTuple;
 use sqlbuild_state::execution_history::models::{Query, SqlParam};
 
 use crate::bindings::_helpers::execution_history::conversion::python_params;
+use crate::bindings::_helpers::native_host::sqlite_connection::{SqliteConnection, sqlite_params};
+use crate::bindings::_helpers::native_host::sqlite_cursor::{SqliteCursor, SqliteRow};
 
 /// `target.execute(sql, params)`.
 pub(crate) fn execute<'py>(
@@ -13,6 +15,15 @@ pub(crate) fn execute<'py>(
     params: &[SqlParam],
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = target.py();
+    if let Ok(connection) = target.cast::<SqliteConnection>() {
+        return Bound::new(
+            py,
+            connection
+                .get()
+                .execute_native(py, sql, &sqlite_params(params)?)?,
+        )
+        .map(Bound::into_any);
+    }
     target.call_method1("execute", (sql, python_params(py, params)?))
 }
 
@@ -21,6 +32,9 @@ pub(crate) fn execute_plain<'py>(
     target: &Bound<'py, PyAny>,
     sql: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
+    if target.is_instance_of::<SqliteConnection>() {
+        return execute(target, sql, &[]);
+    }
     target.call_method1("execute", (sql,))
 }
 
@@ -34,6 +48,13 @@ pub(crate) fn execute_query<'py>(
 
 /// The first row `cursor.fetchone()` returns, or `None`.
 pub(crate) fn fetch_one<'py>(cursor: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
+    if let Ok(cursor) = cursor.cast::<SqliteCursor>() {
+        return cursor
+            .get()
+            .next_row()
+            .map(|row| Bound::new(cursor.py(), row).map(Bound::into_any))
+            .transpose();
+    }
     let row: Bound<'py, PyAny> = cursor.call_method0("fetchone")?;
     Ok((!row.is_none()).then_some(row))
 }
@@ -43,21 +64,11 @@ pub(crate) fn fetch_all<'py>(cursor: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'
     cursor.call_method0("fetchall")?.try_iter()?.collect()
 }
 
-/// Run `body` while holding the Python `lock`, releasing it on every exit.
-pub(crate) fn locked<T>(
-    lock: &Bound<'_, PyAny>,
-    body: impl FnOnce() -> PyResult<T>,
-) -> PyResult<T> {
-    lock.call_method0("acquire")?;
-    let result: PyResult<T> = body();
-    let released = lock.call_method0("release");
-    let value: T = result?;
-    released?;
-    Ok(value)
-}
-
 /// `row[name]`.
 pub(crate) fn column<'py>(row: &Bound<'py, PyAny>, name: &str) -> PyResult<Bound<'py, PyAny>> {
+    if let Ok(row) = row.cast::<SqliteRow>() {
+        return row.get().column(row.py(), name);
+    }
     row.get_item(name)
 }
 

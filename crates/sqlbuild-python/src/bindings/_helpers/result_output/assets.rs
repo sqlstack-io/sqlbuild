@@ -2,16 +2,18 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList};
+use sqlbuild_host::models::{
+    ExecutionStatus, FunctionExecutionResult, LifeCycleEvent, LifeCycleEventKind,
+    LoadExecutionResult, ModelExecutionResult, SeedExecutionResult,
+};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::plan_output::safety::{future_cursor_safety, maximum_start_safety};
-use crate::bindings::_helpers::plan_output::values::{any, dict, items, optional_enum_value};
+use crate::bindings::_helpers::plan_output::values::{any, dict, items};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::result_output::projection::{Projection, rounded};
-
-const FAILED_STATUS: &str = "failed";
-const SQL_EVENT_KIND: &str = "sql";
 
 /// A dictionary of the entries whose value is not `None`, in order.
 pub(crate) fn without_none<'py>(
@@ -64,106 +66,138 @@ fn target<'py>(
     }
 }
 
-fn last_recorded_sql<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = result.py();
-    if !native_field(&native_field(result, "status")?, "value")?.eq(FAILED_STATUS)? {
-        return Ok(py.None().into_bound(py));
+fn last_recorded_sql(status: ExecutionStatus, events: &[LifeCycleEvent]) -> Option<&str> {
+    if status != ExecutionStatus::Failed {
+        return None;
     }
-    let events: Vec<Bound<'py, PyAny>> = items(&native_field(result, "lifecycle_events")?)?;
-    for event in events.iter().rev() {
-        if native_field(&native_field(event, "kind")?, "value")?.eq(SQL_EVENT_KIND)? {
-            return native_field(event, "content");
-        }
-    }
-    Ok(py.None().into_bound(py))
+    events
+        .iter()
+        .rev()
+        .find(|event| event.kind == LifeCycleEventKind::Sql)
+        .map(|event| event.content.as_str())
 }
 
-/// The run type and accounting of a microbatch model result.
-fn microbatch<'py>(result: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = result.py();
-    let run_type: Bound<'py, PyAny> = native_field(result, "microbatch_run_type")?;
-    if run_type.is_none() {
-        return Ok(run_type);
-    }
-    let state: Bound<'py, PyDict> = dict(py, vec![("run_type", run_type)])?;
-    for (key, field) in [
-        ("strategy", "microbatch_strategy"),
-        ("reason", "microbatch_plan_reason"),
+/// Shared run type and bounded accounting summary, without per-interval evidence.
+pub(crate) fn microbatch_summary<'py>(
+    py: Python<'py>,
+    result: &ModelExecutionResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let Some(run_type) = &result.microbatch_run_type else {
+        return Ok(py.None().into_bound(py));
+    };
+    let state: Bound<'py, PyDict> = dict(py, vec![("run_type", any(py, run_type)?)])?;
+    for (key, value) in [
+        ("strategy", &result.microbatch_strategy),
+        ("reason", &result.microbatch_plan_reason),
     ] {
-        let value: Bound<'py, PyAny> = native_field(result, field)?;
-        if !value.is_none() {
+        if let Some(value) = value {
             state.set_item(key, value)?;
         }
     }
-    for (key, field) in [
-        ("batch_count", "batch_count"),
-        ("batch_size", "batch_size"),
-        ("recovery_batch_count", "microbatch_recovery_batch_count"),
-        ("known_gap_count", "microbatch_known_gap_count"),
+    for (key, value) in [
+        ("batch_count", any(py, result.batch_count)?),
+        ("batch_size", any(py, &result.batch_size)?),
+        (
+            "recovery_batch_count",
+            any(py, result.microbatch_recovery_batch_count)?,
+        ),
+        (
+            "known_gap_count",
+            any(py, result.microbatch_known_gap_count)?,
+        ),
         (
             "unaccounted_interval_count",
-            "microbatch_unaccounted_interval_count",
+            any(py, result.microbatch_unaccounted_interval_count)?,
         ),
         (
             "synthetic_completion_count",
-            "microbatch_synthetic_completion_count",
+            any(py, result.microbatch_synthetic_completion_count)?,
         ),
         (
             "unknown_fingerprint_count",
-            "microbatch_unknown_fingerprint_count",
+            any(py, result.microbatch_unknown_fingerprint_count)?,
         ),
-        ("contiguous_frontier", "microbatch_contiguous_frontier"),
+        (
+            "contiguous_frontier",
+            any(py, &result.microbatch_contiguous_frontier)?,
+        ),
         (
             "unaccounted_partition_policy",
-            "microbatch_unaccounted_partition_policy",
+            any(py, &result.microbatch_unaccounted_partition_policy)?,
         ),
-        ("replay_requirement_id", "microbatch_replay_requirement_id"),
+        (
+            "replay_requirement_id",
+            any(py, &result.microbatch_replay_requirement_id)?,
+        ),
         (
             "required_model_version_hash",
-            "microbatch_required_model_version_hash",
+            any(py, &result.microbatch_required_model_version_hash)?,
         ),
         (
             "physical_generation_id",
-            "microbatch_physical_generation_id",
+            any(py, &result.microbatch_physical_generation_id)?,
         ),
-        ("concurrent_enabled", "microbatch_concurrent_enabled"),
-        ("batch_concurrency", "microbatch_batch_concurrency"),
-        ("global_concurrency", "microbatch_global_concurrency"),
+        (
+            "concurrent_enabled",
+            any(py, result.microbatch_concurrent_enabled)?,
+        ),
+        (
+            "batch_concurrency",
+            any(py, result.microbatch_batch_concurrency)?,
+        ),
+        (
+            "global_concurrency",
+            any(py, result.microbatch_global_concurrency)?,
+        ),
         (
             "replay_requirement_state",
-            "microbatch_replay_requirement_state",
+            any(py, &result.microbatch_replay_requirement_state)?,
         ),
     ] {
-        state.set_item(key, native_field(result, field)?)?;
-    }
-    let intervals: Bound<'py, PyList> = PyList::empty(py);
-    for interval in items(&native_field(result, "microbatch_accounting_intervals")?)? {
-        let fields: Vec<(&str, Bound<'py, PyAny>)> = [
-            "partition_start",
-            "partition_end",
-            "accounting_status",
-            "fingerprint_status",
-            "model_version_hash",
-            "completion_type",
-            "event_id",
-        ]
-        .into_iter()
-        .map(|field| Ok((field, native_field(&interval, field)?)))
-        .collect::<PyResult<_>>()?;
-        pyo3::types::PyListMethods::append(&intervals, dict(py, fields)?)?;
-    }
-    state.set_item("intervals", intervals)?;
-    let limit: Bound<'py, PyAny> = native_field(result, "microbatch_limit")?;
-    if !limit.is_none() {
-        state.set_item("limit", limit)?;
-        state.set_item("count", native_field(result, "microbatch_limit_count")?)?;
-        state.set_item(
-            "action",
-            optional_enum_value(&native_field(result, "microbatch_limit_action")?)?,
-        )?;
-        state.set_item("warning", native_field(result, "microbatch_limit_warning")?)?;
+        state.set_item(key, value)?;
     }
     Ok(state.into_any())
+}
+
+/// The run type and accounting of a microbatch model result, including interval evidence.
+fn microbatch<'py>(
+    py: Python<'py>,
+    result: &ModelExecutionResult<Bound<'py, PyAny>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let summary: Bound<'py, PyAny> = microbatch_summary(py, result)?;
+    if summary.is_none() {
+        return Ok(summary);
+    }
+    let state: &Bound<'py, PyDict> = summary.downcast()?;
+    let intervals: Bound<'py, PyList> = PyList::empty(py);
+    for interval in &result.microbatch_accounting_intervals {
+        pyo3::types::PyListMethods::append(
+            &intervals,
+            dict(
+                py,
+                vec![
+                    ("partition_start", any(py, &interval.partition_start)?),
+                    ("partition_end", any(py, &interval.partition_end)?),
+                    ("accounting_status", any(py, &interval.accounting_status)?),
+                    ("fingerprint_status", any(py, &interval.fingerprint_status)?),
+                    ("model_version_hash", any(py, &interval.model_version_hash)?),
+                    ("completion_type", any(py, &interval.completion_type)?),
+                    ("event_id", any(py, &interval.event_id)?),
+                ],
+            )?,
+        )?;
+    }
+    state.set_item("intervals", intervals)?;
+    if let Some(limit) = result.microbatch_limit {
+        state.set_item("limit", limit)?;
+        state.set_item("count", result.microbatch_limit_count)?;
+        state.set_item(
+            "action",
+            result.microbatch_limit_action.map(ResultEnum::value),
+        )?;
+        state.set_item("warning", &result.microbatch_limit_warning)?;
+    }
+    Ok(summary)
 }
 
 fn value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -181,59 +215,67 @@ fn optional_value<'py>(result: &Bound<'py, PyAny>, field: &str) -> PyResult<Boun
 
 fn model_asset<'py>(
     projection: &Projection<'py>,
-    result: &Bound<'py, PyAny>,
+    result: &ModelExecutionResult<Bound<'py, PyAny>>,
     targets: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let py: Python<'py> = result.py();
-    let name: Bound<'py, PyAny> = native_field(result, "model_name")?;
+    let py: Python<'py> = projection.py;
+    let name: Bound<'py, PyAny> = any(py, &result.model_name)?;
     let planned: Bound<'py, PyAny> = target(py, targets, &name)?;
-    let empty_inputs: Bound<'py, PyAny> =
-        PyList::new(py, items(&native_field(result, "empty_cursor_inputs")?)?)?.into_any();
+    let empty_inputs: Bound<'py, PyAny> = any(py, &result.empty_cursor_inputs)?;
     without_none(
         py,
         vec![
             ("kind", any(py, "model")?),
             ("name", name),
-            ("status", value(result, "status")?),
+            ("status", any(py, result.status.value())?),
             (
                 "duration_ms",
-                projection.result_duration(result, &native_field(result, "duration_ms")?)?,
+                projection.result_duration(result, &any(py, result.duration_ms)?)?,
             ),
             (
                 "target",
                 if planned.is_truthy()? {
                     planned
                 } else {
-                    native_field(result, "promoted_relation")?
+                    any(py, &result.promoted_relation)?
                 },
             ),
+            ("staging_relation", any(py, &result.staging_relation)?),
             (
-                "staging_relation",
-                native_field(result, "staging_relation")?,
+                "failed_phase",
+                any(py, result.failed_phase.map(ResultEnum::value))?,
             ),
-            ("failed_phase", optional_value(result, "failed_phase")?),
-            ("skip_mode", optional_value(result, "skip_mode")?),
-            ("skip_reason", native_field(result, "skip_reason")?),
-            ("error_code", native_field(result, "error_code")?),
-            ("error_help", native_field(result, "error_help")?),
-            ("error_message", native_field(result, "error_message")?),
-            ("failed_sql", native_field(result, "failed_sql")?),
-            ("last_recorded_sql", last_recorded_sql(result)?),
-            ("warnings", native_field(result, "warning_messages")?),
+            (
+                "skip_mode",
+                any(py, result.skip_mode.map(ResultEnum::value))?,
+            ),
+            ("skip_reason", any(py, &result.skip_reason)?),
+            ("error_code", any(py, &result.error_code)?),
+            ("error_help", any(py, &result.error_help)?),
+            ("error_message", any(py, &result.error_message)?),
+            ("failed_sql", any(py, &result.failed_sql)?),
+            (
+                "last_recorded_sql",
+                any(
+                    py,
+                    last_recorded_sql(result.status, &result.lifecycle_events),
+                )?,
+            ),
+            ("warnings", any(py, &result.warning_messages)?),
             ("empty_cursor_inputs", or_none(empty_inputs)?),
             (
                 "waiting_on_empty_inputs",
-                or_none(native_field(result, "waiting_on_empty_inputs")?)?,
+                or_none(any(py, result.waiting_on_empty_inputs)?)?,
             ),
             (
                 "future_cursor_safety",
-                future_cursor_safety(&native_field(result, "future_cursor_safety")?)?,
+                future_cursor_safety(&any(py, &result.future_cursor_safety)?)?,
             ),
             (
                 "maximum_start_safety",
-                maximum_start_safety(&native_field(result, "maximum_start_safety")?)?,
+                maximum_start_safety(&any(py, &result.maximum_start_safety)?)?,
             ),
-            ("microbatch", microbatch(result)?),
+            ("microbatch", microbatch(py, result)?),
         ],
     )
 }
@@ -241,7 +283,7 @@ fn model_asset<'py>(
 /// Model result assets, with plan targets when a plan is given.
 pub(crate) fn model_assets<'py>(
     projection: &Projection<'py>,
-    results: &[Bound<'py, PyAny>],
+    results: &[&ModelExecutionResult<Bound<'py, PyAny>>],
     plan: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let targets: Option<Bound<'py, PyAny>> = targets(plan, "model_locations")?;
@@ -257,7 +299,7 @@ pub(crate) fn model_assets<'py>(
 /// Seed result assets, with plan targets and reasons when a plan is given.
 pub(crate) fn seed_assets<'py>(
     projection: &Projection<'py>,
-    results: &[Bound<'py, PyAny>],
+    results: &[&SeedExecutionResult],
     plan: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let targets: Option<Bound<'py, PyAny>> = targets(plan, "seed_locations")?;
@@ -276,23 +318,23 @@ pub(crate) fn seed_assets<'py>(
         if !projection.terminal_recorded(result)? {
             continue;
         }
-        let py: Python<'py> = result.py();
-        let name: Bound<'py, PyAny> = native_field(result, "seed_name")?;
+        let py: Python<'py> = projection.py;
+        let name: Bound<'py, PyAny> = any(py, &result.seed_name)?;
         assets.push(without_none(
             py,
             vec![
                 ("kind", any(py, "seed")?),
                 ("name", name.clone()),
-                ("status", value(result, "status")?),
+                ("status", any(py, result.status.value())?),
                 (
                     "duration_ms",
-                    projection.result_duration(result, &native_field(result, "duration_ms")?)?,
+                    projection.result_duration(result, &any(py, result.duration_ms)?)?,
                 ),
                 ("target", target(py, targets.as_ref(), &name)?),
                 ("reason", target(py, reasons.as_ref(), &name)?),
-                ("error_code", native_field(result, "error_code")?),
-                ("error_help", native_field(result, "error_help")?),
-                ("error_message", native_field(result, "error_message")?),
+                ("error_code", any(py, &result.error_code)?),
+                ("error_help", any(py, &result.error_help)?),
+                ("error_message", any(py, &result.error_message)?),
             ],
         )?);
     }
@@ -302,7 +344,7 @@ pub(crate) fn seed_assets<'py>(
 /// Function result assets, with plan targets when a plan is given.
 pub(crate) fn function_assets<'py>(
     projection: &Projection<'py>,
-    results: &[Bound<'py, PyAny>],
+    results: &[&FunctionExecutionResult],
     plan: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let targets: Option<Bound<'py, PyAny>> = targets(plan, "function_locations")?;
@@ -311,23 +353,23 @@ pub(crate) fn function_assets<'py>(
         if !projection.terminal_recorded(result)? {
             continue;
         }
-        let py: Python<'py> = result.py();
-        let name: Bound<'py, PyAny> = native_field(result, "function_name")?;
+        let py: Python<'py> = projection.py;
+        let name: Bound<'py, PyAny> = any(py, &result.function_name)?;
         assets.push(without_none(
             py,
             vec![
-                ("kind", native_field(result, "function_kind")?),
+                ("kind", any(py, &result.function_kind)?),
                 ("name", name.clone()),
-                ("status", value(result, "status")?),
+                ("status", any(py, result.status.value())?),
                 (
                     "duration_ms",
-                    projection.result_duration(result, &native_field(result, "duration_ms")?)?,
+                    projection.result_duration(result, &any(py, result.duration_ms)?)?,
                 ),
                 ("target", target(py, targets.as_ref(), &name)?),
-                ("error_code", native_field(result, "error_code")?),
-                ("error_help", native_field(result, "error_help")?),
-                ("error_message", native_field(result, "error_message")?),
-                ("warnings", native_field(result, "warning_messages")?),
+                ("error_code", any(py, &result.error_code)?),
+                ("error_help", any(py, &result.error_help)?),
+                ("error_message", any(py, &result.error_message)?),
+                ("warnings", any(py, &result.warning_messages)?),
             ],
         )?);
     }
@@ -337,38 +379,35 @@ pub(crate) fn function_assets<'py>(
 /// Source and loader load result assets.
 pub(crate) fn load_assets<'py>(
     projection: &Projection<'py>,
-    results: &[Bound<'py, PyAny>],
+    results: &[&LoadExecutionResult<Bound<'py, PyAny>>],
 ) -> PyResult<Vec<Bound<'py, PyDict>>> {
     let mut assets: Vec<Bound<'py, PyDict>> = Vec::new();
     for result in results {
         if !projection.terminal_recorded(result)? {
             continue;
         }
-        let py: Python<'py> = result.py();
+        let py: Python<'py> = projection.py;
         assets.push(without_none(
             py,
             vec![
-                ("kind", value(result, "resource_kind")?),
-                ("name", native_field(result, "source_name")?),
-                ("status", value(result, "status")?),
+                ("kind", any(py, result.resource_kind.value())?),
+                ("name", any(py, &result.source_name)?),
+                ("status", any(py, result.status.value())?),
                 (
                     "duration_ms",
-                    projection.result_duration(result, &native_field(result, "duration_ms")?)?,
+                    projection.result_duration(result, &any(py, result.duration_ms)?)?,
                 ),
-                ("target", native_field(result, "target")?),
+                ("target", any(py, &result.target)?),
+                ("staging_relation", any(py, &result.staging_relation)?),
+                ("loader", any(py, &result.loader_name)?),
+                ("rows_loaded", any(py, result.rows_loaded)?),
                 (
-                    "staging_relation",
-                    native_field(result, "staging_relation")?,
+                    "skip_mode",
+                    any(py, result.skip_mode.map(ResultEnum::value))?,
                 ),
-                ("loader", native_field(result, "loader_name")?),
-                ("rows_loaded", native_field(result, "rows_loaded")?),
-                ("skip_mode", optional_value(result, "skip_mode")?),
-                ("skip_reason", native_field(result, "skip_reason")?),
-                ("error_message", native_field(result, "error_message")?),
-                (
-                    "warnings",
-                    or_none(native_field(result, "warning_messages")?)?,
-                ),
+                ("skip_reason", any(py, &result.skip_reason)?),
+                ("error_message", any(py, &result.error_message)?),
+                ("warnings", or_none(any(py, &result.warning_messages)?)?),
             ],
         )?);
     }

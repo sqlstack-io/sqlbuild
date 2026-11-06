@@ -49,6 +49,15 @@ class RequiredCheckTestCase:
 
 
 @dataclass(frozen=True)
+class VerificationSuitesTestCase:
+    description: str
+    selected: str
+    checks: str
+    native_checks: str
+    expected_exit_code: int
+
+
+@dataclass(frozen=True)
 class ExpressionTestCase:
     description: str
     expression: str

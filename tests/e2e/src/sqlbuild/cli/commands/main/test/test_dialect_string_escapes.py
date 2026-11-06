@@ -18,7 +18,7 @@ _PROJECT_FILES: dict[str, str] = {
     "models/stg_orders.sql": "MODEL (description 'Test model stg_orders.', materialized table);\n\nSELECT 1 AS order_id\n",
     "models/order_names.sql": (
         "MODEL (description 'Test model order_names.', materialized table);\n\n"
-        "SELECT E'O\\'Brien' AS customer_name, order_id\n"
+        "SELECT E'O\\'Brien' AS customer_name, 'C:\\' AS folder, order_id\n"
         'FROM __ref("stg_orders")\n'
     ),
     "tests/unit/test_order_names.sql": (
@@ -39,7 +39,7 @@ _PROJECT_FILES: dict[str, str] = {
     "test_case",
     (
         SqlTestE2ETestCase(
-            description="escape strings before model references and test markers",
+            description="escape strings and a plain trailing backslash before references and markers",
             expected_exit_code=0,
             expected_stdout_fragment="PASS=1  FAIL=0",
         ),

@@ -128,6 +128,13 @@ def prepare_semantic_corpus_project(
     for relative_path, contents in test_case.repo_files.items():
         path: Path = project / relative_path
         path.write_text(contents, encoding="utf-8")
+    ignored: str = ", ".join(f'"{code}"' for code in test_case.ignored_rules)
+    ignore_entry: str = (
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        'reason = "The probe SQL exercises compiler semantics, not this Rule."\n'
+    )
+    with (project / "sqlbuild_project.toml").open("a", encoding="utf-8") as config:
+        config.write({True: ignore_entry, False: ""}[bool(test_case.ignored_rules)])
     return project
 
 
@@ -553,8 +560,10 @@ def run_fresh_process_compile_cache_benchmark(
     expected_cold_max_wall_seconds: float,
     expected_warm_max_wall_seconds: float,
     expected_edit_max_wall_seconds: float,
+    expected_project_config_edit_max_wall_seconds: float,
     macro_call_interval: int,
     scoped_macros: bool,
+    compiler_only: bool = False,
 ) -> FreshProcessCompileCacheBenchmarkResult:
     """Measure exact and incremental cache reuse across independent CLI processes."""
 
@@ -569,6 +578,7 @@ def run_fresh_process_compile_cache_benchmark(
         audit_count=audit_count,
         macro_call_interval=macro_call_interval,
         scoped_macros=scoped_macros,
+        compiler_only=compiler_only,
     )
     target_dir: Path = project_dir / "target"
     assert not target_dir.exists()
@@ -631,7 +641,7 @@ def run_fresh_process_compile_cache_benchmark(
     project_config_edit: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=project_dir,
         label=f"cache-project-config-edit-{model_count}",
-        expected_max_wall_seconds=expected_cold_max_wall_seconds,
+        expected_max_wall_seconds=expected_project_config_edit_max_wall_seconds,
         compile_args=(),
     )
     after_project_config_edit: FreshProcessCompileBenchmarkResult = (
@@ -1271,6 +1281,11 @@ def _write_compile_project_config(project_dir: Path) -> None:
                 "[targets.dev]",
                 'schema = "main"',
                 "",
+                "[[rules.rule_ignores]]",
+                'rules = ["SQLCLEAN018"]',
+                'paths = ["models/**"]',
+                'reason = "The generated workload ranks by a non-unique id; keep its SQL stable."',
+                "",
             )
         ),
         encoding="utf-8",
@@ -1571,14 +1586,16 @@ def write_semantic_compile_project(
     scoped_macros: bool = False,
     shared_diamond_layers: int = 0,
     shared_diamond_width: int = 0,
+    compiler_only: bool = False,
 ) -> None:
     """Write a neutral project with broad resources and dense SQL semantics.
 
     A positive `shared_diamond_layers` adds the shared-dependency lattice from
     `write_shared_diamond_models`; the default leaves the compile guard fixtures unchanged.
+    `compiler_only` sets `select = []` so a guard measures the compiler without default Rules.
     """
 
-    _layered_write_project_config(project_dir=project_dir)
+    _layered_write_project_config(project_dir=project_dir, compiler_only=compiler_only)
     _layered_write_sources(project_dir=project_dir, source_count=source_count)
     _layered_write_seeds(project_dir=project_dir, seed_count=seed_count)
     _layered_write_functions(project_dir=project_dir, function_count=function_count)
@@ -1615,10 +1632,11 @@ def write_semantic_compile_project(
     )
 
 
-def _layered_write_project_config(*, project_dir: Path) -> None:
+def _layered_write_project_config(*, project_dir: Path, compiler_only: bool = False) -> None:
     project_dir.mkdir(parents=True)
+    rules_selection: str = {True: "[rules]\nselect = []\n\n", False: ""}[compiler_only]
     (project_dir / "sqlbuild_project.toml").write_text(
-        """name = "layered_production_performance_guard"
+        f"""name = "layered_production_performance_guard"
 adapter = "duckdb"
 default_target = "dev"
 
@@ -1642,6 +1660,11 @@ materialized = "table"
 
 [path_defaults."mart"]
 materialized = "table"
+
+{rules_selection}[[rules.rule_ignores]]
+rules = ["SQLCLEAN039"]
+paths = ["models/**"]
+reason = "The workload mixes nested query shapes on purpose to cover their compile path."
 """,
         encoding="utf-8",
     )
@@ -2590,7 +2613,11 @@ def write_relation_stub_project(
                 "[connection]\n"
                 'database = "orders.duckdb"\n\n'
                 "[targets.dev]\n"
-                'schema = "main"\n'
+                'schema = "main"\n\n'
+                "[[rules.rule_ignores]]\n"
+                'rules = ["SQLCLEAN005"]\n'
+                'paths = ["models/order_status.sql"]\n'
+                'reason = "The stub-named CTE is left unread on purpose."\n'
             ),
             "models/orders.sql": (
                 "MODEL (description 'Test model orders.', "
@@ -2893,7 +2920,7 @@ def write_set_operation_project(
     }[adapter == "duckdb"]
     files: dict[str, str] = {
         "sqlbuild_project.toml": (
-            f'name = "orders"\nadapter = "{adapter}"\n{target}[rules]\nselect = ["SQBRSQL020"]\n'
+            f'name = "orders"\nadapter = "{adapter}"\n{target}[rules]\nselect = ["SQLCLEAN020"]\n'
         ),
     }
     for model in models:
@@ -2962,7 +2989,7 @@ def run_set_operation_lifecycle(
 def run_set_arity_rule(*, project_dir: Path) -> subprocess.CompletedProcess[str]:
     """Run the set-operation arity Rule over every model."""
 
-    return run_sqb(project_dir=project_dir, command=("rules", "run", "SQBRSQL020"))
+    return run_sqb(project_dir=project_dir, command=("rules", "run", "SQLCLEAN020"))
 
 
 def format_set_operation_models(
@@ -5291,7 +5318,11 @@ def run_delta_compile(
         project_dir=project_dir, args=args, env={REUSE_DISABLE_ENV_VAR: "0", **env}
     )
     return DeltaCompileOutcome(
-        returncode=result.returncode, stdout=result.stdout, stderr=result.stderr
+        returncode=result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        command=tuple(result.args),
+        environment=tuple(sorted({REUSE_DISABLE_ENV_VAR: "0", **env}.items())),
     )
 
 
@@ -5345,6 +5376,16 @@ def dialect_syntax_model(description: str, sql: str, config: str = "") -> str:
     """Build a model file with a description, optional extra header config and its query."""
 
     return f"MODEL (description '{description}'{config});\n{sql}\n"
+
+
+def dialect_ignored_rules_entry(codes: tuple[str, ...]) -> str:
+    """A scoped ignore of `codes` for cases whose SQL shape is the parser input under test."""
+
+    ignored: str = ", ".join(f'"{code}"' for code in codes)
+    return (
+        f'\n[[rules.rule_ignores]]\nrules = [{ignored}]\npaths = ["models/**"]\n'
+        'reason = "The case covers parsing this SQL shape."\n'
+    )
 
 
 def append_to_compiled_sql_tests(project_dir: Path) -> None:

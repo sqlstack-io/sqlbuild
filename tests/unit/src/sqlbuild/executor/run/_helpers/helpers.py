@@ -29,8 +29,10 @@ from sqlbuild.compiler.auditing.types import (
     AuditRunScope,
     AuditSeverity,
 )
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.auditing.models import AuditExecutionResult
 from sqlbuild.executor.run._helpers.execution.hooks import execute_hooks
+from sqlbuild.executor.run._helpers.validation.configured_columns import require_quoted_spelling
 from sqlbuild.executor.run.models import HookContext, HookRelationLookup, HookRunContext
 from sqlbuild.executor.run.types import HookPhase
 from sqlbuild.python_nodes.models import SqlResourceRef
@@ -369,3 +371,18 @@ def run_python_hook_with_relations(
             enforce_explicit_references=enforce_explicit_references,
         ),
     )
+
+
+def quoted_spelling_rejection(*, configured: str, listed_names: tuple[str, ...]) -> str | None:
+    """The error a unique_key ``configured`` gets against ``listed_names``, or None."""
+
+    try:
+        require_quoted_spelling(
+            model_name="orders",
+            setting="unique_key",
+            configured=(configured,),
+            listed_columns=tuple(ColumnInfo(name=name, type="VARCHAR") for name in listed_names),
+        )
+    except ExecutorInputError as error:
+        return str(error)
+    return None

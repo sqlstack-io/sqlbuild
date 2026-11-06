@@ -7,6 +7,7 @@ from typing import Any
 from sqlbuild._native import fit_auxiliary_relation_name
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
@@ -38,7 +39,7 @@ def enforce_types_staged(
         schema=staging_schema,
         name=staging_table,
     )
-    declared_map: dict[str, str] = {col.name.lower(): col.type for col in declared_columns}
+    declared_map: dict[str, str] = {column_name_key(col.name): col.type for col in declared_columns}
 
     needs_enforcement: bool = False
     col: ColumnInfo
@@ -46,7 +47,7 @@ def enforce_types_staged(
         produced_type: str | None = None
         produced_col: ColumnInfo
         for produced_col in produced_columns:
-            if produced_col.name.lower() == col.name.lower():
+            if column_name_key(produced_col.name) == column_name_key(col.name):
                 produced_type = produced_col.type
                 break
         if produced_type is not None and not types_equal(
@@ -104,7 +105,7 @@ def _build_type_enforcement_projection(
     projection_parts: list[str] = []
     produced_column: ColumnInfo
     for produced_column in produced_columns:
-        declared_type: str | None = declared_map.get(produced_column.name.lower())
+        declared_type: str | None = declared_map.get(column_name_key(produced_column.name))
         quoted_column: str = adapter.render_identifier(produced_column.name)
         if declared_type is None:
             projection_parts.append(quoted_column)

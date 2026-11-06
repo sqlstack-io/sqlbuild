@@ -7,8 +7,9 @@ use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyList, PyString};
-use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_cache::project_reuse::constants::FAILED_COMPILED_DIRECTORY_NAME;
+use sqlbuild_cli::replay::main::output_file_identities::output_file_identities;
 use sqlbuild_cli::replay::main::write_launch_record::write_launch_record as write_record_file;
 use sqlbuild_core::command_output::constants::INVOCATION_CONTEXT_ENV;
 
@@ -34,7 +35,7 @@ use crate::bindings::_helpers::compile_command::constants::{
 };
 use crate::bindings::_helpers::compile_command::models::CompileReuseAttempt;
 use crate::bindings::_helpers::compile_command::runtime_identity::{
-    invocation_identity, redirected_output_files, runtime_identity,
+    invocation_identity, runtime_identity,
 };
 use crate::bindings::_helpers::compile_context::delta;
 use crate::bindings::_helpers::compile_delta::driver::{
@@ -44,7 +45,9 @@ use crate::bindings::_helpers::compile_delta::verify;
 use crate::bindings::_helpers::compile_driver::command::run_compile_command;
 use crate::bindings::_helpers::compile_driver::phases::{elapsed_ms, monotonic};
 use crate::bindings::_helpers::compile_outputs::json_report::plain_json;
-use crate::bindings::_helpers::compile_outputs::reuse::{ReuseCheckPy, check_compile_reuse};
+use crate::bindings::_helpers::compile_outputs::reuse::{
+    ReuseCheckPy, ReuseRulesPy, check_compile_reuse,
+};
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::macro_bridge::first_compile::keep_delta_claim;
 use crate::bindings::_helpers::native_host::host;
@@ -61,10 +64,6 @@ const MISS: &str = "miss";
 /// The logging format that prints its one argument as given.
 const LOG_TEXT: &str = "%s";
 const BYPASS: &str = "bypass";
-
-fn listed<'py>(value: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
-    Ok(PyList::new(value.py(), value.try_iter()?.collect::<PyResult<Vec<_>>>()?)?.into_any())
-}
 
 fn reuse_logger(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     imported(py, "logging", "getLogger")?.call1((REUSE_LOGGER_NAME,))
@@ -86,78 +85,41 @@ fn reuse_debug_with<'py>(
 }
 
 /// The reuse constants the native check, the stored compile and the launch record share.
-pub(crate) fn reuse_rules(py: Python<'_>, with_output_files: bool) -> PyResult<Bound<'_, PyDict>> {
-    let rules: Bound<'_, PyDict> = PyDict::new(py);
-    rules.set_item("excluded", PyList::new(py, EXCLUDED_DIRECTORIES)?)?;
-    rules.set_item(
-        "excluded_root",
-        imported(py, "builtins", "sorted")?.call1((registry::native(
-            py,
-            NativeAttr::CompileReuseExcludedRootDirectories,
-        )?,))?,
-    )?;
-    rules.set_item(
-        "presence_suffixes",
-        PyList::new(py, PRESENCE_ONLY_FILE_SUFFIXES)?,
-    )?;
-    let output_files: Bound<'_, PyList> = redirected_output_files(py)?;
-    if with_output_files {
-        rules.set_item("output_files", output_files)?;
-    }
-    rules.set_item(
-        "tracked_prefixes",
-        PyList::new(py, TRACKED_ENVIRONMENT_PREFIXES)?,
-    )?;
-    rules.set_item(
-        "untracked_names",
-        PyList::new(py, UNTRACKED_ENVIRONMENT_NAMES)?,
-    )?;
-    rules.set_item(
-        "disabling_variables",
-        PyList::new(
-            py,
-            [
-                (
-                    COMPILE_CACHE_DISABLE_ENV_VAR.into_bound_py_any(py)?,
-                    COMPILE_CACHE_DISABLE_VALUE.into_bound_py_any(py)?,
-                ),
-                (
-                    REUSE_DISABLE_ENV_VAR.into_bound_py_any(py)?,
-                    REUSE_DISABLE_VALUE.into_bound_py_any(py)?,
-                ),
-            ],
-        )?,
-    )?;
-    rules.set_item(
-        "config_filenames",
-        PyList::new(py, PROJECT_CONFIG_FILENAMES)?,
-    )?;
-    for (key, value) in [
-        ("max_stored_entries", REUSE_MAX_STORED_ENTRIES),
-        ("max_entry_bytes", REUSE_MAX_ENTRY_BYTES),
-        ("missing_path_mtime_ns", MISSING_PATH_MTIME_NS),
-        ("project_root_path_mtime_ns", PROJECT_ROOT_PATH_MTIME_NS),
-    ] {
-        rules.set_item(key, value)?;
-    }
-    rules.set_item(
-        "racy_window_ns",
-        registry::native(py, NativeAttr::CompileReuseRacyWindowNs)?,
-    )?;
-    rules.set_item("missing_environment_value", MISSING_ENVIRONMENT_VALUE)?;
-    rules.set_item("missing_file_digest", MISSING_FILE_DIGEST)?;
-    rules.set_item(
-        "compiled_root",
-        format!(
-            "{TARGET_DIRECTORY_NAME}{}{COMPILED_DIRECTORY_NAME}",
-            std::path::MAIN_SEPARATOR
-        ),
-    )?;
-    rules.set_item(
-        "retired_directories",
-        PyList::new(py, RETIRED_REUSE_DIRECTORY_NAMES)?,
-    )?;
-    Ok(rules)
+pub(crate) fn reuse_rules(py: Python<'_>) -> PyResult<ReuseRulesPy> {
+    let mut excluded_root: Vec<String> =
+        registry::native(py, NativeAttr::CompileReuseExcludedRootDirectories)?
+            .try_iter()?
+            .map(|value| value?.extract())
+            .collect::<PyResult<_>>()?;
+    excluded_root.sort();
+    Ok(ReuseRulesPy {
+        excluded: EXCLUDED_DIRECTORIES.map(str::to_owned).into(),
+        excluded_root,
+        presence_suffixes: PRESENCE_ONLY_FILE_SUFFIXES.map(str::to_owned).into(),
+        output_files: output_file_identities(),
+        tracked_prefixes: TRACKED_ENVIRONMENT_PREFIXES.map(str::to_owned).into(),
+        untracked_names: UNTRACKED_ENVIRONMENT_NAMES.map(str::to_owned).into(),
+        disabling_variables: vec![
+            (
+                COMPILE_CACHE_DISABLE_ENV_VAR.to_owned(),
+                COMPILE_CACHE_DISABLE_VALUE.to_owned(),
+            ),
+            (
+                REUSE_DISABLE_ENV_VAR.to_owned(),
+                REUSE_DISABLE_VALUE.to_owned(),
+            ),
+        ],
+        config_filenames: PROJECT_CONFIG_FILENAMES.map(str::to_owned).into(),
+        racy_window_ns: registry::native(py, NativeAttr::CompileReuseRacyWindowNs)?.extract()?,
+        max_stored_entries: REUSE_MAX_STORED_ENTRIES as usize,
+        max_entry_bytes: REUSE_MAX_ENTRY_BYTES as usize,
+        missing_environment_value: MISSING_ENVIRONMENT_VALUE.to_owned(),
+        missing_file_digest: MISSING_FILE_DIGEST.to_owned(),
+        missing_path_mtime_ns: MISSING_PATH_MTIME_NS,
+        project_root_path_mtime_ns: PROJECT_ROOT_PATH_MTIME_NS,
+        compiled_root: PathBuf::from(TARGET_DIRECTORY_NAME).join(COMPILED_DIRECTORY_NAME),
+        retired_directories: RETIRED_REUSE_DIRECTORY_NAMES.map(str::to_owned).into(),
+    })
 }
 
 /// The launch record `sqb` replays this reusable compile from, as a JSON object.
@@ -214,7 +176,12 @@ fn launch_payload<'py>(
         host::entry(py, FacadeHost::StartupInputs)?.call0()?,
     )?;
     payload.set_item("json_output", native_field(attempt, "json_output")?)?;
-    payload.set_item("rules", reuse_rules(py, false)?)?;
+    let native_rules: ReuseRulesPy = reuse_rules(py)?;
+    let compiled_root = native_rules.compiled_root.clone().into_os_string();
+    let rules: Bound<'py, PyDict> = native_rules.into_pyobject(py)?;
+    rules.set_item("compiled_root", compiled_root)?;
+    rules.del_item("output_files")?;
+    payload.set_item("rules", rules)?;
     payload.set_item("capture", capture)?;
     payload.set_item("hit_message", PyList::new(py, REUSE_HIT_MESSAGE)?)?;
     payload.set_item("timings", timings)?;
@@ -286,31 +253,26 @@ fn reuse_attempt<'py>(
 fn reuse_check<'py>(
     request: &Bound<'py, PyAny>,
     project_dir: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyDict>> {
+) -> PyResult<ReuseCheckPy> {
     let py: Python<'py> = request.py();
     let flag = |name: &str| -> PyResult<bool> { native_field(request, name)?.is_truthy() };
     let use_color: bool = !flag("no_color")? && stdout_supports_color(py)?;
-    let check: Bound<'py, PyDict> = PyDict::new(py);
-    check.set_item("project_dir", project_dir)?;
-    check.set_item(
-        "store_directory",
-        cache_directory(&imported(py, "pathlib", "Path")?.call1((project_dir,))?)?
-            .call_method1("__truediv__", (NATIVE_REUSE_DIRECTORY_NAME,))?,
-    )?;
-    check.set_item("selected_target", native_field(request, "selected_target")?)?;
-    check.set_item(
-        "invocation",
-        invocation_identity(request, project_dir, use_color)?,
-    )?;
-    check.set_item("runtime", runtime_identity(py)?)?;
-    check.set_item("search_path", listed(py.import("sys")?.getattr("path")?)?)?;
-    check.set_item(
-        "bypass_requested",
-        flag("no_cache")? || flag("manifest")? || flag("profiling")? || flag("debug")?,
-    )?;
-    check.set_item("json_output", native_field(request, "json_output")?)?;
-    check.set_item("rules", reuse_rules(py, true)?)?;
-    Ok(check)
+    let directory: PathBuf =
+        cache_directory(&imported(py, "pathlib", "Path")?.call1((project_dir,))?)?.extract()?;
+    Ok(ReuseCheckPy {
+        project_dir: project_dir.extract()?,
+        store_directory: directory.join(NATIVE_REUSE_DIRECTORY_NAME),
+        selected_target: native_field(request, "selected_target")?.extract()?,
+        invocation: invocation_identity(request, project_dir, use_color)?.extract()?,
+        runtime: runtime_identity(py)?,
+        search_path: py.import("sys")?.getattr("path")?.extract()?,
+        bypass_requested: flag("no_cache")?
+            || flag("manifest")?
+            || flag("profiling")?
+            || flag("debug")?,
+        json_output: native_field(request, "json_output")?.extract()?,
+        rules: reuse_rules(py)?,
+    })
 }
 
 /// `print(text, file=sys.stderr)`.
@@ -409,11 +371,8 @@ fn attempt_compile_reuse<'py>(request: &Bound<'py, PyAny>) -> PyResult<Bound<'py
         } else {
             requested
         },))?;
-    let native: Bound<'py, PyAny> = check_compile_reuse(
-        py,
-        reuse_check(request, &project_dir)?.extract::<ReuseCheckPy>()?,
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+    let native: Bound<'py, PyAny> = check_compile_reuse(py, reuse_check(request, &project_dir)?)
+        .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     let checked: String = native.call_method0("outcome")?.extract()?;
     let json_output: Bound<'py, PyAny> = native_field(request, "json_output")?;
     let mut base: Vec<(&'static str, Bound<'py, PyAny>)> = vec![

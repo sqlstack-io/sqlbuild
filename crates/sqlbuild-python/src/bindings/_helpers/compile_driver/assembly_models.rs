@@ -165,6 +165,7 @@ fn compiled_model<'py>(
         top_level_macro_call_names(
             py,
             &native_field(model_input, "macro_source_sql")?.extract::<String>()?,
+            context.syntax.as_ref(),
         )?
         .into_any()
     };

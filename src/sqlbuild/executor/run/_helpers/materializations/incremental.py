@@ -18,6 +18,7 @@ from sqlbuild._native import (
 from sqlbuild._native import cursor_sentinel_to_token as sentinel_to_token
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.relations.main.resolve_qualified_name_parts import (
     resolve_qualified_name_parts,
@@ -654,10 +655,10 @@ def _prepare_incremental_delta_types(
         inputs.declared_columns if entry.type_enforcement else ()
     )
     authoritative_names: frozenset[str] = frozenset(
-        column.name.lower() for column in authoritative_columns
+        column_name_key(column.name) for column in authoritative_columns
     )
     delta_map: dict[str, ColumnInfo] = {
-        column.name.lower(): column for column in inputs.delta_columns
+        column_name_key(column.name): column for column in inputs.delta_columns
     }
     effective_policy: OnSchemaChange = entry.on_schema_change or _DEFAULT_ON_SCHEMA_CHANGE
     preserved_columns: list[tuple[ColumnInfo, ColumnInfo]] = []
@@ -665,10 +666,10 @@ def _prepare_incremental_delta_types(
     if effective_policy in (OnSchemaChange.APPEND_NEW_COLUMNS, OnSchemaChange.IGNORE):
         target_column: ColumnInfo
         for target_column in inputs.target_columns:
-            incoming_column: ColumnInfo | None = delta_map.get(target_column.name.lower())
+            incoming_column: ColumnInfo | None = delta_map.get(column_name_key(target_column.name))
             if (
                 incoming_column is not None
-                and target_column.name.lower() not in authoritative_names
+                and column_name_key(target_column.name) not in authoritative_names
                 and not types_equal(
                     left=target_column.type,
                     right=incoming_column.type,
@@ -732,8 +733,8 @@ def _apply_schema_change(
 
     guard: BoundViewGuard = bound_views or BoundViewGuard()
 
-    target_map: dict[str, str] = {col.name.lower(): col.type for col in target_columns}
-    delta_map: dict[str, str] = {col.name.lower(): col.type for col in delta_columns}
+    target_map: dict[str, str] = {column_name_key(col.name): col.type for col in target_columns}
+    delta_map: dict[str, str] = {column_name_key(col.name): col.type for col in delta_columns}
 
     added: list[ColumnInfo] = []
     removed: list[str] = []
@@ -741,7 +742,7 @@ def _apply_schema_change(
 
     col: ColumnInfo
     for col in delta_columns:
-        col_lower: str = col.name.lower()
+        col_lower: str = column_name_key(col.name)
         if col_lower not in target_map:
             added.append(col)
         elif not types_equal(
@@ -750,7 +751,7 @@ def _apply_schema_change(
             type_changed.append(col)
 
     for col in target_columns:
-        col_lower = col.name.lower()
+        col_lower = column_name_key(col.name)
         if col_lower not in delta_map:
             removed.append(col.name)
 
@@ -885,9 +886,9 @@ def _execute_dml(
     strategy: str | None = entry.incremental_strategy
     unique_key: tuple[str, ...] = entry.unique_key
 
-    target_col_set: frozenset[str] = frozenset(col.name.lower() for col in target_columns)
+    target_col_set: frozenset[str] = frozenset(column_name_key(col.name) for col in target_columns)
     intersection_names: tuple[str, ...] = tuple(
-        col.name for col in delta_columns if col.name.lower() in target_col_set
+        col.name for col in delta_columns if column_name_key(col.name) in target_col_set
     )
     dml_columns: tuple[str, ...] = intersection_names
     projection: str = ", ".join(intersection_names)

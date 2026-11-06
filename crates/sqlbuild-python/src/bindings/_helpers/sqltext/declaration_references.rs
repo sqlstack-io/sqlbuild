@@ -7,6 +7,7 @@ use sqlbuild_sqltext::compiler::models::{
     DeclarationReference, DeclarationReferenceKind, DeclarationReferenceScan,
     DeclarationReferenceStop,
 };
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// The reference kind of an outer SQL macro call.
 const SQL_MACRO_REFERENCE_KIND: u8 = 2;
@@ -24,20 +25,20 @@ pub(crate) struct ScannedReference {
 type ScanRow = (Vec<ScannedReference>, Option<u8>);
 
 /// One SQL string's references and stop code, scanned without walking past malformed ones.
-pub(crate) fn declaration_scan(sql: &str) -> ScanRow {
+pub(crate) fn declaration_scan(sql: &str, syntax: Option<&LexicalSyntax>) -> ScanRow {
     let scanned: Vec<DeclarationReferenceScan> =
-        scan_declaration_references(&[sql.to_owned()], false);
+        scan_declaration_references(&[sql.to_owned()], false, syntax);
     let row: ScanRow = scanned.into_iter().next().map(scan_row).unwrap_or_default();
     if !sql.contains(SQL_CALL_PREFIX) {
         return row;
     }
-    with_sql_macro_calls(sql, row)
+    with_sql_macro_calls(sql, row, syntax)
 }
 
 /// The scan with each outer SQL macro call as one kind-2 reference, replacing those inside it.
-fn with_sql_macro_calls(sql: &str, row: ScanRow) -> ScanRow {
+fn with_sql_macro_calls(sql: &str, row: ScanRow, syntax: Option<&LexicalSyntax>) -> ScanRow {
     let (references, stop) = row;
-    let Ok(calls) = sql_macro_calls(sql) else {
+    let Ok(calls) = sql_macro_calls(sql, syntax) else {
         return (references, stop);
     };
     if calls.is_empty() {

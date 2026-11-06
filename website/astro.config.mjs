@@ -18,13 +18,14 @@ export default defineConfig({
 			},
 			favicon: '/favicon.png',
 			head: [
+				{ tag: 'link', attrs: { rel: 'stylesheet', href: '/brand.css' } },
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://sqlbuild.com/assets/og-sqlbuild-docs.png' } },
 				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
 				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
 				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://sqlbuild.com/assets/og-sqlbuild-docs.png' } },
 			],
 			social: [
-				{ icon: 'github', label: 'GitHub', href: 'https://github.com/chio-labs/sqlbuild' },
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/sqlstack-io/sqlbuild' },
 				{ icon: 'discord', label: 'Discord', href: 'https://discord.gg/tYU4nXdsT' },
 			],
 			components: {
@@ -35,6 +36,7 @@ export default defineConfig({
 				SiteTitle: './src/components/SiteTitle.astro',
 				Pagination: './src/components/Pagination.astro',
 				ThemeSelect: './src/components/ThemeSelect.astro',
+				Footer: './src/components/Footer.astro',
 			},
 			customCss: ['./src/styles/fonts.css', './src/styles/sqlbuild.css'],
 			expressiveCode: {

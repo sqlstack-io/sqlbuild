@@ -431,14 +431,13 @@ pub(crate) struct GateRow {
     pub(crate) read: ResourceKey,
 }
 
-/// One hook-read ordering edge: the hook, the gated and read resources, its type and path.
+/// One hook-read ordering edge: the hook, the gated and read resources, and its type.
 pub(crate) struct HookRow {
     pub(crate) hook_name: String,
     pub(crate) gated: ResourceKey,
     pub(crate) read: ResourceKey,
     /// The `HookReadType` value.
     pub(crate) hook_type: &'static str,
-    pub(crate) path: Option<String>,
 }
 
 /// The attached-audit gate edges and hook-read edges of one project, in Python's order.
@@ -478,7 +477,6 @@ fn hook_row(edge: HookEdge) -> HookRow {
         gated: edge.gated,
         read: edge.read,
         hook_type,
-        path: edge.path,
     }
 }
 

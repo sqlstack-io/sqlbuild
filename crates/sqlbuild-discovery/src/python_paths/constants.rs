@@ -1,7 +1,9 @@
 //! The documented roots project Python may live under, and the directories the walk skips.
 
+use crate::constants::ORCHESTRATION_DIRECTORY;
+
 /// Top-level directories whose Python files are always supported.
-pub(crate) const DIRECT_PYTHON_ROOTS: [&str; 10] = [
+pub(crate) const DIRECT_PYTHON_ROOTS: [&str; 11] = [
     "adapters",
     "materializations",
     "providers",
@@ -12,6 +14,7 @@ pub(crate) const DIRECT_PYTHON_ROOTS: [&str; 10] = [
     "enums",
     "constants",
     "event_exporters",
+    ORCHESTRATION_DIRECTORY,
 ];
 /// `(root, language)` directory pairs whose Python files are supported.
 pub(crate) const LANGUAGE_PYTHON_ROOTS: [(&str, &str); 2] =

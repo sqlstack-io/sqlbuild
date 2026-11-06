@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::sql_macros::errors::ExpansionFailure;
 use crate::sql_macros::models::{RenderedDeclarations, SqlMacroCheck, SqlMacroDefinition};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// Whose scope a piece of SQL resolves its declarations and macros in.
 #[derive(Clone, Debug)]
@@ -53,6 +54,11 @@ pub trait SqlMacroHost {
     /// The project's adapter name for type rules and literal positions; empty for generic SQL.
     fn adapter(&self) -> &str {
         ""
+    }
+
+    /// The lexical rules the project's SQL is authored in; `None` reads it under generic rules.
+    fn lexical_syntax(&self) -> Option<&LexicalSyntax> {
+        None
     }
 
     /// Keep what the caller's analysed SQL must show for a call the caller wrote to fit.

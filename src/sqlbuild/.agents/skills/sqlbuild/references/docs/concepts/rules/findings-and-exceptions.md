@@ -29,7 +29,7 @@ Use an exact exception for one known finding. Exceptions require a reason and ar
 
 ```toml
 [[rules.rule_exceptions]]
-rule = "SQBRSQL004"
+rule = "SQLCLEAN004"
 path = "models/examples/sample_orders.sql"
 reason = "This example intentionally demonstrates one sampled row."
 ```
@@ -44,12 +44,12 @@ paragraph (see [Folded descriptions](../models/configuration.md#folded-descripti
 ## Relation-level exceptions
 
 A file-wide exception for a deliberate cartesian product would also hide any accidental cross join
-added to the same file later. `SQBRSQL038` findings name the joined relation and, inside a CTE,
+added to the same file later. `SQLCLEAN038` findings name the joined relation and, inside a CTE,
 that CTE, so an exception can cover exactly one join:
 
 ```toml
 [[rules.rule_exceptions]]
-rule = "SQBRSQL038"
+rule = "SQLCLEAN038"
 path = "models/orders/order_checks.sql"
 relation = "order_policy"
 cte = "policy_checks"   # optional: only the join inside this top-level CTE
@@ -59,14 +59,14 @@ reason = "Every order is evaluated against every policy check."
 `relation` is the joined relation as written, with `__ref`, `__seed` and `__source` calls resolved
 to the referenced name. Without `cte`, the exception covers that relation anywhere in the file.
 Relation-level exceptions are stale-checked like exact exceptions: an entry that matches no finding
-fails compilation. `relation` is accepted only for `SQBRSQL038`, and a file-wide exception cannot be
+fails compilation. `relation` is accepted only for `SQLCLEAN038`, and a file-wide exception cannot be
 combined with relation-level exceptions for the same code and path.
 
 A join that reads no named relation, such as `CROSS JOIN UNNEST(...)` or `CROSS JOIN LATERAL`, has
 no relation to name. Its finding says so and prints the file-wide exception (rule and path) that is
 the only way to cover it.
 
-`SQBRSQL038` does not report a cross join when either side provably holds at most one row, so most
+`SQLCLEAN038` does not report a cross join when either side provably holds at most one row, so most
 intentional cross joins need no exception at all. SQLBuild infers this from the query, never from a
 declaration: a seed whose CSV has one data row (adding a second row brings the finding back), an
 aggregate without `GROUP BY`, a one-row `VALUES`, `LIMIT 1`, or `QUALIFY ROW_NUMBER() OVER (...) = 1`
@@ -79,19 +79,21 @@ Use a path ignore when a documented project area intentionally follows a differe
 
 ```toml
 [[rules.rule_ignores]]
-rules = ["SQBRSQL"]
+rules = ["SQLCLEAN"]
 paths = ["models/examples/**"]
 reason = "Examples retain intentionally minimal SQL."
 ```
 
 Path ignores accept exact codes and family prefixes. Keep their scope narrow and explain why the
-project differs from the selected requirement.
+project differs from the selected requirement. A path without glob characters must exist, so an
+ignore left behind by a renamed or deleted file fails compilation with
+`rule ignore path does not exist: <path>`; move the ignore to the new path or delete it.
 
 Use `selectors` when the exception follows graph-resource identities or lineage rather than files:
 
 ```toml
 [[rules.rule_ignores]]
-rules = ["SQBRSQL021"]
+rules = ["SQLCLEAN021"]
 selectors = ["intermediate_*"]
 reason = "These intermediate interfaces intentionally preserve upstream columns."
 ```
@@ -102,7 +104,7 @@ matching, including SQL tests and audits that are not graph resources:
 
 ```toml
 [[rules.rule_ignores]]
-rules = ["SQBRSQL021"]
+rules = ["SQLCLEAN021"]
 paths = ["models/**/intermediate_*.sql"]
 reason = "These intermediate SQL files intentionally preserve upstream columns."
 ```
@@ -114,15 +116,15 @@ To turn a Rule off for the whole project, add its code to `[rules] ignore`.
 ## No inline suppressions
 
 SQLBuild has no inline suppression comment. An `-- sqb: ignore ...` or `/* sqb: ignore ... */`
-comment is a `SQBRSQL000` error that suppresses nothing, so the finding it was meant to hide is reported too. The error prints the
+comment is a `SQBRSUPPRESSION000` error that suppresses nothing, so the finding it was meant to hide is reported too. The error prints the
 exact entry to add instead:
 
 ```text
-error[SQBRSQL000]: Inline Rule suppressions are not supported; declare the exception in sqlbuild_project.toml
+error[SQBRSUPPRESSION000]: Inline Rule suppressions are not supported; declare the exception in sqlbuild_project.toml
   --> models/orders/order_checks.sql:4:1
-  = help: Remove this comment, then fix the SQBRSQL038 finding, or record it as a reviewed exception in sqlbuild_project.toml:
+  = help: Remove this comment, then fix the SQLCLEAN038 finding, or record it as a reviewed exception in sqlbuild_project.toml:
             [[rules.rule_exceptions]]
-            rule = "SQBRSQL038"
+            rule = "SQLCLEAN038"
             path = "models/orders/order_checks.sql"
             relation = "order_policy"
             reason = "every order meets every policy"
@@ -150,7 +152,7 @@ Use JSON when another tool consumes findings:
 
 ```bash
 sqb compile --json
-sqb rules --json run SQBRSQL
+sqb rules --json run SQLCLEAN
 ```
 
 Machine-readable output remains on stdout. Lifecycle progress and terminal status are written to

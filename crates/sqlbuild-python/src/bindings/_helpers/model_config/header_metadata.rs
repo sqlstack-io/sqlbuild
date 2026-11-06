@@ -9,14 +9,23 @@ use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
 use pyo3::{FromPyObject, IntoPyObject, IntoPyObjectExt};
 use sqlbuild_discovery::model_files::models::{NativeAudit, NativeColumn};
 use sqlbuild_discovery::models::LineColumnSpan;
+use sqlbuild_model_config::header_metadata::constants::AUDITS_KEY;
 use sqlbuild_model_config::header_metadata::models::{
     ParsedAudit, ParsedColumn, ParsedThresholds, ThresholdBound,
 };
+use sqlbuild_model_config::types::AuthoredNode;
 use sqlbuild_sqltext::compiler::models::AuthoredValue;
 
 use crate::bindings::_helpers::discovery::model_file_record::NativeModelFile;
 use crate::bindings::_helpers::model_config::authored_nodes::PyNode;
+use crate::bindings::_helpers::model_config::config_nodes::{
+    PyConfigNode, config_node, config_object,
+};
 use crate::bindings::_helpers::model_config::contract_classes::contract_classes;
+use crate::bindings::_helpers::model_config::header_audits::{
+    AuditInstance, HeaderAudits, authored_audit,
+};
+use crate::bindings::_helpers::model_config::typed_config::node_text;
 use crate::bindings::_helpers::records::construct::{new_record, record_class};
 use crate::bindings::_helpers::records::fields::all_specs;
 use crate::bindings::_helpers::records::fields::field;
@@ -61,10 +70,58 @@ const POSITIONAL_RECORDS: [(&str, &[&str]); 4] = [
     ("MeasurementThresholdBound", &THRESHOLD_BOUND_FIELDS),
 ];
 
+/// A parsed leaf projected only when a public contract needs its Python value.
+pub(crate) trait HeaderValue: AuthoredNode {
+    fn object<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>>;
+
+    fn retained(&self, py: Python<'_>) -> PyResult<PyConfigNode> {
+        config_node(&self.object(py)?)
+    }
+
+    fn exact_text(&self, py: Python<'_>) -> PyResult<String> {
+        self.object(py)?.extract()
+    }
+}
+
+impl HeaderValue for PyNode<'_> {
+    fn object<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(self.0.as_unbound().bind(py).clone())
+    }
+}
+
+impl HeaderValue for &PyConfigNode {
+    fn object<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        config_object(py, self)
+    }
+
+    fn exact_text(&self, py: Python<'_>) -> PyResult<String> {
+        node_text(py, self)
+    }
+
+    fn retained(&self, _py: Python<'_>) -> PyResult<PyConfigNode> {
+        Ok((*self).clone())
+    }
+}
+
+impl HeaderValue for PyConfigNode {
+    fn object<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        config_object(py, self)
+    }
+
+    fn exact_text(&self, py: Python<'_>) -> PyResult<String> {
+        node_text(py, self)
+    }
+
+    fn retained(&self, _py: Python<'_>) -> PyResult<PyConfigNode> {
+        Ok(self.clone())
+    }
+}
+
 /// Native column fields; a Python record is constructed only for public consumers.
 pub(crate) struct HeaderColumn {
     fields: ColumnFields,
     class: Py<PyAny>,
+    audits: Option<HeaderAudits>,
     projection: PyOnceLock<Py<PyAny>>,
 }
 
@@ -86,6 +143,81 @@ pub(crate) struct NativeColumnSpec {
 }
 
 impl HeaderColumn {
+    /// Retype a builtin column without discarding its retained audit specs.
+    pub(crate) fn enum_type(
+        mut self,
+        py: Python<'_>,
+        scalar_type: Bound<'_, PyAny>,
+        generated: Option<ParsedAudit<PyConfigNode>>,
+    ) -> PyResult<Self> {
+        if self.audits.is_none()
+            && let ColumnFields::Native(spec) = &self.fields
+        {
+            let audits = spec
+                .column
+                .audits
+                .iter()
+                .map(|audit| authored_audit(py, audit))
+                .collect::<PyResult<Vec<_>>>()?;
+            let classes: ContractClasses<'_> = contract_classes(py)?.extract()?;
+            self.audits = Some(HeaderAudits::new(
+                py,
+                &classes,
+                &audits,
+                &native_location(py, spec)?,
+            )?);
+        }
+        if let Some(audits) = &mut self.audits {
+            if let Some(generated) = generated {
+                audits.push_native(generated);
+            }
+            match &mut self.fields {
+                ColumnFields::Native(spec) => spec.column.column_type = scalar_type.extract()?,
+                ColumnFields::Python(values) => values[1] = scalar_type.unbind(),
+                ColumnFields::Projected => {
+                    return Err(PyRuntimeError::new_err(
+                        "enum column has no retained fields",
+                    ));
+                }
+            }
+            self.projection = PyOnceLock::new();
+            return Ok(self);
+        }
+        Err(PyRuntimeError::new_err(
+            "enum column has no retained audits",
+        ))
+    }
+
+    pub(crate) fn retains_audits(&self) -> bool {
+        self.audits.is_some() || matches!(self.fields, ColumnFields::Native(_))
+    }
+
+    pub(crate) fn audit_instances<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Vec<AuditInstance<'py>>> {
+        if let Some(audits) = &self.audits {
+            return Ok(audits.instances(py));
+        }
+        if let ColumnFields::Native(spec) = &self.fields {
+            let audits = spec
+                .column
+                .audits
+                .iter()
+                .map(|audit| authored_audit(py, audit))
+                .collect::<PyResult<Vec<_>>>()?;
+            let classes: ContractClasses<'_> = contract_classes(py)?.extract()?;
+            return Ok(
+                HeaderAudits::new(py, &classes, &audits, &native_location(py, spec)?)?
+                    .instances(py),
+            );
+        }
+        self.field(py, "audits")?
+            .try_iter()?
+            .map(|value| value.map(AuditInstance::Python))
+            .collect()
+    }
+
     pub(crate) fn replaced<'py>(
         class: &Bound<'py, PyAny>,
         values: [Bound<'py, PyAny>; 8],
@@ -111,6 +243,11 @@ impl HeaderColumn {
         if let Some(projected) = self.projection.get(py) {
             return field(projected.bind(py), name);
         }
+        if name == AUDITS_KEY
+            && let Some(audits) = &self.audits
+        {
+            return Ok(audits.project(py)?.into_any());
+        }
         match &self.fields {
             ColumnFields::Python(values) => Ok(values[index()?].bind(py).clone()),
             ColumnFields::Native(spec) => native_value(py, spec, index()?),
@@ -121,7 +258,7 @@ impl HeaderColumn {
     pub(crate) fn project<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.projection
             .get_or_try_init(py, || {
-                let values: [Bound<'py, PyAny>; 8] = match &self.fields {
+                let mut values: [Bound<'py, PyAny>; 8] = match &self.fields {
                     ColumnFields::Python(values) => {
                         values.each_ref().map(|value| value.bind(py).clone())
                     }
@@ -130,6 +267,9 @@ impl HeaderColumn {
                         return Err(PyRuntimeError::new_err("missing column projection"));
                     }
                 };
+                if let Some(audits) = &self.audits {
+                    values[5] = audits.project(py)?.into_any();
+                }
                 contract_object(self.class.bind(py), values).map(Bound::unbind)
             })
             .map(|value| value.bind(py).clone())
@@ -143,6 +283,7 @@ impl HeaderColumn {
         Ok(Self {
             fields: ColumnFields::Projected,
             class,
+            audits: None,
             projection,
         })
     }
@@ -158,6 +299,7 @@ impl HeaderColumn {
         Ok(Self {
             fields: ColumnFields::Python(values.map(Bound::unbind)),
             class: class.clone().unbind(),
+            audits: None,
             projection: PyOnceLock::new(),
         })
     }
@@ -172,14 +314,18 @@ impl HeaderColumn {
         Ok(Self {
             fields: ColumnFields::Native(Box::new(spec)),
             class: class.clone().unbind(),
+            audits: None,
             projection: PyOnceLock::new(),
         })
     }
 }
 
 impl HeaderColumn {
-    /// The natively parsed column, or `None` when Python built its values or record.
+    /// The original native column, if no retained audit edits changed its public contract.
     pub(crate) fn native_spec(&self) -> Option<&NativeColumnSpec> {
+        if self.audits.is_some() {
+            return None;
+        }
         match &self.fields {
             ColumnFields::Native(spec) => Some(spec),
             ColumnFields::Python(_) | ColumnFields::Projected => None,
@@ -369,7 +515,7 @@ pub(crate) struct ContractClasses<'py> {
     pub(crate) source_location: Bound<'py, PyAny>,
     measurement_thresholds: Bound<'py, PyAny>,
     measurement_threshold_bound: Bound<'py, PyAny>,
-    severities: Bound<'py, PyDict>,
+    pub(crate) severities: Bound<'py, PyDict>,
     threshold_operators: Bound<'py, PyDict>,
 }
 
@@ -426,10 +572,10 @@ pub(crate) fn audit_tuple<'py>(
 }
 
 /// The parsed audits as `SchemaAuditInstance` objects without a location, in order.
-pub(crate) fn audit_instances<'py>(
+pub(crate) fn audit_instances<'py, N: HeaderValue>(
     py: Python<'py>,
     classes: &ContractClasses<'py>,
-    parsed: &[ParsedAudit<PyNode<'py>>],
+    parsed: &[ParsedAudit<N>],
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let no_location: Bound<'py, PyAny> = py.None().into_bound(py);
     let mut audits: Vec<Bound<'py, PyAny>> = Vec::with_capacity(parsed.len());
@@ -440,13 +586,16 @@ pub(crate) fn audit_instances<'py>(
 }
 
 /// `audit.name or audit.definition_name` of the instance `audit` builds.
-pub(crate) fn parsed_audit_identity(audit: &ParsedAudit<PyNode<'_>>) -> PyResult<String> {
+pub(crate) fn parsed_audit_identity<N: HeaderValue>(
+    py: Python<'_>,
+    audit: &ParsedAudit<N>,
+) -> PyResult<String> {
     if let Some(name) = &audit.name
-        && name.0.is_truthy()?
+        && name.object(py)?.is_truthy()?
     {
-        return name.0.extract();
+        return name.exact_text(py);
     }
-    audit.definition_name.0.extract()
+    audit.definition_name.exact_text(py)
 }
 
 /// `class(*values)`: the same record as keywords bind, given in `POSITIONAL_RECORDS` order.
@@ -491,8 +640,14 @@ fn mismatched_record() -> Option<&'static str> {
     None
 }
 
-fn optional<'py>(py: Python<'py>, value: Option<&PyNode<'py>>) -> Bound<'py, PyAny> {
-    value.map_or_else(|| py.None().into_bound(py), |node| node.0.clone())
+fn optional<'py, N: HeaderValue>(
+    py: Python<'py>,
+    value: Option<&N>,
+) -> PyResult<Bound<'py, PyAny>> {
+    Ok(value
+        .map(|node| node.object(py))
+        .transpose()?
+        .unwrap_or_else(|| py.None().into_bound(py)))
 }
 
 fn schema_column<'py>(
@@ -504,70 +659,78 @@ fn schema_column<'py>(
     native_schema_column(py, classes, column, locations)?.project(py)
 }
 
-pub(crate) fn native_schema_column<'py>(
+pub(crate) fn native_schema_column<'py, N: HeaderValue>(
     py: Python<'py>,
     classes: &ContractClasses<'py>,
-    column: &ParsedColumn<PyNode<'py>>,
+    column: &ParsedColumn<N>,
     locations: &Bound<'py, PyDict>,
 ) -> PyResult<HeaderColumn> {
     let location = locations
-        .get_item(&column.name.0)?
+        .get_item(column.name.object(py)?)?
         .unwrap_or_else(|| py.None().into_bound(py));
-    let audits = column
-        .audits
-        .iter()
-        .map(|audit| audit_instance(py, classes, audit, &location))
-        .collect::<PyResult<Vec<_>>>()?;
-    HeaderColumn::new(
+    let audits = HeaderAudits::new(py, classes, &column.audits, &location)?;
+    let projected_audits = if classes
+        .schema_column
+        .is(&record_class(py, RecordId::SchemaColumn)?)
+    {
+        PyTuple::empty(py)
+    } else {
+        audits.project(py)?
+    };
+    let mut result = HeaderColumn::new(
         &classes.schema_column,
         [
-            column.name.0.clone(),
-            optional(py, column.column_type.as_ref()),
-            optional(py, column.nullable.as_ref()),
-            optional(py, column.description.as_ref()),
+            column.name.object(py)?,
+            optional(py, column.column_type.as_ref())?,
+            optional(py, column.nullable.as_ref())?,
+            optional(py, column.description.as_ref())?,
             PyDict::new(py).into_any(),
-            PyTuple::new(py, audits)?.into_any(),
+            projected_audits.into_any(),
             location,
-            optional(py, column.migrate_from.as_ref()),
+            optional(py, column.migrate_from.as_ref())?,
         ],
-    )
+    )?;
+    if !matches!(result.fields, ColumnFields::Projected) {
+        result.audits = Some(audits);
+    }
+    Ok(result)
 }
 
-fn audit_instance<'py>(
+pub(crate) fn audit_instance<'py, N: HeaderValue>(
     py: Python<'py>,
     classes: &ContractClasses<'py>,
-    audit: &ParsedAudit<PyNode<'py>>,
+    audit: &ParsedAudit<N>,
     location: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let arguments = PyDict::new(py);
     for (key, value) in &audit.arguments {
-        arguments.set_item(&key.0, &value.0)?;
+        arguments.set_item(key.object(py)?, value.object(py)?)?;
     }
     let severity = match &audit.severity {
         Some(severity) => classes
             .severities
-            .get_item(&severity.0)?
+            .get_item(severity.object(py)?)?
             .unwrap_or_else(|| py.None().into_bound(py)),
         None => py.None().into_bound(py),
     };
-    let always_run = audit.always_run.as_ref().map_or_else(
-        || PyBool::new(py, false).to_owned().into_any(),
-        |node| node.0.clone(),
-    );
+    let always_run = match &audit.always_run {
+        Some(node) => node.object(py)?,
+        None => PyBool::new(py, false).to_owned().into_any(),
+    };
     contract_object(
         &classes.schema_audit_instance,
         [
-            audit.definition_name.0.clone(),
+            audit.definition_name.object(py)?,
             arguments.into_any(),
-            optional(py, audit.name.as_ref()),
-            optional(py, audit.description.as_ref()),
+            optional(py, audit.name.as_ref())?,
+            optional(py, audit.description.as_ref())?,
             severity,
-            optional(py, audit.run_scope.as_ref()),
+            optional(py, audit.run_scope.as_ref())?,
             always_run,
             thresholds(py, classes, audit.thresholds.as_ref())?,
-            optional(py, audit.minimum_samples.as_ref()),
-            optional(py, audit.evidence_limit.as_ref()),
-            optional(py, audit.meta.as_ref()),
+            optional(py, audit.minimum_samples.as_ref())?,
+            optional(py, audit.evidence_limit.as_ref())?,
+            optional(py, audit.meta.as_ref())?,
             location.clone(),
         ],
     )

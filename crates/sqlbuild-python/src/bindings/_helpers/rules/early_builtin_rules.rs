@@ -25,7 +25,7 @@ use crate::bindings::_helpers::compiled_views::records::{
 use crate::bindings::_helpers::records::fields::field;
 use crate::bindings::_helpers::rules::catalogue::references_custom_rules;
 use crate::bindings::_helpers::rules::rule_dispatch::speculative_rules_request;
-use crate::bindings::_helpers::rules::rule_plan::rule_run_plan;
+use crate::bindings::_helpers::rules::rule_plan::{rule_run_plan, selects_row_rules};
 use crate::bindings::_helpers::rules::rules_config::load_rules_config_with_cache;
 use crate::bindings::types::CompilerDetach;
 
@@ -199,7 +199,7 @@ fn early_request(
         None,
         settings.no_sql_analysis,
     )?;
-    if field(&plan, "selected")?.len()? == 0 || field(&plan, "custom_payloads")?.is_truthy()? {
+    if !selects_row_rules(&plan)? || field(&plan, "custom_payloads")?.is_truthy()? {
         return Ok(None);
     }
     let facts: Bound<'_, NativeCompiledProject> = Bound::new(

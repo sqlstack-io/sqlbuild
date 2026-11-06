@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from typing import cast
 
@@ -12,7 +13,10 @@ from sqlbuild._native import (
     statement_metadata_effect,
 )
 from sqlbuild.adapter.contract.models import RelationInfo
-from sqlbuild.adapter.relations.constants import SCHEMA_LISTING_LOOKUP_THRESHOLD
+from sqlbuild.adapter.relations.constants import (
+    SCHEMA_LISTING_LOOKUP_THRESHOLD,
+    SCHEMA_LISTING_MAX_AGE_SECONDS,
+)
 from sqlbuild.adapter.relations.models import RunSchemaListing, StatementMetadataEffect
 from sqlbuild.adapter.relations.types import (
     RelationCacheKey,
@@ -24,8 +28,11 @@ from sqlbuild.adapter.relations.types import (
 class RelationMetadataCache:
     """Serve repeated identical metadata lookups until SQL may have changed the relation."""
 
-    def __init__(self, *, transactional_ddl: bool) -> None:
+    def __init__(
+        self, *, transactional_ddl: bool, clock: Callable[[], float] = time.monotonic
+    ) -> None:
         self._transactional_ddl: bool = transactional_ddl
+        self._clock: Callable[[], float] = clock
         self._lock: threading.Lock = threading.Lock()
         self._entries: dict[RelationCacheKey, object] = {}
         self._name_versions: dict[str, int] = {}
@@ -70,7 +77,11 @@ class RelationMetadataCache:
         listing: RunSchemaListing | None
         with self._lock:
             listing = self._listings.get(scope)
-            if listing is None:
+            expired: bool = listing is not None and self._expired(listing=listing)
+            if expired:
+                del self._listings[scope]
+                listing = None
+            if listing is None and not expired:
                 lookups: int = self._schema_lookups.get(scope, 0) + 1
                 self._schema_lookups[scope] = lookups
                 if lookups < SCHEMA_LISTING_LOOKUP_THRESHOLD:
@@ -90,13 +101,41 @@ class RelationMetadataCache:
     def refresh_schema_listing(
         self, *, scope: SchemaListingScope, read_listing: Callable[[], dict[str, RelationInfo]]
     ) -> RunSchemaListing:
-        """List the schema again; every relation in it is current as of this listing."""
+        """List the schema again; every relation in it is current as of this listing, for a time."""
+
+        versions: tuple[int, dict[str, int]] = self.listing_versions()
+        return self.keep_schema_listing(
+            scope=scope,
+            relations=read_listing(),
+            versions=versions,
+            max_age_seconds=SCHEMA_LISTING_MAX_AGE_SECONDS,
+        )
+
+    def listing_versions(self) -> tuple[int, dict[str, int]]:
+        """The cache versions a listing read from now on is current as of."""
 
         with self._lock:
-            global_version: int = self._global_version
-            name_versions: dict[str, int] = dict(self._name_versions)
+            return self._global_version, dict(self._name_versions)
+
+    def keep_schema_listing(
+        self,
+        *,
+        scope: SchemaListingScope,
+        relations: dict[str, RelationInfo],
+        versions: tuple[int, dict[str, int]],
+        max_age_seconds: float | None = None,
+    ) -> RunSchemaListing:
+        """Keep a listing read after ``listing_versions`` returned ``versions``, for a time."""
+
+        global_version: int = versions[0]
+        expires_at: float | None = (
+            None if max_age_seconds is None else self._clock() + max_age_seconds
+        )
         listing: RunSchemaListing = RunSchemaListing(
-            relations=read_listing(), global_version=global_version, name_versions=name_versions
+            relations=relations,
+            global_version=global_version,
+            name_versions=versions[1],
+            expires_at=expires_at,
         )
         with self._lock:
             if self._global_version == global_version:
@@ -116,9 +155,14 @@ class RelationMetadataCache:
 
     def _listed_fresh(self, *, listing: RunSchemaListing, name: str) -> bool:
         name_key: str = relation_name_key(name)
-        return listing.global_version == self._global_version and listing.name_versions.get(
-            name_key, 0
-        ) == self._name_versions.get(name_key, 0)
+        return (
+            not self._expired(listing=listing)
+            and listing.global_version == self._global_version
+            and listing.name_versions.get(name_key, 0) == self._name_versions.get(name_key, 0)
+        )
+
+    def _expired(self, *, listing: RunSchemaListing) -> bool:
+        return listing.expires_at is not None and self._clock() >= listing.expires_at
 
     def invalidate_relations(self, *, qualified_names: tuple[str, ...]) -> None:
         """Evict relations changed outside SQL statements, such as by a warehouse copy job."""

@@ -1,5 +1,6 @@
 //! Typed requests of plan entry construction.
 
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use pyo3::prelude::{Bound, Py, PyAny};
 use pyo3::pyclass;
 
@@ -68,7 +69,7 @@ pub(crate) struct PlannerRelationsContext {
 #[derive(Debug)]
 pub(crate) struct ModelPlanContext {
     pub(crate) model_locations: Py<PyAny>,
-    pub(crate) models_by_name: Py<PyAny>,
+    pub(crate) models_by_name: ModelLookup,
     pub(crate) seed_locations: Py<PyAny>,
     pub(crate) function_locations: Py<PyAny>,
     pub(crate) source_map: Py<PyAny>,

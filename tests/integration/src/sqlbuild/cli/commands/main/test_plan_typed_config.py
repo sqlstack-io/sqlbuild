@@ -1,4 +1,4 @@
-"""Planning converts only the config values its readers ask for."""
+"""Planning retains native config trees and leaves unread Python containers unopened."""
 
 from __future__ import annotations
 
@@ -35,4 +35,4 @@ def test_given_config_keys_planning_never_reads_when_planning_then_they_are_not_
     )
     _ = capsys.readouterr()
 
-    assert (plain > 0, extended == plain) == (True, test_case.expected_same_reads)
+    assert (plain, extended == plain) == (0, test_case.expected_same_reads)

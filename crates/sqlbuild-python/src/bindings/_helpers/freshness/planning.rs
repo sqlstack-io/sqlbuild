@@ -1,10 +1,15 @@
 //! Planning-time source freshness: observe, compare with latest state and map downstream impact.
 
+use std::collections::{HashMap, HashSet};
+
 use pyo3::prelude::{
     Bound, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
 };
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PySet, PySetMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::planner_identity::constants::{MODEL_RESOURCE, SOURCE_RESOURCE};
+use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::main::configuration_error::configuration_error;
 
@@ -17,7 +22,7 @@ use crate::bindings::_helpers::freshness::observation::{
 use crate::bindings::_helpers::freshness::state_io::{StateRead, read_latest};
 use crate::bindings::_helpers::freshness::support::text;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_identity::graph::build_downstream_model_name_closure;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -295,23 +300,22 @@ fn frozen<'py>(items: &Bound<'py, PySet>) -> PyResult<Bound<'py, PyAny>> {
     items.py().get_type::<PyFrozenSet>().call1((items,))
 }
 
-fn downstream_models<'py>(
-    source_name: &Bound<'py, PyAny>,
-    downstream_deps: &Bound<'py, PyAny>,
-) -> PyResult<Bound<'py, PyFrozenSet>> {
-    let py: Python<'py> = source_name.py();
-    let key: Bound<'py, PyAny> = new_record_with(
-        py,
-        RecordId::CompiledObjectKey,
-        &[
-            (
-                "resource_type",
-                enum_member(py, RecordId::CompiledResourceType, "SOURCE")?,
-            ),
-            ("name", source_name.clone()),
-        ],
-    )?;
-    build_downstream_model_name_closure(&PyTuple::new(py, [key])?.into_any(), downstream_deps)
+fn downstream_models(
+    source_name: String,
+    downstream_deps: &HashMap<&ObjectKey, &Vec<ObjectKey>>,
+) -> HashSet<String> {
+    let key = (SOURCE_RESOURCE.to_owned(), source_name);
+    let mut visited: HashSet<&ObjectKey> = HashSet::new();
+    let Ok(()) = breadth_first_reach([&key], None, &mut visited, |node| {
+        Ok(downstream_deps
+            .get(node)
+            .map_or(&[][..], |deps| deps.as_slice()))
+    });
+    visited
+        .into_iter()
+        .filter(|key| key.0 == MODEL_RESOURCE)
+        .map(|key| key.1.clone())
+        .collect()
 }
 
 /// Map changed and unknown source freshness roots to downstream model names.
@@ -322,24 +326,31 @@ pub(crate) fn build_direct_source_freshness_propagation_result<'py>(
     scope: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = scope.py();
-    let downstream_deps: Bound<'py, PyAny> = native_field(scope, "downstream_deps")?;
+    let scope = scope_data(scope)?;
+    let downstream_deps: HashMap<&ObjectKey, &Vec<ObjectKey>> = scope
+        .downstream
+        .iter()
+        .map(|(key, deps)| (key, deps))
+        .collect();
     let changed: Bound<'py, PyDict> = PyDict::new(py);
     let unknown_sources: Bound<'py, PyDict> = PyDict::new(py);
     let errors: Bound<'py, PyDict> = PyDict::new(py);
-    let stale: Bound<'py, PySet> = PySet::empty(py)?;
-    let blocked: Bound<'py, PySet> = PySet::empty(py)?;
+    let mut stale: HashSet<String> = HashSet::new();
+    let mut blocked: HashSet<String> = HashSet::new();
     for identity in native_field(source_freshness, "changed_identities")?.try_iter()? {
         let identity: Bound<'py, PyAny> = identity?;
-        let models: Bound<'py, PyFrozenSet> =
-            downstream_models(&native_field(&identity, "source_name")?, &downstream_deps)?;
-        stale.call_method1("update", (&models,))?;
-        changed.set_item(identity, models)?;
+        let models = downstream_models(
+            native_field(&identity, "source_name")?.extract()?,
+            &downstream_deps,
+        );
+        stale.extend(models.iter().cloned());
+        changed.set_item(identity, PyFrozenSet::new(py, models)?)?;
     }
     for name in native_field(source_freshness, "unknown_source_names")?.try_iter()? {
         let name: Bound<'py, PyAny> = name?;
-        let models: Bound<'py, PyFrozenSet> = downstream_models(&name, &downstream_deps)?;
-        stale.call_method1("update", (&models,))?;
-        unknown_sources.set_item(name, models)?;
+        let models = downstream_models(name.extract()?, &downstream_deps);
+        stale.extend(models.iter().cloned());
+        unknown_sources.set_item(name, PyFrozenSet::new(py, models)?)?;
     }
     let error_status: Bound<'py, PyAny> =
         enum_member(py, RecordId::SourceFreshnessAgeStatus, "ERROR")?;
@@ -350,10 +361,12 @@ pub(crate) fn build_direct_source_freshness_propagation_result<'py>(
         if status.ne(&error_status)? {
             continue;
         }
-        let models: Bound<'py, PyFrozenSet> =
-            downstream_models(&native_field(&identity, "source_name")?, &downstream_deps)?;
-        blocked.call_method1("update", (&models,))?;
-        errors.set_item(identity, models)?;
+        let models = downstream_models(
+            native_field(&identity, "source_name")?.extract()?,
+            &downstream_deps,
+        );
+        blocked.extend(models.iter().cloned());
+        errors.set_item(identity, PyFrozenSet::new(py, models)?)?;
     }
     new_record_with(
         py,
@@ -362,8 +375,11 @@ pub(crate) fn build_direct_source_freshness_propagation_result<'py>(
             ("changed_source_model_names", changed.into_any()),
             ("unknown_source_model_names", unknown_sources.into_any()),
             ("error_source_model_names", errors.into_any()),
-            ("stale_model_names", frozen(&stale)?),
-            ("blocked_model_names", frozen(&blocked)?),
+            ("stale_model_names", PyFrozenSet::new(py, stale)?.into_any()),
+            (
+                "blocked_model_names",
+                PyFrozenSet::new(py, blocked)?.into_any(),
+            ),
         ],
     )
 }

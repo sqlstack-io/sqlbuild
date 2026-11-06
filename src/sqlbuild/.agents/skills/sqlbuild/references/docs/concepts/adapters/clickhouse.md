@@ -21,7 +21,7 @@ Online: https://sqlbuild.com/docs/concepts/adapters/clickhouse/
 - Limits
 - Recall store
 
-The ClickHouse adapter is in beta and supports a single server. Clusters (`ON CLUSTER`, replicated and distributed tables) are not supported yet. Please [report issues](https://github.com/chio-labs/sqlbuild/issues).
+The ClickHouse adapter is in beta and supports a single server. Clusters (`ON CLUSTER`, replicated and distributed tables) are not supported yet. Please [report issues](https://github.com/sqlstack-io/sqlbuild/issues).
 
 ClickHouse requires the optional `clickhouse-connect` dependency:
 

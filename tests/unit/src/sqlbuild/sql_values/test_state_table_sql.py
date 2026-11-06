@@ -27,9 +27,10 @@ from tests.unit.src.sqlbuild.sql_values._test_types import (
             expected_sql=(
                 "INSERT INTO analytics._sqlbuild_source_freshness (source_name, "
                 "target_database, target_schema, target_name, run_id, strategy, value_kind, "
-                "data_version, data_version_hash, observed_at) VALUES ('raw.o''rders', NULL, "
+                "data_version, data_version_hash, observed_at, event_id) VALUES ('raw.o''rders', NULL, "
                 "'raw', 'orders', 'run-1', 'adapter', 'timestamp', "
-                "'2026-01-01T01:00:00+01:00', 'hash', '2026-01-01T00:00:00+00:00')"
+                "'2026-01-01T01:00:00+01:00', 'hash', '2026-01-01T00:00:00+00:00', "
+                "'a7a96057679375d1ba89ff2842c691f288d410dc1f502726feeb9cc0675bfd26')"
             ),
         )
     ],

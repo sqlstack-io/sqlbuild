@@ -15,6 +15,7 @@ from sqlbuild._native import run_cli as main
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from sqlbuild.executor.build._helpers import scheduler as scheduler_module
 from tests.integration.src.sqlbuild.cli.commands.main.model_migrations.helpers import (
+    PROJECT_TOML,
     execute,
     query,
     write_project,
@@ -183,10 +184,10 @@ def migrate_columns(declarations: str) -> str:
     return f"  columns ({declarations}),\n"
 
 
-def write_model(*, project_dir: Path, sql: str) -> None:
+def write_model(*, project_dir: Path, sql: str, project_toml: str = PROJECT_TOML) -> None:
     """Replace the project with exactly the orders model."""
 
-    write_project(project_dir=project_dir, models={MODEL_NAME: sql})
+    write_project(project_dir=project_dir, models={MODEL_NAME: sql}, project_toml=project_toml)
 
 
 def load_orders(*, project_dir: Path, last_day: int, failing_day: int | None = None) -> None:

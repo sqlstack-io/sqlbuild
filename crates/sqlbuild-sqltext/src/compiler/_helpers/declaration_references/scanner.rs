@@ -7,6 +7,8 @@ use crate::compiler::models::{
     DeclarationReference, DeclarationReferenceKind, DeclarationReferenceScan,
     DeclarationReferenceStop,
 };
+use crate::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
+use crate::sql_scan::models::{LexicalSyntax, Unclosed};
 
 const SPECIAL_BYTES: &[u8] = b"'\"`$@/-";
 const ENUM_KEYWORD: &str = "@enum";
@@ -22,13 +24,21 @@ enum NextStart<'sql> {
 }
 
 /// Python's references in `sql` (code points) and stop; `skip_malformed` resumes past malformed.
-pub(crate) fn scan_references(sql: &str, skip_malformed: bool) -> DeclarationReferenceScan {
+pub(crate) fn scan_references(
+    sql: &str,
+    skip_malformed: bool,
+    syntax: Option<&LexicalSyntax>,
+) -> DeclarationReferenceScan {
     let mut references: Vec<DeclarationReference> = Vec::new();
     let mut offsets: CharOffsets = CharOffsets::default();
     let mut cursor: usize = 0;
     let mut stop: Option<DeclarationReferenceStop> = None;
     while cursor < sql.len() {
-        let (start, matched) = match next_reference_start(sql, cursor) {
+        let next: NextStart<'_> = match syntax {
+            Some(syntax) => next_dialect_reference_start(sql, cursor, syntax),
+            None => next_reference_start(sql, cursor),
+        };
+        let (start, matched) = match next {
             NextStart::Reference(start, matched) => (start, matched),
             NextStart::End => break,
             NextStart::Malformed(_, keyword_end) if skip_malformed => {
@@ -98,6 +108,43 @@ fn next_reference_start(sql: &str, start: usize) -> NextStart<'_> {
             Some(next) => index = next,
             None => return NextStart::Stop(DeclarationReferenceStop::UnclosedQuote),
         }
+    }
+    NextStart::End
+}
+
+/// The next reference start at or after `start`, skipping text the dialect reads as non-code.
+fn next_dialect_reference_start<'sql>(
+    sql: &'sql str,
+    start: usize,
+    syntax: &LexicalSyntax,
+) -> NextStart<'sql> {
+    let rest: &str = &sql[start..];
+    if !rest.contains("@enum") && !rest.contains("@const") {
+        return NextStart::End;
+    }
+    let bytes: &[u8] = sql.as_bytes();
+    let mut index: usize = start;
+    while index < bytes.len() {
+        if bytes[index] == b'@' {
+            match match_reference(sql, index) {
+                ReferenceSyntax::NotReference => index += 1,
+                ReferenceSyntax::Matched(matched) => return NextStart::Reference(index, matched),
+                ReferenceSyntax::Malformed(kind) => {
+                    return NextStart::Malformed(kind, index + keyword_length(kind));
+                }
+            }
+            continue;
+        }
+        index = match dialect_non_code_end(bytes, index, syntax) {
+            Ok(Some(end)) => end,
+            Ok(None) => index + 1,
+            Err(Unclosed::BlockComment) => {
+                return NextStart::Stop(DeclarationReferenceStop::UnclosedBlockComment);
+            }
+            Err(Unclosed::Quote | Unclosed::Parenthesis) => {
+                return NextStart::Stop(DeclarationReferenceStop::UnclosedQuote);
+            }
+        };
     }
     NextStart::End
 }

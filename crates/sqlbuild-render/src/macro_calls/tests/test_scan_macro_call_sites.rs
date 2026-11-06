@@ -1,5 +1,6 @@
 use crate::macro_calls::errors::ScanError;
 use crate::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites;
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use std::time::Instant;
 
 use crate::macro_calls::tests::test_types::{
@@ -170,7 +171,7 @@ fn given_authored_sql_when_scanning_macro_calls_then_sites_match_python_expansio
     ];
 
     for test_case in test_cases {
-        let scan = scan_macro_call_sites(test_case.sql);
+        let scan = scan_macro_call_sites(test_case.sql, None);
         let actual: Vec<ExpectedSite> = scan
             .sites
             .into_iter()
@@ -238,7 +239,7 @@ fn given_deeply_nested_calls_when_scanning_then_time_is_linear_and_nothing_overf
         );
         let started = Instant::now();
 
-        let scan = scan_macro_call_sites(&sql);
+        let scan = scan_macro_call_sites(&sql, None);
 
         assert!(
             started.elapsed().as_secs_f64() < test_case.expected_max_seconds,
@@ -298,7 +299,7 @@ fn given_calls_when_scanning_then_argument_starts_and_failing_call_names_match_p
         },
     ];
     for test_case in test_cases {
-        let scan = scan_macro_call_sites(test_case.sql);
+        let scan = scan_macro_call_sites(test_case.sql, None);
 
         assert_eq!(
             (
@@ -316,6 +317,68 @@ fn given_calls_when_scanning_then_argument_starts_and_failing_call_names_match_p
                     name.map(str::to_owned),
                     error
                 )),
+            ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_backslash_escapes_when_scanning_macro_calls_then_dialect_quotes_are_text() {
+    let syntax = LexicalSyntax {
+        backslash_escape_quotes: vec!["'".to_owned()],
+        line_comment_prefixes: vec!["--".to_owned(), "//".to_owned()],
+        ..LexicalSyntax::default()
+    };
+    let test_cases = [
+        ScanMacroCallSitesTestCase {
+            description: "an escaped quote before a call stays inside its string",
+            sql: "'O\\'Brien @py.hidden()' @py.m('a\\')')",
+            expected_sites: &[(24, 37, "m", Some(&["m"]), false)],
+            expected_failure: None,
+        },
+        ScanMacroCallSitesTestCase {
+            description: "a backslash at the end of a literal escapes itself",
+            sql: "'C:\\\\' @py.m(')')",
+            expected_sites: &[(7, 17, "m", Some(&["m"]), false)],
+            expected_failure: None,
+        },
+        ScanMacroCallSitesTestCase {
+            description: "a dialect line comment hides a call",
+            sql: "// it's @py.hidden()\n@py.m()",
+            expected_sites: &[(21, 28, "m", Some(&["m"]), false)],
+            expected_failure: None,
+        },
+        ScanMacroCallSitesTestCase {
+            description: "a dialect line comment marker inside Python arguments is an operator",
+            sql: "@py.m(10 // 3) AS a",
+            expected_sites: &[(0, 14, "m", Some(&["m"]), false)],
+            expected_failure: None,
+        },
+    ];
+
+    for test_case in test_cases {
+        let scan = scan_macro_call_sites(test_case.sql, Some(&syntax));
+        let actual: Vec<(usize, usize, String)> = scan
+            .sites
+            .into_iter()
+            .map(|site| (site.start, site.end, site.name))
+            .collect();
+
+        assert_eq!(
+            (
+                actual,
+                scan.failure
+                    .map(|failure| (failure.call_start, failure.error))
+            ),
+            (
+                test_case
+                    .expected_sites
+                    .iter()
+                    .map(|(start, end, name, _, _)| (*start, *end, (*name).to_owned()))
+                    .collect::<Vec<(usize, usize, String)>>(),
+                test_case.expected_failure
             ),
             "{}",
             test_case.description

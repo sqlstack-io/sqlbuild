@@ -13,6 +13,7 @@ from sqlbuild._native import (
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.unkeyed_diff import UnkeyedDiffMixin
 from sqlbuild.adapter.contract.constants import DIFF_LEFT_SIDE, DIFF_RIGHT_SIDE
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     RowDiffCoverage,
@@ -176,16 +177,18 @@ def execute_query_diff(
         ),
         unkeyed=options.unkeyed,
     )
-    canonical_names: dict[str, str] = {column.name.lower(): column.name for column in left_columns}
-    unique_key = tuple(canonical_names[key.lower()] for key in unique_key)
+    canonical_names: dict[str, str] = {
+        column_name_key(column.name): column.name for column in left_columns
+    }
+    unique_key = tuple(canonical_names[column_name_key(key)] for key in unique_key)
     excluded_columns: tuple[str, ...] = tuple(
-        canonical_names[column.lower()] for column in options.excluded_columns_override
+        canonical_names[column_name_key(column)] for column in options.excluded_columns_override
     )
     tolerance_overrides: RowDiffTolerances = options.tolerance_overrides or RowDiffTolerances()
     tolerances: RowDiffTolerances = replace(
         tolerance_overrides,
         by_column={
-            canonical_names[column.lower()]: tolerance
+            canonical_names[column_name_key(column)]: tolerance
             for column, tolerance in tolerance_overrides.by_column.items()
         },
     )
@@ -306,10 +309,14 @@ def _validate_query_diff_columns(
     tolerance_columns: tuple[str, ...],
     unkeyed: bool,
 ) -> None:
-    left_names: dict[str, str] = {column.name.lower(): column.name for column in left_columns}
-    right_names: dict[str, str] = {column.name.lower(): column.name for column in right_columns}
+    left_names: dict[str, str] = {
+        column_name_key(column.name): column.name for column in left_columns
+    }
+    right_names: dict[str, str] = {
+        column_name_key(column.name): column.name for column in right_columns
+    }
     for key in unique_key:
-        if key.lower() not in left_names or key.lower() not in right_names:
+        if column_name_key(key) not in left_names or column_name_key(key) not in right_names:
             raise ExecutorInputError(
                 f"raw-query diff key column '{key}' is missing from one or both results",
                 code="X307",
@@ -317,7 +324,7 @@ def _validate_query_diff_columns(
     missing_exclusions: tuple[str, ...] = tuple(
         column
         for column in excluded_columns
-        if column.lower() not in left_names or column.lower() not in right_names
+        if column_name_key(column) not in left_names or column_name_key(column) not in right_names
     )
     if missing_exclusions:
         raise ExecutorInputError(
@@ -328,7 +335,7 @@ def _validate_query_diff_columns(
     missing_tolerances: tuple[str, ...] = tuple(
         column
         for column in tolerance_columns
-        if column.lower() not in left_names or column.lower() not in right_names
+        if column_name_key(column) not in left_names or column_name_key(column) not in right_names
     )
     if missing_tolerances:
         raise ExecutorInputError(
@@ -336,18 +343,22 @@ def _validate_query_diff_columns(
             + ", ".join(missing_tolerances),
             code="X311",
         )
-    excluded_column_names: frozenset[str] = frozenset(item.lower() for item in excluded_columns)
+    excluded_column_names: frozenset[str] = frozenset(
+        column_name_key(item) for item in excluded_columns
+    )
     intersection: tuple[str, ...] = tuple(
-        key for key in unique_key if key.lower() in excluded_column_names
+        key for key in unique_key if column_name_key(key) in excluded_column_names
     )
     if intersection:
         raise ExecutorInputError(
             "raw-query diff excluded columns intersect --key: " + ", ".join(intersection),
             code="X309",
         )
-    tolerance_column_names: frozenset[str] = frozenset(item.lower() for item in tolerance_columns)
+    tolerance_column_names: frozenset[str] = frozenset(
+        column_name_key(item) for item in tolerance_columns
+    )
     tolerance_key_intersection: tuple[str, ...] = tuple(
-        key for key in unique_key if key.lower() in tolerance_column_names
+        key for key in unique_key if column_name_key(key) in tolerance_column_names
     )
     if tolerance_key_intersection:
         raise ExecutorInputError(
@@ -355,8 +366,10 @@ def _validate_query_diff_columns(
             + ", ".join(tolerance_key_intersection),
             code="X312",
         )
-    excluded_names: frozenset[str] = frozenset(column.lower() for column in excluded_columns)
-    if unkeyed and all(column.name.lower() in excluded_names for column in left_columns):
+    excluded_names: frozenset[str] = frozenset(
+        column_name_key(column) for column in excluded_columns
+    )
+    if unkeyed and all(column_name_key(column.name) in excluded_names for column in left_columns):
         raise ExecutorInputError(
             "unkeyed raw-query diff requires at least one compared column",
             code="X310",
@@ -660,10 +673,10 @@ def _require_relation_keys(
     *, adapter: BaseAdapter, connection: Any, relation: str, keys: tuple[str, ...]
 ) -> None:
     columns: set[str] = {
-        column.name.lower()
+        column_name_key(column.name)
         for column in adapter.describe_relation(connection=connection, relation=relation)
     }
-    missing: tuple[str, ...] = tuple(key for key in keys if key.lower() not in columns)
+    missing: tuple[str, ...] = tuple(key for key in keys if column_name_key(key) not in columns)
     if not missing:
         return
     noun: str = "column" if len(missing) == 1 else "columns"

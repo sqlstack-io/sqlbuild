@@ -16,6 +16,7 @@ from sqlbuild._native import (
 )
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.executor.migrations._helpers.relation_for_location import (
     migration_relation_for_location,
@@ -75,11 +76,12 @@ def _rename_and_record(
     attempts: int = MIGRATION_WRITE_ATTEMPTS,
 ) -> None:
     live: frozenset[str] = frozenset(
-        column.name.lower()
+        column_name_key(column.name)
         for column in _live_columns(adapter=adapter, connection=connection, entry=entry)
     )
     already_renamed: bool = (
-        entry.origin_column.lower() not in live and entry.destination_column.lower() in live
+        column_name_key(entry.origin_column) not in live
+        and column_name_key(entry.destination_column) in live
     )
     decision: ColumnMigrationDecision = entry.decision
     if entry.decision.renames and not already_renamed:

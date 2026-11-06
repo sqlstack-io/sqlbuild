@@ -10,6 +10,7 @@ use sqlbuild_core::build_command::main::render_phase_timings::render_phase_timin
 use sqlbuild_core::build_command::models::PhaseTimings;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::BuildStatus;
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords};
 use crate::bindings::_helpers::build_command::execution::{
@@ -20,6 +21,7 @@ use crate::bindings::_helpers::build_command::support::{
     boolean, emit, joined, none, text, utc_now,
 };
 use crate::bindings::_helpers::build_progress::footer::format_build_footer_with;
+use crate::bindings::_helpers::build_progress::result_text::build_result_text;
 use crate::bindings::_helpers::check::check_results::check_result_text;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::plan_has_executable_work;
 use crate::bindings::_helpers::compile_outputs::runtime_target::{
@@ -34,7 +36,7 @@ use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::result_output::documents::format_build_execution_json;
-use crate::bindings::_helpers::result_output::documents::format_degradable_build_execution_json;
+use crate::bindings::_helpers::result_output::documents::format_build_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
 use sqlbuild_core::build_progress::models::PythonNodeText;
 use sqlbuild_core::check_command::models::{CheckResultText, CheckStatus};
@@ -351,10 +353,9 @@ pub(crate) fn complete_direct_build<'py>(
 ) -> PyResult<i32> {
     let py: Python<'py> = context.py();
     let completed_at: Bound<'py, PyAny> = utc_now(py)?;
-    let result: &Bound<'py, PyAny> = &outcome.result;
+    let result = &outcome.result;
     let plan: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
-    let succeeded: bool =
-        native_field(result, "status")?.str()?.extract::<String>()? == SUCCESS_STATUS;
+    let succeeded: bool = result.status == BuildStatus::Success;
     let python_failed: bool = any_failed(&outcome.python_results, |result| {
         Ok(python_node_failed(
             &native_field(result, "status")?.str()?.extract::<String>()?,
@@ -390,7 +391,7 @@ pub(crate) fn complete_direct_build<'py>(
         .map(|check| Ok(check_node_text(&check_result_text(&check?)?)))
         .collect::<PyResult<_>>()?;
     let footer: String = format_build_footer_with(
-        &result.clone(),
+        &build_result_text(py, result)?,
         (
             native_field(&preparation.callbacks, "elapsed")?.extract::<f64>()?,
             context.use_color,
@@ -399,12 +400,12 @@ pub(crate) fn complete_direct_build<'py>(
         checks,
     )?;
     emit(&context.stream, &format!("\n{footer}\n"))?;
-    let payload: Bound<'py, PyAny> = format_degradable_build_execution_json(
+    let payload: Bound<'py, PyAny> = format_build_execution_json_with(
         py,
+        result,
         Some(keywords(
             py,
             &[
-                ("result", result.clone()),
                 ("plan", plan),
                 ("python_node_results", outcome.python_results.clone()),
                 ("python_check_results", check_results.clone()),
@@ -419,17 +420,15 @@ pub(crate) fn complete_direct_build<'py>(
     write_json(context, payload)?;
     render_build_cost(&record, &context.stream, context.use_color)?;
     if context.verbose {
-        let timings: Bound<'py, PyAny> = native_field(result, "timings")?;
-        let seconds =
-            |name: &str| -> PyResult<Option<f64>> { native_field(&timings, name)?.extract() };
+        let timings = &result.timings;
         write_timings(
             context,
             &PhaseTimings {
                 compile_seconds: native_field(pipeline, "compile_seconds")?.extract()?,
                 planning_seconds: native_field(pipeline, "planning_seconds")?.extract()?,
-                connection_preparation_seconds: seconds("connection_preparation_seconds")?,
-                schema_preparation_seconds: seconds("schema_preparation_seconds")?,
-                execution_seconds: seconds("execution_seconds")?,
+                connection_preparation_seconds: timings.connection_preparation_seconds,
+                schema_preparation_seconds: timings.schema_preparation_seconds,
+                execution_seconds: timings.execution_seconds,
                 cost_collection_seconds: Some(cost_seconds),
                 total_seconds: Some(context.started.elapsed().as_secs_f64()),
             },

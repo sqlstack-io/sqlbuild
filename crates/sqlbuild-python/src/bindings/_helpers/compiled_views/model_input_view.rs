@@ -21,9 +21,12 @@ use crate::bindings::_helpers::compiled_views::compiled_model_view::{
 use crate::bindings::_helpers::compiled_views::project_host::PyProjectHost;
 use crate::bindings::_helpers::compiled_views::relation_keys::{RelationKeyRow, relation_key_row};
 use crate::bindings::_helpers::discovery::model_file_record::{NativeModelFile, projected_text};
+use crate::bindings::_helpers::model_config::header_audits::HeaderAudits;
+use crate::bindings::_helpers::model_config::header_families::{HeaderFamilies, family_specs};
 use crate::bindings::_helpers::model_config::header_metadata::HeaderColumns;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::render::macro_call_rows::{SpanRow, span_tuple};
+use sqlbuild_model_config::header_metadata::models::DynamicFamily;
 use sqlbuild_project::models::ReferenceRow;
 
 const MODEL_RELATION_KIND: &str = "ref";
@@ -49,8 +52,8 @@ pub(crate) type ModelInputRecord = project_models::ModelInputRecord<PyProjectHos
 /// A model schema's header columns and specs, which carry user-authored audit arguments.
 pub(crate) struct SchemaHandles {
     pub(crate) columns: Arc<HeaderColumns>,
-    pub(crate) audits: Py<PyTuple>,
-    pub(crate) dynamic_columns: Py<PyTuple>,
+    pub(crate) audits: Arc<HeaderAudits>,
+    pub(crate) dynamic_columns: Arc<HeaderFamilies>,
 }
 
 /// A model input's user values and the attribute projections its views build.
@@ -411,10 +414,9 @@ pub(crate) fn model_relation_key_row(
 ) -> PyResult<RelationKeyRow> {
     let values: Bound<'_, PyAny> = native_field(record.host.config.bind(py), "values")?;
     let declared = match (&record.schema, owner.input_schema_fact(record)) {
-        (Some(schema), Some(fact)) => Some((
-            fact.columns.as_slice(),
-            schema.host.audits.bind(py).as_any(),
-        )),
+        (Some(schema), Some(fact)) => {
+            Some((fact.columns.as_slice(), schema.host.audits.key_rows(py)?))
+        }
         _ => None,
     };
     relation_key_row(
@@ -450,8 +452,8 @@ pub(crate) fn schema_entry(
             fields.set_item("description", &schema.description)?;
             fields.set_item("type_enforcement", schema.type_enforcement.then_some(true))?;
             fields.set_item("columns", schema.host.columns.project(py)?)?;
-            fields.set_item("dynamic_columns", schema.host.dynamic_columns.bind(py))?;
-            fields.set_item("audits", schema.host.audits.bind(py))?;
+            fields.set_item("dynamic_columns", schema.host.dynamic_columns.project(py)?)?;
+            fields.set_item("audits", schema.host.audits.project(py)?)?;
             Ok(classes.schema_model_entry.call((), Some(&fields))?.unbind())
         })
         .map(|entry| entry.clone_ref(py))
@@ -484,16 +486,16 @@ fn expansion_object(
 }
 
 /// A model input's attached schema: its name and dynamic column families.
-pub(crate) struct AttachedSchema<'py> {
+pub(crate) struct AttachedSchema {
     pub(crate) name: String,
-    pub(crate) dynamic_columns: Bound<'py, PyAny>,
+    pub(crate) dynamic_columns: Vec<DynamicFamily>,
     pub(crate) type_enforcement: bool,
 }
 
 /// The attached schema of `model_input`; a native input answers without building its entry.
 pub(crate) fn attached_schema<'py>(
     model_input: &Bound<'py, PyAny>,
-) -> PyResult<Option<AttachedSchema<'py>>> {
+) -> PyResult<Option<AttachedSchema>> {
     let py: Python<'py> = model_input.py();
     if let Ok(native) = model_input.cast::<NativeModelInput>() {
         return native.get().read(py, |record, py| {
@@ -502,7 +504,7 @@ pub(crate) fn attached_schema<'py>(
             };
             Ok(Some(AttachedSchema {
                 name: record.name.clone(),
-                dynamic_columns: schema.host.dynamic_columns.bind(py).clone().into_any(),
+                dynamic_columns: schema.host.dynamic_columns.read(py)?,
                 type_enforcement: schema.type_enforcement,
             }))
         });
@@ -513,7 +515,7 @@ pub(crate) fn attached_schema<'py>(
     }
     Ok(Some(AttachedSchema {
         name: native_field(&entry, "name")?.extract()?,
-        dynamic_columns: native_field(&entry, "dynamic_columns")?,
+        dynamic_columns: family_specs(&native_field(&entry, "dynamic_columns")?)?,
         type_enforcement: native_field(&entry, "type_enforcement")?.is_truthy()?,
     }))
 }

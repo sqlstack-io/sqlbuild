@@ -13,7 +13,7 @@ Online: https://sqlbuild.com/docs/concepts/adapters/
 SQLBuild uses adapters to connect to different database engines. Snowflake is the main target.
 
 - **Supported:** ready for production use.
-- **Beta:** builds, tests and plans work, but with less production use so far. Expect rough edges, and please [report issues](https://github.com/chio-labs/sqlbuild/issues).
+- **Beta:** builds, tests and plans work, but with less production use so far. Expect rough edges, and please [report issues](https://github.com/sqlstack-io/sqlbuild/issues).
 
 | Adapter | Status | Install |
 |---------|--------|---------|

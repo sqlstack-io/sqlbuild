@@ -24,6 +24,7 @@ use sqlbuild_analysis::sql_macros::models::{
     SqlMacroDefinition, SqlMacroLocation, TextContext, TextSplice,
 };
 use sqlbuild_analysis::sql_macros::types::{ConstantShape, SqlMacroHost, SqlMacroScope};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::records::construct::{
     enum_member, new_helped_error, new_record, new_record_with,
@@ -66,6 +67,8 @@ pub(crate) struct SqlMacroSource<'a, 'py> {
     pub(crate) origin: Option<SqlCallOrigin<'a>>,
     /// Where macro bodies resolve their declarations; `None` outside the input loops.
     pub(crate) scopes: Option<&'a dyn MacroScopes<'py>>,
+    /// The lexical rules the authored SQL is written in; `None` reads it under the generic rules.
+    pub(crate) syntax: Option<&'a LexicalSyntax>,
 }
 
 /// The declaration contexts of macro files in a scoped compile.
@@ -102,8 +105,9 @@ pub(crate) fn expanded_sql_macro_calls<'py>(
     starts: &[usize],
 ) -> PyResult<(Vec<ExpandedText>, SqlMacroFacts<'py>)> {
     let sql: &str = request.sql;
+    let syntax: Option<&LexicalSyntax> = request.sql_macros.and_then(|source| source.syntax);
     let calls: Vec<SqlMacroCall> =
-        sql_macro_calls(sql).map_err(|error| macro_error(request, &error))?;
+        sql_macro_calls(sql, syntax).map_err(|error| macro_error(request, &error))?;
     let by_char: HashMap<usize, &SqlMacroCall> = calls
         .iter()
         .map(|call| (sql[..call.start].chars().count(), call))
@@ -112,6 +116,7 @@ pub(crate) fn expanded_sql_macro_calls<'py>(
         loaded_macros: None,
         origin: None,
         scopes: None,
+        syntax: None,
     });
     let host: PyHost<'_, '_, 'py> = PyHost {
         request,
@@ -219,7 +224,12 @@ pub(crate) fn reject_bare_macro_calls(request: &DeclarationExpansion<'_, '_>) ->
     let Some(origin) = request.sql_macros.and_then(|source| source.origin) else {
         return Ok(());
     };
-    let Some((name, start)) = bare_macro_calls(request.sql).into_iter().next() else {
+    let Some((name, start)) = bare_macro_calls(
+        request.sql,
+        request.sql_macros.and_then(|source| source.syntax),
+    )
+    .into_iter()
+    .next() else {
         return Ok(());
     };
     let error: SqlMacroError = SqlMacroError::new_public(
@@ -418,6 +428,10 @@ impl<'py> PyHost<'_, '_, 'py> {
 impl<'py> SqlMacroHost for PyHost<'_, '_, 'py> {
     type Error = PyErr;
 
+    fn lexical_syntax(&self) -> Option<&LexicalSyntax> {
+        self.source.syntax
+    }
+
     fn definition(
         &self,
         scope: &SqlMacroScope,
@@ -475,7 +489,7 @@ impl<'py> SqlMacroHost for PyHost<'_, '_, 'py> {
         scope: &SqlMacroScope,
         text: &str,
     ) -> Result<RenderedDeclarations, ExpansionFailure<PyErr>> {
-        let (references, stop) = declaration_scan(text);
+        let (references, stop) = declaration_scan(text, self.source.syntax);
         if references.is_empty() && stop.is_none() {
             return Ok(RenderedDeclarations {
                 sql: text.to_owned(),

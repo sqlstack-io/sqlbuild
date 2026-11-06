@@ -20,6 +20,7 @@ from sqlbuild._native import (
     PlanOutput,
     PlanReason,
     PythonHookEntry,
+    SeedPlanEntry,
     SourceEntry,
     SourceLoadPlanEntry,
     SourceWriteStrategy,
@@ -218,7 +219,7 @@ def test_given_model_materialize_hook_when_build_runs_then_it_prepares_or_fails_
         ),
     )
 
-    def before_model_materialize(entry: ModelPlanEntry, *, connection: object) -> None:
+    def before_node_write(entry: ModelPlanEntry | SeedPlanEntry, *, connection: object) -> None:
         events.append(f"hook:{entry.name}")
         hook_actions: dict[bool, Callable[[], object]] = {
             True: lambda: (_ for _ in ()).throw(RuntimeError("hook failed")),
@@ -243,7 +244,7 @@ def test_given_model_materialize_hook_when_build_runs_then_it_prepares_or_fails_
             ),
             callbacks=BuildCallbacks(
                 on_node_start=lambda name, *, resource_kind: events.append(f"start:{name}"),
-                before_model_materialize=before_model_materialize,
+                before_node_write=before_node_write,
             ),
         )
         loaded_rows: tuple[tuple[object, ...], ...] = fetch_rows_or_empty(

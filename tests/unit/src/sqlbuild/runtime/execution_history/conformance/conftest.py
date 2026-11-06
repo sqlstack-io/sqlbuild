@@ -580,7 +580,7 @@ BACKEND_CASES: tuple[BackendCase, ...] = (
         expected_backend="memory",
     ),
     BackendCase(
-        description="stdlib SQLite backend",
+        description="native SQLite backend",
         event_log_factory=sqlite_factory,
         run_storage_factory=sqlite_factory,
         append_failing_event_log_factory=sqlite_append_failing_factory,

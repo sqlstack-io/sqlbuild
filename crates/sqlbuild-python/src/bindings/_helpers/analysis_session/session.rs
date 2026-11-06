@@ -70,6 +70,19 @@ positional_record! {
     }
 }
 
+impl From<sqlbuild_model_config::header_metadata::models::DynamicFamily> for FamilyRow {
+    fn from(family: sqlbuild_model_config::header_metadata::models::DynamicFamily) -> Self {
+        Self {
+            name: family.name,
+            pivot_column: family.pivot_column,
+            value_column: family.value_column,
+            aggregate: family.aggregate,
+            data_type: family.data_type,
+            name_pattern: family.name_pattern,
+        }
+    }
+}
+
 /// A model's name, SQL, placeholders, references, lineage, required names, flags and pivot.
 pub(crate) struct ModelRow {
     pub(crate) name: String,

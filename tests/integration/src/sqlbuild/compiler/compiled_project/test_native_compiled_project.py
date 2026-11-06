@@ -14,6 +14,7 @@ from sqlbuild._native import (
     InferredColumn,
     InvalidQualifiedIdentityError,
     SchemaColumn,
+    SchemaDynamicColumnFamily,
     SchemaModelEntry,
     build_compiled_project,
     discover_project_inputs,
@@ -98,6 +99,22 @@ def test_given_header_contracts_when_compiling_then_columns_project_only_on_publ
     assert model.schema_entry is entry
     assert model.schema_entry.columns is columns
     assert pickle.loads(pickle.dumps(columns)) == columns
+    assert pickle.loads(pickle.dumps(entry.audits)) == entry.audits
+    pivot_entry: SchemaModelEntry | None = models["category_amounts"].schema_entry
+    assert pivot_entry is not None
+    families: tuple[SchemaDynamicColumnFamily, ...] = pivot_entry.dynamic_columns
+    assert len(families) == 1
+    assert (
+        families[0].name,
+        families[0].pivot_column,
+        families[0].value_column,
+        families[0].aggregate,
+        families[0].type,
+        families[0].name_pattern,
+    ) == ("category_amounts", "category", "amount", "MAX", "INTEGER", "^[a-z]+$")
+    assert models["category_amounts"].schema_entry is pivot_entry
+    assert pivot_entry.dynamic_columns is families
+    assert pickle.loads(pickle.dumps(families)) == families
 
 
 @pytest.mark.parametrize(

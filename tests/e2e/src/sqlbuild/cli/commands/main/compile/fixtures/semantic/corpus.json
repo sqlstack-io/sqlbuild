@@ -98,7 +98,10 @@
       "pending_native": false,
       "repo_files": {
         "models/probe.sql": "MODEL (description \"Test model probe.\", materialized table);\n\nSELECT id FROM __source(\"raw__orders\") QUALIFY ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY ordered_at) = 1\n"
-      }
+      },
+      "ignored_rules": [
+        "SQLCLEAN018"
+      ]
     },
     {
       "description": "t05: AVG(TIMESTAMP)",
@@ -1766,7 +1769,10 @@
       "pending_native": true,
       "repo_files": {
         "models/probe.sql": "MODEL (description \"Test model probe.\", materialized table);\n\nWITH a AS (SELECT id FROM __source(\"raw__orders\")) SELECT * FROM b\n"
-      }
+      },
+      "ignored_rules": [
+        "SQLCLEAN005"
+      ]
     },
     {
       "description": "x05: raw table reference",

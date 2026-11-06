@@ -10,10 +10,10 @@ use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::compiled_views::source_reads;
 use crate::bindings::_helpers::fingerprints::latest_rows::select_latest_fingerprints;
 use crate::bindings::_helpers::fingerprints::storage_io::read_latest_fingerprints;
-use crate::bindings::_helpers::graph::algorithms::transitive_closure_many;
+use crate::bindings::_helpers::graph::keys::{KeyCache, native_key};
 use crate::bindings::_helpers::model_config::typed_config::{config_node_of, model_values};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_identity::graph::build_execution_upstream_deps;
+use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::effectively_full_refreshed_model_names;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::objects::{
@@ -33,9 +33,10 @@ use pyo3::IntoPyObject;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::pyfunction;
 use pyo3::types::PyDict as KeywordDict;
-use pyo3::types::{PyDict, PyDictMethods, PyString, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple};
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_MODEL;
 use sqlbuild_analysis::fingerprint_storage::constants::NODE_TYPE_SEED;
+use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 use sqlbuild_core::constants::FINGERPRINT_TABLE_NAME;
 use sqlbuild_core::constants::MIGRATION_TABLE_NAME;
 use sqlbuild_core::constants::OLD_NAME_VIEW_TABLE_NAME;
@@ -104,8 +105,15 @@ fn relevant_state_keys<'py>(
     if selected.is_none() {
         return Ok(selected.clone());
     }
-    let deps = build_execution_upstream_deps(project)?.into_any();
-    object(py, transitive_closure_many(selected, &deps, true, None)?)
+    let deps = execution_deps(project)?;
+    let selected = selected
+        .try_iter()?
+        .map(|key| native_key(&key?))
+        .collect::<PyResult<Vec<_>>>()?;
+    let reachable = reachable_keys(&selected, &deps)
+        .into_iter()
+        .collect::<Vec<_>>();
+    Ok(PyFrozenSet::new(py, KeyCache::new(py)?.keys(&reachable)?)?.into_any())
 }
 
 fn resolve_database<'py>(

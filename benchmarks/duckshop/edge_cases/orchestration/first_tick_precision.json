@@ -1,0 +1,7 @@
+{
+  "description": "A minutely cron trigger whose recorded start has a sub-second fraction first falls due on the next whole minute, never at its start's own whole minute. A cursor left just past the latest occurrence by an earlier build resumes without ticking that occurrence again.",
+  "expression": "* * * * *",
+  "start_minutes_ahead": 1,
+  "start_fraction_microseconds": 123456,
+  "legacy_cursor_fraction_microseconds": 999999
+}

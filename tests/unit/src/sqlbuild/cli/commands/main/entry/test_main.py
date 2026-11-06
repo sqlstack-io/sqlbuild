@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import signal
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -43,6 +45,7 @@ from sqlbuild.runtime.observability.models import LifecycleEvent
 from tests.unit.src.sqlbuild.cli.commands.main.entry._test_types import (
     AuditAggregateRenderingTestCase,
     CompileJsonErrorRenderingTestCase,
+    InterruptedCommandTestCase,
     MainErrorRenderingTestCase,
     MainTestCase,
     SkillFreshnessNoticeTestCase,
@@ -52,6 +55,7 @@ from tests.unit.src.sqlbuild.cli.commands.main.entry.helpers import (
     UnprintableError,
     build_handlers,
     build_json_recording_handler,
+    compile_with_callback_interrupt,
     invalid_loader_destination_error,
 )
 from tests.unit.src.sqlbuild.presentation.helpers import use_color_terminal
@@ -272,7 +276,7 @@ def test_given_dbt_plan_arguments_when_running_with_dependencies_then_it_dispatc
                 "rules",
                 "--json",
                 "run",
-                "SQBRSQL001",
+                "SQLCLEAN001",
                 "--select",
                 "commerce__mart__prices",
                 "--exclude",
@@ -303,7 +307,7 @@ def test_given_rules_arguments_when_running_then_dispatches_typed_request(
             project_dir=Path("/tmp/rules-project"),
             json_output=True,
             action="run",
-            rule_selector="SQBRSQL001",
+            rule_selector="SQLCLEAN001",
             skills_check=False,
             select=("commerce__mart__prices",),
             exclude=("legacy_model",),
@@ -2520,6 +2524,72 @@ def test_given_successful_handler_when_cli_dispatches_then_invocation_identity_i
     assert observed[0].run_id is None
     assert observed[0].resource_id is None
     assert current_execution_identity() is None
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        InterruptedCommandTestCase(
+            description="default interrupt survives an unraisable weakref callback",
+            argv=["compile"],
+            expected_error_type=KeyboardInterrupt,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_sigint_in_weakref_callback_when_cli_runs_then_default_interrupt_is_retained(
+    test_case: InterruptedCommandTestCase,
+) -> None:
+    unraisable: list[type[BaseException]] = []
+    previous: Any = signal.signal(signal.SIGINT, signal.default_int_handler)
+    try:
+        with (
+            patch("sys.unraisablehook", side_effect=lambda args: unraisable.append(args.exc_type)),
+            pytest.raises(test_case.expected_error_type),
+        ):
+            _main_with_dependencies(
+                argv=test_case.argv,
+                handlers=build_handlers(run_compile=compile_with_callback_interrupt),
+            )
+        assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+        assert unraisable == [test_case.expected_error_type]
+        assert _main_with_dependencies(argv=test_case.argv, handlers=build_handlers()) == 0
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        MainTestCase(
+            description="embedding interrupt handler remains authoritative",
+            argv=["compile"],
+            expected_exit_code=0,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_embedding_sigint_handler_when_cli_runs_then_handler_remains_authoritative(
+    test_case: MainTestCase,
+) -> None:
+    received: list[int] = []
+
+    def custom_handler(number: int, _frame: object) -> None:
+        received.append(number)
+
+    previous: Any = signal.signal(signal.SIGINT, custom_handler)
+    try:
+        assert (
+            _main_with_dependencies(
+                argv=test_case.argv,
+                handlers=build_handlers(run_compile=compile_with_callback_interrupt),
+            )
+            == test_case.expected_exit_code
+        )
+        assert signal.getsignal(signal.SIGINT) is custom_handler
+        assert received == [signal.SIGINT]
+    finally:
+        signal.signal(signal.SIGINT, previous)
 
 
 @pytest.mark.parametrize(

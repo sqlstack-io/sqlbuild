@@ -1,4 +1,4 @@
-use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY};
+use crate::constants::{API_VERSION, NATIVE_BUILD_IDENTITY, SQL_RULE_PREFIX};
 use crate::models::RulesCodeGrammar;
 use crate::models::{CustomRule, ResolveRulesRequest, RuleGuidance, RuleMetadata, RuleScope};
 use fensu_policy::policy::errors::PolicyError;
@@ -18,7 +18,7 @@ macro_rules! rule {
             message: $message.into(),
             remediation: $remediation.into(),
             guidance: None,
-            implementation_fingerprint: env!("CARGO_PKG_VERSION").into(),
+            implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
             enabled_by_default: true,
             project_wide: matches!(
                 $code,
@@ -373,8 +373,9 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
             "Add RuleCase values evaluated by evaluate_rule under tests/.",
         ),
     ];
+    let defaults: Vec<&str> = sqlclean::sql_lint::main::default_rules::default_rules();
     rules.extend(
-        crate::sql_lint::main::catalogue::catalogue()
+        sqlclean::sql_lint::main::catalogue::catalogue()
             .into_iter()
             .map(|rule| RuleMetadata {
                 code: rule.code.into(),
@@ -383,8 +384,8 @@ pub(crate) fn catalogue() -> Vec<RuleMetadata> {
                 message: rule.message.into(),
                 remediation: rule.remediation.into(),
                 guidance: None,
-                implementation_fingerprint: env!("CARGO_PKG_VERSION").into(),
-                enabled_by_default: true,
+                implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
+                enabled_by_default: defaults.contains(&rule.code),
                 project_wide: false,
                 custom: false,
                 scope: RuleScope::SqlLint,
@@ -412,7 +413,7 @@ fn minimum_tests_rule() -> RuleMetadata {
             "Add a SQL unit test that mocks each real import and asserts concrete transformed rows. Empty-input-only tests flagged by SQBRTEST203 do not count toward this minimum unless they are listed in its allowed_tests option; do not write them to satisfy the minimum.",
         ),
         guidance: Some(guidance),
-        implementation_fingerprint: env!("CARGO_PKG_VERSION").into(),
+        implementation_fingerprint: NATIVE_BUILD_IDENTITY.into(),
         enabled_by_default: true,
         project_wide: false,
         custom: false,
@@ -452,19 +453,21 @@ pub(crate) fn with_custom(custom: &[CustomRule]) -> Result<Vec<RuleMetadata>, St
 
 pub(crate) fn select<'a>(
     catalogue: &'a [RuleMetadata],
-    selected: &[String],
+    selected: Option<&[String]>,
     ignored: &[String],
 ) -> Result<Vec<&'a RuleMetadata>, String> {
     let grammar = RulesCodeGrammar;
     let references: Vec<&RuleMetadata> = catalogue.iter().collect();
+    let selected_or_none: &[String] = selected.unwrap_or_default();
     let configured = PolicySelectors {
-        select: selected.to_vec(),
+        select: selected_or_none.to_vec(),
         warn: Vec::new(),
         ignore: Vec::new(),
     };
     let _ = resolve_policy(&references, &(), &configured, &grammar).map_err(rules_error)?;
     let (mut effective_select, custom_selected) =
-        activate_explicit_custom_matches(catalogue, selected, &grammar);
+        activate_explicit_custom_matches(catalogue, selected_or_none, &grammar);
+    effective_select.extend(sql_lint_selection(catalogue, selected, &grammar));
     if custom_selected
         && !effective_select
             .iter()
@@ -480,6 +483,34 @@ pub(crate) fn select<'a>(
     resolve_policy(&references, &(), &effective, &grammar)
         .map(|ruleset| ruleset.blocking)
         .map_err(rules_error)
+}
+
+/// SQLClean's selection: its default Rules without a selection, and every Rule a selector names, whatever its default.
+pub(crate) fn sql_lint_selection(
+    catalogue: &[RuleMetadata],
+    selected: Option<&[String]>,
+    grammar: &RulesCodeGrammar,
+) -> Vec<String> {
+    catalogue
+        .iter()
+        .filter(|rule| rule.code.starts_with(SQL_RULE_PREFIX))
+        .filter(|rule| match selected {
+            None => rule.enabled_by_default,
+            Some(selectors) => matches_any_selector(grammar, &rule.code, selectors),
+        })
+        .map(|rule| rule.code.clone())
+        .collect()
+}
+
+/// Whether any of `selectors` matches `code`.
+pub(crate) fn matches_any_selector(
+    grammar: &RulesCodeGrammar,
+    code: &str,
+    selectors: &[String],
+) -> bool {
+    selectors
+        .iter()
+        .any(|selector| grammar.code_matches_selector(code, selector))
 }
 
 fn activate_explicit_custom_matches(
@@ -517,7 +548,11 @@ pub(crate) fn selected_codes_json(request_json: &str) -> Result<String, String> 
     }
     crate::configuration::main::validate::validate(&request.config)?;
     let rules = with_custom(&request.custom_rules)?;
-    let selected = select(&rules, &request.config.select, &request.config.ignore)?;
+    let selected = select(
+        &rules,
+        request.config.select.as_deref(),
+        &request.config.ignore,
+    )?;
     let codes: Vec<&str> = selected.iter().map(|rule| rule.code.as_str()).collect();
     serde_json::to_string(&codes).map_err(|error| error.to_string())
 }

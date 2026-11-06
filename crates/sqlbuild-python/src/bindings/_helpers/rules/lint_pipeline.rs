@@ -22,6 +22,7 @@ use sqlbuild_rules::dsl_headers::models::{
     HeaderRulesConfig, HeaderSeverity, HeaderSpan, HeaderViolation,
 };
 use sqlbuild_rules::lint_text::constants::SUPPRESSION_CODE;
+use sqlbuild_rules::lint_text::main::defined_cte_names::defined_cte_names;
 use sqlbuild_rules::lint_text::main::dependency_sites::dependency_sites;
 use sqlbuild_rules::lint_text::main::first_header_only::first_header_only;
 use sqlbuild_rules::lint_text::main::frame_sql_macro_expression::frame_sql_macro_expression;
@@ -31,17 +32,16 @@ use sqlbuild_rules::lint_text::main::neutralize_audit_parameters::neutralize_aud
 use sqlbuild_rules::lint_text::main::neutralize_context_interpolation::neutralize_context_interpolation;
 use sqlbuild_rules::lint_text::main::neutralize_sql_macro_parameters::neutralize_sql_macro_parameters;
 use sqlbuild_rules::lint_text::main::neutralize_test_parameters::neutralize_test_parameters;
+use sqlbuild_rules::lint_text::main::preparation::prepare;
 use sqlbuild_rules::lint_text::main::reject_inline_suppressions::reject_inline_suppressions;
 use sqlbuild_rules::lint_text::models::{
     AuthoredDiagnostic, ExpansionSpan, FramedExpression, InterpolationSite, LintSqlBody,
     LintSqlOptions, Neutralized, SuppressionFinding,
 };
+use sqlbuild_rules::lint_text::types::PreparedSql;
 use sqlbuild_rules::project_tree::main::project_real_path::project_real_path;
 use sqlbuild_rules::project_tree::main::project_real_paths::project_real_paths;
-use sqlbuild_rules::sql_lint::main::defined_cte_names::defined_cte_names;
-use sqlbuild_rules::sql_lint::main::fill_finding_path::fill_finding_path;
-use sqlbuild_rules::sql_lint::main::preparation::prepare;
-use sqlbuild_rules::sql_lint::types::PreparedSql;
+use sqlclean::sql_lint::main::fill_finding_path::fill_finding_path;
 
 use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::boundary::python_calls::call_with;

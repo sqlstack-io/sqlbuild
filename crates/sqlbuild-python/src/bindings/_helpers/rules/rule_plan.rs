@@ -89,6 +89,18 @@ pub(crate) fn rule_run_plan<'py>(
         }
         selected = kept;
     }
+    if no_sql_analysis {
+        let mut kept: Vec<Bound<'py, PyAny>> = Vec::with_capacity(selected.len());
+        for rule in selected {
+            if !field(&rule, "code")?
+                .extract::<String>()?
+                .starts_with(SQL_RULE_PREFIX)
+            {
+                kept.push(rule);
+            }
+        }
+        selected = kept;
+    }
     let mut custom_rules: Vec<Bound<'py, PyAny>> = Vec::new();
     for rule in &selected {
         if field(rule, "custom")?.is_truthy()? {
@@ -140,6 +152,19 @@ pub(crate) fn rule_run_plan<'py>(
             ("config", selected_config),
         ],
     )
+}
+
+/// Whether the plan selects any built-in or custom rule beyond the SQL Rules, which need the rows engine's facts.
+pub(crate) fn selects_row_rules(plan: &Bound<'_, PyAny>) -> PyResult<bool> {
+    for rule in field(plan, "selected")?.try_iter()? {
+        if !field(&rule?, "code")?
+            .extract::<String>()?
+            .starts_with(SQL_RULE_PREFIX)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// The selected non-SQL-lint codes a model selection evaluates over the whole project.

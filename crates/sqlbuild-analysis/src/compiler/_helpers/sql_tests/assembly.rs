@@ -28,7 +28,7 @@ pub(crate) fn assemble_batch(batch: &SqlTestAssemblyBatch) -> Vec<SqlTestAssembl
         .models
         .iter()
         .map(|model| match &model.unscanned_macro_source {
-            Some(sql) if tests_macros => macro_call_names(sql),
+            Some(sql) if tests_macros => macro_call_names(sql, &batch.lexical_syntax),
             Some(_) => Ok(Vec::new()),
             None => Ok(model.macro_deps.clone()),
         })

@@ -396,19 +396,8 @@ pub(crate) fn schema_validations<'py>(
     PyTuple::new(py, results)
 }
 
-/// Whether quoted identifiers bind case-insensitively for `connection` and `dialect`.
-#[pyfunction]
-#[pyo3(name = "ignores_quoted_case", signature = (*, connection, dialect))]
-fn ignores_quoted_case_binding(
-    connection: &Bound<'_, PyAny>,
-    dialect: &Bound<'_, PyAny>,
-) -> PyResult<bool> {
-    ignores_quoted_case(connection, dialect)
-}
-
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<BindingCatalog>()?;
     module.add_function(wrap_pyfunction!(schema_validations, module)?)?;
-    module.add_function(wrap_pyfunction!(ignores_quoted_case_binding, module)?)?;
     Ok(())
 }

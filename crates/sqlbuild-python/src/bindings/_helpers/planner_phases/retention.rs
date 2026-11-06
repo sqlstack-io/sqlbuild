@@ -14,10 +14,11 @@ use crate::bindings::_helpers::planner_phases::constants::{
     TRANSIENT_TABLE_TYPE,
 };
 use crate::bindings::_helpers::planner_phases::objects::{
-    construct, member, model_key_names, native, native_member, optional_text, planner_error,
-    planner_model, replace, sorted_names, text, tuple,
+    construct, member, native, native_member, optional_text, planner_error, planner_model, replace,
+    sorted_names, text, tuple,
 };
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::record_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -57,15 +58,16 @@ fn selected_models<'py>(
     runtime: &Bound<'py, PyAny>,
     scope: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
-    let names: BTreeSet<String> = model_key_names(&native_field(scope, "selected_keys")?)?
-        .into_iter()
-        .collect();
+    let scope = scope_data(scope)?;
     let mut models: Vec<_> = Vec::new();
     for model in
         project_reads::models(&runtime_field(runtime, |runtime| &runtime.project)?)?.try_iter()?
     {
         let model = model?;
-        if names.contains(&model_reads::model_name(&model)?) {
+        if scope
+            .selected
+            .contains(&("model".to_owned(), model_reads::model_name(&model)?))
+        {
             models.push(model);
         }
     }

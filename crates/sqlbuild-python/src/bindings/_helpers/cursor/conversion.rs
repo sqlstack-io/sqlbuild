@@ -156,11 +156,6 @@ impl<'py> CursorSession<'py> {
         if inner { held.clone() } else { value.clone() }
     }
 
-    /// The `date`, `datetime` or `int` input value `handle` holds.
-    pub(crate) fn held(&self, handle: usize) -> Bound<'py, PyAny> {
-        self.input(handle, true)
-    }
-
     /// The `datetime` holding `local` in the zone and type of input `template`.
     fn date_time(&self, timestamp: &Timestamp) -> PyResult<Bound<'py, PyAny>> {
         match timestamp.template {

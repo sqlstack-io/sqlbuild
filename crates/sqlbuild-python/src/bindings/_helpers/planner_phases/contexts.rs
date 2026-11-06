@@ -7,6 +7,7 @@ use pyo3::{PyClass, pyclass::boolean_struct::True};
 use crate::bindings::_helpers::planner_phases::models::{
     PlannerIdentityContext, PlannerScopeResolution,
 };
+use crate::bindings::_helpers::planner_scope::retained::project_scope;
 
 #[pymethods]
 impl PlannerScopeResolution {
@@ -22,6 +23,21 @@ impl PlannerScopeResolution {
             stale_warning_scope,
             inspection_scope,
         }
+    }
+
+    #[getter]
+    fn selected_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.selected_scope.bind(py))
+    }
+
+    #[getter]
+    fn stale_warning_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.stale_warning_scope.bind(py))
+    }
+
+    #[getter]
+    fn inspection_scope<'py>(&self, py: pyo3::Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        project_scope(self.inspection_scope.bind(py))
     }
 }
 

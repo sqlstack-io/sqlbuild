@@ -2,8 +2,10 @@
 
 use serde_json::{Map, Value};
 
-use crate::planner_changes::_helpers::json_payload::{canonical_text, decoded_object};
 use crate::planner_changes::constants::{CONFIG_METADATA_KEY, CURSOR_INPUTS_CONFIG_KEY};
+use sqlbuild_core::fingerprint_identity::main::{
+    canonical_text::canonical_text, decoded_object::decoded_object,
+};
 
 /// Canonical metadata JSON whose `config.cursor_inputs` keys use origin names; other text is returned unchanged.
 pub(crate) fn with_origin_cursor_input_names(

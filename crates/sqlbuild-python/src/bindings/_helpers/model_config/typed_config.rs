@@ -1,5 +1,6 @@
-//! Model config values read as typed config nodes, each key converted on first read and kept.
+//! Built model config trees retained natively, with Python-authored values converted on first read.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::PyRuntimeError;
@@ -12,11 +13,11 @@ use sqlbuild_model_config::config_values::main::checked_flag::checked_flag;
 use sqlbuild_model_config::config_values::main::checked_integer::checked_integer;
 use sqlbuild_model_config::config_values::main::checked_text::checked_text;
 use sqlbuild_model_config::config_values::main::checked_texts::checked_texts;
-use sqlbuild_model_config::config_values::models::{ConfigNode, CursorBound};
+use sqlbuild_model_config::config_values::models::{ConfigNode, CursorBound, HostChildren};
 
 use crate::bindings::_helpers::compile_driver::stage_work::{TYPED_CONFIG_READS, count_stage};
 use crate::bindings::_helpers::model_config::config_nodes::{
-    HostHandle, PyConfigNode, config_node, config_object,
+    HostHandle, PyConfigEntries, PyConfigNode, config_node, config_object, is_exact_container,
 };
 use crate::bindings::_helpers::model_config::config_values::config_value_type_error;
 use crate::bindings::_helpers::records::fields::{
@@ -31,10 +32,46 @@ const ISOFORMAT_METHOD: &str = "isoformat";
 const TYPED_VALUES_SLOT: &str = "__typed_values__";
 const POISONED: &str = "typed config values cache is poisoned";
 
-/// The typed nodes of a config record's values read so far, by key.
+/// A built config's string-keyed tree; values shared across reused configs stay native.
+pub(crate) type BuiltConfigValues = Arc<HashMap<String, Arc<PyConfigNode>>>;
+
+/// The built tree and any Python-authored values opened by the record's readers.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct TypedConfigValues {
+    pub(crate) built: Option<BuiltConfigValues>,
     read: Mutex<Vec<(String, Arc<PyConfigNode>)>>,
+}
+
+/// Keep the builder's tree without interpreting custom Python mapping keys natively.
+pub(crate) fn built_values(entries: PyConfigEntries) -> Option<BuiltConfigValues> {
+    let mut values = HashMap::with_capacity(entries.len());
+    for (key, value) in entries {
+        let ConfigNode::Str(key) = key else {
+            return None;
+        };
+        values.insert(key, Arc::new(value));
+    }
+    Some(Arc::new(values))
+}
+
+/// Attach the built tree to its public record, rather than reconstructing it from that view.
+pub(crate) fn retain_values(
+    config: &Bound<'_, PyAny>,
+    built: Option<&BuiltConfigValues>,
+) -> PyResult<()> {
+    if let Some(built) = built
+        && let Ok(record) = config.cast::<NativeRecord>()
+    {
+        let typed = Bound::new(
+            config.py(),
+            TypedConfigValues {
+                built: Some(Arc::clone(built)),
+                read: Mutex::new(Vec::new()),
+            },
+        )?;
+        store_cached(record, TYPED_VALUES_SLOT, &typed.into_any().unbind())?;
+    }
+    Ok(())
 }
 
 /// A config record's values and the typed nodes read of them, each key converted on first read.
@@ -44,6 +81,20 @@ pub(crate) type ConfigValues<'py> = (Bound<'py, PyAny>, Bound<'py, TypedConfigVa
 fn node(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
     let (mapping, typed) = values;
     let py: Python<'_> = mapping.py();
+    let built = typed.get().built.as_ref().map(|values| values.get(key));
+    let deferred = match built {
+        Some(Some(node)) => match node.as_ref() {
+            ConfigNode::Host(host)
+                if matches!(host.children, HostChildren::None)
+                    && is_exact_container(host.handle.0.bind(py)) =>
+            {
+                Some(host.handle.0.bind(py))
+            }
+            _ => return Ok(Arc::clone(node)),
+        },
+        Some(None) => return Ok(Arc::new(ConfigNode::Null)),
+        None => None,
+    };
     let read: &Mutex<Vec<(String, Arc<PyConfigNode>)>> = &typed.get().read;
     let poisoned = || PyRuntimeError::new_err(POISONED);
     let found: Option<Arc<PyConfigNode>> = read
@@ -55,7 +106,10 @@ fn node(values: &ConfigValues<'_>, key: &str) -> PyResult<Arc<PyConfigNode>> {
     if let Some(node) = found {
         return Ok(node);
     }
-    let node: Arc<PyConfigNode> = Arc::new(config_node(&mapping_get(mapping, key)?)?);
+    let node: Arc<PyConfigNode> = Arc::new(match deferred {
+        Some(value) => config_node(value)?,
+        None => config_node(&mapping_get(mapping, key)?)?,
+    });
     count_stage(py, TYPED_CONFIG_READS, 1)?;
     read.lock()
         .map_err(|_| poisoned())?
@@ -71,6 +125,7 @@ pub(crate) fn typed_values<'py>(config: &Bound<'py, PyAny>) -> PyResult<ConfigVa
         Bound::new(
             py,
             TypedConfigValues {
+                built: None,
                 read: Mutex::new(Vec::new()),
             },
         )

@@ -1,11 +1,12 @@
 //! Interpolate `@@` tokens in authored SQL and extract static SQL references.
 
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use std::cell::RefCell;
 
+use pyo3::PyErr;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
 use pyo3::types::{PyDict, PyDictMethods, PyListMethods, PyString, PyStringMethods};
-use pyo3::{FromPyObject, PyErr};
 use sqlbuild_sqltext::compiler::main::sql_interpolation::interpolate_sql;
 use sqlbuild_sqltext::compiler::models::InterpolationRead;
 use sqlbuild_sqltext::compiler::types::InterpolationHost;
@@ -24,13 +25,14 @@ pub(crate) struct InterpolationRow {
     pub(crate) error: Option<String>,
 }
 
-/// Project variables, the environment, context values (or `None`) and the variable renderer.
-#[derive(FromPyObject)]
+/// Variables, environment, context values (or `None`), variable renderer and lexical rules.
 pub(crate) struct InterpolationSources<'py>(
     pub(crate) Bound<'py, PyDict>,
     pub(crate) Bound<'py, PyAny>,
     pub(crate) Option<Bound<'py, PyDict>>,
     pub(crate) Bound<'py, PyAny>,
+    /// The lexical rules the SQL is authored in; `None` reads it under the generic rules.
+    pub(crate) Option<LexicalSyntax>,
 );
 
 struct PythonInterpolationHost<'py> {
@@ -128,6 +130,10 @@ impl InterpolationHost for PythonInterpolationHost<'_> {
             Ok(text) => Some(Some(text)),
             Err(_held) => Some(None),
         }
+    }
+
+    fn lexical_syntax(&self) -> Option<&LexicalSyntax> {
+        self.sources.4.as_ref()
     }
 
     fn context_names(&self) -> Vec<String> {

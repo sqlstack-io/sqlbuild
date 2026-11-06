@@ -99,7 +99,7 @@ def _edit_query(*, context: StepContext, target: ModelFacts) -> MutationResult:
         target=target,
         rewrite=lambda model_file: ModelFile(
             header=model_file.header,
-            query=f"SELECT *\nFROM (\n{model_file.query}\n) AS {_EDIT_ALIAS}",
+            query=f"WITH {_EDIT_ALIAS} AS (\n{model_file.query}\n)\nSELECT *\nFROM {_EDIT_ALIAS}",
         ),
     )
 
@@ -166,8 +166,9 @@ def _declare_column(*, context: StepContext, target: ModelFacts) -> MutationResu
         return ModelFile(
             header=header,
             query=(
+                f"WITH {_EDIT_ALIAS} AS (\n{model_file.query}\n)\n"
                 f"SELECT {', '.join(columns)}, CAST(1 AS INTEGER) AS {ADDED_COLUMN_NAME}\n"
-                f"FROM (\n{model_file.query}\n) AS {_EDIT_ALIAS}"
+                f"FROM {_EDIT_ALIAS}"
             ),
         )
 

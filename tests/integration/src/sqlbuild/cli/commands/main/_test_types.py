@@ -101,10 +101,10 @@ class DerivedNativeCompileTestCase:
 
 @dataclass(frozen=True)
 class KeywordFunctionCompileTestCase:
-    """Expected compile result for a DuckDB SQL keyword function projection."""
+    """Expected compile result for a DuckDB SQL keyword function query."""
 
     description: str
-    projection: str
+    query: str
     expected_exit_code: int
     expected_diagnostics: tuple[str, ...]
 
@@ -327,7 +327,7 @@ class FormatCompileIntegrationTestCase:
     upstream_sql: str = (
         "SELECT CAST(1 AS INTEGER) AS order_id, CAST('new' AS VARCHAR) AS order_label\n"
     )
-    selected_rules: str = '["SQBRSQL021"]'
+    selected_rules: str = '["SQLCLEAN021"]'
 
 
 @dataclass(frozen=True)
@@ -916,7 +916,7 @@ class SqlReadabilityTestCase:
     description: str
     sql: str
     expected_fault: bool
-    rule_code: str = "SQBRSQL041"
+    rule_code: str = "SQLCLEAN041"
 
 
 @dataclass(frozen=True)
@@ -971,7 +971,7 @@ class NativeAllocatorEntryTestCase:
 
 @dataclass(frozen=True)
 class UnusedOutputDifferentialCase:
-    """One SQBRSQL042 CTE whose rows must survive `format --fix` unchanged."""
+    """One SQLCLEAN042 CTE whose rows must survive `format --fix` unchanged."""
 
     description: str
     cte_sql: str
@@ -1031,7 +1031,7 @@ class FormatExceptionPolicyTestCase:
 
 @dataclass(frozen=True)
 class RepeatedJsonParseTestCase:
-    """One model body checked by SQBRSQL045 through the CLI."""
+    """One model body checked by SQLCLEAN045 through the CLI."""
 
     description: str
     adapter: str

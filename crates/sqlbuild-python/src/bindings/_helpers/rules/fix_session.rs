@@ -16,6 +16,7 @@ use sqlbuild_rules::fix_verification::main::with_edits::with_edits;
 use sqlbuild_rules::fix_verification::models::{FixEdit, FixEligibility};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, keywords};
+use crate::bindings::_helpers::compile_attachment::sql_expansion_context::ExpansionVars;
 use crate::bindings::_helpers::compile_driver::project::build_compiled_project;
 use crate::bindings::_helpers::compiled_views::relation_keys::{
     RelationKeys, project_relation_keys,
@@ -172,6 +173,7 @@ impl<'py> FixSession<'py> {
         let sources: Vec<LintFile> = lint_sources(&project_dir, Some(&selected), given)?;
         let context: Option<SqlExpansionInputs> = if settings.native_enabled {
             Some(lint_expansion_inputs(LintExpansionSources {
+                vars: ExpansionVars::ProjectDefault(None),
                 project_dir: self.project_dir.clone(),
                 value_renderer: self.adapter.is_truthy()?.then(|| self.adapter.clone()),
                 discovered_inputs: Some(updated_inputs(&self.inputs, files)?),
@@ -214,7 +216,7 @@ impl<'py> FixSession<'py> {
         for violation in violations {
             if !field(&violation, "code")?
                 .extract::<String>()?
-                .starts_with("SQBRSQL")
+                .starts_with("SQLCLEAN")
             {
                 continue;
             }
@@ -273,7 +275,7 @@ impl<'py> FixSession<'py> {
             model_body: model_paths.contains(&path)?,
             has_fix,
             safe_code: SAFE_RULE_FIX_CODES.contains(&code.extract::<String>()?.as_str()),
-            conditionless_join: code.eq("SQBRSQL003")?,
+            conditionless_join: code.eq("SQLCLEAN003")?,
             snowflake: field(&self.config, "dialect")?.eq("snowflake")?,
         };
         if let Some(reason) = refusal(&facts) {

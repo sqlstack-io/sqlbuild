@@ -60,3 +60,4 @@ class RunSchemaListing:
     relations: dict[str, RelationInfo]
     global_version: int
     name_versions: dict[str, int]
+    expires_at: float | None = None

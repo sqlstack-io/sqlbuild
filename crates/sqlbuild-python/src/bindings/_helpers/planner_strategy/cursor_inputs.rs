@@ -15,6 +15,7 @@ use crate::bindings::_helpers::model_config::typed_config::{
     config_cursor_bound, config_text_object, config_value, model_values,
 };
 use crate::bindings::_helpers::planner_identity::metadata::or_empty;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_strategy::constants::{
     ENFORCED_CONTRACT, INCREMENTAL_MATERIALIZATION, MODEL_REFERENCE, SEED_REFERENCE,
     SOURCE_REFERENCE, TIMESTAMP_CURSOR,
@@ -64,7 +65,7 @@ fn lookups_of<'py>(request: &Request<'_, 'py>) -> PyResult<CursorInputLookups<'p
     let py: Python<'py> = request.py();
     let lookup = |name: &str| or_empty(request.optional(name)?, py);
     Ok(CursorInputLookups {
-        models_by_name: lookup("models_by_name")?,
+        models_by_name: lookup("models_by_name")?.into(),
         functions_by_name: lookup("functions_by_name")?,
         source_map: lookup("source_map")?,
         source_warehouse_columns: lookup("source_warehouse_columns")?,
@@ -102,7 +103,7 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
     }
     let model: &Bound<'py, PyAny> = model;
     let roles: Bound<'py, PyAny> = resolve_cursor_input_roles(model)?;
-    let models_by_name: &Bound<'py, PyAny> = &lookups.models_by_name;
+    let models_by_name = &lookups.models_by_name;
     let source_map: &Bound<'py, PyAny> = &lookups.source_map;
     let warehouse_columns: &Bound<'py, PyAny> = &lookups.source_warehouse_columns;
     let model_name: String = model_reads::model_name(model)?;
@@ -112,7 +113,7 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
             let reference: Bound<'py, PyAny> = resolve_lineage_reference(
                 model,
                 &input_name,
-                models_by_name.clone(),
+                models_by_name.clone_ref(py),
                 lookups.functions_by_name.clone(),
             )?;
             let kind: String = text(&native_field(&reference, "ref_kind")?)?;
@@ -125,7 +126,7 @@ pub(crate) fn reject_unexposed_cursor_input_columns<'py>(
                 known_columns,
             };
             if kind == MODEL_REFERENCE {
-                let upstream: Bound<'py, PyAny> = mapping_get(models_by_name, &name)?;
+                let upstream = models_by_name.get(py, &name)?;
                 if upstream.is_none()
                     || !config_value(py, &model_values(&upstream)?, "contract")?
                         .eq(ENFORCED_CONTRACT)?
@@ -258,7 +259,7 @@ pub(crate) fn build_cursor_input_relations<'py>(
         return Ok(PyTuple::empty(py));
     }
     let model: Bound<'py, PyAny> = model.clone();
-    let models_by_name: &Bound<'py, PyAny> = &lookups.models_by_name;
+    let models_by_name = &lookups.models_by_name;
     let functions_by_name: &Bound<'py, PyAny> = &lookups.functions_by_name;
     let model_locations: &Bound<'py, PyAny> = &lookups.model_locations;
     let producers: &Bound<'py, PyAny> = &lookups.runtime_cursor_producer_names;
@@ -275,7 +276,7 @@ pub(crate) fn build_cursor_input_relations<'py>(
         let reference: Bound<'py, PyAny> = resolve_lineage_reference(
             &model,
             &input_name,
-            models_by_name.clone(),
+            models_by_name.clone_ref(py),
             functions_by_name.clone(),
         )?;
         let kind: String = text(&native_field(&reference, "ref_kind")?)?;
@@ -285,7 +286,7 @@ pub(crate) fn build_cursor_input_relations<'py>(
             continue;
         };
         let producer: Option<Bound<'py, PyAny>> = if kind == MODEL_REFERENCE {
-            Some(mapping_get(models_by_name, &name)?).filter(|model| !model.is_none())
+            Some(models_by_name.get(py, &name_text)?).filter(|model| !model.is_none())
         } else {
             None
         };
@@ -336,14 +337,13 @@ pub(crate) fn runtime_cursor_producer_names<'py>(
     source_map: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyFrozenSet>> {
     let py: Python<'py> = scope.py();
-    let mut names: Vec<Bound<'py, PyAny>> = Vec::new();
-    for key in native_field(scope, "selected_keys")?.try_iter()? {
-        let key: Bound<'py, PyAny> = key?;
-        let name: Bound<'py, PyAny> = native_field(&key, "name")?;
-        match text(&native_field(&key, "resource_type")?)?.as_str() {
+    let data = scope_data(scope)?;
+    let mut names: Vec<&str> = Vec::new();
+    for (kind, name) in &data.selected {
+        match kind.as_str() {
             "model" | "seed" => names.push(name),
             "source" => {
-                let source: Bound<'py, PyAny> = mapping_get(source_map, &name)?;
+                let source: Bound<'py, PyAny> = mapping_get(source_map, name)?;
                 if !source.is_none() && !native_field(&source, "loader")?.is_none() {
                     names.push(name);
                 }

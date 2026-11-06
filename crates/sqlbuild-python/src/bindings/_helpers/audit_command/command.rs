@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyInt, PyList, PyListMethods, PyString, PyTuple};
+use pyo3::types::{PyDict, PyDictMethods, PyInt, PyString};
 use pyo3::{pyclass, pyfunction, pymethods, wrap_pyfunction};
 use sqlbuild_analysis::assembly::target_checks::constants::PRESERVE_TARGET_VALUE;
 use sqlbuild_core::audit_command::main::audit_exit_code::audit_exit_code;
@@ -12,6 +12,7 @@ use sqlbuild_core::audit_command::main::render_audit_summary::render_audit_summa
 use sqlbuild_core::audit_command::models::AuditCounts;
 use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{AuditExecutionResult, AuditOutcome};
 
 use crate::bindings::_helpers::boundary::python_calls::{call_with, keywords, within};
 use crate::bindings::_helpers::build_progress::audit_progress::AuditProgressReporter;
@@ -25,20 +26,17 @@ use crate::bindings::_helpers::compile_driver::static_context::compile_static_co
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::planner_entries::command_plans::build_audit_command_plan;
 use crate::bindings::_helpers::records::construct::{new_record_with, record_class};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
-use crate::bindings::_helpers::result_output::documents::format_audit_execution_json;
-use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
+use crate::bindings::_helpers::result_output::documents::{
+    audit_execution_json, audit_projection, write_execution_json_output,
+};
 use crate::bindings::_helpers::result_output::event_writer::ExecutionEventWriter;
 
 const EXECUTION_COMMAND: &str = "sqb audit";
-const PASS_OUTCOME: &str = "pass";
-const WARN_OUTCOME: &str = "warn";
-const ERROR_OUTCOME: &str = "error";
-const INSUFFICIENT_OUTCOME: &str = "insufficient";
-const PROJECTION_FAILURE: &str = "audit_result_projection_failure";
 
 fn text<'py>(py: Python<'py>, value: &str) -> Bound<'py, PyAny> {
     PyString::new(py, value).into_any()
@@ -292,7 +290,7 @@ fn execute<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
     run: &AuditRun<'py>,
-) -> PyResult<Vec<Bound<'py, PyAny>>> {
+) -> PyResult<Vec<AuditExecutionResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = invocation.py();
     let plan: Bound<'py, PyAny> = native_field(pipeline, "plan_output")?;
     let project: Bound<'py, PyAny> = native_field(pipeline, "project")?;
@@ -307,7 +305,7 @@ fn execute<'py>(
             connection: run.connection.clone().unbind(),
         },
     )?;
-    let executed: PyResult<Vec<Bound<'py, PyAny>>> = (|| {
+    let executed: PyResult<Vec<AuditExecutionResult<Bound<'py, PyAny>>>> = (|| {
         run.progress
             .call_method1("set_result_callback", (native_field(&relay, "on_result")?,))?;
         let projector: Bound<'py, PyAny> = current_native_progress_projector(py)?;
@@ -407,12 +405,13 @@ fn execute<'py>(
                 ],
             )?
             .try_iter()?
+            .map(|result| AuditExecutionResult::read(&result?))
             .collect()
         })
     })();
     let progress_closed: PyResult<Bound<'py, PyAny>> = run.progress.call_method0("close");
     let writer_closed: PyResult<Bound<'py, PyAny>> = event_writer.call_method0("close");
-    let results: Vec<Bound<'py, PyAny>> = executed?;
+    let results = executed?;
     progress_closed?;
     writer_closed?;
     Ok(results)
@@ -420,46 +419,33 @@ fn execute<'py>(
 
 /// The audit JSON document, with the result projection counts when audits were projected.
 fn audit_payload<'py>(
-    results: &Bound<'py, PyAny>,
+    py: Python<'py>,
+    results: &[AuditExecutionResult<Bound<'py, PyAny>>],
     (concurrency, worker_count): (i64, i64),
-) -> PyResult<Bound<'py, PyAny>> {
-    let py: Python<'py> = results.py();
-    let payload: Bound<'py, PyAny> = format_audit_execution_json(
-        py,
-        results.clone(),
-        Some(PyInt::new(py, concurrency).into_any()).filter(|value| !value.is_none()),
-        Some(PyInt::new(py, worker_count).into_any()).filter(|value| !value.is_none()),
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+) -> PyResult<String> {
     let projection: Bound<'py, PyAny> =
         host::entry(py, ExecutorHost::CurrentAuditResultProjection)?.call0()?;
-    if projection.is_none() {
-        return Ok(payload);
-    }
-    let json: Bound<'py, PyAny> = py.import("json")?.into_any();
-    let document: Bound<'py, PyAny> = json.call_method1("loads", (payload,))?;
-    let counts: Bound<'py, PyDict> = PyDict::new(py);
-    for field in ["attempted_count", "written_count", "failed_count"] {
-        counts.set_item(field, native_field(&projection, field)?)?;
-    }
-    document.set_item("audit_result_projection", &counts)?;
-    if native_field(&projection, "degraded")?.is_truthy()? {
-        document.set_item("projection_degraded", true)?;
-        let reason: Bound<'py, PyDict> = PyDict::new(py);
-        reason.set_item("reason", PROJECTION_FAILURE)?;
-        for field in ["attempted_count", "written_count", "failed_count"] {
-            reason.set_item(field, native_field(&projection, field)?)?;
-        }
-        let reasons: Bound<'py, PyList> = PyList::empty(py);
-        reasons.append(reason)?;
-        document.set_item("projection_degradation_reasons", reasons)?;
-    }
-    let options: Bound<'py, PyDict> = PyDict::new(py);
-    options.set_item("indent", 2)?;
-    let dumped: String = json
-        .call_method("dumps", (document,), Some(&options))?
-        .extract()?;
-    Ok(PyString::new(py, &format!("{dumped}\n")).into_any())
+    let trailing = if projection.is_none() {
+        Vec::new()
+    } else {
+        audit_projection(
+            py,
+            (
+                native_field(&projection, "attempted_count")?.extract()?,
+                native_field(&projection, "written_count")?.extract()?,
+                native_field(&projection, "failed_count")?.extract()?,
+            ),
+        )?
+    };
+    audit_execution_json(
+        py,
+        results,
+        (
+            Some(PyInt::new(py, concurrency).into_any()),
+            Some(PyInt::new(py, worker_count).into_any()),
+        ),
+        trailing,
+    )
 }
 
 /// The warning line for audit results that could not be stored in the warehouse history table; audit outcomes are unaffected.
@@ -482,7 +468,7 @@ fn projection_warning(py: Python<'_>, style: CliStyle) -> PyResult<Option<String
 fn complete(
     request: &Bound<'_, PyAny>,
     invocation: &Bound<'_, PyAny>,
-    results: &[Bound<'_, PyAny>],
+    results: &[AuditExecutionResult<Bound<'_, PyAny>>],
     run: &AuditRun<'_>,
 ) -> PyResult<i32> {
     let py: Python<'_> = request.py();
@@ -491,16 +477,12 @@ fn complete(
         ..AuditCounts::default()
     };
     for result in results {
-        match native_field(result, "outcome")?
-            .getattr("value")?
-            .extract::<String>()?
-            .as_str()
-        {
-            PASS_OUTCOME => counts.passed += 1,
-            WARN_OUTCOME => counts.warned += 1,
-            ERROR_OUTCOME => counts.failed += 1,
-            INSUFFICIENT_OUTCOME => counts.insufficient += 1,
-            _ => {}
+        match result.outcome {
+            AuditOutcome::Pass => counts.passed += 1,
+            AuditOutcome::Warn => counts.warned += 1,
+            AuditOutcome::Error => counts.failed += 1,
+            AuditOutcome::Insufficient => counts.insufficient += 1,
+            AuditOutcome::Skipped => {}
         }
     }
     let stream: Bound<'_, PyAny> = native_field(invocation, "progress_stream")?;
@@ -513,17 +495,13 @@ fn complete(
         (format!("{warning}{}", render_audit_summary(counts, style)),),
     )?;
     stream.call_method0("flush")?;
-    let payload: Bound<'_, PyAny> = audit_payload(
-        &PyTuple::new(py, results)?.into_any(),
-        (run.concurrency, run.worker_count),
-    )?;
+    let payload = audit_payload(py, results, (run.concurrency, run.worker_count))?;
     write_execution_json_output(
         py,
-        payload,
+        PyString::new(py, &payload).into_any(),
         native_field(request, "json_output")?.extract::<bool>()?,
         native_field(request, "json_output_path")?,
-    )
-    .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
+    )?;
     Ok(audit_exit_code(counts.failed))
 }
 
@@ -539,7 +517,7 @@ pub(crate) fn run_audit_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     let pipeline: Bound<'_, PyAny> = compile_audits(request, &invocation)?;
     let run: AuditRun<'_> = prepare_run(request, &invocation, &pipeline)?;
     write_headers(&invocation, &pipeline, run.concurrency)?;
-    let results: Vec<Bound<'_, PyAny>> = execute(&invocation, &pipeline, &run)?;
+    let results = execute(&invocation, &pipeline, &run)?;
     complete(request, &invocation, &results, &run)
 }
 

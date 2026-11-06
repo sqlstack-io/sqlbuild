@@ -355,6 +355,16 @@ class CapturedVariantTextScenarioTestCase:
 
 
 @dataclass(frozen=True)
+class EscapedQuoteScenarioTestCase:
+    """A Snowflake project whose SQL holds backslash escapes before compile markers."""
+
+    description: str
+    scenario_name: str
+    expected_compiled_fragments: tuple[str, ...]
+    expected_stdout_fragment: str
+
+
+@dataclass(frozen=True)
 class CapturedLambdaScenarioTestCase:
     """A Snowflake-captured scenario whose model uses an arrow lambda, replayed in DuckDB."""
 

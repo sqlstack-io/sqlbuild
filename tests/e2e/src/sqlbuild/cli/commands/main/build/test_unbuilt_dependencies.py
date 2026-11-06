@@ -92,8 +92,8 @@ _CUSTOMERS_SQL: str = "SELECT 1 AS customer_id\n"
                 "models/summary.sql": (
                     "MODEL (description 'Test model summary.');\n"
                     "SELECT c.customer_id, f.order_id\n"
-                    'FROM __ref("customers") AS c,\n'
-                    '  __table_fn("customer_orders")(c.customer_id) AS f\n'
+                    'FROM __ref("customers") AS c\n'
+                    '  CROSS JOIN __table_fn("customer_orders")(c.customer_id) AS f\n'
                 ),
                 "tests/unit/test_summary.sql": (
                     "TEST();\nWITH\n__ref__customers AS (SELECT 1 AS customer_id),\n"

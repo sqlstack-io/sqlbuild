@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pickle
+from dataclasses import replace
+
 import pytest
 
 from sqlbuild._native import (
     PlannerPolicies,
+    PlannerScope,
     PlannerScopeResolution,
     PlannerSelection,
     resolve_planner_scopes,
@@ -84,3 +88,10 @@ def test_given_selection_when_resolving_scopes_then_stale_warning_scope_is_upstr
     assert stale_scope_names == test_case.expected_stale_warning_names
     assert tuple(sorted(stale_order_names)) == test_case.expected_stale_warning_names
     assert resolution.inspection_scope is resolution.selected_scope
+    assert isinstance(resolution.selected_scope, PlannerScope)
+    assert tuple(resolution.selected_scope.models_by_name) == tuple(test_case.model_deps)
+    assert set(resolution.stale_warning_scope.models_by_name) == set(
+        test_case.expected_stale_warning_names
+    )
+    assert replace(resolution.selected_scope, load_sources=True).load_sources
+    assert pickle.loads(pickle.dumps(resolution.selected_scope)) == resolution.selected_scope

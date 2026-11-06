@@ -683,7 +683,7 @@ def build_empty_fixture_scenario_project_files(*, customer_columns_yaml: str) ->
             "[defaults]\n"
             'materialized = "table"\n\n'
             "[rules]\n"
-            'select = ["SQBRSQL021"]\n'
+            'select = ["SQLCLEAN021"]\n'
         ),
         "sources/raw.yml": (
             "sources:\n"

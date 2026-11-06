@@ -23,6 +23,7 @@ use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::compile_driver::stage_work::{
     EXPRESSION_SHAPE_BATCHES, EXPRESSION_SHAPES_INFERRED, count_stage,
 };
+use crate::bindings::_helpers::model_config::header_families::family_specs;
 use crate::bindings::_helpers::records::construct::{enum_from_value, new_record};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
@@ -251,19 +252,10 @@ pub(crate) fn dynamic_contract_proofs<'py>(
 
 /// Declared dynamic families as native request rows.
 pub(crate) fn family_rows(families: &Bound<'_, PyAny>) -> PyResult<Vec<FamilyRow>> {
-    let mut rows: Vec<FamilyRow> = Vec::new();
-    for family in families.try_iter()? {
-        let family: Bound<'_, PyAny> = family?;
-        rows.push(FamilyRow {
-            name: native_field(&family, "name")?.extract()?,
-            pivot_column: native_field(&family, "pivot_column")?.extract()?,
-            value_column: native_field(&family, "value_column")?.extract()?,
-            aggregate: native_field(&family, "aggregate")?.extract()?,
-            data_type: native_field(&family, "type")?.extract()?,
-            name_pattern: native_field(&family, "name_pattern")?.extract()?,
-        });
-    }
-    Ok(rows)
+    Ok(family_specs(families)?
+        .into_iter()
+        .map(FamilyRow::from)
+        .collect())
 }
 
 fn or_empty<'py>(

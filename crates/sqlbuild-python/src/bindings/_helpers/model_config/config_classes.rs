@@ -8,6 +8,7 @@ use sqlbuild_model_config::model_validation::models::{RetentionOverride, TableTy
 use crate::bindings::_helpers::model_config::model_config_builder::{
     BuiltConfig, NativeModelConfigBuilder,
 };
+use crate::bindings::_helpers::model_config::typed_config::{BuiltConfigValues, retain_values};
 
 const MATERIALIZED_KEY: &str = "materialized";
 const VALUES_FIELD: &str = "values";
@@ -39,7 +40,7 @@ pub(crate) fn built_config<'py>(
     matched: Option<&str>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let fields: Bound<'py, PyDict> = config_fields(classes, built, matched)?;
-    view(classes, &built.values, &fields)
+    view(classes, &built.values, &fields, built.nodes.as_ref())
 }
 
 /// Every `CompileModelConfig` field but `values`, recording the build's template reads first.
@@ -139,8 +140,11 @@ pub(crate) fn view<'py>(
     classes: &ConfigClasses<'py>,
     values: &Bound<'py, PyDict>,
     fields: &Bound<'py, PyDict>,
+    nodes: Option<&BuiltConfigValues>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let arguments: Bound<'py, PyDict> = fields.copy()?;
     arguments.set_item(VALUES_FIELD, values)?;
-    classes.compile_model_config.call((), Some(&arguments))
+    let config = classes.compile_model_config.call((), Some(&arguments))?;
+    retain_values(&config, nodes)?;
+    Ok(config)
 }

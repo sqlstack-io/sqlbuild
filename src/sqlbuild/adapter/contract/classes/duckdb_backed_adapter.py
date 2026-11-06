@@ -6,6 +6,7 @@ import importlib.util
 import json
 import logging
 import re
+import time
 from datetime import date, datetime
 from decimal import Decimal
 from importlib.machinery import ModuleSpec
@@ -49,6 +50,8 @@ from sqlbuild.adapter.contract.constants import (
     QUALIFIED_NAME_SEPARATOR,
 )
 from sqlbuild.adapter.contract.exceptions import AdapterUserError, ViewRenameRefusedError
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
+from sqlbuild.adapter.contract.main.is_quoted_identifier import is_quoted_identifier
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
 from sqlbuild.adapter.contract.main.unsupported_relation_usage import unsupported_relation_usage
@@ -338,6 +341,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
 
+    def render_current_utc_timestamp(self) -> str:
+        return "CAST(get_current_timestamp() AT TIME ZONE 'UTC' AS TIMESTAMP)"
+
     def drop_view(
         self,
         *,
@@ -399,6 +405,8 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     def render_identifier(self, name: str) -> str:
         """Render one DuckDB identifier using double-quote escaping."""
 
+        if is_quoted_identifier(name):
+            return name
         return '"' + name.replace('"', '""') + '"'
 
     def render_exact_identifier(self, name: str) -> str:
@@ -1071,12 +1079,31 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         return f"'{value}'"
 
     def connect(self, config: dict[str, Any]) -> Any:
-        """Open a DuckDB connection from the resolved connection config."""
+        """Open DuckDB, waiting up to five seconds for another process's database file lock."""
 
         import duckdb
 
         database: str = str(config.get("database", ":memory:"))
-        raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(database=database)
+        deadline: float = time.monotonic() + 5
+        while True:
+            try:
+                raw_connection: duckdb.DuckDBPyConnection = duckdb.connect(
+                    database=database, read_only=bool(config.get("read_only", False))
+                )
+                break
+            except duckdb.IOException as error:
+                if (
+                    not any(
+                        marker in str(error)
+                        for marker in (
+                            ": Conflicting lock is held in ",
+                            "\nFile is already open in ",
+                        )
+                    )
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.05)
         return self._configured_connection(raw_connection=raw_connection, config=config)
 
     def connect_local_replay(self, database: Path) -> Any:
@@ -1233,6 +1260,12 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         )
         if schema is not None:
             query += f" AND table_schema = {_duckdb_string_literal(schema)}"
+        else:
+            query += (
+                " AND lower(table_schema) IN "
+                "(SELECT lower(search_schema) FROM "
+                "(SELECT UNNEST(current_schemas(true)) AS search_schema))"
+            )
         if database is not None:
             query += f" AND table_catalog = {_duckdb_string_literal(database)}"
         result: Any = self.execute(connection=connection, sql=query).fetchone()
@@ -2070,7 +2103,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         exclude_columns: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         immutable_columns: frozenset[str] = frozenset(
-            column.lower() for column in (*unique_key, *exclude_columns)
+            column_name_key(column) for column in (*unique_key, *exclude_columns)
         )
         join_condition: str = " AND ".join(
             f"__target.{self.render_identifier(k)} = __source.{self.render_identifier(k)}"
@@ -2079,7 +2112,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         update_assignments: str = ", ".join(
             f"{self.render_identifier(col)} = __source.{self.render_identifier(col)}"
             for col in source_columns
-            if col.lower() not in immutable_columns
+            if column_name_key(col) not in immutable_columns
         )
         insert_columns: str = ", ".join(self.render_identifier(col) for col in source_columns)
         insert_values: str = ", ".join(
@@ -2240,6 +2273,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read DuckDB's estimated table size from the catalog."""
 

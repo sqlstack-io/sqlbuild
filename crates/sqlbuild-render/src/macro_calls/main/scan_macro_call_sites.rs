@@ -2,13 +2,14 @@
 
 use crate::macro_calls::_helpers::offsets::char_offsets;
 use crate::macro_calls::_helpers::scanner::{
-    call_name, mentions_typed_reference, nested_names, top_level_calls,
+    call_name, mentions_typed_reference, nested_names, python_argument_syntax, top_level_calls,
 };
 use crate::macro_calls::models::{MacroCallScan, MacroCallSite, MacroScanFailure};
+use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 /// Every complete top-level call site in order, and where Python's scan raises, if it does.
-pub fn scan_macro_call_sites(sql: &str) -> MacroCallScan {
-    let (calls, failure) = top_level_calls(sql);
+pub fn scan_macro_call_sites(sql: &str, syntax: Option<&LexicalSyntax>) -> MacroCallScan {
+    let (calls, failure) = top_level_calls(sql, syntax);
     let mut boundaries: Vec<usize> = calls
         .iter()
         .flat_map(|call| [call.start, call.open + 1, call.close + 1])
@@ -21,7 +22,14 @@ pub fn scan_macro_call_sites(sql: &str) -> MacroCallScan {
         .zip(offsets.as_chunks::<3>().0)
         .map(|(call, offsets)| {
             let args = &sql[call.open + 1..call.close];
-            let tree_names: Option<Vec<String>> = call_tree_names(&call.name, args);
+            let python_syntax: LexicalSyntax = python_argument_syntax();
+            let argument_syntax: Option<&LexicalSyntax> = if call.python {
+                Some(&python_syntax)
+            } else {
+                syntax
+            };
+            let tree_names: Option<Vec<String>> =
+                call_tree_names(&call.name, args, argument_syntax);
             MacroCallSite {
                 start: offsets[0],
                 args_start: offsets[1],
@@ -46,8 +54,8 @@ fn failed_call_name(sql: &str, start: Option<usize>) -> Option<String> {
 }
 
 /// The call's name, then each nested call's once; None where a nested scan raises.
-fn call_tree_names(name: &str, args: &str) -> Option<Vec<String>> {
-    let nested: Vec<String> = match nested_names(args) {
+fn call_tree_names(name: &str, args: &str, syntax: Option<&LexicalSyntax>) -> Option<Vec<String>> {
+    let nested: Vec<String> = match nested_names(args, syntax) {
         Ok(nested) => nested,
         Err(_scan_error) => return None,
     };

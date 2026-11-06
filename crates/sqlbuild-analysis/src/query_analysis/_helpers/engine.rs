@@ -6,6 +6,7 @@ use polyglot_sql::{
     ReferenceConfidence, SchemaValidationOptions, TransformKind, ValidationResult,
     ValidationSchema, analyze_query, analyze_query_for_project_projections,
 };
+#[cfg(test)]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::ser::SerializeTuple;
 use serde::{Deserialize, Serialize, Serializer};
@@ -22,6 +23,7 @@ const ANALYSIS_WORKER_STACK_BYTES: usize = 16 * 1024 * 1024;
 const COMPACT_ANALYSIS_BATCH_SIZE: usize = 64;
 const LARGE_COMPACT_SQL_BYTES: usize = 32 * 1024 * 1024;
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct AnalysisBatchRequest {
     requests: Vec<AnalysisRequest>,
@@ -92,6 +94,7 @@ impl AnalysisRequest {
     }
 }
 
+#[cfg(test)]
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum AnalysisResponse {
@@ -99,6 +102,7 @@ enum AnalysisResponse {
     Failure { error: String },
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct ProjectAnalysisBatchRequest {
     requests: Vec<ProjectAnalysisRequest>,
@@ -139,6 +143,7 @@ struct CompactProjectAnalysisProjectionRequest {
     resource_names: HashMap<String, String>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectAnalysisRequest {
@@ -163,6 +168,7 @@ struct LineageResource {
     resource_name: String,
 }
 
+#[cfg(test)]
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 enum ProjectAnalysisResponse {
@@ -279,6 +285,7 @@ fn default_true() -> bool {
     true
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_json(request_json: &str) -> Result<String, String> {
     let request: AnalysisBatchRequest =
         serde_json::from_str(request_json).map_err(|error| error.to_string())?;
@@ -298,6 +305,7 @@ pub(crate) fn analyze_json(request_json: &str) -> Result<String, String> {
     serde_json::to_string(&responses).map_err(|error| error.to_string())
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_project_json(request_json: &str) -> Result<String, String> {
     let request: ProjectAnalysisBatchRequest =
         serde_json::from_str(request_json).map_err(|error| error.to_string())?;
@@ -317,10 +325,12 @@ pub(crate) fn analyze_project_json(request_json: &str) -> Result<String, String>
     serde_json::to_string(&responses).map_err(|error| error.to_string())
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_project_compact_json(request_json: &str) -> Result<String, String> {
     analyze_project_compact_with_catalog(request_json, None)
 }
 
+#[cfg(test)]
 pub(crate) fn analyze_project_compact_with_catalog(
     request_json: &str,
     catalog: Option<&crate::semantic_validation::models::ProjectCatalog>,
@@ -1077,6 +1087,7 @@ fn project_query_templates(
     results
 }
 
+#[cfg(test)]
 fn analyze_request(request: AnalysisRequest) -> AnalysisResponse {
     match query_analysis(request, false) {
         Ok(analysis) => AnalysisResponse::Success { analysis },
@@ -1110,6 +1121,7 @@ fn query_analysis(
     .map_err(|error| error.to_string())
 }
 
+#[cfg(test)]
 fn analyze_project_request(request: ProjectAnalysisRequest) -> ProjectAnalysisResponse {
     match analyze_project_result(request) {
         Ok(analysis) => ProjectAnalysisResponse::Success { analysis },
@@ -1117,6 +1129,7 @@ fn analyze_project_request(request: ProjectAnalysisRequest) -> ProjectAnalysisRe
     }
 }
 
+#[cfg(test)]
 fn analyze_project_result(request: ProjectAnalysisRequest) -> Result<ProjectAnalysis, String> {
     let analysis = query_analysis(request.query, true)?;
     Ok(project_analysis(ProjectAnalysisInputs {

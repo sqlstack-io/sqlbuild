@@ -133,16 +133,13 @@ on Snowflake. Report any failure rather than editing the expectations to match.
 
 ```bash
 sqb scenario capture --exclude edge_cases
-python ../scripts/core_project.py /tmp/duckshop-core
-(cd /tmp/duckshop-core && sqb scenario test --local --strict)
+sqb scenario test --local --strict --exclude edge_cases
 ```
 
 Capture materialises each scenario's fixtures in Snowflake, downloads them as JSONL into
 `tests/_scenario_snapshots/`, and drops what it created. The local run then replays all 8
 scenarios on your machine from those files, with no warehouse connection; `--strict` fails on a
-missing or stale snapshot instead of skipping it. It runs in a copy of the project without the
-edge-case area, because local replay of the full project stops at compile on an edge-case model
-(see Known limitations in the README). Delete the copy afterwards.
+missing or stale snapshot instead of skipping it.
 
 With SQLBuild 0.175.0 the local run is expected to end with `ERROR=8`: five scenarios fail while
 translating Snowflake SQL to DuckDB, and three report `X602` (stale snapshot) because of a
@@ -175,18 +172,25 @@ collation). Check with `SHOW PARAMETERS LIKE 'DEFAULT_DDL_COLLATION' IN SCHEMA <
 ### Load, build and test
 
 ```bash
-sqb build --target edge --select tag:edge_case --exclude stg_edge_partner_listings+ --concurrency 8
+sqb build --target edge --select tag:edge_case --concurrency 8
 sqb test --target edge --select tag:edge_case --concurrency 8
 sqb scenario test --target edge --select edge_cases
 ```
 
-The build loads the `edge__*` sources from fixed rows that `data_scale` does not change, then
-builds the edge models and runs their tests and audits. `fct_edge_delivery_events` is disabled and
-reports `skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
-`stg_edge_partner_listings` and its downstream models are excluded because planning fails once the
-`edge__partner_listings` table exists (see Known limitations in the README); the
-`edge_partner_listings__star_contract_and_quoted_export` scenario covers the models downstream of
-it.
+The build loads the `edge__*` sources from fixed rows that `data_scale` does not change, creates
+the area's Python functions (`functions/python/edge_*.py`, tagged `edge_case`), then builds the edge
+models and runs their tests and audits. `fct_edge_delivery_events` is disabled and reports
+`skip: disabled` (see [Pending acceptance cases](#pending-acceptance-cases)).
+
+`int_edge_basket_running_peaks` calls `edge_running_peaks`, a JavaScript function its pre-hook
+creates in the target schema. SQLBuild does not declare it, so the model's unit test needs a build
+of that model first, and the model calls the function without a schema: set `database` and
+`schema` on the edge connection as well as on the target, so that the session's current schema is
+the target schema. `relations.py drop` drops the function too.
+
+`int_edge_ticket_tokens` calls volatile Python functions, so its values change on every run; its
+test compares only the deterministic columns and asserts facts that hold for any values, such as
+every token being distinct.
 
 ### Replay the delivery change log as two loads
 
@@ -228,6 +232,12 @@ against the case the test describes before committing: a capture records what Sn
 which is the point, but a fixture mistake is captured as faithfully as a real edge. Scenario
 expectations, and the assertions in tests about ties (where Snowflake may return any of the tied
 rows), are written by hand from the captured values.
+
+Some edge models read values whose order Snowflake does not define, such as an `ARRAY_AGG`
+without `WITHIN GROUP` or a `MAX_BY` whose keys tie. They output only order-free facts, and a
+comment in the model or test says so; leave any column that can still differ between runs out of
+the expected CTE and check it with an assertion instead. Run the capture twice on such tests: the
+second run must leave the files unchanged.
 
 Capture scenario snapshots for the edge scenarios with
 `sqb scenario capture --target edge --select edge_cases`.

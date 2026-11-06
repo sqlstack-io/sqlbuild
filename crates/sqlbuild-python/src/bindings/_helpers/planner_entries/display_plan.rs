@@ -2,13 +2,13 @@
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
+use crate::bindings::_helpers::graph::keys::KeyCache;
+use crate::bindings::_helpers::graph::views::edge_dict;
 use crate::bindings::_helpers::model_config::typed_config::{config_text_object, model_values};
 use crate::bindings::_helpers::planner_entries::values::{
     boolean, native, none, planner_model, planner_type, string,
 };
-use crate::bindings::_helpers::planner_identity::graph::{
-    build_downstream_deps, build_execution_upstream_deps,
-};
+use crate::bindings::_helpers::planner_identity::graph::execution_deps;
 use crate::bindings::_helpers::planner_phases::full_refresh::resolve_model_full_refresh;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_strategy::strategy::materialization_of;
@@ -17,6 +17,7 @@ use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyFrozenSet, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::graph::main::downstream_edges::downstream_edges;
 
 const VIEW: &str = "view";
 const INCREMENTAL: &str = "incremental";
@@ -149,8 +150,10 @@ pub(crate) fn build_display_only_sqlbuild_plan<'py>(
         .iter()
         .map(|entry| native_field(entry, "key"))
         .collect::<PyResult<_>>()?;
-    let upstream = build_execution_upstream_deps(project)?.into_any();
-    let downstream = build_downstream_deps(&upstream)?.into_any();
+    let upstream = execution_deps(project)?;
+    let cache = KeyCache::new(py)?;
+    let downstream = edge_dict(&cache, &downstream_edges(&upstream))?.into_any();
+    let upstream = edge_dict(&cache, &upstream)?.into_any();
     planner_model(
         py,
         RecordId::PlanOutput,

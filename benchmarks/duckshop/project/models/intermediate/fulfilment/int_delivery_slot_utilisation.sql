@@ -49,6 +49,21 @@ warehouse_regions AS (
     ON w.country_code = c.country_code
 ),
 
+busiest_slots AS (
+  SELECT
+    s.warehouse_code,
+    s.slot_start_local::DATE AS slot_date_local,
+    s.slot_start_local AS busiest_slot_start_local
+  FROM slots AS s
+  WHERE s.capacity <> 0
+  -- The earliest of equally busy slots, so ties give one answer.
+  QUALIFY
+    ROW_NUMBER() OVER (
+      PARTITION BY s.warehouse_code, s.slot_start_local::DATE
+      ORDER BY s.booked / s.capacity DESC, s.slot_start_local, s.slot_id
+    ) = 1
+),
+
 by_day AS (
   SELECT
     s.warehouse_code,
@@ -56,8 +71,7 @@ by_day AS (
     COUNT(*) AS slot_count,
     SUM(s.capacity) AS total_capacity,
     SUM(s.booked) AS total_booked,
-    COUNT_IF(s.remaining_capacity = 0) AS full_slot_count,
-    MAX_BY(s.slot_start_local, s.booked / NULLIF(s.capacity, 0)) AS busiest_slot_start_local
+    COUNT_IF(s.remaining_capacity = 0) AS full_slot_count
   FROM slots AS s
   GROUP BY
     s.warehouse_code,
@@ -72,13 +86,16 @@ with_calendar AS (
     d.total_capacity,
     d.total_booked,
     d.full_slot_count,
-    d.busiest_slot_start_local,
+    b.busiest_slot_start_local,
     r.region_code,
     (
       h.holiday_date IS NOT NULL
     ) AS is_holiday,
     d.total_booked / NULLIF(d.total_capacity, 0) AS utilisation_raw
   FROM by_day AS d
+  LEFT JOIN busiest_slots AS b
+    ON d.warehouse_code = b.warehouse_code
+    AND d.slot_date_local = b.slot_date_local
   LEFT JOIN warehouse_regions AS r
     ON d.warehouse_code = r.warehouse_code
   LEFT JOIN holidays AS h
@@ -108,9 +125,13 @@ final AS (
       @const("unknown_region_code")
     )::VARCHAR AS region_code,
     d.is_holiday::BOOLEAN AS is_holiday,
+    -- The average as an exact decimal sum over a count, so rounding gives one answer.
     ROUND(
       d.utilisation_raw
-        - AVG(d.utilisation_raw) OVER (
+        - SUM(d.utilisation_raw) OVER (
+          PARTITION BY d.warehouse_code, DAYOFWEEKISO(d.slot_date_local)
+        )
+        / COUNT(d.utilisation_raw) OVER (
           PARTITION BY d.warehouse_code, DAYOFWEEKISO(d.slot_date_local)
         ),
       4

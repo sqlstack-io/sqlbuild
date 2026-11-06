@@ -4,21 +4,30 @@ from __future__ import annotations
 
 import random
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
+from sqlbuild._native import assemble_project
+from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
+from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.model_config._test_types import (
     ColumnMetadataExpansionTestCase,
+    HeaderAuditArgumentsTestCase,
     HeaderMetadataParityTestCase,
     ModelConfigTierTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.model_config.helpers import (
     HeaderMetadataParity,
     column_metadata_outcome,
+    config_value_inputs,
     generated_header_metadata,
     header_metadata_parity,
     model_config_outcome,
 )
+
+if TYPE_CHECKING:
+    from sqlbuild._native import CompileInputsView
 
 
 @pytest.mark.parametrize(
@@ -49,6 +58,36 @@ def test_given_generated_header_metadata_when_attaching_then_model_loop_matches_
         parity.rejected >= test_case.expected_minimum_rejected,
         parity.later_validated <= test_case.expected_maximum_later_validated,
     ) == ([], True, True, True), (parity.parsed, parity.rejected, parity.later_validated)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        HeaderAuditArgumentsTestCase(
+            description="numeric keys on model and column audits are ignored during compilation",
+            header={
+                "description": "One row per order.",
+                "columns": {"order_id": {"audits": [{"unique": {1: "ignored"}}]}},
+                "audits": [{"unique": {2: "also ignored", "column": "order_id"}}],
+            },
+            expected_audits=[("unique", "order_id"), ("unique", "order_id")],
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_non_string_audit_arguments_when_attaching_then_keys_remain_ignored(
+    test_case: HeaderAuditArgumentsTestCase,
+    tmp_path: Path,
+) -> None:
+    inputs: CompileInputsView = config_value_inputs(project_dir=tmp_path, header=test_case.header)
+    project: CompiledProjectView = assemble_project(
+        inputs=inputs, inference_profile=ExpressionInferenceProfile(sql_analysis_dialect="duckdb")
+    )
+
+    assert [
+        (audit.definition_name, audit.attached_column_name) for audit in project.audits
+    ] == test_case.expected_audits
+    assert project.diagnostics == ()
 
 
 @pytest.mark.parametrize(

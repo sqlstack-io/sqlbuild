@@ -1,5 +1,6 @@
 //! The warehouse inspection phase: snapshot, migrations and inspection relations in one pass.
 
+use crate::bindings::_helpers::graph::views::compiled_graph_keys;
 use crate::bindings::_helpers::planner_entries::models::RelationsRequest;
 use crate::bindings::_helpers::planner_entries::relations::planner_relations_context;
 use crate::bindings::_helpers::planner_migrations::column_planning::plan_column_migrations;
@@ -14,6 +15,7 @@ use crate::bindings::_helpers::planner_phases::models::PlannerScopeResolution;
 use crate::bindings::_helpers::planner_phases::models::PlannerWarehouseState;
 use crate::bindings::_helpers::planner_phases::objects::native;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::fingerprint_cache::MigrationFingerprintCache;
 use crate::bindings::_helpers::planner_warehouse::snapshot::{SnapshotRequest, warehouse_snapshot};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -80,15 +82,16 @@ pub(crate) fn gather_planner_warehouse_state<'py>(
         ],
     )?;
     let adapter = runtime_field(runtime, |runtime| &runtime.adapter)?;
-    let stale_keys = pyo3::types::PyFrozenSet::new(
+    let stale_scope = scope_data(&class_field(scopes, |s: &PlannerScopeResolution| {
+        &s.stale_warning_scope
+    })?)?;
+    let stale_keys = compiled_graph_keys(
         py,
-        native_field(
-            &class_field(scopes, |s: &PlannerScopeResolution| &s.stale_warning_scope)?,
-            "all_keys",
-        )?
-        .call_method0("values")?
-        .try_iter()?
-        .collect::<PyResult<Vec<_>>>()?,
+        stale_scope
+            .names
+            .iter()
+            .map(|(_, key)| key.clone())
+            .collect(),
     )?
     .into_any();
     let snapshot = warehouse_snapshot(&SnapshotRequest {

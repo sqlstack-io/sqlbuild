@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from sqlbuild.adapter.contract.models import ColumnInfo
+from sqlbuild.adapter.contract.models import ColumnInfo, RelationInfo
 from sqlbuild.adapter.relations.classes.relation_metadata_cache import RelationMetadataCache
 from sqlbuild.adapter.relations.main.cached_relation_columns import cached_relation_columns
 from sqlbuild.adapter.relations.main.cached_relation_exists import cached_relation_exists
@@ -17,6 +17,7 @@ from sqlbuild.adapter.relations.main.relation_metadata_cache_scope import (
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
 from tests.unit.src.sqlbuild.adapter.relations.classes.relation_metadata_cache._test_types import (
     CacheInvalidationTestCase,
+    ListingExpiryTestCase,
     LiveInvalidationTestCase,
     OverlappingReadTestCase,
 )
@@ -229,3 +230,47 @@ def test_given_adapter_ddl_when_looking_up_again_then_returns_fresh_metadata(
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ListingExpiryTestCase(
+            description="a recent listing answers the lookup",
+            seconds_later=30.0,
+            expected_listings=1,
+        ),
+        ListingExpiryTestCase(
+            description="a listing older than a minute is read again",
+            seconds_later=61.0,
+            expected_listings=2,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_refreshed_listing_when_looking_up_later_then_expired_listing_is_read_again(
+    test_case: ListingExpiryTestCase,
+) -> None:
+    now: list[float] = [0.0]
+    cache: RelationMetadataCache = RelationMetadataCache(
+        transactional_ddl=False, clock=lambda: now[0]
+    )
+    listings: list[int] = []
+    orders: RelationInfo = RelationInfo(
+        database="ANALYTICS", schema="MARTS", name="ORDERS", relation_type="table"
+    )
+
+    def read_listing() -> dict[str, RelationInfo]:
+        listings.append(1)
+        return {"ORDERS": orders}
+
+    _ = cache.refresh_schema_listing(scope=("ANALYTICS", "MARTS"), read_listing=read_listing)
+    now[0] = test_case.seconds_later
+    _ = cache.schema_relation(
+        scope=("ANALYTICS", "MARTS"),
+        name="analytics.marts.orders",
+        stored_name="ORDERS",
+        read_listing=read_listing,
+    )
+
+    assert len(listings) == test_case.expected_listings

@@ -15,6 +15,8 @@ use sqlbuild_core::scenario_command::models::{
     ScenarioNamespace, ScenarioResultRow, ScenarioTestFlags, SqlAnalysisCommand,
 };
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{ExecutionStatus, ScenarioRunResult};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
@@ -26,10 +28,11 @@ use crate::bindings::_helpers::change_selection::selection::{
 };
 use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency;
 use crate::bindings::_helpers::native_host::host;
+use crate::bindings::_helpers::native_host::results::ReadResult;
 use crate::bindings::_helpers::records::fields::field as native_field;
-use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json;
+use crate::bindings::_helpers::result_output::documents::format_scenario_execution_json_with;
 use crate::bindings::_helpers::result_output::documents::write_execution_json_output;
-use crate::bindings::_helpers::scenario_command::conversions::{scenario_result_row, succeeded};
+use crate::bindings::_helpers::scenario_command::conversions::scenario_result_row;
 use crate::bindings::_helpers::scenario_command::presentation::{
     CompletionKind, RelayContext, SectionStatus, activity, begin_section, connection_hooks,
     progress_relay, write_completion,
@@ -140,7 +143,11 @@ fn prepare<'py>(py: Python<'py>, request: &Bound<'py, PyAny>) -> PyResult<TestRu
 fn finish(
     request: &Bound<'_, PyAny>,
     run: &TestRun<'_>,
-    (section, started, results): (&SectionStatus<'_>, Instant, &Bound<'_, PyTuple>),
+    (section, started, results): (
+        &SectionStatus<'_>,
+        Instant,
+        &[ScenarioRunResult<Bound<'_, PyAny>>],
+    ),
     (counts, succeeded): (Vec<SummaryCount>, bool),
 ) -> PyResult<()> {
     let py: Python<'_> = request.py();
@@ -155,7 +162,7 @@ fn finish(
     )?;
     let rows: Vec<ScenarioResultRow> = results
         .iter()
-        .map(|result| scenario_result_row(&result))
+        .map(|result| scenario_result_row(py, result))
         .collect::<PyResult<_>>()?;
     let failures: String = render_scenario_failures(&rows, run.style);
     if !failures.is_empty() {
@@ -167,12 +174,12 @@ fn finish(
     let payload: Bound<'_, PyAny> = PyString::new(
         py,
         &with_since_section(
-            format_scenario_execution_json(
+            format_scenario_execution_json_with(
                 py,
+                results,
                 Some(keywords(
                     py,
                     &[
-                        ("results", results.clone().into_any()),
                         ("local", boolean(py, run.local)),
                         (
                             "run_namespace",
@@ -302,21 +309,16 @@ fn run_scenarios(
         ]);
         ExecutorHost::RunScenarioTestPipeline
     };
-    let results: Bound<'_, PyTuple> = PyTuple::new(
-        py,
-        call_with(&host::entry(py, runner)?, &arguments)?
-            .try_iter()?
-            .collect::<PyResult<Vec<_>>>()?,
-    )?;
+    let results =
+        Vec::<ScenarioRunResult<_>>::read(&call_with(&host::entry(py, runner)?, &arguments)?)?;
     let total: usize = results.len();
     let (counts, ok): (Vec<SummaryCount>, bool) = if run.local {
         let mut tallies: [usize; 4] = [0; 4];
         for result in results.iter() {
-            let status: Bound<'_, PyAny> = result.getattr("local_status")?;
-            if status.is_none() {
+            let Some(status) = result.local_status else {
                 continue;
-            }
-            let value: String = status.getattr("value")?.extract()?;
+            };
+            let value = status.value();
             if let Some(index) = LOCAL_STATUSES.iter().position(|label| *label == value) {
                 tallies[index] += 1;
             }
@@ -331,7 +333,7 @@ fn run_scenarios(
     } else {
         let mut passed: usize = 0;
         for result in results.iter() {
-            if succeeded(&result)? {
+            if result.status == ExecutionStatus::Success {
                 passed += 1;
             }
         }
@@ -427,6 +429,10 @@ pub(crate) fn run_scenario_test_command(
                 ("no_sql_validation", boolean(py, no_sql_validation)),
                 ("source_deferral_enabled", boolean(py, false)),
                 ("connection_config", run.connection_config.clone()),
+                (
+                    "source_lexical_syntax",
+                    native_field(&run.project_adapter, "sql_lexical_syntax")?,
+                ),
             ],
             planning: &planning,
         },

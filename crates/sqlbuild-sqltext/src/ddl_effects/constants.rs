@@ -44,6 +44,12 @@ pub(crate) const NEUTRAL_SESSION_PARAMETERS: &[&[&str]] = &[
     &["STATEMENT_TIMEOUT_IN_SECONDS"],
     &["USE_CACHED_RESULT"],
 ];
+/// `SET` before the setting it changes.
+pub(crate) const SET_WORD: &[&str] = &["SET"];
+/// Scope modifiers allowed between `SET` and the setting.
+pub(crate) const SET_SCOPE_MODIFIERS: &[&[&str]] = &[&["SESSION"], &["LOCAL"], &["GLOBAL"]];
+/// Settings, such as DuckDB's and PostgreSQL's, that change how unqualified names resolve.
+pub(crate) const NAME_RESOLUTION_SETTINGS: &[&[&str]] = &[&["search_path"], &["schema"]];
 /// Statements that end the current transaction.
 pub(crate) const TRANSACTION_END_STATEMENTS: &[&str] = &["COMMIT", "ROLLBACK", "END", "ABORT"];
 /// Statements whose relation name is read from the statement.

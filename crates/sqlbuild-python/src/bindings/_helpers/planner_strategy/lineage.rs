@@ -13,6 +13,7 @@ use crate::bindings::_helpers::compile_attachment::cursor_roles::resolve_cursor_
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::resource_reads;
 use crate::bindings::_helpers::model_config::typed_config::{config_text_is, model_values};
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_strategy::microbatches::{
     CAP_ACTIONS, microbatch_limit_config,
 };
@@ -25,7 +26,7 @@ const MICROBATCH_MODE: &str = "microbatch";
 
 /// The project's models and SQL functions by name.
 struct ProjectLineage<'py> {
-    models_by_name: Bound<'py, PyAny>,
+    models_by_name: ModelLookup,
     functions_by_name: Bound<'py, PyAny>,
 }
 
@@ -75,7 +76,11 @@ impl<'py> ReferenceGraph for ProjectLineage<'py> {
     }
 
     fn model_references(&self, name: &str) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
-        mapped_references(&self.models_by_name, name)
+        let value = self.models_by_name.get(self.functions_by_name.py(), name)?;
+        if value.is_none() {
+            return Ok(None);
+        }
+        references(&value).map(Some)
     }
 
     fn function_references(&self, name: &str) -> PyResult<Option<Vec<Bound<'py, PyAny>>>> {
@@ -83,7 +88,7 @@ impl<'py> ReferenceGraph for ProjectLineage<'py> {
     }
 
     fn producer_facts(&self, name: &str) -> PyResult<ProducerFacts> {
-        let producer: Bound<'py, PyAny> = self.models_by_name.get_item(name)?;
+        let producer = self.models_by_name.get(self.functions_by_name.py(), name)?;
         let values: Bound<'py, PyAny> = native_field(&model_reads::config(&producer)?, "values")?;
         let capped: bool = match microbatch_limit_config(&values)?.1 {
             Some(action) => CAP_ACTIONS.contains(&text(&action)?.as_str()),
@@ -96,7 +101,7 @@ impl<'py> ReferenceGraph for ProjectLineage<'py> {
     }
 
     fn watermark_inputs(&self, name: &str) -> PyResult<Vec<String>> {
-        watermark_names(&self.models_by_name.get_item(name)?)
+        watermark_names(&self.models_by_name.get(self.functions_by_name.py(), name)?)
     }
 }
 
@@ -117,7 +122,7 @@ fn lineage_error(py: Python<'_>, failure: LineageFailure<PyErr>) -> PyErr {
 pub(crate) fn resolve_lineage_reference<'py>(
     model: &Bound<'py, PyAny>,
     input_name: &str,
-    models_by_name: Bound<'py, PyAny>,
+    models_by_name: ModelLookup,
     functions_by_name: Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = model.py();
@@ -133,7 +138,7 @@ pub(crate) fn resolve_lineage_reference<'py>(
 /// Reject capped producers feeding a microbatch model's watermark inputs.
 pub(crate) fn reject_capped_watermark_inputs<'py>(
     model: &Bound<'py, PyAny>,
-    models_by_name: Bound<'py, PyAny>,
+    models_by_name: ModelLookup,
     functions_by_name: Option<Bound<'py, PyAny>>,
 ) -> PyResult<()> {
     let py: Python<'py> = model.py();

@@ -2,9 +2,11 @@
 
 use serde_json::Value;
 
-use crate::planner_changes::_helpers::json_payload::{decoded_object, python_equal};
-use crate::planner_changes::constants::LOCAL_FUNCTION_HASHES_METADATA_KEY;
 use crate::planner_changes::models::IdentityPayload;
+use sqlbuild_core::fingerprint_identity::constants::LOCAL_FUNCTION_HASHES_METADATA_KEY;
+use sqlbuild_core::fingerprint_identity::main::{
+    decoded_object::decoded_object, python_equal::python_equal,
+};
 
 /// Python equality of two identity payloads.
 pub(crate) fn payloads_equal(left: &IdentityPayload, right: &IdentityPayload) -> bool {

@@ -146,7 +146,7 @@ fn given_clickhouse_statement_sets_when_rendered_then_every_statement_has_the_sh
             expected_count: VIEW_NAMES.len(),
         },
         StatementSetTestCase {
-            description: "the administrator's script ends by recording the schema version",
+            description: "the administrator's script ends by recording the schema version and the producing release",
             statements: ddl_script(Dialect::ClickHouse, &options(None))
                 .rsplit(";\n\n")
                 .take(1)
@@ -155,6 +155,7 @@ fn given_clickhouse_statement_sets_when_rendered_then_every_statement_has_the_sh
             required_fragments: &[
                 "INSERT INTO `observability`.`recall_meta`",
                 "SELECT 'schema', 'schema_version', '5'",
+                "5, '9.8.7', now64(6)",
             ],
             expected_count: 1,
         },

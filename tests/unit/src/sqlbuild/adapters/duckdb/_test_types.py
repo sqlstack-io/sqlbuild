@@ -8,6 +8,8 @@ class DuckDbMergeExclusionTestCase:
     description: str
     expected_update_clause: str
     expected_insert_clause: str
+    unique_key: tuple[str, ...] = ("order_id", "line_id")
+    source_columns: tuple[str, ...] = ("order_id", "line_id", "status", "updated_at")
 
 
 @dataclass(frozen=True)

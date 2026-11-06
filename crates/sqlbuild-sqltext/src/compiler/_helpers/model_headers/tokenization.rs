@@ -133,7 +133,11 @@ impl<'a> HeaderParser<'a> {
                 continue;
             }
             let key_token = self.peek().clone();
-            let key = self.consume_key()?;
+            let key = if options.column_entries {
+                self.consume_column_key()?
+            } else {
+                self.consume_key()?
+            };
             if values.iter().any(|(existing, _)| existing == &key) {
                 return Err(format!("duplicate key '{key}'"));
             }
@@ -456,6 +460,19 @@ impl<'a> HeaderParser<'a> {
         }
         self.advance();
         Ok(token.1)
+    }
+
+    /// A column name: a bare word, or a double-quoted identifier kept with its quotes.
+    fn consume_column_key(&mut self) -> Result<String, String> {
+        let token = self.peek().clone();
+        let quoted: bool = token.0 == STRING_TOKEN
+            && self.characters.get(token.2) == Some(&'"')
+            && !opens_triple_quote(self.characters, token.2);
+        if !quoted {
+            return self.consume_key();
+        }
+        self.advance();
+        Ok(format!("\"{}\"", token.1))
     }
 
     fn at_end_symbol(&self, symbol: Option<&str>) -> bool {

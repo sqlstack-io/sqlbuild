@@ -17,6 +17,7 @@ use crate::contracts::models::{
     DeclaredColumn, InferredOutputColumn, RelatedOutput,
 };
 use crate::type_system::errors::TypeNormalizationError;
+use sqlbuild_sqltext::resolution::main::unquoted_column_name::unquoted_column_name as output_column_name;
 
 /// Python's `_requires_contract_evaluation`.
 pub(crate) fn requires_contract_evaluation(model: &ContractModel, implicit: bool) -> bool {
@@ -85,12 +86,17 @@ pub(crate) fn model_contract_diagnostics(
         .map(String::as_str)
         .collect();
     for (index, declared) in schema.columns.iter().enumerate() {
-        let Some(inferred) = inferred_by_name.get(declared.name.as_str()).or_else(|| {
-            types
-                .folds_upper()
-                .then(|| inferred_by_name.get(declared.name.to_uppercase().as_str()))
-                .flatten()
-        }) else {
+        let output: &str = output_column_name(&declared.name);
+        let Some(inferred) = inferred_by_name
+            .get(declared.name.as_str())
+            .or_else(|| inferred_by_name.get(output))
+            .or_else(|| {
+                types
+                    .folds_upper()
+                    .then(|| inferred_by_name.get(declared.name.to_uppercase().as_str()))
+                    .flatten()
+            })
+        else {
             if validate_declared_shape && !model.fast_lineage_has_star {
                 diagnostics.push(missing_column(model, index, declared, contract_enforced));
             }
@@ -168,8 +174,11 @@ fn extra_columns(
         .columns
         .iter()
         .flat_map(|column| {
+            let output: &str = output_column_name(&column.name);
             let folded: Option<String> = folds_upper.then(|| column.name.to_uppercase());
-            std::iter::once(column.name.clone()).chain(folded)
+            std::iter::once(column.name.clone())
+                .chain(std::iter::once(output.to_owned()))
+                .chain(folded)
         })
         .collect();
     let help: &str = if schema.named_schema {

@@ -1,6 +1,7 @@
 //! `sqlite_retention_sql`: the deletes SQLite maintenance runs, all rows of an invocation together.
 
-use crate::schema::_helpers::rendering::sqlite_identifier;
+use sqlbuild_core::identifier_text::main::quote_identifier::quote_identifier as sqlite_identifier;
+
 use crate::schema::constants::{
     INVOCATION_TABLES, META_MAINTENANCE_COMPONENT, RETENTION_CANDIDATE_TABLES,
 };

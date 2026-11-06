@@ -135,7 +135,7 @@ pub(crate) fn body_form(body: &str, scanned: &[Token]) -> SqlMacroForm {
 /// The SQL macros the body calls, rejecting Python and bare macro calls.
 fn body_calls(name: &str, body: &str, in_body: Locate<'_>) -> Result<Vec<String>, SqlMacroError> {
     let constructs: Vec<AtConstruct> =
-        at_constructs(body).map_err(|_| unclosed_body(name, in_body(0)))?;
+        at_constructs(body, None).map_err(|_| unclosed_body(name, in_body(0)))?;
     let mut calls: Vec<String> = Vec::new();
     for construct in constructs {
         match construct {

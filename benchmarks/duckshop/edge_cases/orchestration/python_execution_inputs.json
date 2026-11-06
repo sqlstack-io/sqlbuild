@@ -1,0 +1,6 @@
+{
+  "initial": "from sqlbuild.checks import check\nfrom sqlbuild.refs import model\n@check(depends_on=model('orders'), description='Orders are present.')\ndef orders_present(ctx):\n    return ctx.pass_()\n",
+  "changed": "from sqlbuild.checks import check\nfrom sqlbuild.refs import model\n@check(depends_on=model('orders'), description='Orders are present.')\ndef orders_present(ctx):\n    raise RuntimeError('changed check executed after publication')\n",
+  "task": "from sqlbuild.tasks import task\n@task(description='Notify support.')\ndef notify_support(ctx):\n    return None\n",
+  "asset": "from sqlbuild.assets import asset\n@asset(description='Order export.')\ndef order_export(ctx):\n    return []\n"
+}

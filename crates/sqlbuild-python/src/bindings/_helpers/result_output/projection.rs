@@ -2,7 +2,14 @@
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyRef, PyResult, Python};
 use pyo3::types::{PyFloat, PyInt};
+use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id;
+use sqlbuild_core::nested_progress::main::sql_test_resource_id::sql_test_resource_id;
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_host::models::{
+    AuditExecutionResult, FunctionExecutionResult, LoadExecutionResult, ModelExecutionResult,
+    SeedExecutionResult, SqlTestExecutionResult,
+};
+use sqlbuild_host::types::ResultEnum;
 
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::plan_output::values::text;
@@ -101,6 +108,86 @@ pub(crate) fn resource_identity(result: &Bound<'_, PyAny>) -> PyResult<Option<(S
     }))
 }
 
+/// Resource identity shared by executor records and the permanent Python-node edge.
+pub(crate) trait ResultIdentity {
+    fn identity(&self) -> PyResult<Option<(String, String)>>;
+}
+
+impl<T: ResultIdentity> ResultIdentity for &T {
+    fn identity(&self) -> PyResult<Option<(String, String)>> {
+        (*self).identity()
+    }
+}
+
+impl ResultIdentity for Bound<'_, PyAny> {
+    fn identity(&self) -> PyResult<Option<(String, String)>> {
+        resource_identity(self)
+    }
+}
+
+macro_rules! named_identity {
+    ($kind:ident $(<$value:ident>)?, $field:ident, $prefix:literal) => {
+        impl $(<$value>)? ResultIdentity for $kind $(<$value>)? {
+            fn identity(&self) -> PyResult<Option<(String, String)>> {
+                Ok(Some((
+                    self.$field.clone(),
+                    format!("{}:{}", $prefix, self.$field),
+                )))
+            }
+        }
+    };
+}
+
+named_identity!(ModelExecutionResult<V>, model_name, "model");
+named_identity!(SeedExecutionResult, seed_name, "seed");
+named_identity!(LoadExecutionResult<V>, source_name, "source");
+
+impl ResultIdentity for FunctionExecutionResult {
+    fn identity(&self) -> PyResult<Option<(String, String)>> {
+        Ok(Some((
+            self.function_name.clone(),
+            format!("{}:{}", self.function_kind, self.function_name),
+        )))
+    }
+}
+
+impl<V> ResultIdentity for SqlTestExecutionResult<V> {
+    fn identity(&self) -> PyResult<Option<(String, String)>> {
+        let path = self.source_path.as_ref().map(|path| {
+            path.to_string_lossy()
+                .replace(std::path::MAIN_SEPARATOR, "/")
+        });
+        let case = path
+            .as_deref()
+            .zip(self.block_index)
+            .zip(self.case_name.as_deref())
+            .map(|((path, block), case)| (path, block, case));
+        Ok(Some((
+            self.test_name.clone(),
+            sql_test_resource_id(&self.test_name, case),
+        )))
+    }
+}
+
+impl<V> ResultIdentity for AuditExecutionResult<V> {
+    fn identity(&self) -> PyResult<Option<(String, String)>> {
+        let kind = self
+            .attached_target_kind
+            .map_or(self.attachment_kind.value(), ResultEnum::value);
+        Ok(Some((
+            self.audit_name.clone(),
+            audit_resource_id(
+                &self.audit_name,
+                kind,
+                (
+                    self.attached_target_name.as_deref(),
+                    self.attached_column_name.as_deref(),
+                ),
+            ),
+        )))
+    }
+}
+
 /// `round(value)`: the nearest integer, ties to even.
 pub(crate) fn rounded(py: Python<'_>, value: f64) -> PyResult<Bound<'_, PyAny>> {
     py.import("builtins")?.getattr("round")?.call1((value,))
@@ -116,7 +203,7 @@ pub(crate) fn number(value: &Bound<'_, PyAny>) -> PyResult<Option<f64>> {
 
 /// Results matched against the installed terminal event index, if any.
 pub(crate) struct Projection<'py> {
-    py: Python<'py>,
+    pub(crate) py: Python<'py>,
     index: Option<PyRef<'py, TerminalEventIndex>>,
     /// Scenario whose resources are namespaced under `scenario:<name>:`.
     pub(crate) scenario: Option<String>,
@@ -173,8 +260,8 @@ impl<'py> Projection<'py> {
     }
 
     /// Whether an executor result has a terminal.
-    pub(crate) fn terminal_recorded(&self, result: &Bound<'py, PyAny>) -> PyResult<bool> {
-        match resource_identity(result)? {
+    pub(crate) fn terminal_recorded<T: ResultIdentity>(&self, result: &T) -> PyResult<bool> {
+        match result.identity()? {
             Some((name, resource_id)) => self.resource_terminal_recorded(&name, &resource_id),
             None => Ok(self.index.is_none()),
         }
@@ -195,6 +282,18 @@ impl<'py> Projection<'py> {
         Ok(kept)
     }
 
+    /// Borrow typed results with recorded terminals; never recreate Python result records.
+    pub(crate) fn retained<'a, T: ResultIdentity>(&self, results: &'a [T]) -> PyResult<Vec<&'a T>> {
+        results
+            .iter()
+            .filter_map(|result| match self.terminal_recorded(result) {
+                Ok(true) => Some(Ok(result)),
+                Ok(false) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect()
+    }
+
     /// The terminal's `duration_ms`, or the fallback without an index.
     pub(crate) fn resource_duration(
         &self,
@@ -213,12 +312,12 @@ impl<'py> Projection<'py> {
     }
 
     /// The rounded canonical duration of a result, else its own `duration_ms`.
-    pub(crate) fn result_duration(
+    pub(crate) fn result_duration<T: ResultIdentity>(
         &self,
-        result: &Bound<'py, PyAny>,
+        result: &T,
         fallback: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let Some((name, resource_id)) = resource_identity(result)? else {
+        let Some((name, resource_id)) = result.identity()? else {
             return Ok(fallback.clone());
         };
         match self.resource_duration((&name, &resource_id), number(fallback)?)? {

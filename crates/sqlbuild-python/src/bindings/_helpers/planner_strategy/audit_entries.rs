@@ -1,21 +1,28 @@
 //! Assemble audit plan dataclasses using native rendering and scheduling.
 
+use sqlbuild_analysis::assembly::project::types::ObjectKey;
+use sqlbuild_analysis::graph::main::graph_from_indexes::graph_from_indexes;
+use sqlbuild_analysis::graph::models::GraphIndexes;
+use std::collections::HashSet;
+
 use crate::bindings::_helpers::attachments::reference_markers::assert_no_unresolved_sql_markers;
 use crate::bindings::_helpers::auditing::render::render_audit_sql;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compiled_views::audit_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::views::project_lineage_views;
+use crate::bindings::_helpers::graph::keys::native_key;
+use crate::bindings::_helpers::graph::project_graph::NativeProjectGraph;
 use crate::bindings::_helpers::planner_phases::objects::object;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
+use crate::bindings::_helpers::planner_scope::values::edges;
 use crate::bindings::_helpers::planner_strategy::audits::{
-    reads_outside_target_lineage, resolve_attachment_kind, resolve_effective_run_scope,
+    attachment, outside_target_lineage, resolve_effective_run_scope,
 };
-use crate::bindings::_helpers::records::construct::{enum_from_value, new_record, new_record_with};
-use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
+use crate::bindings::_helpers::records::construct::new_record;
+use pyo3::IntoPyObject;
+use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult};
 use pyo3::pyfunction;
-use pyo3::types::{
-    PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple, PyTupleMethods,
-};
+use pyo3::types::{PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyString};
 
 use crate::bindings::_helpers::boundary::keyword_request::Request;
 use crate::bindings::_helpers::boundary::python_calls::imported;
@@ -87,8 +94,14 @@ pub(crate) fn plan_audit_of<'py>(
             source_map: request.get("source_map")?,
             adapter: request.get("adapter")?,
             model_materializations: request.get("model_materializations")?,
-            lineage_upstream_deps: request.get("lineage_upstream_deps")?,
-            lineage_downstream_deps: request.get("lineage_downstream_deps")?,
+            lineage: Py::new(
+                request.py(),
+                NativeProjectGraph::new(graph_from_indexes(GraphIndexes {
+                    upstream: edges(&request.get("lineage_upstream_deps")?)?,
+                    downstream: edges(&request.get("lineage_downstream_deps")?)?,
+                    ..GraphIndexes::default()
+                })),
+            )?,
         },
     )
 }
@@ -116,12 +129,15 @@ fn plan_audit<'py>(
             &format!("audit '{name}' planned evidence SQL"),
         )?
     };
-    let attachment: Bound<'_, PyTuple> =
-        resolve_attachment_kind(&audit, &request.lineage_downstream_deps)?;
-    let kind = attachment.get_item(0)?;
-    let target = attachment.get_item(1)?;
-    let kind_text: String = kind.extract()?;
-    let materialization = if kind_text == MODEL_ATTACHMENT && !target.is_none() {
+    let lineage = request.lineage.bind(py).borrow();
+    let (kind_text, target_name) = attachment(&audit, lineage.graph())?;
+    let kind = audit_enum(
+        PyString::new(py, &kind_text).into_any(),
+        "AuditAttachmentKind",
+        "end",
+    )?;
+    let target = target_name.as_deref().into_pyobject(py)?.into_any();
+    let materialization = if kind_text == MODEL_ATTACHMENT && target_name.is_some() {
         mapping_get(&request.model_materializations, &target)?
     } else {
         py.None().into_bound(py)
@@ -179,12 +195,9 @@ fn plan_audit<'py>(
         ("attached_target_name", target),
         (
             "reads_outside_target_lineage",
-            PyBool::new(
-                py,
-                reads_outside_target_lineage(&audit, &request.lineage_upstream_deps)?,
-            )
-            .to_owned()
-            .into_any(),
+            PyBool::new(py, outside_target_lineage(&audit, lineage.graph())?)
+                .to_owned()
+                .into_any(),
         ),
     ] {
         values.set_item(field, value)?;
@@ -195,25 +208,21 @@ fn plan_audit<'py>(
 /// Select attached audits by their logical target and singular audits by dependency overlap.
 pub(crate) fn audit_is_selected(
     audit: &Bound<'_, PyAny>,
-    selected_keys: &Bound<'_, PyAny>,
+    selected_keys: &HashSet<ObjectKey>,
 ) -> PyResult<bool> {
     let py = audit.py();
     let kind = audit_reads::attached_target_kind(audit)?;
     let name = audit_reads::attached_target_name(audit)?;
     if !kind.is_none() && !name.is_none() {
-        let target_value = imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?
-            .call1((kind,))?
-            .getattr("value")?;
-        let resource_type = enum_from_value(py, RecordId::CompiledResourceType, target_value)?;
-        let key = new_record_with(
-            py,
-            RecordId::CompiledObjectKey,
-            &[("resource_type", resource_type), ("name", name)],
+        let target_value = native_field(
+            &imported(py, COMPILE_TYPES_MODULE, "AttachedAuditTargetKind")?.call1((kind,))?,
+            "value",
         )?;
-        return selected_keys.contains(key);
+        let key = (target_value.extract()?, name.extract()?);
+        return Ok(selected_keys.contains(&key));
     }
     for dependency in audit_reads::scope_deps(audit)?.try_iter()? {
-        if selected_keys.contains(dependency?)? {
+        if selected_keys.contains(&native_key(&dependency?)?) {
             return Ok(true);
         }
     }
@@ -227,11 +236,11 @@ pub(crate) fn build_selected_audit_entries<'py>(
     let request = Request::new("build_selected_audit_entries", request)?;
     let py = request.py();
     let project = request.get("project")?;
-    let selected_keys = native_field(&request.get("scope")?, "selected_keys")?;
+    let scope = scope_data(&request.get("scope")?)?;
     let mut selected: Vec<Bound<'py, PyAny>> = Vec::new();
     for audit in project_reads::audits(&project)?.try_iter()? {
         let audit = audit?;
-        if audit_is_selected(&audit, &selected_keys)? {
+        if audit_is_selected(&audit, &scope.selected)? {
             selected.push(audit);
         }
     }
@@ -239,7 +248,6 @@ pub(crate) fn build_selected_audit_entries<'py>(
     if selected.is_empty() {
         return Ok(entries);
     }
-    let lineage = project_lineage_views(py, &project)?;
     let relations = request.get("relations")?;
     let planning = AuditPlanning {
         model_locations: native_field(&relations, "model_locations")?,
@@ -247,8 +255,7 @@ pub(crate) fn build_selected_audit_entries<'py>(
         source_map: native_field(&relations, "source_read_map")?,
         adapter: request.get("adapter")?,
         model_materializations: request.get("model_materializations")?,
-        lineage_upstream_deps: native_field(&lineage, "upstream_deps")?,
-        lineage_downstream_deps: native_field(&lineage, "downstream_deps")?,
+        lineage: native_field(&project, "lineage_graph")?.extract()?,
     };
     for audit in selected {
         entries.append(plan_audit(&audit, &planning)?)?;

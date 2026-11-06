@@ -38,6 +38,7 @@ from sqlbuild.adapter.contract.exceptions import (
     AdapterUserError,
     UnsupportedTypedSqlRenderingError,
 )
+from sqlbuild.adapter.contract.main.column_name_key import column_name_key
 from sqlbuild.adapter.contract.main.run_relation_read_probe import run_relation_read_probe
 from sqlbuild.adapter.contract.main.same_view_definition import same_view_definition
 from sqlbuild.adapter.contract.main.unsupported_relation_usage import unsupported_relation_usage
@@ -969,7 +970,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         exclude_columns: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         immutable_columns: frozenset[str] = frozenset(
-            column.lower() for column in (*unique_key, *exclude_columns)
+            column_name_key(column) for column in (*unique_key, *exclude_columns)
         )
         join_condition: str = " AND ".join(
             f"__target.{self.render_identifier(k)} = __source.{self.render_identifier(k)}"
@@ -978,7 +979,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         update_assignments: str = ", ".join(
             f"{self.render_identifier(col)} = __source.{self.render_identifier(col)}"
             for col in source_columns
-            if col.lower() not in immutable_columns
+            if column_name_key(col) not in immutable_columns
         )
         insert_columns: str = ", ".join(self.render_identifier(col) for col in source_columns)
         insert_values: str = ", ".join(
@@ -1660,6 +1661,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Report an unknown row count for custom adapters without metadata support."""
 
@@ -2283,6 +2285,34 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         del database, schema
         return ()
 
+    def render_create_consumption_table_sql(self, *, database: str | None, schema: str) -> str:
+        """Render DDL that creates the consumption table when it is missing."""
+
+        from sqlbuild._native import build_consumption_create_table_sql
+
+        return build_consumption_create_table_sql(
+            database=database,
+            schema=schema,
+            render_qualified_name=self.render_qualified_name,
+            render_framework_type=self.render_framework_type,
+        )
+
+    def render_create_consumption_index_sqls(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+    ) -> tuple[str, ...]:
+        """Render optional consumption table index DDL statements."""
+
+        del database, schema
+        return ()
+
+    def render_current_utc_timestamp(self) -> str:
+        """Render the warehouse clock as a UTC timestamp expression."""
+
+        return "CURRENT_TIMESTAMP"
+
     def render_insert_source_freshness_records_sql(
         self,
         *,
@@ -2426,6 +2456,18 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
         retain_versions: int,
     ) -> str:
         """Render SQL that prunes old source freshness history rows."""
+
+        del database, schema, retain_versions
+        raise AdapterUserError(message="direct-state history pruning is adapter-specific")
+
+    def render_prune_consumption_history_sql(
+        self,
+        *,
+        database: str | None,
+        schema: str,
+        retain_versions: int,
+    ) -> str:
+        """Render SQL that prunes old consumption executions."""
 
         del database, schema, retain_versions
         raise AdapterUserError(message="direct-state history pruning is adapter-specific")

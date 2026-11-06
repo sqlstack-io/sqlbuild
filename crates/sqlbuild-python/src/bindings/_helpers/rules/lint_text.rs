@@ -1,19 +1,16 @@
 //! Interpolation sentinels, inline directive findings and fixture-null candidates over lint models.
 
-use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
-use pyo3::types::{PyDict, PyDictMethods, PyFrozenSet, PyString};
+use pyo3::types::{PyDict, PyDictMethods, PyString};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_rules::lint_text::errors::LintTextError;
 use sqlbuild_rules::lint_text::main::format_sql_bodies::format_sql_bodies;
 use sqlbuild_rules::lint_text::main::named_declaration_role_kind::named_declaration_role_kind as role_kind;
-use sqlbuild_rules::lint_text::main::neutralize_context_interpolation::neutralize_context_interpolation;
 use sqlbuild_rules::lint_text::main::neutralize_interpolation::neutralize_interpolation;
 use sqlbuild_rules::lint_text::main::reject_inline_suppressions::reject_inline_suppressions;
 use sqlbuild_rules::lint_text::main::restore_interpolation::restore_interpolation;
-use sqlbuild_rules::lint_text::main::scan_fixture_null_candidates::scan_fixture_null_candidates;
 use sqlbuild_rules::lint_text::models::{
     FormatFault, FormatFile, FormattedBodies, InterpolationSite, Neutralized, SuppressionFinding,
 };
@@ -51,13 +48,6 @@ fn neutralize_lint_interpolation(
     })
 }
 
-#[pyfunction]
-fn neutralize_lint_context_interpolation(
-    body: &str,
-) -> PyResult<(String, Vec<Positional<InterpolationSite>>)> {
-    compiler_guard(|| Ok(site_tuples(neutralize_context_interpolation(body))))
-}
-
 /// Restored text, or `(False, reason)` when a sentinel is missing or repeated.
 #[pyfunction]
 fn restore_lint_interpolation(
@@ -70,23 +60,6 @@ fn restore_lint_interpolation(
         Err(LintTextError::Restoration(message)) => Ok((false, message)),
         Err(error) => Err(value_error(error)),
     }
-}
-
-#[pyfunction]
-#[pyo3(signature = (project_dir, selected_paths = None))]
-fn scan_fixture_typed_null_candidates<'py>(
-    py: Python<'py>,
-    project_dir: PathBuf,
-    selected_paths: Option<BTreeSet<PathBuf>>,
-) -> PyResult<(Bound<'py, PyFrozenSet>, Bound<'py, PyFrozenSet>)> {
-    let candidates = compiler_guard(|| {
-        scan_fixture_null_candidates(&project_dir, selected_paths.as_ref()).map_err(value_error)
-    })?;
-    let paths: Vec<PathBuf> = candidates.paths.into_iter().map(PathBuf::from).collect();
-    Ok((
-        PyFrozenSet::new(py, paths)?,
-        PyFrozenSet::new(py, candidates.model_names)?,
-    ))
 }
 
 /// The named declaration kind of a project-relative path, as `DeclarationKind`.
@@ -231,15 +204,7 @@ pub(crate) fn format_lint_sql_bodies<'py>(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(neutralize_lint_interpolation, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        neutralize_lint_context_interpolation,
-        module
-    )?)?;
     module.add_function(wrap_pyfunction!(restore_lint_interpolation, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        scan_fixture_typed_null_candidates,
-        module
-    )?)?;
     module.add_function(wrap_pyfunction!(format_lint_sql_bodies, module)?)?;
     module.add_function(wrap_pyfunction!(named_declaration_role_kind, module)?)?;
     module.add_function(wrap_pyfunction!(reject_lint_suppressions, module)?)

@@ -215,7 +215,7 @@ pub(crate) fn start_planning(
 /// Join SQL test planning threads at exit: finalization ending one inside native planning aborts.
 #[pyfunction]
 fn join_sql_test_planning_threads(py: Python<'_>) -> PyResult<()> {
-    signal_interpreter_exit(py)?;
+    signal_interpreter_exit();
     let threads: &PlanningThreads = planning_threads(py)?.get();
     py.detach(|| threads.wait(PLANNING_EXIT_JOIN));
     Ok(())

@@ -1,0 +1,81 @@
+{
+  "migrations": [
+    {
+      "event_id": "move-orders-1",
+      "destination_model": "orders",
+      "origin_model": "orders_v1",
+      "origin_name": "orders_v1",
+      "decision": "migrate",
+      "created_at": "2026-02-01T04:05:06Z"
+    },
+    {
+      "event_id": "move-orders-2",
+      "destination_model": "orders",
+      "origin_model": null,
+      "origin_name": "orders_🧾",
+      "decision": "renamed",
+      "discovery": "automatic",
+      "created_at": "2026-02-03T04:05:06Z"
+    },
+    {
+      "event_id": "move-customers-1",
+      "destination_model": "customers",
+      "origin_model": "clients",
+      "origin_name": "clients",
+      "decision": "superseded_replace",
+      "created_at": "2026-02-02T04:05:06Z"
+    }
+  ],
+  "old_name_views": [
+    {
+      "event_id": "view-orders-1",
+      "migration_event_id": "move-orders-2",
+      "destination_model": "orders",
+      "event_type": "required",
+      "created_at": "2026-02-03T04:05:06Z"
+    },
+    {
+      "event_id": "view-orders-2",
+      "migration_event_id": "move-orders-2",
+      "destination_model": "orders",
+      "event_type": "view_created",
+      "created_at": "2026-02-03T04:05:07Z",
+      "column_aliases": "{\"order_id\":\"legacy_order_id\"}"
+    },
+    {
+      "event_id": "view-customers-1",
+      "migration_event_id": "move-customers-1",
+      "destination_model": "customers",
+      "event_type": "required",
+      "created_at": "2026-02-02T04:05:06Z"
+    },
+    {
+      "event_id": "view-orders-old-1",
+      "migration_event_id": "move-orders-1",
+      "destination_model": "orders",
+      "event_type": "required",
+      "created_at": "2026-02-01T04:05:06Z"
+    }
+  ],
+  "janitor_events": [
+    {
+      "event_id": "cleanup-1",
+      "event_type": "archive",
+      "occurred_at": "2026-02-01T05:05:06Z"
+    },
+    {
+      "event_id": "cleanup-2",
+      "event_type": "delete",
+      "occurred_at": "2026-02-04T05:05:06Z"
+    }
+  ],
+  "preview_old_name_views": [
+    {
+      "event_id": "view-preview-1",
+      "migration_event_id": "move-orders-2",
+      "destination_model": "orders",
+      "event_type": "view_dropped",
+      "created_at": "2026-02-05T04:05:06Z"
+    }
+  ]
+}

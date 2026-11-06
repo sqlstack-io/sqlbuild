@@ -27,6 +27,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _typed_collection_items,
     _typed_scalar_payload,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -148,7 +149,7 @@ from sqlbuild.runtime.observability.classes.statement_lifecycle import Statement
 from sqlbuild.spec.contracts.constants import DEFAULT_SEED_CSV_SETTINGS
 
 
-class BigQueryAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """BigQuery adapter backed by google-cloud-bigquery."""
 
     def get_columns_for_relations(
@@ -1064,6 +1065,9 @@ class BigQueryAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
     def render_current_timestamp(self) -> str:
         return "CURRENT_TIMESTAMP"
+
+    def render_current_utc_timestamp(self) -> str:
+        return "CURRENT_TIMESTAMP()"
 
     def render_loader_logical_type(self, type_name: LoaderLogicalType) -> str:
         match type_name:
@@ -2569,6 +2573,7 @@ class BigQueryAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
         """Read ``numRows`` from the tables API; only native tables report a count."""
 
@@ -2579,11 +2584,19 @@ class BigQueryAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         )
         table_type: str = str(getattr(table, "table_type", NATIVE_TABLE_TYPE)).upper()
         num_rows: object | None = getattr(table, "num_rows", None)
-        if table_type != NATIVE_TABLE_TYPE or not isinstance(num_rows, int):
+        if table_type != NATIVE_TABLE_TYPE:
             return RelationRowCountEstimate(
                 row_count=None, detail=f"no row count ({table_type.lower()})"
             )
-        return RelationRowCountEstimate(row_count=num_rows)
+        byte_count: object | None = getattr(table, "num_bytes", None) if metadata_only else None
+        return RelationRowCountEstimate(
+            row_count=num_rows if isinstance(num_rows, int) else None,
+            detail=f"no row count ({table_type.lower()})"
+            if not isinstance(num_rows, int)
+            else None,
+            byte_count=byte_count if isinstance(byte_count, int) else None,
+            byte_count_basis="tables_api_num_bytes" if isinstance(byte_count, int) else None,
+        )
 
     def inspect_row_diff_coverage(
         self,

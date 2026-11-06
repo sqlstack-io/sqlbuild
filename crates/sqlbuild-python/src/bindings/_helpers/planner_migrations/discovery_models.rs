@@ -4,18 +4,19 @@ use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::project_reads;
-use crate::bindings::_helpers::graph::node_set::PyNodeSet;
+use crate::bindings::_helpers::graph::keys::native_key;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_identity::metadata::build_function_local_hashes;
 use crate::bindings::_helpers::planner_identity::metadata::build_model_version_identity_metadata_json;
 use crate::bindings::_helpers::planner_phases::objects::object;
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_items;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult};
-use pyo3::types::{PyDict, PyDictMethods, PySet, PySetMethods};
+use pyo3::types::{PyDict, PyDictMethods};
+use sqlbuild_analysis::graph::main::reachable_keys::reachable_keys;
 use sqlbuild_analysis::planner_migrations::main::discovery_order::discovery_order;
-use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use std::collections::BTreeMap;
 
 pub(super) fn ordered<'py>(runtime: &Bound<'py, PyAny>) -> PyResult<Vec<Bound<'py, PyAny>>> {
@@ -48,22 +49,13 @@ pub(super) fn triggered(
     snapshot: &Bound<'_, PyAny>,
     declared: &Bound<'_, PyDict>,
 ) -> PyResult<bool> {
-    let py = scope.py();
-    let selected: Vec<Bound<'_, PyAny>> = native_field(scope, "selected_keys")?
-        .try_iter()?
-        .collect::<PyResult<_>>()?;
-    let mut relevant = PyNodeSet(PySet::new(py, &selected)?);
-    breadth_first_reach(selected, None, &mut relevant, |key| {
-        native_field(scope, "upstream_deps")?
-            .call_method1("get", (key, pyo3::types::PyTuple::empty(py)))?
-            .try_iter()?
-            .collect::<PyResult<Vec<Bound<'_, PyAny>>>>()
-    })?;
-    let relevant = relevant.0;
+    let scope = scope_data(scope)?;
+    let selected: Vec<_> = scope.selected.iter().cloned().collect();
+    let relevant = reachable_keys(&selected, &scope.upstream);
     let fingerprints = native_field(&native_field(snapshot, "fingerprints")?, "models")?;
     for item in models {
         let name = model_reads::name_object(item)?;
-        if relevant.contains(model_reads::model_key(item)?)?
+        if relevant.contains(&native_key(&model_reads::model_key(item)?)?)
             && !fingerprints.contains(&name)?
             && !declared.contains(&name)?
         {

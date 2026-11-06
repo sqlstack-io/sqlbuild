@@ -9,7 +9,8 @@ use pyo3::{pyfunction, wrap_pyfunction};
 use sqlbuild_core::constants::SOURCE_FRESHNESS_TABLE_NAME;
 use sqlbuild_host::entries::models::AdapterHost;
 use sqlbuild_state::freshness::constants::{
-    SOURCE_FRESHNESS_COLUMN_TYPES, STRING_STATE_VALUE_TYPE, TEXT_TIMESTAMP_STATE_VALUE_TYPE,
+    SOURCE_FRESHNESS_COLUMN_TYPES, SOURCE_FRESHNESS_EVENT_ID, STRING_STATE_VALUE_TYPE,
+    TEXT_TIMESTAMP_STATE_VALUE_TYPE,
 };
 use sqlbuild_state::state_tables::main::create_table_sql::create_table_sql;
 use sqlbuild_state::state_tables::main::values_insert_sql::values_insert_sql;
@@ -20,6 +21,7 @@ use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::contracts::state_literals::render_state_sql_literal;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::state_rows::freshness::record_event_id;
 
 const MISSING_SCHEMA_MESSAGE: &str = "source freshness table requires a target schema";
 /// Each state value type a state table may declare and the framework type that renders it.
@@ -121,18 +123,20 @@ fn render_insert_source_freshness_records_sql<'py>(
     let mut rows: Vec<Vec<String>> = Vec::new();
     for record in records.try_iter()? {
         let record: Bound<'py, PyAny> = record?;
-        let row: Vec<String> = SOURCE_FRESHNESS_COLUMN_TYPES
+        let mut row: Vec<String> = SOURCE_FRESHNESS_COLUMN_TYPES
             .iter()
             .map(|(column, declared)| {
                 render_state_sql_literal(py, &native_field(&record, column)?, declared, None)
             })
             .collect::<PyResult<_>>()?;
+        row.push(format!("'{}'", record_event_id(&record)?));
         rows.push(row);
     }
-    let names: Vec<&str> = SOURCE_FRESHNESS_COLUMN_TYPES
+    let mut names: Vec<&str> = SOURCE_FRESHNESS_COLUMN_TYPES
         .iter()
         .map(|(column, _)| *column)
         .collect();
+    names.push(SOURCE_FRESHNESS_EVENT_ID);
     Ok(values_insert_sql(
         &table.extract::<String>()?,
         &names,

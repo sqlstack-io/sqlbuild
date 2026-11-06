@@ -32,7 +32,7 @@ _PROJECT: str = (
     'connection = "local"\n'
     'schema = "dev"\n\n'
     "[rules]\n"
-    'select = ["SQBRSQL028"]\n'
+    'select = ["SQLCLEAN028"]\n'
 )
 _ORDERS: str = (
     'MODEL (\n  description "One row per order",\n  materialized table,\n);\n\n'
@@ -47,7 +47,7 @@ _PASSING: str = 'SELECT o.order_id, o.status FROM __ref("orders") AS o'
 _FAILING: str = 'SELECT o.order_id, status FROM __ref("orders") AS o'
 _FAILED_OPEN_ORDERS: bytes = (
     b"-- sqb: compile failed for this model; not buildable\n"
-    b"-- SQBRSQL028 at models/open_orders.sql:6:20: "
+    b"-- SQLCLEAN028 at models/open_orders.sql:6:20: "
     b"Single-relation query mixes qualified and unqualified columns\n"
     b'SELECT o.order_id, status FROM __ref("orders") AS o\n'
 )

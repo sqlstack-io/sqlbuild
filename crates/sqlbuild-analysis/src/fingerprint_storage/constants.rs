@@ -12,8 +12,9 @@ pub const COLUMN_SCHEMA_FINGERPRINT: &str = "schema_fingerprint";
 pub const COLUMN_DEFINITION_B64: &str = "definition_b64";
 pub const COLUMN_METADATA_JSON_B64: &str = "metadata_json_b64";
 pub const COLUMN_TIMESTAMP: &str = "ts";
+pub const COLUMN_EVENT_ID: &str = "event_id";
 
-/// Every stored column, in table order.
+/// Legacy columns used by latest-row readers, including readers of tables without an event ID.
 pub const FINGERPRINT_COLUMNS: [&str; 12] = [
     COLUMN_NODE_TYPE,
     COLUMN_NODE_NAME,

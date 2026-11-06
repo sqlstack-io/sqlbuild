@@ -33,6 +33,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _render_explicit_source_relation_cast_subquery,
     _render_typed_value_list,
 )
+from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
     HistoricalCheckSnapshotSql,
 )
@@ -164,7 +165,7 @@ _TRUE_SEED_VALUES: frozenset[str] = frozenset({"true", "t", "yes", "y", "1"})
 _FALSE_SEED_VALUES: frozenset[str] = frozenset({"false", "f", "no", "n", "0"})
 
 
-class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
+class SqliteAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseAdapter):
     """SQLite adapter: one database file, SQLBuild schemas stored as `schema__name` tables."""
 
     adapter_name: ClassVar[str] = BuiltinAdapter.SQLITE.value
@@ -988,6 +989,9 @@ class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
 
         return "strftime('%Y-%m-%d %H:%M:%f', 'now')"
 
+    def render_current_utc_timestamp(self) -> str:
+        return "strftime('%Y-%m-%dT%H:%M:%f', 'now')"
+
     def create_table_as(
         self,
         *,
@@ -1502,9 +1506,14 @@ class SqliteAdapter(MicrobatchMixin, UnkeyedDiffMixin, BaseAdapter):
         database: str | None,
         schema: str | None,
         name: str,
+        metadata_only: bool = False,
     ) -> RelationRowCountEstimate:
-        """Count table rows: a local file has no metadata count, and counting reads only pages."""
+        """Keep interactive counts; background metadata sampling never reads table pages."""
 
+        if metadata_only:
+            return RelationRowCountEstimate(
+                row_count=None, detail="SQLite does not report table row counts from metadata"
+            )
         del database
         table_name: str = physical_name(schema=schema, name=name)
         row: tuple[Any, ...] | None = connection.execute_with(

@@ -1,5 +1,6 @@
 //! Python's `get_semantic_metadata_diagnostics`, apart from the resource SQL checks.
 
+use sqlbuild_sqltext::resolution::main::column_name_key::column_name_key;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
@@ -128,11 +129,11 @@ fn model_error(
     })
 }
 
-/// Python's `{column.casefold() for column in shape}`.
+/// Each shape column's case-folded name, without the quotes of a quoted identifier.
 fn folded_names(shape: &[(String, String)]) -> Result<HashSet<String>, SemanticFailure> {
     let mut names: HashSet<String> = HashSet::with_capacity(shape.len());
     for (name, _) in shape {
-        names.insert(casefold(name));
+        names.insert(column_name_key(name));
     }
     Ok(names)
 }
@@ -162,7 +163,7 @@ fn reference_errors(
     }
     let mut errors: Vec<MetadataFinding> = Vec::new();
     for (key, name, reference_shape) in references {
-        if !folded_names(reference_shape)?.contains(&casefold(name)) {
+        if !folded_names(reference_shape)?.contains(&column_name_key(name)) {
             let message = format!("{key} references unknown column '{name}'");
             errors.push(model_error(
                 model,
@@ -232,7 +233,7 @@ fn source_errors(
         else {
             continue;
         };
-        if folded_names(shape)?.contains(&casefold(cursor)) {
+        if folded_names(shape)?.contains(&column_name_key(cursor)) {
             continue;
         }
         let (line, column) = text_position(&source.contents, cursor, 0)?;
@@ -267,7 +268,7 @@ fn sql_test_errors(
             };
             let available: HashSet<String> = folded_names(shape)?;
             for column_name in columns {
-                if available.contains(&casefold(column_name)) {
+                if available.contains(&column_name_key(column_name)) {
                     continue;
                 }
                 let offset: usize = find_code_point(&test.contents, cte_name).unwrap_or(0);

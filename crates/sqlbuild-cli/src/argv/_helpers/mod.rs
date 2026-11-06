@@ -1,5 +1,6 @@
 pub(crate) mod dbt_execution;
 pub(crate) mod formatting;
+pub(crate) mod job_settings;
 pub(crate) mod namespace;
 pub(crate) mod normalization;
 pub(crate) mod parsing;

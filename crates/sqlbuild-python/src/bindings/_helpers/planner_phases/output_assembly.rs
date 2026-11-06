@@ -1,8 +1,7 @@
 //! Plan output assembly: storage policies, warnings and direct-mode metadata.
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
-use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::compiled_views::project_reads;
+use crate::bindings::_helpers::native_host::model_lookup::ModelLookup;
 use crate::bindings::_helpers::planner_entries::models::PlanOutputInputs;
 use crate::bindings::_helpers::planner_entries::plan_output::plan_output_fields;
 use crate::bindings::_helpers::planner_identity::staleness::build_stale_out_of_selection_warnings;
@@ -21,6 +20,7 @@ use crate::bindings::_helpers::planner_phases::objects::{
 use crate::bindings::_helpers::planner_phases::retention::{plan_retention, plan_table_types};
 use crate::bindings::_helpers::planner_phases::runtime::runtime_field;
 use crate::bindings::_helpers::planner_phases::runtime::warehouse_field;
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::planner_warehouse::source_freshness::source_freshness_unknown_warnings;
 use crate::bindings::_helpers::records::construct::{enum_member, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -28,6 +28,7 @@ use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::ids::RecordId;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyTuple};
+use sqlbuild_analysis::planner_scope::constants::MODEL;
 
 fn concat<'py>(py: Python<'py>, parts: &[Bound<'py, PyAny>]) -> PyResult<Bound<'py, PyAny>> {
     let mut items: Vec<_> = Vec::new();
@@ -172,35 +173,14 @@ pub(crate) fn add_storage_policies<'py>(
     let py = runtime.py();
     let mut entries = output.field("model_entries")?;
     if native_field(policies, "record_migration_fingerprints")?.is_truthy()? {
-        let models = PyDict::new(py);
-        for model in project_reads::models(&runtime_field(runtime, |runtime| &runtime.project)?)?
-            .try_iter()?
-        {
-            let model = model?;
-            models.set_item(model_reads::name_object(&model)?, model)?;
-        }
+        let scope = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
         entries = object(
             py,
             with_migration_fingerprints(
-                py,
-                Some(keywords(
-                    py,
-                    &[
-                        ("entries", entries),
-                        ("models_by_name", models.into_any()),
-                        (
-                            "fingerprints",
-                            warehouse_field(warehouse, |warehouse| {
-                                &warehouse.migration_fingerprints
-                            })?,
-                        ),
-                        (
-                            "dialect",
-                            native_field(runtime, "adapter")?
-                                .call_method0("sql_analysis_dialect")?,
-                        ),
-                    ],
-                )?),
+                &entries,
+                &ModelLookup::Native(scope_data(&scope)?),
+                &warehouse_field(warehouse, |warehouse| &warehouse.migration_fingerprints)?,
+                &native_field(runtime, "adapter")?.call_method0("sql_analysis_dialect")?,
             )?,
         )?;
     }
@@ -303,22 +283,16 @@ pub(crate) fn add_plan_warnings<'py>(
 
 /// The unselected models the selected scope reads, sorted.
 pub(crate) fn unselected_upstream_models(scopes: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
-    let py = scopes.py();
     let selected = class_field(scopes, |s: &PlannerScopeResolution| &s.selected_scope)?;
-    let selected_keys = native_field(&selected, "selected_keys")?;
-    let upstream_deps = native_field(&selected, "upstream_deps")?;
-    let model_type = enum_member(py, RecordId::CompiledResourceType, "MODEL")?;
+    let selected = crate::bindings::_helpers::planner_scope::retained::scope_data(&selected)?;
     let mut names: Vec<String> = Vec::new();
-    for key in selected_keys.try_iter()? {
-        let Some(deps) = upstream_deps.downcast::<PyDict>()?.get_item(key?)? else {
+    for (key, deps) in &selected.upstream {
+        if !selected.selected.contains(key) {
             continue;
-        };
-        for dep in deps.try_iter()? {
-            let dep = dep?;
-            if native_field(&dep, "resource_type")?.eq(&model_type)?
-                && !selected_keys.contains(&dep)?
-            {
-                names.push(native_field(&dep, "name")?.extract()?);
+        }
+        for dep in deps {
+            if dep.0 == MODEL && !selected.selected.contains(dep) {
+                names.push(dep.1.clone());
             }
         }
     }

@@ -213,6 +213,7 @@ pub(crate) fn expanded_authored_sql<'py>(
             hooks.environment.clone(),
             None,
             hooks.render_project_var.clone(),
+            Some(context.syntax.clone()),
         ),
         sql,
         file_path,
@@ -227,7 +228,7 @@ pub(crate) fn expanded_authored_sql<'py>(
     }
     let interpolated_sql: String = interpolated_sql.unwrap_or_else(|| sql.to_owned());
     let consumer: Bound<'py, PyAny> = native_field(declarations, "consumer")?;
-    let (references, stop) = declaration_scan(&interpolated_sql);
+    let (references, stop) = declaration_scan(&interpolated_sql, Some(context.syntax));
     let mut usages: Vec<Bound<'py, PyAny>> = Vec::new();
     let mut argument_references: Vec<ReferenceRow> = Vec::new();
     let mut expanded_sql: String = interpolated_sql.clone();
@@ -252,6 +253,7 @@ pub(crate) fn expanded_authored_sql<'py>(
                 loaded_macros: Some(context.classes.macros.loaded_macros.bind(py).as_any()),
                 origin: None,
                 scopes: Some(&context.classes.visibility),
+                syntax: Some(context.syntax),
             }),
         })?;
         expanded_sql = expanded.spliced.sql;

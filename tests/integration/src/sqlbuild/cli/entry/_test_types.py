@@ -135,3 +135,12 @@ class MachineOutputResetTestCase:
     failing_args: tuple[str, ...]
     failing_extra_toml: str
     expected_error_code: str
+
+
+@dataclass(frozen=True)
+class NativeCostTestCase:
+    """A persisted history request and its independently specified ordering."""
+
+    description: str
+    args: tuple[str, ...]
+    expected_run_ids: tuple[str, ...]

@@ -5,10 +5,15 @@ import shutil
 import signal
 import subprocess
 import sys
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import sqlbuild
 from sqlbuild._native import COMPILE_REUSE_DISABLE_ENV_VAR as REUSE_DISABLE_ENV_VAR
+from sqlbuild._native import CostRunRecord, ResourceCost, write_cost_run
+from sqlbuild.cost.models import RunCostSummary
+from sqlbuild.cost.types import CostStatus
 
 type LauncherRun = tuple[int, bytes, bytes]
 
@@ -354,3 +359,51 @@ def write_janitor_project(project_dir: Path, *, extra_toml: str) -> Path:
         "MODEL (description 'Orders.');\n\nSELECT 1 AS order_id\n", encoding="utf-8"
     )
     return project_dir
+
+
+def write_cost_project(project_dir: Path) -> Path:
+    """Persist exact, asymmetric metrics through the public API, with ties and missing metrics."""
+
+    project: Path = write_project(project_dir)
+    origin: datetime = datetime(2026, 8, 23, tzinfo=UTC)
+    for index, (name, usd, status) in enumerate(
+        (
+            ("negative", "-3", CostStatus.COMPLETE),
+            ("small", "2", CostStatus.COMPLETE),
+            ("large", "10.0000000000000000001", CostStatus.COMPLETE),
+            ("tie", "2.00", CostStatus.COMPLETE),
+            ("pending", "100", CostStatus.PENDING),
+        )
+    ):
+        completed: datetime = origin + timedelta(days=index)
+        resource: ResourceCost = ResourceCost(
+            resource_type="model",
+            resource_name="orders",
+            warehouse_name="warehouse",
+            warehouse_size="small",
+            warehouse_type="STANDARD",
+            cluster_number=1,
+            query_count=1,
+            attributed_seconds=Decimal(index + 1),
+            bytes_scanned=index + 1,
+            estimated_compute_credits=Decimal(usd),
+            estimated_usd=Decimal(usd),
+        )
+        record: CostRunRecord = CostRunRecord(
+            run_id=f"run-{name}",
+            adapter_name="duckdb",
+            target_name="dev",
+            build_status="success",
+            started_at=completed - timedelta(seconds=index + 1),
+            completed_at=completed,
+            cost=RunCostSummary(
+                status=status,
+                usd_per_credit=Decimal(1),
+                rate_source="default",
+                resources=(resource,),
+                estimated_compute_credits=Decimal(usd),
+                estimated_usd=Decimal(usd),
+            ),
+        )
+        _ = write_cost_run(project_dir=project, record=record)
+    return project

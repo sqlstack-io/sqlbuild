@@ -11,8 +11,8 @@ use sqlbuild_analysis::planner_identity::constants::{
 };
 use sqlbuild_analysis::planner_identity::main::expected_graph_identity_hashes::expected_graph_identity_hashes;
 use sqlbuild_analysis::planner_identity::main::graph_write_identity_hashes::graph_write_identity_hashes;
-use sqlbuild_analysis::planner_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_analysis::planner_identity::models::{GraphKey, IdentityGraph, IdentityNode};
+use sqlbuild_core::fingerprint_identity::main::model_local_identity_hash::model_local_identity_hash;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::boundary::python_calls::KeywordArguments;
@@ -24,6 +24,7 @@ use crate::bindings::_helpers::planner_identity::hashing::{graph_key, model_quer
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
+use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::construct::new_record_with;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -50,7 +51,9 @@ fn string_pairs(mapping: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
 }
 
 /// `{name: identity.version_hash}` of the discovered Python hooks.
-fn hook_version_hashes<'py>(hook_functions: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyDict>> {
+pub(crate) fn hook_version_hashes<'py>(
+    hook_functions: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = hook_functions.py();
     let hashes: Bound<'py, PyDict> = PyDict::new(py);
     let identities: Bound<'py, PyAny> =
@@ -150,18 +153,16 @@ pub(crate) fn direct_model_version_identities<'py>(
     }
     let model_metadata: Bound<'py, PyDict> = PyDict::new(py);
     let model_local: Bound<'py, PyDict> = PyDict::new(py);
-    let models_by_name: Bound<'py, PyAny> = native_field(scope, "models_by_name")?;
-    for key in native_field(scope, "execution_order")?.try_iter()? {
-        let key: Bound<'py, PyAny> = key?;
-        let order_key: GraphKey = graph_key(&key)?;
+    let scope = scope_data(scope)?;
+    for key in &scope.order {
+        let order_key = GraphKey::from(key);
         graph.execution_order.push(order_key.clone());
         if order_key.kind != MODEL_RESOURCE {
             continue;
         }
-        let model: Bound<'py, PyAny> = mapping_get(&models_by_name, &order_key.name)?;
-        if model.is_none() {
+        let Some(model) = scope.model(py, &order_key.name) else {
             continue;
-        }
+        };
         let name: String = model_reads::model_name(&model)?;
         let metadata_json: String = model_version_identity_metadata_json(
             &model,
@@ -229,21 +230,17 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
     let snapshot: Bound<'py, PyAny> = arguments.value("snapshot")?;
     let changes: Bound<'py, PyAny> = arguments.value("changes")?;
     let identities: Bound<'py, PyAny> = arguments.value("version_identities")?;
-    let selected_python: Bound<'py, PyAny> = native_field(&scope, "selected_keys")?;
-    let selected: HashSet<GraphKey> = graph_keys(&selected_python)?.into_iter().collect();
+    let scope = scope_data(&scope)?;
+    let selected: HashSet<GraphKey> = scope.selected.iter().map(GraphKey::from).collect();
     let function_hashes: Vec<(String, String)> =
         string_pairs(&native_field(&identities, "function_local_hashes")?)?;
     let mut graph = IdentityGraph::default();
     let mut base_hashes: Vec<(GraphKey, String)> = Vec::new();
     let mut function_deps: HashMap<GraphKey, Vec<GraphKey>> = HashMap::new();
-    for item in native_field(&scope, "upstream_deps")?
-        .call_method0("items")?
-        .try_iter()?
-    {
-        let (key, deps): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
-        let key: GraphKey = graph_key(&key)?;
+    for (key, deps) in &scope.upstream {
+        let key = GraphKey::from(key);
         if key.kind == UDF_RESOURCE || key.kind == TABLE_FN_RESOURCE {
-            function_deps.insert(key, graph_keys(&deps)?);
+            function_deps.insert(key, deps.iter().map(GraphKey::from).collect());
         }
     }
     for (name, function_hash) in &function_hashes {
@@ -282,11 +279,8 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
         base_hashes.push((seed_key, write_hash));
     }
     let local_hashes: Bound<'py, PyAny> = native_field(&identities, "model_local_hashes")?;
-    for model in native_field(&scope, "models_by_name")?
-        .call_method0("values")?
-        .try_iter()?
-    {
-        let model: Bound<'py, PyAny> = model?;
+    for model in scope.models.values() {
+        let model = model.bind(py);
         let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
         graph.nodes.insert(
             key_of(MODEL_RESOURCE, &name.extract::<String>()?),
@@ -311,7 +305,7 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
             base_hashes.push((key_of(MODEL_RESOURCE, &name), model_hash));
         }
     }
-    graph.execution_order = graph_keys(&native_field(&scope, "execution_order")?)?;
+    graph.execution_order = scope.order.iter().map(GraphKey::from).collect();
     let write_hashes: HashMap<GraphKey, String> =
         graph_write_identity_hashes(&graph, &selected, base_hashes)
             .into_iter()
@@ -322,17 +316,14 @@ pub(crate) fn with_honest_model_write_hashes<'py>(
             .downcast::<PyDict>()?
             .as_mapping(),
     )?;
-    let models_by_name: Bound<'py, PyAny> = native_field(&scope, "models_by_name")?;
-    for key in native_field(&scope, "execution_order")?.try_iter()? {
-        let key: Bound<'py, PyAny> = key?;
-        let order_key: GraphKey = graph_key(&key)?;
+    for key in &scope.order {
+        let order_key = GraphKey::from(key);
         if order_key.kind != MODEL_RESOURCE || !selected.contains(&order_key) {
             continue;
         }
-        let model: Bound<'py, PyAny> = mapping_get(&models_by_name, &order_key.name)?;
-        if model.is_none() {
+        let Some(model) = scope.model(py, &order_key.name) else {
             continue;
-        }
+        };
         let name: Bound<'py, PyAny> = model_reads::name_object(&model)?;
         if mapping_get(&local_hashes, &name)?.is_none() {
             continue;

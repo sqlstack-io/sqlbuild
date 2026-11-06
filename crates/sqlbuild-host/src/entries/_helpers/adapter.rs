@@ -224,4 +224,9 @@ pub(crate) const ENTRIES: &[HostEntry] = &[
         kind: HostKind::Function,
         edge: HostEdge::Adapter,
     },
+    HostEntry {
+        name: "relation_metadata_cache_scope",
+        kind: HostKind::Function,
+        edge: HostEdge::Adapter,
+    },
 ];

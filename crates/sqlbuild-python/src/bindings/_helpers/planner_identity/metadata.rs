@@ -11,8 +11,8 @@ use sqlbuild_analysis::planner_identity::constants::{
     VERSION_IDENTITY_CONFIG_KEYS,
 };
 use sqlbuild_analysis::planner_identity::main::function_fingerprint_sql::function_fingerprint_sql;
-use sqlbuild_analysis::planner_identity::main::stable_identity_hash::stable_identity_hash;
 use sqlbuild_analysis::planner_identity::models::FunctionFingerprintFields;
+use sqlbuild_core::fingerprint_identity::main::stable_identity_hash::stable_identity_hash;
 
 use crate::bindings::_helpers::boundary::python_calls::{imported, keywords, within};
 use crate::bindings::_helpers::compiled_views::function_reads;

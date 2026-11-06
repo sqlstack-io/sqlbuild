@@ -1,15 +1,26 @@
 from __future__ import annotations
 
 import json
+import re
+import signal
+import sqlite3
 import subprocess
+import time
+from contextlib import closing
+from itertools import takewhile
 from pathlib import Path
 from textwrap import dedent
 from typing import Any
 
+import duckdb
+
 from tests.e2e.src.sqlbuild.cli.commands.main.build._test_types import (
+    ChangedBuildStep,
+    ChangedWarehouse,
     DeferCloneBuildE2ETestCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
+    REPO_ROOT,
     execute_duckdb,
     prepare_inline_project,
     query_duckdb,
@@ -557,7 +568,8 @@ def prepare_attached_audit_gate_project(
         "audits/generic/code_check.sql": _GATE_AUDIT_TEMPLATE.format(read=read),
         "models/valid_codes.sql": (
             "MODEL (description 'Test model valid_codes.', "
-            "materialized table);\n\nSELECT code FROM (VALUES ('A'), ('B')) AS valid(code)\n"
+            "materialized table);\n\n"
+            "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
         ),
     }
     files.update(
@@ -607,7 +619,7 @@ def prepare_nested_source_gate_project(*, tmp_path: Path, raw_code: str) -> Path
             ),
             "models/valid_codes.sql": (
                 "MODEL (description 'Test model valid_codes.', materialized table);\n\n"
-                "SELECT code FROM (VALUES ('A'), ('B')) AS valid(code)\n"
+                "WITH valid(code) AS (VALUES ('A'), ('B'))\nSELECT code FROM valid\n"
             ),
         },
     )
@@ -1233,3 +1245,199 @@ def target_concurrency_microbatch_files() -> dict[str, str]:
             "WHERE event_time >= __cursor_start() AND event_time < __cursor_end()\n"
         ),
     }
+
+
+CHANGED_BUILDS_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds"
+CHANGED_BUILDS_UDF_FIXTURE: Path = REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_udf"
+CHANGED_BUILDS_UNQUALIFIED_FIXTURE: Path = (
+    REPO_ROOT / "benchmarks/duckshop/edge_cases/changed_builds_unqualified"
+)
+CHANGED_ORDER_SKEW_SECONDS: float = 5.2
+_CHANGED_PROGRESS_PATTERN: re.Pattern[str] = re.compile(
+    r"^\s+\d+/\d+\s+\S+\s+(\S+)\s+OK\b", re.MULTILINE
+)
+_CHANGED_SLOW_MODEL: str = (
+    'MODEL (description "Order totals over a long synthetic scan.", materialized table);\n'
+    "WITH {scan}\n"
+    "SELECT o.customer_id, count(*) AS weight\n"
+    'FROM __ref("stg_orders") AS o\n'
+    "CROSS JOIN scan\n"
+    "GROUP BY o.customer_id\n"
+)
+
+
+def _duckdb_rows(path: Path, sql: str) -> list[tuple[object, ...]]:
+    with duckdb.connect(str(path)) as connection:
+        return connection.execute(sql).fetchall()
+
+
+def _sqlite_rows(path: Path, sql: str) -> list[tuple[object, ...]]:
+    with closing(sqlite3.connect(path)) as connection, connection:
+        return connection.execute(sql).fetchall()
+
+
+DUCKDB_CHANGED: ChangedWarehouse = ChangedWarehouse(
+    name="duckdb",
+    project_toml=(
+        'name = "changed_builds"\nadapter = "duckdb"\n\n[connection]\ndatabase = "shop.duckdb"\n'
+    ),
+    warehouse_file="shop.duckdb",
+    raw_tables_sql=(
+        "CREATE SCHEMA raw",
+        "CREATE TABLE raw.orders AS SELECT 1 AS order_id, 1 AS customer_id, 1 AS load_id",
+        "CREATE TABLE raw.customers AS SELECT 1 AS customer_id, 1 AS load_id",
+    ),
+    consumption_table="main._sqlbuild_consumption",
+    orders_table="raw.orders",
+    customers_table="raw.customers",
+    slow_scan_cte="scan AS (SELECT r.i FROM range(4000000000) AS r(i))",
+    execute=_duckdb_rows,
+)
+SQLITE_CHANGED: ChangedWarehouse = ChangedWarehouse(
+    name="sqlite",
+    project_toml=(
+        'name = "changed_builds"\nadapter = "sqlite"\n\n'
+        '[connection]\npath = "shop.sqlite"\n\n[targets.dev]\nschema = "main"\n'
+    ),
+    warehouse_file="shop.sqlite",
+    raw_tables_sql=(
+        "CREATE TABLE raw__orders (order_id INTEGER, customer_id INTEGER, load_id INTEGER)",
+        "INSERT INTO raw__orders VALUES (1, 1, 1)",
+        "CREATE TABLE raw__customers (customer_id INTEGER, load_id INTEGER)",
+        "INSERT INTO raw__customers VALUES (1, 1)",
+    ),
+    consumption_table="_sqlbuild_consumption",
+    orders_table="raw__orders",
+    customers_table="raw__customers",
+    slow_scan_cte=(
+        "RECURSIVE scan(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM scan WHERE i < 30000000)"
+    ),
+    execute=_sqlite_rows,
+)
+
+
+def prepare_changed_project(*, tmp_path: Path, warehouse: ChangedWarehouse) -> Path:
+    """The DuckShop changed-builds edge case on `warehouse`, with its raw tables loaded."""
+
+    files: dict[str, str] = {
+        str(path.relative_to(CHANGED_BUILDS_FIXTURE)): path.read_text(encoding="utf-8")
+        for path in sorted(CHANGED_BUILDS_FIXTURE.glob("*/*"))
+    }
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="changed_builds",
+        repo_files=files | {"sqlbuild_project.toml": warehouse.project_toml},
+    )
+    for sql in warehouse.raw_tables_sql:
+        warehouse.execute(project_dir / warehouse.warehouse_file, sql)
+    return project_dir
+
+
+def add_changed_overlay(project_dir: Path, fixture: Path) -> None:
+    """Overlay one of the DuckShop changed-builds cases on the base case."""
+
+    for path in fixture.rglob("*.sql"):
+        destination: Path = project_dir / path.relative_to(fixture)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def run_changed_build(project_dir: Path, arguments: tuple[str, ...]) -> frozenset[str]:
+    """Wait out the order skew, build successfully, and return the models and seeds written."""
+
+    time.sleep(CHANGED_ORDER_SKEW_SECONDS)
+    result: subprocess.CompletedProcess[str] = run_sqb(
+        command=("--no-color", "build", *arguments), project_dir=project_dir
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return frozenset(_CHANGED_PROGRESS_PATTERN.findall(result.stdout))
+
+
+def apply_changed_step(
+    project_dir: Path, warehouse: ChangedWarehouse, step: ChangedBuildStep
+) -> None:
+    """Apply one step's warehouse statements and project edits."""
+
+    for sql in step.warehouse_sql:
+        warehouse.execute(project_dir / warehouse.warehouse_file, sql)
+    for relative_path, contents in step.project_files.items():
+        (project_dir / relative_path).write_text(contents, encoding="utf-8")
+
+
+def kill_changed_build_mid_write(
+    project_dir: Path, warehouse: ChangedWarehouse
+) -> tuple[frozenset[str], list[tuple[object, ...]]]:
+    """Kill a build while a slow model writes; return what it finished and the slow model's rows."""
+
+    slow_model: Path = project_dir / "models/order_weights.sql"
+    slow_model.write_text(
+        _CHANGED_SLOW_MODEL.format(scan=warehouse.slow_scan_cte), encoding="utf-8"
+    )
+    time.sleep(CHANGED_ORDER_SKEW_SECONDS)
+    build: subprocess.Popen[str] = subprocess.Popen(
+        (
+            str(REPO_ROOT / ".venv/bin/sqb"),
+            "--no-color",
+            "--project-dir",
+            str(project_dir),
+            "build",
+            "--concurrency",
+            "1",
+        ),
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    assert build.stdout is not None
+    output: str = "".join(takewhile(lambda line: "order_weights START" not in line, build.stdout))
+    time.sleep(0.5)
+    build.send_signal(signal.SIGKILL)
+    build.wait(timeout=30)
+    build.stdout.close()
+    slow_model.unlink()
+    rows: list[tuple[object, ...]] = warehouse.execute(
+        project_dir / warehouse.warehouse_file,
+        f"SELECT node_name, phase FROM {warehouse.consumption_table} "
+        "WHERE node_name = 'order_weights'",
+    )
+    return frozenset(_CHANGED_PROGRESS_PATTERN.findall(output)), rows
+
+
+def changed_build_steps(warehouse: ChangedWarehouse) -> tuple[ChangedBuildStep, ...]:
+    """Mutations and builds whose `--changed` run sets follow from consumed inputs alone."""
+
+    return (
+        ChangedBuildStep("first --changed build", (), {}, ("--changed",)),
+        ChangedBuildStep("nothing changed", (), {}, ("--changed",)),
+        ChangedBuildStep(
+            "a new order",
+            (f"INSERT INTO {warehouse.orders_table} VALUES (2, 1, 2)",),
+            {},
+            ("--changed",),
+        ),
+        ChangedBuildStep(
+            "a definition change",
+            (),
+            {
+                "models/stg_customers.sql": (
+                    'MODEL (description "Staged customers.", materialized table);\n'
+                    'SELECT customer_id FROM __source("raw_customers") WHERE customer_id > 0\n'
+                )
+            },
+            ("--changed",),
+        ),
+        ChangedBuildStep(
+            "a stale unselected upstream",
+            (f"INSERT INTO {warehouse.customers_table} VALUES (2, 2)",),
+            {},
+            ("--changed", "--select", "customer_orders"),
+        ),
+        ChangedBuildStep(
+            "the upstream is still stale", (), {}, ("--changed", "--select", "customer_orders")
+        ),
+        ChangedBuildStep("building the whole selection", (), {}, ("--changed",)),
+        ChangedBuildStep("a plain build", (), {}, ()),
+        ChangedBuildStep("after the plain build", (), {}, ("--changed",)),
+        ChangedBuildStep("full refresh", (), {}, ("--changed", "--full-refresh")),
+    )

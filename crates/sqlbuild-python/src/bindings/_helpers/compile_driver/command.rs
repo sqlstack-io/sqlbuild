@@ -5,7 +5,7 @@ use pyo3::sync::PyOnceLock;
 use pyo3::types::{
     PyBool, PyDict, PyDictMethods, PyList, PyListMethods, PyMapping, PyString, PyTuple,
 };
-use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
+use pyo3::{IntoPyObject, IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_host::compile_context::main::collect_compile_timings::collect_compile_timings;
 use sqlbuild_host::compile_context::main::timing_milliseconds::timing_milliseconds;
 use sqlbuild_host::compile_context::types::CompileTimingsHandle;
@@ -43,6 +43,8 @@ use crate::bindings::_helpers::records::fields::replaced;
 use crate::bindings::_helpers::records::ids::{NativeAttr, RecordId};
 use crate::bindings::_helpers::records::registry;
 use crate::bindings::_helpers::rules::results::format_skipped_type_proof_rules;
+use crate::bindings::_helpers::rules::rules_config::rules_config_of;
+use sqlbuild_rules::rule_results::main::default_rules_notice::default_rules_notice;
 
 const BYPASS_OUTCOME: &str = "bypass";
 
@@ -588,6 +590,17 @@ fn record_output<'py>(
             PyBool::new(py, use_color).to_owned().into_any(),
         ));
         arguments.push(("sql_validation_enabled", validation_enabled));
+        let project_dir: PathBuf = native_field(request, "project_dir")?.extract()?;
+        let select_omitted: bool =
+            matches!(rules_config_of(&project_dir)?, Ok(config) if config.select.is_none());
+        let codes: Vec<String> = diagnostics
+            .try_iter()?
+            .map(|diagnostic| native_field(&diagnostic?, "code")?.extract::<Option<String>>())
+            .filter_map(Result::transpose)
+            .collect::<PyResult<_>>()?;
+        let notice: Option<String> =
+            default_rules_notice(select_omitted, codes.iter().map(String::as_str));
+        arguments.push(("default_rules_notice", notice.into_bound_py_any(py)?));
         format_compile_text(py, Some(keywords(py, &arguments)?))?
     };
     output.call_method1("record_stdout", (rendered,))?;

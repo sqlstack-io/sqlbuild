@@ -271,3 +271,164 @@ sources:
         nullable: false
         audits:
           - not_null
+  - name: edge__basket_lines
+    description: >-
+      Append-only basket lines with a free-form tag per line, collected into arrays whose element
+      order Snowflake does not define
+    managed: true
+    contract: enforced
+    columns:
+      - name: line_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: basket_id
+        type: VARCHAR
+      - name: line_no
+        type: NUMBER(38,0)
+      - name: sku
+        type: VARCHAR
+      - name: tag
+        type: VARCHAR
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null
+  - name: edge__date_texts
+    description: >-
+      Dates, zoned times and clock times as partners write them: unpadded fields, two-digit years,
+      ISO separators, offsets in several spellings, and times with sub-millisecond digits
+    managed: true
+    contract: enforced
+    columns:
+      - name: text_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: date_text
+        type: VARCHAR
+      - name: zoned_text
+        type: VARCHAR
+      - name: wall_clock
+        type: TIMESTAMP_NTZ
+      - name: wall_clock_text
+        type: VARCHAR
+      - name: local_time
+        type: TIME
+      - name: fine_time
+        type: TIME
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null
+  - name: edge__amount_checks
+    description: >-
+      Reconciliation checks keyed by numbers of two widths and by text, with amounts at several
+      scales, FLOAT ratios and raw JSON number text
+    managed: true
+    contract: enforced
+    columns:
+      - name: check_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: group_code
+        type: VARCHAR
+      - name: narrow_key
+        type: NUMBER(18,0)
+      - name: wide_key
+        type: NUMBER(38,0)
+      - name: key_text
+        type: VARCHAR
+      - name: amount
+        type: NUMBER(18,2)
+      - name: fine_amount
+        type: NUMBER(20,15)
+      - name: ratio
+        type: FLOAT
+      - name: json_text
+        type: VARCHAR
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null
+  - name: edge__variant_values
+    description: >-
+      Partner attribute values held as VARIANT, mixing numbers, strings, booleans, JSON nulls,
+      objects with reordered keys and wide integers, with the raw text beside each
+    managed: true
+    contract: enforced
+    columns:
+      - name: value_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: group_code
+        type: VARCHAR
+      - name: sort_key
+        type: NUMBER(38,0)
+      - name: attribute_value
+        type: VARIANT
+      - name: value_text
+        type: VARCHAR
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null
+  - name: edge__category_links
+    description: >-
+      Catalogue category links for walking the category tree, with the shelf depth each category
+      is displayed at
+    managed: true
+    contract: enforced
+    columns:
+      - name: category_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: parent_id
+        type: VARCHAR
+      - name: category_name
+        type: VARCHAR
+      - name: shelf_depth
+        type: NUMBER(38,0)
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null
+  - name: edge__supplier_notes
+    description: >-
+      Supplier notes whose columns are declared but whose contract is not enforced, so readers see
+      an open source
+    managed: true
+    columns:
+      - name: note_id
+        type: VARCHAR
+        nullable: false
+        audits:
+          - not_null
+          - unique
+      - name: supplier_code
+        type: VARCHAR
+      - name: note_text
+        type: VARCHAR
+      - name: _loaded_at
+        type: TIMESTAMP_NTZ
+        nullable: false
+        audits:
+          - not_null

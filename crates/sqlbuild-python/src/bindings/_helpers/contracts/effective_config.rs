@@ -287,7 +287,25 @@ pub(crate) fn effective_config_connection<'py>(
     local_config: &Bound<'py, PyAny>,
     target_config: &Bound<'py, PyAny>,
 ) -> PyResult<Outcome<'py, Bound<'py, PyDict>>> {
-    let target: Option<(Option<Key<'py>>, Pairs<'py>)> = if target_config.is_none() {
+    effective_connection_fields(py, (project_config, local_config), target_config, false)
+}
+
+/// Catalog selection uses the same named-layer resolver, with no writer layers.
+pub(crate) fn effective_connection_fields<'py>(
+    py: Python<'py>,
+    (project_config, local_config): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    target_config: &Bound<'py, PyAny>,
+    catalog: bool,
+) -> PyResult<Outcome<'py, Bound<'py, PyDict>>> {
+    let catalog_name = if catalog && !target_config.is_none() {
+        optional_key(&native_field(target_config, "catalog_connection")?)?
+    } else {
+        None
+    };
+    let independent = catalog_name.is_some();
+    let target: Option<(Option<Key<'py>>, Pairs<'py>)> = if independent {
+        Some((catalog_name, Vec::new()))
+    } else if target_config.is_none() {
         None
     } else {
         Some((
@@ -296,15 +314,33 @@ pub(crate) fn effective_config_connection<'py>(
         ))
     };
     let layers: ConnectionLayers<Key<'py>, Value<'py>> = ConnectionLayers {
-        project: pairs(&native_field(project_config, "connection")?)?,
+        project: if independent {
+            Vec::new()
+        } else {
+            pairs(&native_field(project_config, "connection")?)?
+        },
         target,
         project_named: named(&native_field(project_config, "connections")?)?,
         local_named: named(&native_field(local_config, "connections")?)?,
-        local: pairs(&native_field(local_config, "connection")?)?,
+        local: if independent {
+            Vec::new()
+        } else {
+            pairs(&native_field(local_config, "connection")?)?
+        },
     };
     Ok(match effective_connection(layers) {
         Ok(connection) => (Some(dictionary(py, connection)?), None),
-        Err(error) => (None, Some(message(py, &error)?)),
+        Err(error) => {
+            let message = message(py, &error)?;
+            (
+                None,
+                Some(if independent {
+                    PyString::new(py, &format!("catalog_connection: {message}"))
+                } else {
+                    message
+                }),
+            )
+        }
     })
 }
 
