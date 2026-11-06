@@ -26,7 +26,6 @@ export const PERMISSIONS: Record<Capability, PermissionInfo> = {
 	},
 	'trigger.toggle': { label: 'Pause and resume schedules and sensors', description: 'Stop or restart automatic runs.', risk: 'operate' },
 	'sensor.reset_cursor': { label: 'Reset where a sensor is up to', description: 'Move a sensor’s position so it looks at events again.', risk: 'operate' },
-	'warehouse.sync': { label: 'Refresh the warehouse sync', description: 'Read SQLBuild’s own tables back from the warehouse now.', risk: 'operate' },
 	'run.adhoc': { label: 'Build any selection of nodes', description: 'Start an ad-hoc run of nodes outside a declared job, writing to the warehouse.', risk: 'changes_data' },
 	'connection.test': { label: 'Test warehouse connections', description: 'Run the connection check from a location.', risk: 'operate' },
 	'plan.preview': { label: 'Preview build plans', description: 'See what a run would build without running it.', risk: 'read' },

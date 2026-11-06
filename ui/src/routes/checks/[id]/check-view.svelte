@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LockIcon from '@lucide/svelte/icons/lock';
-	import type { CheckEvidence } from '$lib/api';
+	import type { CheckEvidence, CheckSql } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import CodePreview from '$lib/components/code/code-preview.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
@@ -40,6 +40,24 @@
 			evidenceError = errorMessage(error);
 		} finally {
 			evidenceBusy = null;
+		}
+	}
+
+	let sql = $state<CheckSql | null>(null);
+	let sqlBusy = $state(false);
+	let sqlError = $state<string | null>(null);
+
+	async function showSql() {
+		const scope = app.scope;
+		if (!scope) return;
+		sqlBusy = true;
+		sqlError = null;
+		try {
+			sql = await app.client.getCheckSql(scope, id);
+		} catch (error) {
+			sqlError = errorMessage(error);
+		} finally {
+			sqlBusy = false;
 		}
 	}
 
@@ -84,7 +102,6 @@
 									<td><span title={formatStamp(e.evaluatedAt)}>{formatAgo(e.evaluatedAt, app.now)}</span></td>
 									<td>
 										<StatusLabel tone={checkOutcomeTone[e.outcome]} label={checkOutcomeLabel[e.outcome]} />
-										{#if e.executionError}<div class="cell-desc err">{e.executionError}</div>{/if}
 									</td>
 									<td class="num">{checkValue(e, c.evaluationMode)}</td>
 									<td>
@@ -110,7 +127,7 @@
 							<thead><tr>{#each evidence.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
 							<tbody>
 								{#each evidence.rows as row, i (i)}
-									<tr>{#each row as v, j (j)}<td class="mono">{v === null ? 'NULL' : v}</td>{/each}</tr>
+									<tr>{#each row as v, j (j)}<td class="mono">{v === null ? 'NULL' : String(v)}</td>{/each}</tr>
 								{:else}
 									<tr><td colspan={evidence.columns.length || 1} class="faint">No rows were stored.</td></tr>
 								{/each}
@@ -120,11 +137,20 @@
 					</Panel>
 				{/if}
 
-				<Panel title="SQL that ran" note="The latest time">
-					{#if c.sql}
-						<CodePreview file="{c.id}.sql" code={c.sql} maxLines={30} />
-					{:else}
+				<Panel title="SQL that ran" note="The latest time · reading it is recorded in the audit log">
+					{#if sql}
+						{#if sql.executionError}<div class="msg err">{sql.executionError}</div>{/if}
+						{#if sql.evidenceError}<div class="msg err">Evidence couldn't be collected: {sql.evidenceError}</div>{/if}
+						{#each [sql.executedSql, sql.measurementSql, sql.evidenceSql].filter((text, i, all) => text && all.indexOf(text) === i) as text, i (i)}
+							<CodePreview file="{c.id}.sql" code={text ?? ''} maxLines={30} />
+						{:else}
+							<p class="faint">No SQL was stored with the latest result.</p>
+						{/each}
+					{:else if !app.can('view.sql')}
 						<p class="faint locked"><LockIcon size={13} /> You don't have permission to see SQL (view.sql)</p>
+					{:else}
+						<GatedButton requires="view.sql" size="xs" busy={sqlBusy} onclick={showSql}>Show SQL and errors</GatedButton>
+						{#if sqlError}<div class="msg err">{sqlError}</div>{/if}
 					{/if}
 				</Panel>
 			</div>

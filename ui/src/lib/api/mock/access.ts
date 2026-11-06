@@ -119,7 +119,6 @@ const PLAIN: Record<Capability, string> = {
 	'run.rewrite_history': 'full refresh or reprocess past data',
 	'trigger.toggle': 'pause and resume schedules and sensors',
 	'sensor.reset_cursor': 'reset where a sensor is up to',
-	'warehouse.sync': 'refresh the warehouse sync',
 	'run.adhoc': 'build any selection of nodes',
 	'connection.test': 'test warehouse connections',
 	'plan.preview': 'preview build plans',

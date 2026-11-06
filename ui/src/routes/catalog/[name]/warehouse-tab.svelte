@@ -24,6 +24,8 @@
 	const mismatched = $derived(warehouse.columns.filter((c) => c.state !== 'match').length);
 	const batchTone = { complete: 'var(--sb-success)', gap: 'var(--sb-error)', replay_required: 'var(--sb-warning)' } as const;
 	const batchLabel = { complete: 'complete', gap: 'gap', replay_required: 'replay required' } as const;
+	/** Timestamp bounds as local stamps; integer bounds as written. */
+	const bound = (text: string | null) => (microbatch?.cursorType === 'timestamp' ? formatStamp(text) : (text ?? '—'));
 </script>
 
 <div class="wrap">
@@ -70,17 +72,17 @@
 	</Panel>
 
 	{#if microbatch}
-		<Panel title="Microbatch coverage" note="{microbatch.cursorColumn} · {microbatch.batchSize} batches · complete up to {formatStamp(microbatch.contiguousFrontier)}">
+		<Panel title="Microbatch coverage" note="Tracked only for concurrent microbatch models · {microbatch.cursorColumn} · {microbatch.batchSize} batches · complete up to {bound(microbatch.contiguousFrontier)}">
 			<div class="batches">
 				{#each microbatch.batches as b (b.start)}
-					<a class="batch" href={b.runId ? `/runs/${b.runId}` : undefined} style:background={batchTone[b.state]} title="{formatStamp(b.start)} – {formatStamp(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
+					<a class="batch" href={b.runId ? `/runs/${b.runId}` : undefined} style:background={batchTone[b.state]} title="{bound(b.start)} – {bound(b.end)} · {batchLabel[b.state]}{b.runId ? ` · ${b.runId}` : ''}"><span class="sr-only">{batchLabel[b.state]}</span></a>
 				{/each}
 			</div>
 			<div class="legend">
 				<span><i style:background={batchTone.complete}></i>complete</span>
-				<span><i style:background={batchTone.gap}></i>{microbatch.knownGaps} known {microbatch.knownGaps === 1 ? 'gap' : 'gaps'}</span>
+				<span title="Holes between completed partitions"><i style:background={batchTone.gap}></i>{microbatch.knownGaps} known {microbatch.knownGaps === 1 ? 'gap' : 'gaps'}</span>
 				<span><i style:background={batchTone.replay_required}></i>replay required</span>
-				<span class="muted">Tracked since {formatStamp(microbatch.earliest)}</span>
+				<span class="muted">{microbatch.batchesTruncated ? 'Newest batches shown · ' : ''}tracked since {bound(microbatch.earliest)}</span>
 			</div>
 		</Panel>
 	{/if}

@@ -32,7 +32,7 @@
 
 	const q = $derived(query.trim().toLowerCase());
 	const shownMigrations = $derived(
-		migrations.filter((m) => !q || `${m.originModel} ${m.destinationModel} ${formatRelation(m.origin)} ${formatRelation(m.destination)}`.toLowerCase().includes(q))
+		migrations.filter((m) => !q || `${m.originModel ?? ''} ${m.destinationModel} ${formatRelation(m.origin)} ${formatRelation(m.destination)}`.toLowerCase().includes(q))
 	);
 	const shownViews = $derived(
 		views.filter((v) => !q || `${v.destinationModel} ${formatRelation(v.old)} ${formatRelation(v.new)}`.toLowerCase().includes(q))
@@ -109,7 +109,7 @@
 							<div class="cell-desc" title={m.discovery === 'automatic' ? undefined : 'Declared with migrate_from'}>{m.discovery === 'automatic' ? 'Spotted automatically' : 'Set in the code'}</div>
 						</td>
 						<td>
-							<span class="model">{m.originModel}</span>
+							<span class="model">{m.originModel ?? formatRelation(m.origin)}</span>
 							<div class="cell-desc"><code>{formatRelation(m.origin)}</code></div>
 						</td>
 						<td>

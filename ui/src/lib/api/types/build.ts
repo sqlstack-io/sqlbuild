@@ -123,16 +123,25 @@ export type WarehouseObject = {
 
 export type MicrobatchState = 'complete' | 'gap' | 'replay_required';
 
-/** Projection of `_sqlbuild_microbatches` for a microbatch model. */
+/**
+ * Projection of `_sqlbuild_microbatches` for a model's current relation. Coverage is
+ * tracked only for concurrent microbatch models; other models have none.
+ */
 export type MicrobatchCoverage = {
 	cursorColumn: string;
+	/** Bounds are timestamp text for `timestamp` cursors and integer text for `integer` cursors. */
+	cursorType: 'timestamp' | 'integer';
 	batchSize: string;
-	earliest: Iso;
-	/** End of the contiguous completed range. */
-	contiguousFrontier: Iso;
+	/** Start of the earliest completed partition. */
+	earliest: string;
+	/** End of the completed range that starts at `earliest` without a hole. */
+	contiguousFrontier: string | null;
+	/** Holes between completed partitions. */
 	knownGaps: number;
-	/** Recent batches, oldest first. */
-	batches: { start: Iso; end: Iso; state: MicrobatchState; runId: string | null }[];
+	/** The newest batches, oldest first. */
+	batches: { start: string; end: string; state: MicrobatchState; runId: string | null }[];
+	/** Older batches were left out of `batches`. */
+	batchesTruncated: boolean;
 };
 
 /** Renames and moves recorded in `_sqlbuild_migrations`, with any old-name views. */
@@ -205,7 +214,6 @@ export type CheckEvaluation = {
 	outcome: CheckOutcome;
 	violationCount: number | null;
 	measuredValue: number | null;
-	executionError: string | null;
 	evidenceCount: number | null;
 	evidenceTruncated: boolean;
 };
@@ -232,15 +240,24 @@ export type Check = {
 
 export type CheckDetail = Check & {
 	history: CheckEvaluation[];
-	/** Executed SQL of the latest evaluation; null without `view.sql`. */
-	sql: string | null;
+};
+
+/** The latest evaluation's SQL and error texts, which quote SQL. Reading them requires `view.sql` and is audited. */
+export type CheckSql = {
+	evaluationId: string;
+	executedSql: string | null;
+	measurementSql: string | null;
+	evidenceSql: string | null;
+	executionError: string | null;
+	evidenceError: string | null;
 };
 
 /** Sample rows stored with a result. Reading them requires `view.evidence` and is audited. */
 export type CheckEvidence = {
 	evaluationId: string;
+	/** Every row key, in sorted order; a row without a key holds null there. */
 	columns: string[];
-	rows: (string | number | null)[][];
+	rows: (string | number | boolean | null)[][];
 	truncated: boolean;
 };
 

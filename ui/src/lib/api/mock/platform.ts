@@ -138,7 +138,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	const custom = (role: Pick<RoleDefinition, 'name' | 'source' | 'definedIn' | 'description' | 'extends' | 'grants' | 'pendingApprovalId'>): RoleDefinition => ({ ...role, holders: 0, recentlyMatched: 0 });
 	const roles: RoleDefinition[] = [
 		builtIn('viewer', 'See everything except SQL and sample rows.'),
-		builtIn('operator', 'Run, cancel and rerun jobs; pause triggers; refresh the warehouse sync.'),
+		builtIn('operator', 'Run, cancel and rerun jobs; pause triggers.'),
 		builtIn('developer', 'Operator, plus ad-hoc runs, full refreshes, plan previews, connection tests and sample rows.'),
 		builtIn('admin', 'Everything, including people, roles, tokens, locations and the audit log.'),
 		custom({
@@ -305,7 +305,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 	};
 	const shopProd = { locationId: LOCATION_SHOP };
 	const auditEntries: AuditEntry[] = [
-		entry(2, { actor: DEMO_USER, action: 'warehouse.sync', outcome: 'allowed', scope: { ...shopProd, subject: null }, grantingRole: role, evidenceRead: false, summary: 'Requested a warehouse sync (started)', before: null, after: null }),
+		entry(2, { actor: DEMO_USER, action: 'view.sql', outcome: 'allowed', scope: { ...shopProd, subject: 'chk-fo-unique' }, grantingRole: role, evidenceRead: false, summary: 'Read the SQL of unique(order_id)', before: null, after: null }),
 		entry(18, { actor: SAM, action: 'view.evidence', outcome: 'allowed', scope: { ...shopProd, subject: 'fact_orders' }, grantingRole: 'finance_operator', evidenceRead: true, summary: 'Read sample rows of fact_orders', before: null, after: null, ip: '10.0.7.33' }),
 		entry(26, { actor: JORDAN, action: 'job.run', outcome: 'denied', decisionId: 'dec-4k7q2m', scope: { ...shopProd, subject: 'daily_revenue' }, grantingRole: null, evidenceRead: false, summary: 'Denied: reporting_operator runs jobs on group:reporting only', before: null, after: null, ip: '10.0.9.4' }),
 		entry(42, { actor: CI_ACCOUNT, action: 'job.run', outcome: 'allowed', scope: { ...shopProd, subject: 'checks_only' }, grantingRole: 'operator', evidenceRead: false, summary: 'Launched checks_only', before: null, after: 'run-c40e queued', ip: '10.0.2.8' }),
@@ -515,7 +515,7 @@ function createPlatformFixtures(now: number, role: BuiltInRole) {
 		{ eventId: 'mig-4', targetName: 'prod', originModel: 'activity_hourly', origin: relation('ANALYTICS', 'ACTIVITY_HOURLY'), destinationModel: 'hourly_activity_ctx', destination: relation('ANALYTICS', 'HOURLY_ACTIVITY_CTX'), discovery: 'manual', decision: 'redo', runId: 'run-e3f8', createdAt: ago(days(2)) },
 		{ eventId: 'mig-3', targetName: 'prod', originModel: 'customer_segments', origin: relation('ANALYTICS', 'CUSTOMER_SEGMENTS'), destinationModel: 'customer_segments', destination: relation('MARTS', 'CUSTOMER_SEGMENTS'), discovery: 'manual', decision: 'migrate', runId: 'run-2b70', createdAt: ago(days(4)) },
 		{ eventId: 'mig-2', targetName: 'prod', originModel: 'revenue_by_day', origin: relation('ANALYTICS', 'REVENUE_BY_DAY'), destinationModel: 'daily_revenue', destination: relation('ANALYTICS', 'DAILY_REVENUE'), discovery: 'manual', decision: 'migrate', runId: 'run-91cd', createdAt: ago(days(9)) },
-		{ eventId: 'mig-1', targetName: 'prod', originModel: 'stg_payment', origin: relation('STAGING', 'STG_PAYMENT'), destinationModel: 'stg_payments', destination: relation('STAGING', 'STG_PAYMENTS'), discovery: 'automatic', decision: 'renamed', runId: 'run-77b3', createdAt: ago(days(20)) },
+		{ eventId: 'mig-1', targetName: 'prod', originModel: null, origin: relation('STAGING', 'STG_PAYMENT'), destinationModel: 'stg_payments', destination: relation('STAGING', 'STG_PAYMENTS'), discovery: 'automatic', decision: 'renamed', runId: 'run-77b3', createdAt: ago(days(20)) },
 		{ eventId: 'mig-0', targetName: 'prod', originModel: 'orders_v1', origin: relation('ANALYTICS', 'ORDERS_V1'), destinationModel: 'fact_orders', destination: relation('ANALYTICS', 'FACT_ORDERS'), discovery: 'manual', decision: 'migrate', runId: 'run-c40e', createdAt: ago(days(41)) }
 	];
 	const step = (eventType: OldNameView['steps'][number]['eventType'], minutesAgo: number, runId: string) => ({ eventType, at: ago(minutesAgo), runId });
@@ -638,6 +638,11 @@ export class MockPlatformApi implements PlatformApi {
 	recordEvidenceRead(scope: Scope, subject: string, summary: string): void {
 		this.#audit('view.evidence', { ...scope, subject }, summary);
 		this.#data.auditEntries[this.#data.auditEntries.length - 1].evidenceRead = true;
+	}
+
+	/** Records an audited read of a check's SQL (`view.sql`). */
+	recordSqlRead(scope: Scope, subject: string, summary: string): void {
+		this.#audit('view.sql', { ...scope, subject }, summary);
 	}
 
 	pendingApprovalCount(): number {

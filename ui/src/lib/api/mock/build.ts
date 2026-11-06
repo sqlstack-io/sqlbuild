@@ -15,6 +15,7 @@ import type {
 	CheckDetail,
 	CheckEvaluation,
 	CheckEvidence,
+	CheckSql,
 	CheckOutcome,
 	ColumnLineage,
 	CostChange,
@@ -133,7 +134,7 @@ export class MockBuild {
 			warehouse: this.#warehouse(state),
 			microbatch: this.#microbatch(state),
 			history: {
-				formerNames: [...new Set(migrations.filter((m) => m.originModel !== key).map((m) => m.originModel))],
+				formerNames: [...new Set(migrations.map((m) => m.originModel ?? m.origin.name.toLowerCase()).filter((name) => name !== key))],
 				migrations,
 				oldNameViews: maintenance.oldNameViews.filter((v) => v.destinationModel === key)
 			}
@@ -174,9 +175,27 @@ export class MockBuild {
 		if (!spec) return this.#ctx.reply(null);
 		const states = this.#states(scope);
 		const history = this.#evaluations(spec, states, 40);
+		return this.#ctx.reply({ ...this.#check(spec, history), history });
+	}
+
+	getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
+		if (!this.#ctx.can('view.sql')) throw new ApiError('Missing permission: view.sql', 403);
+		const spec = CHECK_SPECS.find((s) => s.id === checkId);
+		const states = this.#states(scope);
+		const latest = spec && this.#evaluations(spec, states, 1)[0];
+		if (!spec || !latest) throw new ApiError(`Unknown check ${checkId}`, 404);
 		const relation = spec.node ? relationOf(spec.node) : null;
-		const sql = this.#ctx.can('view.sql') ? spec.sql.replace('{relation}', relation ? `"${relation.database}"."${relation.schema}"."${relation.name}"` : '') : null;
-		return this.#ctx.reply({ ...this.#check(spec, history), history, sql });
+		const executedSql = spec.sql.replace('{relation}', relation ? `"${relation.database}"."${relation.schema}"."${relation.name}"` : '');
+		const failed = latest.outcome === 'error' ? (states.get(spec.node ?? 'daily_revenue')?.entries ?? []).find((e) => e.outcome === 'failed') : undefined;
+		this.#ctx.platform.recordSqlRead(scope, checkId, `Read the SQL of ${spec.name} (${latest.id})`);
+		return this.#ctx.reply({
+			evaluationId: latest.id,
+			executedSql,
+			measurementSql: spec.evaluationMode === 'measurement' ? executedSql : null,
+			evidenceSql: spec.evaluationMode === 'violations' ? executedSql : null,
+			executionError: failed?.message ?? null,
+			evidenceError: null
+		});
 	}
 
 	getCheckEvidence(scope: Scope, checkId: string, evaluationId: string): Promise<CheckEvidence> {
@@ -489,11 +508,13 @@ export class MockBuild {
 		const firstOpen = batches.findIndex((b) => b.state !== 'complete');
 		return {
 			cursorColumn: spec.microbatch.cursorColumn,
+			cursorType: 'timestamp',
 			batchSize: spec.microbatch.batchSize,
 			earliest: iso(end - 90 * DAY),
 			contiguousFrontier: firstOpen >= 0 ? batches[firstOpen].start : batches[batches.length - 1].end,
 			knownGaps: batches.filter((b) => b.state === 'gap').length,
-			batches
+			batches,
+			batchesTruncated: true
 		};
 	}
 
@@ -531,7 +552,7 @@ export class MockBuild {
 		const warnLevel = spec.thresholds.find((t) => t.level === 'warn');
 		const breach = warnLevel && typeof warnLevel.value === 'number' ? round(warnLevel.value * (warnLevel.operator === 'below' ? 0.9 : 1.4), 3) : null;
 		const isViolations = spec.evaluationMode === 'violations';
-		type Extra = { runId?: string | null; evaluatedAt: string; violations?: number; measured?: number; error?: string | null };
+		type Extra = { runId?: string | null; evaluatedAt: string; violations?: number; measured?: number };
 		const at = (seed: string, index: number, outcome: CheckOutcome, extra: Extra): CheckEvaluation => {
 			const counted = outcome === 'pass' || outcome === 'warn' || outcome === 'fail';
 			const violations = !isViolations || !counted ? null : outcome === 'pass' ? 0 : (extra.violations ?? 1 + (hash(seed) % 5));
@@ -543,7 +564,6 @@ export class MockBuild {
 				outcome,
 				violationCount: violations,
 				measuredValue: isViolations || !counted ? null : (extra.measured ?? (outcome === 'pass' ? measured(index) : breach)),
-				executionError: extra.error ?? null,
 				evidenceCount: violations,
 				evidenceTruncated: (violations ?? 0) > 10
 			};
@@ -552,7 +572,7 @@ export class MockBuild {
 		const out: CheckEvaluation[] = entries.map((e, i) => {
 			const seed = e.fingerprintRunId ?? invocationIdLike(e.runId ?? spec.id);
 			const base = { runId: e.runId, evaluatedAt: e.startedAt };
-			if (e.outcome === 'failed') return spec.errorOnFailure ? at(seed, i, 'error', { ...base, error: e.message }) : at(seed, i, 'skipped', base);
+			if (e.outcome === 'failed') return spec.errorOnFailure ? at(seed, i, 'error', base) : at(seed, i, 'skipped', base);
 			const latest = i === 0 ? { violations: spec.latest.violations, measured: spec.latest.measured } : {};
 			if (e.outcome === 'warn' && spec.latest.outcome === 'warn') return at(seed, i, 'warn', { ...base, ...latest, violations: i === 0 ? spec.latest.violations : undefined });
 			return at(seed, i, 'pass', { ...base, ...(spec.latest.outcome === 'pass' ? latest : {}) });

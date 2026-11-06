@@ -8,6 +8,7 @@ import type {
 	Check,
 	CheckDetail,
 	CheckEvidence,
+	CheckSql,
 	ColumnLineage,
 	Job,
 	JobDetail,
@@ -34,8 +35,7 @@ import type {
 	Trigger,
 	TriggerDetail,
 	TriggerState,
-	WarehouseSync,
-	WarehouseSyncRequestResult
+	WarehouseSync
 } from './types';
 import type { ChangeSubscription } from './signals';
 import type { PlatformApi } from './platform-client';
@@ -63,6 +63,8 @@ export interface ApiClient extends PlatformApi {
 	/** Every audit and check with its latest result. */
 	listChecks(scope: Scope): Promise<Check[]>;
 	getCheck(scope: Scope, id: string): Promise<CheckDetail | null>;
+	/** The latest evaluation's SQL and error texts. `view.sql`; every read is audited. */
+	getCheckSql(scope: Scope, checkId: string): Promise<CheckSql>;
 	/** Sample rows stored with a result. `view.evidence`; every read is audited. */
 	getCheckEvidence(scope: Scope, checkId: string, evaluationId: string): Promise<CheckEvidence>;
 	/** The change feed: one entry per published snapshot, newest first. */
@@ -114,8 +116,6 @@ export interface ApiClient extends PlatformApi {
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;
 
 	getWarehouseSync(scope: Scope): Promise<WarehouseSync>;
-	/** Coalescing: merges into a running sync, with at most one follow-up queued. */
-	requestWarehouseSync(scope: Scope): Promise<WarehouseSyncRequestResult>;
 
 	/** Live "changed" signals (SSE in the server client); consumers refetch. */
 	changes: ChangeSubscription;

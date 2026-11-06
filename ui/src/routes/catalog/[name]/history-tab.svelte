@@ -27,7 +27,7 @@
 						<tr>
 							<td><span title={formatStamp(m.createdAt)}>{formatAgo(m.createdAt, app.now)}</span></td>
 							<td class="capitalize">{migrationKind(m)} <span class="muted">· {m.discovery}</span></td>
-							<td><code>{m.originModel}</code><div class="cell-desc">{formatRelation(m.origin)}</div></td>
+							<td>{#if m.originModel}<code>{m.originModel}</code><div class="cell-desc">{formatRelation(m.origin)}</div>{:else}<code>{formatRelation(m.origin)}</code><div class="cell-desc">found in the warehouse</div>{/if}</td>
 							<td><code>{m.destinationModel}</code><div class="cell-desc">{formatRelation(m.destination)}</div></td>
 							<td>{decisionLabel[m.decision]}</td>
 							<td><a class="mono link" href="/runs/{m.runId}">{m.runId}</a></td>

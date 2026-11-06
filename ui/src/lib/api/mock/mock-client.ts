@@ -27,8 +27,7 @@ import type {
 	Trigger,
 	TriggerDetail,
 	TriggerState,
-	WarehouseSync,
-	WarehouseSyncRequestResult
+	WarehouseSync
 } from '../types';
 import { createFixtures, ROLE_CAPABILITIES, type Fixtures } from './fixtures';
 import { DEMO_USER } from './principals';
@@ -43,8 +42,6 @@ export type MockOptions = {
 	events?: 'default' | 'none' | 'all';
 	/** Simulated request latency in milliseconds. */
 	latencyMs?: number;
-	/** How long a simulated warehouse sync takes. */
-	syncDurationMs?: number;
 	/** Simulated state of the live-signal connection. */
 	connection?: ConnectionState;
 };
@@ -57,7 +54,6 @@ export class MockApiClient implements ApiClient {
 	readonly #createdAt = Date.now();
 	readonly #operate: MockOperate;
 	readonly #syncs = new Map<string, WarehouseSync>();
-	readonly #syncTimers = new Map<string, ReturnType<typeof setTimeout>>();
 	readonly #platform: MockPlatformApi;
 	readonly #build: MockBuild;
 
@@ -66,7 +62,6 @@ export class MockApiClient implements ApiClient {
 			role: options.role ?? 'admin',
 			events: options.events ?? 'default',
 			latencyMs: options.latencyMs ?? 120,
-			syncDurationMs: options.syncDurationMs ?? 8000,
 			connection: options.connection ?? 'live'
 		};
 		this.changes.setState(this.#options.connection);
@@ -153,6 +148,10 @@ export class MockApiClient implements ApiClient {
 	getCheck(...args: Parameters<ApiClient['getCheck']>) {
 		this.#location(args[0]);
 		return this.#build.getCheck(...args);
+	}
+	async getCheckSql(...args: Parameters<ApiClient['getCheckSql']>) {
+		this.#location(args[0]);
+		return this.#build.getCheckSql(...args);
 	}
 	async getCheckEvidence(...args: Parameters<ApiClient['getCheckEvidence']>) {
 		this.#location(args[0]);
@@ -304,21 +303,6 @@ export class MockApiClient implements ApiClient {
 		return this.#reply({ ...this.#sync(scope) });
 	}
 
-	async requestWarehouseSync(scope: Scope): Promise<WarehouseSyncRequestResult> {
-		this.#location(scope);
-		this.#require('warehouse.sync');
-		const key = scopeKey(scope);
-		const sync = this.#sync(scope);
-		if (sync.state === 'running') {
-			const outcome = sync.followUpQueued ? 'merged' : 'follow_up_queued';
-			sync.followUpQueued = true;
-			this.changes.emit(`warehouse_sync:${key}`);
-			return this.#reply({ outcome, sync: { ...sync } });
-		}
-		this.#startSync(key, sync);
-		return this.#reply({ outcome: 'started', sync: { ...sync } });
-	}
-
 	// ---- platform and admin: delegated to MockPlatformApi (mock/platform.ts) ----
 
 	platformHealth(...args: Parameters<PlatformApi['platformHealth']>) {
@@ -425,28 +409,6 @@ export class MockApiClient implements ApiClient {
 	}
 
 	// ---- end platform and admin ----
-
-	#startSync(key: string, sync: WarehouseSync) {
-		sync.state = 'running';
-		sync.runningSince = new Date().toISOString();
-		sync.lastError = null;
-		this.changes.emit(`warehouse_sync:${key}`);
-		clearTimeout(this.#syncTimers.get(key));
-		this.#syncTimers.set(
-			key,
-			setTimeout(() => {
-				sync.state = 'idle';
-				sync.lastSyncedAt = new Date().toISOString();
-				sync.runningSince = null;
-				if (sync.followUpQueued) {
-					sync.followUpQueued = false;
-					this.#startSync(key, sync);
-				} else {
-					this.changes.emit(`warehouse_sync:${key}`);
-				}
-			}, this.#options.syncDurationMs)
-		);
-	}
 
 	#sync(scope: Scope): WarehouseSync {
 		const key = scopeKey(scope);

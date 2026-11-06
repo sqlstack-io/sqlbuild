@@ -257,7 +257,8 @@ export type MigrationDecision = 'migrate' | 'redo' | 'superseded_replace' | 'for
 export type MigrationEvent = {
 	eventId: string;
 	targetName: string;
-	originModel: string;
+	/** Null when the move was discovered from the warehouse rather than declared. */
+	originModel: string | null;
 	origin: RelationName;
 	destinationModel: string;
 	destination: RelationName;

@@ -10,8 +10,7 @@ import {
 	type NavCounts,
 	type PlatformEvent,
 	type Scope,
-	type WarehouseSync,
-	type WarehouseSyncRequestOutcome
+	type WarehouseSync
 } from '$lib/api';
 
 const SCOPE_KEY = 'sb-scope';
@@ -35,7 +34,6 @@ class AppState {
 	navCounts = $state<NavCounts | null>(null);
 	platformEvents = $state<PlatformEvent[]>([]);
 	warehouseSync = $state<WarehouseSync | null>(null);
-	lastSyncRequest = $state<WarehouseSyncRequestOutcome | null>(null);
 
 	readonly scope = $derived<Scope | null>(this.locationId ? { locationId: this.locationId } : null);
 	readonly location = $derived(this.bootstrap?.locations.find((l) => l.id === this.locationId) ?? null);
@@ -82,14 +80,6 @@ class AppState {
 		this.#scopeChanged();
 	}
 
-	async requestWarehouseSync(): Promise<void> {
-		const scope = this.scope;
-		if (!scope) return;
-		const result = await this.client.requestWarehouseSync(scope);
-		this.lastSyncRequest = result.outcome;
-		this.warehouseSync = result.sync;
-	}
-
 	refreshNavCounts(): void {
 		void this.#loadNavCounts();
 	}
@@ -98,7 +88,6 @@ class AppState {
 		if (browser) localStorage.setItem(SCOPE_KEY, JSON.stringify(this.scope));
 		this.navCounts = null;
 		this.warehouseSync = null;
-		this.lastSyncRequest = null;
 		this.#loadScoped();
 	}
 

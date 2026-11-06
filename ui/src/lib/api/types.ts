@@ -22,7 +22,6 @@ export const CAPABILITIES = [
 	'sensor.reset_cursor',
 	'run.adhoc',
 	'connection.test',
-	'warehouse.sync',
 	'plan.preview',
 	'location.manage',
 	'user.manage',
@@ -60,28 +59,11 @@ export type Snapshot = {
 	sqbVersion: string;
 };
 
-export type WarehouseSyncState = 'idle' | 'running' | 'failed';
+/** The location reads SQLBuild's own tables back from the warehouse on its own schedule. */
 export type WarehouseSync = {
-	state: WarehouseSyncState;
 	lastSyncedAt: Iso | null;
-	/** Start of the sync in progress, when `state` is `running`. */
-	runningSince: Iso | null;
-	/** A follow-up sync is queued behind the running one (at most one). */
-	followUpQueued: boolean;
+	/** Why the latest sync failed; null when it succeeded. */
 	lastError: string | null;
-};
-
-export type WarehouseSyncRequestOutcome =
-	/** No sync was running; a new one started. */
-	| 'started'
-	/** A sync was running; one follow-up sync was queued behind it. */
-	| 'follow_up_queued'
-	/** A sync was running and a follow-up was already queued; the request merged into it. */
-	| 'merged';
-
-export type WarehouseSyncRequestResult = {
-	outcome: WarehouseSyncRequestOutcome;
-	sync: WarehouseSync;
 };
 
 /** The one target a location is deployed against, e.g. `prod` on Snowflake. */
