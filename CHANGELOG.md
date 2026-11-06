@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.189.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.188.0...v0.189.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* control stores created by 0.188.x are not upgraded. The server refuses them with an error saying to recreate the control store; create a new one when upgrading.
+
+### Features
+
+* read checks through the control API ([#1315](https://github.com/sqlstack-io/sqlbuild/issues/1315)) ([865f8f7](https://github.com/sqlstack-io/sqlbuild/commit/865f8f79f5f9e10969420649ed5df41e48eb98f5))
+
 ## [0.188.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.187.3...v0.188.0) (2026-11-05)
 
 
