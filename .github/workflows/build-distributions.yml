@@ -203,7 +203,7 @@ jobs:
             echo
             echo "| File | Bytes |"
             echo "| --- | ---: |"
-            for file in dist/*.whl "${smoke_scripts}/sqb${exe}" "${smoke_scripts}/sqlbuild${exe}"; do
+            for file in "${GITHUB_WORKSPACE}"/dist/*.whl "${smoke_scripts}/sqb${exe}" "${smoke_scripts}/sqlbuild${exe}"; do
               echo "| $(basename "${file}") | $(wc -c < "${file}" | tr -d ' ') |"
             done
           } >> "${GITHUB_STEP_SUMMARY}"

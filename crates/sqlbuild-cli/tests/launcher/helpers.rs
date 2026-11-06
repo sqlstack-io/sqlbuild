@@ -105,10 +105,10 @@ pub(crate) fn sqb_file() -> String {
     format!("sqb{}", std::env::consts::EXE_SUFFIX)
 }
 
-/// The real `sqlbuild` forwarder, alone in `directory`.
+/// A copy of the real `sqlbuild` forwarder, alone in `directory`; a copy works across volumes.
 pub(crate) fn forwarder_in(directory: &Path) -> PathBuf {
     let forwarder = directory.join(format!("sqlbuild{}", std::env::consts::EXE_SUFFIX));
-    std::fs::hard_link(env!("CARGO_BIN_EXE_sqlbuild"), &forwarder).expect("link the forwarder");
+    std::fs::copy(env!("CARGO_BIN_EXE_sqlbuild"), &forwarder).expect("copy the forwarder");
     forwarder
 }
 
