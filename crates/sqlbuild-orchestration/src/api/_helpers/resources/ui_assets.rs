@@ -5,8 +5,8 @@ use axum::http::{HeaderValue, Method, StatusCode, Uri, header};
 use axum::response::{IntoResponse, Response};
 
 use crate::api::constants::{
-    API_PATH, API_PREFIX, AUTH_PREFIX, ROOT_PATH, UI_FRAME_POLICY, UI_IMMUTABLE_PREFIX,
-    UI_INDEX_PATH,
+    API_PATH, API_PREFIX, AUTH_PREFIX, ROOT_PATH, UI_DOT_SEGMENTS, UI_DOUBLE_SLASH,
+    UI_FRAME_POLICY, UI_IMMUTABLE_PREFIX, UI_INDEX_PATH, UI_REFUSED_ENCODINGS,
 };
 use crate::api::models::UiAsset;
 
@@ -25,8 +25,10 @@ pub(crate) fn serve_ui(application: Router, assets: &'static [UiAsset]) -> Route
 }
 
 fn respond(assets: &'static [UiAsset], method: &Method, path: &str) -> Response {
-    let outside_ui =
-        path == API_PATH || path.starts_with(API_PREFIX) || path.starts_with(AUTH_PREFIX);
+    let outside_ui = path == API_PATH
+        || path.starts_with(API_PREFIX)
+        || path.starts_with(AUTH_PREFIX)
+        || !canonical(path);
     if outside_ui || (method != Method::GET && method != Method::HEAD) {
         return StatusCode::NOT_FOUND.into_response();
     }
@@ -73,6 +75,19 @@ fn respond(assets: &'static [UiAsset], method: &Method, path: &str) -> Response 
         HeaderValue::from_static(UI_FRAME_POLICY),
     );
     response
+}
+
+/// Only plain, already-normalised paths can name an embedded file or the shell.
+fn canonical(path: &str) -> bool {
+    let lowered = path.to_ascii_lowercase();
+    !path.contains('\\')
+        && !path.contains(UI_DOUBLE_SLASH)
+        && !UI_REFUSED_ENCODINGS
+            .iter()
+            .any(|encoded| lowered.contains(encoded))
+        && path
+            .split('/')
+            .all(|segment| !UI_DOT_SEGMENTS.contains(&segment))
 }
 
 fn content_type(path: &str) -> &'static str {

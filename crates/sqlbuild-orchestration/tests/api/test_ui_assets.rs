@@ -5,7 +5,8 @@ use axum::routing::get;
 
 use crate::api::_helpers::resources::ui_assets::serve_ui;
 use crate::api::models::UiAsset;
-use crate::api::tests::test_types::UiAssetTestCase;
+use crate::api::tests::helpers::raw_get;
+use crate::api::tests::test_types::{UiAssetTestCase, UiPathTestCase};
 use crate::store::tests::store_helpers::run;
 
 #[test]
@@ -154,6 +155,182 @@ fn given_embedded_ui_when_requesting_pages_assets_and_api_paths_then_only_ui_pat
                 "{}",
                 test_case.description
             );
+        }
+        server.abort();
+    });
+}
+
+#[test]
+fn given_embedded_ui_when_paths_carry_dot_segments_encodings_or_extra_slashes_then_they_never_reach_ui_files_or_bypass_api_routes()
+ {
+    static ASSETS: &[UiAsset] = &[
+        UiAsset {
+            path: "/index.html",
+            body: b"<html>shell</html>",
+        },
+        UiAsset {
+            path: "/theme.js",
+            body: b"theme()",
+        },
+    ];
+    let test_cases = [
+        UiPathTestCase {
+            description: "parent segment after the API prefix",
+            path: "/api/../theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "parent segment inside a client route",
+            path: "/runs/../theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "current segment",
+            path: "/./theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "encoded parent segment",
+            path: "/runs/%2e%2e/theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "upper-case encoded parent segment",
+            path: "/%2E%2E/theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "encoded slash",
+            path: "/runs%2ftheme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "encoded backslash",
+            path: "/%5ctheme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "double slash before the API",
+            path: "//api/openapi.json",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "double slash before an asset",
+            path: "//theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "double slash inside a route",
+            path: "/runs//x",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "raw backslash",
+            path: "/runs\\..\\theme.js",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "raw backslash before the API",
+            path: "/\\api/openapi.json",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "fragment sent on an asset path",
+            path: "/theme.js#x",
+            expected_status: 200,
+            expected_body: "theme()",
+        },
+        UiPathTestCase {
+            description: "bare API prefix",
+            path: "/api",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "API prefix with a trailing slash",
+            path: "/api/",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "auth prefix with a trailing slash",
+            path: "/auth/",
+            expected_status: 404,
+            expected_body: "",
+        },
+        UiPathTestCase {
+            description: "a path that only starts with api is a client route",
+            path: "/apix",
+            expected_status: 200,
+            expected_body: "<html>shell</html>",
+        },
+        UiPathTestCase {
+            description: "a path that only starts with auth is a client route",
+            path: "/authx",
+            expected_status: 200,
+            expected_body: "<html>shell</html>",
+        },
+        UiPathTestCase {
+            description: "query string on an asset",
+            path: "/theme.js?v=1",
+            expected_status: 200,
+            expected_body: "theme()",
+        },
+        UiPathTestCase {
+            description: "query naming the API on a client route",
+            path: "/runs?next=/api/x",
+            expected_status: 200,
+            expected_body: "<html>shell</html>",
+        },
+        UiPathTestCase {
+            description: "API route keeps precedence",
+            path: "/api/openapi.json",
+            expected_status: 200,
+            expected_body: "api",
+        },
+        UiPathTestCase {
+            description: "auth route keeps precedence",
+            path: "/auth/login",
+            expected_status: 200,
+            expected_body: "auth",
+        },
+    ];
+    run(async {
+        let application = serve_ui(
+            Router::new()
+                .route("/api/openapi.json", get(|| async { "api" }))
+                .route("/auth/login", get(|| async { "auth" })),
+            ASSETS,
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("socket");
+        let address = listener.local_addr().expect("address").to_string();
+        let server = tokio::spawn(async move { axum::serve(listener, application).await });
+        for test_case in test_cases {
+            let target = address.clone();
+            let (status, body) =
+                tokio::task::spawn_blocking(move || raw_get(&target, test_case.path))
+                    .await
+                    .expect("raw request task");
+            assert_eq!(
+                status, test_case.expected_status,
+                "{}",
+                test_case.description
+            );
+            assert_eq!(body, test_case.expected_body, "{}", test_case.description);
         }
         server.abort();
     });

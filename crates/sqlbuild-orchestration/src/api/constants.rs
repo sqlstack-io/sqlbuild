@@ -20,3 +20,7 @@ pub(crate) const UI_FRAME_POLICY: &str = "frame-ancestors 'none'";
 pub(crate) const API_PATH: &str = "/api";
 pub(crate) const API_PREFIX: &str = "/api/";
 pub(crate) const AUTH_PREFIX: &str = "/auth/";
+/// Percent-encoded dot, slash and backslash: a UI path carrying one is refused, never decoded.
+pub(crate) const UI_REFUSED_ENCODINGS: [&str; 3] = ["%2e", "%2f", "%5c"];
+pub(crate) const UI_DOT_SEGMENTS: [&str; 2] = [".", ".."];
+pub(crate) const UI_DOUBLE_SLASH: &str = "//";
