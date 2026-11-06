@@ -22,6 +22,7 @@ use crate::runs::tests::test_types::{
     AdmissionParent, GroupAdmissionTestCase, GroupChildLimitTestCase, GroupQueueTestCase,
     MixedAdmissionTestCase, RunLifecycleTestCase,
 };
+use crate::store::tests::lease_helpers::hold_lease;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -802,10 +803,11 @@ fn given_a_large_healthy_project_with_blocked_groups_when_claiming_then_unrelate
             let published = publish_snapshot(store, &input)
                 .await
                 .expect("publish large project");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("elect")
                 .expect("leader");
+            let lease = hold_lease(store, elected).await;
             let limits = BTreeMap::from([("warehouse".into(), NonZeroU32::new(1).expect("one"))]);
             let scope = (location, "development");
             let mut physical = request((location, published.snapshot_id), 1, 10, &["products"]);

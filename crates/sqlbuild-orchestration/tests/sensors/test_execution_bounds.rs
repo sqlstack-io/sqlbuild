@@ -15,7 +15,6 @@ use crate::runs::main::{
 use crate::runs::models::{
     JobRunRequest, NodeOutcome, RunAuthority, RunChange, RunChangeRequest, RunOutcome,
 };
-use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
@@ -25,6 +24,7 @@ use crate::sensors::tests::helpers::snapshot;
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::tests::lease_helpers::hold_lease;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -79,10 +79,11 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
             publish_snapshot(store, &input)
                 .await
                 .expect("publish wide predicate");
-            let lease = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("elect")
                 .expect("leader");
+            let lease = hold_lease(store, elected).await;
             let limits = std::collections::BTreeMap::new();
             let scope = (location, "development");
             for include_last in [true, false] {
@@ -138,28 +139,22 @@ fn given_a_wide_group_when_only_the_last_node_has_not_started_then_all_chunks_mu
                         exit_code: None,
                     }))
                     .collect::<Vec<_>>();
-                for batch in changes.chunks(100) {
-                    // Evidence setup must keep its scheduler alive, just like the real loop.
-                    renew_lease(store, &lease)
-                        .await
-                        .expect("renew during setup");
-                    for change in batch {
-                        change_run(
-                            store,
-                            RunAuthority::Worker {
-                                run_id: claim.request.run_id,
-                                claim_id: claim.claim_id,
-                            },
-                            &RunChangeRequest {
-                                event_id: Uuid::now_v7(),
-                                run_id: claim.request.run_id,
-                                claim_id: Some(claim.claim_id),
-                                change: change.clone(),
-                            },
-                        )
-                        .await
-                        .expect("real node evidence");
-                    }
+                for change in &changes {
+                    change_run(
+                        store,
+                        RunAuthority::Worker {
+                            run_id: claim.request.run_id,
+                            claim_id: claim.claim_id,
+                        },
+                        &RunChangeRequest {
+                            event_id: Uuid::now_v7(),
+                            run_id: claim.request.run_id,
+                            claim_id: Some(claim.claim_id),
+                            change: change.clone(),
+                        },
+                    )
+                    .await
+                    .expect("real node evidence");
                 }
                 advance_groups(store, &lease, (&limits, scope))
                     .await

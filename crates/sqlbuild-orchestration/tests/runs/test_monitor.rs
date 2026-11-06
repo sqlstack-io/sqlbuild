@@ -9,7 +9,6 @@ use crate::runs::main::heartbeat_run::heartbeat_run;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::monitor_runs::monitor_runs;
 use crate::runs::models::{RunAuthority, RunChange, RunChangeRequest, RunOutcome, RunStatus};
-use crate::scheduler::main::renew_lease::renew_lease;
 use crate::scheduler::models::SchedulerState;
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, scheduler_cycle};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -25,7 +24,7 @@ use crate::runs::tests::test_types::{
     MonitorBacklogTestCase, RunMonitorTestCase, TransactionFault,
 };
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
-use crate::store::tests::lease_helpers::expire_lease;
+use crate::store::tests::lease_helpers::{expire_lease, hold_lease};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -287,10 +286,11 @@ fn given_a_silent_worker_backlog_when_monitoring_then_bounded_transactions_conti
                 .await
                 .expect("snapshot");
             let holder = Uuid::now_v7();
-            let mut lease = acquire_lease(store, holder)
+            let elected = acquire_lease(store, holder)
                 .await
                 .expect("elect")
                 .expect("leader");
+            let lease = hold_lease(store, elected).await;
             for index in 0..test_case.run_count {
                 let mut input = request(
                     (location, published.snapshot_id),
@@ -301,9 +301,6 @@ fn given_a_silent_worker_backlog_when_monitoring_then_bounded_transactions_conti
                 input.write_set.clear();
                 start_run(store, &lease, &input).await;
                 age_heartbeat(store, input.run_id, 50).await;
-                lease = renew_lease(store, &lease)
-                    .await
-                    .expect("renew during setup");
             }
             expire_lease(store).await;
             let mut state = SchedulerState::new(holder);
