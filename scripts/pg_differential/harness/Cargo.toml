@@ -1,0 +1,24 @@
+[package]
+name = "sqlbuild-pg-differential"
+version = "0.0.0"
+description = "Compares SQLBuild's Polyglot analysis of Postgres models with SQLQuack's Postgres parser and analysis."
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Standalone: the SQLQuack crates are not published, so they come from a local checkout through
+# `--config patch.crates-io...` flags that `scripts/run_pg_differential.py` passes. Keeping the
+# harness out of the SQLBuild workspace leaves the workspace buildable without that checkout.
+[workspace]
+
+[[bin]]
+name = "pg-differential"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sqlbuild-analysis = { path = "../../../crates/sqlbuild-analysis" }
+sqlquack-semantics = "0.2.0"
+sqlquack-syntax = "0.2.0"
+sqlquack-syntax-postgres = "0.2.0"
