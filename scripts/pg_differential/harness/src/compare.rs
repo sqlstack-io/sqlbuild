@@ -334,6 +334,7 @@ fn kind_text(kind: TransformKind) -> &'static str {
         TransformKind::Direct => "direct",
         TransformKind::Cast => "cast",
         TransformKind::Expression => "expression",
+        TransformKind::Window => "window",
         TransformKind::Aggregation => "aggregation",
     }
 }
