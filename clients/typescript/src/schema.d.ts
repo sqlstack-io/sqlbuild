@@ -322,6 +322,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonMaintenance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/node-status": {
         parameters: {
             query?: never;
@@ -1121,6 +1137,14 @@ export interface components {
             /** Format: uuid */
             session_id: string;
         };
+        /** @description Recorded moves, their old-name view steps and janitor cleanups, newest moves first. */
+        MaintenanceHistory: {
+            /** @description Empty when the history is for one model; cleanups are not tied to models. */
+            janitor_events: components["schemas"]["WarehouseJanitorRecord"][];
+            migrations: components["schemas"]["WarehouseMigrationRecord"][];
+            /** @description Every step recorded for the listed moves, oldest first; same-time steps are not in step order. */
+            old_name_views: components["schemas"]["WarehouseOldNameRecord"][];
+        };
         /** @description One bounded page of one state table from the registered reader of a published generation. */
         MetadataBatch: {
             /** Format: int64 */
@@ -1731,11 +1755,80 @@ export interface components {
          * @enum {string}
          */
         WarehouseHistoryKind: "fingerprints" | "source_freshness" | "audit_results" | "janitor_events" | "migrations" | "old_name_views" | "microbatches" | "catalog" | "statistics";
+        /** @description Warehouse cleanup facts do not authorize control-plane deletion or worker recovery. */
+        WarehouseJanitorRecord: {
+            archive_name: string;
+            archive_qualified_name: string;
+            /** Format: date-time */
+            archived_at: string;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            occurred_at: string;
+            original_name?: string | null;
+            original_qualified_name?: string | null;
+            relation_database?: string | null;
+            relation_schema: string;
+            relation_type?: string | null;
+            run_id: string;
+            /** Format: int64 */
+            schema_version: number;
+            state_database?: string | null;
+            state_schema: string;
+        };
+        /** @description Model-move history is evidence, not authority to migrate a warehouse relation. */
+        WarehouseMigrationRecord: {
+            /** Format: date-time */
+            created_at: string;
+            decision: string;
+            destination_database?: string | null;
+            destination_model: string;
+            destination_name: string;
+            destination_schema: string;
+            discovery: string;
+            event_id: string;
+            origin_database?: string | null;
+            origin_model?: string | null;
+            origin_name: string;
+            origin_schema?: string | null;
+            origin_version_hash: string;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+        };
         WarehouseMirrorCursor: {
             /** Format: uuid */
             event_id: string;
             /** Format: date-time */
             observed_at: string;
+        };
+        /** @description Preserve nullable compatibility-view facts without projecting live warehouse existence. */
+        WarehouseOldNameRecord: {
+            archive_name?: string | null;
+            column_aliases?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            destination_model: string;
+            drop_reason?: string | null;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            grants_copied?: string | null;
+            migration_event_id: string;
+            new_database?: string | null;
+            new_name: string;
+            new_schema: string;
+            old_database?: string | null;
+            old_name: string;
+            old_schema?: string | null;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+            view_retention?: string | null;
+            view_sql?: string | null;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {
@@ -2529,6 +2622,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonMaintenance: {
+        parameters: {
+            query?: {
+                /** @description Only moves into this model, and no janitor events */
+                node?: string;
+                /** @description Maximum moves and janitor events each; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaintenanceHistory"];
+                };
             };
             /** @description Session rejected */
             401: {

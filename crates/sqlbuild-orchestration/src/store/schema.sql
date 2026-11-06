@@ -429,6 +429,7 @@ CREATE TABLE sqb_warehouse_migrations (
     scan_id {uuid}
 );
 CREATE INDEX sqb_migrations_namespace ON sqb_warehouse_migrations (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_migrations_destination ON sqb_warehouse_migrations (location_id,target,destination_model,observed_at,event_id);
 CREATE TABLE sqb_warehouse_old_name_views (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),
@@ -444,6 +445,7 @@ CREATE TABLE sqb_warehouse_old_name_views (
     scan_id {uuid}
 );
 CREATE INDEX sqb_old_name_views_namespace ON sqb_warehouse_old_name_views (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_old_name_views_migration ON sqb_warehouse_old_name_views (location_id,target,migration_event_id,observed_at,event_id);
 CREATE TABLE sqb_warehouse_microbatches (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),

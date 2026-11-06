@@ -7,8 +7,8 @@ use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
-use crate::warehouse_metadata::_helpers::checks::check_results;
-use crate::warehouse_metadata::models::CheckResult;
+use crate::warehouse_history::_helpers::checks::check_results;
+use crate::warehouse_history::models::CheckResult;
 
 pub async fn read_person_check(
     store: &ControlStore,
