@@ -40,8 +40,16 @@ pub(crate) async fn authorize_person(
             Ok((transaction, context))
         }
         GrantDecision::Denied(missing) => {
-            let reason = denial_reason(scope.action, &missing)?;
-            deny(transaction, &context, json!(scope), &reason).await
+            let (audited, shown) = denial_reason(scope.action, &missing)?;
+            deny(transaction, &context, json!(scope), &audited)
+                .await
+                .map_err(|error| match error {
+                    ControlError::Denied { decision_id, .. } => ControlError::Denied {
+                        reason: shown,
+                        decision_id,
+                    },
+                    error => error,
+                })
         }
     }
 }
