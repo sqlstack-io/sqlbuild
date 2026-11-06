@@ -210,6 +210,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonChecks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonCheckHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonCheckSql"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/connection-tests": {
         parameters: {
             query?: never;
@@ -768,6 +816,52 @@ export interface components {
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
             topic: string;
+        };
+        /** @description One stored check result. Its SQL, error texts and evidence rows need their own permissions. */
+        CheckResult: {
+            attached_column_name?: string | null;
+            attached_target_kind?: string | null;
+            attached_target_name?: string | null;
+            attachment_kind: string;
+            audit_definition_name: string;
+            audit_description?: string | null;
+            audit_name: string;
+            /** @description Identity of the check; a renamed model or changed severity or thresholds starts a new one. */
+            binding_key: string;
+            evaluation_mode: string;
+            /** Format: uuid */
+            event_id: string;
+            /** Format: int64 */
+            evidence_count?: number | null;
+            evidence_truncated?: string | null;
+            invocation_id: string;
+            measured_value?: string | null;
+            /** Format: int64 */
+            minimum_samples?: number | null;
+            /** Format: date-time */
+            occurred_at: string;
+            outcome: string;
+            reused: string;
+            run_id: string;
+            run_scope_phase: string;
+            /** Format: int64 */
+            sample_count?: number | null;
+            sample_unit?: string | null;
+            severity: string;
+            thresholds_json?: string | null;
+            /** Format: int64 */
+            violation_count?: number | null;
+        };
+        /** @description A check's latest SQL and error texts, which quote SQL; `view.sql` reads them, audited. */
+        CheckSql: {
+            binding_key: string;
+            /** Format: uuid */
+            event_id: string;
+            evidence_error?: string | null;
+            evidence_sql?: string | null;
+            executed_sql?: string | null;
+            execution_error?: string | null;
+            measurement_sql?: string | null;
         };
         CliLoginApprovalRequest: {
             approve: boolean;
@@ -2109,6 +2203,124 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPersonChecks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The newest result of every check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckResult"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonCheckHistory: {
+        parameters: {
+            query?: {
+                /** @description Maximum results, newest first; defaults to 50, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                binding_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Empty for an unknown check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckResult"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonCheckSql: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                binding_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["CheckSql"];
+                };
             };
             /** @description Session rejected */
             401: {

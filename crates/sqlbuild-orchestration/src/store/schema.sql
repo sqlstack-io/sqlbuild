@@ -396,9 +396,11 @@ CREATE TABLE sqb_warehouse_audit_results (
     outcome TEXT NOT NULL,
     record_json {json} NOT NULL,
     received_at {time} NOT NULL,
-    scan_id {uuid}
+    scan_id {uuid},
+    binding_key TEXT
 );
 CREATE INDEX sqb_audit_results_namespace ON sqb_warehouse_audit_results (location_id,target,state_database,state_schema,observed_at,event_id);
+CREATE INDEX sqb_audit_results_binding ON sqb_warehouse_audit_results (location_id,target,binding_key,observed_at,event_id);
 CREATE TABLE sqb_warehouse_janitor_events (
     event_id {uuid} PRIMARY KEY,
     location_id {uuid} NOT NULL REFERENCES sqb_locations(location_id),

@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use crate::api::_helpers::authentication::password_sessions;
 use crate::api::_helpers::authentication::{cli_login, oidc};
 use crate::api::_helpers::resources::{
-    administrators, audit, changes, location_health, location_work, person_location_work,
-    person_node_sql, person_operations, run_reads, runs, snapshots, trigger_reads,
-    warehouse_metadata,
+    administrators, audit, changes, location_health, location_work, person_checks,
+    person_location_work, person_node_sql, person_operations, run_reads, runs, snapshots,
+    trigger_reads, warehouse_metadata,
 };
 
 #[derive(Debug, utoipa::OpenApi)]
@@ -24,6 +24,9 @@ use crate::api::_helpers::resources::{
     person_operations::statistics,
     person_operations::fingerprint,
     person_operations::node_status,
+    person_checks::list,
+    person_checks::history,
+    person_checks::sql,
     person_location_work::request,
     person_location_work::result,
     person_node_sql::read,

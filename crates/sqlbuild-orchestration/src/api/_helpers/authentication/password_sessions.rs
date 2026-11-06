@@ -109,6 +109,18 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql",
             get(crate::api::_helpers::resources::person_node_sql::read),
         )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/checks",
+            get(crate::api::_helpers::resources::person_checks::list),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}",
+            get(crate::api::_helpers::resources::person_checks::history),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/sql",
+            get(crate::api::_helpers::resources::person_checks::sql),
+        )
         .layer(DefaultBodyLimit::max(PASSWORD_BODY_BYTES))
 }
 
