@@ -16,6 +16,11 @@ describe('safeNext', () => {
 		'//evil.example/runs',
 		'/\\evil.example/runs',
 		'/\t/evil.example/runs',
+		'/.//evil.example/runs',
+		'/..//evil.example',
+		'/a/..//evil.example',
+		'/%2e//evil.example',
+		'/./\\evil.example',
 		'javascript:alert(1)',
 		'runs'
 	])('refuses %s', (next) => {

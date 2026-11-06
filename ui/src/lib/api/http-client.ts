@@ -39,6 +39,29 @@ export function toBootstrap(wire: Wire['ControlBootstrap']): Bootstrap {
 	};
 }
 
+/** The person change feed URL of a UI location. */
+export function feedUrl(baseUrl: string, scope: Scope): string {
+	const { locationId, target } = parseLocationKey(scope.locationId);
+	return `${baseUrl}/api/control/locations/${encodeURIComponent(locationId)}/targets/${encodeURIComponent(target)}/changes`;
+}
+
+/**
+ * Whether the feed would open now: a refusal (401 or 403) stops retrying, anything else retries.
+ * It asks the feed itself, because the bootstrap lists a location on partial view while the feed
+ * needs view on every node, so a bootstrap check would retry a refused feed forever.
+ */
+export async function feedAllowed(baseUrl: string, scope: Scope, onUnauthorized: () => void): Promise<boolean> {
+	const probe = new AbortController();
+	const response = await fetch(feedUrl(baseUrl, scope), {
+		credentials: 'same-origin',
+		headers: { accept: 'text/event-stream' },
+		signal: probe.signal
+	});
+	probe.abort();
+	if (response.status === 401) onUnauthorized();
+	return response.status !== 401 && response.status !== 403;
+}
+
 /** The change feed of the followed location: one `EventSource`, recreated when the scope changes. */
 export class HttpChangeFeed implements ChangeSubscription {
 	#handlers = new Set<(signal: ChangedSignal) => void>();
@@ -48,10 +71,10 @@ export class HttpChangeFeed implements ChangeSubscription {
 	#retry: ReturnType<typeof setTimeout> | null = null;
 	#failures = 0;
 
-	/** `stillListed` re-reads the bootstrap before a retry, so a lost session or location stops retrying. */
+	/** `stillAllowed` checks access before a retry, so a lost session or refused feed stops retrying. */
 	constructor(
 		private readonly baseUrl: string,
-		private readonly stillListed: (scope: Scope) => Promise<boolean>
+		private readonly stillAllowed: (scope: Scope) => Promise<boolean>
 	) {}
 
 	subscribe(handler: (signal: ChangedSignal) => void): () => void {
@@ -76,10 +99,7 @@ export class HttpChangeFeed implements ChangeSubscription {
 		if (this.#retry) clearTimeout(this.#retry);
 		this.#retry = null;
 		if (!scope) return this.#setState('offline');
-		const { locationId, target } = parseLocationKey(scope.locationId);
-		const source = new EventSource(
-			`${this.baseUrl}/api/control/locations/${encodeURIComponent(locationId)}/targets/${encodeURIComponent(target)}/changes`
-		);
+		const source = new EventSource(feedUrl(this.baseUrl, scope));
 		this.#source = source;
 		this.#setState('connecting');
 		source.onopen = () => {
@@ -93,7 +113,7 @@ export class HttpChangeFeed implements ChangeSubscription {
 			this.#setState(this.#failures > 3 ? 'offline' : 'reconnecting');
 			const delay = Math.min(30_000, 1000 * 2 ** (this.#failures - 1));
 			this.#retry = setTimeout(() => {
-				void this.stillListed(scope)
+				void this.stillAllowed(scope)
 					.catch(() => true)
 					.then((listed) => (listed && this.#source === source ? this.#connect(scope) : this.#setState('offline')));
 			}, delay);
@@ -136,12 +156,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
-		changes: new HttpChangeFeed(baseUrl, async (scope) => {
-			const { data, response } = await http.GET('/api/control/bootstrap');
-			if (response.status === 401) onUnauthorized();
-			if (!data) return response.status >= 500;
-			return toBootstrap(data).locations.some((location) => location.id === scope.locationId);
-		}),
+		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
 		async bootstrap(): Promise<Bootstrap> {
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();
