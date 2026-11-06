@@ -12,3 +12,4 @@ pub(crate) mod publish_group_roles;
 pub(crate) mod read_audit_events;
 pub mod read_security_audit;
 pub(crate) mod refuse_unknown;
+pub(crate) mod row_in_target;

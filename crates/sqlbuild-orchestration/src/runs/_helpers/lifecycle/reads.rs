@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 use crate::runs::models::{RunNodeRecord, RunRecord};
 use crate::store::errors::ControlError;
-use crate::store::main::query::query;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
 
@@ -27,23 +26,4 @@ pub(crate) async fn run_nodes_in(
         "SELECT node_key, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
          FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
         vec![Parameter::Id(run_id)]).await
-}
-
-/// Whether `run_id` belongs to this location and target.
-pub(crate) async fn run_in_scope(
-    transaction: ControlTransaction,
-    (location_id, target): (Uuid, &str),
-    run_id: Uuid,
-) -> Result<(ControlTransaction, bool), ControlError> {
-    let (transaction, rows) = query(
-        transaction,
-        "SELECT run_id FROM sqb_runs WHERE run_id=$1 AND location_id=$2 AND target=$3",
-        vec![
-            Parameter::Id(run_id),
-            Parameter::Id(location_id),
-            Parameter::Text(target.into()),
-        ],
-    )
-    .await?;
-    Ok((transaction, !rows.is_empty()))
 }

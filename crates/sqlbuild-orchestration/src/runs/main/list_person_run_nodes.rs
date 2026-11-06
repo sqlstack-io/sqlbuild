@@ -3,12 +3,13 @@
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::row_in_target::row_in_target;
 use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::runs::_helpers::lifecycle::reads::{run_in_scope, run_nodes_in};
+use crate::runs::_helpers::lifecycle::reads::run_nodes_in;
 use crate::runs::models::RunNodeRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::{ControlStore, TargetRow, TransactionMode};
 
 /// `None` when the run is not in this location and target; authorization runs first either way.
 pub async fn list_person_run_nodes(
@@ -24,7 +25,8 @@ pub async fn list_person_run_nodes(
         default_role,
     )
     .await?;
-    let (transaction, known) = run_in_scope(transaction, (location_id, target), run_id).await?;
+    let (transaction, known) =
+        row_in_target(transaction, (location_id, target), TargetRow::Run(run_id)).await?;
     if !known {
         commit(transaction).await?;
         return Ok(None);

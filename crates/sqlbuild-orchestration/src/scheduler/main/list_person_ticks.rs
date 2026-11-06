@@ -3,12 +3,13 @@
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::row_in_target::row_in_target;
 use crate::credentials::models::{AuditContext, DefaultRole};
-use crate::scheduler::_helpers::reads::{ticks_in, trigger_in_scope};
+use crate::scheduler::_helpers::reads::ticks_in;
 use crate::scheduler::models::TickRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, TransactionMode};
+use crate::store::models::{ControlStore, TargetRow, TransactionMode};
 
 /// `None` when the trigger is not in this location and target; authorization runs first either way.
 pub async fn list_person_ticks(
@@ -24,8 +25,12 @@ pub async fn list_person_ticks(
         default_role,
     )
     .await?;
-    let (transaction, known) =
-        trigger_in_scope(transaction, (location_id, target), trigger_id).await?;
+    let (transaction, known) = row_in_target(
+        transaction,
+        (location_id, target),
+        TargetRow::Trigger(trigger_id),
+    )
+    .await?;
     if !known {
         commit(transaction).await?;
         return Ok(None);
