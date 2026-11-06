@@ -21,7 +21,7 @@ fn given_key_parts_when_hashing_then_matches_stored_digests() {
             visible_renames: vec![("orders".to_owned(), "abc".to_owned())],
         },
         expected_key: "835490d6bfb10f11b9649eb56324524a30685ef55634d585940417179b4e28ad",
-        expected_shared: "ca6125db465a1a7f10fc6b210bb82bc6641998ca007324621992c1285325a121",
+        expected_shared: "2392598b80eb307e8032df09609aaebb6c76281f169ae20dfc6773c39ca0e892",
         expected_entry: "391ffa0fdaf437fff6e7f6d1f0fc01e5509751580667cc37f101ba020c707eb6\n{\"f\":\"fp1\",\"k\":\"k1\",\"v\":1}",
     }];
     for test_case in test_cases {

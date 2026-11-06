@@ -3,10 +3,12 @@
 //! Each case is a compiled Postgres model with SQLBuild's Polyglot results. The model's SQL is
 //! parsed with SQLQuack's Postgres parser and analysed with SQLQuack's lineage and binding findings
 //! under the Postgres profile; the two results are compared for lineage (B), binding findings (C)
-//! and output types and nullability (D).
+//! and output types and nullability (D), and SQLBuild's migration fingerprint is computed from
+//! either parse.
 
 mod cases;
 mod compare;
+mod fingerprint;
 
 use std::io::{BufRead, Write};
 

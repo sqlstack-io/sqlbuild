@@ -6,6 +6,10 @@ use crate::planner_migrations::_helpers::proofs::ast::{
 use crate::planner_migrations::constants::{TABLE_KEY, WITH_KEY};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::Range;
+
+/// A renamed identifier: its source span, when the parser kept one, and its replacement.
+pub(crate) type Rename = (Option<Range<usize>>, String);
 
 fn is_identifier(node: &Value) -> bool {
     identifier(node).is_some() && node.get("quoted").is_some()
@@ -122,46 +126,47 @@ pub(crate) fn unambiguous(root: &Value, definitions: &[(String, bool)]) -> bool 
         .any(|(name, is_cte)| !is_cte && physical.contains(name) && !cte_names.contains(name))
 }
 
-fn renamed(mut node: Value, names: &BTreeMap<String, String>) -> Value {
-    if is_identifier(&node)
-        && let Some(name) = identifier(&node)
-        && let Some(replacement) = names.get(&name.to_lowercase())
-    {
-        node["name"] = Value::String(replacement.clone());
-        node["quoted"] = Value::Bool(false);
+/// The replacement for an identifier node whose name is renamed, at the node's source span.
+fn renamed(node: &Value, names: &BTreeMap<String, String>) -> Option<Rename> {
+    if !is_identifier(node) {
+        return None;
     }
-    node
+    let replacement = names.get(&identifier(node)?.to_lowercase())?;
+    let span = &node["span"];
+    let range = span["start"]
+        .as_u64()
+        .zip(span["end"].as_u64())
+        .and_then(|(start, end)| Some(usize::try_from(start).ok()?..usize::try_from(end).ok()?));
+    Some((range, replacement.clone()))
 }
 
-pub(crate) fn rewrite(
-    node: &mut Value,
+/// Every CTE name, relation alias, alias qualifier and CTE reference to rename, with its span.
+pub(crate) fn renames(
+    node: &Value,
     names: &BTreeMap<String, String>,
     cte_names: &BTreeMap<String, String>,
+    found: &mut Vec<Rename>,
 ) {
     match node {
         Value::Array(items) => items
-            .iter_mut()
-            .for_each(|item| rewrite(item, names, cte_names)),
+            .iter()
+            .for_each(|item| renames(item, names, cte_names, found)),
         Value::Object(object) => {
             for (key, value) in object {
                 if opaque_field(key, value) {
                     continue;
                 }
-                let original = value.clone();
-                rewrite(value, names, cte_names);
-                if ["column", "star"].contains(&key.as_str()) && original.is_object() {
-                    value["table"] = renamed(original["table"].clone(), names);
-                } else if ["table", "subquery"].contains(&key.as_str()) && is_relation(&original) {
-                    value["alias"] = renamed(original["alias"].clone(), names);
-                    if unqualified(&original) && is_identifier(&original["name"]) {
-                        value["name"] = renamed(original["name"].clone(), cte_names);
+                renames(value, names, cte_names, found);
+                if ["column", "star"].contains(&key.as_str()) && value.is_object() {
+                    found.extend(renamed(&value["table"], names));
+                } else if ["table", "subquery"].contains(&key.as_str()) && is_relation(value) {
+                    found.extend(renamed(&value["alias"], names));
+                    if unqualified(value) {
+                        found.extend(renamed(&value["name"], cte_names));
                     }
-                } else if key == WITH_KEY
-                    && original.is_object()
-                    && let Some(ctes) = value["ctes"].as_array_mut()
-                {
-                    for cte in ctes {
-                        cte["alias"] = renamed(cte["alias"].clone(), names);
+                } else if key == WITH_KEY && value.is_object() {
+                    for cte in items(&value["ctes"]) {
+                        found.extend(renamed(&cte["alias"], names));
                     }
                 }
             }

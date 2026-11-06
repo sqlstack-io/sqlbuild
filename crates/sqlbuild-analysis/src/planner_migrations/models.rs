@@ -59,6 +59,15 @@ pub struct QueryProjection {
     pub passthrough: bool,
 }
 
+/// One parsed statement as a fingerprint reads it: the syntax tree as JSON, whose identifiers
+/// carry their source spans, and the source span of every token. Spans are Unicode character
+/// offsets into the parsed SQL, end exclusive; tokens exclude whitespace and comments.
+#[derive(Debug)]
+pub struct ParsedStatement {
+    pub tree: serde_json::Value,
+    pub tokens: Vec<std::ops::Range<usize>>,
+}
+
 /// A plain SELECT with canonical expressions and input binding facts.
 #[derive(Debug)]
 pub struct QueryShape {

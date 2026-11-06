@@ -29,7 +29,7 @@ REFERENCE_RESOURCE_TYPES: dict[str, str] = {
     "TABLE_FUNCTION": "TABLE_FN",
 }
 TABLE_FUNCTION_PREFIX: str = "__sqlbuild_table_function_"
-MEASURES: tuple[str, ...] = ("lineage", "findings", "types")
+MEASURES: tuple[str, ...] = ("lineage", "findings", "types", "fingerprint")
 EXAMPLES_PER_GROUP: int = 5
 TABLE_FUNCTION_KIND: str = "TABLE_FUNCTION"
 MUTATION_SEPARATOR: str = "#"

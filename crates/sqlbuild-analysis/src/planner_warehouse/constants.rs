@@ -24,6 +24,6 @@ pub(crate) const SOURCE_DEFERRAL_CONTEXT_FIELDS: [&str; 2] = ["schema", "databas
 pub(crate) const FINGERPRINT_CACHE_VERSION: i64 = 1;
 pub(crate) const FINGERPRINT_CACHE_ENTRY_SEPARATOR: char = '\n';
 pub(crate) const MAX_FINGERPRINT_CACHE_ENTRY_CHARACTERS: usize = 4_096;
-pub(crate) const MIGRATION_FINGERPRINT_ALGORITHM: &str = "migration-fingerprint-v1";
+pub(crate) const MIGRATION_FINGERPRINT_ALGORITHM: &str = "migration-fingerprint-v2";
 pub(crate) const CHANGE_KIND_FIRST_RUN: &str = "first_run";
 pub(crate) const CHANGE_KIND_RENAMED: &str = "renamed";

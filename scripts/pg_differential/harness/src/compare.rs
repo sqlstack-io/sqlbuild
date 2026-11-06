@@ -18,6 +18,7 @@ use sqlquack_semantics::lineage::types::LineageSchema;
 use sqlquack_semantics::{statement_lineage, statement_name_findings};
 
 use crate::cases::{Case, Column, PolyglotResult, Source};
+use crate::fingerprint::compare_fingerprint;
 
 const ANALYSIS_DIALECT: &str = "postgres";
 const POLYGLOT_DIALECT: &str = "postgresql";
@@ -48,6 +49,8 @@ pub struct Comparison {
     pub lineage: String,
     pub findings: String,
     pub types: String,
+    /// Whether SQLBuild's migration fingerprint is the same from either parser.
+    pub fingerprint: String,
     /// Polyglot's compared findings, as `<code> <message>`.
     pub polyglot_findings: Vec<String>,
     /// Polyglot's other validation errors, which no measure compares.
@@ -99,8 +102,15 @@ pub fn panicked(case: &Case) -> Comparison {
     unmeasured(case, "panic", None, (Vec::new(), Vec::new()))
 }
 
-/// Parse and analyse the case with SQLQuack and compare each measure with Polyglot's results.
+/// Compare every measure of the case, the migration fingerprint included.
 pub fn compare_case(case: &Case) -> Comparison {
+    let mut comparison: Comparison = analysed_case(case);
+    comparison.fingerprint = compare_fingerprint(&case.query_sql, &mut comparison.differences);
+    comparison
+}
+
+/// Parse and analyse the case with SQLQuack and compare each measure with Polyglot's results.
+fn analysed_case(case: &Case) -> Comparison {
     let sql: String = match normalize_analysis_sql(NormalizationInput {
         sql: case.query_sql.clone(),
         dialect: ANALYSIS_DIALECT.to_owned(),
@@ -169,6 +179,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         lineage: lineage_verdict,
         findings: findings_verdict,
         types: types_verdict,
+        fingerprint: "not_measured".to_owned(),
         polyglot_findings,
         polyglot_other,
         sqlquack_findings,
@@ -190,6 +201,7 @@ fn unmeasured(
         lineage: "not_measured".to_owned(),
         findings: "not_measured".to_owned(),
         types: "not_measured".to_owned(),
+        fingerprint: "not_measured".to_owned(),
         polyglot_findings,
         polyglot_other,
         sqlquack_findings: Vec::new(),

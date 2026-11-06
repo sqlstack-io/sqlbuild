@@ -27,6 +27,8 @@ pub(crate) const WITH_KEY: &str = "with";
 pub(crate) const TABLE_KEY: &str = "table";
 pub(crate) const NUMBER_LITERAL: &str = "number";
 
+/// Characters that open a quoted identifier, string or dollar-quoted body; such tokens keep their case.
+pub(crate) const QUOTE_DELIMITERS: &[char] = &['\'', '"', '`', '$', '['];
 pub(crate) const REF_MARKER: &str = r#"__ref\(\s*(?:"([^"]+)"|'([^']+)')\s*\)"#;
 pub(crate) const EXCLUDED_CONFIG: &[&str] = &[
     "batch_size",
