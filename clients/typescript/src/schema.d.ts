@@ -1577,8 +1577,11 @@ export interface components {
         RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
         RunRecord: {
             /** Format: date-time */
+            cancel_requested_at?: string | null;
+            /** Format: date-time */
             ended_at?: string | null;
             job_key?: string | null;
+            kind: components["schemas"]["RunKind"];
             /** Format: int64 */
             last_event_storage_id: number;
             /** Format: date-time */
@@ -1588,8 +1591,22 @@ export interface components {
             node_counts_json: {
                 [key: string]: number;
             };
+            origin: components["schemas"]["RunOrigin"];
+            /** Format: uuid */
+            parent_run_id?: string | null;
+            /** Format: int64 */
+            priority: number;
             /** Format: date-time */
             queued_at: string;
+            /** @description The stored actor: `principal:<id>` for a person, otherwise a system actor such as `system:scheduler`. */
+            requested_by: string;
+            /** @description The display name of the requesting principal; never set for system actors. */
+            requester_name?: string | null;
+            /** Format: uuid */
+            rerun_of_run_id?: string | null;
+            rewrite_history: boolean;
+            /** Format: uuid */
+            root_run_id: string;
             /** Format: uuid */
             run_id: string;
             selection_json: string[];
@@ -1598,7 +1615,13 @@ export interface components {
             /** Format: date-time */
             started_at?: string | null;
             status: components["schemas"]["RunStatus"];
+            status_reason?: string | null;
             target: string;
+            /** Format: uuid */
+            tick_id?: string | null;
+            /** Format: uuid */
+            trigger_id?: string | null;
+            trigger_name?: string | null;
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {

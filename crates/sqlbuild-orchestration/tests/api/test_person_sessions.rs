@@ -343,6 +343,50 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         .as_u16(),
                         role_case.expected_job
                     );
+                    if role_case.expected_job == 200 && role_case.expected_metadata == 200 {
+                        let listed: Value = request(
+                            &provider.client,
+                            session,
+                            (Method::GET, &metadata),
+                            (&Value::Null, &session.csrf),
+                        )
+                        .await
+                        .json()
+                        .await
+                        .expect("runs after launch");
+                        let rows = listed.as_array().expect("run rows");
+                        let launched = rows
+                            .iter()
+                            .find(|row| row["run_id"] == job["run_id"])
+                            .expect("launched job is listed");
+                        for (key, expected) in [
+                            ("kind", json!("job")),
+                            ("origin", json!("manual")),
+                            ("job_key", json!("orders")),
+                            ("requested_by", json!(format!("principal:{person}"))),
+                            ("requester_name", json!("orders-person")),
+                            ("root_run_id", job["run_id"].clone()),
+                            ("parent_run_id", Value::Null),
+                            ("trigger_name", Value::Null),
+                            ("rerun_of_run_id", Value::Null),
+                            ("priority", json!(0)),
+                            ("rewrite_history", json!(false)),
+                            ("cancel_requested_at", Value::Null),
+                        ] {
+                            assert_eq!(launched[key], expected, "launched run {key}");
+                        }
+                        let seeded = rows
+                            .iter()
+                            .find(|row| row["run_id"] == json!(seed_run.run_id))
+                            .expect("seed run is listed");
+                        for (key, expected) in [
+                            ("kind", json!("adhoc")),
+                            ("requested_by", json!("test-operator")),
+                            ("requester_name", Value::Null),
+                        ] {
+                            assert_eq!(seeded[key], expected, "system-requested run {key}");
+                        }
+                    }
                     for (endpoint, request_body) in
                         [(&path[..], &body), ("/api/control/runs", &job)]
                     {
