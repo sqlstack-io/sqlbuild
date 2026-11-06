@@ -4290,6 +4290,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlbuild-core",
+ "sqlbuild-cursor",
+ "sqlbuild-model-config",
  "sqlbuild-recall",
  "sqlbuild-state",
  "sqlx-core",
