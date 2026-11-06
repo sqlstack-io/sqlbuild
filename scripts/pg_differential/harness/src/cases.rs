@@ -12,6 +12,8 @@ pub struct Case {
     pub query_sql: String,
     /// The relations the compile's binding catalog knew, by analysis name.
     pub relations: Vec<Relation>,
+    /// The project's functions, as SQLBuild declares them to Polyglot.
+    pub functions: Vec<Function>,
     /// What the compile recorded for the model; absent for a mutated query, which only
     /// measures name findings.
     pub polyglot: Option<PolyglotResult>,
@@ -24,6 +26,13 @@ pub struct Relation {
     pub resource_type: Option<String>,
     pub resource_name: Option<String>,
     pub columns: Vec<Column>,
+}
+
+/// A project function: scalar functions carry their return type, table functions none.
+#[derive(Debug, Deserialize)]
+pub struct Function {
+    pub name: String,
+    pub returns: Option<String>,
 }
 
 /// A column with its type spelling and inferred nullability (`non_null`, `nullable`, `unknown`).

@@ -81,6 +81,9 @@ def project_cases(path: Path) -> Iterator[dict[str, Any]]:
     shapes: dict[str, list[dict[str, Any]]] = dict(
         catalog["analysis_shapes"][UNORDERED_MAPPING_KEY]
     )
+    functions: list[dict[str, str | None]] = [
+        project_function(function) for function in project["functions"]
+    ]
     for model in project["models"]:
         resources: dict[str, tuple[str, str]] = {}
         for reference in model["references"]:
@@ -94,8 +97,15 @@ def project_cases(path: Path) -> Iterator[dict[str, Any]]:
             "id": f"{project_name}/{model['name']}",
             "query_sql": model["query_sql"],
             "relations": relations(schemas=schemas, shapes=shapes, resources=resources),
+            "functions": functions,
             "polyglot": polyglot_result(model),
         }
+
+
+def project_function(function: dict[str, Any]) -> dict[str, str | None]:
+    """A project function as SQLBuild types it for analysis: scalar ones by their return type."""
+    returns: str | None = None if function["return_columns"] else function["returns"]
+    return {"name": function["name"], "returns": returns}
 
 
 def relations(
@@ -213,5 +223,6 @@ def mutated(*, case: dict[str, Any], mutation: Mutation, sql: str) -> dict[str, 
         "id": f"{case['id']}{MUTATION_SEPARATOR}{mutation}",
         "query_sql": sql,
         "relations": case["relations"],
+        "functions": case["functions"],
         "polyglot": None,
     }

@@ -67,13 +67,30 @@ pub struct Difference {
     pub sqlquack: String,
 }
 
-/// The catalog the compile knew, keyed by resolved relation name.
+/// SQLBuild's analysis-name stubs for a project function, as `function_names` declares them.
+const UDF_PREFIX: &str = "__sqlbuild_udf_";
+const TABLE_FUNCTION_PREFIX: &str = "__sqlbuild_table_function_";
+
+/// The catalog the compile knew: relations by resolved name, and the project's functions by
+/// their analysis names in lower case, as SQLBuild hands them to Polyglot.
 #[derive(Debug, Default)]
-struct Catalog(HashMap<String, Vec<SchemaColumn>>);
+struct Catalog {
+    relations: HashMap<String, Vec<SchemaColumn>>,
+    /// Known function names, with the return type of each scalar UDF's stub.
+    functions: HashMap<String, Option<String>>,
+}
 
 impl LineageSchema for Catalog {
     fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
-        self.0.get(relation).map(Vec::as_slice)
+        self.relations.get(relation).map(Vec::as_slice)
+    }
+
+    fn function_type(&self, name: &str) -> Option<&str> {
+        self.functions.get(&name.to_lowercase())?.as_deref()
+    }
+
+    fn known_function(&self, name: &str) -> bool {
+        self.functions.contains_key(&name.to_lowercase())
     }
 }
 
@@ -186,7 +203,8 @@ fn is_compared(code: &str) -> bool {
 }
 
 /// Polyglot's validation of the normalized SQL with the options SQLBuild's binding catalog
-/// uses for Postgres (`ProjectCatalog::new`): strict, with type, reference and semantic checks.
+/// uses for Postgres (`ProjectCatalog::new`): the project's functions as known, strict, with
+/// type, reference and semantic checks.
 /// Returns `(compared findings, other errors)` as `<code> <message>`.
 fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<String>), String> {
     let tables: Vec<Value> = case
@@ -206,11 +224,23 @@ fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<Strin
             json!({"name": relation.name, "columns": columns})
         })
         .collect();
+    let known_functions: Vec<String> = case
+        .functions
+        .iter()
+        .flat_map(|function| {
+            [
+                function.name.clone(),
+                format!("{UDF_PREFIX}{}", function.name),
+                format!("{TABLE_FUNCTION_PREFIX}{}", function.name),
+            ]
+        })
+        .collect();
     let request: Value = json!({
         "sql": sql,
         "dialect": POLYGLOT_DIALECT,
         "schema": {"tables": tables, "strict": true},
         "options": {
+            "known_functions": known_functions,
             "check_types": true,
             "check_references": true,
             "semantic": true,
@@ -235,27 +265,34 @@ fn polyglot_validation(case: &Case, sql: &str) -> Result<(Vec<String>, Vec<Strin
 }
 
 fn catalog(case: &Case, profile: &dyn DialectProfile) -> Catalog {
-    Catalog(
-        case.relations
-            .iter()
-            .map(|relation| {
-                let columns: Vec<SchemaColumn> = relation
-                    .columns
-                    .iter()
-                    .map(|column| SchemaColumn {
-                        quoted: column.name != column.name.to_lowercase(),
-                        name: column.name.clone(),
-                        data_type: column
-                            .data_type
-                            .clone()
-                            .filter(|data_type| data_type != "UNKNOWN"),
-                        nullability: nullability(&column.nullability),
-                    })
-                    .collect();
-                (profile.resolved_identifier(&relation.name, false), columns)
-            })
-            .collect(),
-    )
+    let relations: HashMap<String, Vec<SchemaColumn>> = case
+        .relations
+        .iter()
+        .map(|relation| {
+            let columns: Vec<SchemaColumn> = relation
+                .columns
+                .iter()
+                .map(|column| SchemaColumn {
+                    quoted: column.name != column.name.to_lowercase(),
+                    name: column.name.clone(),
+                    data_type: column.data_type.clone(),
+                    nullability: nullability(&column.nullability),
+                })
+                .collect();
+            (profile.resolved_identifier(&relation.name, false), columns)
+        })
+        .collect();
+    let mut functions: HashMap<String, Option<String>> = HashMap::new();
+    for function in &case.functions {
+        let name: String = function.name.to_lowercase();
+        functions.insert(format!("{UDF_PREFIX}{name}"), function.returns.clone());
+        functions.insert(format!("{TABLE_FUNCTION_PREFIX}{name}"), None);
+        functions.insert(name, None);
+    }
+    Catalog {
+        relations,
+        functions,
+    }
 }
 
 fn resources(case: &Case, profile: &dyn DialectProfile) -> HashMap<String, (String, String)> {
