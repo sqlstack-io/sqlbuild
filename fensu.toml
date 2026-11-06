@@ -993,8 +993,18 @@ symbols = ["assert_required_cgroup_memory_limit"]
 reason = "Tests and benchmarks run this tooling; Fensu does not count tests as roots."
 
 [[targets.python.dead_code.roots]]
+modules = ["scripts.cold_compile_performance.main.compile_memory_scope_command"]
+symbols = ["compile_memory_scope_command"]
+reason = "Tests and benchmarks run this tooling; Fensu does not count tests as roots."
+
+[[targets.python.dead_code.roots]]
 modules = ["scripts.cold_compile_performance.main.read_compile_measurement"]
 symbols = ["read_compile_measurement"]
+reason = "Tests and benchmarks run this tooling; Fensu does not count tests as roots."
+
+[[targets.python.dead_code.roots]]
+modules = ["scripts.cold_compile_performance.main.require_compile_memory_scope"]
+symbols = ["require_compile_memory_scope"]
 reason = "Tests and benchmarks run this tooling; Fensu does not count tests as roots."
 
 [[targets.python.dead_code.roots]]

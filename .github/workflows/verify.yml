@@ -773,26 +773,14 @@ jobs:
         run: uv python install 3.12
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
-      - name: Run dense all-rules and delta edit-loop guards under 4 GiB
+      # Each timed compile runs in its own 4 GiB transient scope; pytest stays outside it.
+      - name: Run dense all-rules and delta edit-loop guards with each compile under 4 GiB
         env:
           BENCHMARK_MODELS: ${{ matrix.models }}
-          MEMORY_LIMIT_BYTES: "4294967296"
+          SQLBUILD_COMPILE_MEMORY_LIMIT_BYTES: "4294967296"
         run: |
-          sudo systemd-run \
-            --unit="sqlbuild-dense-${BENCHMARK_MODELS}-${GITHUB_RUN_ID}" \
-            --uid="$(id -u)" \
-            --gid="$(id -g)" \
-            --same-dir \
-            --setenv="HOME=${HOME}" \
-            --setenv="PATH=${PATH}" \
-            --setenv="SQLBUILD_REQUIRE_MEMORY_LIMIT_BYTES=${MEMORY_LIMIT_BYTES}" \
-            --property="MemoryMax=${MEMORY_LIMIT_BYTES}" \
-            --property="MemorySwapMax=0" \
-            --wait \
-            --collect \
-            --pipe \
-            make test-e2e-dense-compile-performance \
-              SQLBUILD_BENCHMARK_MODELS="${BENCHMARK_MODELS}"
+          make test-e2e-dense-compile-performance \
+            SQLBUILD_BENCHMARK_MODELS="${BENCHMARK_MODELS}"
 
       - name: Run diagnostic-heavy compile guards
         if: matrix.models == 1000

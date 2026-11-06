@@ -12,8 +12,8 @@ from scripts.cold_compile_performance._helpers.dense_project import (
     dense_test_path,
     write_dense_compile_project,
 )
-from scripts.cold_compile_performance.main.assert_required_cgroup_memory_limit import (
-    assert_required_cgroup_memory_limit,
+from scripts.cold_compile_performance.main.require_compile_memory_scope import (
+    require_compile_memory_scope,
 )
 from sqlbuild._native import (
     Rule,
@@ -85,7 +85,7 @@ def test_given_dense_project_when_compiling_cold_then_preserves_rules_semantics_
     test_case: DenseCompileGuardTestCase,
     tmp_path: Path,
 ) -> None:
-    assert_required_cgroup_memory_limit()
+    require_compile_memory_scope()
     project_dir: Path = tmp_path / "dense_orders"
     write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
     config: RulesConfig = load_rules_config(project_dir=project_dir)
@@ -179,7 +179,7 @@ def test_given_dense_project_when_compiling_warm_and_after_one_edit_then_matches
     test_case: DenseWarmEditCompileGuardTestCase,
     tmp_path: Path,
 ) -> None:
-    assert_required_cgroup_memory_limit()
+    require_compile_memory_scope()
     project_dir: Path = tmp_path / "dense_orders"
     write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
     edited_model_path: Path = dense_model_path(
@@ -264,7 +264,7 @@ def test_given_dense_project_when_editing_one_file_then_delta_compiles_stay_chea
     test_case: DenseDeltaEditLoopGuardTestCase,
     tmp_path: Path,
 ) -> None:
-    assert_required_cgroup_memory_limit()
+    require_compile_memory_scope()
     project_dir: Path = tmp_path / "dense_orders"
     write_dense_compile_project(project_dir=project_dir, model_count=test_case.model_count)
     index: int = test_case.edited_model_index
