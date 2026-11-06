@@ -153,8 +153,9 @@ jobs:
                 ;;
             esac
             case "${path}" in
-              ui/*|.github/workflows/verify.yml)
-                # The web UI is not packaged; its own checks and unit tests cover it.
+              ui/*|clients/typescript/*|.github/workflows/verify.yml)
+                # The web UI is not packaged; its own checks and unit tests cover it. It compiles
+                # against the generated control client, so client changes run them too.
                 ui=true
                 ;;
             esac
