@@ -6,8 +6,8 @@ use crate::credentials::models::{Action, AuditContext};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::models::{ControlStore, TransactionMode};
-use crate::warehouse_metadata::_helpers::checks::{check_result, evidence, sensitive_check_read};
-use crate::warehouse_metadata::models::CheckEvidence;
+use crate::warehouse_history::_helpers::checks::{check_result, evidence, sensitive_check_read};
+use crate::warehouse_history::models::CheckEvidence;
 
 pub async fn read_person_check_evidence(
     store: &ControlStore,

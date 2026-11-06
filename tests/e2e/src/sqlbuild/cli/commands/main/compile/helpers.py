@@ -34,6 +34,9 @@ import sqlbuild.adapter.type_system._helpers.type_normalization as type_normaliz
 import sqlbuild.cli.compile_reuse._helpers.provider_settings as provider_settings
 import sqlbuild.compiler.compile._helpers.macro_bridge.call_store as call_store_module
 import sqlbuild.compiler.macro_bridge.classes.macro_bridge as macro_bridge_class
+from scripts.cold_compile_performance.main.compile_memory_scope_command import (
+    compile_memory_scope_command,
+)
 from scripts.cold_compile_performance.main.read_compile_measurement import read_compile_measurement
 from scripts.cold_compile_performance.main.semantic_compile_fingerprint import (
     semantic_compile_fingerprint,
@@ -726,6 +729,7 @@ def _run_timed_sqb(
     output_path: Path = project_dir.parent / f"{label}.out"
     stderr_path: Path = project_dir.parent / f"{label}.stderr"
     command: list[str] = [
+        *compile_memory_scope_command(label=label),
         "/usr/bin/time",
         "--quiet",
         "--output",

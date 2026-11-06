@@ -10,8 +10,8 @@ from typing import cast
 
 import pytest
 
-from scripts.cold_compile_performance.main.assert_required_cgroup_memory_limit import (
-    assert_required_cgroup_memory_limit,
+from scripts.cold_compile_performance.main.require_compile_memory_scope import (
+    require_compile_memory_scope,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.compile._test_types import (
     GeneratedBenchmarkCompileTestCase,
@@ -44,7 +44,7 @@ _GIB: int = 1024 * 1024 * 1024
 def test_given_generated_duckshop_10k_when_compiling_cold_then_matches_checksum_and_is_clean(
     test_case: GeneratedBenchmarkCompileTestCase, tmp_path: Path
 ) -> None:
-    assert_required_cgroup_memory_limit()
+    require_compile_memory_scope()
     project_dir: Path = tmp_path / "duckshop_10k"
 
     generated: subprocess.CompletedProcess[str] = run_benchmark_generator(

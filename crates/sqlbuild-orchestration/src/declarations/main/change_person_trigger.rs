@@ -20,7 +20,7 @@ pub async fn change_person_trigger(
 ) -> Result<bool, ControlError> {
     let (transaction, scope) = trigger_scope(
         begin(store, TransactionMode::Write).await?,
-        context,
+        (context, credentials),
         request,
     )
     .await?;

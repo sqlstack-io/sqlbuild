@@ -18,6 +18,7 @@ use crate::runs::tests::terminal_helpers::finish;
 use crate::runs::tests::test_types::{
     BacklogClaimTestCase, GroupLimitTestCase, PriorityClaimsTestCase, ScopedClaimTestCase,
 };
+use crate::store::tests::lease_helpers::extend_lease_through_test;
 use crate::store::tests::replica_helpers::second_store;
 use crate::store::tests::store_helpers::{close_store, close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
@@ -399,23 +400,19 @@ fn given_more_than_one_page_of_blocked_runs_when_claiming_then_lower_priority_in
                 .await
                 .expect("snapshot");
             let scope = (location, published.snapshot_id);
-            let mut lease = acquire_lease(store, Uuid::now_v7())
+            let elected = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("elect")
                 .expect("leader");
+            let lease = extend_lease_through_test(store, elected).await;
             let limits = BTreeMap::new();
             queue(store, &request(scope, 1, 0, &["orders"])).await;
             claim_next_run(store, &lease, &limits, None)
                 .await
                 .expect("claim blocker")
                 .expect("available");
-            for batch in (2..=104).collect::<Vec<_>>().chunks(20) {
-                for id in batch {
-                    queue(store, &request(scope, *id, 0, &["orders"])).await;
-                }
-                lease = crate::scheduler::main::renew_lease::renew_lease(store, &lease)
-                    .await
-                    .expect("keep leader live while preparing backlog");
+            for id in 2..=104 {
+                queue(store, &request(scope, id, 0, &["orders"])).await;
             }
             queue(store, &request(scope, 105, -1, &["customers"])).await;
             let started = std::time::Instant::now();

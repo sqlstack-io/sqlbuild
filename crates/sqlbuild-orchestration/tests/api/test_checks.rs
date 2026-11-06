@@ -1,35 +1,19 @@
 //! Check reads through the public API: keyed by binding key, view-gated, with audited SQL.
 
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::api::models::{ApiAuthentication, HumanLogin};
-use crate::api::tests::checks_helpers::{ORIGIN, PASSWORD, fixture, get, latest_audit, login};
-use crate::api::tests::helpers::{start_api_with_authentication, stop_api};
+use crate::api::tests::helpers::stop_api;
 use crate::api::tests::test_types::WarehouseMetadataTestCase;
-use crate::authorization::main::{
-    assign_builtin_role::assign_builtin_role, bootstrap_user::bootstrap_user,
+use crate::api::tests::warehouse_history_helpers::{
+    batch, fixture, get, latest_audit, login, seed_target, start_password_api,
 };
-use crate::credentials::main::{
-    identities::create_principal::create_principal, sessions::login_password::login_password,
-    sessions::set_password::set_password,
-};
-use crate::credentials::models::{
-    AuditContext, BuiltinRole, PasswordAuthority, PasswordLogin, RoleAssignmentRequest,
-};
-use crate::credentials::tests::location_helpers::create_location;
-use crate::platform::main::report_location_health::report_location_health;
-use crate::platform::models::{LocationHealth, LocationHealthReport};
-use crate::runs::tests::helpers::snapshot;
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::store::main::migrate_store::migrate_store;
 use crate::store::tests::fault_helpers::{install_fault, remove_fault};
 use crate::store::tests::fault_types::TransactionFault;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 use crate::warehouse_metadata::main::ingest_audit_results::ingest_audit_results;
-use crate::warehouse_metadata::models::MetadataBatch;
 
 #[test]
 fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_and_sql_permissions_hold()
@@ -50,79 +34,7 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
         run(async {
             let fixture_store = open_test_store(test_case.backend).await.expect("store");
             let store = &fixture_store.store;
-            migrate_store(store).await.expect("migrate");
-            let context = AuditContext {
-                actor: "control-store-owner".into(),
-                granting_role: "control-store-owner".into(),
-                request_id: Uuid::now_v7(),
-                ip_address: Some("127.0.0.1".parse().expect("local peer")),
-            };
-            let admin = bootstrap_user(store, &context, "orders-admin")
-                .await
-                .expect("bootstrap");
-            let PasswordLogin::Authenticated(admin_session) = ({
-                set_password(
-                    store,
-                    &context,
-                    PasswordAuthority::Operator(admin),
-                    PASSWORD,
-                )
-                .await
-                .expect("admin password");
-                login_password(store, &context, ("orders-admin", PASSWORD))
-                    .await
-                    .expect("admin login")
-            }) else {
-                panic!("authenticated administrator");
-            };
-            let location = create_location(store, "orders", "test-admin")
-                .await
-                .expect("location");
-            for (name, role) in [
-                ("orders-viewer", BuiltinRole::Viewer),
-                ("orders-developer", BuiltinRole::Developer),
-            ] {
-                let person = create_principal(store, &context, name)
-                    .await
-                    .expect("person");
-                set_password(
-                    store,
-                    &context,
-                    PasswordAuthority::Operator(person),
-                    PASSWORD,
-                )
-                .await
-                .expect("password");
-                assign_builtin_role(
-                    store,
-                    (&context, admin_session.identity.principal_id),
-                    &RoleAssignmentRequest {
-                        principal_id: person,
-                        role: role.into(),
-                        location_id: Some(location),
-                        target: Some("development".into()),
-                        revoke: false,
-                    },
-                )
-                .await
-                .expect("scoped role");
-            }
-            publish_snapshot(store, &snapshot(location))
-                .await
-                .expect("snapshot");
-            let session_id = Uuid::now_v7();
-            report_location_health(
-                store,
-                location,
-                &LocationHealthReport {
-                    event_id: Uuid::now_v7(),
-                    session_id,
-                    target: "development".into(),
-                    health: LocationHealth::Heartbeat {},
-                },
-            )
-            .await
-            .expect("reader");
+            let (location, session_id) = seed_target(store).await;
             let data = fixture("check_identity.json");
             let base = fixture("audit_result_history.json")["record"].clone();
             let records: Vec<Value> = data["results"]
@@ -146,24 +58,18 @@ fn given_checks_sharing_an_audit_name_when_people_read_them_then_binding_keys_an
                 })
                 .collect();
             assert_eq!(records.len(), test_case.expected_observations);
-            let batch: MetadataBatch = serde_json::from_value(json!({"kind":"audit_results","session_id":session_id,"generation":1,"records":records,
-                "scan":{"scan_id":Uuid::now_v7(),"location":{"database":null,"schema":"main"},"complete":false}})).expect("batch");
             assert!(
-                ingest_audit_results(store, (location, "development"), &batch)
-                    .await
-                    .expect("real audit ingestion")
-                    .applied
+                ingest_audit_results(
+                    store,
+                    (location, "development"),
+                    &batch(session_id, "audit_results", records)
+                )
+                .await
+                .expect("real audit ingestion")
+                .applied
             );
 
-            let api = start_api_with_authentication(
-                store,
-                ApiAuthentication {
-                    login: HumanLogin::Password(ORIGIN.into()),
-                    ..Default::default()
-                },
-            )
-            .await;
-            let client = Client::new();
+            let (api, client) = start_password_api(store).await;
             let viewer = login(&client, &api.url, "orders-viewer").await;
             let developer = login(&client, &api.url, "orders-developer").await;
             let administrator = login(&client, &api.url, "orders-admin").await;

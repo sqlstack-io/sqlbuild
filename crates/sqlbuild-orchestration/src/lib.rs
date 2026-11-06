@@ -12,6 +12,7 @@ pub mod scheduler;
 pub mod sensors;
 pub mod snapshots;
 pub mod store;
+pub mod warehouse_history;
 pub mod warehouse_metadata;
 pub mod webhooks;
 pub mod worker;
