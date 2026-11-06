@@ -1,0 +1,477 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn-svelte/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@custom-variant dark (&:is(.dark *));
+@plugin '@tailwindcss/typography';
+
+/* Refined SQLBuild light theme: crisp white chrome over a restrained cool-grey canvas. */
+:root {
+	/* experiment: panels are outlined in light mode, filled (borderless) in dark mode */
+	/* light: the card edge is the strongest line on the page; lines inside cards stay quieter */
+	--panel-border: rgba(28, 32, 38, 0.2);
+	--panel-shadow: none;
+	--inner-line: rgba(28, 32, 38, 0.055);
+	--node-border: var(--border-strong);
+	--radius: 2px; /* experiment: boxy corners */
+
+	--background: #ffffff;
+	--foreground: #171a1f;
+	--card: #ffffff;
+	--card-foreground: #171a1f;
+	--popover: #ffffff;
+	--popover-foreground: #171a1f;
+	--primary: #2677d9;
+	--primary-foreground: #ffffff;
+	--secondary: #f6f7f9;
+	--secondary-foreground: #171a1f;
+	--muted: #f6f7f9;
+	--muted-foreground: #626a76;
+	--accent: #f3f5f7;
+	--accent-foreground: #171a1f;
+	--destructive: #c74757;
+	--border: rgba(31, 41, 55, 0.12);
+	--input: rgba(31, 41, 55, 0.18);
+	--ring: #2677d9;
+	--chart-1: #2677d9;
+	--chart-2: #16825c;
+	--chart-3: #7756b9;
+	--chart-4: #aa6c16;
+	--chart-5: #16825c;
+	--sidebar: #ffffff;
+	--sidebar-foreground: #626a76;
+	--sidebar-primary: #2677d9;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: rgba(38, 119, 217, 0.10);
+	--sidebar-accent-foreground: #171a1f;
+	--sidebar-border: rgba(28, 32, 38, 0.10);
+	--sidebar-ring: #2677d9;
+
+	/* SQLBuild semantic + structural tokens (light) */
+	--sb-success: #16825c;
+	--sb-warning: #aa6c16;
+	--sb-error: #c74757;
+	--sb-running: #2677d9;
+	--sb-stale: #7756b9;
+	--sb-secondary: #16826f;
+	--sb-text-faint: #98a0ad;
+	--sb-surface-low: #f7f8fa;
+	--sb-surface-high: #ffffff;
+	--sb-inset: #fbfcfe;
+	--sb-hover: #f5f7fa;
+	--sb-layer-source: #8b9098;
+	--sb-layer-staging: #16826f;
+	--sb-layer-intermediate: #aa6c16;
+	--sb-layer-marts: #2677d9;
+	--sb-elev: 0 1px 2px rgba(16,24,40,0.035), 0 5px 16px rgba(16,24,40,0.045);
+
+	/* structural border + graph tokens (light) */
+	--border-subtle: rgba(28, 32, 38, 0.075);
+	--border-strong: rgba(28, 32, 38, 0.22);
+	--sb-edge: rgba(28, 32, 38, 0.24);
+	--sb-edge-dim: rgba(28, 32, 38, 0.08);
+	--sb-grid: rgba(28, 32, 38, 0.075);
+	--sb-mono: #464b53;
+	--sb-mono-err: #aa3445;
+
+	/* SQL syntax tokens (light) */
+	--syn-keyword: #1a56c4;
+	--syn-string: #0a7a3f;
+	--syn-number: #9a6700;
+	--syn-comment: #8a909c;
+	--syn-function: #7c3aed;
+	--syn-operator: #3a3f4a;
+	--syn-punct: #5b616e;
+}
+
+/* Neutral operational dark theme: no warm tint, with SQLBuild blue reserved for action. */
+.dark {
+	--panel-border: transparent;
+	--panel-shadow: none;
+	--inner-line: rgba(176, 184, 198, 0.09);
+	--node-border: rgba(176, 184, 198, 0.1);
+	--background: #0d0f12;
+	--foreground: #e9ebef;
+	--card: #171a1f;
+	--card-foreground: #e9ebef;
+	--popover: #191c21;
+	--popover-foreground: #e9ebef;
+	--primary: #3788e8;
+	--primary-foreground: #ffffff;
+	--secondary: #20242a;
+	--secondary-foreground: #e9ebef;
+	--muted: #191c21;
+	--muted-foreground: #9ba1ac;
+	--accent: #20242a;
+	--accent-foreground: #e9ebef;
+	--destructive: #eb6475;
+	--border: rgba(176, 184, 198, 0.14);
+	--input: rgba(176, 184, 198, 0.22);
+	--ring: #3788e8;
+	--chart-1: #3788e8;
+	--chart-2: #4dd6c4;
+	--chart-3: #a78bfa;
+	--chart-4: #f0c267;
+	--chart-5: #54cf8e;
+	--sidebar: #080a0d;
+	--sidebar-foreground: #9ba1ac;
+	--sidebar-primary: #3788e8;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: rgba(55, 136, 232, 0.14);
+	--sidebar-accent-foreground: #e9ebef;
+	--sidebar-border: rgba(176, 184, 198, 0.12);
+	--sidebar-ring: #69aaf6;
+
+	/* SQLBuild semantic + structural tokens (used by custom widgets) */
+	--sb-success: #54cf8e;
+	--sb-warning: #f0c267;
+	--sb-error: #f47089;
+	--sb-running: #69aaf6;
+	--sb-stale: #a78bfa;
+	--sb-secondary: #4dd6c4;
+	--sb-text-faint: #626975;
+	--sb-surface-low: #080a0d;
+	--sb-surface-high: #20242a;
+	--sb-inset: #090b0e;
+	--sb-hover: #20242a;
+	--sb-layer-source: #59627a;
+	--sb-layer-staging: #4dd6c4;
+	--sb-layer-intermediate: #f0c267;
+	--sb-layer-marts: #3788e8;
+	--sb-elev: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(176,184,198,0.04), inset 0 1px 0 rgba(255,255,255,0.035);
+
+	/* structural border + graph tokens (dark) */
+	--border-subtle: rgba(176, 184, 198, 0.09);
+	--border-strong: rgba(176, 184, 198, 0.28);
+	--sb-edge: rgba(176, 184, 198, 0.28);
+	--sb-edge-dim: rgba(176, 184, 198, 0.09);
+	--sb-grid: rgba(176, 184, 198, 0.09);
+	--sb-mono: #b6bbc4;
+	--sb-mono-err: #d6a6ae;
+
+	/* SQL syntax tokens (dark) */
+	--syn-keyword: #5aa9e6;
+	--syn-string: #79c98a;
+	--syn-number: #e3b341;
+	--syn-comment: #5c606b;
+	--syn-function: #c79bf0;
+	--syn-operator: #aeb3bd;
+	--syn-punct: #8b8f9b;
+}
+
+@theme inline {
+	--font-sans: 'Inter Variable', sans-serif;
+	--font-display: 'Space Grotesk Variable', 'Inter Variable', sans-serif;
+	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar: var(--sidebar);
+	--color-chart-5: var(--chart-5);
+	--color-chart-4: var(--chart-4);
+	--color-chart-3: var(--chart-3);
+	--color-chart-2: var(--chart-2);
+	--color-chart-1: var(--chart-1);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive: var(--destructive);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
+}
+
+/* Shared list-table treatment (Catalog/Runs/Jobs/Triggers/Checks/Providers).
+   Dagster-like: row dividers only, muted sentence-case header, one text scale,
+   mono only for genuinely code-y values (.code / <code>). */
+.sb-list {
+	width: 100%;
+	font-family: var(--font-sans);
+	font-size: 12.5px;
+	border-collapse: separate !important;
+	border-spacing: 0;
+}
+.sb-list thead th {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	height: 36px;
+	padding: 0 16px;
+	border-bottom: 1px solid var(--border);
+	background: var(--background);
+	color: var(--muted-foreground);
+	font-size: 12px;
+	font-weight: 500;
+	text-align: left;
+	white-space: nowrap;
+}
+.sb-list tbody td {
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: middle;
+}
+.sb-list th:first-child,
+.sb-list td:first-child {
+	padding-left: 20px;
+}
+.sb-list th:last-child,
+.sb-list td:last-child {
+	padding-right: 20px;
+}
+.sb-list tbody tr {
+	cursor: pointer;
+}
+.sb-list tbody tr:hover {
+	background: var(--sb-hover);
+}
+.sb-list .code,
+.sb-list code {
+	font-family: var(--font-mono);
+	font-size: 12px;
+}
+.sb-list .num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.sb-list .muted {
+	color: var(--muted-foreground);
+}
+.sb-list .cell-name {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+.sb-list .cell-name > svg {
+	flex: 0 0 auto;
+	color: var(--muted-foreground);
+}
+.sb-list .cell-name a,
+.sb-list .cell-name strong {
+	color: var(--foreground);
+	font-size: 13px;
+	font-weight: 500;
+}
+.sb-list .cell-name a:hover {
+	color: var(--primary);
+}
+.sb-list .cell-desc {
+	margin-top: 1px;
+	overflow: hidden;
+	color: var(--muted-foreground);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.sb-list .link {
+	color: var(--primary);
+}
+.sb-list .link:hover {
+	text-decoration: underline;
+}
+.sb-list .empty {
+	padding: 48px 20px;
+	color: var(--muted-foreground);
+	text-align: center;
+	cursor: default;
+}
+.sb-list-wrap {
+	min-height: 0;
+	flex: 1;
+	overflow: auto;
+}
+/* table pill (Dagster-style): wrap discrete values so cells read as objects */
+.sb-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	background: var(--sb-hover);
+	border: 0;
+	border-radius: 2px;
+	padding: 2px 7px;
+	font-size: 11.5px;
+	line-height: 1.45;
+	color: var(--muted-foreground);
+	white-space: nowrap;
+}
+.sb-tag .sb-tag-ico {
+	color: var(--sb-text-faint);
+}
+/* status label: coloured dot + plain label (no tinted pill) */
+.sb-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--foreground);
+	font-size: 12.5px;
+	font-weight: 500;
+	white-space: nowrap;
+	text-transform: capitalize;
+}
+.sb-status > span:first-child {
+	width: 8px !important;
+	height: 8px !important;
+	border-radius: 50% !important;
+	background: var(--tone) !important;
+}
+/* styled checkbox (replaces the chunky native accent-color box) */
+.sb-check {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 14px;
+	height: 14px;
+	border: 1.5px solid var(--border-strong);
+	border-radius: 2px;
+	background: transparent;
+	cursor: pointer;
+	position: relative;
+	vertical-align: middle;
+	transition:
+		background 0.12s,
+		border-color 0.12s;
+}
+.sb-check:hover {
+	border-color: var(--muted-foreground);
+}
+.sb-check:checked {
+	background: var(--primary);
+	border-color: var(--primary);
+}
+.sb-check:checked::after {
+	content: '';
+	position: absolute;
+	left: 4px;
+	top: 1px;
+	width: 4px;
+	height: 8px;
+	border: solid #fff;
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+.sb-check:indeterminate {
+	background: var(--primary);
+	border-color: var(--primary);
+}
+.sb-check:indeterminate::after {
+	content: '';
+	position: absolute;
+	left: 2px;
+	top: 4.5px;
+	width: 7px;
+	height: 2px;
+	background: #fff;
+}
+.sb-check:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+/* paused/disabled row: dim the row content (toggle keeps its own colour) */
+.sb-row-off td {
+	opacity: 0.6;
+}
+.sb-toggle {
+	position: relative;
+	width: 28px;
+	height: 16px;
+	flex: 0 0 28px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--border-strong);
+	transition: background 0.15s;
+}
+.sb-toggle.on {
+	background: var(--sb-success);
+}
+.sb-toggle::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #fff;
+	transition: left 0.15s;
+}
+.sb-toggle.on::after {
+	left: 14px;
+}
+.sb-toggle:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+/* Prism token theme — mapped to SQLBuild syntax tokens (works light + dark) */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+	color: var(--syn-comment);
+	font-style: italic;
+}
+.token.keyword {
+	color: var(--syn-keyword);
+}
+.token.string,
+.token.char,
+.token.attr-value {
+	color: var(--syn-string);
+}
+.token.number,
+.token.boolean {
+	color: var(--syn-number);
+}
+.token.function,
+.token.sb-ref {
+	color: var(--syn-function);
+}
+.token.operator,
+.token.entity,
+.token.url {
+	color: var(--syn-operator);
+}
+.token.punctuation {
+	color: var(--syn-punct);
+}
+.token.sb-config {
+	color: var(--syn-keyword);
+	font-weight: 500;
+}
+

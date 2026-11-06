@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use pyo3::prelude::{PyAnyMethods, PyResult, Python};
 use serde_json::{Value, json};
+use sqlbuild_core::nested_progress::main::audit_resource_id::audit_resource_id;
 use sqlbuild_orchestration::snapshots::models::SnapshotNode;
 
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
@@ -101,9 +102,17 @@ pub(crate) fn resource_nodes(
         let target: Option<Value> = attached.target.as_ref().map(
             |target| json!({"kind": target.kind, "name": target.name, "column": target.column}),
         );
+        let key = match &attached.target {
+            Some(target) => audit_resource_id(
+                attached.compiled_name(),
+                &target.kind,
+                (Some(&target.name), target.column.as_deref()),
+            ),
+            None => format!("audit:{}", attached.compiled_name()),
+        };
         nodes = insert_node(
             nodes,
-            format!("audit:{}", attached.compiled_name()),
+            key,
             SnapshotNode {
                 kind: "audit".into(),
                 definition: json!({

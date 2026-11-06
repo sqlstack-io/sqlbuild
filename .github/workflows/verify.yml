@@ -29,6 +29,7 @@ jobs:
       rules_performance: ${{ steps.scope.outputs.rules_performance }}
       wheels: ${{ steps.scope.outputs.wheels }}
       recovery: ${{ steps.scope.outputs.recovery }}
+      ui: ${{ steps.scope.outputs.ui }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,11 +55,12 @@ jobs:
               echo "compiler_differential=$8"
               echo "clickhouse=$9"
               echo "recovery=${10}"
+              echo "ui=${11}"
             } >> "${GITHUB_OUTPUT}"
           }
 
           if [[ "${EVENT_NAME}" != "pull_request" && "${EVENT_NAME}" != "merge_group" ]]; then
-            write_scope true true true true true true true true true true
+            write_scope true true true true true true true true true true true
             exit 0
           fi
 
@@ -70,7 +72,7 @@ jobs:
           if [[ -z "${BASE_SHA}" || -z "${HEAD_SHA}" ]] || \
              ! git diff --name-only -z "${BASE_SHA}...${HEAD_SHA}" > "${changed_paths}"; then
             echo "Could not diff ${BASE_SHA:-<none>}...${HEAD_SHA:-<none>}; running every suite" >&2
-            write_scope true true true true true true true true true true
+            write_scope true true true true true true true true true true true
             exit 0
           fi
 
@@ -116,7 +118,7 @@ jobs:
                 && "${HEAD_REF}" == release-please--branches--* ]] && release_metadata_only; then
             echo "Release Please pull request changes only release metadata; skipping the suites" \
               | tee -a "${GITHUB_STEP_SUMMARY}"
-            write_scope false false false false false false false false false false
+            write_scope false false false false false false false false false false false
             exit 0
           fi
 
@@ -129,6 +131,7 @@ jobs:
           wheels=false
           compiler_differential=false
           recovery=false
+          ui=false
           broad=false
           changed=false
           # A change that only touches the website, root-level Markdown, the README demo GIFs or the
@@ -147,6 +150,13 @@ jobs:
             case "${path}" in
               crates/*|Cargo.toml|Cargo.lock|pyproject.toml|.github/workflows/verify.yml|.github/workflows/build-distributions.yml|deploy/Dockerfile|deploy/project/*|deploy/compose*|compose.yml|.dockerignore|Makefile|tests/integration/src/sqlbuild/compiler/compiled_project/publication/test_compose.py|tests/integration/src/sqlbuild/compiler/compiled_project/publication/docker/compose/*|benchmarks/duckshop/edge_cases/orchestration/container_deployment.json)
                 wheels=true
+                ;;
+            esac
+            case "${path}" in
+              ui/*|clients/typescript/*|.github/workflows/verify.yml)
+                # The web UI is not packaged; its own checks and unit tests cover it. It compiles
+                # against the generated control client, so client changes run them too.
+                ui=true
                 ;;
             esac
             case "${path}" in
@@ -201,6 +211,8 @@ jobs:
                 ;;
               tests/unit/*|tests/integration/*)
                 ;;
+              ui/*)
+                ;;
               .github/workflows/verify.yml|Makefile)
                 performance=true
                 format_performance=true
@@ -215,7 +227,7 @@ jobs:
           done < "${changed_paths}"
 
           if [[ "${changed}" != "true" ]]; then
-            write_scope true true true true true true true true true true
+            write_scope true true true true true true true true true true true
             exit 0
           fi
 
@@ -241,7 +253,8 @@ jobs:
             "${wheels}" \
             "${compiler_differential}" \
             "${clickhouse}" \
-            "${recovery}"
+            "${recovery}" \
+            "${ui}"
 
   lockfile:
     name: Lockfile consistency
@@ -762,26 +775,14 @@ jobs:
         run: uv python install 3.12
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
-      - name: Run dense all-rules and delta edit-loop guards under 4 GiB
+      # Each timed compile runs in its own 4 GiB transient scope; pytest stays outside it.
+      - name: Run dense all-rules and delta edit-loop guards with each compile under 4 GiB
         env:
           BENCHMARK_MODELS: ${{ matrix.models }}
-          MEMORY_LIMIT_BYTES: "4294967296"
+          SQLBUILD_COMPILE_MEMORY_LIMIT_BYTES: "4294967296"
         run: |
-          sudo systemd-run \
-            --unit="sqlbuild-dense-${BENCHMARK_MODELS}-${GITHUB_RUN_ID}" \
-            --uid="$(id -u)" \
-            --gid="$(id -g)" \
-            --same-dir \
-            --setenv="HOME=${HOME}" \
-            --setenv="PATH=${PATH}" \
-            --setenv="SQLBUILD_REQUIRE_MEMORY_LIMIT_BYTES=${MEMORY_LIMIT_BYTES}" \
-            --property="MemoryMax=${MEMORY_LIMIT_BYTES}" \
-            --property="MemorySwapMax=0" \
-            --wait \
-            --collect \
-            --pipe \
-            make test-e2e-dense-compile-performance \
-              SQLBUILD_BENCHMARK_MODELS="${BENCHMARK_MODELS}"
+          make test-e2e-dense-compile-performance \
+            SQLBUILD_BENCHMARK_MODELS="${BENCHMARK_MODELS}"
 
       - name: Run diagnostic-heavy compile guards
         if: matrix.models == 1000
@@ -1124,6 +1125,28 @@ jobs:
       - name: Verify packaged Compose deployment and operational recovery
         run: make test-compose-packaged
 
+  ui:
+    name: UI checks and unit tests
+    needs: changes
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+
   verify:
     # The required Verify of a Release Please pull request is the commit status that the trusted
     # release checks in release-please.yml post on the branch's current head, after the lockfile
@@ -1159,6 +1182,7 @@ jobs:
         clickhouse,
         wheels,
         compose,
+        ui,
       ]
     runs-on: ubuntu-24.04
     steps:
@@ -1185,6 +1209,8 @@ jobs:
           CLICKHOUSE_RESULT: ${{ needs.clickhouse.result }}
           WHEELS_RESULT: ${{ needs.wheels.result }}
           COMPOSE_RESULT: ${{ needs.compose.result }}
+          UI_SELECTED: ${{ needs.changes.outputs.ui }}
+          UI_RESULT: ${{ needs.ui.result }}
         run: |
           if [[ "${CHANGES_RESULT}" != "success" || "${LOCKFILE_RESULT}" != "success" ]]; then
             echo "Required classification or lockfile checks did not pass" >&2
@@ -1223,4 +1249,9 @@ jobs:
               exit 1
             fi
           done
+          if [[ "${UI_RESULT}" != "success" ]] && \
+             ! [[ "${UI_SELECTED}" != "true" && "${UI_RESULT}" == "skipped" ]]; then
+            echo "Required UI checks did not pass: ${UI_RESULT}" >&2
+            exit 1
+          fi
           echo "All path-relevant verification jobs passed"

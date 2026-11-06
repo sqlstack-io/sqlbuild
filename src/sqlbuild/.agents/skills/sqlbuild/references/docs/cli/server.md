@@ -172,5 +172,7 @@ permissions = ["view.evidence"]
 Assign a project role with `POST /api/admin/roles`, using the role key as `role`. Each
 publication replaces the location's project roles: new and changed grants apply at once, and
 removed roles stop applying. A selector covers newly matching nodes as soon as they are
-published. Each change appears in the publication's change list as `role:<key>`. A denial lists
-the nodes the request was missing.
+published. Each change appears in the publication's change list as `role:<key>`. A denial names
+only the missing permission, such as `missing view permission for this target`, and its decision
+ID. It names no nodes, and an unknown location, job, trigger or run is refused with the same
+response. The security audit event for that decision ID lists the nodes the request was missing.

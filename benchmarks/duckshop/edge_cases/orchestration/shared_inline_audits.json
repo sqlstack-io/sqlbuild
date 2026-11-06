@@ -1,0 +1,15 @@
+{
+  "description": "Two models attach the same inline audit to a column of the same name, and the same explicitly named audit. Each attachment is its own snapshot node.",
+  "files": {
+    "sqlbuild_project.toml": "name = \"orders\"\nadapter = \"duckdb\"\n[connections.local]\ndatabase = \"warehouse.duckdb\"\n[targets.development]\nschema = \"main\"\n",
+    "models/orders.sql": "MODEL (\n  materialized table,\n  description \"Synthetic rows.\",\n  columns (id (audits [not_null, unique, accepted_values (name \"id_known\", values [1, 2])])),\n);\n\nSELECT 1 AS id\n",
+    "models/customers.sql": "MODEL (\n  materialized table,\n  description \"Synthetic rows.\",\n  columns (id (audits [not_null, accepted_values (name \"id_known\", values [1, 2])])),\n);\n\nSELECT 2 AS id\n"
+  },
+  "expected_audits": [
+    "audit:id_known:model:customers:id",
+    "audit:id_known:model:orders:id",
+    "audit:not_null:model:customers:id",
+    "audit:not_null:model:orders:id",
+    "audit:unique:model:orders:id"
+  ]
+}
