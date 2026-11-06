@@ -1755,6 +1755,16 @@ rule = "FPRSH002"
 path = "crates/sqlbuild-process-ownership/src/ownership/_helpers/windows.rs"
 reason = "The workspace allows unsafe code only in sqlbuild-process-ownership, for the platform calls that prove which process owns a worker claim; each call has an item-level allow and a SAFETY comment."
 
+[[targets.rust.rule_exceptions]]
+rule = "FPRSR701"
+path = "crates/sqlbuild-cli/src/bin/sqlbuild.rs"
+reason = "The sqlbuild forwarder compiles only the launcher hand-off file instead of linking the sqlbuild-cli library: linking the library grows the stripped binary from about 0.37 MB to 6.4 MB in every wheel."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSR702"
+path = "crates/sqlbuild-cli/src/bin/sqlbuild.rs"
+reason = "The sqlbuild forwarder compiles only the launcher hand-off file instead of linking the sqlbuild-cli library: linking the library grows the stripped binary from about 0.37 MB to 6.4 MB in every wheel."
+
 [targets.rust.rule_options.FPRSL102]
 packages = []
 restricted_paths = ["crates/sqlbuild-rules/src/rules"]

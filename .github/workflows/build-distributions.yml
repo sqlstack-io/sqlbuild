@@ -189,6 +189,24 @@ jobs:
           "${run_as[@]}" "${smoke_scripts}/sqb" --version
           "${run_as[@]}" "${smoke_scripts}/sqb" --help
           "${run_as[@]}" "${smoke_scripts}/sqlbuild" --help
+          "${run_as[@]}" "${smoke_scripts}/sqlbuild" --version
+          # The sqlbuild forwarder returns sqb's own exit code; an unknown command is a usage error.
+          code=0
+          "${run_as[@]}" "${smoke_scripts}/sqlbuild" no-such-command > /dev/null 2>&1 || code=$?
+          if [[ "${code}" != "2" ]]; then
+            echo "sqlbuild no-such-command exited ${code}; sqb exits 2" >&2
+            exit 1
+          fi
+          exe="${{ runner.os == 'Windows' && '.exe' || '' }}"
+          {
+            echo "### Sizes (${{ matrix.platform.name }})"
+            echo
+            echo "| File | Bytes |"
+            echo "| --- | ---: |"
+            for file in dist/*.whl "${smoke_scripts}/sqb${exe}" "${smoke_scripts}/sqlbuild${exe}"; do
+              echo "| $(basename "${file}") | $(wc -c < "${file}" | tr -d ' ') |"
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"
           if [[ "${{ inputs.prebuilt-run-id == '' }}" == "true" ]]; then
             cd "${GITHUB_WORKSPACE}"
             "${run_as[@]}" "${smoke_python}" -m tests.integration.src.sqlbuild.compiler.compiled_project.publication.wheel.helpers \
