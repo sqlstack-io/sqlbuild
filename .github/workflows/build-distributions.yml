@@ -34,6 +34,11 @@ on:
         required: false
         type: number
         default: 0
+      cargo-profile:
+        description: "Cargo profile of the native builds: dist for released wheels, release for quicker checks"
+        required: false
+        type: string
+        default: dist
     outputs:
       sha:
         description: "Commit the distributions were built from"
@@ -141,7 +146,7 @@ jobs:
           command: build
           # One platform records a cargo build timing report for build time work.
           args: >-
-            --release --out dist --features extension-module
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -159,7 +164,7 @@ jobs:
         with:
           command: build
           args: >-
-            --release --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
+            --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
