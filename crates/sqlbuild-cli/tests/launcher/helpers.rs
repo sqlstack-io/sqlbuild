@@ -108,8 +108,24 @@ pub(crate) fn sqb_file() -> String {
 /// A copy of the real `sqlbuild` forwarder, alone in `directory`; a copy works across volumes.
 pub(crate) fn forwarder_in(directory: &Path) -> PathBuf {
     let forwarder = directory.join(format!("sqlbuild{}", std::env::consts::EXE_SUFFIX));
-    std::fs::copy(env!("CARGO_BIN_EXE_sqlbuild"), &forwarder).expect("copy the forwarder");
+    copy_executable(Path::new(env!("CARGO_BIN_EXE_sqlbuild")), &forwarder);
     forwarder
+}
+
+/// Copies in a child, so tests forking in parallel never inherit a write handle (ETXTBSY).
+#[cfg(unix)]
+fn copy_executable(source: &Path, destination: &Path) {
+    let status = Command::new("cp")
+        .arg(source)
+        .arg(destination)
+        .status()
+        .expect("run cp");
+    assert!(status.success(), "copy the forwarder: {status:?}");
+}
+
+#[cfg(windows)]
+fn copy_executable(source: &Path, destination: &Path) {
+    std::fs::copy(source, destination).expect("copy the forwarder");
 }
 
 /// The real forwarder with a fake `sqb` beside it that reports what it received.
