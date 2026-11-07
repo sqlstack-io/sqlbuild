@@ -1,15 +1,35 @@
 import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
-import { RUN_WINDOW, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns } from './http-runs';
+import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
+import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
-import type { RerunMode, Run, RunDetail, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
+import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
 type Wire = components['schemas'];
 
 /** The client methods the server has endpoints for; the shell hides pages that need others. */
-const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>(['supports', 'bootstrap', 'changes', 'listRunRows', 'runTabCounts', 'getRun', 'getRunDetail', 'cancelRun', 'rerunRun']);
+const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
+	'supports',
+	'bootstrap',
+	'changes',
+	'listRunRows',
+	'runTabCounts',
+	'listRuns',
+	'getRun',
+	'getRunDetail',
+	'cancelRun',
+	'rerunRun',
+	'listJobs',
+	'getJob',
+	'launchJob',
+	'listTriggers',
+	'getTrigger',
+	'setTriggerStates',
+	'resetTriggerToDefault',
+	'resetSensorCursor'
+]);
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -190,8 +210,97 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
+		},
+		listRuns: async (scope: Scope, query: RunListQuery = {}): Promise<Run[]> => runsMatching(toRuns(await listedRuns(scope), scope.locationId), query),
+		async listJobs(scope: Scope): Promise<Job[]> {
+			const [jobs, triggers, runs] = await Promise.all([listedJobs(scope), triggersOf(scope), recentRuns(scope)]);
+			return jobs.map((job) => toJob(job, triggers, runs));
+		},
+		async getJob(scope: Scope, key: string): Promise<JobDetail | null> {
+			const [jobs, triggers, runs] = await Promise.all([listedJobs(scope), triggersOf(scope), recentRuns(scope)]);
+			const wire = jobs.find((job) => job.job_key === key);
+			return wire ? jobDetailOf(toJob(wire, triggers, runs), wire) : null;
+		},
+		async launchJob(scope: Scope, key: string): Promise<Run> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: 'Started from the web UI' };
+			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return requireRun(scope, body.run_id);
+		},
+		listTriggers: (scope: Scope): Promise<Trigger[]> => triggersOf(scope),
+		async getTrigger(scope: Scope, id: string): Promise<TriggerDetail | null> {
+			const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
+			const wire = wires.find((t) => t.trigger_id === id);
+			if (!wire) return null;
+			const ticks = (await ticksOf(scope, id, 100)).map(toTick);
+			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks);
+		},
+		async setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]> {
+			for (const id of ids) await changeTrigger(id, { kind: state === 'running' ? 'enable' : 'pause' }, reason);
+			return (await triggersOf(scope)).filter((t) => ids.includes(t.id));
+		},
+		async resetTriggerToDefault(scope: Scope, id: string): Promise<Trigger> {
+			await changeTrigger(id, { kind: 'reset_default' });
+			return requireTrigger(scope, id);
+		},
+		async resetSensorCursor(scope: Scope, id: string, reason?: string | null): Promise<TriggerDetail> {
+			await changeTrigger(id, { kind: 'reset_cursor' }, reason);
+			const detail = await implemented.getTrigger(scope, id);
+			if (!detail) throw new ApiError('The trigger is no longer published', 404);
+			return detail;
 		}
 	};
+
+	async function listedJobs(scope: Scope) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/jobs', { params: { path: { location_id: locationId, target } } });
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function listedTriggers(scope: Scope) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers', { params: { path: { location_id: locationId, target } } });
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function ticksOf(scope: Scope, triggerId: string, limit: number) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
+			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	const recentRuns = async (scope: Scope) => toRuns(await listedRuns(scope), scope.locationId);
+
+	/** Triggers with their latest tick and the newest listed run each started. */
+	async function triggersOf(scope: Scope): Promise<Trigger[]> {
+		const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
+		const latest = await Promise.all(wires.map(async (t) => (await ticksOf(scope, t.trigger_id, 1)).map(toTick)[0] ?? null));
+		return wires.map((t, i) => toTrigger(t, runs, latest[i]));
+	}
+
+	async function requireTrigger(scope: Scope, id: string): Promise<Trigger> {
+		const trigger = (await triggersOf(scope)).find((t) => t.id === id);
+		if (!trigger) throw new ApiError('The trigger is no longer published', 404);
+		return trigger;
+	}
+
+	/** Records an operator change; the server takes the actor from the session and needs a reason. */
+	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
+		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
+		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+	}
 
 	/** The newest runs of the location, up to the server's cap. */
 	async function listedRuns(scope: Scope) {

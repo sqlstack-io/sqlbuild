@@ -54,9 +54,13 @@
 <section>
 	<h3 title="The sensor's cursor">Where it's up to</h3>
 	<div class="cursor">
-		<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
-		{#if sensor.cursorUpdatedAt}<span class="faint" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
-		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
+		{#if sensor.cursorKnown}
+			<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
+			{#if sensor.cursorUpdatedAt}<span class="faint" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
+		{:else}
+			<span class="faint">Starting over makes the next check look at everything again.</span>
+		{/if}
+		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
 	</div>
 	{#if confirmReset}
 		<div class="confirm">
@@ -71,6 +75,7 @@
 	{#if error}<p class="err">{error}</p>{/if}
 </section>
 
+{#if trigger.evaluations}
 <section>
 	<h3 title="Each time the sensor ran its check (an evaluation)">Checks · {trigger.evaluations.length}</h3>
 	<table>
@@ -95,7 +100,9 @@
 	</table>
 	{#if trigger.evaluations.length > shown}<button class="more" onclick={() => (shown += 50)}>Show more</button>{/if}
 </section>
+{/if}
 
+{#if trigger.runRequests}
 <section>
 	<h3 title="Run requests by run key">Runs it started · {trigger.runRequests.length}</h3>
 	{#if trigger.runRequests.length}
@@ -117,6 +124,7 @@
 		<p class="faint">{trigger.jobKey ? 'It hasn’t started any runs yet.' : 'This sensor only runs its own code; it doesn’t start runs.'}</p>
 	{/if}
 </section>
+{/if}
 
 <style>
 	section {

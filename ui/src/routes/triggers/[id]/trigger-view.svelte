@@ -85,10 +85,12 @@
 				{:else}
 					<SensorPanel trigger={t} />
 				{/if}
-				<section>
-					<h3>Code <span>read-only; change it in the project and deploy</span></h3>
-					<CodePreview file="{t.declaration.sourceFile}:{t.declaration.line}" code={t.declaration.code} language="text" maxLines={20} />
-				</section>
+				{#if t.declaration}
+					<section>
+						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
+						<CodePreview file="{t.declaration.sourceFile}:{t.declaration.line}" code={t.declaration.code} language="text" maxLines={20} />
+					</section>
+				{/if}
 			</div>
 
 			<aside class="rail sb-scroll">
@@ -99,12 +101,12 @@
 					{#if t.cron}<div><dt>Cron</dt><dd><code>{t.cron}</code></dd></div>{/if}
 					{#if t.timezone}<div><dt>Time zone</dt><dd>{t.timezone}</dd></div>{/if}
 					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy: {t.catchUp.mode}">{t.catchUp.mode === 'latest' ? 'runs once for the latest missed time' : `runs for each missed time, up to ${t.catchUp.max}`}</dd></div>{/if}
-					<div><dt>Targets</dt><dd>{t.targets?.join(', ') ?? 'all targets'}</dd></div>
+					{#if t.declaration}<div><dt>Targets</dt><dd>{t.targets?.join(', ') ?? 'all targets'}</dd></div>{/if}
 					<div><dt>In the code</dt><dd>{t.defaultState === 'running' ? 'on' : 'paused'}</dd></div>
-					<div><dt>Defined in</dt><dd><code>{t.sourceFile}</code></dd></div>
+					{#if t.sourceFile}<div><dt>Defined in</dt><dd><code>{t.sourceFile}</code></dd></div>{/if}
 				</dl>
 
-				{#if isSchedule}
+				{#if isSchedule && t.upcoming}
 					<h3>Next runs</h3>
 					{#if t.state === 'paused'}
 						<p class="faint">Paused, so it isn't starting runs. When you turn it back on, it makes up missed times as set under “After downtime”.</p>
@@ -135,6 +137,7 @@
 					<p class="faint">No runs yet.</p>
 				{/if}
 
+				{#if t.stateHistory}
 				<h3>On/off history</h3>
 				{#if t.stateHistory.length}
 					{#each t.stateHistory as e (e.id)}
@@ -146,6 +149,7 @@
 					{/each}
 				{:else}
 					<p class="faint">Never switched here: it's on or paused as the code says.</p>
+				{/if}
 				{/if}
 			</aside>
 		</div>

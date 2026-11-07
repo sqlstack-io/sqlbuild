@@ -31,7 +31,13 @@ export const SNAPSHOT_GENERATION = 42;
 
 // ---- jobs and groups ----
 
-type JobDef = Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'> & {
+/** The mock knows every field the server may leave out. */
+type Known<T, K extends keyof T> = Omit<T, K> & { [P in K]-?: NonNullable<T[P]> };
+
+type JobDef = Known<
+	Omit<JobDetail, 'nodeCount' | 'resolvedNodes' | 'lastRun' | 'triggerIds' | 'concurrency' | 'memberOf' | 'cursorType' | 'groupMembers'>,
+	'members' | 'overlap' | 'onFailure' | 'priority' | 'sourceFile' | 'declaration' | 'settings'
+> & {
 	after: Record<string, string[]>;
 };
 

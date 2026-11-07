@@ -17,8 +17,8 @@
 	import { isActiveRun, isProblemRun, runStatusLabel, runStatusTone } from '$lib/status';
 	import { overlapHelp, overlapPlain } from '$lib/operate/labels';
 
-	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs']);
-	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
+	const jobs = createResource((client, scope) => client.listJobs(scope), ['jobs', 'runs', 'snapshot']);
+	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
 
 	const triggerById = $derived(new Map((triggers.data ?? []).map((t) => [t.id, t])));
 	const canToggle = $derived(app.can('trigger.toggle'));
@@ -46,10 +46,14 @@
 			if (lastRun === 'active' && !(j.lastRun && isActiveRun(j.lastRun.status))) return false;
 			if (lastRun === 'never' && j.lastRun) return false;
 			const q = query.trim().toLowerCase();
-			return !q || `${j.key} ${j.description} ${j.select ?? ''} ${j.members.join(' ')}`.toLowerCase().includes(q);
+			return !q || `${j.key} ${j.description} ${j.select ?? ''} ${(j.members ?? []).join(' ')}`.toLowerCase().includes(q);
 		})
 	);
 	const scheduledCount = $derived(all.filter((j) => j.triggerIds.some((id) => triggerById.get(id)?.state === 'running')).length);
+	// Columns the server doesn't report stay hidden rather than showing dashes.
+	const showPolicy = $derived(all.some((j) => j.overlap !== null));
+	const showOwner = $derived(all.some((j) => j.owner !== null));
+	const showSelection = $derived(all.some((j) => j.select !== null || j.members !== null));
 	const failingCount = $derived(all.filter((j) => j.lastRun && isProblemRun(j.lastRun.status)).length);
 </script>
 
@@ -96,11 +100,11 @@
 		<thead>
 			<tr>
 				<th>Job</th>
-				<th>Selection</th>
+				{#if showSelection}<th>Selection</th>{/if}
 				<th class="num">Nodes</th>
-				<th title="What happens when it's asked to run while a run is already waiting or running">If already running</th>
+				{#if showPolicy}<th title="What happens when it's asked to run while a run is already waiting or running">If already running</th>{/if}
 				<th>Started by</th>
-				<th>Owner</th>
+				{#if showOwner}<th>Owner</th>{/if}
 				<th>Last run</th>
 			</tr>
 		</thead>
@@ -117,15 +121,17 @@
 							</div>
 						</div>
 					</td>
-					<td>
-						{#if j.kind === 'group'}
-							<span class="muted">Group · {j.members.join(', ')}</span>
-						{:else}
-							<code>{j.select}</code>
-						{/if}
-					</td>
+					{#if showSelection}
+						<td>
+							{#if j.kind === 'group'}
+								<span class="muted">Group{#if j.members} · {j.members.join(', ')}{/if}</span>
+							{:else}
+								<code>{j.select}</code>
+							{/if}
+						</td>
+					{/if}
 					<td class="num muted">{j.nodeCount}</td>
-					<td class="muted nowrap" title="{overlapHelp[j.overlap]} (overlap = {j.overlap})">{overlapPlain[j.overlap]}{#if j.priority}<span title="Higher priority runs go first when they wait for the same slot"> · priority {j.priority}</span>{/if}</td>
+					{#if showPolicy}<td class="muted nowrap" title={j.overlap ? `${overlapHelp[j.overlap]} (overlap = ${j.overlap})` : undefined}>{j.overlap ? overlapPlain[j.overlap] : '—'}{#if j.priority}<span title="Higher priority runs go first when they wait for the same slot"> · priority {j.priority}</span>{/if}</td>{/if}
 					<td>
 						{#if jobTriggers.length === 0}
 							<span class="muted" title="No schedule or sensor starts it; start it from its page">Only by hand</span>
@@ -151,7 +157,7 @@
 							</div>
 						{/if}
 					</td>
-					<td class="muted">{j.owner ?? '—'}</td>
+					{#if showOwner}<td class="muted">{j.owner ?? '—'}</td>{/if}
 					<td>
 						{#if j.lastRun}
 							<a class="last-run" href="/runs/{j.lastRun.id}" onclick={(e) => e.stopPropagation()}>

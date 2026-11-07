@@ -14,15 +14,16 @@
 
 	let { name }: { name: string } = $props();
 
-	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs']);
+	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs', 'snapshot']);
 	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 12 }), ['runs']);
-	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers']);
+	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
 	const nodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
 
 	const def = $derived(job.data ?? null);
 	const kindOf = $derived(new Map((nodes.data ?? []).map((n) => [n.key, n.kind])));
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 	const runs = $derived(jobRuns.data ?? []);
+	const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
 	let launchOpen = $state(false);
 	let actionError = $state<string | null>(null);
@@ -68,7 +69,7 @@
 		<a href="/jobs" class="back">← Jobs</a>
 		<span class="font-display text-[17px] font-semibold">{name}</span>
 		{#if def}
-			<span class="faint">{def.kind === 'group' ? `Group of ${def.members.length} jobs` : 'Job'} · {def.nodeCount} nodes</span>
+			<span class="faint">{def.kind === 'group' ? (def.members ? `Group of ${def.members.length} jobs` : 'Group') : 'Job'} · {def.nodeCount} nodes</span>
 			<span class="faint">{def.description}</span>
 		{/if}
 	</div>
@@ -82,12 +83,14 @@
 	{#if def}
 		<div class="flex min-h-0 flex-1">
 			<div class="main sb-scroll">
-				<section>
-					<h3>Code <span>read-only; change it in the project and deploy</span></h3>
-					<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={24} />
-				</section>
+				{#if def.declaration}
+					<section>
+						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
+						<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={24} />
+					</section>
+				{/if}
 
-				{#if def.kind === 'group'}
+				{#if def.kind === 'group' && def.groupMembers}
 					<section>
 						<h3>Jobs in this group, in order <span>from the data each job reads and writes, plus any <code>after</code> in the code</span></h3>
 						<GroupOrder job={def} />
@@ -107,8 +110,8 @@
 										<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
 										<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
 										<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
-										<td class="faint">{r.requestedBy.name}</td>
-										<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>
+										<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
+										{#if showCost}<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
 									</tr>
 								{/each}
 							</tbody>
@@ -119,7 +122,7 @@
 				</section>
 
 				<section>
-					<h3>What it builds · {def.resolvedNodes.length} nodes <span>{def.select ? `--select ${def.select}` : 'everything its jobs build'}{def.exclude.length ? ` --exclude ${def.exclude.join(' ')}` : ''}</span></h3>
+					<h3>What it builds · {def.resolvedNodes.length} nodes <span>{def.select ? `--select ${def.select}` : def.kind === 'group' ? 'everything its jobs build' : ''}{def.exclude.length ? ` --exclude ${def.exclude.join(' ')}` : ''}</span></h3>
 					<div class="nodes">
 						{#each def.resolvedNodes as n (n)}
 							<a href="/catalog/{n}" class="node">
@@ -138,29 +141,37 @@
 				<dl>
 					<div><dt>Kind</dt><dd>{def.kind === 'group' ? 'Group of jobs' : 'Job'}</dd></div>
 					{#if def.select}<div><dt>Selection</dt><dd><code>{def.select}</code></dd></div>{/if}
-					<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>
-					<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>
-					<div><dt>Priority</dt><dd title="Higher priority runs go first when they wait for the same slot">{def.priority}</dd></div>
-					<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all targets'}</dd></div>
-					<div><dt>Owner</dt><dd>{def.owner ?? '—'}</dd></div>
-					<div><dt>Defined in</dt><dd><code>{def.sourceFile}</code></dd></div>
-					{#if def.memberOf.length}
+					{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
+					{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
+					{#if def.priority !== null}<div><dt>Priority</dt><dd title="Higher priority runs go first when they wait for the same slot">{def.priority}</dd></div>{/if}
+					{#if def.declaration}<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all targets'}</dd></div>{/if}
+					{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
+					{#if def.sourceFile}<div><dt>Defined in</dt><dd><code>{def.sourceFile}</code></dd></div>{/if}
+					{#if def.memberOf?.length}
 						<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href="/jobs/{g}">{g}</a>{/each}</dd></div>
 					{/if}
 				</dl>
-				<p class="help">{overlapHelp[def.overlap]}. {onFailureHelp[def.onFailure]}.</p>
+				{#if def.overlap && def.onFailure}<p class="help">{overlapHelp[def.overlap]}. {onFailureHelp[def.onFailure]}.</p>{/if}
 
-				<h3>Extra options</h3>
-				{#if Object.keys(def.settings).length}
-					{#each Object.entries(def.settings) as [flag, value] (flag)}
-						<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
-					{/each}
-				{:else}
-					<p class="faint">None; it runs with the defaults.</p>
+				{#if def.settings}
+					<h3>Extra options</h3>
+					{#if Object.keys(def.settings).length}
+						{#each Object.entries(def.settings) as [flag, value] (flag)}
+							<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
+						{/each}
+					{:else}
+						<p class="faint">None; it runs with the defaults.</p>
+					{/if}
 				{/if}
 
 				<h3>Shared slots</h3>
-				{#if def.concurrency.length}
+				{#if def.concurrency === null}
+					{#if def.concurrencyGroups.length}
+						{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}"><span>Uses {slotLabel(g)} slots</span></p>{/each}
+					{:else}
+						<p class="faint">None. It only waits for runs that update the same data.</p>
+					{/if}
+				{:else if def.concurrency.length}
 					{#each def.concurrency as g (g.key)}
 						<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
 							<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} slot{g.limit === 1 ? '' : 's'} in use</span>
@@ -173,7 +184,7 @@
 
 				<h3>Schedules and sensors · {jobTriggers.length}</h3>
 				{#if jobTriggers.length === 0}
-					<p class="faint">Nothing starts it automatically. Run it by hand{def.memberOf.length ? ', or through its groups' : ''}.</p>
+					<p class="faint">Nothing starts it automatically. Run it by hand{def.memberOf?.length ? ', or through its groups' : ''}.</p>
 				{:else}
 					{#each jobTriggers as t (t.id)}
 						<div class="trigger" class:off={t.state === 'paused'}>

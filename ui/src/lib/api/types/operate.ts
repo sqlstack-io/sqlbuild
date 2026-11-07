@@ -483,7 +483,6 @@ export type CursorWindow = {
 
 export type JobLaunchOptions = {
 	window?: CursorWindow;
-	fullRefresh?: boolean;
 };
 
 /** `selected` reruns exactly the nodes passed with the request. */
@@ -503,15 +502,16 @@ export type Job = {
 	description: string;
 	/** Selector for jobs; null for groups. */
 	select: string | null;
-	/** Member jobs for groups. */
-	members: string[];
+	/** Member jobs for groups; null when the server doesn't say. */
+	members: string[] | null;
 	nodeCount: number;
-	overlap: OverlapPolicy;
-	onFailure: OnFailure;
+	/** Null where the server doesn't report it (also `onFailure`, `priority`, `sourceFile`). */
+	overlap: OverlapPolicy | null;
+	onFailure: OnFailure | null;
 	concurrencyGroups: string[];
-	priority: number;
+	priority: number | null;
 	owner: string | null;
-	sourceFile: string;
+	sourceFile: string | null;
 	triggerIds: string[];
 	lastRun: RunRef | null;
 };
@@ -532,18 +532,19 @@ export type JobGroupMember = {
 };
 
 export type JobDetail = Job & {
-	declaration: { sourceFile: string; line: number; code: string };
+	/** Null where the server doesn't report it, as for `settings`, `concurrency`, `groupMembers` and `memberOf`. */
+	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */
-	settings: Record<string, string | boolean>;
+	settings: Record<string, string | boolean> | null;
 	resolvedNodes: string[];
-	concurrency: ConcurrencyGroup[];
+	concurrency: ConcurrencyGroup[] | null;
 	/** Null when the job applies to every target. */
 	targets: string[] | null;
-	groupMembers: JobGroupMember[];
+	groupMembers: JobGroupMember[] | null;
 	criticalNodes: string[];
 	/** Groups this job belongs to. */
-	memberOf: string[];
+	memberOf: string[] | null;
 	/** Nodes with a cursor, so a cursor window applies. */
 	cursorType: 'timestamp' | 'integer' | null;
 };
@@ -601,7 +602,7 @@ export type Trigger = {
 	nextDueAt: Iso | null;
 	lastTick: Tick | null;
 	lastRun: RunRef | null;
-	sourceFile: string;
+	sourceFile: string | null;
 	/** Code changed since the last evaluation (sensors). */
 	definitionChanged: boolean;
 	/** The watchdog's warning, e.g. an overdue tick or a low calendar horizon. */
@@ -647,11 +648,12 @@ export type SensorRunRequest = {
 export type CatchUpPolicy = { mode: 'latest' | 'all'; max: number | null };
 
 export type TriggerDetail = Trigger & {
-	declaration: { sourceFile: string; line: number; code: string };
+	/** Null where the server doesn't report it, as for `upcoming`, `evaluations`, `runRequests` and `stateHistory`. */
+	declaration: { sourceFile: string; line: number; code: string } | null;
 	targets: string[] | null;
 	catchUp: CatchUpPolicy | null;
 	/** Upcoming due times (schedules). */
-	upcoming: Iso[];
+	upcoming: Iso[] | null;
 	/** Calendar schedules: times are computed ahead and stored up to `storedUntil`. */
 	calendar: {
 		horizon: string;
@@ -668,11 +670,13 @@ export type TriggerDetail = Trigger & {
 		timeoutSeconds: number | null;
 		cursor: string | null;
 		cursorUpdatedAt: Iso | null;
-		currentFingerprint: string;
+		/** False when the server doesn't report the cursor; resetting it still works. */
+		cursorKnown: boolean;
+		currentFingerprint: string | null;
 		lastEvaluatedFingerprint: string | null;
 	} | null;
 	ticks: Tick[];
-	evaluations: SensorEvaluation[];
-	runRequests: SensorRunRequest[];
-	stateHistory: TriggerStateEvent[];
+	evaluations: SensorEvaluation[] | null;
+	runRequests: SensorRunRequest[] | null;
+	stateHistory: TriggerStateEvent[] | null;
 };

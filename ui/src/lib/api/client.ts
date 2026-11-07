@@ -109,6 +109,8 @@ export interface ApiClient extends PlatformApi {
 	listJobs(scope: Scope): Promise<Job[]>;
 	getJob(scope: Scope, key: string): Promise<JobDetail | null>;
 	launchJob(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run>;
+	/** Launches with `--full-refresh`, rebuilding the job's tables from scratch. */
+	launchJobFromScratch(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run>;
 
 	listTriggers(scope: Scope): Promise<Trigger[]>;
 	getTrigger(scope: Scope, id: string): Promise<TriggerDetail | null>;
