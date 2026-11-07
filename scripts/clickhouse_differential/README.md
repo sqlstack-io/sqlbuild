@@ -48,3 +48,32 @@ statements; SQLQuack parses only when it returns a tree with no gap, since a gap
 declines to decide. Counts are over unique bodies, grouped by statement form, body kind and source.
 `bar_misses` lists every body Polyglot parses and SQLQuack does not, and `gap_constructs` ranks
 SQLQuack's gaps by how many bodies hit each.
+
+## Semantic differential
+
+The `clickhouse-semantic` binary compares SQLBuild's Polyglot analysis of each compiled ClickHouse
+model with SQLQuack's, as the BigQuery semantic differential does: lineage, binding findings
+(`E2xx`) and output types and nullability. Each model also yields variants with one name broken (an
+unknown column, the column in upper case and backquotes, which ClickHouse's case-sensitive names do
+not resolve, an unknown qualifier, and an unqualified column two joined relations share).
+`harness/src/semantic/profile.rs` stands in for a ClickHouse profile until `sqlquack-semantics` has
+one: names keep their case and compare exactly.
+
+ClickHouse referees both sides. `semantic_oracle.py` gives each case a fresh `clickhouse local`
+session with a Memory table per relation and a SQL function per project UDF stub, then runs
+`DESCRIBE (<query>)` for the output types or ClickHouse's error. `semantic_types.py` canonicalizes
+every type spelling with ClickHouse itself before comparing.
+
+```sh
+python scripts/clickhouse_differential/semantic_cases.py /tmp/ch/cases.jsonl seeds=/tmp/ch/seeds e2e=/tmp/ch/e2e
+python scripts/clickhouse_differential/semantic_run.py target/debug/clickhouse-semantic /tmp/ch/cases.jsonl \
+  /tmp/ch/results.jsonl
+python scripts/clickhouse_differential/semantic_oracle.py /tmp/ch/cases.chained.jsonl /tmp/ch/results.jsonl \
+  /tmp/ch/oracle.jsonl <clickhouse>
+python scripts/clickhouse_differential/semantic_types.py /tmp/ch/cases.chained.jsonl /tmp/ch/results.jsonl \
+  /tmp/ch/oracle.jsonl /tmp/ch/types.json <clickhouse>
+python scripts/clickhouse_differential/semantic_findings.py /tmp/ch/results.jsonl /tmp/ch/oracle.jsonl
+```
+
+Build `clickhouse-semantic` with the same `--config patch.crates-io...` flags as the parse harness,
+adding `sqlquack-semantics`.
