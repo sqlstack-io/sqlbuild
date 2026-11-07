@@ -235,6 +235,59 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         role_case.expected_metadata == StatusCode::OK.as_u16()
                     );
                     assert!(!page.to_string().contains("select 1 as id"));
+                    let known_reads = [
+                        format!("{metadata}/{}/nodes", seed_run.run_id),
+                        format!("/api/control/locations/{location}/targets/development/triggers"),
+                        format!(
+                            "/api/control/locations/{location}/targets/development/triggers/{}/ticks",
+                            trigger.trigger_id
+                        ),
+                    ];
+                    let unknown_reads = [
+                        format!("{metadata}/{}/nodes", Uuid::now_v7()),
+                        format!(
+                            "/api/control/locations/{location}/targets/development/triggers/{}/ticks",
+                            Uuid::now_v7()
+                        ),
+                    ];
+                    for read_path in &known_reads {
+                        let detail = request(
+                            &provider.client,
+                            session,
+                            (Method::GET, read_path),
+                            (&Value::Null, &session.csrf),
+                        )
+                        .await;
+                        assert_eq!(
+                            detail.status().as_u16(),
+                            role_case.expected_metadata,
+                            "{read_path}"
+                        );
+                        let detail: Value = detail.json().await.expect("detail response");
+                        assert_eq!(
+                            detail.is_array(),
+                            role_case.expected_metadata == StatusCode::OK.as_u16(),
+                            "{read_path}"
+                        );
+                    }
+                    for read_path in &unknown_reads {
+                        let missing = request(
+                            &provider.client,
+                            session,
+                            (Method::GET, read_path),
+                            (&Value::Null, &session.csrf),
+                        )
+                        .await;
+                        assert_eq!(
+                            missing.status().as_u16(),
+                            if role_case.expected_metadata == StatusCode::OK.as_u16() {
+                                StatusCode::NOT_FOUND.as_u16()
+                            } else {
+                                role_case.expected_metadata
+                            },
+                            "{read_path}"
+                        );
+                    }
                     let sql = request(
                         &provider.client,
                         session,

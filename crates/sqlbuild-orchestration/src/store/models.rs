@@ -37,6 +37,13 @@ pub(crate) struct ControlEvent<'a> {
     pub(crate) payload: serde_json::Value,
 }
 
+/// A row whose location and target decide whether a person's target-scoped read may name it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum TargetRow {
+    Run(Uuid),
+    Trigger(Uuid),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TransactionMode {
     Read,

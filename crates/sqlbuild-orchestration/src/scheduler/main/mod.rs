@@ -5,6 +5,7 @@ pub(in crate::scheduler) mod _plan_ticks;
 pub(in crate::scheduler) mod _previous_cron_time;
 pub(in crate::scheduler) mod _scheduler_cycle;
 pub(crate) mod check_lease;
+pub mod list_person_ticks;
 pub mod list_ticks;
 pub(crate) mod next_schedule_time;
 pub mod parse_cron;

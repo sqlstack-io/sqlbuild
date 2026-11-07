@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::runs::models::RunRecord;
+use crate::runs::models::{RunNodeRecord, RunRecord};
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -16,4 +16,14 @@ pub(crate) async fn list_runs_in(
         "SELECT run_id, location_id, target, snapshot_id, job_key, status, queued_at, launched_at, started_at, ended_at, selection_json, node_counts_json, last_event_storage_id \
          FROM sqb_runs WHERE location_id=$1 AND target=$2 ORDER BY queued_at DESC, run_id DESC LIMIT $3",
         vec![Parameter::Id(location_id), Parameter::Text(target.into()), Parameter::Integer(i64::from(limit.min(1000)))]).await
+}
+
+pub(crate) async fn run_nodes_in(
+    transaction: ControlTransaction,
+    run_id: Uuid,
+) -> Result<(ControlTransaction, Vec<RunNodeRecord>), ControlError> {
+    query_records(transaction,
+        "SELECT node_key, status, started_at, ended_at, rows_affected, error_code, skipped_because_of \
+         FROM sqb_run_nodes WHERE run_id=$1 AND kind='node' ORDER BY node_key",
+        vec![Parameter::Id(run_id)]).await
 }

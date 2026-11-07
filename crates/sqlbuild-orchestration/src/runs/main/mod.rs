@@ -4,6 +4,7 @@ pub mod change_run;
 pub mod claim_next_run;
 pub(crate) mod frozen_job_request;
 pub mod heartbeat_run;
+pub mod list_person_run_nodes;
 pub mod list_person_runs;
 pub mod list_run_claims;
 pub mod list_run_nodes;

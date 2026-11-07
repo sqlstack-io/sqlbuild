@@ -20,8 +20,9 @@ use crate::store::tests::store_helpers::{close_test_store, open_test_store, run}
 use crate::store::tests::store_test_types::Backend;
 
 /// Location-scoped reads and the action each needs.
-const READS: [(&str, &str); 9] = [
+const READS: [(&str, &str); 10] = [
     ("runs", "view"),
+    ("triggers", "view"),
     ("changes", "view"),
     ("catalog?schema=orders", "view"),
     ("statistics?schema=orders&name=orders", "view"),
@@ -130,6 +131,42 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                 })
                 .collect();
             cases.extend([
+                (
+                    "run nodes".to_owned(),
+                    "view",
+                    vec![
+                        (
+                            read(inventory, &format!("runs/{}/nodes", queued.run_id)),
+                            None,
+                        ),
+                        (read(inventory, &format!("runs/{unknown_run}/nodes")), None),
+                        (
+                            read(roles.location_id, &format!("runs/{unknown_run}/nodes")),
+                            None,
+                        ),
+                    ],
+                ),
+                (
+                    "trigger ticks".to_owned(),
+                    "view",
+                    vec![
+                        (
+                            read(inventory, &format!("triggers/{trigger_id}/ticks")),
+                            None,
+                        ),
+                        (
+                            read(inventory, &format!("triggers/{unknown_trigger}/ticks")),
+                            None,
+                        ),
+                        (
+                            read(
+                                roles.location_id,
+                                &format!("triggers/{unknown_trigger}/ticks"),
+                            ),
+                            None,
+                        ),
+                    ],
+                ),
                 (
                     "job run".to_owned(),
                     "job.run",
