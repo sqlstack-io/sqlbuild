@@ -55,6 +55,13 @@ _PROJECT_FILES: dict[str, str] = {
             expected_reasons={"stg_orders": "no_change", "large_orders": "no_change"},
         ),
         QueryFingerprintEditE2ETestCase(
+            description="an unedited project plans nothing after a build",
+            edits=(),
+            format_flags=("--check",),
+            expected_format_summary="3 files checked, 2 changed",
+            expected_reasons={"stg_orders": "no_change", "large_orders": "no_change"},
+        ),
+        QueryFingerprintEditE2ETestCase(
             description="comment and keyword case edits are unchanged",
             edits=(
                 ("models/stg_orders.sql", "SELECT id", "-- Staged orders.\nselect id"),
@@ -70,6 +77,13 @@ _PROJECT_FILES: dict[str, str] = {
             format_flags=("--check",),
             expected_format_summary="3 files checked, 2 changed",
             expected_reasons={"stg_orders": "query_changed"},
+        ),
+        QueryFingerprintEditE2ETestCase(
+            description="identifier case is a query change",
+            edits=(("models/large_orders.sql", "AS is_large", "AS Is_Large"),),
+            format_flags=("--check",),
+            expected_format_summary="3 files checked, 2 changed",
+            expected_reasons={"stg_orders": "no_change", "large_orders": "query_changed"},
         ),
     ],
     ids=lambda case: case.description,
