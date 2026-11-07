@@ -266,15 +266,15 @@
 		return matchesFilterStatus(c, statusFilter);
 	}
 	function matchesFilterStatus(c: CatalogNode, f: typeof statusFilter): boolean {
-		if (f === 'stale') return c.stale.length > 0;
-		if (f === 'changed') return c.stale.some((r) => r.reason !== 'behind');
-		if (f === 'behind') return c.stale.some((r) => r.reason === 'behind');
+		if (f === 'stale') return (c.stale?.length ?? 0) > 0;
+		if (f === 'changed') return !!c.stale?.some((r) => r.reason !== 'behind');
+		if (f === 'behind') return !!c.stale?.some((r) => r.reason === 'behind');
 		if (f === 'failed') return c.lastOutcome === 'failed';
 		return true;
 	}
 	const catalogNodes = $derived<CatalogNode[]>(catalog.data ?? []);
 	const kindOptions = $derived(NODE_KINDS.filter((k) => catalogNodes.some((n) => n.kind === k)).map((k) => ({ value: k, label: nodeKindPlural[k], count: catalogNodes.filter((n) => n.kind === k).length })));
-	const groupOptions = $derived([...new Set(catalogNodes.map((n) => n.group))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
+	const groupOptions = $derived([...new Set(catalogNodes.flatMap((n) => (n.group === null ? [] : [n.group])))].map((g) => ({ value: g, label: g, count: catalogNodes.filter((n) => n.group === g).length })));
 	const ownerOptions = $derived([...new Set(catalogNodes.flatMap((n) => n.owner))].sort().map((o) => ({ value: o, label: o, count: catalogNodes.filter((n) => n.owner.includes(o)).length })));
 	const statusOptions = [
 		{ value: 'stale' as const, label: 'Stale' },

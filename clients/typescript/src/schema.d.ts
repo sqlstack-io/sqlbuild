@@ -418,6 +418,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonCatalogNodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql": {
         parameters: {
             query?: never;
@@ -956,6 +972,31 @@ export interface components {
             /** Format: uuid */
             run_id: string;
         };
+        /** @description A fingerprint row's build identity; the `sqb` run that wrote it, not a scheduler run. */
+        CatalogNodeBuild: {
+            /** Format: date-time */
+            observed_at: string;
+            run_id: string;
+            version_hash: string;
+        };
+        /** @description A current snapshot node's declared metadata and latest build, without SQL, source or config. */
+        CatalogNodeRecord: {
+            column_count?: number | null;
+            /** @description Keys of the nodes this node reads. */
+            dependencies: string[];
+            description?: string | null;
+            /** @description The snapshot node kind, such as `model`, `seed`, `source` or `audit`. */
+            kind: string;
+            last_build?: null | components["schemas"]["CatalogNodeBuild"];
+            materialization?: string | null;
+            name: string;
+            node_key: string;
+            path?: string | null;
+            relation?: null | components["schemas"]["CatalogRelation"];
+            /** Format: uuid */
+            snapshot_id: string;
+            tags: string[];
+        };
         CatalogObservation: {
             /** Format: uuid */
             event_id: string;
@@ -966,6 +1007,11 @@ export interface components {
         CatalogPage: {
             next_after?: null | components["schemas"]["WarehouseMirrorCursor"];
             records: components["schemas"]["CatalogObservation"][];
+        };
+        CatalogRelation: {
+            database?: string | null;
+            name: string;
+            schema: string;
         };
         /** @description SSE invalidation topics; `all` means refetch the authorized REST resources. */
         ChangeNotice: {
@@ -3062,6 +3108,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPersonCatalogNodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every node of the current snapshot; empty before the first publication */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogNodeRecord"][];
+                };
             };
             /** @description Session rejected */
             401: {
