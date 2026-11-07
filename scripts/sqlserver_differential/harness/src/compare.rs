@@ -31,6 +31,8 @@ pub struct Comparison {
     pub mode: String,
     /// The body as Polyglot saw it, after SQLBuild's normalization.
     pub cleaned: String,
+    /// The text SQLQuack parsed when it is not `cleaned`: the statement SQL Server receives.
+    pub sqlquack_input: Option<String>,
     /// The statement forms of the cleaned body, in order.
     pub forms: Vec<String>,
     /// `normalized`, or the error SQLBuild's normalization raised (the raw text is then parsed).
@@ -66,6 +68,7 @@ fn empty(case: &Case) -> Comparison {
         kind: case.kind.clone(),
         mode: case.mode.clone(),
         cleaned: String::new(),
+        sqlquack_input: None,
         forms: Vec::new(),
         normalization: String::new(),
         gate: "none".to_owned(),
@@ -118,6 +121,9 @@ pub fn compare_case(case: &Case) -> Comparison {
         Some(wrapped) => cleaned_text(wrapped, &case.placeholders),
         None => cleaned.clone(),
     };
+    if sqlquack_input != cleaned {
+        comparison.sqlquack_input = Some(sqlquack_input.clone());
+    }
     match parse_strict(&sqlquack_input) {
         Ok(Parsed { statements, gaps }) => {
             comparison.sqlquack = if gaps.is_empty() { "tree" } else { "gap" }.to_owned();
