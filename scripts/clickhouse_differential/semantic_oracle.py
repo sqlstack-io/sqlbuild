@@ -3,9 +3,9 @@
 Usage: semantic_oracle.py CASES_JSONL RESULTS_JSONL OUT_JSONL CLICKHOUSE [JOBS]
 
 For every case SQLQuack parsed (a mutated variant too, for its verdict), a fresh `clickhouse local`
-session creates each relation the query names as a Memory table with the catalog's column types and
-each project UDF stub as a SQL function returning `Nullable(<type>)`, as SQLBuild's adapter defines
-it, then runs `DESCRIBE (<query>)`. The output columns' names and types, nullability included, are
+session under SQLBuild's ClickHouse session settings creates each relation the query names as a
+Memory table with the catalog's column types and each project UDF stub as a SQL function returning
+`Nullable(<type>)`, as SQLBuild's adapter defines it, then runs `DESCRIBE (<query>)`. The output columns' names and types, nullability included, are
 ClickHouse's; an error is ClickHouse's first refusal, with its code name. A case reading an open
 relation (no column list) is skipped. An undeclared column of an upstream model takes ClickHouse's
 own type for that model, so ClickHouse types the project end to end.
@@ -20,6 +20,14 @@ import subprocess
 import sys
 
 UDF_PREFIX = "__sqlbuild_udf_"
+# The session settings SQLBuild's ClickHouse adapter requires (`adapters/clickhouse/constants.py`),
+# which change how ClickHouse types a query (`join_use_nulls`, `cast_keep_nullable`).
+SESSION_SETTINGS = (
+    "SET join_use_nulls = 1, cast_keep_nullable = 1, union_default_mode = 'DISTINCT', "
+    "except_default_mode = 'DISTINCT', intersect_default_mode = 'DISTINCT', "
+    "date_time_input_format = 'best_effort', cast_string_to_date_time_mode = 'best_effort', "
+    "insert_null_as_default = 0"
+)
 UNTYPED_UNUSED = "String"
 ERROR = re.compile(r"Code: (\d+)\. DB::Exception: (.*?)(?: \(([A-Z_]+)\))?(?: \(version [^)]*\))?$", re.M)
 
@@ -49,7 +57,7 @@ def argument_count(sql, stub):
 def program(case, sql, typed):
     """The clickhouse-local program for `case`, with `typed` giving upstream models' types."""
     used = set(re.findall(r"[A-Za-z_]\w*", sql))
-    statements = []
+    statements = [SESSION_SETTINGS]
     for relation in case["relations"]:
         if relation["name"] not in used:
             continue
