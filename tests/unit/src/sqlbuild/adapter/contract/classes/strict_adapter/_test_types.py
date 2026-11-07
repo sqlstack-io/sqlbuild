@@ -45,5 +45,6 @@ class TemporaryFunctionRenderingTestCase:
     description: str
     adapter: StrictAdapter
     language: FunctionLanguage
+    argument_type: str
     return_columns: tuple[tuple[str, str], ...]
     expected_temporary_function: TemporaryFunction | None
