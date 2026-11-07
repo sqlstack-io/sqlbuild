@@ -259,20 +259,19 @@ fn targeted_project<'py>(
     )
 }
 
-/// The compile inputs produced through the `COMPILE_PROJECT_INPUTS` frontier.
-fn frontier_compile_inputs<'py>(
-    py: Python<'py>,
-    request: &ProjectRequest,
-    no_cache: bool,
+/// The adapter behaviour compile inputs need, from the discovered project and its adapter.
+pub(crate) fn compile_adapter_context<'py>(
+    discovered: &Bound<'py, PyAny>,
+    adapter: &Bound<'py, PyAny>,
+    syntax: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let discovered: &Bound<'py, PyAny> = request.discovered_inputs.bind(py);
-    let adapter: &Bound<'py, PyAny> = request.adapter.bind(py);
+    let py: Python<'py> = discovered.py();
     let collection_rendering: Bound<'py, PyAny> = resolve_effective_collection_rendering(
         &native_field(discovered, "project_config")?,
         &py.None().into_bound(py),
     )
     .and_then(|value| value.into_bound_py_any(py))?;
-    let adapter_context: Bound<'py, PyAny> = new_record_with(
+    new_record_with(
         py,
         RecordId::CompileAdapterContext,
         &[
@@ -282,9 +281,25 @@ fn frontier_compile_inputs<'py>(
                 "python_functions_inherit_default_namespace",
                 adapter.call_method0("python_functions_inherit_default_namespace")?,
             ),
-            ("sql_lexical_syntax", request.lexical_syntax(py)?),
+            ("sql_lexical_syntax", syntax.clone()),
+            (
+                "sql_analysis_dialect",
+                adapter.call_method0("sql_analysis_dialect")?,
+            ),
         ],
-    )?;
+    )
+}
+
+/// The compile inputs produced through the `COMPILE_PROJECT_INPUTS` frontier.
+fn frontier_compile_inputs<'py>(
+    py: Python<'py>,
+    request: &ProjectRequest,
+    no_cache: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let discovered: &Bound<'py, PyAny> = request.discovered_inputs.bind(py);
+    let adapter: &Bound<'py, PyAny> = request.adapter.bind(py);
+    let adapter_context: Bound<'py, PyAny> =
+        compile_adapter_context(discovered, adapter, &request.lexical_syntax(py)?)?;
     let inputs: InputsRequest = InputsRequest {
         discovered_inputs: discovered.clone().unbind(),
         adapter_context: adapter_context.unbind(),

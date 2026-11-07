@@ -6,3 +6,7 @@ use crate::analysis_route::types::NativeDialect;
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[];
 /// The warning, or under `require_sql_analysis` the error, for a model analysis skips.
 pub(crate) const SKIPPED_ANALYSIS_CODE: &str = "P026";
+/// ClickHouse's top-level nullability wrapper, which the native profile spells as a flag.
+pub(crate) const NULLABLE_WRAPPER: &str = "Nullable";
+/// ClickHouse's top-level dictionary-encoding wrapper, which leaves the column's type as it is.
+pub(crate) const LOW_CARDINALITY_WRAPPER: &str = "LowCardinality";

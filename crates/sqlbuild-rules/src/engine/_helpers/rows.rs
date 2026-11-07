@@ -63,6 +63,7 @@ fn build_model(row: ModelRow, inputs: &ModelInputs<'_, '_>) -> Result<Model, Str
         ..
     } = *inputs;
     let sql_analysis_disabled: bool = !context.sql_analysis_enabled
+        || row.sql_analysis_skipped
         || row.config.get("sql_analysis") == Some(&serde_json::Value::Bool(false));
     let bare_dynamic_pivot: bool = row
         .dynamic_proof

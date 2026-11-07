@@ -25,3 +25,11 @@ pub struct LocatedGap {
     pub line: usize,
     pub column: usize,
 }
+
+/// How an inferred column type meets its declared type: the type itself, then its nullability.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TypeMatch {
+    pub same_type: bool,
+    /// The inferred column may be null, but its declared type does not allow it.
+    pub nullable_into_non_null: bool,
+}
