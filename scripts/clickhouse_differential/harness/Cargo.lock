@@ -651,6 +651,7 @@ name = "sqlquack-syntax-clickhouse"
 version = "0.2.0"
 dependencies = [
  "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]

@@ -16,10 +16,11 @@ Bodies come from:
   for SQL gathered another way, such as the adapter's statements rendered with representative
   arguments, the Rust fixtures that parse ClickHouse SQL, or a formatter corpus.
 
-SQLBuild's corpus has no ClickHouse seed projects, so seeds are generated with the ClickHouse
-adapter and dummy connection settings and compiled offline; the e2e projects under
-`tests/e2e/src/sqlbuild/cli/commands/main/clickhouse` are snapshotted at their first `sqb` call and
-compiled the same way. Nothing reaches a warehouse.
+SQLBuild's corpus has no ClickHouse seed projects, so seed projects are generated with the
+ClickHouse adapter and dummy connection settings, and the e2e projects under
+`tests/e2e/src/sqlbuild/cli/commands/main/clickhouse` are copied as each test first calls `sqb`.
+Both are made outside this harness and compiled offline with `run_compiler_differential`, so
+nothing reaches a warehouse.
 
 A scalar function body is an expression, which ClickHouse only ever receives inside the adapter's
 `CREATE OR REPLACE FUNCTION f(args) RETURNS type RETURN ...`: Polyglot parses the bare body, as
@@ -32,7 +33,7 @@ crates are not published, so the runner takes them from a local SQLQuack checkou
 `--config patch.crates-io...` flags.
 
 ```sh
-uv run python -m scripts.run_compiler_differential --corpus --project /tmp/dbx-projects/* \
+uv run python -m scripts.run_compiler_differential --corpus --project /tmp/clickhouse-projects/* \
   --stage-captures --work-dir /tmp/captures
 uv run python -m scripts.run_clickhouse_differential --work-dir compile=/tmp/captures \
   --listed templates=/tmp/templates.jsonl --sqlquack ../sqlquack --out /tmp/clickhouse-differential

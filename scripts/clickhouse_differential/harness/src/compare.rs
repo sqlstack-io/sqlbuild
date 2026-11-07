@@ -46,6 +46,8 @@ pub struct Comparison {
     pub sqlquack_statements: usize,
     pub sqlquack_gaps: Vec<String>,
     pub sqlquack_message: Option<String>,
+    /// The text SQLQuack parsed: the cleaned body, or its wrapped form.
+    pub sqlquack_input: String,
     /// Whether SQLQuack's refusal is the grammar's or the scanner's, not a transformer check.
     pub sqlquack_syntax: Option<bool>,
     /// `both`, `polyglot_only`, `sqlquack_only` or `neither`; SQLQuack parses only to a `tree`.
@@ -76,6 +78,7 @@ fn empty(case: &Case) -> Comparison {
         sqlquack_statements: 0,
         sqlquack_gaps: Vec::new(),
         sqlquack_message: None,
+        sqlquack_input: String::new(),
         sqlquack_syntax: None,
         category: "neither".to_owned(),
     }
@@ -117,6 +120,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         Some(wrapped) => cleaned_text(wrapped, &case.placeholders),
         None => cleaned.clone(),
     };
+    comparison.sqlquack_input.clone_from(&sqlquack_input);
     match parse_strict(&sqlquack_input) {
         Ok(Parsed { statements, gaps }) => {
             comparison.sqlquack = if gaps.is_empty() { "tree" } else { "gap" }.to_owned();
