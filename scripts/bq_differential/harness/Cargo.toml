@@ -15,8 +15,12 @@ publish = false
 name = "bq-differential"
 path = "src/main.rs"
 
+[[bin]]
+name = "bq-semantic"
+path = "src/semantic/main.rs"
+
 [dependencies]
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 sqlbuild-analysis = { path = "../../../crates/sqlbuild-analysis" }
 polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
     "ast-tools",
@@ -26,3 +30,6 @@ polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "876
     "stacker",
 ] }
 sqlquack-syntax-bigquery = "0.2.0"
+serde = { version = "1", features = ["derive"] }
+sqlquack-semantics = "0.2.0"
+sqlquack-syntax = "0.2.0"

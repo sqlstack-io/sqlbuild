@@ -528,8 +528,11 @@ name = "sqlbuild-bq-differential"
 version = "0.0.0"
 dependencies = [
  "polyglot-sql",
+ "serde",
  "serde_json",
  "sqlbuild-analysis",
+ "sqlquack-semantics",
+ "sqlquack-syntax",
  "sqlquack-syntax-bigquery",
 ]
 
@@ -630,6 +633,34 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "sqlquack-core"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-semantics"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-core",
+ "sqlquack-snowflake",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-snowflake"
+version = "0.2.0"
+dependencies = [
+ "serde",
+ "sqlquack-core",
 ]
 
 [[package]]
