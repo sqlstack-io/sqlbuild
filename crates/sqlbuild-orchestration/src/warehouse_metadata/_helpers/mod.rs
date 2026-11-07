@@ -1,4 +1,5 @@
 pub(crate) mod catalog;
+pub(crate) mod catalog_nodes;
 pub(crate) mod events;
 pub(crate) mod fingerprint_reads;
 pub(crate) mod fingerprints;

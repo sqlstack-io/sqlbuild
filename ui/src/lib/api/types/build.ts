@@ -56,7 +56,8 @@ export type CatalogNode = {
 	kind: NodeKind;
 	/** e.g. `table`, `view`, `incremental · merge`, `incremental · microbatch`; null for sources and tasks. */
 	materialization: string | null;
-	group: string;
+	/** Null when the server does not report groups. */
+	group: string | null;
 	tags: string[];
 	/** Declared `owner`, or the project default. */
 	owner: string[];
@@ -69,10 +70,15 @@ export type CatalogNode = {
 	lastBuild: NodeBuild | null;
 	/** The latest build attempt's outcome, from run nodes and audit results. */
 	lastOutcome: NodeOutcome | null;
-	stale: StaleReason[];
+	/**
+	 * Null when the server does not report build state; outcome and staleness are then unknown,
+	 * not absent, and pages hide them instead of showing "Not built".
+	 */
+	stale: StaleReason[] | null;
 	/** Sources only. */
 	sourceFreshness: SourceFreshness | null;
-	checks: CheckCounts;
+	/** Null when the server does not report check counts. */
+	checks: CheckCounts | null;
 };
 
 // ---- node detail ----
@@ -153,7 +159,10 @@ export type NodeHistory = {
 
 export type NodeJob = { key: string; kind: 'job' | 'group'; triggerIds: string[] };
 
-export type CatalogNodeDetail = CatalogNode & {
+/** The detail read reports build state, so its staleness and check counts are never unknown. */
+export type CatalogNodeDetail = Omit<CatalogNode, 'stale' | 'checks'> & {
+	stale: StaleReason[];
+	checks: CheckCounts;
 	downstream: string[];
 	/** Outcomes of the most recent builds, oldest first, up to 40 (`recent_outcomes`). */
 	recentOutcomes: NodeOutcome[];

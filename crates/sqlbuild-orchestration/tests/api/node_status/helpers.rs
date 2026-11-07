@@ -12,6 +12,7 @@ use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::{
     ingest_catalog::ingest_catalog, ingest_fingerprints::ingest_fingerprints,
     ingest_source_freshness::ingest_source_freshness,
+    list_person_catalog_nodes::list_person_catalog_nodes,
     read_person_node_status::read_person_node_status,
 };
 use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
@@ -197,6 +198,48 @@ pub(crate) async fn node_status_reads(
     );
     assert_eq!(changed_status["source_data"], after["source_data"]);
     assert!(!changed_status.to_string().contains("metadata_json"));
+    let listed: Vec<Value> = list_person_catalog_nodes(
+        store,
+        credentials,
+        (location, "development"),
+        DefaultRole::None,
+    )
+    .await
+    .expect("catalog nodes")
+    .into_iter()
+    .map(|node| json!(node))
+    .collect();
+    let listed_node = |key: &str| {
+        listed
+            .iter()
+            .find(|node| node["node_key"] == key)
+            .cloned()
+            .unwrap_or_else(|| panic!("{key} listed"))
+    };
+    let orders = listed_node("model:orders");
+    assert_eq!(
+        orders["last_build"]["observed_at"],
+        json!(changed.records[0]["ts"]),
+        "the newest build of the model wins"
+    );
+    assert_eq!(orders["last_build"]["run_id"], batch.records[0]["run_id"]);
+    assert_eq!(
+        orders["relation"],
+        json!({"database": null, "schema": "main", "name": "orders"})
+    );
+    assert_eq!(orders["dependencies"], json!(["source:raw_orders"]));
+    assert_eq!(
+        listed_node("udf:orders")["last_build"]["run_id"],
+        "orders-function-run",
+        "a same-named function keeps its own build"
+    );
+    assert!(
+        listed
+            .iter()
+            .filter(|node| node["relation"].is_null())
+            .all(|node| node["last_build"].is_null())
+    );
+    assert!(!json!(listed).to_string().contains("metadata_json"));
     assert!(matches!(
         read_person_node_status(
             store,

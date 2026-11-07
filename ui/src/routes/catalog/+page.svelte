@@ -33,9 +33,9 @@
 
 	const matchesStatus = (n: CatalogNode, f: StatusFilter | '') =>
 		!f ||
-		(f === 'stale' && n.stale.length > 0) ||
-		(f === 'changed' && n.stale.some((s) => s.reason !== 'behind')) ||
-		(f === 'behind' && n.stale.some((s) => s.reason === 'behind')) ||
+		(f === 'stale' && !!n.stale?.length) ||
+		(f === 'changed' && !!n.stale?.some((s) => s.reason !== 'behind')) ||
+		(f === 'behind' && !!n.stale?.some((s) => s.reason === 'behind')) ||
 		(f === 'failed' && n.lastOutcome === 'failed') ||
 		(f === 'warn' && n.lastOutcome === 'warn');
 
@@ -52,7 +52,13 @@
 
 	const kinds = $derived(NODE_KINDS.filter((k) => all.some((n) => n.kind === k)));
 	const owners = $derived([...new Set(all.flatMap((n) => n.owner))].sort());
-	const groups = $derived([...new Set(all.map((n) => n.group))]);
+	const groups = $derived([...new Set(all.flatMap((n) => (n.group === null ? [] : [n.group])))]);
+	/** Outcome and staleness come together; a server that reports neither leaves them unknown. */
+	const showBuildState = $derived(all.some((n) => n.stale !== null));
+	const showChecks = $derived(all.some((n) => n.checks !== null));
+	const linksNodes = $derived(app.client.supports('getCatalogNode'));
+	const canRun = $derived(app.client.supports('launchAdhocRun'));
+	const columns = $derived(3 + (owners.length ? 1 : 0) + (showBuildState ? 2 : 0) + (showChecks ? 1 : 0));
 	const counts = $derived({
 		failed: all.filter((n) => n.lastOutcome === 'failed').length,
 		warn: all.filter((n) => n.lastOutcome === 'warn').length,
@@ -74,29 +80,31 @@
 
 <AppTopbar title="Catalog">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>
+	{#if canRun}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{narrowed ? ` ${filteredRunnable.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
-<RunPanel bind:open={runOpen} selection={narrowed ? filteredRunnable : []} />
+{#if canRun}<RunPanel bind:open={runOpen} selection={narrowed ? filteredRunnable : []} />{/if}
 
 <ListToolbar
 	bind:query
 	placeholder="Search catalog"
 	total="{filtered.length} of {all.length} nodes"
-	counts={[
-		{ tone: 'var(--sb-stale)', count: counts.changed, label: 'changed' },
-		{ tone: 'var(--sb-warning)', count: counts.behind, label: 'behind' },
-		{ tone: 'var(--sb-error)', count: counts.failed, label: 'failed' }
-	]}
+	counts={showBuildState
+		? [
+				{ tone: 'var(--sb-stale)', count: counts.changed, label: 'changed' },
+				{ tone: 'var(--sb-warning)', count: counts.behind, label: 'behind' },
+				{ tone: 'var(--sb-error)', count: counts.failed, label: 'failed' }
+			]
+		: []}
 >
 	{#snippet filters()}
 		<SegmentedFilter
 			bind:value={kindFilter}
 			options={[{ value: 'all' as const, label: 'All', count: all.length }, ...kinds.map((k) => ({ value: k, label: nodeKindPlural[k], count: all.filter((n) => n.kind === k).length }))]}
 		/>
-		<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />
-		<ChoiceFilter label="Owner" bind:value={ownerFilter} options={owners.map((o) => ({ value: o, label: o, count: all.filter((n) => n.owner.includes(o)).length }))} />
-		<ChoiceFilter label="Group" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => n.group === g).length }))} />
+		{#if showBuildState}<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: all.filter((n) => matchesStatus(n, o.value)).length }))} />{/if}
+		{#if owners.length}<ChoiceFilter label="Owner" bind:value={ownerFilter} options={owners.map((o) => ({ value: o, label: o, count: all.filter((n) => n.owner.includes(o)).length }))} />{/if}
+		{#if groups.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groups.map((g) => ({ value: g, label: g, count: all.filter((n) => n.group === g).length }))} />{/if}
 	{/snippet}
 </ListToolbar>
 
@@ -106,31 +114,33 @@
 			<tr>
 				<th>Name</th>
 				<th>Kind</th>
-				<th>Owner</th>
-				<th>Last outcome</th>
-				<th>Stale</th>
-				<th class="num">Checks</th>
+				{#if owners.length}<th>Owner</th>{/if}
+				{#if showBuildState}<th>Last outcome</th><th>Stale</th>{/if}
+				{#if showChecks}<th class="num">Checks</th>{/if}
 				<th>Last built</th>
 			</tr>
 		</thead>
 		<tbody>
 			{#each filtered as n (n.key)}
 				{@const Glyph = nodeIcon[nodeIconKey(n)] ?? nodeIcon.table}
-				<tr onclick={() => goto(`/catalog/${n.key}`)}>
+				<tr onclick={() => linksNodes && goto(`/catalog/${n.key}`)}>
 					<td>
 						<div class="cell-name">
 							<Glyph size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href="/catalog/{n.key}" onclick={(e) => e.stopPropagation()}>{n.key}</a>
+								{#if linksNodes}<a href="/catalog/{n.key}" onclick={(e) => e.stopPropagation()}>{n.key}</a>{:else}<span class="mono">{n.key}</span>{/if}
 								<div class="cell-desc">{n.description}</div>
 							</div>
 						</div>
 					</td>
-					<td class="muted">{kindLine(n)}<div class="cell-desc">{n.group}</div></td>
+					<td class="muted">{kindLine(n)}{#if n.group}<div class="cell-desc">{n.group}</div>{/if}</td>
+					{#if owners.length}
 					<td>
 						{#if n.owner.length}<div class="flex flex-wrap gap-1">{#each n.owner as o (o)}<span class="sb-tag">{o}</span>{/each}</div>
 						{:else}<span class="muted">—</span>{/if}
 					</td>
+					{/if}
+					{#if showBuildState}
 					<td>
 						{#if n.kind === 'source'}
 							{#if n.sourceFreshness}<StatusLabel tone={n.sourceFreshness.status === 'pass' ? 'var(--sb-success)' : n.sourceFreshness.status === 'warn' ? 'var(--sb-warning)' : 'var(--sb-error)'} label="Freshness {n.sourceFreshness.status}" />
@@ -139,20 +149,23 @@
 							<StatusLabel tone={nodeOutcomeTone[n.lastOutcome]} label={nodeOutcomeLabel[n.lastOutcome]} />
 						{:else}<span class="muted">Not built</span>{/if}
 					</td>
-					<td><StaleBadges reasons={n.stale} empty="—" /></td>
-					<td class="num" style:color={n.checks.failing ? 'var(--sb-error)' : n.checks.warning ? 'var(--sb-warning)' : 'var(--muted-foreground)'}>
-						{n.checks.total ? `${n.checks.passing} / ${n.checks.total}` : '—'}
+					<td><StaleBadges reasons={n.stale ?? []} empty="—" /></td>
+					{/if}
+					{#if showChecks}
+					<td class="num" style:color={n.checks?.failing ? 'var(--sb-error)' : n.checks?.warning ? 'var(--sb-warning)' : 'var(--muted-foreground)'}>
+						{n.checks?.total ? `${n.checks.passing} / ${n.checks.total}` : '—'}
 					</td>
+					{/if}
 					<td>
 						{#if n.kind === 'source'}
 							<RelativeTime value={n.sourceFreshness?.loadedAt ? `loaded ${formatAgo(n.sourceFreshness.loadedAt, app.now)}` : '—'} exact={formatStamp(n.sourceFreshness?.loadedAt)} />
 						{:else if n.lastBuild}
-							<RelativeTime value={formatAgo(n.lastBuild.builtAt, app.now)} exact="{formatStamp(n.lastBuild.builtAt)} · {n.lastBuild.runId ? `run ${shortRunId(n.lastBuild.runId)}` : `from the command line · ${shortRunId(n.lastBuild.fingerprintRunId)}`}" />
+							<RelativeTime value={formatAgo(n.lastBuild.builtAt, app.now)} exact="{formatStamp(n.lastBuild.builtAt)} · {n.lastBuild.runId ? `run ${shortRunId(n.lastBuild.runId)}` : `sqb run ${shortRunId(n.lastBuild.fingerprintRunId)}`}" />
 						{:else}<span class="muted">Never</span>{/if}
 					</td>
 				</tr>
 			{:else}
-				<LoadRow colspan={7} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'} />
+				<LoadRow colspan={columns} resource={catalog} empty={all.length ? 'No nodes match the filter.' : 'Nothing deployed yet. Deploy the project to see its models, sources and seeds here.'} />
 			{/each}
 		</tbody>
 	</table>

@@ -455,7 +455,7 @@ pub struct CatalogPage {
 }
 
 /// Exact node and physical destination, not a selector; omitted namespace values match SQL NULL.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FingerprintQuery {
     pub node_type: String,
@@ -608,4 +608,40 @@ impl Default for StatisticsRetention {
             days: DEFAULT_STATISTICS_RETENTION_DAYS,
         }
     }
+}
+
+/// A current snapshot node's declared metadata and latest build, without SQL, source or config.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogNodeRecord {
+    pub node_key: String,
+    /// The snapshot node kind, such as `model`, `seed`, `source` or `audit`.
+    pub kind: String,
+    pub name: String,
+    pub path: Option<String>,
+    pub materialization: Option<String>,
+    pub description: Option<String>,
+    pub tags: Vec<String>,
+    /// Keys of the nodes this node reads.
+    pub dependencies: Vec<String>,
+    /// The warehouse relation the node builds or reads.
+    pub relation: Option<CatalogRelation>,
+    pub column_count: Option<usize>,
+    /// The newest fingerprint recorded for the node at its current relation, from any build.
+    pub last_build: Option<CatalogNodeBuild>,
+    pub snapshot_id: Uuid,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogRelation {
+    pub database: Option<String>,
+    pub schema: String,
+    pub name: String,
+}
+
+/// A fingerprint row's build identity; the `sqb` run that wrote it, not a scheduler run.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct CatalogNodeBuild {
+    pub observed_at: DateTime<Utc>,
+    pub run_id: String,
+    pub version_hash: String,
 }

@@ -285,6 +285,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     assert!(!page.to_string().contains("select 1 as id"));
                     let known_reads = [
                         format!("{metadata}/{}/nodes", seed_run.run_id),
+                        format!("/api/control/locations/{location}/targets/development/nodes"),
                         format!("/api/control/locations/{location}/targets/development/jobs"),
                         format!("/api/control/locations/{location}/targets/development/triggers"),
                         format!(
