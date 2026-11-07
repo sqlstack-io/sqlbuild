@@ -1,4 +1,4 @@
-//! A person lists the current nodes with view on all of them; each build is one indexed seek.
+//! A person lists the current nodes with view on all of them; builds are batched indexed seeks.
 
 use uuid::Uuid;
 
@@ -10,9 +10,9 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::_helpers::catalog_nodes::catalog_node;
-use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprint;
+use crate::warehouse_metadata::_helpers::fingerprint_reads::latest_fingerprints;
 use crate::warehouse_metadata::_helpers::node_status::destination;
-use crate::warehouse_metadata::models::{CatalogNodeBuild, CatalogNodeRecord};
+use crate::warehouse_metadata::models::{CatalogNodeBuild, CatalogNodeRecord, FingerprintQuery};
 
 pub async fn list_person_catalog_nodes(
     store: &ControlStore,
@@ -32,23 +32,30 @@ pub async fn list_person_catalog_nodes(
         commit(transaction).await?;
         return Ok(Vec::new());
     };
-    let (mut transaction, nodes) =
-        read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
-    let mut records: Vec<CatalogNodeRecord> = Vec::with_capacity(nodes.len());
-    for (key, node) in &nodes {
-        let mut last_build: Option<CatalogNodeBuild> = None;
+    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
+    let mut positions: Vec<usize> = Vec::new();
+    let mut queries: Vec<FingerprintQuery> = Vec::new();
+    for (position, (_, node)) in nodes.iter().enumerate() {
         if let Some(query) = destination(node) {
-            let (next, build) =
-                latest_fingerprint(transaction, (location_id, target, &query)).await?;
-            transaction = next;
-            last_build = build.map(|(record, _)| CatalogNodeBuild {
-                observed_at: record.observed_at,
-                run_id: record.run_id,
-                version_hash: record.version_hash,
-            });
+            positions.push(position);
+            queries.push(query);
         }
-        records.push(catalog_node((key, node), snapshot.snapshot_id, last_build));
     }
+    let (transaction, found) =
+        latest_fingerprints(transaction, (location_id, target, &queries)).await?;
+    let mut builds: Vec<Option<CatalogNodeBuild>> = vec![None; nodes.len()];
+    for (position, build) in positions.iter().zip(found) {
+        builds[*position] = build.map(|(record, _)| CatalogNodeBuild {
+            observed_at: record.observed_at,
+            run_id: record.run_id,
+            version_hash: record.version_hash,
+        });
+    }
+    let records: Vec<CatalogNodeRecord> = nodes
+        .iter()
+        .zip(builds)
+        .map(|((key, node), build)| catalog_node((key, node), snapshot.snapshot_id, build))
+        .collect();
     commit(transaction).await?;
     Ok(records)
 }

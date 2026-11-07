@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::snapshots::models::SnapshotInput;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
@@ -242,6 +243,7 @@ pub(crate) async fn node_status_reads(
     );
     assert!(!json!(listed).to_string().contains("metadata_json"));
     listing_ignores_build_history(store, credentials, (location, &listed)).await;
+    listing_reads_wide_targets_in_batches(store, credentials, (location, input.clone())).await;
     assert!(matches!(
         read_person_node_status(
             store,
@@ -352,6 +354,101 @@ async fn listing_ignores_build_history(
         "listing {} nodes over {} builds took {:?}",
         listed.len(),
         templates.len() * (copies + 1),
+        timings[1]
+    );
+}
+
+/// Three thousand built nodes are read in batches, not one store round trip per node.
+async fn listing_reads_wide_targets_in_batches(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (location, mut input): (Uuid, SnapshotInput),
+) {
+    let names: Vec<String> = (0..3_000).map(|index| format!("wide_{index:04}")).collect();
+    for name in &names {
+        input.nodes.insert(format!("model:{name}"), SnapshotNode {
+            kind: "model".into(),
+            definition: json!({"name":name,"destination":{"database":null,"schema":"main","name":name}}),
+            raw_sql: None,
+            compiled_sql: None,
+            python_source: None,
+        });
+    }
+    input.generation += 1;
+    publish_snapshot(store, &input)
+        .await
+        .expect("wide snapshot");
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (mut transaction, rows) = query(
+        transaction,
+        "SELECT event_id,record_json ->> 'run_id' AS run_id FROM sqb_warehouse_fingerprints \
+         WHERE location_id=$1 AND target='development' AND node_type='model' AND node_name='orders' \
+         AND target_database IS NULL AND target_schema='main' AND target_name='orders' LIMIT 1",
+        vec![Parameter::Id(location)],
+    )
+    .await
+    .expect("template build");
+    let template: Uuid = serde_json::from_value(rows[0]["event_id"].clone()).expect("event id");
+    for chunk in names.chunks(300) {
+        let mut parameters = vec![Parameter::Id(template)];
+        let mut values: Vec<String> = Vec::new();
+        for name in chunk {
+            values.push(format!(
+                "(${},${},${})",
+                parameters.len() + 1,
+                parameters.len() + 2,
+                parameters.len() + 3
+            ));
+            parameters.push(Parameter::Id(Uuid::now_v7()));
+            parameters.push(Parameter::Text(format!("wide-{name}")));
+            parameters.push(Parameter::Text(name.clone()));
+        }
+        (transaction, _) = query(
+            transaction,
+            &format!(
+                "INSERT INTO sqb_warehouse_fingerprints (event_id,source_event_id,node_name,target_name,location_id,target, \
+                   observed_at,definition_text_hash,record_json,received_at,state_database,state_schema,node_type, \
+                   target_database,target_schema) \
+                 SELECT wide.column1,wide.column2,wide.column3,wide.column3,location_id,target,observed_at, \
+                   definition_text_hash,record_json,received_at,state_database,state_schema,node_type, \
+                   target_database,target_schema \
+                 FROM (VALUES {}) AS wide, sqb_warehouse_fingerprints WHERE event_id=$1",
+                values.join(",")
+            ),
+            parameters,
+        )
+        .await
+        .expect("wide builds");
+    }
+    commit(transaction).await.expect("commit builds");
+    let mut timings: Vec<std::time::Duration> = Vec::new();
+    for _ in 0..3 {
+        let started = std::time::Instant::now();
+        let listed = list_person_catalog_nodes(
+            store,
+            credentials,
+            (location, "development"),
+            DefaultRole::None,
+        )
+        .await
+        .expect("wide catalog");
+        timings.push(started.elapsed());
+        let built = listed
+            .iter()
+            .filter(|node| node.node_key.starts_with("model:wide_"))
+            .filter(|node| {
+                node.last_build
+                    .as_ref()
+                    .is_some_and(|build| json!(build.run_id) == rows[0]["run_id"])
+            })
+            .count();
+        assert_eq!(built, names.len(), "every wide node keeps its own build");
+    }
+    timings.sort();
+    assert!(
+        timings[1] < std::time::Duration::from_millis(450),
+        "listing {} nodes took {:?}",
+        names.len(),
         timings[1]
     );
 }
