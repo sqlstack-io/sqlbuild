@@ -1,0 +1,28 @@
+# Generic dialect: keywords reserved in every dialect file above except Databricks
+# (DuckDB, PostgreSQL, BigQuery, Snowflake and T-SQL).
+all
+and
+any
+as
+create
+distinct
+else
+for
+from
+group
+having
+in
+intersect
+into
+not
+null
+on
+or
+order
+select
+some
+then
+to
+union
+where
+with
