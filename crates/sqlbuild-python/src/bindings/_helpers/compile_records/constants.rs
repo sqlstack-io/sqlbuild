@@ -1347,6 +1347,7 @@ const R_MODEL_INPUT_BUILD_CONTEXT: RecordSpec = RecordSpec {
         FieldSpec::new("public_constants", FieldDefault::EmptyDict),
         FieldSpec::new("public_model_schemas", FieldDefault::EmptyDict),
         FieldSpec::new("declaration_resolver", FieldDefault::None),
+        FieldSpec::new("sql_analysis_dialect", FieldDefault::None),
     ],
 };
 const R_COMPILE_SQL_REFERENCE: RecordSpec = RecordSpec {
