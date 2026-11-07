@@ -147,7 +147,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         let detail: String = format!("{count} statements");
         return unmeasured(case, "parse_error", Some(detail), polyglot_findings);
     };
-    let profile: &'static dyn DialectProfile = &crate::profile::SQL_SERVER;
+    let profile: &'static dyn DialectProfile = &sqlquack_semantics::dialects::constants::SQL_SERVER;
     let catalog: Catalog = catalog(case, profile);
     let context = LineageContext {
         profile,

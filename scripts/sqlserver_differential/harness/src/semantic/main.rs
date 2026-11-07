@@ -1,13 +1,12 @@
 //! Reads cases as JSON lines on stdin and writes one comparison per case as a JSON line.
 //!
 //! Each case is a compiled SQL Server model with SQLBuild's Polyglot results. The model's SQL is
-//! parsed with SQLQuack's SQL Server parser and analysed with SQLQuack's lineage and binding findings
-//! under the harness's SQL Server profile; the two results are compared for lineage, binding findings and
-//! output types and nullability.
+//! parsed with SQLQuack's SQL Server parser and analysed with SQLQuack's lineage and binding
+//! findings under sqlquack-semantics' SQL Server profile; the two results are compared for lineage,
+//! binding findings and output types and nullability.
 
 mod cases;
 mod compare;
-mod profile;
 
 use std::io::{BufRead, Write};
 

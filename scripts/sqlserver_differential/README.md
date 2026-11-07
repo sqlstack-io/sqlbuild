@@ -47,3 +47,31 @@ statements; SQLQuack parses only when it returns a tree with no gap, since a gap
 declines to decide. Counts are over unique bodies, grouped by statement form, body kind and source.
 `bar_misses` lists every body Polyglot parses and SQLQuack does not, and `gap_constructs` ranks
 SQLQuack's gaps by how many bodies hit each.
+
+## Semantic differential
+
+The `sqlserver-semantic` binary compares SQLBuild's Polyglot analysis of each compiled SQL Server
+model with SQLQuack's, as the ClickHouse semantic differential does: lineage, binding findings
+(`E2xx`) and output types and nullability. Each model also yields variants with one name broken: an
+unknown column, the column in upper case in brackets (which SQL Server resolves under the default
+case-insensitive collation SQLBuild's adapter keeps), an unknown qualifier, and an unqualified column
+two joined relations share. SQLQuack's side runs under `sqlquack-semantics`'s SQL Server profile, so
+build against a SQLQuack checkout that has it (`wip/sqlserver-semantics` until it reaches `main`), with
+the same `--config patch.crates-io...` flags as the parse harness plus `sqlquack-semantics`.
+
+SQL Server referees both sides. `semantic_oracle.py` connects to a local SQL Server as `sa`, with
+the password in `MSSQL_SA_PASSWORD`, gives each project a fresh database with a table per relation and
+a `__sqlbuild.udf_<name>` function per scalar UDF stub, and describes each query with
+`sys.dm_exec_describe_first_result_set` for the output types or SQL Server's error.
+`semantic_types.py` canonicalizes every type spelling with SQL Server itself before comparing.
+
+```sh
+python scripts/sqlserver_differential/semantic_cases.py /tmp/ss/cases.jsonl seeds=/tmp/ss/seeds e2e=/tmp/ss/e2e
+python scripts/sqlserver_differential/semantic_run.py <harness>/sqlserver-semantic /tmp/ss/cases.jsonl \
+  /tmp/ss/results.jsonl
+python scripts/sqlserver_differential/semantic_oracle.py /tmp/ss/cases.jsonl /tmp/ss/results.jsonl \
+  /tmp/ss/oracle.jsonl
+python scripts/sqlserver_differential/semantic_types.py /tmp/ss/cases.chained.jsonl /tmp/ss/results.jsonl \
+  /tmp/ss/oracle.jsonl /tmp/ss/types.json
+python scripts/sqlserver_differential/semantic_findings.py /tmp/ss/results.jsonl /tmp/ss/oracle.jsonl
+```
