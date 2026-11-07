@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.196.0"
+version = "0.196.1"
 dependencies = [
  "blake3",
  "chrono",
@@ -4339,7 +4339,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.196.0"
+version = "0.196.1"
 dependencies = [
  "chrono",
  "chrono-tz",
