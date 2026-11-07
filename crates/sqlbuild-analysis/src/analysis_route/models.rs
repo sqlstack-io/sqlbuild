@@ -1,0 +1,27 @@
+//! The route a dialect's analysis takes, and what stops a native parser reading SQL whole.
+
+use crate::analysis_route::types::NativeDialect;
+
+/// The engine that analyses a dialect's SQL.
+#[derive(Clone, Copy)]
+pub enum AnalysisRoute {
+    /// Polyglot, as before the dialect's native module.
+    Legacy,
+    /// The dialect's native module; a model it cannot read whole is not analysed.
+    Native(&'static dyn NativeDialect),
+}
+
+/// The first construct a native parser cannot read, and its byte offset in the SQL it read.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParserGap {
+    pub construct: String,
+    pub offset: usize,
+}
+
+/// A gap with the line and column, from 1, of its offset in the analysed SQL.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocatedGap {
+    pub construct: String,
+    pub line: usize,
+    pub column: usize,
+}
