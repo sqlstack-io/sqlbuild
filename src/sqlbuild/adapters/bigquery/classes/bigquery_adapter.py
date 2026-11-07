@@ -1691,8 +1691,8 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def default_table_promotion_mode(self) -> TablePromotionMode:
         return TablePromotionMode.STAGED
@@ -1759,7 +1759,9 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
                 )
             package_sql: str = ""
             if packages:
-                package_values: str = ", ".join(f"'{package}'" for package in packages)
+                package_values: str = ", ".join(
+                    self._quote_sql_string(package) for package in packages
+                )
                 package_sql = f",\n  packages = [{package_values}]"
             return (
                 "CREATE OR REPLACE FUNCTION "
@@ -2354,7 +2356,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -3094,7 +3096,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     def _render_cursor_value_literal(cursor_value: CursorValue) -> str:
         if cursor_value.kind == CursorKind.INTEGER:
             return str(cursor_value.value)
-        return f"TIMESTAMP '{cursor_value.value}'"
+        return f"TIMESTAMP '{str(cursor_value.value).translate(STRING_LITERAL_ESCAPES)}'"
 
     @staticmethod
     def _to_int(value: object) -> int:
@@ -3107,5 +3109,5 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         try:
             int(value)
         except ValueError:
-            return f"TIMESTAMP '{value}'"
+            return f"TIMESTAMP '{value.translate(STRING_LITERAL_ESCAPES)}'"
         return value

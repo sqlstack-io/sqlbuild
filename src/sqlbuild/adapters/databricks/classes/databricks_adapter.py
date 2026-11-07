@@ -11,13 +11,14 @@ from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from sqlbuild._native import (
     SeedCsvSettings,
     SourceFreshnessRecord,
     SqlLexicalSyntax,
     SqlValue,
+    SqlValueKind,
     render_insert_source_freshness_records_sql,
 )
 from sqlbuild.adapter.contract.classes.base_adapter import (
@@ -25,6 +26,7 @@ from sqlbuild.adapter.contract.classes.base_adapter import (
     _encode_typed_json,
     _render_ansi_typed_scalar,
     _render_typed_value_list,
+    _typed_scalar_payload,
 )
 from sqlbuild.adapter.contract.classes.consumption import ConsumptionMixin
 from sqlbuild.adapter.contract.classes.historical_check_snapshot_sql import (
@@ -132,6 +134,7 @@ from sqlbuild.adapters.databricks.constants import (
     DETAILED_TABLE_INFORMATION_MARKER,
     NON_ROW_RESULT_COLUMN_NAMES,
     RELATION_NOT_FOUND_ERROR_CLASSES,
+    STRING_LITERAL_ESCAPES,
     TABLE_RELATION_METADATA_TYPES,
     TEMPORARY_FUNCTION_PREFIX,
     UNDEFINED_TABLE_SQLSTATE,
@@ -884,6 +887,8 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
                 return "STRING"
 
     def render_typed_scalar(self, *, value: SqlValue) -> str:
+        if value.kind == SqlValueKind.STRING:
+            return self._quote_sql_string(cast(str, _typed_scalar_payload(value)))
         return _render_ansi_typed_scalar(value=value)
 
     def render_typed_value_list(self, *, value: SqlValue) -> str:
@@ -961,7 +966,7 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
         return self._to_databricks_type(column_type)
 
     def _quote_sql_string(self, value: str) -> str:
-        return "'" + value.replace("'", "''") + "'"
+        return "'" + value.translate(STRING_LITERAL_ESCAPES) + "'"
 
     def render_create_initial_snapshot_destination(
         self,
@@ -1830,8 +1835,8 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def render_drop(self, *, destination: str, if_exists: bool = True) -> tuple[str, ...]:
         exists_clause: str = " IF EXISTS" if if_exists else ""
@@ -1960,13 +1965,9 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
             connection=connection,
             sql=(
                 f"SELECT view_definition FROM {views} WHERE lower(table_schema) = lower("
-                + "'"
-                + schema.replace("'", "''")
-                + "'"
+                + self._quote_sql_string(schema)
                 + ") AND lower(table_name) = lower("
-                + "'"
-                + name.replace("'", "''")
-                + "'"
+                + self._quote_sql_string(name)
                 + ")"
             ),
         ).fetchall()
@@ -2444,7 +2445,7 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -3191,8 +3192,7 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
 
     @staticmethod
     def _string_literal(value: str) -> str:
-        escaped_value: str = value.replace("'", "''")
-        return f"'{escaped_value}'"
+        return "'" + value.translate(STRING_LITERAL_ESCAPES) + "'"
 
     @staticmethod
     def _information_schema(database: str) -> str:
@@ -3221,13 +3221,13 @@ class DatabricksAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Bas
     def _render_cursor_value_literal(cursor_value: CursorValue) -> str:
         if cursor_value.kind == CursorKind.INTEGER:
             return str(cursor_value.value)
-        return f"TIMESTAMP '{cursor_value.value}'"
+        return f"TIMESTAMP '{str(cursor_value.value).translate(STRING_LITERAL_ESCAPES)}'"
 
     @staticmethod
     def _render_cursor_bound_string(value: str) -> str:
         if value.isdigit():
             return value
-        return f"TIMESTAMP '{value}'"
+        return f"TIMESTAMP '{value.translate(STRING_LITERAL_ESCAPES)}'"
 
     @staticmethod
     def _to_int(value: object) -> int:

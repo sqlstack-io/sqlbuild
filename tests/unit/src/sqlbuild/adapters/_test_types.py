@@ -187,3 +187,11 @@ class BigQueryQueuedJobTestCase:
     pending_polls: int
     poll_seconds: float
     expected_maximum_running_seconds: float
+
+
+@dataclass(frozen=True)
+class AdapterCursorLiteralEscapingTestCase:
+    description: str
+    adapter: StrictAdapter
+    expected_literal: str
+    expected_delete_bound: str
