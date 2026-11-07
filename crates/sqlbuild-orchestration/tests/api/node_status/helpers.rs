@@ -358,17 +358,24 @@ async fn listing_ignores_build_history(
     );
 }
 
-/// Three thousand built nodes are read in batches, not one store round trip per node.
+/// Three thousand built nodes, half in a named database, are read in batches and keep their own builds.
 async fn listing_reads_wide_targets_in_batches(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (location, mut input): (Uuid, SnapshotInput),
 ) {
     let names: Vec<String> = (0..3_000).map(|index| format!("wide_{index:04}")).collect();
-    for name in &names {
+    let database = |index: usize| (index % 2 == 1).then(|| "analytics_db".to_owned());
+    let built_at = |index: usize| {
+        chrono::DateTime::parse_from_rfc3339("2026-02-01T00:00:00Z")
+            .expect("build start")
+            .to_utc()
+            + chrono::Duration::seconds(i64::try_from(index).expect("seconds"))
+    };
+    for (index, name) in names.iter().enumerate() {
         input.nodes.insert(format!("model:{name}"), SnapshotNode {
             kind: "model".into(),
-            definition: json!({"name":name,"destination":{"database":null,"schema":"main","name":name}}),
+            definition: json!({"name":name,"destination":{"database":database(index),"schema":"main","name":name}}),
             raw_sql: None,
             compiled_sql: None,
             python_source: None,
@@ -389,29 +396,33 @@ async fn listing_reads_wide_targets_in_batches(
     .await
     .expect("template build");
     let template: Uuid = serde_json::from_value(rows[0]["event_id"].clone()).expect("event id");
-    for chunk in names.chunks(300) {
+    for (chunk_index, chunk) in names.chunks(300).enumerate() {
         let mut parameters = vec![Parameter::Id(template)];
         let mut values: Vec<String> = Vec::new();
-        for name in chunk {
+        for (offset, name) in chunk.iter().enumerate() {
+            let index = chunk_index * 300 + offset;
             values.push(format!(
-                "(${},${},${})",
+                "(${},${},${},${},${})",
                 parameters.len() + 1,
                 parameters.len() + 2,
-                parameters.len() + 3
+                parameters.len() + 3,
+                parameters.len() + 4,
+                parameters.len() + 5
             ));
             parameters.push(Parameter::Id(Uuid::now_v7()));
             parameters.push(Parameter::Text(format!("wide-{name}")));
             parameters.push(Parameter::Text(name.clone()));
+            parameters.push(Parameter::Time(built_at(index)));
+            parameters.push(Parameter::OptionalText(database(index)));
         }
         (transaction, _) = query(
             transaction,
             &format!(
                 "INSERT INTO sqb_warehouse_fingerprints (event_id,source_event_id,node_name,target_name,location_id,target, \
-                   observed_at,definition_text_hash,record_json,received_at,state_database,state_schema,node_type, \
-                   target_database,target_schema) \
-                 SELECT wide.column1,wide.column2,wide.column3,wide.column3,location_id,target,observed_at, \
-                   definition_text_hash,record_json,received_at,state_database,state_schema,node_type, \
-                   target_database,target_schema \
+                   observed_at,target_database,definition_text_hash,record_json,received_at,state_database,state_schema, \
+                   node_type,target_schema) \
+                 SELECT wide.column1,wide.column2,wide.column3,wide.column3,location_id,target,wide.column4,wide.column5, \
+                   definition_text_hash,record_json,received_at,state_database,state_schema,node_type,target_schema \
                  FROM (VALUES {}) AS wide, sqb_warehouse_fingerprints WHERE event_id=$1",
                 values.join(",")
             ),
@@ -433,13 +444,22 @@ async fn listing_reads_wide_targets_in_batches(
         .await
         .expect("wide catalog");
         timings.push(started.elapsed());
-        let built = listed
+        let builds: std::collections::BTreeMap<&str, _> = listed
             .iter()
-            .filter(|node| node.node_key.starts_with("model:wide_"))
-            .filter(|node| {
-                node.last_build
-                    .as_ref()
-                    .is_some_and(|build| json!(build.run_id) == rows[0]["run_id"])
+            .map(|node| (node.node_key.as_str(), node.last_build.as_ref()))
+            .collect();
+        let built = names
+            .iter()
+            .enumerate()
+            .filter(|(index, name)| {
+                builds
+                    .get(format!("model:{name}").as_str())
+                    .copied()
+                    .flatten()
+                    .is_some_and(|build| {
+                        build.observed_at == built_at(*index)
+                            && json!(build.run_id) == rows[0]["run_id"]
+                    })
             })
             .count();
         assert_eq!(built, names.len(), "every wide node keeps its own build");
