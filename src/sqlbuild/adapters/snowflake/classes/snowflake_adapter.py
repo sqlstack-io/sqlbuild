@@ -1164,8 +1164,9 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> tuple[str, ...]:
         quoted_cursor_column: str = self.render_identifier(cursor_column)
         delete_sql: str = (
-            f"DELETE FROM {destination} WHERE {quoted_cursor_column} >= '{cursor_start}' "
-            f"AND {quoted_cursor_column} < '{cursor_end}'"
+            f"DELETE FROM {destination} WHERE {quoted_cursor_column} >= "
+            f"{self._quote_sql_string(cursor_start)} "
+            f"AND {quoted_cursor_column} < {self._quote_sql_string(cursor_end)}"
         )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
@@ -3079,10 +3080,7 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         if cursor_type == CursorKind.INTEGER:
             return value
-        if cursor_type == CursorKind.TIMESTAMP:
-            escaped_value: str = value.replace("'", "''")
-            return f"'{escaped_value}'"
-        return f"'{value}'"
+        return self._quote_sql_string(value)
 
     def interrupt_connection(self, connection: Any) -> bool:
         """Abort the connection's running statements through Snowflake's cancel request."""
@@ -3462,7 +3460,7 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -3975,9 +3973,11 @@ class SnowflakeAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
 
         if cursor_column is None or start_cursor is None:
             return ""
-        clauses: list[str] = [f"{cursor_column} >= '{start_cursor.value}'"]
+        clauses: list[str] = [
+            f"{cursor_column} >= {self._quote_sql_string(str(start_cursor.value))}"
+        ]
         if end_cursor is not None:
-            clauses.append(f"{cursor_column} < '{end_cursor.value}'")
+            clauses.append(f"{cursor_column} < {self._quote_sql_string(str(end_cursor.value))}")
         return " AND ".join(clauses)
 
     def _build_information_schema_type(

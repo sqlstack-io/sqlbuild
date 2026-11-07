@@ -6,6 +6,7 @@ import pytest
 
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
+from sqlbuild.compiler.compile.types import FunctionLanguage
 from tests.unit.src.sqlbuild.adapter.contract.typed_sql_rendering.helpers import typed_sql_value
 from tests.unit.src.sqlbuild.adapters.bigquery._test_types import (
     BigQueryGoogleSqlRenderingTestCase,
@@ -66,6 +67,24 @@ def test_given_special_characters_when_rendering_string_literal_then_uses_backsl
             description="quoted identifier keeps an apostrophe as stored view definitions spell it",
             render=lambda adapter: adapter.render_identifier("customer's id"),
             expected_sql="`customer's id`",
+        ),
+        BigQueryGoogleSqlRenderingTestCase(
+            description="python udf packages are escaped string literals",
+            render=lambda adapter: next(
+                line
+                for line in adapter.render_create_function(
+                    destination="demo.udfs.score",
+                    arguments=(),
+                    returns="INT64",
+                    body_sql="def main():\n    return 1",
+                    language=FunctionLanguage.PYTHON,
+                    runtime_version="3.11",
+                    entry_point="main",
+                    packages=("numpy", "o'k\\x\ny"),
+                )[0].splitlines()
+                if "packages" in line
+            ),
+            expected_sql=r"  packages = ['numpy', 'o\'k\\x\ny']",
         ),
         BigQueryGoogleSqlRenderingTestCase(
             description="column type change uses set data type",
