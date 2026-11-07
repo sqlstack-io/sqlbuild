@@ -1,5 +1,7 @@
 //! The SQL bodies `scripts/run_databricks_differential.py` collects.
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 /// One SQL body SQLBuild parses or emits for Databricks.
@@ -19,4 +21,7 @@ pub struct Case {
     /// The text SQLQuack parses instead, when Databricks only ever receives the body wrapped.
     #[serde(default)]
     pub sqlquack_sql: Option<String>,
+    /// The model's own placeholder values, which SQLBuild substitutes for `@@@name`.
+    #[serde(default)]
+    pub placeholders: HashMap<String, String>,
 }

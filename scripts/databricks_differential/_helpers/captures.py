@@ -99,22 +99,37 @@ def project_cases(*, path: Path, source: str) -> Iterator[dict[str, Any]]:
     if catalog is None or catalog.get("dialect") != DATABRICKS_DIALECT:
         return
 
-    def case(kind: str, name: str, sql: str, mode: str) -> dict[str, Any]:
+    def case(
+        kind: str, name: str, sql: str, mode: str, placeholders: dict[str, str] | None = None
+    ) -> dict[str, Any]:
         return {
             "id": f"{source}/{project_name}/{kind}/{name}",
             "source": source,
             "kind": kind,
             "sql": sql,
             "mode": mode,
+            "placeholders": placeholders or {},
         }
 
+    # Each model's own placeholder values, which SQLBuild substitutes for `@@@name`.
+    model_placeholders: dict[str, dict[str, str]] = {}
     for model in project.get("models", []):
-        if isinstance(model.get("query_sql"), str):
-            yield case("model", model["name"], model["query_sql"], VALIDATE_MODE)
         values: dict[str, Any] = (model.get("config") or {}).get("values") or {}
+        placeholders: dict[str, str] = {
+            str(name): str(value) for name, value in (values.get("placeholders") or {}).items()
+        }
+        model_placeholders[model["name"]] = placeholders
+        if isinstance(model.get("query_sql"), str):
+            yield case("model", model["name"], model["query_sql"], VALIDATE_MODE, placeholders)
         for key in HOOK_KEYS:
             for index, statement in enumerate(hook_statements(values.get(key))):
-                yield case("model_hook", f"{model['name']}#{key}{index}", statement, VALIDATE_MODE)
+                yield case(
+                    "model_hook",
+                    f"{model['name']}#{key}{index}",
+                    statement,
+                    VALIDATE_MODE,
+                    placeholders,
+                )
     for resources, fields in RESOURCE_FIELDS.items():
         for index, resource in enumerate(project.get(resources) or []):
             language: Any = resource.get("language")
@@ -138,4 +153,10 @@ def project_cases(*, path: Path, source: str) -> Iterator[dict[str, Any]]:
             continue
         relative: str = file.relative_to(compiled).as_posix()
         kind: str = COMPILED_KINDS.get(relative.split("/", 1)[0], "compiled")
-        yield case(f"compiled_{kind}", relative, sql, VALIDATE_MODE if kind == "model" else NO_GATE)
+        yield case(
+            f"compiled_{kind}",
+            relative,
+            sql,
+            VALIDATE_MODE if kind == "model" else NO_GATE,
+            model_placeholders.get(file.stem) if kind == "model" else None,
+        )

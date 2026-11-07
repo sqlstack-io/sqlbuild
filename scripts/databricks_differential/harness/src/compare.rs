@@ -85,7 +85,7 @@ fn empty(case: &Case) -> Comparison {
 
 pub fn compare_case(case: &Case) -> Comparison {
     let mut comparison: Comparison = empty(case);
-    let cleaned: String = match normalized(&case.sql) {
+    let cleaned: String = match normalized(&case.sql, &case.placeholders) {
         Ok(cleaned) => {
             comparison.normalization = "normalized".to_owned();
             cleaned
@@ -116,7 +116,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         Err(error) => comparison.polyglot_message = Some(error.to_string()),
     }
     let sqlquack_input: String = match &case.sqlquack_sql {
-        Some(wrapped) => cleaned_text(wrapped),
+        Some(wrapped) => cleaned_text(wrapped, &case.placeholders),
         None => cleaned.clone(),
     };
     match parse_strict(&sqlquack_input) {
@@ -148,18 +148,18 @@ pub fn compare_case(case: &Case) -> Comparison {
 }
 
 /// `sql` as SQLBuild's normalization leaves it for the parser.
-fn normalized(sql: &str) -> Result<String, String> {
+fn normalized(sql: &str, placeholders: &HashMap<String, String>) -> Result<String, String> {
     normalize_analysis_sql(NormalizationInput {
         sql: sql.to_owned(),
         dialect: DIALECT.to_owned(),
         stubs: HashMap::new(),
-        placeholders: HashMap::new(),
+        placeholders: placeholders.clone(),
     })
 }
 
 /// `sql` normalized, or as written when normalization refuses it.
-fn cleaned_text(sql: &str) -> String {
-    normalized(sql).unwrap_or_else(|_| sql.to_owned())
+fn cleaned_text(sql: &str, placeholders: &HashMap<String, String>) -> String {
+    normalized(sql, placeholders).unwrap_or_else(|_| sql.to_owned())
 }
 
 /// SQLBuild's own gate for bodies it checks: `validate` for model queries and hooks, `parse`
@@ -172,7 +172,11 @@ fn gate(case: &Case, comparison: &mut Comparison) {
     };
     let check: SyntaxCheck = SyntaxCheck {
         sql: case.sql.clone(),
-        placeholders: Vec::new(),
+        placeholders: case
+            .placeholders
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect(),
     };
     match sql_syntax_error(&check, DIALECT, mode) {
         Ok(None) => comparison.gate = "accept".to_owned(),
