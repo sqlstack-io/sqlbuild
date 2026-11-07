@@ -358,7 +358,7 @@ async fn listing_ignores_build_history(
     );
 }
 
-/// Three thousand built nodes, half in a named database, are read in batches and keep their own builds.
+/// Three thousand built nodes, half in a named database, keep their own builds, and listing them grows linearly.
 async fn listing_reads_wide_targets_in_batches(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
