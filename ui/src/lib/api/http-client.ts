@@ -2,11 +2,12 @@ import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
+import { toCatalogNodes } from './http-catalog';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
-import type { Check, CheckDetail, CheckEvidence, CheckSql } from './types/build';
+import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
 type Wire = components['schemas'];
@@ -34,7 +35,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listChecks',
 	'getCheck',
 	'getCheckSql',
-	'getCheckEvidence'
+	'getCheckEvidence',
+	'listCatalogNodes'
 ]);
 
 /** A UI location is one server location and target; its id carries both. */
@@ -234,6 +236,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
+		},
+		async listCatalogNodes(scope: Scope): Promise<CatalogNode[]> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toCatalogNodes(data);
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
