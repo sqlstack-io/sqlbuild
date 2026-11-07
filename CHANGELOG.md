@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.196.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.196.0...v0.196.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **bigquery:** render GoogleSQL column type changes and escapes ([#1341](https://github.com/sqlstack-io/sqlbuild/issues/1341)) ([18f2ac3](https://github.com/sqlstack-io/sqlbuild/commit/18f2ac3ed0edd93b599794640371227c6c324bfd))
+
+## [0.196.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.195.0...v0.196.0) (2026-11-07)
+
+
+### Features
+
+* **ui:** wire the checks pages to the live control API ([#1338](https://github.com/sqlstack-io/sqlbuild/issues/1338)) ([d7ebacb](https://github.com/sqlstack-io/sqlbuild/commit/d7ebacbccfa6b7ab4b9145471fc88ffecff0042a))
+
 ## [0.195.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.194.0...v0.195.0) (2026-11-07)
 
 

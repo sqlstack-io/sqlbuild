@@ -50,8 +50,8 @@ from tests.unit.src.sqlbuild.adapters._test_types import (
             "event`time",
             "2026-09-01",
             True,
-            "SELECT MAX(`event``time`) FROM analytics.events "
-            "WHERE `event``time` <= CAST('2026-09-01' AS DATE)",
+            r"SELECT MAX(`event\`time`) FROM analytics.events "
+            r"WHERE `event\`time` <= CAST('2026-09-01' AS DATE)",
         ),
         AdapterEligibleMaxCursorSqlTestCase(
             "sqlserver date predicate",

@@ -405,7 +405,7 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
 
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -425,9 +425,11 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
 
         if cursor_column is None or start_cursor is None:
             return ""
-        clauses: list[str] = [f"{cursor_column} >= '{start_cursor.value}'"]
+        clauses: list[str] = [
+            f"{cursor_column} >= {self._quote_sql_string(str(start_cursor.value))}"
+        ]
         if end_cursor is not None:
-            clauses.append(f"{cursor_column} < '{end_cursor.value}'")
+            clauses.append(f"{cursor_column} < {self._quote_sql_string(str(end_cursor.value))}")
         return " AND ".join(clauses)
 
     def schema_exists(
@@ -710,8 +712,9 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
     ) -> tuple[str, ...]:
         delete_sql: str = (
             f"DELETE FROM {destination} "
-            f"WHERE {self.render_identifier(cursor_column)} >= '{cursor_start}' "
-            f"AND {self.render_identifier(cursor_column)} < '{cursor_end}'"
+            f"WHERE {self.render_identifier(cursor_column)} >= "
+            f"{self._quote_sql_string(cursor_start)} "
+            f"AND {self.render_identifier(cursor_column)} < {self._quote_sql_string(cursor_end)}"
         )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
@@ -2482,14 +2485,19 @@ class BaseAdapter(RetentionAdapterMixin, StrictAdapter):
 
         return ExpressionInferenceProfile(sql_analysis_dialect=self.sql_analysis_dialect())
 
+    def _quote_sql_string(self, value: str) -> str:
+        """Quote one string literal in this adapter's dialect; adapters override the escaping."""
+
+        return _quote_sql_string(value)
+
     def render_cursor_bound_literal(self, *, value: str, cursor_type: str | None) -> str:
         """Render one generic cursor bound literal from a normalized string value."""
 
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def default_table_promotion_mode(self) -> TablePromotionMode:
         """Return staged as the generic default promotion mode."""

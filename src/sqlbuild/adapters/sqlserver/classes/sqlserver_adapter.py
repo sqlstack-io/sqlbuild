@@ -287,7 +287,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )

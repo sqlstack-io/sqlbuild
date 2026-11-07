@@ -134,12 +134,14 @@ from sqlbuild.adapters.bigquery.constants import (
     DECIMAL_METADATA_TYPE_NAMES,
     FLOAT_METADATA_TYPE_NAME,
     FLOAT_WIRE_TYPE_NAME,
+    IDENTIFIER_ESCAPES,
     INTEGER_METADATA_TYPE_NAME,
     INTEGER_TYPE_TOKEN,
     INTEGER_WIRE_TYPE_NAME,
     NATIVE_TABLE_TYPE,
     NOT_FOUND_ERROR_CLASS_NAME,
     SELECT_STATEMENT_TYPE,
+    STRING_LITERAL_ESCAPES,
     TABLE_NAME_WILDCARD,
     TIMESTAMP_TYPE_TOKEN,
 )
@@ -1026,7 +1028,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> tuple[str, ...]:
         return tuple(
             f"ALTER TABLE {destination} ALTER COLUMN "
-            f"{self.render_identifier(col.name)} TYPE {col.type}"
+            f"{self.render_identifier(col.name)} SET DATA TYPE {col.type}"
             for col in columns
         )
 
@@ -1089,6 +1091,8 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     def render_typed_scalar(self, *, value: SqlValue) -> str:
         if value.kind == SqlValueKind.DECIMAL:
             return f"NUMERIC {self._quote_sql_string(str(_typed_scalar_payload(value)))}"
+        if value.kind == SqlValueKind.STRING:
+            return self._quote_sql_string(cast(str, _typed_scalar_payload(value)))
         return _render_ansi_typed_scalar(value=value)
 
     def render_typed_value_list(self, *, value: SqlValue) -> str:
@@ -1173,13 +1177,13 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         return f"CAST({literal} AS {self._loader_row_sql_type(sql_type)}) AS {quoted_column}"
 
     def render_identifier(self, name: str) -> str:
-        return "`" + name.replace("`", "``") + "`"
+        return "`" + name.translate(IDENTIFIER_ESCAPES) + "`"
 
     def render_exact_identifier(self, name: str) -> str:
         return self.render_identifier(name)
 
     def _quote_sql_string(self, value: str) -> str:
-        return "'" + value.replace("'", "''") + "'"
+        return "'" + self._escape_sql_string(value) + "'"
 
     def render_create_initial_snapshot_destination(
         self,
@@ -1687,8 +1691,8 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def default_table_promotion_mode(self) -> TablePromotionMode:
         return TablePromotionMode.STAGED
@@ -1755,7 +1759,9 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
                 )
             package_sql: str = ""
             if packages:
-                package_values: str = ", ".join(f"'{package}'" for package in packages)
+                package_values: str = ", ".join(
+                    self._quote_sql_string(package) for package in packages
+                )
                 package_sql = f",\n  packages = [{package_values}]"
             return (
                 "CREATE OR REPLACE FUNCTION "
@@ -2350,7 +2356,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -3046,7 +3052,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
 
     @staticmethod
     def _escape_sql_string(value: str) -> str:
-        return value.replace("'", "''")
+        return value.translate(STRING_LITERAL_ESCAPES)
 
     @staticmethod
     def _strip_identifier_quotes(value: str) -> str:
@@ -3090,7 +3096,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     def _render_cursor_value_literal(cursor_value: CursorValue) -> str:
         if cursor_value.kind == CursorKind.INTEGER:
             return str(cursor_value.value)
-        return f"TIMESTAMP '{cursor_value.value}'"
+        return f"TIMESTAMP '{str(cursor_value.value).translate(STRING_LITERAL_ESCAPES)}'"
 
     @staticmethod
     def _to_int(value: object) -> int:
@@ -3103,5 +3109,5 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         try:
             int(value)
         except ValueError:
-            return f"TIMESTAMP '{value}'"
+            return f"TIMESTAMP '{value.translate(STRING_LITERAL_ESCAPES)}'"
         return value

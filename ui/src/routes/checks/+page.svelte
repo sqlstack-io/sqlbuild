@@ -18,11 +18,11 @@
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel } from '$lib/build-area/labels';
-	import { checkValue, outcomeOf } from './utils';
+	import { checkValue, kindLabel, outcomeOf } from './utils';
 
 	type OutcomeFilter = 'all' | 'failing' | 'warn' | 'pass' | 'other';
 
-	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs']);
+	const checks = createResource((client, scope) => client.listChecks(scope), ['checks', 'runs', 'node_status']);
 	const all = $derived(checks.data ?? []);
 
 	let query = $state(page.url.searchParams.get('q') ?? '');
@@ -41,7 +41,7 @@
 			if (attachment && c.attachment !== attachment) return false;
 			if (nodeFilter && c.node !== nodeFilter) return false;
 			const q = query.trim().toLowerCase();
-			return !q || [c.name, c.node ?? '', c.column ?? '', c.definition ?? c.kind].some((s) => s.toLowerCase().includes(q));
+			return !q || [c.name, c.node ?? '', c.column ?? '', kindLabel(c)].some((s) => s.toLowerCase().includes(q));
 		})
 	);
 	const counts = $derived({
@@ -63,14 +63,16 @@
 	// A check-only run (`sqb audit`) over the nodes the visible checks attach to.
 	const runSelection = $derived([...new Set(filtered.map((c) => c.node).filter((n): n is string => !!n))]);
 	let runOpen = $state(false);
+	const linksNodes = $derived(app.client.supports('getCatalogNode'));
+	const hasRecent = $derived(all.some((c) => c.recentOutcomes !== null));
 </script>
 
 <AppTopbar title="Checks">
 	<Button variant="outline" size="sm" onclick={() => checks.refresh()}>↻ Refresh</Button>
-	<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run checks</GatedButton>
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run checks</GatedButton>{/if}
 </AppTopbar>
 
-<RunPanel bind:open={runOpen} verb="audit" selection={filtered.length === all.length ? [] : runSelection} />
+{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={runOpen} verb="audit" selection={filtered.length === all.length ? [] : runSelection} />{/if}
 
 <ListToolbar
 	bind:query
@@ -99,7 +101,7 @@
 				<th>Checks</th>
 				<th>Result type</th>
 				<th class="num">Result</th>
-				<th>Recent</th>
+				{#if hasRecent}<th>Recent</th>{/if}
 				<th>Last checked</th>
 			</tr>
 		</thead>
@@ -112,24 +114,24 @@
 							<ShieldCheckIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
 								<a href="/checks/{c.id}" class="check-name" onclick={(e) => e.stopPropagation()}>{c.name}</a>
-								<div class="cell-desc">{c.kind === 'audit' ? `audit · ${c.definition ?? 'custom'}` : c.kind.replace('_', ' ')}</div>
+								<div class="cell-desc">{kindLabel(c)}</div>
 							</div>
 						</div>
 					</td>
 					<td><StatusLabel tone={checkOutcomeTone[o]} label={checkOutcomeLabel[o]} /></td>
 					<td>
-						{#if c.node}<a href="/catalog/{c.node}" class="link" onclick={(e) => e.stopPropagation()}>{c.node}</a>{#if c.column}<span class="muted">.{c.column}</span>{/if}
+						{#if c.node}{#if linksNodes}<a href="/catalog/{c.node}" class="link" onclick={(e) => e.stopPropagation()}>{c.node}</a>{:else}<span>{c.node}</span>{/if}{#if c.column}<span class="muted">.{c.column}</span>{/if}
 						{:else}<span class="muted">{attachmentLabel[c.attachment]}</span>{/if}
 					</td>
 					<td class="muted capitalize">{c.severity}</td>
 					<td class="muted">{runScopePhaseLabel[c.runScopePhase]}</td>
 					<td class="muted">{evaluationModeLabel[c.evaluationMode]}</td>
 					<td class="num" style:color={o === 'pass' ? 'var(--muted-foreground)' : checkOutcomeTone[o]}>{checkValue(c.latest, c.evaluationMode)}</td>
-					<td><span class="mini-strip">{#each c.recentOutcomes as r, i (i)}<i style:background={checkOutcomeTone[r as CheckOutcome]}></i>{/each}</span></td>
+					{#if hasRecent}<td><span class="mini-strip">{#each c.recentOutcomes ?? [] as r, i (i)}<i style:background={checkOutcomeTone[r as CheckOutcome]}></i>{/each}</span></td>{/if}
 					<td><RelativeTime value={formatAgo(c.latest?.evaluatedAt, app.now)} exact={formatStamp(c.latest?.evaluatedAt)} /></td>
 				</tr>
 			{:else}
-				<LoadRow colspan={9} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'} />
+				<LoadRow colspan={hasRecent ? 9 : 8} resource={checks} empty={all.length ? 'No checks match the filter.' : 'No checks yet. Add audits or tests to a model and they show up here after the next deploy.'} />
 			{/each}
 		</tbody>
 	</table>
