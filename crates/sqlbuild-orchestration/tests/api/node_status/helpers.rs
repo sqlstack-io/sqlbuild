@@ -8,7 +8,8 @@ use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
-use crate::store::models::ControlStore;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::warehouse_metadata::main::{
     ingest_catalog::ingest_catalog, ingest_fingerprints::ingest_fingerprints,
     ingest_source_freshness::ingest_source_freshness,
@@ -240,6 +241,7 @@ pub(crate) async fn node_status_reads(
             .all(|node| node["last_build"].is_null())
     );
     assert!(!json!(listed).to_string().contains("metadata_json"));
+    listing_ignores_build_history(store, credentials, (location, &listed)).await;
     assert!(matches!(
         read_person_node_status(
             store,
@@ -266,5 +268,90 @@ pub(crate) async fn node_status_reads(
         .await
         .expect("unknown node")
         .is_none()
+    );
+}
+
+/// Older builds copied 200,000 times over must not change the listing or make it scan them.
+async fn listing_ignores_build_history(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (location, listed): (Uuid, &[Value]),
+) {
+    let transaction = begin(store, TransactionMode::Write).await.expect("begin");
+    let (mut transaction, rows) = query(
+        transaction,
+        "SELECT event_id FROM sqb_warehouse_fingerprints WHERE location_id=$1 AND target='development'",
+        vec![Parameter::Id(location)],
+    )
+    .await
+    .expect("current builds");
+    let templates: Vec<Uuid> = rows
+        .iter()
+        .map(|row| serde_json::from_value(row["event_id"].clone()).expect("event id"))
+        .collect();
+    let copies = 200_000 / templates.len();
+    let oldest = chrono::DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
+        .expect("history start")
+        .to_utc();
+    for template in &templates {
+        for first in (0..copies).step_by(1_000) {
+            let mut parameters = vec![Parameter::Id(*template)];
+            let mut values: Vec<String> = Vec::new();
+            for copy in first..copies.min(first + 1_000) {
+                values.push(format!(
+                    "(${},${},${})",
+                    parameters.len() + 1,
+                    parameters.len() + 2,
+                    parameters.len() + 3
+                ));
+                parameters.push(Parameter::Id(Uuid::now_v7()));
+                parameters.push(Parameter::Text(format!("history-{template}-{copy}")));
+                parameters.push(Parameter::Time(
+                    oldest + chrono::Duration::seconds(i64::try_from(copy).expect("seconds")),
+                ));
+            }
+            (transaction, _) = query(
+                transaction,
+                &format!(
+                    "INSERT INTO sqb_warehouse_fingerprints (event_id,source_event_id,observed_at,location_id,target, \
+                       definition_text_hash,record_json,received_at,state_database,state_schema,node_type,node_name, \
+                       target_database,target_schema,target_name) \
+                     SELECT history.column1,history.column2,history.column3,location_id,target,definition_text_hash, \
+                       record_json,received_at,state_database,state_schema,node_type,node_name,target_database, \
+                       target_schema,target_name \
+                     FROM (VALUES {}) AS history, sqb_warehouse_fingerprints WHERE event_id=$1",
+                    values.join(",")
+                ),
+                parameters,
+            )
+            .await
+            .expect("older build history");
+        }
+    }
+    commit(transaction).await.expect("commit history");
+    let mut timings: Vec<std::time::Duration> = Vec::new();
+    for _ in 0..3 {
+        let started = std::time::Instant::now();
+        let relisted: Vec<Value> = list_person_catalog_nodes(
+            store,
+            credentials,
+            (location, "development"),
+            DefaultRole::None,
+        )
+        .await
+        .expect("catalog nodes over a long history")
+        .into_iter()
+        .map(|node| json!(node))
+        .collect();
+        timings.push(started.elapsed());
+        assert_eq!(relisted, listed, "older builds never replace the newest");
+    }
+    timings.sort();
+    assert!(
+        timings[1] < std::time::Duration::from_millis(100),
+        "listing {} nodes over {} builds took {:?}",
+        listed.len(),
+        templates.len() * (copies + 1),
+        timings[1]
     );
 }

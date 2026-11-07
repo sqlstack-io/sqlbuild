@@ -39,17 +39,6 @@
 		(f === 'failed' && n.lastOutcome === 'failed') ||
 		(f === 'warn' && n.lastOutcome === 'warn');
 
-	const filtered = $derived(
-		all.filter((n) => {
-			if (kindFilter !== 'all' && n.kind !== kindFilter) return false;
-			if (ownerFilter && !n.owner.includes(ownerFilter)) return false;
-			if (groupFilter && n.group !== groupFilter) return false;
-			if (!matchesStatus(n, statusFilter)) return false;
-			const q = query.trim().toLowerCase();
-			return !q || [n.key, n.description, kindLine(n), ...n.tags, ...n.owner].some((s) => s.toLowerCase().includes(q));
-		})
-	);
-
 	const kinds = $derived(NODE_KINDS.filter((k) => all.some((n) => n.kind === k)));
 	const owners = $derived([...new Set(all.flatMap((n) => n.owner))].sort());
 	const groups = $derived([...new Set(all.flatMap((n) => (n.group === null ? [] : [n.group])))]);
@@ -58,6 +47,19 @@
 	const showChecks = $derived(all.some((n) => n.checks !== null));
 	const linksNodes = $derived(app.client.supports('getCatalogNode'));
 	const canRun = $derived(app.client.supports('launchAdhocRun'));
+
+	const filtered = $derived(
+		all.filter((n) => {
+			if (kindFilter !== 'all' && n.kind !== kindFilter) return false;
+			// A filter whose control is hidden, for example from a shared link, never narrows the list.
+			if (owners.length && ownerFilter && !n.owner.includes(ownerFilter)) return false;
+			if (groups.length && groupFilter && n.group !== groupFilter) return false;
+			if (showBuildState && !matchesStatus(n, statusFilter)) return false;
+			const q = query.trim().toLowerCase();
+			return !q || [n.key, n.description, kindLine(n), ...n.tags, ...n.owner].some((s) => s.toLowerCase().includes(q));
+		})
+	);
+
 	const columns = $derived(3 + (owners.length ? 1 : 0) + (showBuildState ? 2 : 0) + (showChecks ? 1 : 0));
 	const counts = $derived({
 		failed: all.filter((n) => n.lastOutcome === 'failed').length,

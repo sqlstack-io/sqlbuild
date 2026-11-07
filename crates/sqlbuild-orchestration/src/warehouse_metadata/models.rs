@@ -455,7 +455,7 @@ pub struct CatalogPage {
 }
 
 /// Exact node and physical destination, not a selector; omitted namespace values match SQL NULL.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FingerprintQuery {
     pub node_type: String,
