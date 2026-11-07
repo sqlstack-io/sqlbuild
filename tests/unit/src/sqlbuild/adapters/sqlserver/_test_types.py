@@ -41,6 +41,9 @@ class SqlServerRenderCreateTableAsTestCase:
 @dataclass(frozen=True)
 class SqlServerRenderCreateFunctionTestCase:
     description: str
+    arguments: tuple[tuple[str, str], ...]
+    returns: str
+    body_sql: str
     expected_statements: tuple[str, ...]
 
 

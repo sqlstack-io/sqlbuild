@@ -116,6 +116,7 @@ from sqlbuild.adapters.sqlserver.constants import (
     INFORMATION_SCHEMA_NULLABLE_VALUE,
     INTEGER_TYPE_TOKEN,
     ISO8601_CONVERT_STYLE,
+    TABLE_FUNCTION_RETURN_TYPE,
     USER_TABLE_OBJECT_TYPE,
 )
 from sqlbuild.compiler.compile.types import FunctionLanguage
@@ -831,11 +832,17 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
                 message="Python functions require an engine-specific implementation"
             )
         arg_sql: str = ", ".join(f"@{arg.name} {arg.type}" for arg in arguments)
-        body_expression: str = body_sql.strip().removeprefix("SELECT").strip().rstrip(";")
+        body_query: str = body_sql.strip().rstrip(";")
         for arg in arguments:
-            body_expression = re.sub(
-                rf"\b{re.escape(str(arg.name))}\b", f"@{arg.name}", body_expression
+            body_query = re.sub(rf"\b{re.escape(str(arg.name))}\b", f"@{arg.name}", body_query)
+        if returns.upper() == TABLE_FUNCTION_RETURN_TYPE:
+            return (
+                f"CREATE OR ALTER FUNCTION {destination}({arg_sql})\n"
+                "RETURNS TABLE\n"
+                "AS\n"
+                f"RETURN (\n{body_query}\n)",
             )
+        body_expression: str = body_query.removeprefix("SELECT").strip()
         if returns.upper() == BOOLEAN_RETURN_TYPE and not body_expression.upper().startswith(
             ("CASE ", "CAST(")
         ):

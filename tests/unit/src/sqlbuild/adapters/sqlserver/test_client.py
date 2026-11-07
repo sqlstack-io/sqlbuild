@@ -419,6 +419,9 @@ def test_given_table_target_when_rendering_create_then_sqlserver_uses_select_int
     [
         SqlServerRenderCreateFunctionTestCase(
             description="renders scalar SQL function with T-SQL body",
+            arguments=(("order_status", "NVARCHAR(MAX)"),),
+            returns="BIT",
+            body_sql="SELECT order_status = 'completed'",
             expected_statements=(
                 "CREATE OR ALTER FUNCTION dbo.is_completed_order(@order_status NVARCHAR(MAX))\n"
                 "RETURNS BIT\n"
@@ -427,7 +430,25 @@ def test_given_table_target_when_rendering_create_then_sqlserver_uses_select_int
                 "    RETURN (CASE WHEN @order_status = 'completed' THEN 1 ELSE 0 END)\n"
                 "END",
             ),
-        )
+        ),
+        SqlServerRenderCreateFunctionTestCase(
+            description="renders a table function as an inline TVF that keeps its SELECT",
+            arguments=(("p_floor", "FLOAT"),),
+            returns="table",
+            body_sql=(
+                "SELECT id, CASE WHEN amount > p_floor THEN 'high' ELSE 'low' END AS band "
+                "FROM dbo.orders;"
+            ),
+            expected_statements=(
+                "CREATE OR ALTER FUNCTION dbo.is_completed_order(@p_floor FLOAT)\n"
+                "RETURNS TABLE\n"
+                "AS\n"
+                "RETURN (\n"
+                "SELECT id, CASE WHEN amount > @p_floor THEN 'high' ELSE 'low' END AS band "
+                "FROM dbo.orders\n"
+                ")",
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -438,9 +459,11 @@ def test_given_sql_function_when_rendering_create_then_sqlserver_declares_functi
 
     statements: tuple[str, ...] = adapter.render_create_function(
         destination="dbo.is_completed_order",
-        arguments=(FunctionArgument(name="order_status", type="NVARCHAR(MAX)"),),
-        returns="BIT",
-        body_sql="SELECT order_status = 'completed'",
+        arguments=tuple(
+            FunctionArgument(name=name, type=type_name) for name, type_name in test_case.arguments
+        ),
+        returns=test_case.returns,
+        body_sql=test_case.body_sql,
     )
 
     assert statements == test_case.expected_statements
