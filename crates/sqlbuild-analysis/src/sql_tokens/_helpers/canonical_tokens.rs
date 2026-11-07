@@ -21,16 +21,13 @@ pub(crate) fn canonical_tokens(
     let raws: Vec<&str> = significant_texts(sql, dialect.tokenizer)?;
     let uppers: Vec<String> = raws.iter().map(|raw| raw.to_ascii_uppercase()).collect();
     let names: Vec<bool> = name_positions(&uppers);
+    let closers: Vec<Option<usize>> = matching_closers(&uppers);
     let mut texts: Vec<String> = Vec::with_capacity(raws.len());
     for (index, raw) in raws.iter().enumerate() {
-        let calls = uppers
-            .get(index + 1)
-            .is_some_and(|next| next == CALL_OPENER)
-            && !raw.starts_with(PLACEHOLDER_PREFIX)
-            && !names_column_list(&uppers, index);
         let folds = !names[index]
             && is_unquoted_word(raw)
-            && (calls || is_reserved_keyword(dialect.keywords, &uppers[index]));
+            && (is_reserved_keyword(dialect.keywords, &uppers[index])
+                || calls(raw, &uppers, &closers, index));
         texts.push(if folds {
             uppers[index].clone()
         } else {
@@ -63,27 +60,40 @@ fn significant_texts(sql: &str, tokenizer: FingerprintTokenizer) -> Result<Vec<&
     }
 }
 
-/// Whether the word at `index` names the relation a column list follows, as in `cte(a, b) AS (`.
-fn names_column_list(uppers: &[String], index: usize) -> bool {
-    let previous: Option<&str> = index.checked_sub(1).map(|before| uppers[before].as_str());
-    if previous.is_some_and(|word| COLUMN_LIST_RELATION_KEYWORDS.contains(&word)) {
-        return true;
-    }
-    let mut depth: usize = 0;
-    for (offset, token) in uppers.iter().enumerate().skip(index + 1) {
+/// The index of the `)` closing each `(`, by the index of the `(`.
+fn matching_closers(uppers: &[String]) -> Vec<Option<usize>> {
+    let mut closers: Vec<Option<usize>> = vec![None; uppers.len()];
+    let mut open: Vec<usize> = Vec::new();
+    for (index, token) in uppers.iter().enumerate() {
         if token == CALL_OPENER {
-            depth += 1;
-        } else if token == CALL_CLOSER {
-            depth -= 1;
-            if depth == 0 {
-                return uppers
-                    .get(offset + 1)
-                    .is_some_and(|next| next == CTE_BODY_PREFIX)
-                    && uppers
-                        .get(offset + 2)
-                        .is_some_and(|next| CTE_BODY_OPENERS.contains(&next.as_str()));
-            }
+            open.push(index);
+        } else if token == CALL_CLOSER
+            && let Some(opener) = open.pop()
+        {
+            closers[opener] = Some(index);
         }
     }
-    false
+    closers
+}
+
+/// Whether the word at `index` is called: followed by `(` and neither a placeholder nor a relation.
+fn calls(raw: &str, uppers: &[String], closers: &[Option<usize>], index: usize) -> bool {
+    if uppers.get(index + 1).is_none_or(|next| next != CALL_OPENER)
+        || raw.starts_with(PLACEHOLDER_PREFIX)
+    {
+        return false;
+    }
+    let previous: Option<&str> = index.checked_sub(1).map(|before| uppers[before].as_str());
+    if previous.is_some_and(|word| COLUMN_LIST_RELATION_KEYWORDS.contains(&word)) {
+        return false;
+    }
+    let Some(closer) = closers[index + 1] else {
+        return true;
+    };
+    !(uppers
+        .get(closer + 1)
+        .is_some_and(|next| next == CTE_BODY_PREFIX)
+        && uppers
+            .get(closer + 2)
+            .is_some_and(|next| CTE_BODY_OPENERS.contains(&next.as_str())))
 }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from sqlbuild._native import QueryFingerprintError, compute_query_hash, normalize_query_sql
@@ -8,7 +10,10 @@ from tests.unit.src.sqlbuild.compiler.fingerprints.main._test_types import (
     ComputeQueryHashTestCase,
     NormalizeQuerySqlTestCase,
     QueryFingerprintFailureTestCase,
+    QueryFingerprintTimeLimitTestCase,
 )
+
+_NESTING: int = 32_000
 
 
 @pytest.mark.parametrize(
@@ -307,3 +312,36 @@ def test_given_untokenizable_sql_when_computing_hash_then_raises_fingerprint_err
 ) -> None:
     with pytest.raises(QueryFingerprintError, match=test_case.expected_message):
         _ = compute_query_hash(query_sql=test_case.query_sql, dialect=test_case.dialect)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        QueryFingerprintTimeLimitTestCase(
+            "deeply nested parentheses",
+            "duckdb",
+            "SELECT 1 + " + "(" * _NESTING + "1" + ")" * _NESTING,
+            0.25,
+        ),
+        QueryFingerprintTimeLimitTestCase(
+            "deeply nested calls",
+            "postgres",
+            "SELECT " + "f(" * _NESTING + "1" + ")" * _NESTING,
+            0.25,
+        ),
+        QueryFingerprintTimeLimitTestCase(
+            "unclosed calls",
+            "snowflake",
+            "SELECT " + "f(" * _NESTING,
+            0.25,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pathological_nesting_when_computing_hash_then_time_stays_linear(
+    test_case: QueryFingerprintTimeLimitTestCase,
+) -> None:
+    started: float = time.perf_counter()
+    _ = compute_query_hash(query_sql=test_case.query_sql, dialect=test_case.dialect)
+
+    assert time.perf_counter() - started < test_case.expected_max_seconds
