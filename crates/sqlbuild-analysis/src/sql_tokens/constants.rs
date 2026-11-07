@@ -2,7 +2,7 @@
 
 use sqlquack_syntax::tokens::models::Dialect;
 
-use crate::sql_tokens::models::{KeywordList, SqlquackFingerprintDialect};
+use crate::sql_tokens::models::{FingerprintTokenizer, KeywordList, SqlquackFingerprintDialect};
 
 /// The fingerprint dialect when a project names none.
 pub(crate) const GENERIC_FINGERPRINT_DIALECT: &str = "generic";
@@ -14,36 +14,36 @@ pub(crate) const FINGERPRINT_DIALECT_ALIASES: [(&str, &str); 3] = [
 ];
 /// The function language whose definitions are fingerprinted like queries.
 pub(crate) const SQL_FUNCTION_LANGUAGE: &str = "sql";
-/// Fingerprint dialects SQLQuack tokenizes; the generic stream uses its DuckDB tokenizer.
+/// Fingerprint dialects SQLQuack tokenizes; generic uses the DuckDB tokenizer, PostgreSQL its native scanner.
 pub(crate) const SQLQUACK_FINGERPRINT_DIALECTS: [SqlquackFingerprintDialect; 6] = [
     SqlquackFingerprintDialect {
         name: "generic",
-        tokenizer: Dialect::DuckDB,
+        tokenizer: FingerprintTokenizer::Lossless(Dialect::DuckDB),
         keywords: KeywordList::Generic,
     },
     SqlquackFingerprintDialect {
         name: "duckdb",
-        tokenizer: Dialect::DuckDB,
+        tokenizer: FingerprintTokenizer::Lossless(Dialect::DuckDB),
         keywords: KeywordList::DuckDB,
     },
     SqlquackFingerprintDialect {
         name: "postgres",
-        tokenizer: Dialect::PostgreSQL,
+        tokenizer: FingerprintTokenizer::PostgresScanner,
         keywords: KeywordList::PostgreSQL,
     },
     SqlquackFingerprintDialect {
         name: "postgresql",
-        tokenizer: Dialect::PostgreSQL,
+        tokenizer: FingerprintTokenizer::PostgresScanner,
         keywords: KeywordList::PostgreSQL,
     },
     SqlquackFingerprintDialect {
         name: "snowflake",
-        tokenizer: Dialect::Snowflake,
+        tokenizer: FingerprintTokenizer::Lossless(Dialect::Snowflake),
         keywords: KeywordList::Snowflake,
     },
     SqlquackFingerprintDialect {
         name: "sqlite",
-        tokenizer: Dialect::SQLite,
+        tokenizer: FingerprintTokenizer::Lossless(Dialect::SQLite),
         keywords: KeywordList::Generic,
     },
 ];

@@ -4143,6 +4143,7 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlclean",
  "sqlquack-syntax",
+ "sqlquack-syntax-postgres",
 ]
 
 [[package]]
@@ -4516,6 +4517,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "sqlquack-syntax-postgres"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=4d0c6bc56da0e44eb164601a2af673ae7998257d#4d0c6bc56da0e44eb164601a2af673ae7998257d"
+dependencies = [
+ "sqlquack-syntax",
 ]
 
 [[package]]

@@ -174,6 +174,20 @@ def test_given_dialect_query_when_computing_hash_then_golden_fingerprint_is_stab
             True,
         ),
         ComputeQueryHashStabilityTestCase(
+            "quoted call name case is significant",
+            "snowflake",
+            'SELECT "MyFunc"(id) FROM orders',
+            'SELECT "myfunc"(id) FROM orders',
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "PostgreSQL multi-character operator is one token",
+            "postgres",
+            "SELECT a |>> b FROM orders",
+            "SELECT a |> > b FROM orders",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
             "CTE column-list name case is significant",
             "duckdb",
             "WITH Tree(id) AS (SELECT 1) SELECT id FROM orders",

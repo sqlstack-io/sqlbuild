@@ -11,10 +11,19 @@ pub(crate) enum KeywordList {
     Generic,
 }
 
+/// The SQLQuack tokenizer a fingerprint dialect reads its tokens with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FingerprintTokenizer {
+    /// `sqlquack_syntax`'s lossless tokenizer for one dialect.
+    Lossless(Dialect),
+    /// The native PostgreSQL scanner of `sqlquack_syntax_postgres`.
+    PostgresScanner,
+}
+
 /// A fingerprint dialect SQLQuack tokenizes: its tokenizer and its reserved keywords.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SqlquackFingerprintDialect {
     pub(crate) name: &'static str,
-    pub(crate) tokenizer: Dialect,
+    pub(crate) tokenizer: FingerprintTokenizer,
     pub(crate) keywords: KeywordList,
 }
