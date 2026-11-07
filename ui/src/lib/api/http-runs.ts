@@ -171,7 +171,10 @@ export function toRunNode(wire: Wire['RunNodeRecord'], run: Run): RunNode {
 	};
 }
 
-/** A run's detail from the listing. Rerun from failure covers failed and skipped nodes only, as the server does; cancelled nodes need a full rerun. and the nodes of the run and its child runs; parts with no server source stay empty. */
+/**
+ * A run's detail from the listing and the nodes of the run and its child runs; parts with no server source stay empty.
+ * Rerun from failure covers failed and skipped nodes only, as the server does; cancelled nodes need a full rerun.
+ */
 export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], nodes: RunNode[]): RunDetail {
 	const byId = new Map(listed.map((r) => [r.id, r]));
 	return {
