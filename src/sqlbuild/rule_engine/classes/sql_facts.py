@@ -2,8 +2,7 @@
 
 from functools import cached_property
 
-from sqlbuild._native import Model, ModelSql, RuleUsageError
-from sqlbuild.rule_engine.classes.sql_document import SqlDocument
+from sqlbuild._native import Model, ModelSql, RuleUsageError, SqlDocument
 from sqlbuild.rule_engine.types import RuleFactModel, RuleFactProject
 
 
