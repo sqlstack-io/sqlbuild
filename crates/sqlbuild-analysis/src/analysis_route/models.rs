@@ -33,3 +33,7 @@ pub struct TypeMatch {
     /// The inferred column may be null, but its declared type does not allow it.
     pub nullable_into_non_null: bool,
 }
+
+/// BigQuery, whose SQL SQLQuack's GoogleSQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct BigQueryDialect;

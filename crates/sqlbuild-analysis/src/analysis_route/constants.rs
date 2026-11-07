@@ -1,9 +1,19 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
+use crate::analysis_route::models::BigQueryDialect;
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
-pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[];
+pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] =
+    &[(BIGQUERY_DIALECT, &BigQueryDialect)];
+/// BigQuery's analysis dialect name.
+pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
+/// The stub prefix BigQuery reads as one unquoted name.
+pub(crate) const BIGQUERY_STUB_PREFIX: &str = "__sqlbuild_";
+/// The construct of a byte the BigQuery scanner reads as no token, blank or comment.
+pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
+/// The construct of SQL holding more than one statement.
+pub(crate) const STATEMENTS_CONSTRUCT: &str = "more than one statement";
 /// The warning, or under `require_sql_analysis` the error, for a model analysis skips.
 pub(crate) const SKIPPED_ANALYSIS_CODE: &str = "P026";
 /// ClickHouse's top-level nullability wrapper, which the native profile spells as a flag.

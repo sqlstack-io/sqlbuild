@@ -1,14 +1,14 @@
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::main::skipped_analysis::skipped_analysis;
-use crate::analysis_route::models::{AnalysisRoute, LocatedGap};
+use crate::analysis_route::models::{AnalysisRoute, BigQueryDialect, LocatedGap};
 use crate::analysis_route::tests::test_types::{
     NativeGapTestCase, PivotlessDialect, RouteTestCase, SkippedAnalysisTestCase,
 };
 use crate::assembly::project::models::SyntaxCheck;
 
 #[test]
-fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
+fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_legacy_path() {
     let test_cases = [
         RouteTestCase {
             description: "postgres",
@@ -33,7 +33,7 @@ fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
         RouteTestCase {
             description: "bigquery",
             dialect: Some("bigquery"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "databricks",
@@ -121,6 +121,76 @@ fn given_model_sql_when_probing_the_native_parser_then_its_gap_is_located_after_
         };
         assert_eq!(
             native_gap(&PivotlessDialect, &check),
+            Ok(test_case.expected_gap),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_bigquery_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has_no_gap() {
+    let test_cases = [
+        NativeGapTestCase {
+            description: "a query BigQuery reads whole",
+            sql: "SELECT 1 AS a FROM t WHERE region = @@@region",
+            placeholders: &[("region", "'eu'")],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "a UDF call's stub reads as one name",
+            sql: "SELECT __udf(\"scaled_amount\")(amount, 2) AS scaled FROM t",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "cursor bounds read as stub calls",
+            sql: "SELECT * FROM t WHERE updated_at >= __cursor_start() AND updated_at < __cursor_end( )",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "a syntax error is located where GoogleSQL locates it",
+            sql: "SELECT 1 FROM FROM",
+            placeholders: &[],
+            expected_gap: Some(LocatedGap {
+                construct: "Syntax error at or near 'FROM'".to_owned(),
+                line: 1,
+                column: 15,
+            }),
+        },
+        NativeGapTestCase {
+            description: "a scripting statement is a named gap",
+            sql: "DECLARE x INT64 DEFAULT 1",
+            placeholders: &[],
+            expected_gap: Some(LocatedGap {
+                construct: "declare".to_owned(),
+                line: 1,
+                column: 1,
+            }),
+        },
+        NativeGapTestCase {
+            description: "a second statement is not read whole",
+            sql: "SELECT 1;\nSELECT 2",
+            placeholders: &[],
+            expected_gap: Some(LocatedGap {
+                construct: "more than one statement".to_owned(),
+                line: 2,
+                column: 9,
+            }),
+        },
+    ];
+    for test_case in test_cases {
+        let check = SyntaxCheck {
+            sql: test_case.sql.to_owned(),
+            placeholders: test_case
+                .placeholders
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+                .collect(),
+        };
+        assert_eq!(
+            native_gap(&BigQueryDialect, &check),
             Ok(test_case.expected_gap),
             "{}",
             test_case.description

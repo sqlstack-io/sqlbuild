@@ -4142,6 +4142,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlquack-syntax-bigquery",
 ]
 
 [[package]]
@@ -4492,6 +4493,37 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "sqlquack-syntax"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73#048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax-derive",
+ "stacker",
+ "thiserror 1.0.69",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "sqlquack-syntax-bigquery"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73#048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73"
+dependencies = [
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-syntax-derive"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73#048e7dd1a786fcf2f2d5ab4d6393b1ddda8fdc73"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

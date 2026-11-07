@@ -25,6 +25,7 @@ sqlbuild-model-config.workspace = true
 sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
+sqlquack-syntax-bigquery.workspace = true
 sqlclean.workspace = true
 
 [lints]
