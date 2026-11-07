@@ -179,6 +179,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let mut expected_runs = 1;
             let mut last_request = Value::Null;
             let mut listed_person_runs = 0;
+            let mut launched_person_runs = 0;
             let mut listed_seed_runs = 0;
             for role_case in roles {
                 for role in role_case.role.iter().copied() {
@@ -237,11 +238,13 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         role_case.expected_metadata == StatusCode::OK.as_u16()
                     );
                     let rows = page.as_array().into_iter().flatten();
+                    let mut listed_here = 0;
                     for launched in rows
                         .clone()
                         .filter(|row| row["requested_by"] == json!(format!("principal:{person}")))
                     {
                         listed_person_runs += 1;
+                        listed_here += 1;
                         for (key, expected) in [
                             ("kind", json!("job")),
                             ("origin", json!("manual")),
@@ -258,6 +261,11 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             assert_eq!(launched[key], expected, "person-requested run {key}");
                         }
                     }
+                    assert_eq!(
+                        listed_here,
+                        launched_person_runs * usize::from(page.is_array()),
+                        "every earlier person launch is listed"
+                    );
                     for seeded in rows.filter(|row| row["run_id"] == json!(seed_run.run_id)) {
                         listed_seed_runs += 1;
                         for (key, expected) in [
@@ -377,6 +385,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         .as_u16(),
                         role_case.expected_job
                     );
+                    launched_person_runs += usize::from(role_case.expected_job == 200);
                     for (endpoint, request_body) in
                         [(&path[..], &body), ("/api/control/runs", &job)]
                     {

@@ -68,7 +68,8 @@ describe('runs list', () => {
 		wire('r4', { status: 'failed', node_counts_json: { success: 1, failed: 2, skipped: 3 } }),
 		wire('r5', { status: 'partial' }),
 		wire('r5-child', { status: 'queued', parent_run_id: 'r5', root_run_id: 'r5' }),
-		wire('r6', { status: 'success' })
+		wire('r6', { status: 'success' }),
+		wire('r7', { status: 'cancelled', node_counts_json: { success: 1, failed: 1, cancelled: 2, skipped: 1 } })
 	];
 
 	it('pages one tab with an offset cursor and hides children unless asked', () => {
@@ -76,7 +77,7 @@ describe('runs list', () => {
 		expect(first.rows.map((r) => r.run.id)).toEqual(['r1', 'r2', 'r3', 'r4']);
 		expect(first.nextCursor).toBe('4');
 		const second = runRowPage(listing, LOCATION, { tab: 'all', limit: 4, cursor: first.nextCursor });
-		expect(second.rows.map((r) => r.run.id)).toEqual(['r5', 'r6']);
+		expect(second.rows.map((r) => r.run.id)).toEqual(['r5', 'r6', 'r7']);
 		expect(second.nextCursor).toBeNull();
 		expect(runRowPage(listing, LOCATION, { tab: 'failed' }).rows.map((r) => r.run.id)).toEqual(['r4', 'r5']);
 		expect(runRowPage(listing, LOCATION, { parentRunId: 'r5' }).rows.map((r) => r.run.id)).toEqual(['r5-child']);
@@ -87,6 +88,7 @@ describe('runs list', () => {
 		expect(rows.find((r) => r.run.id === 'r1')?.cancelRequestedAt).toBe('2026-11-06T10:05:00Z');
 		expect(rows.find((r) => r.run.id === 'r2')?.cancelRequestedAt).toBeNull();
 		expect(rows.find((r) => r.run.id === 'r4')?.rerunFromFailureCount).toBe(5);
+		expect(rows.find((r) => r.run.id === 'r7')?.rerunFromFailureCount).toBe(2);
 	});
 
 	it('counts active and queued runs under the filter, ignoring the tab', () => {
@@ -98,7 +100,7 @@ describe('runs list', () => {
 });
 
 describe('run detail', () => {
-	it('links parent, children and reruns, and reruns from failed, skipped and cancelled nodes', () => {
+	it('links parent, children and reruns, and reruns from failed and skipped nodes but not cancelled ones', () => {
 		const wires = [
 			wire('parent', { kind: 'group' }),
 			wire('run', { parent_run_id: 'parent', root_run_id: 'parent', status: 'failed' }),
@@ -115,7 +117,7 @@ describe('run detail', () => {
 		expect(detail.parent?.id).toBe('parent');
 		expect(detail.children.map((r) => r.id)).toEqual(['child-early', 'child-late']);
 		expect(detail.reruns.map((r) => r.id)).toEqual(['retry']);
-		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2', 'model.n3']);
+		expect(detail.rerunFromFailureNodes).toEqual(['model.n1', 'model.n2']);
 		expect(nodes[4].status).toBe('not_run');
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});

@@ -116,6 +116,10 @@
 		</div>
 	{:else if view.detailRes.loading}
 		<div class="empty">Loading…</div>
+	{:else if view.detailRes.error}
+		<div class="empty">Couldn't load this run: {view.detailRes.error}</div>
+	{:else}
+		<div class="empty">Run not found. This page shows only the newest 1,000 runs of a location, so an older run can be missing here.</div>
 	{/if}
 </div>
 
