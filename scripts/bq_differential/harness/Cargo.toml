@@ -1,0 +1,28 @@
+[package]
+name = "sqlbuild-bq-differential"
+version = "0.0.0"
+description = "Compares Polyglot's BigQuery parse of SQLBuild's SQL with SQLQuack's native BigQuery parser."
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Standalone: SQLQuack's BigQuery parser is not published, so it comes from a local checkout through
+# `--config patch.crates-io...` flags (see ../README.md). Keeping the harness out of the SQLBuild
+# workspace leaves the workspace buildable without that checkout.
+[workspace]
+
+[[bin]]
+name = "bq-differential"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+sqlbuild-analysis = { path = "../../../crates/sqlbuild-analysis" }
+polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
+    "ast-tools",
+    "builder",
+    "all-dialects",
+    "semantic",
+    "stacker",
+] }
+sqlquack-syntax-bigquery = "0.2.0"
