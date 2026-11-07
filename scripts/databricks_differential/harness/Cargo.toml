@@ -1,0 +1,39 @@
+[package]
+name = "sqlbuild-databricks-differential"
+version = "0.0.0"
+description = "Compares Polyglot's Databricks parse of SQLBuild's SQL with SQLQuack's Databricks parser."
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Standalone: the SQLQuack crates are not published, so they come from a local checkout through
+# `--config patch.crates-io...` flags that `scripts/run_databricks_differential.py` passes.
+# Keeping the harness out of the SQLBuild workspace leaves the workspace buildable without that
+# checkout.
+[workspace]
+
+[[bin]]
+name = "databricks-differential"
+path = "src/main.rs"
+
+[dependencies]
+polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
+    "ast-tools",
+    "builder",
+    "all-dialects",
+    "semantic",
+    "stacker",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sqlbuild-analysis = { path = "../../../crates/sqlbuild-analysis" }
+sqlquack-syntax = "0.2.0"
+sqlquack-syntax-databricks = "0.2.0"
+
+# SQLBuild's workspace profiles, so a build sharing its target directory reuses compiled crates.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 1
+debug = false
