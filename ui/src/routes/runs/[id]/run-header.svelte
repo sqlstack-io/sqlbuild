@@ -12,7 +12,7 @@
 
 	const run = $derived(view.run);
 	const pct = $derived(view.progress.total ? (view.progress.done / view.progress.total) * 100 : 0);
-	const what = $derived(run?.jobKey ?? (view.detail?.provenance.selection.join(' ') || 'whole project'));
+	const what = $derived(run?.jobKey ?? (view.detail?.selection.join(' ') || 'whole project'));
 	const cancelRequested = $derived(!!view.detail?.cancel && !view.detail.cancel.terminatedAt);
 </script>
 

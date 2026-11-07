@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AppTopbar from '$lib/components/app-topbar.svelte';
+	import { app } from '$lib/state/app.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
 	import RunPanel from '$lib/run/run-panel.svelte';
@@ -13,11 +14,13 @@
 	import { addToken } from './utils';
 
 	const list = createRunsState();
-	const queue = createResource((client, scope) => client.listQueue(scope), ['runs']);
+	const queue = createResource((client, scope) => (client.supports('listQueue') ? client.listQueue(scope) : Promise.resolve([])), ['runs']);
 	let panelOpen = $state(false);
 	let timelineQuery = $state('');
 
 	const p = $derived(list.params);
+	/** A view the server can't load falls back to the list. */
+	const shown = $derived(p.view === 'timeline' && app.client.supports('timeline') ? 'timeline' : p.view === 'queue' && app.client.supports('listQueue') ? 'queue' : 'list');
 	const matchingActive = $derived(p.tab === 'active' ? (list.counts?.active ?? null) : p.tab === 'queued' ? (list.counts?.queued ?? null) : null);
 	const filtered = $derived(p.q.trim() !== '' || p.range !== 'any');
 	const emptyText = $derived.by(() => {
@@ -35,21 +38,23 @@
 </script>
 
 <AppTopbar title="Runs">
-	<GatedButton requires="run.adhoc" variant="default" onclick={() => (panelOpen = true)}>▷ New run</GatedButton>
+	{#if app.client.supports('launchAdhocRun')}
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => (panelOpen = true)}>▷ New run</GatedButton>
+	{/if}
 </AppTopbar>
 
 <RunsToolbar {list} queued={queue.data?.length ?? null} />
 
-{#if p.view === 'timeline'}
+{#if shown === 'timeline'}
 	<div class="timeline-page"><RunTimeline bind:query={timelineQuery} /></div>
-{:else if p.view === 'queue'}
+{:else if shown === 'queue'}
 	<RunQueue entries={queue.data ?? []} resource={queue} />
 {:else}
 	<BulkBar {list} {matchingActive} />
 	<RunList {list} onfilter={filterBy} {emptyText} />
 {/if}
 
-<RunPanel bind:open={panelOpen} />
+{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={panelOpen} />{/if}
 
 <style>
 	.timeline-page {

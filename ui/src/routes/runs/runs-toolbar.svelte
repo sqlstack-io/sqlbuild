@@ -14,6 +14,12 @@
 	let { list, queued }: { list: RunsState; queued: number | null } = $props();
 
 	const p = $derived(list.params);
+	/** Views the server can load; the switch hides when only the list is left. */
+	const views = $derived([
+		{ value: 'list' as RunsView, label: 'List' },
+		...(app.client.supports('timeline') ? [{ value: 'timeline' as RunsView, label: 'Timeline' }] : []),
+		...(app.client.supports('listQueue') ? [{ value: 'queue' as RunsView, label: 'Queue', count: queued ?? undefined }] : [])
+	]);
 
 	// The box edits a local copy; the URL follows after a short pause.
 	let draft = $state('');
@@ -63,14 +69,9 @@
 		{/each}
 	</div>
 	<div class="right">
-		<SegmentedFilter
-			bind:value={() => p.view, (v: RunsView) => list.update({ view: v })}
-			options={[
-				{ value: 'list', label: 'List' },
-				{ value: 'timeline', label: 'Timeline' },
-				{ value: 'queue', label: 'Queue', count: queued ?? undefined }
-			]}
-		/>
+		{#if views.length > 1}
+			<SegmentedFilter bind:value={() => p.view, (v: RunsView) => list.update({ view: v })} options={views} />
+		{/if}
 		<span class="fresh {list.freshness}" title={freshnessTitle[list.freshness]}>
 			{#if list.updatedAt}<span class="ago">updated {formatAgo(new Date(list.updatedAt).toISOString(), app.now)}</span>{/if}
 			<i></i>{freshnessText[list.freshness]}

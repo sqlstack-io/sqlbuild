@@ -141,7 +141,8 @@ export const runOriginLabel: Record<RunOrigin, string> = {
 	manual: 'Manual',
 	schedule: 'Schedule',
 	sensor: 'Sensor',
-	rerun: 'Rerun'
+	rerun: 'Rerun',
+	backfill: 'Backfill'
 };
 
 /** One-line "what · why" label, e.g. "Group · Schedule". */

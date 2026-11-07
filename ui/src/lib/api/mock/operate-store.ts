@@ -270,7 +270,7 @@ export class MockOperate {
 			provenance: {
 				snapshotId: rec.run.snapshotId,
 				snapshotGeneration: rec.script.snapshotGeneration,
-				gitRevision: rec.run.gitRevision,
+				gitRevision: rec.run.gitRevision ?? '',
 				gitDirty: false,
 				imageId: rec.script.imageId,
 				sqbVersion: rec.script.snapshotGeneration === SNAPSHOT_GENERATION ? '0.185.0' : '0.184.2',
@@ -278,6 +278,7 @@ export class MockOperate {
 				exclude: rec.script.exclude,
 				command: rec.script.nodes.length ? commandOf(rec) : `group ${rec.run.jobKey}: ${this.#children(rec).length} child runs`
 			},
+			selection: rec.script.select,
 			waits: rec.run.status === 'queued' ? this.#queue().get(rec.run.id) ?? [] : [],
 			rerunFromFailureNodes: nodes.filter((n) => n.status === 'failed' || n.status === 'skipped').map((n) => n.nodeKey),
 			rerunOf: rec.run.rerunOfRunId ? ((r) => (r ? this.#view(r, scope) : null))(this.#byId(rec.run.rerunOfRunId)) : null,

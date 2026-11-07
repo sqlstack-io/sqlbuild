@@ -97,7 +97,9 @@ export interface ApiClient extends PlatformApi {
 	/** Writes a `cancel_requested` fact; the scheduler then signals the worker. */
 	cancelRun(scope: Scope, runId: string): Promise<Run>;
 	/** `nodes` is required for `selected` and ignored otherwise. */
-	rerunRun(scope: Scope, runId: string, mode: RerunMode, nodes?: string[]): Promise<Run>;
+	rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run>;
+	/** Reruns exactly `nodes` of the run. */
+	rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run>;
 
 	listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]>;
 	/** The server's pre-launch check: resolution, write set and authorization. */

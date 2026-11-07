@@ -14,9 +14,9 @@ function message(error: unknown): string {
 export function createRunDetailState(runId: string) {
 	const topics = [`run:${runId}`, 'runs'];
 	const detailRes = createResource((client, scope) => client.getRunDetail(scope, runId), topics);
-	const eventsRes = createResource((client, scope) => client.listRunEvents(scope, runId, { limit: 5000 }), topics);
-	const outputRes = createResource((client, scope) => client.listRunOutput(scope, runId), topics);
-	const statementsRes = createResource((client, scope) => client.listRunStatements(scope, runId), topics);
+	const eventsRes = createResource((client, scope) => (client.supports('listRunEvents') ? client.listRunEvents(scope, runId, { limit: 5000 }) : Promise.resolve({ events: [], nextCursor: null })), topics);
+	const outputRes = createResource((client, scope) => (client.supports('listRunOutput') ? client.listRunOutput(scope, runId) : Promise.resolve([])), topics);
+	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? client.listRunStatements(scope, runId) : Promise.resolve([])), topics);
 
 	const detail = $derived(detailRes.data ?? null);
 	const run = $derived(detail?.run ?? null);
@@ -49,7 +49,7 @@ export function createRunDetailState(runId: string) {
 	}
 
 	// ---- actions ----
-	const choices = $derived(detail ? rerunChoices(detail, selected, (c) => app.can(c)) : []);
+	const choices = $derived(detail ? rerunChoices(detail, app.client.supports('rerunSelectedNodes') ? selected : [], (c) => app.can(c)) : []);
 	const primary = $derived(detail && choices.length ? primaryChoice(detail, choices) : null);
 	let busy = $state<'cancel' | RerunMode | null>(null);
 	let actionError = $state<string | null>(null);
@@ -81,7 +81,7 @@ export function createRunDetailState(runId: string) {
 		busy = mode;
 		actionError = null;
 		try {
-			const next = await app.client.rerunRun(scope, run.id, mode, mode === 'selected' ? selected : undefined);
+			const next = mode === 'selected' ? await app.client.rerunSelectedNodes(scope, run.id, selected) : await app.client.rerunRun(scope, run.id, mode);
 			await goto(`/runs/${next.id}`);
 		} catch (e) {
 			actionError = message(e);
