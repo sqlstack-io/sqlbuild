@@ -7,6 +7,7 @@ pub mod ingest_migrations;
 pub mod ingest_old_name_views;
 pub mod ingest_source_freshness;
 pub mod ingest_statistics;
+pub mod list_person_catalog_nodes;
 pub(crate) mod prune_statistics;
 pub mod read_person_catalog;
 pub mod read_person_fingerprint;

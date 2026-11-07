@@ -21,6 +21,7 @@ use crate::api::_helpers::resources::{
     person_operations::change_trigger,
     person_operations::recent_runs,
     person_reads::run_nodes,
+    person_reads::nodes,
     person_reads::jobs,
     person_reads::triggers,
     person_reads::ticks,

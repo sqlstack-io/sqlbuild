@@ -230,8 +230,8 @@ export class MockBuild {
 		const thisWeek = this.#deploys.filter((d) => d.publishedAt >= weekAgo).flatMap((d) => d.nodes);
 		const isModelChange = (key: string) => MODEL_KINDS.has(snapshotNode(key)?.kind ?? 'table');
 
-		const changed = nodes.filter((n) => n.stale.some((s) => s.reason !== 'behind')).map((n) => n.key);
-		const behind = nodes.filter((n) => n.stale.some((s) => s.reason === 'behind')).map((n) => n.key);
+		const changed = nodes.filter((n) => n.stale?.some((s) => s.reason !== 'behind')).map((n) => n.key);
+		const behind = nodes.filter((n) => n.stale?.some((s) => s.reason === 'behind')).map((n) => n.key);
 		const staleSources = nodes.filter((n) => n.sourceFreshness && n.sourceFreshness.status !== 'pass');
 
 		const attention: AttentionItem[] = [];
@@ -258,13 +258,15 @@ export class MockBuild {
 		const groups = new Map<string, GroupStatus>();
 		for (const n of nodes) {
 			if (n.kind === 'source') continue;
-			const g = groups.get(n.group) ?? { group: n.group, total: 0, current: 0, changed: 0, behind: 0, failed: 0 };
+			const group = n.group ?? '';
+			const g = groups.get(group) ?? { group, total: 0, current: 0, changed: 0, behind: 0, failed: 0 };
 			g.total += 1;
 			if (n.lastOutcome === 'failed') g.failed += 1;
-			if (n.stale.some((s) => s.reason !== 'behind')) g.changed += 1;
-			if (n.stale.some((s) => s.reason === 'behind')) g.behind += 1;
-			if (!n.stale.length && n.lastOutcome !== 'failed' && n.lastBuild) g.current += 1;
-			groups.set(n.group, g);
+			const stale = n.stale ?? [];
+			if (stale.some((s) => s.reason !== 'behind')) g.changed += 1;
+			if (stale.some((s) => s.reason === 'behind')) g.behind += 1;
+			if (!stale.length && n.lastOutcome !== 'failed' && n.lastBuild) g.current += 1;
+			groups.set(group, g);
 		}
 		const latest = runs.find((r) => r.endedAt);
 		return this.#ctx.reply({
@@ -395,7 +397,7 @@ export class MockBuild {
 		return state.lastBuild ? Date.parse(state.lastBuild.builtAt) : -Infinity;
 	}
 
-	#catalogNode(state: NodeState, checks: Check[]): CatalogNode {
+	#catalogNode(state: NodeState, checks: Check[]): CatalogNode & Pick<CatalogNodeDetail, 'stale' | 'checks'> {
 		const { sn, lastBuild, lastOutcome, stale } = state;
 		const spec = NODE_SPECS[sn.key];
 		return {
