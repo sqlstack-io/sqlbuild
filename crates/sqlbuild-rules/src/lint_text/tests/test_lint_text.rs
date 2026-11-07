@@ -6,6 +6,7 @@ use crate::lint_text::_helpers::sql_diagnostics::{
 };
 use crate::lint_text::constants::SITE_START_BYTES;
 use crate::lint_text::errors::LintTextError;
+use crate::lint_text::main::counts_toward_exit::counts_toward_exit;
 use crate::lint_text::main::format_sql_bodies::format_sql_bodies;
 use crate::lint_text::main::frame_sql_macro_expression::frame_sql_macro_expression;
 use crate::lint_text::main::lint_sql_bodies::lint_sql_bodies;
@@ -19,9 +20,9 @@ use crate::lint_text::main::restore_interpolation::restore_interpolation;
 use crate::lint_text::models::{ExpansionSpan, FormatFile, LintSqlBody, LintSqlOptions};
 use crate::lint_text::tests::helpers::directive_finding;
 use crate::lint_text::tests::test_types::{
-    Finding, FormatBodiesTestCase, LintBodiesTestCase, NeutralizeTestCase, ParameterTestCase,
-    RestoreTestCase, SitePatternTestCase, SlotReadTestCase, SuppressionTestCase, TokenAtTestCase,
-    UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
+    ExitCountTestCase, Finding, FormatBodiesTestCase, LintBodiesTestCase, NeutralizeTestCase,
+    ParameterTestCase, RestoreTestCase, SitePatternTestCase, SlotReadTestCase, SuppressionTestCase,
+    TokenAtTestCase, UnavailableFinding, UnavailableLintTestCase, UnwrappedExpressionTestCase,
 };
 use sqlbuild_analysis::sql_macros::main::parse_sql_macro::parse_sql_macro;
 
@@ -729,6 +730,35 @@ fn given_engine_response_when_dialect_is_unavailable_then_each_file_gets_one_war
 
         assert_eq!(
             findings, test_case.expected_findings,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_findings_when_deciding_exit_then_only_lint_unavailable_never_fails_a_command() {
+    let test_cases = [
+        ExitCountTestCase {
+            description: "an unavailable-dialect warning reports our gap, not the user's SQL",
+            code: "L007",
+            expected_counts: false,
+        },
+        ExitCountTestCase {
+            description: "a SQL lint rule finding still fails",
+            code: "SQLCLEAN005",
+            expected_counts: true,
+        },
+        ExitCountTestCase {
+            description: "an engine fault still fails",
+            code: "L003",
+            expected_counts: true,
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            counts_toward_exit(test_case.code),
+            test_case.expected_counts,
             "{}",
             test_case.description
         );

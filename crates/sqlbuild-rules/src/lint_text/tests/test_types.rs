@@ -56,6 +56,12 @@ pub(crate) struct LintBodiesTestCase {
     pub(crate) expected_findings: Vec<Finding<'static>>,
 }
 
+pub(crate) struct ExitCountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) code: &'static str,
+    pub(crate) expected_counts: bool,
+}
+
 pub(crate) struct UnavailableLintTestCase {
     pub(crate) description: &'static str,
     pub(crate) response: serde_json::Value,

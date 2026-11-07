@@ -5,6 +5,7 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::wrap_pyfunction;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_catalogue::main::render_rule_list::render_rule_list;
 use sqlbuild_rules::rule_catalogue::models::RuleListing;
 
@@ -246,7 +247,12 @@ fn run_rule_selection(
         native_field(request, "json_output")?.is_truthy()?,
     )?;
     print_line(py, &text, false)?;
-    let findings: usize = native_field(&result, "findings")?.len()?;
+    let mut findings: usize = 0;
+    for finding in native_field(&result, "findings")?.try_iter()? {
+        if counts_toward_exit(&native_field(&finding?, "code")?.extract::<String>()?) {
+            findings += 1;
+        }
+    }
     if findings > 0 {
         print_line(
             py,

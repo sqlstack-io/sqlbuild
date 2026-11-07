@@ -144,6 +144,11 @@ These checks run through ordinary compilation. There is intentionally no separat
 lifecycle. If an SQL requirement affects whether the project is acceptable, the compiler enforces
 it with the rest of the configured Rules.
 
+If SQL Rules cannot run because SQLBuild does not parse the project's dialect yet, `sqb compile`,
+`sqb rules run` and `sqb format` show one `L007` warning per file that names the dialect. `L007`
+never changes an exit code: it reports a gap in SQLBuild's dialect support, not a problem in your
+SQL, so the file's SQL Rules simply did not run.
+
 Not every traditional lint concern should become a diagnostic. SQLBuild separates three kinds of
 SQL responsibility:
 
