@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.195.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.194.0...v0.195.0) (2026-11-07)
+
+
+### Features
+
+* **ui:** wire the jobs and triggers pages to the live control API ([#1336](https://github.com/sqlstack-io/sqlbuild/issues/1336)) ([8b6a91c](https://github.com/sqlstack-io/sqlbuild/commit/8b6a91c474d0d064e2b0d30aaee744df29ef8c55))
+
 ## [0.194.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.193.0...v0.194.0) (2026-11-07)
 
 
