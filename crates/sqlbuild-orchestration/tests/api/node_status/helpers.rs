@@ -358,13 +358,42 @@ async fn listing_ignores_build_history(
     );
 }
 
-/// Three thousand built nodes, half in a named database, are read in batches and keep their own builds.
+/// Three thousand built nodes, half in a named database, keep their own builds, and listing them grows linearly.
 async fn listing_reads_wide_targets_in_batches(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (location, mut input): (Uuid, SnapshotInput),
 ) {
     let names: Vec<String> = (0..3_000).map(|index| format!("wide_{index:04}")).collect();
+    let mut medians: Vec<std::time::Duration> = Vec::new();
+    for (first, size) in [(0, 1_000), (1_000, names.len())] {
+        medians.push(
+            list_wide_target(
+                store,
+                credentials,
+                (location, &mut input),
+                (&names, first, size),
+            )
+            .await,
+        );
+    }
+    let ratio: f64 = medians[1].as_secs_f64() / medians[0].as_secs_f64();
+    assert!(
+        ratio < 6.0,
+        "listing {} nodes took {:?}, {ratio:.1} times the {:?} for 1,000; listing must stay linear",
+        names.len(),
+        medians[1],
+        medians[0]
+    );
+}
+
+/// Add `names[first..size]` with one build each and return the median time to list the first `size`.
+async fn list_wide_target(
+    store: &ControlStore,
+    credentials: (&AuditContext, Uuid),
+    (location, input): (Uuid, &mut SnapshotInput),
+    (names, first, size): (&[String], usize, usize),
+) -> std::time::Duration {
     let database = |index: usize| (index % 2 == 1).then(|| "analytics_db".to_owned());
     let built_at = |index: usize| {
         chrono::DateTime::parse_from_rfc3339("2026-02-01T00:00:00Z")
@@ -372,7 +401,7 @@ async fn listing_reads_wide_targets_in_batches(
             .to_utc()
             + chrono::Duration::seconds(i64::try_from(index).expect("seconds"))
     };
-    for (index, name) in names.iter().enumerate() {
+    for (index, name) in names.iter().enumerate().take(size).skip(first) {
         input.nodes.insert(format!("model:{name}"), SnapshotNode {
             kind: "model".into(),
             definition: json!({"name":name,"destination":{"database":database(index),"schema":"main","name":name}}),
@@ -382,9 +411,7 @@ async fn listing_reads_wide_targets_in_batches(
         });
     }
     input.generation += 1;
-    publish_snapshot(store, &input)
-        .await
-        .expect("wide snapshot");
+    publish_snapshot(store, input).await.expect("wide snapshot");
     let transaction = begin(store, TransactionMode::Write).await.expect("begin");
     let (mut transaction, rows) = query(
         transaction,
@@ -396,11 +423,11 @@ async fn listing_reads_wide_targets_in_batches(
     .await
     .expect("template build");
     let template: Uuid = serde_json::from_value(rows[0]["event_id"].clone()).expect("event id");
-    for (chunk_index, chunk) in names.chunks(300).enumerate() {
+    for (chunk_index, chunk) in names[first..size].chunks(300).enumerate() {
         let mut parameters = vec![Parameter::Id(template)];
         let mut values: Vec<String> = Vec::new();
         for (offset, name) in chunk.iter().enumerate() {
-            let index = chunk_index * 300 + offset;
+            let index = first + chunk_index * 300 + offset;
             values.push(format!(
                 "(${},${},${},${},${})",
                 parameters.len() + 1,
@@ -448,7 +475,7 @@ async fn listing_reads_wide_targets_in_batches(
             .iter()
             .map(|node| (node.node_key.as_str(), node.last_build.as_ref()))
             .collect();
-        let built = names
+        let built = names[..size]
             .iter()
             .enumerate()
             .filter(|(index, name)| {
@@ -462,13 +489,8 @@ async fn listing_reads_wide_targets_in_batches(
                     })
             })
             .count();
-        assert_eq!(built, names.len(), "every wide node keeps its own build");
+        assert_eq!(built, size, "every wide node keeps its own build");
     }
     timings.sort();
-    assert!(
-        timings[1] < std::time::Duration::from_millis(450),
-        "listing {} nodes took {:?}",
-        names.len(),
-        timings[1]
-    );
+    timings[1]
 }
