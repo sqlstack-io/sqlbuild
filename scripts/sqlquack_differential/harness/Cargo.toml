@@ -27,3 +27,5 @@ sqlquack-syntax = "0.2.0"
 # `sqlquack-syntax-duckdb = { version = "0.2.0", optional = true }` to the dependencies and
 # patch it from a checkout that has the crate.
 native-duckdb = []
+# Parse SQLite cases with SQLQuack's native SQLite parser, as native-duckdb does for DuckDB.
+native-sqlite = []

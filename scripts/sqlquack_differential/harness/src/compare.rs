@@ -119,7 +119,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         sql: case.query_sql.clone(),
         dialect: case.dialect.clone(),
         stubs: HashMap::new(),
-        placeholders: HashMap::new(),
+        placeholders: case.placeholders.clone(),
     }) {
         Ok(sql) => sql,
         Err(error) => {
@@ -629,6 +629,15 @@ fn read(sql: &str, dialect: Dialect) -> Result<Vec<Expression>, (&'static str, S
     #[cfg(feature = "native-duckdb")]
     if dialect == Dialect::DuckDB {
         let parsed = sqlquack_syntax_duckdb::parse_strict(sql)
+            .map_err(|error| ("parse_error", format!("{error:?}")))?;
+        if let Some(gap) = parsed.gaps.first() {
+            return Err(("opaque", format!("{}@{}", gap.construct, gap.start)));
+        }
+        return Ok(parsed.statements);
+    }
+    #[cfg(feature = "native-sqlite")]
+    if dialect == Dialect::SQLite {
+        let parsed = sqlquack_syntax_sqlite::parse_strict(sql)
             .map_err(|error| ("parse_error", format!("{error:?}")))?;
         if let Some(gap) = parsed.gaps.first() {
             return Err(("opaque", format!("{}@{}", gap.construct, gap.start)));

@@ -1,6 +1,7 @@
 //! The cases `scripts/run_sqlquack_differential.py` extracts from compile captures.
 
 use serde::Deserialize;
+use std::collections::HashMap;
 
 /// One Snowflake, DuckDB or SQLite query: its analysis SQL, the relations it reads and, for a compiled model,
 /// SQLBuild's recorded results.
@@ -15,6 +16,9 @@ pub struct Case {
     pub quoted_ignore_case: bool,
     /// The query SQL with SQLBuild's reference markers, as the compile analysed it.
     pub query_sql: String,
+    /// The model's `@@@name` placeholder defaults, substituted before analysis as SQLBuild does.
+    #[serde(default)]
+    pub placeholders: HashMap<String, String>,
     /// The relations the compile's binding catalog knew, by analysis name.
     pub relations: Vec<Relation>,
     /// The project's functions, as SQLBuild declares them to Polyglot.
