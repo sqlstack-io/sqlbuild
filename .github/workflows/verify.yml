@@ -1099,6 +1099,8 @@ jobs:
       sdist: false
       upload: true
       retention-days: 3
+      # Release Distributions builds and smoke tests the slower dist profile for every release.
+      cargo-profile: release
 
   compose:
     name: Packaged Compose lifecycle
