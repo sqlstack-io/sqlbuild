@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.194.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.193.0...v0.194.0) (2026-11-07)
+
+
+### Features
+
+* **orchestration:** let people read run nodes, triggers and ticks ([#1332](https://github.com/sqlstack-io/sqlbuild/issues/1332)) ([fb13201](https://github.com/sqlstack-io/sqlbuild/commit/fb132010481633df2c8c5776f658380d5f265043))
+* **ui:** wire the runs pages to the live control API ([#1334](https://github.com/sqlstack-io/sqlbuild/issues/1334)) ([68a1551](https://github.com/sqlstack-io/sqlbuild/commit/68a1551ce61e1c7010bfac472823e36aadfe1bc2))
+
 ## [0.193.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.192.0...v0.193.0) (2026-11-07)
 
 
