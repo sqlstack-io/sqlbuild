@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.193.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.192.0...v0.193.0) (2026-11-07)
+
+
+### Features
+
+* **cli:** make sqlbuild a small forwarder to sqb ([#1333](https://github.com/sqlstack-io/sqlbuild/issues/1333)) ([821385d](https://github.com/sqlstack-io/sqlbuild/commit/821385d8af5bbc39ecf23f87f3493bc260882ab6))
+* run the orchestration UI shell on the live control API ([#1328](https://github.com/sqlstack-io/sqlbuild/issues/1328)) ([cf07c40](https://github.com/sqlstack-io/sqlbuild/commit/cf07c4016ea4b8595dcc6d2d9e5dcfbb21021403))
+* serve the web UI from sqb server and ship it in the wheels ([#1329](https://github.com/sqlstack-io/sqlbuild/issues/1329)) ([1345322](https://github.com/sqlstack-io/sqlbuild/commit/1345322e34957bb1fb7735fc44fc40e7fc86be5d))
+
+
+### Bug Fixes
+
+* let Recall's final delivery rows use the remaining shutdown budget ([#1325](https://github.com/sqlstack-io/sqlbuild/issues/1325)) ([04e98cb](https://github.com/sqlstack-io/sqlbuild/commit/04e98cbb4b2c3b2ac50024efd8ba025de9cefa71))
+* publish audits that share a name as separate snapshot nodes ([#1326](https://github.com/sqlstack-io/sqlbuild/issues/1326)) ([8f0728e](https://github.com/sqlstack-io/sqlbuild/commit/8f0728ec45af3ff9c79cb8761d721e1ee02e6844))
+* **security:** name no nodes in authorization denials ([#1322](https://github.com/sqlstack-io/sqlbuild/issues/1322)) ([8d2d2da](https://github.com/sqlstack-io/sqlbuild/commit/8d2d2da23f9b900a233c123fd2b2feae02aa937f))
+
 ## [0.192.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.191.0...v0.192.0) (2026-11-06)
 
 

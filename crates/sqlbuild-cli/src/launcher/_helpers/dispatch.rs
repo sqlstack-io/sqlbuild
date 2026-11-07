@@ -4,11 +4,13 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
 
-use crate::launcher::_helpers::handoff::{hand_off, python_cli};
+use crate::launcher::_helpers::handoff::{beside, hand_off};
 use crate::launcher::_helpers::launch_key::{launch_key, launch_record_path};
-use crate::launcher::_helpers::messages::{print_version, report_missing_python_cli};
+use crate::launcher::_helpers::messages::{
+    print_version, report_handoff_failure, report_missing_python_cli,
+};
 use crate::launcher::constants::{
-    HANDOFF_FAILURE_EXIT_CODE, LAUNCH_RECORD_OPTION, VERSION_OPTIONS,
+    HANDOFF_FAILURE_EXIT_CODE, LAUNCH_RECORD_OPTION, PYTHON_CLI_SCRIPT, VERSION_OPTIONS,
 };
 use crate::native_commands::main::parse_native_invocation::parse_native_invocation;
 use crate::native_commands::main::run_control_invocation::run_control_invocation;
@@ -64,7 +66,7 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
         return code;
     }
     let program: PathBuf = std::env::current_exe().unwrap_or_default();
-    let Some(script) = python_cli(&program) else {
+    let Some(script) = beside(&program, PYTHON_CLI_SCRIPT) else {
         report_missing_python_cli(&program);
         return HANDOFF_FAILURE_EXIT_CODE;
     };
@@ -94,5 +96,12 @@ pub(crate) fn launch(arguments: Vec<OsString>, started: (Instant, SystemTime)) -
         handed.push(option);
     }
     handed.extend(arguments);
-    hand_off(&script, &handed)
+    match hand_off(&script, &handed) {
+        Ok(Some(code)) => code,
+        Ok(None) => HANDOFF_FAILURE_EXIT_CODE,
+        Err(error) => {
+            report_handoff_failure(&script, &error);
+            HANDOFF_FAILURE_EXIT_CODE
+        }
+    }
 }
