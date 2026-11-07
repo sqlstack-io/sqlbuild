@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.196.2](https://github.com/sqlstack-io/sqlbuild/compare/v0.196.1...v0.196.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **adapters:** escape cursor bounds and UDF packages as dialect string literals ([#1346](https://github.com/sqlstack-io/sqlbuild/issues/1346)) ([d3fc0e0](https://github.com/sqlstack-io/sqlbuild/commit/d3fc0e04908434bf758da2abc1ff864a695c1024))
+
 ## [0.196.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.196.0...v0.196.1) (2026-11-07)
 
 
