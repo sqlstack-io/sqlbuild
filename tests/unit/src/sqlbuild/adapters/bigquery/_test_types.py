@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -9,6 +10,7 @@ from sqlbuild.adapter.contract.models import (
     RowDiffSampleRow,
     SchemaDiffResult,
 )
+from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
 
 
 @dataclass(frozen=True)
@@ -266,3 +268,17 @@ class BigQueryCloneStatementTestCase:
     description: str
     statement: str
     expected_clone: bool
+
+
+@dataclass(frozen=True)
+class BigQueryStringLiteralTestCase:
+    description: str
+    value: str
+    expected_literal: str
+
+
+@dataclass(frozen=True)
+class BigQueryGoogleSqlRenderingTestCase:
+    description: str
+    render: Callable[[BigQueryAdapter], str | tuple[str, ...]]
+    expected_sql: str | tuple[str, ...]

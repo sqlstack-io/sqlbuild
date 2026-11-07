@@ -35,3 +35,4 @@ USAGE_UNAVAILABLE_ERROR_CLASSES: tuple[str, ...] = (
 USAGE_UNAVAILABLE_SQLSTATES: frozenset[str] = frozenset({"42501", "42P01", "42704"})
 LINEAGE_VIEW_SOURCE_TYPES: tuple[str, ...] = ("VIEW", "MATERIALIZED_VIEW", "METRIC_VIEW")
 CURRENT_CATALOG_INFORMATION_SCHEMA: str = "information_schema"
+STRING_LITERAL_ESCAPES: dict[int, str] = str.maketrans({"\\": "\\\\", "'": "\\'"})

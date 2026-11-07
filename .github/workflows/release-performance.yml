@@ -66,7 +66,10 @@ jobs:
         run: uv python install 3.12
       - name: Install dependencies
         run: uv sync --locked --all-groups --all-extras
+      # The candidate uses the released wheels' cargo profile, so both sides of the comparison match.
       - name: Build candidate wheel
+        env:
+          MATURIN_PEP517_ARGS: --profile dist
         run: |
           uv build --wheel --out-dir "${RUNNER_TEMP}/candidate"
           uv build --wheel crates/sqlbuild-cli --out-dir "${RUNNER_TEMP}/candidate"

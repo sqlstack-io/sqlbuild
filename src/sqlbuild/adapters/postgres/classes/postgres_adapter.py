@@ -300,7 +300,7 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -320,9 +320,11 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
 
         if cursor_column is None or start_cursor is None:
             return ""
-        clauses: list[str] = [f"{cursor_column} >= '{start_cursor.value}'"]
+        clauses: list[str] = [
+            f"{cursor_column} >= {self._quote_sql_string(str(start_cursor.value))}"
+        ]
         if end_cursor is not None:
-            clauses.append(f"{cursor_column} < '{end_cursor.value}'")
+            clauses.append(f"{cursor_column} < {self._quote_sql_string(str(end_cursor.value))}")
         return " AND ".join(clauses)
 
     def schema_exists(
@@ -632,8 +634,9 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> tuple[str, ...]:
         quoted_cursor_column: str = self.render_identifier(cursor_column)
         delete_sql: str = (
-            f"DELETE FROM {destination} WHERE {quoted_cursor_column} >= '{cursor_start}' "
-            f"AND {quoted_cursor_column} < '{cursor_end}'"
+            f"DELETE FROM {destination} WHERE {quoted_cursor_column} >= "
+            f"{self._quote_sql_string(cursor_start)} "
+            f"AND {quoted_cursor_column} < {self._quote_sql_string(cursor_end)}"
         )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns
@@ -1932,8 +1935,8 @@ class PostgresAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def default_table_promotion_mode(self) -> TablePromotionMode:
         """Return staged as the generic default promotion mode."""
