@@ -6,7 +6,7 @@ from pathlib import Path
 
 HARNESS_MANIFEST: Path = Path(__file__).parent / "harness" / "Cargo.toml"
 HARNESS_BINARY: str = "sqlserver-differential"
-SQLQUACK_CRATES: tuple[str, ...] = ("sqlquack-syntax", "sqlquack-syntax-sqlserver")
+SQLQUACK_CRATES: tuple[str, ...] = ("sqlquack-semantics", "sqlquack-syntax", "sqlquack-syntax-sqlserver")
 REPO_ROOT: Path = Path(__file__).parents[2]
 COMPILED_PROJECT_CAPTURE: str = "captures/0-compile/003-compiled_project.json"
 SQLSERVER_DIALECT: str = "tsql"
