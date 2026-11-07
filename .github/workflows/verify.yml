@@ -619,6 +619,8 @@ jobs:
             -l "${RUNNER_TEMP}/postgres.log" -w start
       - name: Worker claim ownership, recovery and stop
         run: cargo test --locked -p sqlbuild-process-ownership
+      - name: sqlbuild forwarder arguments, exit codes, streams, signals and missing sqb
+        run: cargo test --locked -p sqlbuild-cli --test launcher
       - name: Control store, scheduler and recovery contracts on SQLite and PostgreSQL
         env:
           SQLBUILD_TEST_CONTROL_POSTGRES_URL: postgresql://postgres@127.0.0.1:5433/postgres
