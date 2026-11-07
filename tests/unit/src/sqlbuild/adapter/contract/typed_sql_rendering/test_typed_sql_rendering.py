@@ -80,7 +80,7 @@ from tests.unit.src.sqlbuild.adapter.contract.typed_sql_rendering.helpers import
         AdapterTypedSqlRenderingTestCase(
             description="bigquery",
             adapter_factory=BigQueryAdapter,
-            expected_string="'O''Brien'",
+            expected_string="'O\\'Brien'",
             expected_true="TRUE",
             expected_false="FALSE",
             expected_integer="-7",
@@ -88,7 +88,7 @@ from tests.unit.src.sqlbuild.adapter.contract.typed_sql_rendering.helpers import
             expected_decimal="NUMERIC '2.4700'",
             expected_null="NULL",
             expected_value_list="('GB', 'FR')",
-            expected_object='JSON \'{"amount":2.4700,"label":"O\'\'Brien"}\'',
+            expected_object='JSON \'{"amount":2.4700,"label":"O\\\'Brien"}\'',
         ),
         AdapterTypedSqlRenderingTestCase(
             description="databricks",
