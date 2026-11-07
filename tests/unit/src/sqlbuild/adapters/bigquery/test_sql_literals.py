@@ -63,6 +63,11 @@ def test_given_special_characters_when_rendering_string_literal_then_uses_backsl
             expected_sql=r"`order\`s\\total`",
         ),
         BigQueryGoogleSqlRenderingTestCase(
+            description="quoted identifier keeps an apostrophe as stored view definitions spell it",
+            render=lambda adapter: adapter.render_identifier("customer's id"),
+            expected_sql="`customer's id`",
+        ),
+        BigQueryGoogleSqlRenderingTestCase(
             description="column type change uses set data type",
             render=lambda adapter: adapter.render_alter_column_types(
                 destination="`analytics.orders`",

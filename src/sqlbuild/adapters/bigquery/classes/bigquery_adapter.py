@@ -134,6 +134,7 @@ from sqlbuild.adapters.bigquery.constants import (
     DECIMAL_METADATA_TYPE_NAMES,
     FLOAT_METADATA_TYPE_NAME,
     FLOAT_WIRE_TYPE_NAME,
+    IDENTIFIER_ESCAPES,
     INTEGER_METADATA_TYPE_NAME,
     INTEGER_TYPE_TOKEN,
     INTEGER_WIRE_TYPE_NAME,
@@ -1176,7 +1177,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         return f"CAST({literal} AS {self._loader_row_sql_type(sql_type)}) AS {quoted_column}"
 
     def render_identifier(self, name: str) -> str:
-        return "`" + self._escape_sql_string(name).replace("`", "\\`") + "`"
+        return "`" + name.translate(IDENTIFIER_ESCAPES) + "`"
 
     def render_exact_identifier(self, name: str) -> str:
         return self.render_identifier(name)

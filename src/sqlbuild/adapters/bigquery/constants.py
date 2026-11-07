@@ -56,3 +56,6 @@ CLONE_STATEMENT_PATTERN: str = (
 STRING_LITERAL_ESCAPES: dict[int, str] = str.maketrans(
     {"\\": "\\\\", "'": "\\'", "\n": "\\n", "\r": "\\r"}
 )
+IDENTIFIER_ESCAPES: dict[int, str] = str.maketrans(
+    {"\\": "\\\\", "`": "\\`", "\n": "\\n", "\r": "\\r"}
+)
