@@ -40,6 +40,12 @@ describe('trigger mapping', () => {
 		expect(toTrigger(onInventory, runs, null).lastRun).toBeNull();
 	});
 
+	it('links a group trigger to its group run, not a child listed before it', () => {
+		const child = { ...run('r-child', 'orders_member', 't-daily'), parentRunId: 'r-group' } as Run;
+		const group = { ...run('r-group', 'orders', 't-daily'), status: 'failed' } as Run;
+		expect(toTrigger(daily, [child, group], null).lastRun?.id).toBe('r-group');
+	});
+
 	it('reports lateness from evaluation time and hides sensor parts the server lacks', () => {
 		const tick = toTick({ tick_id: 'k1', trigger_id: 't-daily', epoch: 1, scheduled_for: '2026-11-07T06:00:00Z', evaluated_at: '2026-11-07T06:02:30Z', outcome: 'requested', run_id: 'r-new' });
 		expect(tick.lateBySeconds).toBe(150);

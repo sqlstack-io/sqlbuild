@@ -70,7 +70,8 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 		state: wire.status,
 		nextDueAt: wire.next_due_at ?? null,
 		lastTick,
-		lastRun: newest(runs, (r) => r.triggerId === wire.trigger_id),
+		// Group children copy the group's trigger, so only top-level runs are the trigger's own.
+		lastRun: newest(runs, (r) => r.triggerId === wire.trigger_id && !r.parentRunId),
 		sourceFile: null,
 		definitionChanged: false,
 		warning: null

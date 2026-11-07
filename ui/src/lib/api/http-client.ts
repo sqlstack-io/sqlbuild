@@ -238,7 +238,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks);
 		},
 		async setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]> {
-			for (const id of ids) await changeTrigger(id, { kind: state === 'running' ? 'enable' : 'pause' }, reason);
+			for (const [done, id] of ids.entries()) {
+				try {
+					await changeTrigger(id, { kind: state === 'running' ? 'enable' : 'pause' }, reason);
+				} catch (error) {
+					if (done === 0 || !(error instanceof ApiError)) throw error;
+					throw new ApiError(`${error.message} (${done} of ${ids.length} triggers were already changed)`, error.status);
+				}
+			}
 			return (await triggersOf(scope)).filter((t) => ids.includes(t.id));
 		},
 		async resetTriggerToDefault(scope: Scope, id: string): Promise<Trigger> {
