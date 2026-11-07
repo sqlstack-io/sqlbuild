@@ -1,0 +1,29 @@
+[package]
+name = "sqlbuild-sqlquack-differential"
+version = "0.0.0"
+description = "Compares SQLBuild's Polyglot analysis of Snowflake, DuckDB and SQLite models with SQLQuack's."
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Standalone: the SQLQuack crates come from a local checkout through `--config patch.crates-io...`
+# flags that `scripts/run_sqlquack_differential.py` passes. Keeping the harness out of the SQLBuild
+# workspace leaves the workspace buildable without that checkout.
+[workspace]
+
+[[bin]]
+name = "sqlquack-differential"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sqlbuild-analysis = { path = "../../../crates/sqlbuild-analysis" }
+sqlquack-semantics = "0.2.0"
+sqlquack-syntax = "0.2.0"
+
+[features]
+# Parse DuckDB cases with SQLQuack's native DuckDB parser: add
+# `sqlquack-syntax-duckdb = { version = "0.2.0", optional = true }` to the dependencies and
+# patch it from a checkout that has the crate.
+native-duckdb = []
