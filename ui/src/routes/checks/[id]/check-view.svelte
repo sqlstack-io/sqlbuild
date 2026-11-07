@@ -15,7 +15,7 @@
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
 	import { errorMessage } from '$lib/platform/labels';
-	import { checkValue, kindLabel, outcomeOf } from '../utils';
+	import { cellText, checkValue, kindLabel, outcomeOf } from '../utils';
 
 	let { id }: { id: string } = $props();
 
@@ -127,7 +127,7 @@
 							<thead><tr>{#each evidence.columns as col (col)}<th>{col}</th>{/each}</tr></thead>
 							<tbody>
 								{#each evidence.rows as row, i (i)}
-									<tr>{#each row as v, j (j)}<td class="mono">{v === null ? 'NULL' : String(v)}</td>{/each}</tr>
+									<tr>{#each row as v, j (j)}<td class="mono">{cellText(v)}</td>{/each}</tr>
 								{:else}
 									<tr><td colspan={evidence.columns.length || 1} class="faint">No rows were stored.</td></tr>
 								{/each}

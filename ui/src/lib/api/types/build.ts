@@ -258,7 +258,8 @@ export type CheckEvidence = {
 	evaluationId: string;
 	/** Every row key, in sorted order; a row without a key holds null there. */
 	columns: string[];
-	rows: (string | number | boolean | null)[][];
+	/** JSON cells: scalars, or objects and arrays from structured warehouse columns. */
+	rows: unknown[][];
 	truncated: boolean;
 };
 

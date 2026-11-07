@@ -20,3 +20,9 @@ export function kindLabel(check: Pick<Check, 'kind' | 'definition'>): string {
 	if (check.kind === null) return check.definition ?? 'check';
 	return check.kind === 'audit' ? `audit · ${check.definition ?? 'custom'}` : check.kind.replace('_', ' ');
 }
+
+/** An evidence cell as text: NULL, JSON for structured values, the value itself otherwise. */
+export function cellText(value: unknown): string {
+	if (value === null || value === undefined) return 'NULL';
+	return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}

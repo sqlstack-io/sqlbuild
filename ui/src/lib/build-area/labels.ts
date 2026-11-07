@@ -120,7 +120,6 @@ export const warehouseColumnTone: Record<WarehouseColumnState, string> = {
 	undeclared: 'var(--sb-text-faint)'
 };
 
-/** Short ID for a fingerprint run, which is a UUID or an invocation ID. */
 /** A UUID's first block, or the random suffix of an `sqb` run id such as `20261107T061043Z_ea9122fb7f42`. */
 export function shortRunId(id: string): string {
 	const suffix = id.slice(id.lastIndexOf('_') + 1);

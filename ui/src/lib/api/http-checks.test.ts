@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
 import { shortRunId } from '$lib/build-area/labels';
+import { cellText } from '../../routes/checks/utils';
 import { checkDetailOf, thresholdsOf, toCheck, toCheckEvidence } from './http-checks';
 
 type W = components['schemas'];
@@ -57,5 +58,11 @@ describe('check mapping', () => {
 	it('shortens an sqb run id to its random suffix, not its date', () => {
 		expect(shortRunId('20261107T061043Z_ea9122fb7f42')).toBe('ea9122fb7f42');
 		expect(shortRunId('0f9a3c27-5d61-4e0b-9a88-2c4d7e1b6f30')).toBe('0f9a3c27');
+	});
+});
+
+describe('evidence cells', () => {
+	it('renders structured values as JSON and missing keys as NULL', () => {
+		expect([cellText({ sku: 7 }), cellText([1, 'a']), cellText(null), cellText(false), cellText(3.5)]).toEqual(['{"sku":7}', '[1,"a"]', 'NULL', 'false', '3.5']);
 	});
 });
