@@ -4126,7 +4126,6 @@ version = "0.0.0"
 dependencies = [
  "memchr",
  "polyglot-sql",
- "polyglot-sql-function-catalogs",
  "rayon",
  "regex",
  "rustc-hash",

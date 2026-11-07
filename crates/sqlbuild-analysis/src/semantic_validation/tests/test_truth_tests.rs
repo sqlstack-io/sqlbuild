@@ -1,6 +1,5 @@
 use crate::semantic_validation::_helpers::diagnostics::map_diagnostics;
 use crate::semantic_validation::_helpers::truth_tests::{rejects_truth_tests, truth_tests};
-use crate::semantic_validation::models::FunctionProbes;
 use crate::semantic_validation::tests::test_types::{
     LocatedTruthTestDiagnosticTestCase, TruthTestDialectTestCase, TruthTestScanTestCase,
 };
@@ -91,7 +90,6 @@ fn given_dialect_when_checking_truth_tests_then_only_rejecting_warehouses_report
                 valid: true,
                 errors: Vec::new(),
             },
-            &FunctionProbes::default(),
         )
         .expect(test_case.description);
         assert_eq!(
@@ -162,7 +160,6 @@ fn given_rejected_truth_test_when_mapping_diagnostics_then_returns_located_b103(
                 valid: true,
                 errors: Vec::new(),
             },
-            &FunctionProbes::default(),
         )?;
         let [error] = result.errors.as_slice() else {
             return Err(format!("{}: {:?}", test_case.description, result.errors));

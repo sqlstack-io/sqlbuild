@@ -10,7 +10,6 @@ rust-version.workspace = true
 [dependencies]
 memchr.workspace = true
 polyglot-sql.workspace = true
-polyglot-sql-function-catalogs.workspace = true
 rayon.workspace = true
 regex.workspace = true
 rustc-hash.workspace = true

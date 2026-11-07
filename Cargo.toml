@@ -93,9 +93,6 @@ polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "876
     "semantic",
     "stacker",
 ] }
-polyglot-sql-function-catalogs = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
-    "dialect-duckdb",
-] }
 blake3 = { version = "1", features = ["rayon"] }
 # Only sqlbuild-build-features uses these: each enables in the sqb build exactly the features the
 # extension build resolves for that crate, so both builds share one compile of every common crate.

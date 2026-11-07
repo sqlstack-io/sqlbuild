@@ -550,12 +550,8 @@ fn analyze_compact_query_work(
     if let (Some(sql), Ok(dialect)) = (diagnostic_sql, dialect)
         && let Some(validation) = result.validation.take()
     {
-        let local_probes = crate::semantic_validation::models::FunctionProbes::default();
-        let probes = catalog.map_or(&local_probes, |catalog| catalog.function_probes.as_ref());
         result.validation = Some(validation.and_then(|value| {
-            crate::semantic_validation::main::map_diagnostics::map_diagnostics(
-                &sql, dialect, value, probes,
-            )
+            crate::semantic_validation::main::map_diagnostics::map_diagnostics(&sql, dialect, value)
         }));
     }
     result

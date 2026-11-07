@@ -1,6 +1,6 @@
 //! Compile-owned native catalog, mapping state and boundary requests.
 
-use crate::semantic_validation::types::{PreparedCompactAnalysis, ProbeKey, Relations};
+use crate::semantic_validation::types::{PreparedCompactAnalysis, Relations};
 use polyglot_sql::validation::SchemaTable;
 use polyglot_sql::{DialectType, SchemaValidationOptions};
 use rayon::ThreadPool;
@@ -65,12 +65,6 @@ pub struct PositionInput {
     pub passes: Vec<Vec<Expansion>>,
 }
 
-/// Memoized call-site function-name probes, owned by the catalog that validates a compile.
-#[derive(Debug, Default)]
-pub(crate) struct FunctionProbes {
-    pub(crate) suggestions: Mutex<HashMap<ProbeKey, Option<String>>>,
-}
-
 pub struct ProjectCatalog {
     pub(crate) dialect: DialectType,
     pub(crate) options: SchemaValidationOptions,
@@ -78,7 +72,6 @@ pub struct ProjectCatalog {
     pub(super) tables: HashMap<String, SchemaTable>,
     pub(super) overrides: Vec<HashMap<String, SchemaTable>>,
     pub(super) analysis_tables: HashMap<String, SchemaTable>,
-    pub(crate) function_probes: Arc<FunctionProbes>,
     /// One analysis pool per compile catalog, built on first use and shared by its views.
     pub(super) analysis_pool: Arc<Mutex<Option<Arc<ThreadPool>>>>,
     /// Analysis batches running on the pool; preparation only borrows the pool while none run.
