@@ -34,6 +34,10 @@ pub struct TypeMatch {
     pub nullable_into_non_null: bool,
 }
 
+/// DuckDB and MotherDuck, whose type spellings the native route compares as Polyglot did.
+#[derive(Clone, Copy, Debug)]
+pub struct DuckDbDialect;
+
 /// Snowflake, whose SQL SQLQuack's Snowflake parser reads.
 #[derive(Clone, Copy, Debug)]
 pub struct SnowflakeDialect;
@@ -41,3 +45,24 @@ pub struct SnowflakeDialect;
 /// SQLite, whose SQL SQLQuack's native SQLite parser reads.
 #[derive(Clone, Copy, Debug)]
 pub struct SqliteDialect;
+
+/// How a dialect's type names are respelt before SQLBuild's type fallback reads them.
+#[derive(Clone, Copy, Debug)]
+pub struct TypeSpelling {
+    /// Each name, upper-cased and single-spaced, and the name it is compared as.
+    pub aliases: &'static [(&'static str, &'static str)],
+    /// Further aliases that apply only inside another type, such as a list's element.
+    pub nested_aliases: &'static [(&'static str, &'static str)],
+    /// Names whose parameters are dropped when they are renamed.
+    pub sizeless: &'static [&'static str],
+    /// Names whose parameterised spelling, as a whole type, the fallback cannot spell as compared.
+    pub sizeless_whole: &'static [&'static str],
+    /// Names kept as written when they have no parameters.
+    pub bare_kept: &'static [&'static str],
+    /// Types whose parameters are named fields.
+    pub fielded: &'static [&'static str],
+    /// Types whose parameters are compared as written.
+    pub verbatim: &'static [&'static str],
+    /// Whether `[]` array suffixes are part of the dialect's type syntax.
+    pub arrays: bool,
+}

@@ -2,8 +2,11 @@
 
 use sqlquack_syntax_sqlite::{Parsed, StrictFailure, parse_strict};
 
+use crate::analysis_route::_helpers::type_spelling::respelt;
 use crate::analysis_route::_helpers::whole::one_statement;
-use crate::analysis_route::constants::{SQLITE_DIALECT, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT};
+use crate::analysis_route::constants::{
+    SQLITE_DIALECT, SQLITE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+};
 use crate::analysis_route::models::{ParserGap, SqliteDialect};
 use crate::analysis_route::types::NativeDialect;
 
@@ -28,5 +31,13 @@ impl NativeDialect for SqliteDialect {
 
     fn stub_prefix(&self) -> &'static str {
         UNQUOTED_STUB_PREFIX
+    }
+}
+
+impl SqliteDialect {
+    /// A type spelt so the type fallback gives Polyglot's result, or `None` (unknown) where it can't.
+    #[must_use]
+    pub fn normalize_type(&self, spelling: &str) -> Option<String> {
+        respelt(spelling, &SQLITE_TYPE_SPELLING)
     }
 }

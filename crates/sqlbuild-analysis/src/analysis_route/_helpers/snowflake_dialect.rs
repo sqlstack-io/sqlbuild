@@ -4,9 +4,10 @@ use sqlquack_syntax::{
     Dialect, Error, Expression, ParseOptions, StrictFailure, TokenizeFailure, parse_strict,
 };
 
+use crate::analysis_route::_helpers::type_spelling::respelt;
 use crate::analysis_route::_helpers::whole::one_statement;
 use crate::analysis_route::constants::{
-    SNOWFLAKE_DIALECT, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+    SNOWFLAKE_DIALECT, SNOWFLAKE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{ParserGap, SnowflakeDialect};
 use crate::analysis_route::types::NativeDialect;
@@ -49,5 +50,13 @@ fn unplaced(error: Error) -> String {
         | Error::Parse { message, .. }
         | Error::Syntax { message, .. } => message,
         other => other.to_string(),
+    }
+}
+
+impl SnowflakeDialect {
+    /// A type spelt so the type fallback gives Polyglot's result, or `None` (unknown) where it can't.
+    #[must_use]
+    pub fn normalize_type(&self, spelling: &str) -> Option<String> {
+        respelt(spelling, &SNOWFLAKE_TYPE_SPELLING)
     }
 }
