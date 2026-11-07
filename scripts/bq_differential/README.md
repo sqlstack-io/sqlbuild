@@ -42,7 +42,7 @@ python scripts/bq_differential/extract.py /tmp/bq/bodies.jsonl \
   --sqlclean ../sqlclean/crates/sqlclean/src/sql_lint/tests/fixtures/format_corpus.json \
   --rust-fixtures crates --adapter /tmp/bq/adapter.jsonl
 Q=../sqlquack/crates
-cargo build --manifest-path scripts/bq_differential/harness/Cargo.toml \
+CARGO_TARGET_DIR=target cargo build --manifest-path scripts/bq_differential/harness/Cargo.toml \
   --config "patch.crates-io.sqlquack-syntax-bigquery.path=\"$Q/sqlquack-syntax-bigquery\"" \
   --config "patch.crates-io.sqlquack-syntax.path=\"$Q/sqlquack-syntax\""
 target/debug/bq-differential < /tmp/bq/bodies.jsonl > /tmp/bq/results.jsonl
