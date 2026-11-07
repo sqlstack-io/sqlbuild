@@ -140,6 +140,7 @@ from sqlbuild.adapters.bigquery.constants import (
     NATIVE_TABLE_TYPE,
     NOT_FOUND_ERROR_CLASS_NAME,
     SELECT_STATEMENT_TYPE,
+    STRING_LITERAL_ESCAPES,
     TABLE_NAME_WILDCARD,
     TIMESTAMP_TYPE_TOKEN,
 )
@@ -1026,7 +1027,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     ) -> tuple[str, ...]:
         return tuple(
             f"ALTER TABLE {destination} ALTER COLUMN "
-            f"{self.render_identifier(col.name)} TYPE {col.type}"
+            f"{self.render_identifier(col.name)} SET DATA TYPE {col.type}"
             for col in columns
         )
 
@@ -1089,6 +1090,8 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
     def render_typed_scalar(self, *, value: SqlValue) -> str:
         if value.kind == SqlValueKind.DECIMAL:
             return f"NUMERIC {self._quote_sql_string(str(_typed_scalar_payload(value)))}"
+        if value.kind == SqlValueKind.STRING:
+            return self._quote_sql_string(cast(str, _typed_scalar_payload(value)))
         return _render_ansi_typed_scalar(value=value)
 
     def render_typed_value_list(self, *, value: SqlValue) -> str:
@@ -1173,13 +1176,13 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
         return f"CAST({literal} AS {self._loader_row_sql_type(sql_type)}) AS {quoted_column}"
 
     def render_identifier(self, name: str) -> str:
-        return "`" + name.replace("`", "``") + "`"
+        return "`" + self._escape_sql_string(name).replace("`", "\\`") + "`"
 
     def render_exact_identifier(self, name: str) -> str:
         return self.render_identifier(name)
 
     def _quote_sql_string(self, value: str) -> str:
-        return "'" + value.replace("'", "''") + "'"
+        return "'" + self._escape_sql_string(value) + "'"
 
     def render_create_initial_snapshot_destination(
         self,
@@ -3046,7 +3049,7 @@ class BigQueryAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, BaseA
 
     @staticmethod
     def _escape_sql_string(value: str) -> str:
-        return value.replace("'", "''")
+        return value.translate(STRING_LITERAL_ESCAPES)
 
     @staticmethod
     def _strip_identifier_quotes(value: str) -> str:

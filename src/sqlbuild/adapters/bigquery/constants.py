@@ -52,3 +52,7 @@ CLONE_STATEMENT_PATTERN: str = (
     + _CLONE_NAME
     + r"([^A-Za-z0-9_`-]|$)"
 )
+
+STRING_LITERAL_ESCAPES: dict[int, str] = str.maketrans(
+    {"\\": "\\\\", "'": "\\'", "\n": "\\n", "\r": "\\r"}
+)
