@@ -320,9 +320,10 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     def render_create_schema(self, *, database: str | None, schema: str) -> tuple[str, ...]:
         del database
         escaped_schema: str = schema.replace("'", "''")
+        escaped_identifier: str = self.render_identifier(schema).replace("'", "''")
         return (
             "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = "
-            f"'{escaped_schema}') EXEC('CREATE SCHEMA {self.render_identifier(schema)}')",
+            f"'{escaped_schema}') EXEC('CREATE SCHEMA {escaped_identifier}')",
         )
 
     def render_drop_schema(self, *, database: str | None, schema: str) -> tuple[str, ...]:
@@ -2406,7 +2407,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         )
         if update_assignments:
             merge_sql += f"WHEN MATCHED THEN UPDATE SET {update_assignments} "
-        merge_sql += f"WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})"
+        merge_sql += f"WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values});"
         return (merge_sql,)
 
     def render_qualified_name(
@@ -2456,7 +2457,15 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         if stripped_expression.startswith("("):
             return stripped_expression
         lowered: str = stripped_expression.lower()
-        if lowered.startswith(("select", "with", "values")):
+        if re.match(r"with\b", lowered):
+            raise AdapterUserError(
+                message="SQL Server cannot read a source expression that starts with WITH: "
+                "a common table expression cannot sit inside a derived table",
+                code="A715",
+                help="rewrite the source expression as one SELECT, using subqueries instead of "
+                "WITH, or define it as a view or model and read that",
+            )
+        if lowered.startswith(("select", "values")):
             return f"({stripped_expression})"
         return stripped_expression
 

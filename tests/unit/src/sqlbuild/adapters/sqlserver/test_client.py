@@ -7,6 +7,7 @@ import pytest
 
 from sqlbuild._native import FunctionArgument
 from sqlbuild.adapter.contract.classes.statement_recorder import StatementRecorder
+from sqlbuild.adapter.contract.exceptions import AdapterUserError
 from sqlbuild.adapter.contract.models import (
     ColumnInfo,
     CursorValue,
@@ -33,6 +34,7 @@ from tests.unit.src.sqlbuild.adapters.sqlserver._test_types import (
     SqlServerRenderRenameTestCase,
     SqlServerRollbackTestCase,
     SqlServerRowDiffEqualitySqlTestCase,
+    SqlServerSourceExpressionRelationTestCase,
 )
 from tests.unit.src.sqlbuild.adapters.sqlserver.helpers import FakeSqlServerConnection
 
@@ -185,7 +187,7 @@ def test_given_cursor_type_when_rendering_delete_insert_then_sqlserver_uses_type
             expected_insert_clause=(
                 "([tenant_id], [order_id], [updated_at], [status]) VALUES "
                 "(__source.[tenant_id], __source.[order_id], __source.[updated_at], "
-                "__source.[status])"
+                "__source.[status]);"
             ),
         )
     ],
@@ -479,7 +481,15 @@ def test_given_sql_function_when_rendering_create_then_sqlserver_declares_functi
                 "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'analytics') "
                 "EXEC('CREATE SCHEMA [analytics]')"
             ),
-        )
+        ),
+        SqlServerRenderCreateSchemaTestCase(
+            description="doubles quotes in both the lookup and the EXEC string",
+            schema="sqb'meta]x",
+            expected_statement=(
+                "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'sqb''meta]x') "
+                "EXEC('CREATE SCHEMA [sqb''meta]]x]')"
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -876,3 +886,44 @@ def test_given_cross_schema_table_move_when_moving_then_sqlserver_uses_native_tr
     assert tuple(event.content for event in statement_recorder.snapshot()) == (
         test_case.expected_statements
     )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlServerSourceExpressionRelationTestCase(
+            description="a SELECT becomes a derived table",
+            expression="SELECT id FROM raw.orders;",
+            expected_relation="(SELECT id FROM raw.orders)",
+            expected_error_code=None,
+        ),
+        SqlServerSourceExpressionRelationTestCase(
+            description="a relation whose name starts with with stays a relation",
+            expression="raw.with_orders",
+            expected_relation="raw.with_orders",
+            expected_error_code=None,
+        ),
+        SqlServerSourceExpressionRelationTestCase(
+            description="a WITH query is refused because SQL Server cannot nest it",
+            expression="WITH x AS (SELECT 1 AS id) SELECT id FROM x",
+            expected_relation=None,
+            expected_error_code="A715",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_source_expression_when_rendering_relation_then_sqlserver_nests_only_what_it_can(
+    test_case: SqlServerSourceExpressionRelationTestCase,
+) -> None:
+    adapter: SqlServerAdapter = SqlServerAdapter()
+
+    try:
+        relation: str | None = adapter.render_source_expression_relation(
+            expression=test_case.expression
+        )
+        error_code: str | None = None
+    except AdapterUserError as error:
+        relation = None
+        error_code = error.code
+
+    assert (relation, error_code) == (test_case.expected_relation, test_case.expected_error_code)

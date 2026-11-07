@@ -167,3 +167,11 @@ class SqlServerMigrationEventReadTestCase:
     description: str
     stored_created_at: object
     expected_read_suffix: str
+
+
+@dataclass(frozen=True)
+class SqlServerSourceExpressionRelationTestCase:
+    description: str
+    expression: str
+    expected_relation: str | None
+    expected_error_code: str | None
