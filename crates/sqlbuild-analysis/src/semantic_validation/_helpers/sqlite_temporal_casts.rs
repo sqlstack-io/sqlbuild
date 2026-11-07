@@ -35,12 +35,11 @@ pub(crate) fn sqlite_temporal_cast_warnings(
                  '2026-01-01 10:00:00' becomes 2026",
                 cast.type_name
             );
-            cursor.advance(sql, cast.start);
-            let start: usize = cursor.characters;
-            let end: usize = start + sql[cast.start..cast.end].chars().count();
-            ValidationError::warning(message, SQLITE_TEMPORAL_CAST_CODE)
-                .with_location(cursor.line, cursor.column)
-                .with_span(Some(start), Some(end))
+            cursor.locate(
+                sql,
+                (cast.start, cast.end),
+                ValidationError::warning(message, SQLITE_TEMPORAL_CAST_CODE),
+            )
         })
         .collect()
 }

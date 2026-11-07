@@ -104,6 +104,21 @@ impl Cursor {
         }
         self.byte = byte;
     }
+
+    /// `error` located at the byte range `start..end` of `sql`, with its character span.
+    pub(crate) fn locate(
+        &mut self,
+        sql: &str,
+        (start, end): (usize, usize),
+        error: ValidationError,
+    ) -> ValidationError {
+        self.advance(sql, start);
+        let first: usize = self.characters;
+        let last: usize = first + sql[start..end].chars().count();
+        error
+            .with_location(self.line, self.column)
+            .with_span(Some(first), Some(last))
+    }
 }
 
 /// Read `dialect SPELLING arguments ACCEPTED` rows; `#` starts a comment.
@@ -156,12 +171,11 @@ pub(crate) fn unsupported_function_errors(sql: &str, dialect: DialectType) -> Ve
                 "Unknown function '{}' for dialect {dialect:?}; did you mean {}?",
                 call.name, call.suggestion
             );
-            cursor.advance(sql, call.start);
-            let start: usize = cursor.characters;
-            let end: usize = start + sql[call.start..call.end].chars().count();
-            ValidationError::error(message, UNKNOWN_FUNCTION)
-                .with_location(cursor.line, cursor.column)
-                .with_span(Some(start), Some(end))
+            cursor.locate(
+                sql,
+                (call.start, call.end),
+                ValidationError::error(message, UNKNOWN_FUNCTION),
+            )
         })
         .collect()
 }

@@ -175,14 +175,9 @@ impl ProjectCatalog {
 
     pub fn with_relations(&self, relations: Relations) -> Self {
         let mut catalog = Self {
-            dialect: self.dialect,
-            options: self.options.clone(),
-            quoted_ignore_case: self.quoted_ignore_case,
             tables: self.tables.clone(),
-            overrides: Vec::new(),
             analysis_tables: self.analysis_tables.clone(),
-            analysis_pool: Arc::clone(&self.analysis_pool),
-            running_analyses: Arc::clone(&self.running_analyses),
+            ..self.analysis_view()
         };
         catalog.update_relations(relations);
         catalog
