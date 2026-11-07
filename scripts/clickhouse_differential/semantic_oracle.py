@@ -5,10 +5,11 @@ Usage: semantic_oracle.py CASES_JSONL RESULTS_JSONL OUT_JSONL CLICKHOUSE [JOBS]
 For every case SQLQuack parsed (a mutated variant too, for its verdict), a fresh `clickhouse local`
 session under SQLBuild's ClickHouse session settings creates each relation the query names as a
 Memory table with the catalog's column types and each project UDF stub as a SQL function returning
-`Nullable(<type>)`, as SQLBuild's adapter defines it, then runs `DESCRIBE (<query>)`. The output columns' names and types, nullability included, are
-ClickHouse's; an error is ClickHouse's first refusal, with its code name. A case reading an open
-relation (no column list) is skipped. An undeclared column of an upstream model takes ClickHouse's
-own type for that model, so ClickHouse types the project end to end.
+`Nullable(<type>)`, as SQLBuild's adapter defines it, then runs `DESCRIBE (<query>)`. The output
+columns' names and types, nullability included, are ClickHouse's; an error is ClickHouse's first
+refusal, with its code name. A case reading an open relation (no column list) is skipped. An
+undeclared column of an upstream model takes ClickHouse's own type for that model, so ClickHouse
+types the project end to end.
 
 Each line: {"id", "status": "ok" | "error" | "skipped", "detail", "outputs": [[name, type]]}.
 """

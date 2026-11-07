@@ -57,7 +57,7 @@ model with SQLQuack's, as the BigQuery semantic differential does: lineage, bind
 unknown column, the column in upper case and backquotes, which ClickHouse's case-sensitive names do
 not resolve, an unknown qualifier, and an unqualified column two joined relations share).
 SQLQuack's side runs under `sqlquack-semantics`'s ClickHouse profile, so build against a SQLQuack
-checkout that has it (`wip/clickhouse-semantics` until it reaches `main`).
+checkout that has it (`wip/clickhouse-semantics-stack` until it reaches `main`).
 
 ClickHouse referees both sides. `semantic_oracle.py` gives each case a fresh `clickhouse local`
 session with a Memory table per relation and a SQL function per project UDF stub, then runs
