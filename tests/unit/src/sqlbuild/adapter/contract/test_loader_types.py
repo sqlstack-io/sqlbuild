@@ -187,7 +187,7 @@ def test_given_builtin_adapter_when_rendering_identifier_then_uses_adapter_quote
             adapter_name=BuiltinAdapter.DATABRICKS.value,
             value={"source": "loader's api"},
             logical_type=LoaderLogicalType.JSON,
-            expected_literal="'{\"source\": \"loader''s api\"}'",
+            expected_literal=r"""'{"source": "loader\'s api"}'""",
         ),
         AdapterLoaderValueLiteralTestCase(
             description="duckdb escapes string literals",

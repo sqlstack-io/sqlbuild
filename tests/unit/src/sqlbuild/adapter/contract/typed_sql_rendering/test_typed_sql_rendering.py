@@ -93,7 +93,7 @@ from tests.unit.src.sqlbuild.adapter.contract.typed_sql_rendering.helpers import
         AdapterTypedSqlRenderingTestCase(
             description="databricks",
             adapter_factory=DatabricksAdapter,
-            expected_string="'O''Brien'",
+            expected_string="'O\\'Brien'",
             expected_true="TRUE",
             expected_false="FALSE",
             expected_integer="-7",
@@ -101,7 +101,7 @@ from tests.unit.src.sqlbuild.adapter.contract.typed_sql_rendering.helpers import
             expected_decimal="2.4700",
             expected_null="NULL",
             expected_value_list="('GB', 'FR')",
-            expected_object='parse_json(\'{"amount":2.4700,"label":"O\'\'Brien"}\')',
+            expected_object='parse_json(\'{"amount":2.4700,"label":"O\\\'Brien"}\')',
         ),
         AdapterTypedSqlRenderingTestCase(
             description="sqlserver",
