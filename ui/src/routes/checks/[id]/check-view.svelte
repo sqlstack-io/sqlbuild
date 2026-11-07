@@ -15,11 +15,11 @@
 	import { checkOutcomeLabel, checkOutcomeTone } from '$lib/status';
 	import { attachmentLabel, evaluationModeLabel, runScopePhaseLabel, shortRunId, thresholdLabel } from '$lib/build-area/labels';
 	import { errorMessage } from '$lib/platform/labels';
-	import { checkValue, outcomeOf } from '../utils';
+	import { checkValue, kindLabel, outcomeOf } from '../utils';
 
 	let { id }: { id: string } = $props();
 
-	const res = createResource((client, scope) => client.getCheck(scope, id), ['checks', 'runs']);
+	const res = createResource((client, scope) => client.getCheck(scope, id), ['checks', 'runs', 'node_status']);
 	const c = $derived(res.data ?? null);
 	const outcome = $derived(c ? outcomeOf(c) : 'skipped');
 
@@ -65,12 +65,12 @@
 </script>
 
 <AppTopbar title="Checks">
-	{#if c}
+	{#if c && app.client.supports('launchAdhocRun')}
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run check</GatedButton>
 	{/if}
 </AppTopbar>
 
-<RunPanel bind:open={runOpen} verb="audit" selection={c?.node ? [c.node] : []} />
+{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={runOpen} verb="audit" selection={c?.node ? [c.node] : []} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
@@ -106,7 +106,7 @@
 									<td class="num">{checkValue(e, c.evaluationMode)}</td>
 									<td>
 										{#if e.runId}<a class="mono link" href="/runs/{e.runId}">{e.runId}</a>
-										{:else}<span class="faint" title="Built by sqb outside this server, e.g. from a laptop or CI (fingerprint run {e.fingerprintRunId})">from the command line · <code>{shortRunId(e.fingerprintRunId)}</code></span>{/if}
+										{:else}<span class="faint" title="The sqb run that evaluated it: {e.fingerprintRunId}">sqb run <code>{shortRunId(e.fingerprintRunId)}</code></span>{/if}
 									</td>
 									<td>
 										{#if e.evidenceCount}
@@ -158,7 +158,7 @@
 				<h3>Definition</h3>
 				<KeyValues
 					rows={[
-						{ label: 'Kind', value: c.kind === 'audit' ? `audit · ${c.definition ?? 'custom'}` : c.kind.replace('_', ' ') },
+						{ label: 'Kind', value: kindLabel(c) },
 						{ label: 'Attached to', value: c.node ? `${c.node}${c.column ? `.${c.column}` : ''}` : attachmentLabel[c.attachment], mono: !!c.node },
 						{ label: 'Target type', value: attachmentLabel[c.attachment] },
 						{ label: 'Severity', value: c.severity },
@@ -169,7 +169,7 @@
 				/>
 				{#if c.node}
 					<h3>Node</h3>
-					<p><a class="link mono" href="/catalog/{c.node}?tab=checks">{c.node}</a></p>
+					<p>{#if app.client.supports('getCatalogNode')}<a class="link mono" href="/catalog/{c.node}?tab=checks">{c.node}</a>{:else}<code>{c.node}</code>{/if}</p>
 				{/if}
 				{#if c.latest}
 					<h3>Latest</h3>
@@ -178,7 +178,7 @@
 							{ label: 'Outcome', value: checkOutcomeLabel[c.latest.outcome], tone: checkOutcomeTone[c.latest.outcome] },
 							{ label: 'Result', value: checkValue(c.latest, c.evaluationMode) },
 							{ label: 'Last checked', value: `${formatAgo(c.latest.evaluatedAt, app.now)} · ${formatStamp(c.latest.evaluatedAt)}` },
-							{ label: 'Run', value: c.latest.runId ?? `from the command line · ${shortRunId(c.latest.fingerprintRunId)}`, mono: true }
+							{ label: 'Run', value: c.latest.runId ?? `sqb run ${shortRunId(c.latest.fingerprintRunId)}`, title: c.latest.fingerprintRunId, mono: true }
 						]}
 					/>
 				{/if}

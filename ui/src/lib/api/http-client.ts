@@ -1,10 +1,12 @@
 import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
+import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
+import type { Check, CheckDetail, CheckEvidence, CheckSql } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
 type Wire = components['schemas'];
@@ -28,7 +30,11 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getTrigger',
 	'setTriggerStates',
 	'resetTriggerToDefault',
-	'resetSensorCursor'
+	'resetSensorCursor',
+	'listChecks',
+	'getCheck',
+	'getCheckSql',
+	'getCheckEvidence'
 ]);
 
 /** A UI location is one server location and target; its id carries both. */
@@ -229,6 +235,28 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
 		},
+		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
+		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
+		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/sql', {
+				params: { path: { location_id: locationId, target, binding_key: checkId } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			if (!data) throw new ApiError('The check has no stored result yet', 404);
+			return toCheckSql(data);
+		},
+		async getCheckEvidence(scope: Scope, checkId: string, evaluationId: string): Promise<CheckEvidence> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}/results/{event_id}/evidence', {
+				params: { path: { location_id: locationId, target, binding_key: checkId, event_id: evaluationId } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			if (!data) throw new ApiError('No evidence was stored with this result', 404);
+			return toCheckEvidence(data);
+		},
 		listTriggers: (scope: Scope): Promise<Trigger[]> => triggersOf(scope),
 		async getTrigger(scope: Scope, id: string): Promise<TriggerDetail | null> {
 			const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
@@ -281,6 +309,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
 		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	/** The newest result of every check, or one check's results newest first. */
+	async function checkResults(scope: Scope, bindingKey?: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = bindingKey
+			? await http.GET('/api/control/locations/{location_id}/targets/{target}/checks/{binding_key}', {
+					params: { path: { location_id: locationId, target, binding_key: bindingKey } }
+				})
+			: await http.GET('/api/control/locations/{location_id}/targets/{target}/checks', { params: { path: { location_id: locationId, target } } });
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;

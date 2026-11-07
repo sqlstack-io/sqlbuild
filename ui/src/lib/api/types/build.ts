@@ -224,7 +224,8 @@ export type Check = {
 	name: string;
 	/** The audit definition, e.g. `not_null`; null for custom checks. */
 	definition: string | null;
-	kind: CheckKind;
+	/** Null where the server does not report it. */
+	kind: CheckKind | null;
 	attachment: CheckAttachment;
 	node: string | null;
 	column: string | null;
@@ -234,8 +235,8 @@ export type Check = {
 	thresholds: CheckThreshold[];
 	description: string | null;
 	latest: CheckEvaluation | null;
-	/** Outcomes of recent evaluations, oldest first. */
-	recentOutcomes: CheckOutcome[];
+	/** Outcomes of recent evaluations, oldest first; null where the listing does not report them. */
+	recentOutcomes: CheckOutcome[] | null;
 };
 
 export type CheckDetail = Check & {
