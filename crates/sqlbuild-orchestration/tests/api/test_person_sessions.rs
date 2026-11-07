@@ -93,6 +93,12 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let mut input = snapshot(location);
             input.documents.get_mut("triggers").expect("triggers")["health_orders"]["when"] =
                 json!({"kind":"custom", "function":"orders_ready", "code_hash":"orders_v1"});
+            input.documents.get_mut("jobs").expect("jobs")["orders"]["concurrency_groups"] =
+                json!(["warehouse_heavy"]);
+            input.documents.insert(
+                "groups".into(),
+                json!({"nightly": {"description": "Nightly orders", "selection": ["orders"], "jobs": {"orders": []}}}),
+            );
             let sql_input: Value = serde_json::from_str(
                 &std::fs::read_to_string(
                     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -279,6 +285,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     assert!(!page.to_string().contains("select 1 as id"));
                     let known_reads = [
                         format!("{metadata}/{}/nodes", seed_run.run_id),
+                        format!("/api/control/locations/{location}/targets/development/jobs"),
                         format!("/api/control/locations/{location}/targets/development/triggers"),
                         format!(
                             "/api/control/locations/{location}/targets/development/triggers/{}/ticks",
@@ -312,6 +319,32 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             "{read_path}"
                         );
                     }
+                    let jobs: Value = request(
+                        &provider.client,
+                        session,
+                        (
+                            Method::GET,
+                            &format!("/api/control/locations/{location}/targets/development/jobs"),
+                        ),
+                        (&Value::Null, &session.csrf),
+                    )
+                    .await
+                    .json()
+                    .await
+                    .expect("jobs response");
+                    let listed_jobs: Vec<Value> =
+                        jobs.as_array().into_iter().flatten().cloned().collect();
+                    let expected_jobs = [
+                        json!({"job_key": "nightly", "kind": "group", "description": "Nightly orders",
+                            "selection": ["orders"], "concurrency_groups": [], "snapshot_id": published.snapshot_id}),
+                        json!({"job_key": "orders", "kind": "job", "description": "Refresh orders",
+                            "selection": ["orders"], "concurrency_groups": ["warehouse_heavy"], "snapshot_id": published.snapshot_id}),
+                    ];
+                    assert_eq!(
+                        listed_jobs,
+                        expected_jobs[..expected_jobs.len() * usize::from(jobs.is_array())],
+                        "jobs list declared metadata and never settings"
+                    );
                     for read_path in &unknown_reads {
                         let missing = request(
                             &provider.client,

@@ -354,6 +354,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/maintenance": {
         parameters: {
             query?: never;
@@ -1133,6 +1149,17 @@ export interface components {
             /** @description Tables whose insert failed, so their rows were not written, and the first failure. */
             failed: components["schemas"]["Table"][];
             failure?: string | null;
+        };
+        /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
+        JobRecord: {
+            concurrency_groups: string[];
+            description: string;
+            job_key: string;
+            /** @description `job` or `group`; a group's selection is the union of its member jobs' selections. */
+            kind: components["schemas"]["RunKind"];
+            selection: string[];
+            /** Format: uuid */
+            snapshot_id: string;
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
@@ -2867,6 +2894,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPersonJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRecord"][];
+                };
             };
             /** @description Session rejected */
             401: {

@@ -87,6 +87,27 @@ pub enum TriggerDeclaration {
     Sensor(SensorDefinition),
 }
 
+/// A job or group of the current published snapshot. Settings are left out of person reads.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct JobRecord {
+    pub job_key: String,
+    /// `job` or `group`; a group's selection is the union of its member jobs' selections.
+    pub kind: crate::runs::models::RunKind,
+    pub description: String,
+    pub selection: BTreeSet<String>,
+    pub concurrency_groups: BTreeSet<String>,
+    pub snapshot_id: uuid::Uuid,
+}
+
+/// A `sqb_jobs` row as stored.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct StoredJob {
+    pub job_key: String,
+    pub kind: crate::runs::models::RunKind,
+    pub snapshot_id: uuid::Uuid,
+    pub definition_json: JobDefinition,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,
