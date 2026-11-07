@@ -274,6 +274,11 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.launchJob(scope, key, options);
 	}
 
+	async launchJobFromScratch(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> {
+		this.#location(scope);
+		return this.#operate.launchJob(scope, key, { ...options, fullRefresh: true });
+	}
+
 	async listTriggers(scope: Scope): Promise<Trigger[]> {
 		this.#location(scope);
 		return this.#operate.listTriggers(scope);

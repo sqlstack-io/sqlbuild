@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Principal } from './types';
-import type { NodeCounts, Run, RunDetail, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
+import type { NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -73,6 +73,23 @@ export function toRuns(wires: Wire['RunRecord'][], locationId: string): Run[] {
 	const children = new Map<string, number>();
 	for (const w of wires) if (w.parent_run_id) children.set(w.parent_run_id, (children.get(w.parent_run_id) ?? 0) + 1);
 	return wires.map((w) => toRun(w, locationId, children.get(w.run_id) ?? 0));
+}
+
+/** Listed runs under a run-list query, newest first. */
+export function runsMatching(runs: Run[], query: RunListQuery): Run[] {
+	const matching = runs.filter(
+		(r) =>
+			(!query.jobKey || r.jobKey === query.jobKey) &&
+			(!query.triggerId || r.triggerId === query.triggerId) &&
+			(!query.parentRunId || r.parentRunId === query.parentRunId) &&
+			(!query.topLevelOnly || !r.parentRunId) &&
+			(!query.statuses?.length || query.statuses.includes(r.status)) &&
+			(!query.kinds?.length || query.kinds.includes(r.kind)) &&
+			(!query.origins?.length || query.origins.includes(r.origin)) &&
+			(!query.since || r.queuedAt >= query.since) &&
+			(!query.until || r.queuedAt < query.until)
+	);
+	return query.limit === undefined ? matching : matching.slice(0, query.limit);
 }
 
 function rowOf(run: Run, wire: Wire['RunRecord']): RunRow {

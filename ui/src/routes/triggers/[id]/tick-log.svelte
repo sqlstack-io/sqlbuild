@@ -12,6 +12,8 @@
 	const filtered = $derived(
 		ticks.filter((t) => (outcome === 'late' ? t.lateBySeconds > LATE_AFTER_SECONDS || t.catchUp : !outcome || t.outcome === outcome))
 	);
+	// The server records no reason per tick; the column shows only where one exists.
+	const showWhy = $derived(ticks.some((t) => t.reason !== null));
 </script>
 
 <div class="bar">
@@ -27,7 +29,7 @@
 </div>
 <table>
 	<thead>
-		<tr><th>Due</th><th title="When the scheduler handled it">Handled</th><th>What happened</th><th>Run</th><th>Late by</th><th>Why</th></tr>
+		<tr><th>Due</th><th title="When the scheduler handled it">Handled</th><th>What happened</th><th>Run</th><th>Late by</th>{#if showWhy}<th>Why</th>{/if}</tr>
 	</thead>
 	<tbody>
 		{#each filtered.slice(0, shown) as t (t.id)}
@@ -41,10 +43,10 @@
 					{:else}<span class="faint">—</span>{/if}
 				</td>
 				<td class="faint nowrap">{t.lateBySeconds > LATE_AFTER_SECONDS ? formatSeconds(t.lateBySeconds) : '—'}</td>
-				<td class="faint" title={t.reason ?? undefined}>{t.outcome === 'covered' ? '' : (t.reason ?? '')}</td>
+				{#if showWhy}<td class="faint" title={t.reason ?? undefined}>{t.outcome === 'covered' ? '' : (t.reason ?? '')}</td>{/if}
 			</tr>
 		{:else}
-			<tr><td colspan="6" class="empty">{ticks.length ? 'Nothing matches the filter.' : 'It hasn’t been due yet.'}</td></tr>
+			<tr><td colspan={showWhy ? 6 : 5} class="empty">{ticks.length ? 'Nothing matches the filter.' : 'It hasn’t been due yet.'}</td></tr>
 		{/each}
 	</tbody>
 </table>

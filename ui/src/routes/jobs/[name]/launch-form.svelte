@@ -14,6 +14,7 @@
 	let error = $state<string | null>(null);
 
 	const canRewrite = $derived(app.can('run.rewrite_history'));
+	const canFullRefresh = $derived(app.client.supports('launchJobFromScratch'));
 	const rewrites = $derived(fullRefresh || useWindow);
 	const placeholder = $derived(job.cursorType === 'integer' ? 'e.g. 1200' : 'e.g. 2026-10-01T00:00:00Z');
 	const windowInvalid = $derived(
@@ -31,10 +32,8 @@
 		busy = true;
 		error = null;
 		try {
-			const run = await app.client.launchJob(scope, job.key, {
-				fullRefresh: fullRefresh || undefined,
-				window: useWindow && job.cursorType ? { type: job.cursorType, start: start || null, end: end || null } : undefined
-			});
+			const options = { window: useWindow && job.cursorType ? { type: job.cursorType, start: start || null, end: end || null } : undefined };
+			const run = fullRefresh ? await app.client.launchJobFromScratch(scope, job.key, options) : await app.client.launchJob(scope, job.key, options);
 			onclose();
 			await goto(`/runs/${run.id}`);
 		} catch (e) {
@@ -48,13 +47,16 @@
 <div class="launch">
 	<p class="title">Run {job.kind === 'group' ? 'group' : 'job'} <code>{job.key}</code> now</p>
 	<p class="faint">
-		{job.kind === 'group' ? `Starts a group run, with one run per job in it (${job.members.length}).` : `Builds ${job.nodeCount} nodes with the job's options.`} If another run is updating the same data, it waits for it to finish.
+		{job.kind === 'group' ? `Starts a group run, with one run per job in it${job.members ? ` (${job.members.length})` : ''}.` : `Builds ${job.nodeCount} nodes with the job's options.`} If another run is updating the same data, it waits for it to finish.
 	</p>
+	{#if canFullRefresh || job.cursorType}
 	<div class="opts" title={canRewrite ? undefined : "You don't have permission to rebuild history (run.rewrite_history)"}>
+		{#if canFullRefresh}
 		<label class:off={!canRewrite}>
 			<input type="checkbox" class="sb-check" bind:checked={fullRefresh} disabled={!canRewrite} />
 			Rebuild from scratch <code title="Same as sqb --full-refresh">--full-refresh</code>
 		</label>
+		{/if}
 		{#if job.cursorType}
 			<label class:off={!canRewrite}>
 				<input type="checkbox" class="sb-check" bind:checked={useWindow} disabled={!canRewrite} />
@@ -71,6 +73,7 @@
 		{/if}
 		{#if !canRewrite}<p class="faint">Rebuilding or reprocessing a range needs extra permission (<code>run.rewrite_history</code>).</p>{:else if rewrites}<p class="warn">This replaces data that was already built. It's recorded in the audit log.</p>{/if}
 	</div>
+	{/if}
 	{#if error}<p class="err">{error}</p>{/if}
 	<div class="row">
 		<Button size="sm" onclick={launch} disabled={busy || !!windowInvalid}>▷ Run</Button>

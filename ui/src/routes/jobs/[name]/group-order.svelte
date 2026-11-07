@@ -6,8 +6,8 @@
 	let { job }: { job: JobDetail } = $props();
 
 	const stages = $derived.by(() => {
-		const max = Math.max(0, ...job.groupMembers.map((m) => m.stage));
-		return Array.from({ length: max + 1 }, (_, i) => job.groupMembers.filter((m) => m.stage === i));
+		const max = Math.max(0, ...(job.groupMembers ?? []).map((m) => m.stage));
+		return Array.from({ length: max + 1 }, (_, i) => (job.groupMembers ?? []).filter((m) => m.stage === i));
 	});
 </script>
 

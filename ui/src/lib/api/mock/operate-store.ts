@@ -464,7 +464,7 @@ export class MockOperate {
 		return this.#ctx.reply(this.#view(rec, scope));
 	}
 
-	launchJob(scope: Scope, key: string, options: JobLaunchOptions = {}): Promise<Run> {
+	launchJob(scope: Scope, key: string, options: JobLaunchOptions & { fullRefresh?: boolean } = {}): Promise<Run> {
 		this.#need('job.run');
 		const job = jobDef(key);
 		if (!job) throw new ApiError(`Unknown job ${key}`, 404);
@@ -1163,6 +1163,7 @@ export class MockOperate {
 						...def.sensor,
 						cursor: rt.cursor,
 						cursorUpdatedAt: rt.cursorUpdatedAt ? new Date(rt.cursorUpdatedAt).toISOString() : null,
+						cursorKnown: true,
 						currentFingerprint: currentFp,
 						lastEvaluatedFingerprint: sensorFp
 					}
