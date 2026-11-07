@@ -33,3 +33,11 @@ pub struct TypeMatch {
     /// The inferred column may be null, but its declared type does not allow it.
     pub nullable_into_non_null: bool,
 }
+
+/// Snowflake, whose SQL SQLQuack's Snowflake parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct SnowflakeDialect;
+
+/// SQLite, whose SQL SQLQuack's native SQLite parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct SqliteDialect;

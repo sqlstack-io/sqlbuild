@@ -1,6 +1,14 @@
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 
+pub(super) struct ArmGapTestCase {
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_gap: Option<LocatedGap>,
+}
+
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
