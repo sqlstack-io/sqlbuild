@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.198.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.197.0...v0.198.0) (2026-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* the first run after upgrading can plan some models as query_changed even though their SQL did not change. On DuckDB, Snowflake and SQLite this affects models that call an unquoted user-defined function, and on SQLite also models calling built-ins such as datetime, date or strftime in lower case; PostgreSQL models are unaffected. Plan that run: affected incremental and microbatch models whose replay_on_change is bounded or full replay or rebuild (even with full_refresh false), sqb build --changed reruns them, and models on the default forward policy only warn.
+
+### Features
+
+* compute query fingerprints from SQLQuack tokens ([#1348](https://github.com/sqlstack-io/sqlbuild/issues/1348)) ([1ee7c8f](https://github.com/sqlstack-io/sqlbuild/commit/1ee7c8f61bbc54fdd97b6b447b6577bba3fbcb6d))
+
 ## [0.197.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.196.1...v0.197.0) (2026-11-07)
 
 
