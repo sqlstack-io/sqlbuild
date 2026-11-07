@@ -1075,8 +1075,8 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
         if cursor_type == CursorKind.INTEGER:
             return value
         if cursor_type == CursorKind.TIMESTAMP:
-            return f"TIMESTAMP '{value}'"
-        return f"'{value}'"
+            return f"TIMESTAMP {self._quote_sql_string(value)}"
+        return self._quote_sql_string(value)
 
     def connect(self, config: dict[str, Any]) -> Any:
         """Open DuckDB, waiting up to five seconds for another process's database file lock."""
@@ -1197,7 +1197,7 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     ) -> str:
         quoted_cursor: str = self.render_identifier(cursor_column)
         maximum_literal: str = (
-            f"CAST('{maximum_allowed}' AS DATE)"
+            f"CAST({self._quote_sql_string(maximum_allowed)} AS DATE)"
             if is_date
             else self.render_cursor_bound_literal(value=maximum_allowed, cursor_type=cursor_type)
         )
@@ -1217,9 +1217,11 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
 
         if cursor_column is None or start_cursor is None:
             return ""
-        clauses: list[str] = [f"{cursor_column} >= '{start_cursor.value}'"]
+        clauses: list[str] = [
+            f"{cursor_column} >= {self._quote_sql_string(str(start_cursor.value))}"
+        ]
         if end_cursor is not None:
-            clauses.append(f"{cursor_column} < '{end_cursor.value}'")
+            clauses.append(f"{cursor_column} < {self._quote_sql_string(str(end_cursor.value))}")
         return " AND ".join(clauses)
 
     def duckdb_build_attach_sql(self, attach_entry: dict[str, object]) -> str:
@@ -1604,8 +1606,9 @@ class DuckDbBackedAdapter(UnkeyedDiffMixin, BaseAdapter):
     ) -> tuple[str, ...]:
         delete_sql: str = (
             f"DELETE FROM {destination} "
-            f"WHERE {self.render_identifier(cursor_column)} >= '{cursor_start}' "
-            f"AND {self.render_identifier(cursor_column)} < '{cursor_end}'"
+            f"WHERE {self.render_identifier(cursor_column)} >= "
+            f"{self._quote_sql_string(cursor_start)} "
+            f"AND {self.render_identifier(cursor_column)} < {self._quote_sql_string(cursor_end)}"
         )
         insert_stmts: tuple[str, ...] = self.render_append(
             destination=destination, sql=sql, columns=columns

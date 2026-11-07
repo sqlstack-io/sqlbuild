@@ -124,7 +124,7 @@ def test_given_builtin_adapter_when_rendering_loader_types_then_maps_every_logic
             description="bigquery renders backtick-quoted loader identifiers",
             adapter_name=BuiltinAdapter.BIGQUERY.value,
             raw_identifier="order `id`",
-            expected_identifier="`order ``id```",
+            expected_identifier=r"`order \`id\``",
         ),
         AdapterIdentifierRenderingTestCase(
             description="databricks renders backtick-quoted loader identifiers",
@@ -180,14 +180,14 @@ def test_given_builtin_adapter_when_rendering_identifier_then_uses_adapter_quote
             adapter_name=BuiltinAdapter.BIGQUERY.value,
             value={"source": "loader's api"},
             logical_type=LoaderLogicalType.JSON,
-            expected_literal="JSON '{\"source\": \"loader''s api\"}'",
+            expected_literal=r"""JSON '{"source": "loader\'s api"}'""",
         ),
         AdapterLoaderValueLiteralTestCase(
             description="databricks renders json as quoted string literal",
             adapter_name=BuiltinAdapter.DATABRICKS.value,
             value={"source": "loader's api"},
             logical_type=LoaderLogicalType.JSON,
-            expected_literal="'{\"source\": \"loader''s api\"}'",
+            expected_literal=r"""'{"source": "loader\'s api"}'""",
         ),
         AdapterLoaderValueLiteralTestCase(
             description="duckdb escapes string literals",
