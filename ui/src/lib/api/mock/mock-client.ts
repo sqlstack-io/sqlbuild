@@ -229,9 +229,14 @@ export class MockApiClient implements ApiClient {
 		return this.#operate.cancelRun(scope, runId);
 	}
 
-	async rerunRun(scope: Scope, runId: string, mode: RerunMode, nodes?: string[]): Promise<Run> {
+	async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 		this.#location(scope);
-		return this.#operate.rerunRun(scope, runId, mode, nodes);
+		return this.#operate.rerunRun(scope, runId, mode);
+	}
+
+	async rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run> {
+		this.#location(scope);
+		return this.#operate.rerunRun(scope, runId, 'selected', nodes);
 	}
 
 	getStatementSql(...args: Parameters<ApiClient['getStatementSql']>) {

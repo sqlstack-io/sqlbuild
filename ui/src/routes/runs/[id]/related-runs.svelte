@@ -46,12 +46,16 @@
 		{@const p = d.provenance}
 		<div class="details">
 			<dl>
+				{#if p}
 				<div><dt>Project version</dt><dd>Version {p.snapshotGeneration} · commit <code>{p.gitRevision}</code>{p.gitDirty ? ' (with uncommitted changes)' : ''} <span class="faint">· snapshot <code>{p.snapshotId}</code></span></dd></div>
 				<div><dt>Command</dt><dd><code>{p.command}</code> <CopyButton value={p.command} label="Copy command" /></dd></div>
 				{#if p.selection.length || p.exclude.length}
 					<div><dt>Selection</dt><dd><code>{p.selection.join(' ') || '—'}</code>{#if p.exclude.length} excluding <code>{p.exclude.join(' ')}</code>{/if}</dd></div>
 				{/if}
 				<div><dt>Image</dt><dd><code title={p.imageId}>{shortImage(p.imageId)}</code> · sqb {p.sqbVersion}</dd></div>
+				{:else if d.selection.length}
+				<div><dt>Selection</dt><dd><code>{d.selection.join(' ')}</code></dd></div>
+				{/if}
 				<div><dt>Rebuilds history</dt><dd>{d.run.rewriteHistory ? 'Yes: a full refresh or a set time window, so it needs extra permission to rerun' : 'No'}</dd></div>
 				<div><dt>Priority</dt><dd>{d.run.priority}</dd></div>
 				<div><dt>Run ID</dt><dd><code>{d.run.id}</code> <CopyButton value={d.run.id} label="Copy run ID" /></dd></div>

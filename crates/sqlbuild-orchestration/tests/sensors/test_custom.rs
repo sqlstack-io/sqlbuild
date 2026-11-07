@@ -18,6 +18,7 @@ use crate::platform::models::{
     LocationWorkResult,
 };
 use crate::runs::main::list_runs::list_runs;
+use crate::runs::models::RunOrigin;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::complete_custom_sensor::complete_custom_sensor;
@@ -260,15 +261,35 @@ fn given_custom_sensor_work_when_results_retry_then_cursor_runs_and_outcome_comm
                     .expect("retry commit"),
                 0
             );
+            let sensor_runs = list_runs(store, (location, "development"), 100)
+                .await
+                .expect("dedup runs");
             assert_eq!(
-                list_runs(store, (location, "development"), 100)
-                    .await
-                    .expect("dedup runs")
-                    .len(),
+                sensor_runs.len(),
                 test_case.expected_runs,
                 "{}",
                 test_case.description
             );
+            for sensor_run in &sensor_runs {
+                assert_eq!(
+                    (
+                        sensor_run.origin,
+                        sensor_run.trigger_id,
+                        sensor_run.trigger_name.as_deref(),
+                        sensor_run.requested_by.as_str(),
+                        sensor_run.requester_name.as_deref(),
+                    ),
+                    (
+                        RunOrigin::Sensor,
+                        Some(trigger.trigger_id),
+                        Some(trigger.name.as_str()),
+                        "system:sensor",
+                        None,
+                    ),
+                    "{}",
+                    test_case.description
+                );
+            }
             let facts = evaluations(store).await;
             let SensorEvaluationOutcome::Completed { cursor, run_ids } =
                 &facts.last().expect("completed").outcome

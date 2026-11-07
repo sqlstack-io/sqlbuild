@@ -1,10 +1,12 @@
 <script lang="ts">
 	import XIcon from '@lucide/svelte/icons/x';
+	import { app } from '$lib/state/app.svelte';
 	import EventsTab from './events-tab.svelte';
 	import OutputTab from './output-tab.svelte';
 	import type { RunDetailState } from './state.svelte';
 	import StatementsTab from './statements-tab.svelte';
 	import type { BottomTab } from './types';
+	import { bottomTabs } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
@@ -17,11 +19,10 @@
 	const shownOutput = $derived(filtering ? output.filter((l) => view.selected.some((k) => l.text.includes(k))) : output);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 
-	const TABS: { value: BottomTab; label: string }[] = [
-		{ value: 'statements', label: 'Statements' },
-		{ value: 'events', label: 'Events' },
-		{ value: 'output', label: 'Output' }
-	];
+	const TABS = $derived(bottomTabs(app.client));
+	$effect(() => {
+		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
+	});
 	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'events' ? shownEvents.length : shownOutput.length);
 	const chipText = $derived(view.selected.length === 1 ? view.selected[0] : `${view.selected.length} nodes`);
 </script>

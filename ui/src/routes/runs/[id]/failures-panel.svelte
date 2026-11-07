@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { app } from '$lib/state/app.svelte';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import type { RunNode } from '$lib/api';
 	import { shortRunId } from '$lib/operate/labels';
@@ -33,7 +34,7 @@
 					{@const key = `${n.runId}/${n.nodeKey}`}
 					<li>
 						<div class="row">
-							<button class="node mono" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</button>
+							{#if app.client.supports('listRunStatements')}<button class="node mono" onclick={() => view.focusNode(n.nodeKey, 'statements')} title="Show this node's queries below">{n.nodeKey}</button>{:else}<span class="node mono">{n.nodeKey}</span>{/if}
 							{#if n.runId !== view.run?.id}<a class="faint" href="/runs/{n.runId}">in {n.jobKey ?? shortRunId(n.runId)}</a>{/if}
 							<span class="msg">{n.errorMessage ?? 'Failed'}</span>
 							{#if n.errorLocation}

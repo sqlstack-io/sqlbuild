@@ -13,6 +13,7 @@
 	import RunHeader from './run-header.svelte';
 	import RunTabs from './run-tabs.svelte';
 	import { createRunDetailState } from './state.svelte';
+	import { bottomTabs } from './utils';
 
 	let { runId }: { runId: string } = $props();
 
@@ -22,6 +23,9 @@
 	const detail = $derived(view.detail);
 	const nodes = $derived(view.nodes);
 	let topView = $state<'timeline' | 'graph'>('timeline');
+	/** The graph needs dependency edges and the bottom pane needs execution reads; servers without them show neither. */
+	const hasGraph = $derived((detail?.edges.length ?? 0) > 0);
+	const hasBottom = $derived(bottomTabs(app.client).length > 0);
 
 	/** The axis starts at the first node start, not at queue time. */
 	const origin = $derived.by(() => {
@@ -60,20 +64,22 @@
 		<RelatedRuns {view} />
 
 		<div bind:this={splitEl} class="flex min-h-0 flex-1 flex-col" class:select-none={dragging}>
-			<div class="flex min-h-0 flex-col" style:flex={topFrac}>
+			<div class="flex min-h-0 flex-col" style:flex={hasBottom ? topFrac : 1}>
 				<div class="exec-head">
 					<span class="label">Nodes over time</span>
 					{#if detail.children.length}<span class="faint">{detail.children.length} job runs · nodes from all of them</span>{/if}
+					{#if hasGraph}
 					<div class="seg" role="tablist">
 						<button role="tab" aria-selected={topView === 'timeline'} class:on={topView === 'timeline'} onclick={() => (topView = 'timeline')}>Timeline</button>
 						<button role="tab" aria-selected={topView === 'graph'} class:on={topView === 'graph'} onclick={() => (topView = 'graph')}>Graph</button>
 					</div>
+					{/if}
 				</div>
 				<div class="flex min-h-0 flex-1">
 					<div class="relative flex min-h-0 flex-1 flex-col">
 						{#if !nodes.length}
 							<div class="empty">{detail.children.length ? 'The job runs in this group have no nodes yet.' : 'No nodes yet: the run hasn’t started.'}</div>
-						{:else if topView === 'timeline'}
+						{:else if topView === 'timeline' || !hasGraph}
 							<RunGantt {nodes} {origin} now={app.now} selected={view.selected} {groups} onselect={(key, add) => view.selectNode(key, add)} />
 						{:else}
 							<RunGraph {nodes} edges={detail.edges} ownRunId={detail.run.id} />
@@ -83,6 +89,7 @@
 				</div>
 			</div>
 
+			{#if hasBottom}
 			<!-- A focusable separator is a keyboard-resizable widget (WAI-ARIA window splitter). -->
 			<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 			<div
@@ -105,9 +112,14 @@
 				<LiveStatements statements={view.runningStatements} onpick={(key) => view.focusNode(key, 'statements')} />
 				<RunTabs {view} />
 			</div>
+			{/if}
 		</div>
 	{:else if view.detailRes.loading}
 		<div class="empty">Loading…</div>
+	{:else if view.detailRes.error}
+		<div class="empty">Couldn't load this run: {view.detailRes.error}</div>
+	{:else}
+		<div class="empty">Run not found. This page shows only the newest 1,000 runs of a location, so an older run can be missing here.</div>
 	{/if}
 </div>
 

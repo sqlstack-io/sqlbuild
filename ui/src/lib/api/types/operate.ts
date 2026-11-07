@@ -27,7 +27,7 @@ export const RUN_KINDS = ['job', 'group', 'adhoc'] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
 /** Why the run was requested. Group children inherit their parent's origin. */
-export const RUN_ORIGINS = ['manual', 'schedule', 'sensor', 'rerun'] as const;
+export const RUN_ORIGINS = ['manual', 'schedule', 'sensor', 'rerun', 'backfill'] as const;
 export type RunOrigin = (typeof RUN_ORIGINS)[number];
 
 export type NodeCounts = {
@@ -74,7 +74,8 @@ export type Run = {
 	locationId: string;
 	target: string;
 	snapshotId: string;
-	gitRevision: string;
+	/** Null where the server does not report the commit. */
+	gitRevision: string | null;
 	queuedAt: Iso;
 	launchedAt: Iso | null;
 	startedAt: Iso | null;
@@ -197,7 +198,8 @@ export type SkippedBecauseOf = {
 
 export type RunNode = {
 	nodeKey: string;
-	kind: NodeKind;
+	/** Null where the server does not report the node kind. */
+	kind: NodeKind | null;
 	/** The (child) run that executed this node. */
 	runId: string;
 	jobKey: string | null;
@@ -359,7 +361,10 @@ export type RunDetail = {
 	invocations: RunInvocation[];
 	liveness: RunLiveness | null;
 	cancel: CancelProgress | null;
-	provenance: RunProvenance;
+	/** Null where the server does not report how the run was built. */
+	provenance: RunProvenance | null;
+	/** The frozen selection the run was authorized for. */
+	selection: string[];
 	/** Why the run is still queued; empty once claimed. */
 	waits: QueueWait[];
 	/** Nodes a rerun from failure would run: the failed ones plus exactly those skipped. */

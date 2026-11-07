@@ -12,7 +12,7 @@ use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::TriggerChange;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_rerun::request_rerun;
-use crate::runs::models::{NodeOutcome, RerunRequest, RunOutcome};
+use crate::runs::models::{NodeOutcome, RerunRequest, RunKind, RunOrigin, RunOutcome};
 use crate::scheduler::tests::contracts::helpers::{acquire_lease, hold_lease};
 use crate::sensors::main::{
     begin_sensor_evaluation::begin_sensor_evaluation,
@@ -383,6 +383,40 @@ fn given_terminal_jobs_and_groups_when_selectors_retry_then_outcomes_scope_and_r
             let sources = list_runs(store, (location, "development"), 500)
                 .await
                 .expect("all source executions");
+            let rerun = sources
+                .iter()
+                .find(|record| record.run_id == retry.run_id)
+                .expect("rerun listed");
+            assert_eq!(
+                (
+                    rerun.kind,
+                    rerun.origin,
+                    rerun.rerun_of_run_id,
+                    rerun.priority,
+                    rerun.root_run_id,
+                    rerun.parent_run_id,
+                    rerun.requested_by.as_str(),
+                    rerun.requester_name.as_deref(),
+                ),
+                (
+                    RunKind::Group,
+                    RunOrigin::Rerun,
+                    Some(retry.source_run_id),
+                    10,
+                    retry.run_id,
+                    None,
+                    "test-admin",
+                    None,
+                )
+            );
+            let rerun_children: Vec<_> = sources
+                .iter()
+                .filter(|record| record.parent_run_id == Some(retry.run_id))
+                .collect();
+            assert!(!rerun_children.is_empty(), "rerun children listed");
+            for child in rerun_children {
+                assert_eq!(child.root_run_id, retry.run_id, "child root");
+            }
             // Same key in another target/location and a different job in this scope must not match.
             let mut other_input = input.clone();
             other_input.location_id = other;

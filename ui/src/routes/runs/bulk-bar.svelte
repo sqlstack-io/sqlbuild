@@ -46,7 +46,7 @@
 			{/each}
 			<button class="clear" onclick={() => list.clearSelection()}>Clear selection</button>
 		{/if}
-		{#if scopedTab && matchingActive}
+		{#if scopedTab && matchingActive && app.client.supports('cancelMatchingRuns')}
 			<span class="all" title={app.can('run.cancel') ? 'Cancels every active run matching the current tab and filters, not only the loaded ones' : "You don't have permission (run.cancel)"}>
 				<Button
 					size="sm"

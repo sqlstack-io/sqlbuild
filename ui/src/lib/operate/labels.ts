@@ -100,9 +100,10 @@ export const onFailurePlain: Record<OnFailure, string> = {
 
 export type WaitPart = { text: string; href?: string; code?: boolean };
 
-/** `run-4f2a` → `4f2a`: the short form shown in lists; the full ID stays in links and copies. */
+/** `run-4f2a` → `4f2a`, a UUID → its first 8 digits: the short form shown in lists; the full ID stays in links and copies. */
 export function shortRunId(id: string): string {
-	return id.replace(/^run-/, '');
+	const short = id.replace(/^run-/, '');
+	return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(short) ? short.slice(0, 8) : short;
 }
 
 /** A concurrency group's slots in words, e.g. `warehouse_heavy` → `warehouse heavy`, `target:prod` → `prod target`. */
