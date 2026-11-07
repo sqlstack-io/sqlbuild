@@ -16,6 +16,10 @@ describe('visibleNav', () => {
 		]);
 	});
 
+	it('keeps lineage hidden until node detail is served, even when the catalog list is', () => {
+		expect(labels(serving('listCatalogNodes'), ['view'])).toEqual([['Build', ['Catalog']]]);
+	});
+
 	it('hides admin pages from people without an admin capability, even when the server serves them', () => {
 		expect(labels(serving('listAccounts', 'listRoles', 'listAuditEntries'), ['view', 'job.run'])).toEqual([]);
 	});
