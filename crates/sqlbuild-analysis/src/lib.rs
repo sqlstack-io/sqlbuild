@@ -47,5 +47,6 @@ pub mod snowflake_cost;
 pub mod sql_macros;
 pub mod sql_test_attachment;
 pub mod sql_tokens;
+mod sqlquack_analysis;
 pub mod target_paths;
 pub mod type_system;

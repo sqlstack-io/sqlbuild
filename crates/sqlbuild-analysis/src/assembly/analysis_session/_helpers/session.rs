@@ -29,7 +29,10 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, dict_from_pairs, same_keys, same_relations,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
+use crate::assembly::analysis_session::_helpers::resolution_rows::with_name_findings;
+use crate::assembly::analysis_session::constants::{
+    QUOTED_IDENTIFIER_DELIMITER, SQLQUACK_NAMES_ONLY_DIALECTS, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
@@ -42,6 +45,7 @@ use crate::semantic_validation::models::ProjectCatalog;
 use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_arguments;
 use crate::sql_macros::models::SqlMacroFinding;
 use crate::sql_macros::types::ArgumentCheckInput;
+use crate::sqlquack_analysis::main::postgres_name_findings::postgres_name_findings;
 
 /// What an internal native failure of the session names.
 const SESSION_CONTEXT: &str = "native model analysis";
@@ -525,6 +529,7 @@ impl AnalysisSession {
                 analysis.binding_validated = true;
             }
         }
+        self.merge_name_findings(&models)?;
         if self.dependency_ordered {
             if self.request.case_sensitive_shapes {
                 self.ensure_cleaned(&models)?;
@@ -534,6 +539,62 @@ impl AnalysisSession {
             }
         }
         self.store_cached(&models);
+        Ok(())
+    }
+
+    /// SQLQuack's name findings in place of polyglot's for the wave's analysed models, in a
+    /// dialect whose names SQLQuack checks, once polyglot's diagnostics for them are final.
+    ///
+    /// A model SQLQuack's parser does not read whole keeps polyglot's rows; a cache hit already
+    /// holds the merged rows.
+    fn merge_name_findings(&mut self, models: &[usize]) -> Result<(), String> {
+        if !SQLQUACK_NAMES_ONLY_DIALECTS.contains(&self.request.dialect.as_str()) {
+            return Ok(());
+        }
+        let checked: Vec<(usize, Shapes)> = models
+            .iter()
+            .copied()
+            .filter(|model| {
+                !self.cached(*model)
+                    && self.outcomes[*model].as_ref().is_some_and(|outcome| {
+                        outcome.analysis.analysis_succeeded && outcome.analysis.binding_validated
+                    })
+            })
+            .map(|model| (model, self.binding_schema(&self.request.models[model])))
+            .collect();
+        if checked.is_empty() {
+            return Ok(());
+        }
+        let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
+        let outcomes: &[Option<ModelOutcome>] = &self.outcomes;
+        let catalog: &ProjectCatalog = &self.catalog.native;
+        let rows: Vec<Option<Vec<DiagnosticRow>>> = pool.install(|| {
+            checked
+                .par_iter()
+                .map(|(model, schema)| {
+                    let sql: &str = outcomes[*model]
+                        .as_ref()
+                        .map_or("", |outcome| outcome.cleaned_sql.as_str());
+                    let Some(findings) = postgres_name_findings(sql, schema) else {
+                        return Ok(None);
+                    };
+                    let exact_columns: bool = schema.iter().any(|(_, columns)| {
+                        columns
+                            .iter()
+                            .any(|(name, _)| name.starts_with(QUOTED_IDENTIFIER_DELIMITER))
+                    });
+                    catalog.finding_rows(sql, exact_columns, findings).map(Some)
+                })
+                .collect::<Result<Vec<_>, String>>()
+        })?;
+        for ((model, _), findings) in checked.iter().zip(rows) {
+            let Some(findings) = findings else {
+                continue;
+            };
+            let analysis: &mut ModelAnalysis = &mut self.outcome_mut(*model)?.analysis;
+            let diagnostics: Vec<DiagnosticRow> = std::mem::take(&mut analysis.binding_diagnostics);
+            analysis.binding_diagnostics = with_name_findings(diagnostics, findings);
+        }
         Ok(())
     }
 

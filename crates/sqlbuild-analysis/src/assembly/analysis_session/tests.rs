@@ -20,6 +20,8 @@ mod names_set_operation;
 mod native_dialect;
 #[path = "tests/test_reference_facts.rs"]
 mod reference_facts;
+#[path = "tests/test_resolution_rows.rs"]
+mod resolution_rows;
 #[path = "tests/test_types.rs"]
 mod test_types;
 #[path = "tests/test_typed_markers.rs"]

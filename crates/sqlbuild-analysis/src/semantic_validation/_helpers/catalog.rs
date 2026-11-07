@@ -21,6 +21,7 @@ use polyglot_sql::{
     ValidationSchema,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use sqlquack_semantics::lineage::models::NameFinding;
 
 const ANALYSIS_WORKERS: usize = 4;
 
@@ -295,6 +296,46 @@ impl ProjectCatalog {
                 })
                 .collect::<Result<Vec<_>, String>>()
         })
+    }
+
+    /// The diagnostic rows of SQLQuack's `findings` in `sql`, mapped as validation errors are.
+    ///
+    /// A finding's message names a column in lower case, restored to its written spelling where
+    /// validation keeps exact names.
+    pub(crate) fn finding_rows(
+        &self,
+        sql: &str,
+        exact_columns: bool,
+        findings: Vec<NameFinding>,
+    ) -> Result<Vec<DiagnosticRow>, String> {
+        let restore: bool = match self.quoted_ignore_case {
+            true => sql.contains('"'),
+            false => exact_columns,
+        };
+        let errors: Vec<ValidationError> = findings
+            .into_iter()
+            .map(|finding| {
+                let message: String = match restore && !finding.written.is_empty() {
+                    true => finding.message.replacen(
+                        &format!("'{}'", finding.written.to_lowercase()),
+                        &format!("'{}'", finding.written),
+                        1,
+                    ),
+                    false => finding.message,
+                };
+                let error = ValidationError::error(message, finding.code);
+                match finding.span {
+                    Some(span) => error
+                        .with_location(span.line, span.column)
+                        .with_span(Some(span.start), Some(span.end)),
+                    None => error,
+                }
+            })
+            .collect();
+        Ok(diagnostics::map_findings(sql, self.dialect, errors)?
+            .into_iter()
+            .map(diagnostic_row)
+            .collect())
     }
 
     /// Normalize a preparation batch on the idle analysis pool, else in turn.

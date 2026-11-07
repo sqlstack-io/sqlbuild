@@ -230,3 +230,14 @@ pub(crate) struct TypedMarkerCacheTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_hits: &'static [bool],
 }
+
+/// A diagnostic row's `(code, line, severity)`.
+pub(crate) type RowShape = (&'static str, usize, &'static str);
+
+/// Polyglot's rows and SQLQuack's name findings for one model, and the merged rows.
+pub(crate) struct NameFindingsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) polyglot: &'static [RowShape],
+    pub(crate) sqlquack: &'static [RowShape],
+    pub(crate) expected_rows: &'static [RowShape],
+}

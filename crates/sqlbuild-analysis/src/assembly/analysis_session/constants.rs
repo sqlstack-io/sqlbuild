@@ -249,3 +249,16 @@ pub(crate) const LINEAGE_RESOURCE_TYPES: [(&str, &str); 4] = [
     ("seed", "seed"),
     ("table_fn", "table_fn"),
 ];
+/// The name codes SQLQuack reports in polyglot's place for a names-only dialect.
+pub(crate) const SQLQUACK_NAME_CODES: [&str; 4] = ["B002", "B003", "B004", "B005"];
+/// Analysis dialects whose names SQLQuack checks, polyglot checking everything else.
+pub(crate) const SQLQUACK_NAMES_ONLY_DIALECTS: [&str; 2] = ["postgres", "postgresql"];
+/// Polyglot's column-count and function codes, which it reports after names.
+pub(crate) const TYPE_CHECK_CODES: [&str; 2] = ["B101", "B102"];
+/// Polyglot's type-check and scope-rule code number ranges, which it reports after names.
+pub(crate) const TYPE_CHECK_CODE_RANGES: [std::ops::RangeInclusive<u16>; 2] =
+    [210..=219, 230..=234];
+/// The words of SQLBuild's own B101 rows, a built-in spelled as the dialect does not accept.
+pub(crate) const SPELLING_SUGGESTION: &str = "; did you mean ";
+/// The severity of a diagnostic that does not fail the model.
+pub(crate) const WARNING_SEVERITY: &str = "warning";
