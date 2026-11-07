@@ -174,6 +174,13 @@ def test_given_dialect_query_when_computing_hash_then_golden_fingerprint_is_stab
             True,
         ),
         ComputeQueryHashStabilityTestCase(
+            "CTE column-list name case is significant",
+            "duckdb",
+            "WITH Tree(id) AS (SELECT 1) SELECT id FROM orders",
+            "WITH tree(id) AS (SELECT 1) SELECT id FROM orders",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
             "SQLBuild placeholder case is significant",
             "duckdb",
             'SELECT id FROM __ref("orders")',

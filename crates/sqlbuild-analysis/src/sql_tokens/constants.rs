@@ -49,5 +49,13 @@ pub(crate) const SQLQUACK_FINGERPRINT_DIALECTS: [SqlquackFingerprintDialect; 6] 
 ];
 /// The token that follows a called function's name.
 pub(crate) const CALL_OPENER: &str = "(";
+/// The token that closes a call's arguments or a column list.
+pub(crate) const CALL_CLOSER: &str = ")";
+/// Keywords after which a word followed by `(` names a relation and its column list.
+pub(crate) const COLUMN_LIST_RELATION_KEYWORDS: [&str; 2] = ["INTO", "TABLE"];
+/// The keyword between a CTE's column list and its body.
+pub(crate) const CTE_BODY_PREFIX: &str = "AS";
+/// The tokens that can follow `AS` after a CTE's column list.
+pub(crate) const CTE_BODY_OPENERS: [&str; 3] = ["(", "MATERIALIZED", "NOT"];
 /// The prefix of SQLBuild placeholder calls such as `__ref` and `__source`.
 pub(crate) const PLACEHOLDER_PREFIX: &str = "__";
