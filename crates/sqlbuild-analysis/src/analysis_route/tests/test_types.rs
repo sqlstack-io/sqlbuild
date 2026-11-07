@@ -1,3 +1,7 @@
+use sqlquack_semantics::dialects::constants::POSTGRES;
+use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_syntax::Parsed;
+
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 
@@ -39,10 +43,27 @@ impl NativeDialect for PivotlessDialect {
         match refused {
             Some((offset, word)) => Err(ParserGap {
                 construct: word.to_owned(),
+                message: word.to_owned(),
                 offset,
+                syntax: false,
             }),
             None => Ok(()),
         }
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        self.read_whole(sql).map(|()| Parsed {
+            statements: Vec::new(),
+            gaps: Vec::new(),
+        })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &POSTGRES
+    }
+
+    fn normalize_type(&self, _spelling: &str) -> Option<String> {
+        None
     }
 
     fn stub_prefix(&self) -> &'static str {
@@ -56,4 +77,17 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred: &'static str,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
+}
+
+pub(super) struct NormalizeTypeTestCase {
+    pub(super) spelling: &'static str,
+    pub(super) expected: Option<&'static str>,
+}
+
+pub(super) struct ParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: String,
+    pub(super) expected_syntax: bool,
+    /// The byte offset of a syntax error; a limit has none worth comparing.
+    pub(super) expected_offset: Option<usize>,
 }

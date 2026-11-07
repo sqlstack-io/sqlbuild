@@ -12,6 +12,14 @@ pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
 pub(crate) const BIGQUERY_STUB_PREFIX: &str = "__sqlbuild_";
 /// The construct of a byte the BigQuery scanner reads as no token, blank or comment.
 pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
+/// The query a type spelling completes, with `)`, so BigQuery's parser reads it as a cast target.
+pub(crate) const CAST_TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
+/// The element types of a BigQuery RANGE.
+pub(crate) const RANGE_ELEMENT_TYPES: &[&str] = &["DATE", "DATETIME", "TIMESTAMP"];
+/// NUMERIC's largest scale and its most digits before the point.
+pub(crate) const NUMERIC_DIGITS: (u32, u32) = (9, 29);
+/// BIGNUMERIC's largest scale and its most digits before the point.
+pub(crate) const BIGNUMERIC_DIGITS: (u32, u32) = (38, 38);
 /// The construct of SQL holding more than one statement.
 pub(crate) const STATEMENTS_CONSTRUCT: &str = "more than one statement";
 /// The warning, or under `require_sql_analysis` the error, for a model analysis skips.

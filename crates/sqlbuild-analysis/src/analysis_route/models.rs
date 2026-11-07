@@ -14,8 +14,13 @@ pub enum AnalysisRoute {
 /// The first construct a native parser cannot read, and its byte offset in the SQL it read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParserGap {
+    /// The construct, such as `PIVOT`, or the parser's error message.
     pub construct: String,
+    /// The parser's message as the engine words it.
+    pub message: String,
     pub offset: usize,
+    /// True when the parser reports invalid syntax; false for an unsupported construct or a limit.
+    pub syntax: bool,
 }
 
 /// A gap with the line and column, from 1, of its offset in the analysed SQL.
