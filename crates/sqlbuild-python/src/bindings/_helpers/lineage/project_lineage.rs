@@ -7,6 +7,8 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
+use sqlbuild_analysis::analysis_route::main::analysis_route::analysis_route;
+use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 use sqlbuild_analysis::lineage::main::build_fast_lineage::build_fast_lineage;
 use sqlbuild_analysis::lineage::main::build_rich_lineage::build_rich_lineage;
 use sqlbuild_analysis::lineage::main::direct_semantic_uses::direct_semantic_uses;
@@ -152,6 +154,8 @@ struct FastModel<'py> {
 /// A model's lineage facts: none, Python facts, or a compiled model's native facts and edge count.
 enum FastFacts<'py> {
     Missing,
+    /// No facts, on a native route, where Polyglot never parses the model: no lineage.
+    Skipped,
     Python(Bound<'py, PyAny>),
     Native(Bound<'py, PyAny>, usize),
 }
@@ -165,6 +169,11 @@ fn fast_lineage<'py>(
     let py: Python<'py> = classes.py();
     let mut work: Vec<FastModel<'py>> = Vec::with_capacity(models.len());
     let mut requests: Vec<FastLineageModel> = Vec::new();
+    let dialect_name: Option<String> = dialect.map(|name| name.extract()).transpose()?;
+    let native: bool = matches!(
+        analysis_route(dialect_name.as_deref()),
+        AnalysisRoute::Native(_)
+    );
     for model in models {
         let (has_star, star_resolved): (bool, bool) = star_flags(model)?;
         let expands_star: bool = has_star && !star_resolved;
@@ -182,6 +191,15 @@ fn fast_lineage<'py>(
             continue;
         }
         let facts: Bound<'py, PyAny> = native_field(model, "fast_lineage_columns")?;
+        if facts.is_none() && native {
+            work.push(FastModel {
+                name: native_field(model, "name")?.extract()?,
+                facts: FastFacts::Skipped,
+                has_star,
+                expands_star,
+            });
+            continue;
+        }
         if facts.is_none() {
             requests.push(FastLineageModel::Parse {
                 query_sql: native_field(model, "query_sql")?.extract()?,
@@ -214,7 +232,7 @@ fn fast_lineage<'py>(
             native_field(&binding_catalog, "native")?.extract()?
         };
         let request = FastLineageRequest {
-            dialect: dialect.map(|name| name.extract()).transpose()?,
+            dialect: dialect_name,
             schema: fast_schema(project)?,
             models: requests,
         };
@@ -248,6 +266,7 @@ fn fast_lineage<'py>(
                 }
                 CompactColumns::Facts(columns.unbind())
             }
+            FastFacts::Skipped => continue,
             FastFacts::Missing => {
                 match outcomes.next() {
                     Some(FastLineageOutcome::Built { columns, has_star }) => {

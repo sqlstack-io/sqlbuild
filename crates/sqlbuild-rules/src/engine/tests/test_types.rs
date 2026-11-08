@@ -323,3 +323,10 @@ pub(crate) struct DialectCallsTestCase {
     pub(crate) dialect: &'static str,
     pub(crate) expected_calls: &'static [&'static str],
 }
+
+pub(crate) struct AnalysisSkipTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql_analysis_skipped: bool,
+    pub(crate) config: &'static [(&'static str, bool)],
+    pub(crate) expected_disabled: bool,
+}

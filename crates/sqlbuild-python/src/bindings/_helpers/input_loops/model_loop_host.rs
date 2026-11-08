@@ -102,6 +102,8 @@ pub(crate) struct FinishedModel<'py> {
     pub(crate) declarations: ExpandedDeclarations<'py>,
     /// Whether the SQL is analysed, and where a rejected `sql_analysis false` was authored.
     pub(crate) analysis: (bool, Option<Bound<'py, PyAny>>),
+    /// Whether analysis was skipped because the dialect's native parser cannot read the model.
+    pub(crate) analysis_skipped: bool,
     /// The usages of the model's named schema and Python hooks, recorded after its hook usages.
     pub(crate) named_usages: Vec<Bound<'py, PyAny>>,
     /// The query's macro expansion, when it calls macros.
@@ -318,6 +320,7 @@ pub(crate) fn finished_record<'py>(
         constant_declarations: declarations(constants)?,
         typed_calls: finished.typed_calls,
         expansion_passes,
+        sql_analysis_skipped: finished.analysis_skipped,
     });
     Ok((record, facts))
 }

@@ -3,8 +3,10 @@ use tempfile::TempDir;
 
 use crate::constants::NATIVE_BUILD_IDENTITY;
 use crate::engine::_helpers::evaluation::evaluate_json;
+use crate::engine::main::build_models::build_models;
 use crate::engine::tests::helpers;
 use crate::engine::tests::test_types;
+use crate::models::{Model, ModelRow, ModelRowsContext};
 use crate::query_facts::main::model_shape::model_shape;
 use crate::query_facts::models::ModelSource;
 
@@ -1507,4 +1509,62 @@ fn given_workspace_checkout_when_deriving_build_identity_then_workspace_files_ar
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_a_model_whose_analysis_was_skipped_when_building_rules_rows_then_its_rules_are_off()
+-> Result<(), String> {
+    let test_cases = [
+        test_types::AnalysisSkipTestCase {
+            description: "an analysed model keeps its rules",
+            sql_analysis_skipped: false,
+            config: &[],
+            expected_disabled: false,
+        },
+        test_types::AnalysisSkipTestCase {
+            description: "a model its dialect's native parser cannot read gets no rules",
+            sql_analysis_skipped: true,
+            config: &[],
+            expected_disabled: true,
+        },
+        test_types::AnalysisSkipTestCase {
+            description: "a model that opts out with sql_analysis false gets no rules",
+            sql_analysis_skipped: false,
+            config: &[("sql_analysis", false)],
+            expected_disabled: true,
+        },
+    ];
+    for test_case in test_cases {
+        let mut row: ModelRow = ModelRow {
+            name: "orders".to_owned(),
+            relative_path: "models/orders.sql".to_owned(),
+            query_sql: "SELECT 1 AS id".to_owned(),
+            sql_analysis_skipped: test_case.sql_analysis_skipped,
+            ..ModelRow::default()
+        };
+        row.config.extend(
+            test_case
+                .config
+                .iter()
+                .map(|(key, enabled)| ((*key).to_owned(), Value::Bool(*enabled))),
+        );
+        let context: ModelRowsContext<'_> = ModelRowsContext {
+            sql_analysis_enabled: true,
+            include_type_proof: false,
+            dialect: "duckdb",
+            attached_audit_targets: &[],
+            sql_tests: &[],
+        };
+        let models: Vec<Model> = build_models(vec![row], context, |_, _| Ok(false))?;
+        assert_eq!(
+            models
+                .iter()
+                .map(|model| model.sql_analysis_disabled)
+                .collect::<Vec<bool>>(),
+            vec![test_case.expected_disabled],
+            "{}",
+            test_case.description
+        );
+    }
+    Ok(())
 }
