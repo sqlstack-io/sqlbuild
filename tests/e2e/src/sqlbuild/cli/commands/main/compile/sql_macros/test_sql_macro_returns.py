@@ -303,7 +303,7 @@ def test_given_optional_returns_when_compiling_then_calls_are_typed_and_checked(
 
 @pytest.mark.xfail(
     strict=True,
-    reason="native DuckDB analysis does not type list literals yet (CHI-1102)",
+    reason="native DuckDB analysis does not type list literals yet",
 )
 @pytest.mark.parametrize(
     "test_case",
