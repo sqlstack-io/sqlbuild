@@ -289,6 +289,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         format!("/api/control/locations/{location}/targets/development/jobs"),
                         format!("/api/control/locations/{location}/targets/development/triggers"),
                         format!("/api/control/locations/{location}/targets/development/snapshots"),
+                        format!("/api/control/locations/{location}/targets/development/health"),
                         format!(
                             "/api/control/locations/{location}/targets/development/triggers/{}/ticks",
                             trigger.trigger_id

@@ -1,5 +1,7 @@
+use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::tokens::issue_token::issue_token;
-use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
+use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::report_remote_location_health::report_remote_location_health;
 use crate::platform::models::{LocationHealth, LocationHealthObservation, LocationHealthReport};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -171,6 +173,35 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
             );
             assert_eq!(observations[0].report, connection);
             assert_eq!(observations[1].report, heartbeat);
+            let audit = AuditContext {
+                actor: "test-admin".into(),
+                granting_role: "admin".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let administrator = bootstrap_user(store, &audit, "orders-admin")
+                .await
+                .expect("administrator");
+            let person_read = |target: &'static str| {
+                read_person_location_health(
+                    store,
+                    (&audit, administrator),
+                    (location_id, target),
+                    DefaultRole::None,
+                )
+            };
+            assert_eq!(
+                person_read("preview #1").await.expect("person health"),
+                observations,
+                "a person sees the same observations for the reporting target"
+            );
+            assert!(
+                person_read("another target")
+                    .await
+                    .expect("other target health")
+                    .is_empty(),
+                "another target's read leaves this target's observations out"
+            );
             let events = read_recall_events(store, 0, 100)
                 .await
                 .expect("read durable events");
