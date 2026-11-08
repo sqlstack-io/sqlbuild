@@ -6,8 +6,9 @@ use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_databricks::{Parsed, StrictFailure, parse_strict};
 
 use crate::analysis_route::constants::{
-    DATABRICKS_CAST_TYPE_PREFIX, DATABRICKS_DEFAULT_DECIMAL, DATABRICKS_DIALECT,
-    DATABRICKS_STRING_TYPE, DATABRICKS_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+    DATABRICKS_BOOLEAN_TYPE, DATABRICKS_CAST_TYPE_PREFIX, DATABRICKS_DATE_TYPE,
+    DATABRICKS_DEFAULT_DECIMAL, DATABRICKS_DIALECT, DATABRICKS_STRING_TYPE, DATABRICKS_STUB_PREFIX,
+    UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{DatabricksDialect, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
@@ -38,6 +39,25 @@ impl NativeDialect for DatabricksDialect {
 
     fn profile(&self) -> &'static dyn DialectProfile {
         &DATABRICKS
+    }
+
+    /// A spelling Databricks cannot read takes its family's type where the family has only one.
+    fn session_type(&self, spelling: &str) -> String {
+        if self.normalize_type(spelling).is_some() {
+            return spelling.to_owned();
+        }
+        let native: &str = match normalize_text_type(spelling, None).family {
+            TypeFamily::String => DATABRICKS_STRING_TYPE,
+            TypeFamily::Boolean => DATABRICKS_BOOLEAN_TYPE,
+            TypeFamily::Date => DATABRICKS_DATE_TYPE,
+            TypeFamily::Integer
+            | TypeFamily::Decimal
+            | TypeFamily::Float
+            | TypeFamily::Timestamp
+            | TypeFamily::Datetime
+            | TypeFamily::Other => spelling,
+        };
+        native.to_owned()
     }
 
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {

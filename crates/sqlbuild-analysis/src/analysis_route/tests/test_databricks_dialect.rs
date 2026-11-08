@@ -2,6 +2,7 @@ use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::models::{DatabricksDialect, LocatedGap, TypeMatch};
 use crate::analysis_route::tests::test_types::{
     DatabricksTypeTestCase, NativeGapTestCase, NativeTypeMatchTestCase, ParseFailureTestCase,
+    SessionTypeTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
@@ -39,6 +40,7 @@ fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_who
                 line: 1,
                 column: 23,
                 syntax: true,
+                source_offset: Some(22),
             }),
         },
         NativeGapTestCase {
@@ -51,6 +53,7 @@ fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_who
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
         NativeGapTestCase {
@@ -63,6 +66,7 @@ fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_who
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
     ];
@@ -354,6 +358,55 @@ fn given_a_declared_and_an_inferred_databricks_type_when_matching_then_a_length_
         assert_eq!(
             DatabricksDialect.type_match(test_case.declared, test_case.inferred, false),
             test_case.expected_match,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_session_type_when_databricks_reads_it_then_only_single_type_families_are_respelt() {
+    let test_cases = [
+        SessionTypeTestCase {
+            description: "a Databricks spelling is kept",
+            spelling: "DECIMAL(10, 2)",
+            expected_type: "DECIMAL(10, 2)",
+        },
+        SessionTypeTestCase {
+            description: "a sized VARCHAR is a Databricks type, so it is kept",
+            spelling: "VARCHAR(12)",
+            expected_type: "VARCHAR(12)",
+        },
+        SessionTypeTestCase {
+            description: "Polyglot's TEXT for string literals reads as STRING",
+            spelling: "TEXT",
+            expected_type: "STRING",
+        },
+        SessionTypeTestCase {
+            description: "BOOL reads as BOOLEAN",
+            spelling: "BOOL",
+            expected_type: "BOOLEAN",
+        },
+        SessionTypeTestCase {
+            description: "an integer of unknown width has no one Databricks type, so stays unread",
+            spelling: "INT64",
+            expected_type: "INT64",
+        },
+        SessionTypeTestCase {
+            description: "a zoned timestamp stays unread",
+            spelling: "TIMESTAMPTZ",
+            expected_type: "TIMESTAMPTZ",
+        },
+        SessionTypeTestCase {
+            description: "a MAP in another dialect's spelling stays unread",
+            spelling: "MAP(VARCHAR, INTEGER)",
+            expected_type: "MAP(VARCHAR, INTEGER)",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            DatabricksDialect.session_type(test_case.spelling),
+            test_case.expected_type,
             "{}",
             test_case.description
         );

@@ -18,6 +18,10 @@ pub(crate) const DATABRICKS_CAST_TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
 pub(crate) const DATABRICKS_DEFAULT_DECIMAL: (u32, u32) = (10, 0);
 /// The type Databricks gives every string expression, a cast to CHAR(n) or VARCHAR(n) included.
 pub(crate) const DATABRICKS_STRING_TYPE: &str = "STRING";
+/// Databricks' one boolean type.
+pub(crate) const DATABRICKS_BOOLEAN_TYPE: &str = "BOOLEAN";
+/// Databricks' one date type.
+pub(crate) const DATABRICKS_DATE_TYPE: &str = "DATE";
 /// The dialect a project with no analysis dialect is named by.
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 /// The gap of SQL that holds more than one statement.
