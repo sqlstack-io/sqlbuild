@@ -135,6 +135,8 @@ pub(crate) const ALIAS_PRECEDING_KEYWORDS: [&str; 13] = [
 pub(crate) const NULL_KEYWORD: &str = "NULL";
 /// The largest DECIMAL precision each dialect that bounds it holds, by analysis dialect name.
 pub(crate) const DECIMAL_PRECISION_LIMITS: [(&str, u64); 2] = [("duckdb", 38), ("postgres", 1000)];
+/// The analysis dialect whose `NUMERIC` and `BIGNUMERIC` limits a `returns` type is checked against.
+pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
 /// BigQuery's most integer digits and scale of a `NUMERIC`.
 pub(crate) const BIGQUERY_NUMERIC_LIMITS: (u32, u32) = (29, 9);
 /// BigQuery's most integer digits and scale of a `BIGNUMERIC`.

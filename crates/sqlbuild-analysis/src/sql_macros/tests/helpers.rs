@@ -107,8 +107,7 @@ impl SqlMacroHost for FakeHost {
         self.adapter
     }
 
-    /// The adapter's analysis dialect; a fake with no adapter analyses as DuckDB, since SQL
-    /// macros need a dialect with a native parser.
+    /// The adapter's analysis dialect; a fake with no adapter analyses as DuckDB.
     fn analysis_dialect(&self) -> Option<&str> {
         Some(analysis_dialect_of(self.adapter))
     }
@@ -116,11 +115,14 @@ impl SqlMacroHost for FakeHost {
 
 /// The analysis dialect the fake host gives `adapter`.
 fn analysis_dialect_of(adapter: &str) -> &str {
-    match adapter {
-        "" | "motherduck" => "duckdb",
-        adapter => adapter,
-    }
+    FAKE_HOST_DIALECTS
+        .iter()
+        .find(|(name, _)| *name == adapter)
+        .map_or(adapter, |(_, dialect)| dialect)
 }
+
+/// The fake host's adapters whose analysis dialect is not their own name: none at all, and MotherDuck.
+const FAKE_HOST_DIALECTS: [(&str, &str); 2] = [("", "duckdb"), ("motherduck", "duckdb")];
 
 /// Whether SQL macros can expand for `adapter`, which needs a native parser for its dialect.
 pub(super) fn adapter_parses(adapter: &str) -> bool {

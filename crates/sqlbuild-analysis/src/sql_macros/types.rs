@@ -56,8 +56,7 @@ pub trait SqlMacroHost {
         ""
     }
 
-    /// The project's SQL analysis dialect, whose native parser reads macro bodies; `None` when the
-    /// adapter has none, which leaves SQL macros unavailable.
+    /// The project's SQL analysis dialect, whose native parser reads macro bodies; `None` has none.
     fn analysis_dialect(&self) -> Option<&str> {
         None
     }

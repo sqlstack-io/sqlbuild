@@ -603,8 +603,7 @@ fn render_response(request: RenderRequest) -> Result<RenderResponse, String> {
     })
 }
 
-/// The native parser of the SQL analysis dialect `name`, which reads SQL tests; `None` where the
-/// dialect has none, so SQL tests are unavailable.
+/// The native parser that reads SQL tests in analysis dialect `name`; `None` leaves them unavailable.
 pub(crate) fn sql_test_parser(name: Option<&str>) -> Option<&'static dyn NativeDialect> {
     match analysis_route(name) {
         AnalysisRoute::Native(parser) => Some(parser),

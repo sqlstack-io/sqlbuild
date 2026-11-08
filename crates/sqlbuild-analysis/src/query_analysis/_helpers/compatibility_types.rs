@@ -69,33 +69,9 @@ fn evaluate_outputs(
         functions,
         dialect,
         used_annotations: Cell::new(false),
-        untyped_source: Cell::new(false),
     };
     let outputs = context.query(expression, &relations);
     (outputs, context.used_annotations.get())
-}
-
-/// Outputs only when every `FROM` and `JOIN` source of the query, CTEs included, was typed.
-pub(super) fn infer_complete_outputs(
-    expression: &Expression,
-    schema: Option<&ValidationSchema>,
-    functions: &HashMap<String, String>,
-    dialect: DialectType,
-) -> Option<Outputs> {
-    let mut relations = Relations::new();
-    if let Some(schema) = schema {
-        for table in &schema.tables {
-            relations.insert(table.name.to_lowercase(), Rc::new(table_outputs(table)));
-        }
-    }
-    let context = TypeContext {
-        functions,
-        dialect,
-        used_annotations: Cell::new(false),
-        untyped_source: Cell::new(false),
-    };
-    let outputs = context.query(expression, &relations);
-    (!context.untyped_source.get()).then_some(outputs)
 }
 
 /// A schema table's columns with their declared types.
@@ -111,8 +87,6 @@ struct TypeContext<'a> {
     functions: &'a HashMap<String, String>,
     dialect: DialectType,
     used_annotations: Cell<bool>,
-    /// Whether a `FROM` or `JOIN` source could not be typed, so stars and columns may be missing.
-    untyped_source: Cell<bool>,
 }
 
 impl TypeContext<'_> {
@@ -188,15 +162,6 @@ impl TypeContext<'_> {
             .flat_map(|from| &from.expressions)
             .chain(select.joins.iter().map(|join| &join.this));
         for source in tables {
-            let typed: bool = match unwrapped(source) {
-                Expression::Values(_) => true,
-                Expression::Subquery(subquery) => subquery.alias.is_some(),
-                Expression::Table(table) => relations.contains_key(&table.name.name.to_lowercase()),
-                _ => false,
-            };
-            if !typed {
-                self.untyped_source.set(true);
-            }
             if let Expression::Values(values) = unwrapped(source) {
                 aliases.items.push((
                     values

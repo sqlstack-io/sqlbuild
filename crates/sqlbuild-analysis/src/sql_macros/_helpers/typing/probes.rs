@@ -532,8 +532,7 @@ pub(crate) fn analysed_probes(
     analysed
 }
 
-/// One model's probes' output columns, inferred against its bound relations; none where the
-/// dialect has no native parser, since its SQL is not analysed.
+/// One model's probes' output columns, inferred against its bound relations by the native route.
 fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Vec<ProbeColumns> {
     let AnalysisRoute::Native(parser) = analysis_route(Some(dialect)) else {
         return vec![None; probes.len()];
@@ -549,8 +548,7 @@ fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Ve
     columns
 }
 
-/// The output columns of `sql` and their type hints, typed by the native route's analysis over
-/// `tables`; `None` until that analysis is available to SQL macros, so no probe finds anything.
+/// The output columns of `sql` over `tables` with their type hints; none until native analysis lands.
 pub(crate) fn probe_outputs(
     _parser: &dyn NativeDialect,
     _sql: &str,
@@ -559,8 +557,7 @@ pub(crate) fn probe_outputs(
     None
 }
 
-/// The findings, as `(code, message)`, the native route's analysis raises on `sql` over
-/// `tables`; none until that analysis is available to SQL macros.
+/// The `(code, message)` findings of `sql` over `tables`; none until native analysis lands.
 pub(crate) fn probe_type_errors(
     _parser: &dyn NativeDialect,
     _sql: &str,

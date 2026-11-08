@@ -1,5 +1,5 @@
 use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
-use crate::compiler::tests::helpers::{
+use crate::compiler::tests::relation_markers_helpers::{
     owned_marker_calls, relation_marker_oracle_mismatches, relation_markers_and_json_oracle,
 };
 use crate::compiler::tests::test_types::{RelationMarkerOracleTestCase, RelationMarkersTestCase};

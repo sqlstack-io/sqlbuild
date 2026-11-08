@@ -1,10 +1,12 @@
 //! A SQL macro's declared `returns` type checked against the adapter's SQL analysis dialect.
 
+use std::num::IntErrorKind;
+
 use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::typing::returns_check::adapter_dialect;
 use crate::sql_macros::constants::{
-    BIGQUERY_BIG_DECIMAL_NAMES, BIGQUERY_BIGNUMERIC_LIMITS, BIGQUERY_NUMERIC_LIMITS,
-    DECIMAL_PRECISION_LIMITS,
+    BIGQUERY_BIG_DECIMAL_NAMES, BIGQUERY_BIGNUMERIC_LIMITS, BIGQUERY_DIALECT,
+    BIGQUERY_NUMERIC_LIMITS, DECIMAL_PRECISION_LIMITS,
 };
 use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
@@ -28,15 +30,22 @@ pub(crate) fn returns_type_error(
 
 /// The decimal's precision and scale, where `normalized` is a decimal with a stated precision.
 fn decimal_digits(normalized: &NormalizedType) -> Option<(u64, u64)> {
-    let number =
-        |value: &Option<PythonInteger>| value.as_ref().and_then(|v| v.as_str().parse().ok());
     if normalized.family != TypeFamily::Decimal {
         return None;
     }
     Some((
-        number(&normalized.precision)?,
-        number(&normalized.scale).unwrap_or(0),
+        normalized.precision.as_ref().and_then(digit_count)?,
+        normalized.scale.as_ref().and_then(digit_count).unwrap_or(0),
     ))
+}
+
+/// A stated precision or scale; one too large for `u64` counts as `u64::MAX`, past every limit.
+fn digit_count(value: &PythonInteger) -> Option<u64> {
+    match value.as_str().parse::<u64>() {
+        Ok(count) => Some(count),
+        Err(error) if *error.kind() == IntErrorKind::PosOverflow => Some(u64::MAX),
+        Err(_) => None,
+    }
 }
 
 /// Why a BigQuery `NUMERIC(P, S)` or `BIGNUMERIC(P, S)` has more digits than the type holds.
@@ -45,7 +54,7 @@ fn bigquery_numeric_error(
     normalized: &NormalizedType,
     dialect: &str,
 ) -> Option<String> {
-    if dialect != "bigquery" {
+    if dialect != BIGQUERY_DIALECT {
         return None;
     }
     let (precision, scale) = decimal_digits(normalized)?;

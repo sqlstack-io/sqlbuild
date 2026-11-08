@@ -163,8 +163,7 @@ pub(crate) fn typed_sql(sql: &str, calls: &[TypedCall]) -> (String, Vec<TextSpli
     (typed, insertions)
 }
 
-/// `calls` without any whose marker would change how `sql` parses in `dialect`; none where
-/// `dialect` has no native parser, since its SQL is not analysed.
+/// `calls` without any whose marker changes how `sql` parses; none where `dialect` has no parser.
 pub(crate) fn markable_calls<'c>(
     sql: &str,
     calls: &'c [TypedCall],
