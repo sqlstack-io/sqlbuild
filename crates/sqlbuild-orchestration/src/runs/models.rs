@@ -28,6 +28,51 @@ impl RunKind {
     }
 }
 
+/// The `sqb` command a run executes; job and group runs always build.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunCommand {
+    #[default]
+    Build,
+    Test,
+    Seed,
+    Audit,
+    Freshness,
+}
+
+impl RunCommand {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Test => "test",
+            Self::Seed => "seed",
+            Self::Audit => "audit",
+            Self::Freshness => "freshness",
+        }
+    }
+
+    /// The command a planned verb runs, when workers run it.
+    #[must_use]
+    pub fn of_verb(verb: &str) -> Option<Self> {
+        [
+            Self::Build,
+            Self::Test,
+            Self::Seed,
+            Self::Audit,
+            Self::Freshness,
+        ]
+        .into_iter()
+        .find(|command| command.as_str() == verb)
+    }
+
+    /// Build is the default, so job requests serialize as they always have.
+    #[must_use]
+    pub fn is_build(&self) -> bool {
+        *self == Self::Build
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RunOrigin {
@@ -98,6 +143,8 @@ pub struct RunRequest {
     pub snapshot_id: Uuid,
     pub image_id: Option<String>,
     pub kind: RunKind,
+    #[serde(default, skip_serializing_if = "RunCommand::is_build")]
+    pub command: RunCommand,
     pub origin: RunOrigin,
     pub job_key: Option<String>,
     pub parent_run_id: Option<Uuid>,

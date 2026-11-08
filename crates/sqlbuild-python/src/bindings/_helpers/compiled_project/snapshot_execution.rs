@@ -1,13 +1,15 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
-use sqlbuild_orchestration::runs::models::{NodeOutcome, RunChange, RunExecution, RunOutcome};
+use sqlbuild_orchestration::runs::models::{
+    NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
+};
 
 use crate::bindings::_helpers::compiled_project::constants::{NO_CHANGE_REASON, SKIP_ACTION};
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
@@ -20,23 +22,41 @@ pub(crate) struct WorkerBuild {
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+    /// Snapshot keys of the checks, audits and SQL tests the server records beside nodes.
+    attached: BTreeSet<String>,
+    /// The worst attached outcome of each node, for commands that only run tests or audits.
+    checked: Mutex<BTreeMap<String, NodeOutcome>>,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
     refusal: Mutex<Option<String>>,
 }
 
 impl WorkerBuild {
-    pub(crate) fn new(worker: &Bound<'_, NativeOrchestrationWorker>) -> PyResult<Arc<Self>> {
+    pub(crate) fn new(
+        worker: &Bound<'_, NativeOrchestrationWorker>,
+        attached: BTreeSet<String>,
+    ) -> PyResult<Arc<Self>> {
         let state = Arc::new(Self {
             execution: worker.get().execution(worker.py())?,
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
             checks: Mutex::default(),
+            attached,
+            checked: Mutex::default(),
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None))?;
         }
         Ok(state)
+    }
+
+    pub(crate) fn command(&self) -> RunCommand {
+        self.execution.claim.request.command
+    }
+
+    /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
+    fn checks_only(&self) -> bool {
+        matches!(self.command(), RunCommand::Test | RunCommand::Audit)
     }
 
     pub(crate) fn has_work(&self) -> bool {
@@ -157,13 +177,95 @@ impl WorkerBuild {
             "table" | "view" | "snapshot" | "custom" => "model",
             kind => kind,
         };
-        let key = format!("{kind}:{name}");
-        if self.execution.claim.request.selection.contains(&key) {
+        self.start_key(py, &format!("{kind}:{name}"))
+    }
+
+    /// Report a selected node as started; the deterministic event ID makes a repeat a no-op.
+    pub(crate) fn start_key(&self, py: Python<'_>, key: &str) -> PyResult<()> {
+        self.check_cancelled(py)?;
+        if self.execution.claim.request.selection.contains(key) {
             self.worker.bind(py).get().change(
                 py,
                 &format!("node-started/{key}"),
-                RunChange::NodeStarted { node_key: key },
+                RunChange::NodeStarted {
+                    node_key: key.into(),
+                },
             )?;
+        }
+        Ok(())
+    }
+
+    /// Report a selected node's outcome when the command reports no executor result for it.
+    pub(crate) fn finish_key(&self, py: Python<'_>, key: &str, outcome: NodeOutcome) -> PyResult<()> {
+        self.complete(py, key, (outcome, None, None))
+    }
+
+    /// A test or audit the snapshot records has started; the node it attaches to starts with it.
+    pub(crate) fn start_attached(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        node: Option<&str>,
+    ) -> PyResult<()> {
+        self.check_cancelled(py)?;
+        if !self.attached.contains(key) {
+            return Ok(());
+        }
+        if self
+            .checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .contains_key(key)
+        {
+            return Ok(());
+        }
+        self.worker.bind(py).get().change(
+            py,
+            &format!("check-started/{key}"),
+            RunChange::CheckStarted {
+                node_key: key.into(),
+            },
+        )?;
+        self.checks
+            .lock()
+            .map_err(|_| poisoned())?
+            .insert(key.into(), None);
+        if let Some(node) = node.filter(|_| self.checks_only()) {
+            self.start_key(py, node)?;
+        }
+        Ok(())
+    }
+
+    /// A test or audit finished; a check the snapshot does not record is not reported.
+    pub(crate) fn finish_attached(
+        &self,
+        py: Python<'_>,
+        key: &str,
+        node: Option<&str>,
+        outcome: NodeOutcome,
+    ) -> PyResult<()> {
+        if !self.attached.contains(key) {
+            return Ok(());
+        }
+        self.start_attached(py, key, node)?;
+        let outcome = if outcome == NodeOutcome::Failed
+            && self.worker.bind(py).get().refresh_cancellation(py)?
+        {
+            NodeOutcome::Cancelled
+        } else {
+            outcome
+        };
+        self.finish_check(py, key, outcome)?;
+        if let Some(node) = node {
+            let mut checked = self.checked.lock().map_err(|_| poisoned())?;
+            let worst = checked.get(node).map_or(outcome, |previous| {
+                if severity(outcome) > severity(*previous) {
+                    outcome
+                } else {
+                    *previous
+                }
+            });
+            checked.insert(node.into(), worst);
         }
         Ok(())
     }
@@ -278,6 +380,14 @@ impl WorkerBuild {
     /// Never call missing selected nodes successful merely because the executor returned zero.
     pub(crate) fn outcome(&self, py: Python<'_>, exit_code: i32) -> PyResult<RunOutcome> {
         let cancelled = self.worker.bind(py).get().refresh_cancellation(py)?;
+        let checks_only = self.checks_only();
+        if checks_only && !cancelled {
+            let checked = self.checked.lock().map_err(|_| poisoned())?.clone();
+            for key in &self.execution.claim.request.selection {
+                let outcome = checked.get(key).copied().unwrap_or(NodeOutcome::Skipped);
+                self.complete(py, key, (outcome, None, None))?;
+            }
+        }
         for key in &self.execution.claim.request.selection {
             self.complete(
                 py,
@@ -294,15 +404,29 @@ impl WorkerBuild {
             )?;
         }
         let outcome = {
-            let completed = self.completed.lock().map_err(|_| poisoned())?;
-            let good = completed
-                .values()
+            let outcomes: Vec<NodeOutcome> = if checks_only {
+                self.checks
+                    .lock()
+                    .map_err(|_| poisoned())?
+                    .values()
+                    .flatten()
+                    .copied()
+                    .collect()
+            } else {
+                self.completed
+                    .lock()
+                    .map_err(|_| poisoned())?
+                    .values()
+                    .copied()
+                    .collect()
+            };
+            let good = outcomes
+                .iter()
                 .any(|value| matches!(value, NodeOutcome::Success | NodeOutcome::Warn));
-            let bad = completed.values().any(|value| {
-                matches!(
-                    value,
-                    NodeOutcome::Failed | NodeOutcome::Skipped | NodeOutcome::Cancelled
-                )
+            let bad = outcomes.iter().any(|value| match value {
+                NodeOutcome::Failed | NodeOutcome::Cancelled => true,
+                NodeOutcome::Skipped => !checks_only,
+                NodeOutcome::Success | NodeOutcome::Warn => false,
             });
             if cancelled {
                 RunOutcome::Cancelled
@@ -310,7 +434,7 @@ impl WorkerBuild {
                 RunOutcome::Partial
             } else if bad || exit_code != 0 {
                 RunOutcome::Failed
-            } else if completed.values().any(|value| *value == NodeOutcome::Warn) {
+            } else if outcomes.contains(&NodeOutcome::Warn) {
                 RunOutcome::Warn
             } else {
                 RunOutcome::Success
@@ -357,6 +481,17 @@ impl WorkerBuild {
             },
         )?;
         Ok(outcome)
+    }
+}
+
+/// Failure outranks cancellation, then warnings, then success; a skip says least.
+fn severity(outcome: NodeOutcome) -> u8 {
+    match outcome {
+        NodeOutcome::Skipped => 0,
+        NodeOutcome::Success => 1,
+        NodeOutcome::Warn => 2,
+        NodeOutcome::Cancelled => 3,
+        NodeOutcome::Failed => 4,
     }
 }
 

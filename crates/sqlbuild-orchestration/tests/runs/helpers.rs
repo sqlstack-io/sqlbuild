@@ -10,7 +10,7 @@ use crate::credentials::models::{AuditContext, BuiltinRole, RoleAssignmentReques
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::_helpers::requests::publication::publish_request;
 use crate::runs::models::{
-    AdhocCheck, AdhocCheckRequest, AdhocRunRequest, RunKind, RunOrigin, RunRequest,
+    AdhocCheck, AdhocCheckRequest, AdhocRunRequest, RunCommand, RunKind, RunOrigin, RunRequest,
 };
 use crate::runs::tests::test_types::{AdhocCommandTestCase, AdhocPeople};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -78,6 +78,7 @@ pub(crate) fn request(
         snapshot_id,
         image_id: Some("sha256:synthetic-orders-image".into()),
         kind: RunKind::Adhoc,
+        command: RunCommand::Build,
         origin: RunOrigin::Manual,
         job_key: None,
         parent_run_id: None,

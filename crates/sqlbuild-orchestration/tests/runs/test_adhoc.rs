@@ -117,14 +117,14 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
             expected_launch: Err(403),
         },
         AdhocCommandTestCase {
-            description: "verbs workers cannot run yet are refused at launch",
+            description: "other commands launch with their own verb and write nothing",
             person: AdhocPerson::Developer,
             command: &["test", "model:orders"],
             priority: 0,
             reason: "Check orders",
             expected_check: json!({"selection": ["model:orders"], "write_set": [], "permissions": [["run.adhoc", true]],
-                "error": "workers do not run sqb test yet; only build can launch", "launchable": false}),
-            expected_launch: Err(400),
+                "error": null, "launchable": true}),
+            expected_launch: Ok(true),
         },
         AdhocCommandTestCase {
             description: "a refused flag is refused before any permission",
@@ -236,6 +236,24 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 ],
                 "{backend:?}: the worker receives the exact resolved selection of the pinned publication"
             );
+            let tested = test_cases
+                .iter()
+                .position(|test_case| test_case.command[0] == "test")
+                .expect("a test launch");
+            let commands = rows(
+                store,
+                "SELECT request_json FROM sqb_runs WHERE run_id=$1 OR run_id=$2 ORDER BY run_id",
+                vec![Parameter::Id(run_ids[0]), Parameter::Id(run_ids[tested])],
+            )
+            .await
+            .iter()
+            .map(|row| json_column(&row["request_json"]).get("command").cloned())
+            .collect::<Vec<Option<Value>>>();
+            assert_eq!(
+                commands,
+                vec![None, Some(json!("test"))],
+                "{backend:?}: the worker receives the command, and a build request is serialized as before"
+            );
             let audit = rows(
                 store,
                 "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested'",
@@ -255,6 +273,7 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 vec![
                     json!(["build", {}, "Refresh orders"]),
                     json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
+                    json!(["test", {}, "Check orders"]),
                 ],
                 "{backend:?}: each launch is audited once with its command, reason and warehouse"
             );

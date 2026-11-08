@@ -11,9 +11,10 @@ use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
 use sqlbuild_orchestration::runs::types::CommandPlanner;
 
 use crate::adhoc::constants::{
-    ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, COMMAND_DEST, INTEGER_CONVERTERS, LOAD_SOURCES_DEST,
-    POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SELECTOR_DESTS,
+    ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, COMMAND_DEST, FRESHNESS_VERB, INTEGER_CONVERTERS,
+    LOAD_SOURCES_DEST, POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SEED_VERB, SELECTOR_DESTS,
 };
+use crate::argv::main::command_settings_arguments::command_settings_arguments;
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
 use crate::argv::models::{ArgvSettings, Namespace, TypeFailure, Value};
@@ -52,13 +53,29 @@ impl CommandPlanner for CliPlanner {
         }
         if verb == BUILD_VERB {
             job_settings_arguments(&settings)?;
+        } else {
+            command_settings_arguments(verb, &settings)?;
         }
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
         select.extend(selectors.remove("positional_select").unwrap_or_default());
         let exclude: Vec<String> = selectors.remove("exclude").unwrap_or_default();
+        let selection: BTreeSet<String> = match verb.as_str() {
+            SEED_VERB => {
+                let seeds: BTreeSet<String> = resolve(resources, &select, &exclude)?
+                    .into_iter()
+                    .filter(|key| key.starts_with("seed:"))
+                    .collect();
+                if seeds.is_empty() {
+                    return Err("the selectors match no seeds in the current publication".into());
+                }
+                seeds
+            }
+            FRESHNESS_VERB => freshness_sources(resources, &select, &exclude)?,
+            _ => resolve(resources, &select, &exclude)?,
+        };
         Ok(CommandPlan {
             verb: verb.clone(),
-            selection: resolve(resources, &select, &exclude)?,
+            selection,
             settings,
         })
     }
@@ -164,17 +181,69 @@ fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
-    let graph = build_project_graph(&graph_resources);
-    let selected: BTreeSet<String> = resolve_selectors(&graph, select, exclude)
-        .map_err(|error| format!("{}: {}", error.code, error.message))?
-        .into_iter()
-        .map(|(kind, name)| format!("{kind}:{name}"))
-        .collect();
+    let selected: BTreeSet<String> = resolved(resources, select, exclude)?;
     if selected.is_empty() {
         return Err("the selectors match no nodes in the current publication".into());
     }
     Ok(selected)
+}
+
+fn resolved(
+    resources: &[PlannerResource],
+    select: &[String],
+    exclude: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
+    let graph = build_project_graph(&graph_resources);
+    Ok(resolve_selectors(&graph, select, exclude)
+        .map_err(|error| format!("{}: {}", error.code, error.message))?
+        .into_iter()
+        .map(|(kind, name)| format!("{kind}:{name}"))
+        .collect())
+}
+
+/// The sources `sqb freshness` observes: selected sources and every source upstream of the
+/// selection, less those the excluded nodes reach the same way.
+fn freshness_sources(
+    resources: &[PlannerResource],
+    select: &[String],
+    exclude: &[String],
+) -> Result<BTreeSet<String>, String> {
+    let selected: BTreeSet<String> =
+        upstream_sources(resources, &resolved(resources, select, &[])?);
+    let excluded: BTreeSet<String> = if exclude.is_empty() {
+        BTreeSet::new()
+    } else {
+        upstream_sources(resources, &resolved(resources, exclude, &[])?)
+    };
+    let sources: BTreeSet<String> = selected.difference(&excluded).cloned().collect();
+    if sources.is_empty() {
+        return Err("no sources are selected or upstream of the selection".into());
+    }
+    Ok(sources)
+}
+
+fn upstream_sources(resources: &[PlannerResource], keys: &BTreeSet<String>) -> BTreeSet<String> {
+    let deps: BTreeMap<&str, &[String]> = resources
+        .iter()
+        .map(|resource| (resource.key.as_str(), resource.deps.as_slice()))
+        .collect();
+    let mut reached: BTreeSet<&str> = BTreeSet::new();
+    let mut pending: Vec<&str> = keys.iter().map(String::as_str).collect();
+    while let Some(key) = pending.pop() {
+        if reached.insert(key) {
+            pending.extend(
+                deps.get(key)
+                    .into_iter()
+                    .flat_map(|deps| deps.iter().map(String::as_str)),
+            );
+        }
+    }
+    reached
+        .into_iter()
+        .filter(|key| key.starts_with("source:"))
+        .map(str::to_owned)
+        .collect()
 }
 
 /// A published node as the selector graph sees it; keys without a kind are not selectable.
