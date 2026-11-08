@@ -90,59 +90,75 @@ fn given_a_databricks_type_spelling_when_normalising_then_the_type_is_polyglot_s
         PolyglotTypeTestCase {
             description: "INTEGER is Polyglot's INT",
             spelling: "INTEGER",
+            expected_name: "INT",
         },
         PolyglotTypeTestCase {
             description: "REAL is Polyglot's FLOAT",
             spelling: "real",
+            expected_name: "FLOAT",
         },
         PolyglotTypeTestCase {
             description: "DOUBLE PRECISION is Polyglot's DOUBLE, whatever the spacing",
             spelling: "DOUBLE   PRECISION",
+            expected_name: "DOUBLE",
         },
         PolyglotTypeTestCase {
             description: "NUMERIC with arguments is DECIMAL with its precision and scale",
             spelling: "NUMERIC(9, 3)",
+            expected_name: "DECIMAL(9,3)",
         },
         PolyglotTypeTestCase {
             description: "NUMERIC alone is DECIMAL",
             spelling: "NUMERIC",
+            expected_name: "DECIMAL",
         },
         PolyglotTypeTestCase {
             description: "TIMESTAMP_NTZ is Polyglot's TIMESTAMPNTZ",
             spelling: "TIMESTAMP_NTZ",
+            expected_name: "TIMESTAMPNTZ",
         },
         PolyglotTypeTestCase {
             description: "TIMESTAMP_LTZ is Polyglot's TIMESTAMPLTZ",
             spelling: "TIMESTAMP_LTZ",
+            expected_name: "TIMESTAMPLTZ",
         },
         PolyglotTypeTestCase {
             description: "a name Polyglot keeps stays as written",
             spelling: "LONG",
+            expected_name: "LONG",
         },
         PolyglotTypeTestCase {
             description: "a word holding an alias is not changed inside",
             spelling: "INTEGERS",
+            expected_name: "INTEGERS",
         },
         PolyglotTypeTestCase {
             description: "a sized string keeps its length",
             spelling: "VARCHAR(10)",
+            expected_name: "VARCHAR(10)",
         },
         PolyglotTypeTestCase {
             description: "an alias inside an array, whose family ARRAY decides",
             spelling: "ARRAY<INTEGER>",
+            expected_name: "ARRAY<INT>",
         },
         PolyglotTypeTestCase {
             description: "aliases inside a map and a struct, whose family MAP decides",
             spelling: "MAP<STRING, STRUCT<a: NUMERIC(5,2), b: INTEGER>>",
+            expected_name: "MAP<STRING,STRUCT<A:DECIMAL(5,2),B:INT>>",
         },
     ];
     for test_case in test_cases {
         let polyglot: NormalizedType = normalize_type(test_case.spelling, "databricks")
             .expect("Polyglot normalizes every Databricks spelling")
             .normalized;
+        let native: Option<NormalizedType> = DatabricksDialect.normalize_type(test_case.spelling);
         assert_eq!(
-            DatabricksDialect.normalize_type(test_case.spelling),
-            Some(polyglot),
+            (
+                native.as_ref().map(|native| native.normalized_name.as_str()),
+                native.as_ref()
+            ),
+            (Some(test_case.expected_name), Some(&polyglot)),
             "{}",
             test_case.description
         );

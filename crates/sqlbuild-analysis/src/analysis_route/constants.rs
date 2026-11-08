@@ -13,7 +13,6 @@ pub(crate) const DATABRICKS_STUB_PREFIX: &str = "__sqlbuild_";
 /// The construct of a byte the native scanner reads as no token, blank or comment.
 pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
 /// Databricks type words Polyglot spells another way, so the text fallback matches it.
-/// The space in DOUBLE PRECISION is taken out before the fallback compares names.
 pub(crate) const DATABRICKS_TYPE_ALIASES: &[(&str, &str)] = &[
     ("INTEGER", "INT"),
     ("REAL", "FLOAT"),

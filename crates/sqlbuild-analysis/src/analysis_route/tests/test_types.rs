@@ -252,6 +252,8 @@ pub(super) struct NativeLineageTestCase {
 pub(super) struct PolyglotTypeTestCase {
     pub(super) description: &'static str,
     pub(super) spelling: &'static str,
+    /// Polyglot's name for the spelling, which the native type must equal whole.
+    pub(super) expected_name: &'static str,
 }
 
 pub(super) struct ParseFailureTestCase {
