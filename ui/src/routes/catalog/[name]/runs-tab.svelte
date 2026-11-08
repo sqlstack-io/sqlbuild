@@ -15,7 +15,7 @@
 <table class="sb-list">
 	<thead><tr><th>Outcome</th><th>Run</th><th>Job</th><th class="num">Rows</th><th class="num">Duration</th><th>Started</th></tr></thead>
 	<tbody>
-		{#each node.runs as r, i (`${r.runId ?? r.fingerprintRunId}-${i}`)}
+		{#each node.runs ?? [] as r, i (`${r.runId ?? r.fingerprintRunId}-${i}`)}
 			<tr>
 				<td>
 					<StatusLabel tone={nodeOutcomeTone[r.outcome]} label={nodeOutcomeLabel[r.outcome]} />

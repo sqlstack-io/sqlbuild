@@ -2,13 +2,13 @@ import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { toCatalogNodes } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes } from './http-catalog';
 import { toSnapshotChanges } from './http-changes';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
-import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
 type Wire = components['schemas'];
@@ -38,6 +38,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckSql',
 	'getCheckEvidence',
 	'listCatalogNodes',
+	'getCatalogNode',
 	'listSnapshotChanges'
 ]);
 
@@ -186,6 +187,10 @@ export type HttpClientOptions = {
  */
 export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOptions): ApiClient {
 	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
+	// Locations whose bootstrap actions include view.sql, which may hold on only some nodes, and the
+	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
+	let sqlLocations = new Set<string>();
+	const sqlRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -193,7 +198,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return toBootstrap(data);
+			const bootstrap = toBootstrap(data);
+			sqlLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.sql')).map((l) => l.id));
+			return bootstrap;
 		},
 		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> => runRowPage(await listedRuns(scope), scope.locationId, query),
 		runTabCounts: async (scope: Scope, query: RunRowQuery = {}): Promise<RunTabCounts> => runTabCountsOf(await listedRuns(scope), scope.locationId, query),
@@ -255,6 +262,24 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (snapshots.response.status === 401) onUnauthorized();
 			if (!snapshots.data) throw new ApiError(errorText(snapshots.error, snapshots.response), snapshots.response.status);
 			return toSnapshotChanges(snapshots.data, runs);
+		},
+		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
+			const nodes = await implemented.listCatalogNodes(scope);
+			const node = findNode(nodes, ref);
+			if (!node) return null;
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const [status, sql, checks] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/node-status', { params: { path, query: { node_key: node.key } } }),
+				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
+					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
+					: null,
+				checkResults(scope).catch(() => [])
+			]);
+			if (status.response.status === 401 || sql?.response.status === 401) onUnauthorized();
+			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
+			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck));
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
