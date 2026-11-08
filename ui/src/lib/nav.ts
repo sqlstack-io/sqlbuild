@@ -26,7 +26,7 @@ export const NAV: readonly NavGroup[] = [
 	{
 		section: 'Build',
 		items: [
-			{ label: 'Lineage', href: '/lineage', icon: GitBranchIcon, loads: 'getCatalogNode' },
+			{ label: 'Lineage', href: '/lineage', icon: GitBranchIcon, loads: 'listCatalogNodes' },
 			{ label: 'Catalog', href: '/catalog', icon: DatabaseIcon, loads: 'listCatalogNodes', badge: { value: (c) => c.catalogNodes, tone: 'muted' } },
 			{ label: 'Checks', href: '/checks', icon: CheckCircleIcon, loads: 'listChecks', badge: { value: (c) => c.failingChecks, tone: 'warning' } },
 			{ label: 'Changes', href: '/changes', icon: GitCompareIcon, loads: 'listSnapshotChanges' }

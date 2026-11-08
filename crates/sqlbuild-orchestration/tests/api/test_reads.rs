@@ -1,12 +1,14 @@
 //! Real HTTP reads keep both location and target scope, including guessed nested resource IDs.
 
+use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
+use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::main::tokens::revoke_token::revoke_token;
-use crate::credentials::models::{AuditContext, CredentialScope};
+use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
@@ -323,6 +325,53 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             );
             assert_eq!(ticks[0]["outcome"], "requested");
             assert_eq!(ticks[0]["scheduled_for"], calendar_text(2));
+            let administrator = bootstrap_user(store, &audit, "orders-admin")
+                .await
+                .expect("administrator");
+            let mut extra = input.clone();
+            extra.generation += 1;
+            extra.nodes.remove("products");
+            extra.git_dirty = !input.git_dirty;
+            publish_snapshot(store, &extra)
+                .await
+                .expect("second publication");
+            input.generation = extra.generation;
+            let history = list_person_snapshots(
+                store,
+                (&audit, administrator),
+                ((location_id, "development"), 20),
+                DefaultRole::None,
+            )
+            .await
+            .expect("person snapshots");
+            assert_eq!(
+                history.iter().map(|s| s.generation).collect::<Vec<_>>(),
+                [extra.generation, published.generation],
+                "newest first, this target only"
+            );
+            assert_eq!(
+                json!(history[0].changes),
+                json!([{"change_kind": "removed", "subject_key": "products"}]),
+                "only the subjects that changed"
+            );
+            assert!(!history[1].changes.is_empty());
+            assert_eq!(
+                (history[0].git_dirty, history[1].git_dirty),
+                (extra.git_dirty, input.git_dirty),
+                "the working-tree flag survives each store's boolean type"
+            );
+            assert_eq!(
+                list_person_snapshots(
+                    store,
+                    (&audit, administrator),
+                    ((location_id, "development"), 1),
+                    DefaultRole::None,
+                )
+                .await
+                .expect("bounded snapshots")
+                .len(),
+                1
+            );
             for path in [&run_path, &event_path, &tick_path, &invocation_path] {
                 assert_eq!(
                     read_json(&client, (&format!("{path}?limit=1"), &token.bearer))
