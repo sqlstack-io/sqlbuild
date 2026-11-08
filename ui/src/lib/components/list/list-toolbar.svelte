@@ -41,18 +41,21 @@
 </div>
 
 <style>
+	/* The search box shrinks first; past that the toolbar wraps onto more rows instead of clipping. */
 	.list-toolbar {
 		display: flex;
-		height: 50px;
-		flex: 0 0 50px;
+		min-height: 50px;
+		flex: 0 0 auto;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px;
-		padding: 0 20px;
+		gap: 8px 6px;
+		padding: 8px 20px;
 		border-bottom: 1px solid var(--border);
 	}
 	.list-search {
 		display: flex;
-		width: 280px;
+		flex: 1 1 180px;
+		max-width: 280px;
 		height: 30px;
 		align-items: center;
 		gap: 7px;
@@ -87,6 +90,7 @@
 	}
 	.list-filters {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 2px;
 	}
