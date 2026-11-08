@@ -113,6 +113,58 @@ fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
             ),
         },
         NormalizeTypeTestCase {
+            description: "ClickHouse respells an alias inside Nullable as the bare alias",
+            type_sql: "NULLABLE(INT)",
+            dialect: "clickhouse",
+            expected_normalization: Ok("NULLABLE(INT32) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse respells a Nullable alias inside an array",
+            type_sql: "ARRAY(NULLABLE(INT))",
+            dialect: "clickhouse",
+            expected_normalization: Ok("ARRAY(NULLABLE(INT32)) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse respells a Nullable timestamp",
+            type_sql: "NULLABLE(TIMESTAMP)",
+            dialect: "clickhouse",
+            expected_normalization: Ok("NULLABLE(DATETIME) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse respells a Nullable boolean",
+            type_sql: "NULLABLE(BOOLEAN)",
+            dialect: "clickhouse",
+            expected_normalization: Ok("NULLABLE(BOOL) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse reads a sized BINARY as FixedString",
+            type_sql: "BINARY(5)",
+            dialect: "clickhouse",
+            expected_normalization: Ok("FIXEDSTRING(5) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse refuses a BINARY without a length",
+            type_sql: "BINARY",
+            dialect: "clickhouse",
+            expected_normalization: Ok(
+                "BINARY | other | - | - | - | ClickHouse's BINARY needs a length",
+            ),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse refuses a Nullable inside a Nullable",
+            type_sql: "NULLABLE(NULLABLE(INT))",
+            dialect: "clickhouse",
+            expected_normalization: Ok(
+                "NULLABLE(NULLABLE(INT)) | other | - | - | - | Nullable cannot wrap the nullable type",
+            ),
+        },
+        NormalizeTypeTestCase {
+            description: "ClickHouse reads a bare alias with its Polyglot nullable spelling",
+            type_sql: "INT",
+            dialect: "clickhouse",
+            expected_normalization: Ok("NULLABLE(INT32) | integer | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
             description: "an enum member outside ClickHouse falls back to the text",
             type_sql: "ENUM8('a' = 1)",
             dialect: "tsql",
