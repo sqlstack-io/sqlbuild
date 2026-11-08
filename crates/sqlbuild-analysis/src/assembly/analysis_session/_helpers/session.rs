@@ -4,12 +4,17 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use rayon::ThreadPool;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::_helpers::analysis_cache::{
     CachedOutcome, decode_outcome, encode_outcome,
 };
@@ -29,6 +34,7 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, dict_from_pairs, same_keys, same_relations,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
+use crate::assembly::analysis_session::_helpers::native_outcome::native_outcome;
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -226,6 +232,9 @@ impl AnalysisSession {
 
     /// Python's `_analyze_model_sql_requests` for one wave, less the models the cache answers.
     fn analyze_wave(&mut self, models: &[usize]) -> Result<(), String> {
+        if let AnalysisRoute::Native(dialect) = self.route() {
+            return self.analyze_native_wave(dialect, models);
+        }
         let schemas: Vec<Shapes> = models
             .iter()
             .map(|model| self.binding_schema(&self.request.models[*model]))
@@ -292,6 +301,39 @@ impl AnalysisSession {
             });
         }
         self.check_sql_macros(models)
+    }
+
+    /// Each model of the wave analysed by its dialect's native module, in parallel.
+    fn analyze_native_wave(
+        &mut self,
+        dialect: &'static dyn NativeDialect,
+        models: &[usize],
+    ) -> Result<(), String> {
+        let inputs: Vec<(usize, Shapes)> = models
+            .iter()
+            .map(|model| (*model, self.binding_schema(&self.request.models[*model])))
+            .collect();
+        let pool = self.catalog.native.analysis_pool()?;
+        let request: &SessionRequest = &self.request;
+        let nullability: &ShapeTable = &self.available_nullability;
+        let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
+            inputs
+                .into_par_iter()
+                .map(|(model, schema)| {
+                    native_outcome(dialect, &request.models[model], (schema, nullability))
+                })
+                .collect()
+        });
+        for (model, (outcome, failure)) in models.iter().zip(outcomes) {
+            self.failures.extend(failure);
+            self.outcomes[*model] = Some(outcome);
+        }
+        self.check_sql_macros(models)
+    }
+
+    /// The route of the session's dialect: a native module, or Polyglot.
+    pub(crate) fn route(&self) -> AnalysisRoute {
+        analysis_route(Some(&self.request.dialect))
     }
 
     /// Each model's SQL macro call arguments checked against its analysed types, cache hits too.
@@ -376,7 +418,7 @@ impl AnalysisSession {
 
     /// Python's `_complete_inferred_bindings` star and type pass for one wave.
     fn complete_wave(&mut self, wave: usize) -> Result<(), String> {
-        if self.cyclic {
+        if self.cyclic || matches!(self.route(), AnalysisRoute::Native(_)) {
             return Ok(());
         }
         let mut candidates: Vec<(usize, Shapes, bool)> = Vec::new();
