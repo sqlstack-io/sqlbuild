@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::authorization::_helpers::principal_names::principal_names;
 use crate::authorization::main::begin_authorized::begin_authorized;
-use crate::authorization::main::read_audit_events::read_audit_events;
+use crate::credentials::main::audit::read_audit_events::read_audit_events;
 use crate::credentials::models::{
     Action, AuditContext, DefaultRole, PermissionScope, SecurityAuditEvent,
 };
