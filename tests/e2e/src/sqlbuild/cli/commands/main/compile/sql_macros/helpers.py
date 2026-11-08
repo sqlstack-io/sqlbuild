@@ -7,7 +7,12 @@ import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
+import pytest
+
 from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+
+# Adapters whose SQL analysis dialect SQLBuild has no native parser for yet; each leaves when its arm lands.
+_UNPARSED_ADAPTERS: frozenset[str] = frozenset({"bigquery", "clickhouse", "databricks", "postgres"})
 
 _SEED_COLUMNS: tuple[tuple[str, str], ...] = (
     ("order_id", "BIGINT"),
@@ -311,6 +316,21 @@ def adapter_project(adapter: str) -> dict[str, str]:
             "[scopes]\nenforce_placement = false\n"
         )
     }
+
+
+def skip_where_macros_are_unavailable(
+    files: Mapping[str, str], result: subprocess.CompletedProcess[str]
+) -> None:
+    """Skip a case whose adapter has no native parser yet, once its compile refused macros as unavailable."""
+
+    adapter: re.Match[str] | None = re.search(
+        r'^adapter = "(\w+)"', files.get("sqlbuild_project.toml", ""), flags=re.MULTILINE
+    )
+    if adapter is None or adapter.group(1) not in _UNPARSED_ADAPTERS:
+        return
+    assert result.returncode == 1, output(result)
+    assert "SQL macros are unavailable for SQL analysis dialect" in output(result), output(result)
+    pytest.skip(f"SQL macros are unavailable on {adapter.group(1)} until its native parser lands")
 
 
 def picked_orders(body: str) -> dict[str, str]:

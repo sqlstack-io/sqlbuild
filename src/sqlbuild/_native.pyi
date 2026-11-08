@@ -5235,7 +5235,7 @@ def render_janitor_completion(
 
 # Native analysis: SQL test planning glue.
 def assemble_native_sql_tests(
-    *, inputs: CompileInputsView
+    *, inputs: CompileInputsView, sql_analysis_dialect: str | None = None
 ) -> tuple[NativeSqlTestAssembly, ...]: ...
 
 # Native analysis: compiled project assembly.

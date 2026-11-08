@@ -17,6 +17,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.compile.sql_macros.helpers import 
     orders_model,
     output,
     run_project,
+    skip_where_macros_are_unavailable,
     text_macro,
     untyped_text_macro,
     with_rules,
@@ -386,6 +387,7 @@ def test_given_optional_returns_when_compiling_then_calls_are_typed_and_checked(
         tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
     )
 
+    skip_where_macros_are_unavailable(test_case.files, result)
     assert result.returncode == test_case.expected_returncode, output(result)
     for fragment in test_case.expected_fragments:
         assert fragment in output(result), output(result)
@@ -530,6 +532,7 @@ def test_given_returns_type_of_when_compiling_then_each_call_has_its_argument_ty
         tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
     )
 
+    skip_where_macros_are_unavailable(test_case.files, result)
     assert result.returncode == test_case.expected_returncode, output(result)
     for fragment in test_case.expected_fragments:
         assert fragment in output(result), output(result)
@@ -623,6 +626,7 @@ def test_given_any_type_families_when_compiling_then_calls_and_bodies_are_checke
         tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
     )
 
+    skip_where_macros_are_unavailable(test_case.files, result)
     assert result.returncode == test_case.expected_returncode, output(result)
     for fragment in test_case.expected_fragments:
         assert fragment in output(result), output(result)

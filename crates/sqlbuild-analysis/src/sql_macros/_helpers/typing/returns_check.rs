@@ -3,13 +3,12 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use polyglot_sql::expressions::DataType;
-use polyglot_sql::{DialectType, SchemaValidationOptions, ValidationSchema, validate_with_schema};
 use serde_json::{Value, json};
 
-use crate::query_analysis::main::annotated_output_types::annotated_output_types;
+use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::parsing::body::expand_body;
 use crate::sql_macros::_helpers::rendering::arguments::type_family;
+use crate::sql_macros::_helpers::typing::probes::{probe_outputs, probe_type_errors};
 use crate::sql_macros::_helpers::typing::typed_calls::{
     markable_calls, shifted, typed_sql, without_marker_calls,
 };
@@ -62,9 +61,9 @@ fn stand_in_column(index: usize) -> String {
 
 /// The body selected over stand-in arguments, and their relation, unless it reads relations.
 fn body_probe(
-    definition: &SqlMacroDefinition,
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     body: &ExpandedText,
-    (families, dialect): (bool, &str),
+    families: bool,
 ) -> Option<(String, Value)> {
     let mut arguments: Vec<RenderedArgument> = Vec::with_capacity(definition.parameters.len());
     let mut columns: Vec<Value> = Vec::with_capacity(definition.parameters.len());
@@ -89,51 +88,28 @@ fn body_probe(
             slots: Vec::new(),
         });
     }
-    let expansion = match expand_body((definition, None), body, &arguments) {
+    let expansion = match expand_body(parser, (definition, None), body, &arguments) {
         Ok(expansion) => expansion,
         Err(_) => return None,
     };
     let prefix: &str = "SELECT (";
     let unmarked: String = format!("{prefix}{}) AS b FROM {STAND_IN_RELATION}", expansion.sql);
     let calls: Vec<TypedCall> = shifted(expansion.calls, prefix.len()).collect();
-    let (probe, _) = typed_sql(&unmarked, &markable_calls(&unmarked, &calls, dialect));
+    let (probe, _) = typed_sql(&unmarked, &markable_calls(&unmarked, &calls, parser.name()));
     let table: Value = json!({"name": STAND_IN_RELATION, "columns": columns});
     Some((probe, table))
 }
 
 /// What inference knows of the body's type.
-fn inferred_body_type(probe: &str, table: Value, dialect: &str) -> BodyType {
-    let Ok(schema) = serde_json::from_value::<ValidationSchema>(json!({ "tables": [table] }))
-    else {
+fn inferred_body_type(parser: &dyn NativeDialect, probe: &str, table: Value) -> BodyType {
+    let Some(outputs) = probe_outputs(parser, probe, &[table]) else {
         return BodyType::Unknown;
     };
-    let Some(outputs) = annotated_output_types(probe, dialect, &schema) else {
-        return BodyType::Unknown;
-    };
-    let Some((_, shown, annotated)) = outputs.into_iter().next() else {
-        return BodyType::Unknown;
-    };
-    match (shown, annotated) {
-        (Some(shown), _) if !shown.to_ascii_uppercase().contains(UNKNOWN_TYPE_HINT) => {
+    match outputs.into_iter().next() {
+        Some((_, Some(shown))) if !shown.to_ascii_uppercase().contains(UNKNOWN_TYPE_HINT) => {
             BodyType::Known(shown)
         }
-        (Some(shown), Some(data_type))
-            if data_type.contains_unknown() && data_type != DataType::Unknown =>
-        {
-            BodyType::PartlyKnown { shown, data_type }
-        }
         _ => BodyType::Unknown,
-    }
-}
-
-/// Whether `returns` cannot fill the unknown components of `partial` without changing its shape.
-fn changes_shape(returns: &str, partial: &DataType, dialect: &str) -> bool {
-    let Ok(dialect_type) = dialect.parse::<DialectType>() else {
-        return false;
-    };
-    match polyglot_sql::parse_data_type(returns, dialect_type) {
-        Ok(declared) => !partial.is_refined_by(&declared),
-        Err(_) => false,
     }
 }
 
@@ -185,7 +161,7 @@ fn remembered<T: Clone>(
 
 /// Rejects an expression macro whose body's known type is not its declared `returns`.
 pub(crate) fn check_body_returns(
-    definition: &SqlMacroDefinition,
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     body: &ExpandedText,
     (adapter, location): (&str, SqlMacroLocation),
 ) -> Result<(), SqlMacroError> {
@@ -195,16 +171,13 @@ pub(crate) fn check_body_returns(
     let Some(returns) = definition.returns.as_deref() else {
         return Ok(());
     };
-    let Some((probe, table)) = body_probe(definition, body, (false, adapter_dialect(adapter)))
-    else {
+    let Some((probe, table)) = body_probe((parser, definition), body, false) else {
         return Ok(());
     };
-    let dialect: &str = adapter_dialect(adapter);
-    let key: String = format!("returns\n{dialect}\n{table}\n{probe}");
+    let key: String = format!("returns\n{}\n{table}\n{probe}", parser.name());
     let body_type: BodyType = remembered(&BODY_TYPES, key, || {
-        inferred_body_type(&probe, table, dialect)
+        inferred_body_type(parser, &probe, table)
     });
-    let partial: bool = matches!(body_type, BodyType::PartlyKnown { .. });
     let (shown, wrong): (String, bool) = match body_type {
         BodyType::Unknown => return Ok(()),
         BodyType::Known(inferred) if inferred.eq_ignore_ascii_case(INFERRED_TEXT_TYPE) => (
@@ -214,10 +187,6 @@ pub(crate) fn check_body_returns(
         BodyType::Known(inferred) => {
             let wrong: bool = disagrees(returns, &inferred, adapter);
             (inferred, wrong)
-        }
-        BodyType::PartlyKnown { shown, data_type } => {
-            let wrong: bool = changes_shape(returns, &data_type, dialect);
-            (shown, wrong)
         }
     };
     if !wrong {
@@ -231,40 +200,20 @@ pub(crate) fn check_body_returns(
         ),
     )
     .at(location)
-    .helped(if partial {
-        format!(
-            "declare a returns of the body's shape {shown} with its unknown parts filled in, CAST the body to {returns}, or remove returns to use the inferred type"
-        )
-    } else {
-        format!(
-            "declare returns {shown}, CAST the body to {returns}, or remove returns to use the inferred type"
-        )
-    }))
+    .helped(format!(
+        "declare returns {shown}, CAST the body to {returns}, or remove returns to use the inferred type"
+    )))
 }
 
-/// The first type error the body's probe shows, as polyglot reports it.
-fn body_type_error(probe: &str, table: Value, dialect: &str) -> Option<String> {
-    let Ok(schema) = serde_json::from_value::<ValidationSchema>(json!({ "tables": [table] }))
-    else {
-        return None;
-    };
-    let dialect_type: DialectType = match dialect.parse() {
-        Ok(dialect_type) => dialect_type,
-        Err(_) => return None,
-    };
-    let options: SchemaValidationOptions = SchemaValidationOptions {
-        check_types: true,
-        strict: Some(false),
-        ..Default::default()
-    };
-    validate_with_schema(probe, dialect_type, &schema, &options)
-        .errors
+/// The first type error the body's probe shows.
+fn body_type_error(parser: &dyn NativeDialect, probe: &str, table: Value) -> Option<String> {
+    probe_type_errors(parser, probe, &[table])
         .into_iter()
-        .find(|error| is_type_code(&error.code))
-        .map(|error| without_marker_calls(&error.message).into_owned())
+        .find(|(code, _)| is_type_code(code))
+        .map(|(_, message)| without_marker_calls(&message).into_owned())
 }
 
-/// Whether a polyglot validation code reports an operand or argument of the wrong type.
+/// Whether an analysis code reports an operand or argument of the wrong type.
 fn is_type_code(code: &str) -> bool {
     let number: usize = match code.get(1..).map(str::parse::<usize>) {
         Some(Ok(number)) => number,
@@ -277,9 +226,9 @@ fn is_type_code(code: &str) -> bool {
 
 /// Rejects a body that misuses an `ANY` family argument, typed as the family's widest member.
 pub(crate) fn check_body_types(
-    definition: &SqlMacroDefinition,
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     body: &ExpandedText,
-    (adapter, location): (&str, SqlMacroLocation),
+    location: SqlMacroLocation,
 ) -> Result<(), SqlMacroError> {
     let families: Vec<String> = definition
         .parameters
@@ -294,15 +243,12 @@ pub(crate) fn check_body_types(
     if families.is_empty() {
         return Ok(());
     }
-    let Some((probe, table)) = body_probe(definition, body, (true, adapter_dialect(adapter)))
-    else {
+    let Some((probe, table)) = body_probe((parser, definition), body, true) else {
         return Ok(());
     };
-    let dialect: &str = adapter_dialect(adapter);
-    let key: String = format!("types\n{dialect}\n{table}\n{probe}");
-    let found: Option<String> = remembered(&TYPE_ERRORS, key, || {
-        body_type_error(&probe, table, dialect)
-    });
+    let key: String = format!("types\n{}\n{table}\n{probe}", parser.name());
+    let found: Option<String> =
+        remembered(&TYPE_ERRORS, key, || body_type_error(parser, &probe, table));
     let Some(found) = found else {
         return Ok(());
     };

@@ -1,13 +1,13 @@
 //! Relation marker calls in a serialized pre-order walk of a parsed statement's relations.
 
-use polyglot_sql::expressions::{From, Join};
-use polyglot_sql::{Expression, ExpressionWalk};
+use sqlquack_syntax::expressions::queries::models::{From, Join};
+use sqlquack_syntax::{Expression, ExpressionWalk};
 
 use crate::compiler::_helpers::sql_tests::planning::DBT_REF_FUNCTION;
 
 pub(crate) type MarkerCall = (String, String);
 
-/// Return marker calls in node order, where Polyglot children follow declared field order.
+/// Return marker calls in node order, where children follow declared field order.
 pub(crate) fn relation_marker_calls(expression: &Expression) -> Vec<MarkerCall> {
     expression.dfs().fold(Vec::new(), node_marker_calls)
 }

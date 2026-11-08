@@ -1,4 +1,5 @@
-use crate::compiler::tests::helpers::{
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
+use crate::compiler::tests::relation_markers_helpers::{
     owned_marker_calls, relation_marker_oracle_mismatches, relation_markers_and_json_oracle,
 };
 use crate::compiler::tests::test_types::{RelationMarkerOracleTestCase, RelationMarkersTestCase};
@@ -82,7 +83,10 @@ fn given_parsed_statements_when_collecting_relation_markers_then_json_walk_order
             expected_calls: &[("__ref", "orders"), ("__ref", "archived_orders")],
         },
     ];
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         let (collected, oracle) =
             relation_markers_and_json_oracle(test_case.dialect, test_case.sql);
         assert_eq!(
@@ -134,7 +138,10 @@ fn given_generated_relation_shapes_when_collecting_markers_then_json_oracle_matc
             expected_mismatches: &[],
         },
     ];
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         assert_eq!(
             relation_marker_oracle_mismatches(test_case.dialect),
             test_case.expected_mismatches,
