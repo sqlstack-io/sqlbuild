@@ -1,6 +1,6 @@
 //! Snowflake's native module: SQLQuack's Snowflake parser reads its SQL. Validation only.
 
-use sqlquack_semantics::dialects::constants::SNOWFLAKE;
+use sqlquack_semantics::dialects::constants::{SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{
     Dialect, Error, Expression, ParseOptions, Parsed, StrictFailure, TokenizeFailure, parse_strict,
@@ -10,7 +10,7 @@ use crate::analysis_route::_helpers::type_spelling::respelt;
 use crate::analysis_route::constants::{
     SNOWFLAKE_DIALECT, SNOWFLAKE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };
-use crate::analysis_route::models::{ParserGap, SnowflakeDialect};
+use crate::analysis_route::models::{AnalysisInput, ParserGap, SnowflakeDialect};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect};
@@ -30,6 +30,14 @@ impl NativeDialect for SnowflakeDialect {
 
     fn profile(&self) -> &'static dyn DialectProfile {
         &SNOWFLAKE
+    }
+
+    /// Snowflake's profile, with quoted names folded as well under QUOTED_IDENTIFIERS_IGNORE_CASE.
+    fn profile_for(&self, input: &AnalysisInput<'_>) -> &'static dyn DialectProfile {
+        match input.quoted_ignore_case {
+            true => &SNOWFLAKE_QUOTED_IGNORING_CASE,
+            false => &SNOWFLAKE,
+        }
     }
 
     /// The type as Polyglot normalised it, or `None` (unknown) where the text fallback can't match it.
