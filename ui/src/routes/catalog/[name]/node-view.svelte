@@ -29,6 +29,10 @@
 
 	const res = createResource((client, scope) => client.getCatalogNode(scope, name), ['runs', 'checks', 'snapshot', 'node_status', 'warehouse_sync']);
 	const n = $derived(res.data ?? null);
+	// Checks and migrations link nodes by bare name; settle on the node key so the graph and links agree.
+	$effect(() => {
+		if (n && n.key !== name) goto(`/catalog/${n.key}${page.url.search}`, { replaceState: true });
+	});
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs']);
 	const colLineage = createResource((client, scope) => client.getColumnLineage(scope, name), ['snapshot']);
 
@@ -38,13 +42,13 @@
 		if (n.columns.length) t.push(['columns', 'Columns']);
 		if (n.sql) t.push(['sql', 'SQL']);
 		else if (n.code) t.push(['sql', 'Code']);
-		if (n.sql) t.push(['drift', 'Drift']);
+		if (n.sql && n.builds.length) t.push(['drift', 'Drift']);
 		t.push(['lineage', 'Lineage']);
-		if (n.columns.length) t.push(['collineage', 'Column lineage']);
-		if (n.kind !== 'source') t.push(['runs', 'Runs']);
+		if (n.columns.length && app.client.supports('getColumnLineage')) t.push(['collineage', 'Column lineage']);
+		if (n.kind !== 'source' && n.runs) t.push(['runs', 'Runs']);
 		t.push(['checks', `Checks${n.checkResults.length ? ` ${n.checkResults.length}` : ''}`]);
 		if (n.warehouse) t.push(['warehouse', 'Warehouse']);
-		t.push(['history', 'History']);
+		if (n.history) t.push(['history', 'History']);
 		return t;
 	});
 	// The URL is the single source of truth for the tab, so back/forward and reloads restore it.
@@ -69,6 +73,7 @@
 		};
 	});
 
+	const canRun = app.client.supports('launchAdhocRun');
 	let runOpen = $state(false);
 	let runSelection = $state<string[]>([]);
 	function execute(selection: string[]) {
@@ -80,12 +85,12 @@
 
 <AppTopbar title="Catalog">
 	<Button variant="outline" size="sm" onclick={() => res.refresh()}>↻ Refresh</Button>
-	{#if n && n.kind !== 'source'}
+	{#if n && n.kind !== 'source' && canRun}
 		<GatedButton requires="run.adhoc" variant="default" onclick={() => execute([name])}>▷ Build</GatedButton>
 	{/if}
 </AppTopbar>
 
-<RunPanel bind:open={runOpen} selection={runSelection} />
+{#if canRun}<RunPanel bind:open={runOpen} selection={runSelection} />{/if}
 
 <div class="asset-page">
 	<header class="asset-header">
@@ -98,7 +103,7 @@
 					<StatusLabel tone="var(--sb-text-faint)" label="External source" muted />
 				{:else if n.lastOutcome}
 					<StatusLabel tone={nodeOutcomeTone[n.lastOutcome]} label="Last build {nodeOutcomeLabel[n.lastOutcome].toLowerCase()}" />
-				{:else}
+				{:else if !n.lastBuild}
 					<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />
 				{/if}
 				<StaleBadges reasons={n.stale} />
@@ -109,7 +114,7 @@
 		</div>
 		{#if n}
 			<div class="meta-row">
-				<span>{kindLine(n)}</span><span>{n.group}</span>{#if n.owner.length}<span>{n.owner.join(', ')}</span>{/if}
+				<span>{kindLine(n)}</span>{#if n.group}<span>{n.group}</span>{/if}{#if n.owner.length}<span>{n.owner.join(', ')}</span>{/if}
 				{#if n.kind === 'source'}<span>{n.sourceFreshness?.loadedAt ? `Loaded ${formatAgo(n.sourceFreshness.loadedAt, app.now)}` : 'No freshness data'}</span>
 				{:else}<span>{n.lastBuild ? `Last built ${formatAgo(n.lastBuild.builtAt, app.now)}` : 'Never built'}</span>{/if}
 			</div>
@@ -153,7 +158,7 @@
 				</DriftTab>
 			{:else if tab === 'lineage'}
 				{#if graph.nodes.length}
-					<ScopedLineage focal={name} graphNodes={graph.nodes} graphEdges={graph.edges} onExecute={execute} />
+					<ScopedLineage focal={name} graphNodes={graph.nodes} graphEdges={graph.edges} onExecute={canRun ? execute : undefined} />
 				{/if}
 			{:else if tab === 'collineage'}
 				{#if colLineage.data}
@@ -165,8 +170,8 @@
 				<ChecksTab node={n} />
 			{:else if tab === 'warehouse' && n.warehouse}
 				<WarehouseTab warehouse={n.warehouse} microbatch={n.microbatch} />
-			{:else if tab === 'history'}
-				<HistoryTab node={n} />
+			{:else if tab === 'history' && n.history}
+				<HistoryTab node={n} history={n.history} />
 			{/if}
 		</div>
 	{/if}

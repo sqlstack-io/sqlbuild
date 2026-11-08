@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpChangeFeed, feedAllowed } from './http-client';
+import { HttpChangeFeed, createHttpClient, feedAllowed } from './http-client';
 import type { ChangedSignal, ConnectionState } from './signals';
 
 /** A stand-in `EventSource` the test opens, fails and feeds by hand. */
@@ -235,5 +235,40 @@ describe('feedAllowed', () => {
 	it('rejects when the network fails, so the feed keeps retrying', async () => {
 		vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('network down'))));
 		await expect(feedAllowed('', ORDERS, () => {})).rejects.toThrow('network down');
+	});
+});
+
+describe('getCatalogNode', () => {
+	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
+	function serve(actions: string[]) {
+		const paths: string[] = [];
+		const answers: [string, unknown][] = [
+			['/bootstrap', { login_mode: 'password', access: { name: 'vic', principal_id: 'p', actions: [], locations: [{ location_id: '0191f0aa-orders', name: 'Orders', target: 'development', actions }] } }],
+			['/nodes', [{ node_key: 'model:orders', kind: 'model', name: 'orders', materialization: 'table', tags: [], dependencies: [], snapshot_id: 's' }]],
+			['/checks', []],
+			['/sql', { node_key: 'model:orders', snapshot_id: 's', raw_sql: 'select 1', compiled_sql: 'select 1' }]
+		];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				paths.push(path);
+				const answer = answers.find(([end]) => path.endsWith(end));
+				return answer ? Response.json(answer[1]) : Response.json({ error: 'refused' }, { status: 403 });
+			})
+		);
+		return paths;
+	}
+
+	it.each([
+		[['view', 'view.sql'], 'select 1'],
+		[['view'], null]
+	])('with %j reads SQL only when the location allows it, so a viewer causes no refused read', async (actions, raw) => {
+		const paths = serve(actions);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		const detail = await client.getCatalogNode(ORDERS, 'orders');
+		expect([detail?.key, detail?.sql?.raw ?? null]).toEqual(['model:orders', raw]);
+		expect(paths.filter((p) => p.endsWith('/sql'))).toHaveLength(raw ? 1 : 0);
 	});
 });

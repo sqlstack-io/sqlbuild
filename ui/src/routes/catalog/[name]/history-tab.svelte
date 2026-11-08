@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CatalogNodeDetail } from '$lib/api';
+	import type { CatalogNodeDetail, NodeHistory } from '$lib/api';
 	import Panel from '$lib/components/platform/panel.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import { app } from '$lib/state/app.svelte';
@@ -9,8 +9,7 @@
 
 	// Renames and moves of this node, from synced `_sqlbuild_migrations` and
 	// `_sqlbuild_old_name_views`; the Maintenance page shows them for every node.
-	let { node }: { node: CatalogNodeDetail } = $props();
-	const h = $derived(node.history);
+	let { node, history: h }: { node: CatalogNodeDetail; history: NodeHistory } = $props();
 </script>
 
 <div class="wrap">

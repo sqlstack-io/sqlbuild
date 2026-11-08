@@ -18,6 +18,8 @@
 	const source = $derived(node.kind === 'source');
 	const unique = $derived(node.sql?.raw.match(/unique_key\s+([^,\n]+)/)?.[1] ?? null);
 	const freshnessTone = $derived(!node.sourceFreshness ? 'var(--sb-text-faint)' : node.sourceFreshness.status === 'pass' ? 'var(--sb-success)' : node.sourceFreshness.status === 'warn' ? 'var(--sb-warning)' : 'var(--sb-error)');
+	// Drift compares the current SQL with the SQL of the last build, so it needs both.
+	const hasDrift = $derived(!!node.sql && node.builds.length > 0);
 	const minutes = (s: number | null) => (s === null ? '—' : s >= 3600 && s % 3600 === 0 ? `${s / 3600}h` : `${Math.round(s / 60)}m`);
 </script>
 
@@ -41,24 +43,24 @@
 		{:else}
 			<section class="panel">
 				<div class="status-top">
-					{#if node.lastOutcome}<StatusLabel tone={nodeOutcomeTone[node.lastOutcome]} label="Last build {node.lastOutcome}" />{:else}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
+					{#if node.lastOutcome}<StatusLabel tone={nodeOutcomeTone[node.lastOutcome]} label="Last build {node.lastOutcome}" />{:else if !node.lastBuild}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
 					<span class="muted">Last built: <BuildSource build={node.lastBuild} /></span>
 				</div>
 				<div class="stat-grid" class:five={!!node.cost}>
 					<div><span>Rows</span><b>{formatNumber(node.lastRows)}</b>{#if node.rowsDelta}<em class:up={node.rowsDelta > 0}>{node.rowsDelta > 0 ? '+' : ''}{formatNumber(node.rowsDelta)}</em>{/if}</div>
 					<div><span>Duration</span><b>{formatMs(node.lastDurationMs)}</b></div>
 					<div><span>Checks</span><b>{node.checks.total ? `${node.checks.passing}/${node.checks.total}` : '—'}</b></div>
-					<div><span>Builds · 40</span><b>{node.recentOutcomes.filter((o) => o === 'failed').length} failed</b></div>
+					{#if node.recentOutcomes.length}<div><span>Builds · {node.recentOutcomes.length}</span><b>{node.recentOutcomes.filter((o) => o === 'failed').length} failed</b></div>{/if}
 					{#if node.cost}<div><span>Cost per build</span><b>{formatCredits(node.cost.perBuild)}</b><em>{formatCredits(node.cost.last24h)} / 24h</em></div>{/if}
 				</div>
 				{#if node.recentOutcomes.length}
 					<div class="strip"><OutcomeStrip outcomes={node.recentOutcomes} tones={nodeOutcomeTone} caption="Last {node.recentOutcomes.length} builds" /></div>
 				{/if}
 				{#each node.stale as r, i (i)}
-					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : node.sql ? onSql('drift') : onTab('history'))}>
+					<button class="drift-hint {r.reason}" onclick={() => (r.reason === 'behind' ? onTab('lineage') : onSql('drift'))} disabled={r.reason !== 'behind' && !hasDrift}>
 						<GitCompareIcon size={14} />
 						<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
-						<em>{r.reason === 'behind' ? 'View lineage →' : 'View drift →'}</em>
+						{#if r.reason === 'behind' || hasDrift}<em>{r.reason === 'behind' ? 'View lineage →' : 'View drift →'}</em>{/if}
 					</button>
 				{/each}
 			</section>
@@ -122,7 +124,7 @@
 			<dl>
 				<div><dt>Kind</dt><dd>{kindLine(node)}</dd></div>
 				{#if unique}<div><dt>Unique key</dt><dd class="mono">{unique}</dd></div>{/if}
-				<div><dt>Group</dt><dd>{node.group}</dd></div>
+				{#if node.group}<div><dt>Group</dt><dd>{node.group}</dd></div>{/if}
 				<div><dt>Owner</dt><dd>{node.owner.join(', ') || '—'}</dd></div>
 				<div><dt>Path</dt><dd class="mono" title={node.path}>{node.path}</dd></div>
 				<div><dt>Relation</dt><dd class="mono" title={relationName(node.relation)}>{relationName(node.relation)}</dd></div>
@@ -136,14 +138,16 @@
 				<div class="flex flex-wrap gap-1">{#each node.tags as t (t)}<span class="sb-tag">{t}</span>{/each}</div>
 			</section>
 		{/if}
-		<section>
-			<h3>Jobs</h3>
-			{#each node.jobs as j (j.key)}
-				<a class="job-row" href="/jobs/{j.key}"><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
-			{:else}
-				<p class="muted">No job selects this node.</p>
-			{/each}
-		</section>
+		{#if node.jobs}
+			<section>
+				<h3>Jobs</h3>
+				{#each node.jobs as j (j.key)}
+					<a class="job-row" href="/jobs/{j.key}"><span>{j.key}</span><small>{j.kind === 'group' ? 'group' : 'job'}{j.triggerIds.length ? ` · ${j.triggerIds.length} ${j.triggerIds.length === 1 ? 'trigger' : 'triggers'}` : ' · manual'}</small></a>
+				{:else}
+					<p class="muted">No job selects this node.</p>
+				{/each}
+			</section>
+		{/if}
 	</aside>
 </div>
 
@@ -188,7 +192,7 @@
 	.job-row span { color: var(--primary); }
 	.job-row small { margin-left: auto; color: var(--muted-foreground); font-size: 12px; }
 	.drift-hint { display: flex; width: 100%; align-items: center; gap: 9px; margin-top: 12px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--sb-stale) 35%, var(--border)); border-radius: 2px; background: transparent; color: var(--foreground); font-size: 12.5px; text-align: left; }
-	.drift-hint:hover { background: var(--sb-hover); }
+	.drift-hint:not(:disabled):hover { background: var(--sb-hover); }
 	.drift-hint :global(svg) { flex: 0 0 auto; color: var(--sb-stale); }
 	.drift-hint.changed_upstream { border-style: dashed; }
 	.drift-hint.behind { border-color: color-mix(in srgb, var(--sb-warning) 35%, var(--border)); }

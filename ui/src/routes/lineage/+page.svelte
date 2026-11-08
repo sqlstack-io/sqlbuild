@@ -63,7 +63,7 @@
 		untrack(() => {
 			if (!nodes.length) {
 				const graph = catalogGraph(data);
-				const focus = data.some((n) => n.key === initialFocus) ? initialFocus : 'fact_orders';
+				const focus = data.some((n) => n.key === initialFocus) ? initialFocus : null;
 				nodes = graph.nodes.map((n) => (n.id === focus ? { ...n, selected: true } : n));
 				edges = graph.edges;
 				return;
@@ -83,7 +83,7 @@
 	const scaleModels = Number(page.url.searchParams.get('models') ?? 0);
 	const scaleMode = scaleModels > 0;
 	const FAR_ZOOM = 0.5;
-	let scaleStartId = 'fact_orders';
+	let scaleStartId = '';
 	const scaleLayout = scaleMode ? (() => {
 		const synthetic = scaleGraph(scaleModels);
 		const t = performance.now();
@@ -253,6 +253,8 @@
 	const listed = $derived(detailSupported ? null : (catalogByKey.get(String(primarySlug)) ?? null));
 	const isSource = $derived(d?.kind === 'source');
 	const hasSql = $derived(!!d?.sql);
+	// Drift compares the current SQL with the SQL of the last build, so it needs both.
+	const hasDrift = $derived(hasSql && !!d?.builds.length);
 
 	// ---- toolbar filters: non-matching nodes are dimmed ----
 	let kindFilter = $state('');
@@ -484,7 +486,7 @@
 				{#each browserNodes.slice(0, 8) as node (node.id)}
 					<button onclick={() => { selectModel(node.id); modelQuery = ''; }}>
 						<i class="browser-status {String(node.data.status)}"></i>
-						<span>{node.data.name}</span>
+						<span title={String(node.data.name)}>{node.data.label ?? node.data.name}</span>
 						<small>{String(node.data.kind).split(' · ')[0]}</small>
 					</button>
 				{:else}
@@ -496,8 +498,8 @@
 	{#if !scaleMode}
 		<div class="toolbar-group">
 			<ChoiceFilter label="Kind" bind:value={kindFilter} options={kindOptions} />
-			<ChoiceFilter label="Group" bind:value={groupFilter} options={groupOptions} />
-			<ChoiceFilter label="Owner" bind:value={ownerFilter} options={ownerOptions} />
+			{#if groupOptions.length}<ChoiceFilter label="Group" bind:value={groupFilter} options={groupOptions} />{/if}
+			{#if ownerOptions.length}<ChoiceFilter label="Owner" bind:value={ownerFilter} options={ownerOptions} />{/if}
 			<ChoiceFilter label="Status" bind:value={statusFilter} options={statusOptions.map((o) => ({ ...o, count: catalogNodes.filter((c) => matchesFilterStatus(c, o.value)).length }))} />
 		</div>
 	{/if}
@@ -550,7 +552,7 @@
 								title={String(node.data.name)}
 							>
 								<i class="browser-status {String(node.data.status)}"></i>
-								<span><strong>{node.data.name}</strong></span>
+								<span><strong>{node.data.label ?? node.data.name}</strong></span>
 							</button>
 						{/each}
 					{/if}
@@ -621,16 +623,19 @@
 		{:else}
 			<div class="inspector-head">
 				<div class="flex items-center gap-2">
-					<span class="truncate text-[15px] font-semibold">{primary?.data.name}</span>
+					<span class="truncate text-[15px] font-semibold" title={String(primary?.data.name ?? '')}>{primary?.data.label ?? primary?.data.name}</span>
 					{#if d}<a href="/catalog/{primarySlug}" class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
 				</div>
 				<div class="inspector-meta">
 					<span>{d ? kindLine(d) : primary?.data.kind}</span>
-					{#if d}<span>{d.group}</span>{#if d.owner.length}<span>{d.owner.join(', ')}</span>{/if}{/if}
+					{#if d}{#if d.group}<span>{d.group}</span>{/if}{#if d.owner.length}<span>{d.owner.join(', ')}</span>{/if}{/if}
 				</div>
 			</div>
 		{/if}
 		<div class="insp-body">
+			{#if !scaleMode && !primary}
+				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
+			{:else}
 			{#if scaleMode}
 				<InspectorSection title="Scale test">
 					<p class="insp-description">A synthetic graph for layout and rendering at scale; nodes have no catalog detail.</p>
@@ -660,7 +665,7 @@
 				<InspectorSection title="Last build">
 					{#snippet meta()}{#if d.lastBuild?.runId}<a class="section-link" href="/runs/{d.lastBuild.runId}">View run →</a>{/if}{/snippet}
 					<div class="status-top">
-						{#if d.lastOutcome}<StatusLabel tone={nodeOutcomeTone[d.lastOutcome]} label={nodeOutcomeLabel[d.lastOutcome]} />{:else}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
+						{#if d.lastOutcome}<StatusLabel tone={nodeOutcomeTone[d.lastOutcome]} label={nodeOutcomeLabel[d.lastOutcome]} />{:else if !d.lastBuild}<StatusLabel tone="var(--sb-text-faint)" label="Not built" muted />{/if}
 						<StaleBadges reasons={d.stale} />
 					</div>
 					<div class="status-stats">
@@ -673,10 +678,10 @@
 						<div class="strip-wrap"><OutcomeStrip outcomes={d.recentOutcomes} tones={nodeOutcomeTone} caption="Last {d.recentOutcomes.length} builds" /></div>
 					{/if}
 					{#each d.stale as r, i (i)}
-						<button class="drift-hint {r.reason === 'changed_upstream' ? 'upstream' : r.reason}" onclick={() => (r.reason === 'behind' ? undefined : openSql('drift'))} disabled={r.reason === 'behind' || !hasSql}>
+						<button class="drift-hint {r.reason === 'changed_upstream' ? 'upstream' : r.reason}" onclick={() => (r.reason === 'behind' ? undefined : openSql('drift'))} disabled={r.reason === 'behind' || !hasDrift}>
 							<GitCompareIcon size={14} />
 							<span><b>Stale · {staleReasonLabel(r)}</b> · {staleReasonDetail(r)}</span>
-							{#if r.reason !== 'behind' && hasSql}<em>View drift →</em>{/if}
+							{#if r.reason !== 'behind' && hasDrift}<em>View drift →</em>{/if}
 						</button>
 					{/each}
 					<dl class="kv">
@@ -728,7 +733,7 @@
 				</InspectorSection>
 			{/if}
 
-			{#if d && !isSource}
+			{#if d && !isSource && d.runs}
 				<InspectorSection title="Recent runs">
 					{#snippet meta()}<a class="section-link" href="/catalog/{primarySlug}?tab=runs">All →</a>{/snippet}
 					{#each d.runs.slice(0, 3) as run, i (i)}
@@ -767,12 +772,13 @@
 					<dl class="kv">
 						<div><dt>Kind</dt><dd>{kindLine(d)}</dd></div>
 						<div><dt>Unique key</dt><dd class="mono">{sqlOutline.config.find((c) => c.key === 'unique_key')?.value ?? '—'}</dd></div>
-						<div><dt>Group</dt><dd>{d.group}</dd></div>
+						<div><dt>Group</dt><dd>{d.group ?? '—'}</dd></div>
 						<div><dt>Owner</dt><dd>{d.owner.join(', ') || '—'}</dd></div>
 						<div><dt>Tags</dt><dd>{d.tags.join(', ') || '—'}</dd></div>
 						<div><dt>Build version</dt><dd class="mono" title="Fingerprint of the last build in this location">{d.lastBuild?.fingerprint.slice(0, 12) ?? '—'}</dd></div>
 					</dl>
 				</InspectorSection>
+			{/if}
 			{/if}
 		</div>
 	</aside>
