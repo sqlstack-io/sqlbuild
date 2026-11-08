@@ -7,7 +7,7 @@ use sqlquack_semantics::dialects::constants::SQL_SERVER;
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{DataType, Expression, Gap, Parsed};
 
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
 use sqlquack_syntax_sqlserver::parse_strict;
 
@@ -126,7 +126,7 @@ impl NativeDialect for TsqlDialect {
             Some(alias) => format!("{alias}{arguments}"),
             None => written.clone(),
         };
-        Some(normalize_with_fallback(&aliased, Some(TypeDialect::Tsql)))
+        Some(normalize_text_type(&aliased, Some(TypeDialect::Tsql)))
     }
 
     /// Every statement of `sql` with the parser's named gaps, or the first error. An unknown

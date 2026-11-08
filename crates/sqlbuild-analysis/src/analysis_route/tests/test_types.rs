@@ -1,9 +1,16 @@
 use sqlquack_syntax::Parsed;
 
-use crate::type_system::models::NormalizedType;
-
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::models::{NormalizedType, TypeFamily};
+
+pub(super) struct ArmGapTestCase {
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_gap: Option<LocatedGap>,
+}
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -73,4 +80,12 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred: &'static str,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
+}
+
+pub(super) struct TypeSpellingTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static str,
+    pub(super) normalize: fn(&str) -> Option<NormalizedType>,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }

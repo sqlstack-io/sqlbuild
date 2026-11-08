@@ -1,8 +1,10 @@
 //! Deterministic comparison SQL rendering for planned SQL-native tests.
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 use std::collections::{HashMap, HashSet};
 
-use polyglot_sql::{Dialect, DialectType};
 
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
 use crate::compiler::_helpers::sql_tests::cte_rename::{CteRename, rename_ctes};
@@ -602,10 +604,13 @@ fn render_response(request: RenderRequest) -> Result<RenderResponse, String> {
     })
 }
 
-/// Resolve the SQL-analysis dialect used to read expected-row columns.
-pub(crate) fn render_dialect(name: Option<&str>) -> Dialect {
-    name.and_then(Dialect::get_by_name)
-        .unwrap_or_else(|| Dialect::get(DialectType::Generic))
+/// The native parser of the SQL analysis dialect `name`, which reads SQL tests; `None` where the
+/// dialect has none, so SQL tests are unavailable.
+pub(crate) fn sql_test_parser(name: Option<&str>) -> Option<&'static dyn NativeDialect> {
+    match analysis_route(name) {
+        AnalysisRoute::Native(parser) => Some(parser),
+        _ => None,
+    }
 }
 
 pub(crate) fn render_difference_sample_json(request_json: &str) -> Result<String, String> {

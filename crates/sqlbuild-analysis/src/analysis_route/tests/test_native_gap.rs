@@ -1,3 +1,4 @@
+use crate::analysis_route::types::NativeDialect;
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::main::skipped_analysis::skipped_analysis;
@@ -19,7 +20,7 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
         RouteTestCase {
             description: "snowflake",
             dialect: Some("snowflake"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "duckdb",
@@ -29,7 +30,7 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
         RouteTestCase {
             description: "sqlite",
             dialect: Some("sqlite"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "bigquery",

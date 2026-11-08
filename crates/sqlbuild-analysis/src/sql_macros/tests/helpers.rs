@@ -105,6 +105,15 @@ impl SqlMacroHost for FakeHost {
     fn adapter(&self) -> &str {
         self.adapter
     }
+
+    /// The adapter's analysis dialect; a fake with no adapter analyses as DuckDB, since SQL
+    /// macros need a dialect with a native parser.
+    fn analysis_dialect(&self) -> Option<&str> {
+        Some(match self.adapter {
+            "" | "motherduck" => "duckdb",
+            adapter => adapter,
+        })
+    }
 }
 
 /// `sql` expanded with `macros` for `adapter`, or the SQL macro error it raised.

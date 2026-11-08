@@ -318,6 +318,11 @@ pub(crate) fn assemble_native_sql_tests<'py>(
             "native_mapping",
         )?
         .extract()?,
+        sql_analysis_dialect: native_field(
+            &native_field(inputs, "native_project")?,
+            "sql_analysis_dialect",
+        )?
+        .extract()?,
     };
     let rows: Vec<AssemblyRow> = assemble_compiled_sql_tests(py, request)?;
     if rows.len() != test_inputs.len() {

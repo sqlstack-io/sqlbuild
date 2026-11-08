@@ -4,16 +4,15 @@ use std::collections::{BTreeSet, HashMap};
 
 use sqlbuild_core::graph_walk::main::breadth_first_path::breadth_first_path;
 
-use polyglot_sql::{Dialect, DialectType, Expression, ExpressionWalk};
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 use serde_json::Value;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, Unclosed};
 
-use crate::compiler::_helpers::polyglot::parse_options::guarded_parse_options;
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::constants::{ALIAS_FIELD, CTES_FIELD, NAME_FIELD};
 
 const DIRECT_DEPENDENCY_PATH_LENGTH: usize = 2;
-const TABLE_KIND: &str = "table";
 const IDENTIFIER_QUOTES: &[u8] = b"\"`";
 
 /// The check CTEs of one file and the labels its messages name.
@@ -23,6 +22,8 @@ pub(crate) struct IndependenceCheck<'a> {
     pub(crate) assertion_prefix: &'a str,
     pub(crate) file_label: &'a str,
     pub(crate) context_label: &'a str,
+    /// The project's native parser; without one, references come from the identifier scan.
+    pub(crate) parser: Option<&'a dyn NativeDialect>,
 }
 
 /// The first independence error of `check`, if any.
@@ -55,7 +56,7 @@ pub(crate) fn independence_error(
         if !casefold(body).contains(&casefold(prohibited_prefix)) {
             continue;
         }
-        if let Some(nested) = defined_cte_names(body)
+        if let Some(nested) = defined_cte_names(check.parser, body)
             .into_iter()
             .find(|nested| nested.starts_with(prohibited_prefix))
         {
@@ -71,7 +72,7 @@ pub(crate) fn independence_error(
     }
     let mut dependencies: HashMap<String, Vec<String>> = HashMap::new();
     for (name, body) in check.ctes {
-        let references = match known_cte_references(body, &names_by_key, syntax) {
+        let references = match known_cte_references(check.parser, body, &names_by_key, syntax) {
             Ok(references) => references,
             Err(message) => return Some(message),
         };
@@ -113,21 +114,20 @@ fn casefold(text: &str) -> String {
     text.to_lowercase()
 }
 
-/// `parse_one(sql, dialect="generic")` under SQLBuild's complexity guard, or `None` on error.
-fn parse_one(sql: &str) -> Option<Expression> {
-    let Ok(options) = guarded_parse_options() else {
-        return None;
-    };
-    let Ok(mut statements) = Dialect::get(DialectType::Generic).parse_with_options(sql, &options)
-    else {
-        return None;
-    };
-    (statements.len() == 1).then(|| statements.remove(0))
+/// The one statement the project's parser reads from `sql` whole, or `None`.
+fn parse_one(parser: Option<&dyn NativeDialect>, sql: &str) -> Option<Expression> {
+    match parser?.parse(sql) {
+        Ok(Parsed {
+            mut statements,
+            gaps,
+        }) if gaps.is_empty() && statements.len() == 1 => statements.pop(),
+        _ => None,
+    }
 }
 
 /// Every CTE alias defined anywhere in `sql`, in the order `to_dict()` lists them.
-fn defined_cte_names(sql: &str) -> Vec<String> {
-    let Some(parsed) = parse_one(sql) else {
+fn defined_cte_names(parser: Option<&dyn NativeDialect>, sql: &str) -> Vec<String> {
+    let Some(parsed) = parse_one(parser, sql) else {
         return Vec::new();
     };
     let Ok(value) = serde_json::to_value(&parsed) else {
@@ -165,6 +165,7 @@ fn collect_cte_names(value: &Value, mut names: Vec<String>) -> Vec<String> {
 
 /// The keys of the file's CTEs that `sql` reads, in reading order.
 fn known_cte_references(
+    parser: Option<&dyn NativeDialect>,
     sql: &str,
     names_by_key: &HashMap<String, &str>,
     syntax: &LexicalSyntax,
@@ -173,21 +174,19 @@ fn known_cte_references(
     if !names_by_key.keys().any(|key| folded.contains(key.as_str())) {
         return Ok(Vec::new());
     }
-    let Some(parsed) = parse_one(sql) else {
+    let Some(parsed) = parse_one(parser, sql) else {
         return identifier_references(sql, names_by_key, syntax);
     };
     let mut references: Vec<String> = Vec::new();
-    for table in parsed
-        .dfs()
-        .skip(1)
-        .filter(|node| node.variant_name() == TABLE_KIND)
-    {
-        references = push_known(references, casefold(table.get_name()), names_by_key);
+    for node in parsed.dfs().skip(1) {
+        if let Expression::Table(table) = node {
+            references = push_known(references, casefold(&table.name.name), names_by_key);
+        }
     }
     Ok(references)
 }
 
-/// The identifier scan used when Polyglot cannot parse a body.
+/// The identifier scan used when the project's parser cannot read a body.
 fn identifier_references(
     sql: &str,
     names_by_key: &HashMap<String, &str>,

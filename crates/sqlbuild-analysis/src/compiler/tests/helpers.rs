@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Barrier, Mutex};
 
-use polyglot_sql::Dialect;
 use serde_json::{Value, json};
 
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
 use crate::compiler::_helpers::sql_tests::cte_slices::{SliceDialect, split_top_level_with};
 use crate::compiler::_helpers::sql_tests::relation_markers::relation_marker_calls;
@@ -673,8 +673,9 @@ pub(crate) fn textual_assertion_with_clause_merges_lifted_ctes() -> bool {
         )
     );
     assert!(
-        polyglot_sql::Dialect::get(polyglot_sql::DialectType::DuckDB)
-            .parse(resolved_sql)
+        sql_test_parser(Some("duckdb"))
+            .expect("DuckDB parser")
+            .read_whole(resolved_sql)
             .is_ok(),
         "{resolved_sql}"
     );
@@ -1644,10 +1645,11 @@ pub(crate) fn relation_markers_and_json_oracle(
     dialect: &str,
     sql: &str,
 ) -> (MarkerCalls, MarkerCalls) {
-    let mut statements = Dialect::get_by_name(dialect)
+    let mut statements = sql_test_parser(Some(dialect))
         .expect("test dialect must exist")
         .parse(sql)
-        .expect("test SQL must parse");
+        .expect("test SQL must parse")
+        .statements;
     assert_eq!(statements.len(), 1, "{sql}");
     let expression = statements.remove(0);
     (
@@ -1682,7 +1684,7 @@ pub(crate) fn relation_marker_oracle_mismatches(dialect: &str) -> Vec<String> {
         "DELETE FROM orders USING {a} JOIN {b} ON TRUE",
         "INSERT INTO orders SELECT * FROM {a} JOIN {b} ON TRUE",
     ];
-    let parser = Dialect::get_by_name(dialect).expect("test dialect must exist");
+    let parser = sql_test_parser(Some(dialect)).expect("test dialect must exist");
     wrappers
         .iter()
         .flat_map(|wrapper| {
@@ -1695,6 +1697,7 @@ pub(crate) fn relation_marker_oracle_mismatches(dialect: &str) -> Vec<String> {
         .filter(|sql| {
             parser
                 .parse(sql)
+                .map(|parsed| parsed.statements)
                 .unwrap_or_default()
                 .iter()
                 .any(|expression| {
@@ -1708,6 +1711,7 @@ pub(crate) fn relation_marker_oracle_mismatches(dialect: &str) -> Vec<String> {
 }
 
 /// Dialects and their analysis modes; analysis reads BigQuery and Databricks markers as strings.
+/// Only those with a native parser are planned; the others' SQL tests are unavailable.
 const DIALECT_MODES: [(&str, &[bool]); 6] = [
     ("duckdb", &[true, false]),
     ("snowflake", &[true, false]),
@@ -1720,6 +1724,9 @@ const DIALECT_MODES: [(&str, &[bool]); 6] = [
 /// Plan a fixture-read helper beside a model on every dialect and check names stay isolated.
 pub(crate) fn helper_names_are_isolated(shared: &SharedNameTestCase) -> bool {
     for (dialect, modes) in DIALECT_MODES {
+        if sql_test_parser(Some(dialect)).is_none() {
+            continue;
+        }
         for &sql_analysis_enabled in modes {
             let label = format!(
                 "{} on {dialect}, analysis {sql_analysis_enabled}",
