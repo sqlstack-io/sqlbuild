@@ -14,6 +14,9 @@ use crate::api::_helpers::resources::{
 #[openapi(paths(
     administrators::change,
     administrators::assign,
+    administrators::people,
+    administrators::holdings,
+    administrators::definitions,
     audit::read,
     person_operations::request_job,
     person_operations::cancel_run,
@@ -26,6 +29,8 @@ use crate::api::_helpers::resources::{
     person_reads::triggers,
     person_reads::ticks,
     person_reads::snapshots,
+    person_reads::health,
+    person_reads::problems,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,
@@ -87,6 +92,7 @@ pub(crate) struct ReadQuery {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadAuditQuery {
     pub(crate) after: Option<i64>,
+    pub(crate) before: Option<i64>,
     pub(crate) limit: Option<u32>,
 }
 

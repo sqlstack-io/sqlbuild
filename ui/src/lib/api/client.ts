@@ -122,7 +122,8 @@ export interface ApiClient extends PlatformApi {
 
 	listPlatformEvents(query: { activeOnly: boolean }): Promise<PlatformEvent[]>;
 
-	getWarehouseSync(scope: Scope): Promise<WarehouseSync>;
+	/** Null when the location has reported no recent sync. */
+	getWarehouseSync(scope: Scope): Promise<WarehouseSync | null>;
 
 	/** Live "changed" signals (SSE in the server client); consumers refetch. */
 	changes: ChangeSubscription;

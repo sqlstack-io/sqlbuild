@@ -7,6 +7,8 @@ pub mod change_administrator;
 pub mod compile_roles;
 pub(crate) mod deny_authorization;
 pub mod grant_admin;
+pub mod list_role_definitions;
+pub mod list_role_holdings;
 pub(crate) mod person_assigns_roles;
 pub(crate) mod person_lists_target;
 pub(crate) mod publish_custom_roles;

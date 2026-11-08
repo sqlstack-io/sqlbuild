@@ -11,6 +11,11 @@
 		app.platformEvents.filter((e) => e.active && e.severity !== 'info').sort((a, b) => rank(b) - rank(a))
 	);
 	const critical = $derived(events.some((e) => e.severity === 'critical'));
+	/** Location problems link to the location's page if it exists, else the Locations list; server problems only to server status. */
+	function linkOf(event: PlatformEvent): { href: string; text: string } | null {
+		if (event.locationId) return { href: app.client.supports('getLocation') ? problemHref(event) : '/locations', text: 'View location →' };
+		return app.client.supports('platformHealth') ? { href: problemHref(event), text: 'View server status →' } : null;
+	}
 </script>
 
 {#if events.length}
@@ -20,11 +25,12 @@
 		</span>
 		<ul>
 			{#each events as event (event.id)}
+				{@const link = linkOf(event)}
 				<li>
 					<strong>{eventKindLabel[event.kind]}</strong>
 					<span title={event.message}>{event.message}</span>
 					<small>{formatAgo(event.occurredAt, app.now)}</small>
-					<a href={problemHref(event)}>{event.locationId ? 'View location →' : 'View server status →'}</a>
+					{#if link}<a href={link.href}>{link.text}</a>{/if}
 				</li>
 			{/each}
 		</ul>

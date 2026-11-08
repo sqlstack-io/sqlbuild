@@ -82,7 +82,7 @@ export function createFixtures(now: number) {
 	];
 
 	const platformEvents: PlatformEvent[] = [
-		{ id: 'pe-1', kind: 'location_broken', severity: 'warning', occurredAt: ago(48), active: true, locationId: LOCATION_MARKETING, subject: 'marketing-analytics', message: 'The latest deploy failed to load; still running the previous version.' },
+		{ id: 'pe-1', kind: 'location_broken', severity: 'warning', occurredAt: ago(48), active: true, locationId: LOCATION_MARKETING, subject: 'marketing-analytics', message: 'marketing-analytics stopped checking in, so its scheduled runs aren’t starting.' },
 		{ id: 'pe-2', kind: 'tick_overdue', severity: 'warning', occurredAt: ago(12), active: true, locationId: LOCATION_SHOP, subject: 'segments_hourly', message: 'The segments_hourly schedule should have started a run 12 minutes ago.' },
 		{ id: 'pe-6', kind: 'warehouse_sync_failed', severity: 'warning', occurredAt: ago(95), active: true, locationId: LOCATION_SHOP_STAGING, subject: '_sqlbuild_janitor_events', message: 'Permission denied on _sqlbuild_janitor_events: the catalog connection’s role can’t use schema ARCHIVE, so cleanup history isn’t up to date.' },
 		{ id: 'pe-3', kind: 'heartbeat', severity: 'info', occurredAt: ago(1), active: false, locationId: null, subject: null, message: 'Server heartbeat.' }

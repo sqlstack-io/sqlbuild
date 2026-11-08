@@ -11,6 +11,9 @@ use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole}
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::declarations::models::{JobRecord, TriggerRecord};
+use crate::platform::main::read_person_location_health::read_person_location_health;
+use crate::platform::main::read_person_problems::read_person_problems;
+use crate::platform::models::{LocationHealthObservation, PlatformProblems};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::RunNodeRecord;
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
@@ -158,6 +161,41 @@ pub(crate) async fn snapshots(
             default_role,
         )
         .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/health", operation_id = "readPersonLocationHealth",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = Vec<LocationHealthObservation>, description = "This target's newest health observations and instance check-ins"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn health(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<LocationHealthObservation>>, ApiError> {
+    Ok(Json(
+        read_person_location_health(
+            &store,
+            (&context, principal),
+            (location_id, &target),
+            default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/platform/problems", operation_id = "readPersonPlatformProblems",
+    responses((status = 200, body = PlatformProblems, description = "Live scheduler state, and broken locations and late ticks of targets the person lists"),
+        (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn problems(
+    State(store): State<ControlStore>,
+    Extension(default_role): Extension<DefaultRole>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<PlatformProblems>, ApiError> {
+    Ok(Json(
+        read_person_problems(&store, principal, default_role).await?,
     ))
 }
 

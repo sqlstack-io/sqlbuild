@@ -66,8 +66,17 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             post(crate::api::_helpers::resources::administrators::change),
         )
         .route(
+            "/api/admin/people",
+            get(crate::api::_helpers::resources::administrators::people),
+        )
+        .route(
+            "/api/admin/locations/{location_id}/targets/{target}/roles",
+            get(crate::api::_helpers::resources::administrators::definitions),
+        )
+        .route(
             "/api/admin/roles",
-            post(crate::api::_helpers::resources::administrators::assign),
+            post(crate::api::_helpers::resources::administrators::assign)
+                .get(crate::api::_helpers::resources::administrators::holdings),
         )
         .route(
             "/api/control/runs",
@@ -120,6 +129,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/snapshots",
             get(crate::api::_helpers::resources::person_reads::snapshots),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/health",
+            get(crate::api::_helpers::resources::person_reads::health),
+        )
+        .route(
+            "/api/control/platform/problems",
+            get(crate::api::_helpers::resources::person_reads::problems),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",

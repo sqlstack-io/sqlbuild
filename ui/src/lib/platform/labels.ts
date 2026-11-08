@@ -38,13 +38,13 @@ export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDe
 		if (location.brokenDeployPolicy === 'fallback') return `Deploy failed — running previous version${version != null ? ` ${version}` : ''}`;
 		return 'Deploy failed — scheduled runs wait until a deploy works';
 	}
-	return healthLabel[location.health];
+	return location.health ? healthLabel[location.health] : 'Unknown';
 }
 
 export const eventKindLabel: Record<PlatformEventKind, string> = {
 	tick_overdue: 'Schedule overdue',
 	scheduler_no_leader: 'Scheduler stopped',
-	location_broken: 'Deploy failed',
+	location_broken: 'Location not checking in',
 	launch_failed: 'Couldn’t start runs',
 	connection_test_failed: 'Connection test failed',
 	warehouse_sync_failed: 'Warehouse sync failing',

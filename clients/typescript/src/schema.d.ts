@@ -1,5 +1,37 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/admin/locations/{location_id}/targets/{target}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoleDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/people/{principal_id}": {
         parameters: {
             query?: never;
@@ -23,7 +55,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listRoleHoldings"];
         put?: never;
         post: operations["assignBuiltinRole"];
         delete?: never;
@@ -354,6 +386,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonLocationHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/jobs": {
         parameters: {
             query?: never;
@@ -538,6 +586,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonTicks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/platform/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonPlatformProblems"];
         put?: never;
         post?: never;
         delete?: never;
@@ -978,6 +1042,15 @@ export interface components {
          * @enum {string}
          */
         BatchState: "complete" | "gap" | "replay_required";
+        /** @description Every instance of this location target has missed two check-ins. */
+        BrokenLocation: {
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            target: string;
+        };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
         /** @description Browser cancellation cannot supply an actor, claim or lifecycle transition. */
@@ -1196,6 +1269,14 @@ export interface components {
             schema_fingerprint: string;
             source_event_id: string;
             version_hash: string;
+        };
+        /** @description A role every member of an SSO group holds. */
+        GroupRole: {
+            group_name: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            role_key: string;
+            target?: string | null;
         };
         HeartbeatResponse: {
             cancel_requested: boolean;
@@ -1472,6 +1553,18 @@ export interface components {
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
+        /** @description A running schedule whose next tick is more than 30 seconds late. */
+        OverdueTick: {
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /** Format: date-time */
+            scheduled_for: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -1492,6 +1585,38 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A role assigned to one person, everywhere or on one location and target. */
+        PersonRole: {
+            /** Format: uuid */
+            assignment_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+            role_key: string;
+            target?: string | null;
+        };
+        /** @description A person as administrators see them: how they sign in, their SSO groups and live sessions. */
+        PersonSummary: {
+            /**
+             * Format: int64
+             * @description Unrevoked, unexpired browser and CLI sessions; none while the person is disabled.
+             */
+            active_sessions: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** @description Groups the identity provider reported at the person's last SSO sign-in. */
+            groups: string[];
+            has_password: boolean;
+            /** Format: date-time */
+            last_signed_in_at?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+        };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
             observation: components["schemas"]["CatalogObservation"];
@@ -1504,6 +1629,17 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        /** @description Problems derived from live state when read; nothing here is stored. */
+        PlatformProblems: {
+            broken_locations: components["schemas"]["BrokenLocation"][];
+            overdue_ticks: components["schemas"]["OverdueTick"][];
+            scheduler_leader: boolean;
+            /**
+             * Format: date-time
+             * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
+             */
+            scheduler_lease_expires_at?: string | null;
+        };
         /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
@@ -1580,8 +1716,35 @@ export interface components {
             role: components["schemas"]["RoleKey"];
             target?: string | null;
         };
+        /** @description Who holds which role where: assigned to people here, or mapped to SSO groups in server config. */
+        RoleHoldings: {
+            assignments: components["schemas"]["PersonRole"][];
+            group_roles: components["schemas"]["GroupRole"][];
+        };
         /** @description A built-in role by name, or a custom role a location publishes. */
         RoleKey: components["schemas"]["BuiltinRole"] | string;
+        /** @description A role usable on one location target: built in, or published by the location's project. */
+        RoleOverview: {
+            builtin: boolean;
+            /** @description The project's description; absent for built-in roles. */
+            description?: string | null;
+            /** @description Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants. */
+            grants: components["schemas"]["RoleOverviewGrant"][];
+            /**
+             * Format: int64
+             * @description Active people holding the role here or everywhere, assigned directly or through an SSO group.
+             */
+            holders: number;
+            key: string;
+        };
+        /** @description Node selectors, the actions they grant, and the nodes each selector matched when published. */
+        RoleOverviewGrant: {
+            matched: {
+                [key: string]: string[];
+            };
+            nodes: string[];
+            permissions: components["schemas"]["Action"][];
+        };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -1802,6 +1965,8 @@ export interface components {
         SecurityAuditEvent: {
             action: string;
             actor: string;
+            /** @description The person's name when `actor` is a principal; person reads set it, exports leave it out. */
+            actor_name?: string | null;
             after_json: unknown;
             before_json: unknown;
             /** Format: uuid */
@@ -2168,6 +2333,78 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listRoleDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Built-in roles, then the target's published custom roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOverview"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonSummary"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     changeAdministrator: {
         parameters: {
             query?: never;
@@ -2201,6 +2438,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listRoleHoldings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleHoldings"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             403: {
                 headers: {
@@ -2540,6 +2811,8 @@ export interface operations {
             query?: {
                 /** @description Exclusive storage-order cursor */
                 after?: number;
+                /** @description Exclusive upper cursor; when set, the page is newest first */
+                before?: number;
                 limit?: number;
             };
             header?: never;
@@ -2978,6 +3251,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonLocationHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This target's newest health observations and instance check-ins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationHealthObservation"][];
+                };
             };
             /** @description Session rejected */
             401: {
@@ -3495,6 +3806,33 @@ export interface operations {
             };
             /** @description Trigger not found for a person who may view the whole target */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonPlatformProblems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live scheduler state, and broken locations and late ticks of targets the person lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformProblems"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

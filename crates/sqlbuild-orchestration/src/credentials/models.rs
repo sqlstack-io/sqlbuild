@@ -39,6 +39,72 @@ pub struct SecurityAuditEvent {
     pub scope_json: serde_json::Value,
     pub before_json: serde_json::Value,
     pub after_json: serde_json::Value,
+    /// The person's name when `actor` is a principal; person reads set it, exports leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_name: Option<String>,
+}
+
+/// A person as administrators see them: how they sign in, their SSO groups and live sessions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSummary {
+    pub principal_id: Uuid,
+    pub name: String,
+    pub created_at: DateTime<Utc>,
+    pub disabled_at: Option<DateTime<Utc>>,
+    pub has_password: bool,
+    /// Groups the identity provider reported at the person's last SSO sign-in.
+    pub groups: Vec<String>,
+    /// Unrevoked, unexpired browser and CLI sessions; none while the person is disabled.
+    pub active_sessions: i64,
+    pub last_signed_in_at: Option<DateTime<Utc>>,
+}
+
+/// Who holds which role where: assigned to people here, or mapped to SSO groups in server config.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleHoldings {
+    pub assignments: Vec<PersonRole>,
+    pub group_roles: Vec<GroupRole>,
+}
+
+/// A role usable on one location target: built in, or published by the location's project.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleOverview {
+    pub key: String,
+    pub builtin: bool,
+    /// The project's description; absent for built-in roles.
+    pub description: Option<String>,
+    /// Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants.
+    pub grants: Vec<RoleOverviewGrant>,
+    /// Active people holding the role here or everywhere, assigned directly or through an SSO group.
+    pub holders: u64,
+}
+
+/// Node selectors, the actions they grant, and the nodes each selector matched when published.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleOverviewGrant {
+    pub nodes: Vec<String>,
+    pub permissions: Vec<Action>,
+    pub matched: std::collections::BTreeMap<String, Vec<String>>,
+}
+
+/// A role assigned to one person, everywhere or on one location and target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonRole {
+    pub assignment_id: Uuid,
+    pub principal_id: Uuid,
+    pub name: String,
+    pub role_key: String,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// A role every member of an SSO group holds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct GroupRole {
+    pub group_name: String,
+    pub role_key: String,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
 }
 
 /// Installation configuration: rows past the horizon stay until every sink and retry lookup is done.

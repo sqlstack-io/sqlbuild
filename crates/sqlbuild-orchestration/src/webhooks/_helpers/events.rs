@@ -20,7 +20,8 @@ pub(crate) async fn read_events(
             ))
         }
         WebhookSource::SecurityAudit => {
-            let (transaction, events) = read_audit_events(transaction, (after, 100)).await?;
+            let (transaction, events) =
+                read_audit_events(transaction, ((after, None), 100)).await?;
             Ok((
                 transaction,
                 events

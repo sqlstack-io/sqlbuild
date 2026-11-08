@@ -4,7 +4,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
 
+use crate::api::models::GroupRole;
 use crate::authorization::main::compile_roles::compile_roles;
+use crate::authorization::main::list_role_definitions::list_role_definitions;
+use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{Action, RoleAssignmentRequest, RoleKey};
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, assign, authorize_member, developer_grants, member_listings,
@@ -15,7 +19,10 @@ use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCa
 use crate::declarations::models::TriggerChange;
 use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
+use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{Parameter, TransactionMode};
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
@@ -90,6 +97,88 @@ fn given_published_selector_when_it_matches_more_nodes_then_coverage_grows_on_pu
                 ],
                 "{}: the new role, the dropped view grant and the grown coverage enter the change feed",
                 test_case.description
+            );
+            publish_group_roles(
+                store,
+                &[GroupRole {
+                    group: "support-team".into(),
+                    role: RoleKey::Custom(SUPPORT_ROLE.into()),
+                    location_id: Some(roles.location_id),
+                    target: None,
+                }],
+            )
+            .await
+            .expect("group mapping");
+            let grouped = create_principal(store, &roles.context, "support-lead")
+                .await
+                .expect("group member");
+            for principal in [grouped, roles.member_id] {
+                let transaction = begin(store, TransactionMode::Write)
+                    .await
+                    .expect("group membership");
+                let (transaction, _) = query(
+                    transaction,
+                    "INSERT INTO sqb_person_groups (principal_id,group_name) VALUES ($1,$2)",
+                    vec![
+                        Parameter::Id(principal),
+                        Parameter::Text("support-team".into()),
+                    ],
+                )
+                .await
+                .expect("member of the group");
+                commit(transaction).await.expect("membership committed");
+            }
+            let definitions = list_role_definitions(
+                store,
+                (&roles.context, roles.administrator.identity.principal_id),
+                (roles.location_id, "development"),
+            )
+            .await
+            .expect("role definitions");
+            assert_eq!(
+                definitions
+                    .iter()
+                    .map(|role| (role.key.as_str(), role.builtin, role.holders))
+                    .collect::<Vec<_>>(),
+                [
+                    ("viewer", true, 0),
+                    ("operator", true, 0),
+                    ("developer", true, 0),
+                    ("admin", true, 1),
+                    (SUPPORT_ROLE, false, 2)
+                ],
+                "{}: built-in roles, then the published role, each counting a person once whether assigned directly or through a group",
+                test_case.description
+            );
+            assert_eq!(
+                definitions[0].grants[0].permissions,
+                [Action::View],
+                "a viewer views every node"
+            );
+            let support = &definitions[4];
+            assert_eq!(
+                support.description.as_deref(),
+                Some("Answer order questions")
+            );
+            assert_eq!(
+                support.grants[0].matched,
+                BTreeMap::from([(
+                    "tag:orders".to_owned(),
+                    vec!["customers".to_owned(), "orders".to_owned()]
+                )]),
+                "each selector shows the nodes it matched at the latest publish"
+            );
+            assert!(
+                matches!(
+                    list_role_definitions(
+                        store,
+                        (&roles.context, roles.member_id),
+                        (roles.location_id, "development"),
+                    )
+                    .await,
+                    Err(ControlError::Denied { .. })
+                ),
+                "people without role.assign everywhere cannot read role definitions"
             );
             close_test_store(fixture).await;
         });

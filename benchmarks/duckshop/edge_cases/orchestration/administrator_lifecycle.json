@@ -12,11 +12,11 @@
     {"role": "developer", "allowed": true}
   ],
   "session_roles": [
-    {"role": null, "expected_metadata": 403, "expected_connection": 403, "expected_job": 403, "expected_sql": 403, "expected_prioritised": 403},
-    {"role": "viewer", "expected_metadata": 200, "expected_connection": 403, "expected_job": 403, "expected_sql": 403, "expected_prioritised": 403},
-    {"role": "operator", "expected_metadata": 200, "expected_connection": 403, "expected_job": 200, "expected_sql": 403, "expected_prioritised": 403},
-    {"role": "developer", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200, "expected_prioritised": 403},
-    {"role": "admin", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200, "expected_prioritised": 200}
+    {"role": null, "expected_metadata": 403, "expected_connection": 403, "expected_job": 403, "expected_sql": 403, "expected_prioritised": 403, "expected_admin": 403},
+    {"role": "viewer", "expected_metadata": 200, "expected_connection": 403, "expected_job": 403, "expected_sql": 403, "expected_prioritised": 403, "expected_admin": 403},
+    {"role": "operator", "expected_metadata": 200, "expected_connection": 403, "expected_job": 200, "expected_sql": 403, "expected_prioritised": 403, "expected_admin": 403},
+    {"role": "developer", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200, "expected_prioritised": 403, "expected_admin": 403},
+    {"role": "admin", "expected_metadata": 200, "expected_connection": 200, "expected_job": 200, "expected_sql": 200, "expected_prioritised": 200, "expected_admin": 200}
   ],
   "job_settings": [
     {"full_refresh": false},

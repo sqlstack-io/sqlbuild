@@ -3,11 +3,17 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
 import { toCatalogNodes } from './http-catalog';
+import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
+import { toLocationSummary, warehouseSyncOf } from './http-locations';
+import { toAccount, toRoleAssignments } from './http-people';
+import { toPlatformEvents } from './http-problems';
+import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
+import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
@@ -38,8 +44,20 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckSql',
 	'getCheckEvidence',
 	'listCatalogNodes',
-	'listSnapshotChanges'
+	'listSnapshotChanges',
+	'listAuditEntries',
+	'listAccounts',
+	'listRoleAssignments',
+	'listLocations',
+	'listPlatformEvents',
+	'listRoles',
+	'getRole',
+	'getWarehouseSync'
 ]);
+
+/** The server's largest audit page, and how many the audit log reads before it stops looking. */
+const AUDIT_PAGE = 100;
+const AUDIT_PAGES = 10;
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -256,6 +274,66 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!snapshots.data) throw new ApiError(errorText(snapshots.error, snapshots.response), snapshots.response.status);
 			return toSnapshotChanges(snapshots.data, runs);
 		},
+		/** Newest first, reading at most `AUDIT_PAGES` server pages to find `limit` matching entries. */
+		async listAuditEntries(query: AuditQuery = {}): Promise<AuditEntry[]> {
+			const limit = query.limit ?? 100;
+			const found: AuditEntry[] = [];
+			let before = Number.MAX_SAFE_INTEGER;
+			for (let page = 0; page < AUDIT_PAGES && found.length < limit; page++) {
+				const { data, error, response } = await http.GET('/api/control/audit', { params: { query: { before, limit: AUDIT_PAGE } } });
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				found.push(...data.map(toAuditEntry).filter((entry) => auditMatches(entry, query)));
+				if (data.length < AUDIT_PAGE) break;
+				before = data[data.length - 1].storage_id;
+			}
+			return found.slice(0, limit);
+		},
+		async getWarehouseSync(scope: Scope): Promise<WarehouseSync | null> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return warehouseSyncOf(data);
+		},
+		async listPlatformEvents(): Promise<PlatformEvent[]> {
+			const { data, error, response } = await http.GET('/api/control/platform/problems');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toPlatformEvents(data, Date.now());
+		},
+		/** Each location the person sees, with health only where they may list the whole target. */
+		async listLocations(): Promise<LocationSummary[]> {
+			const { data, error, response } = await http.GET('/api/control/bootstrap');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return Promise.all(
+				toBootstrap(data).locations.map(async (location) => {
+					const { locationId, target } = parseLocationKey(location.id);
+					const path = { location_id: locationId, target };
+					const [health, snapshots] = await Promise.all([
+						http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path } }),
+						http.GET('/api/control/locations/{location_id}/targets/{target}/snapshots', { params: { path, query: { limit: 1 } } })
+					]);
+					if (health.response.status === 401 || snapshots.response.status === 401) onUnauthorized();
+					return toLocationSummary(location, health.data ?? null, snapshots.data?.[0] ?? null, Date.now());
+				})
+			);
+		},
+		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
+		listRoles: async (locationId: string): Promise<RoleDefinition[]> => (await roleOverviews(locationId)).map(toRoleDefinition),
+		async getRole(locationId: string, name: string): Promise<RoleDetail | null> {
+			const [roles, assignments] = await Promise.all([roleOverviews(locationId), implemented.listRoleAssignments()]);
+			const role = roles.find((r) => r.key === name);
+			return role ? roleDetailOf(role, assignments, locationId) : null;
+		},
+		async listRoleAssignments(): Promise<RoleAssignment[]> {
+			const { data, error, response } = await http.GET('/api/admin/roles');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
+			return toRoleAssignments(data, await people().catch(() => []));
+		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
 		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
@@ -330,6 +408,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
 		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function roleOverviews(locationKey: string) {
+		const { locationId, target } = parseLocationKey(locationKey);
+		const { data, error, response } = await http.GET('/api/admin/locations/{location_id}/targets/{target}/roles', { params: { path: { location_id: locationId, target } } });
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function people() {
+		const { data, error, response } = await http.GET('/api/admin/people');
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;

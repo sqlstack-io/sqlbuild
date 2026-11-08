@@ -11,7 +11,8 @@ use crate::credentials::models::{AuditContext, SecurityAuditEvent};
 use crate::store::models::ControlStore;
 
 #[utoipa::path(get, path = "/api/control/audit", operation_id = "readSecurityAudit",
-    params(("after" = Option<i64>, Query, description = "Exclusive storage-order cursor"), ("limit" = Option<u32>, Query)),
+    params(("after" = Option<i64>, Query, description = "Exclusive storage-order cursor"),
+        ("before" = Option<i64>, Query, description = "Exclusive upper cursor; when set, the page is newest first"), ("limit" = Option<u32>, Query)),
     responses((status = 200, body = Vec<SecurityAuditEvent>), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
     security(("session" = []), ("cliSession" = [])))]
@@ -24,7 +25,10 @@ pub(crate) async fn read(
         read_security_audit(
             &store,
             (&context, principal),
-            (options.after.unwrap_or(0), options.limit.unwrap_or(100)),
+            (
+                (options.after.unwrap_or(0), options.before),
+                options.limit.unwrap_or(100),
+            ),
         )
         .await?,
     ))

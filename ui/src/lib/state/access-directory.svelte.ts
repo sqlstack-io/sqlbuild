@@ -11,10 +11,12 @@ export function createAccessDirectory() {
 	const canAssign = () => app.can('role.assign');
 	const accounts = createResource((client) => (app.can('user.manage') || canAssign() ? client.listAccounts().catch(() => [] as Account[]) : Promise.resolve([] as Account[])));
 	const assignments = createResource((client) => (canAssign() ? client.listRoleAssignments() : Promise.resolve([] as RoleAssignment[])));
-	const overview = createResource((client) => (app.can('user.manage') || canAssign() ? client.listAccessOverview() : Promise.resolve([] as AccessOverview[])));
+	const overview = createResource((client) =>
+		(app.can('user.manage') || canAssign()) && client.supports('listAccessOverview') ? client.listAccessOverview() : Promise.resolve([] as AccessOverview[])
+	);
 	const roles = createResource(async (client) => {
 		const map = new Map<string, RoleDefinition[]>();
-		if (!canAssign()) return map;
+		if (!canAssign() || !client.supports('listRoles')) return map;
 		const locations = app.bootstrap?.locations ?? [];
 		const lists = await Promise.all(locations.map((l) => client.listRoles(l.id)));
 		locations.forEach((l, i) => map.set(l.id, lists[i]));
