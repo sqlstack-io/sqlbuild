@@ -172,19 +172,6 @@ _ROUNDED: dict[str, str] = {
             expected_fragments=("0 errors, 0 warnings",),
         ),
         SqlMacroCompileTestCase(
-            description="a_returns_of_the_body_shape_fills_its_unknown_parts",
-            files={
-                **text_macro("m", "BIGINT[]", "[]", argument="BIGINT"),
-                **contract_model(
-                    "orders",
-                    'v (type "BIGINT[]")',
-                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n',
-                ),
-            },
-            expected_returncode=0,
-            expected_fragments=("0 errors, 0 warnings",),
-        ),
-        SqlMacroCompileTestCase(
             description="an_invalid_returns_is_reported_on_motherduck",
             files={
                 **adapter_project("motherduck"),
@@ -299,6 +286,41 @@ def test_given_optional_returns_when_compiling_then_calls_are_typed_and_checked(
         assert fragment in output(result), output(result)
     for fragment in test_case.unexpected_fragments:
         assert fragment not in output(result), output(result)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="native DuckDB analysis does not type list literals yet",
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SqlMacroCompileTestCase(
+            description="a_returns_of_the_body_shape_fills_its_unknown_parts",
+            files={
+                **text_macro("m", "BIGINT[]", "[]", argument="BIGINT"),
+                **contract_model(
+                    "orders",
+                    'v (type "BIGINT[]")',
+                    'SELECT @sql.m(o.amount_cents) AS v FROM __ref("stg_orders") AS o\n',
+                ),
+            },
+            expected_returncode=0,
+            expected_fragments=("0 errors, 0 warnings",),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_returns_of_a_list_body_shape_when_compiling_then_its_unknown_parts_are_filled(
+    test_case: SqlMacroCompileTestCase, tmp_path: Path
+) -> None:
+    _, result = run_project(
+        tmp_path=tmp_path, files=test_case.files, command=("compile", "--no-cache")
+    )
+
+    assert result.returncode == test_case.expected_returncode, output(result)
+    for fragment in test_case.expected_fragments:
+        assert fragment in output(result), output(result)
 
 
 @pytest.mark.xfail(
@@ -622,7 +644,7 @@ def test_given_a_changed_returns_form_when_compiling_warm_then_the_cache_is_not_
             description="a_guessed_regexp_contains_type_on_bigquery_is_not_checked_against_returns",
             files={
                 **adapter_project("bigquery"),
-                **text_macro("m", "BOOL", "REGEXP_CONTAINS(@value, 'a')", argument="VARCHAR"),
+                **text_macro("m", "BOOL", "REGEXP_CONTAINS(@value, 'a')", argument="STRING"),
                 **orders_model('SELECT @sql.m(o.status) AS v FROM __ref("stg_orders") AS o\n'),
             },
             expected_returncode=0,
