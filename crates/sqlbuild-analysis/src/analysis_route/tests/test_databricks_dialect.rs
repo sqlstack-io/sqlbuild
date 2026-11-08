@@ -1,12 +1,12 @@
 use crate::analysis_route::main::native_gap::native_gap;
-use crate::analysis_route::models::{DatabricksDialect, LocatedGap};
+use crate::analysis_route::models::{DatabricksDialect, LocatedGap, TypeMatch};
 use crate::analysis_route::tests::test_types::{
-    NativeGapTestCase, ParseFailureTestCase, PolyglotTypeTestCase,
+    DatabricksTypeTestCase, NativeGapTestCase, NativeTypeMatchTestCase, ParseFailureTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
 use crate::type_system::main::normalize_type::normalize_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 #[test]
 fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has_no_gap() {
@@ -85,80 +85,169 @@ fn given_databricks_model_sql_when_probing_its_parser_then_only_sql_it_reads_who
 }
 
 #[test]
-fn given_a_databricks_type_spelling_when_normalising_then_the_type_is_polyglot_s() {
+fn given_a_databricks_type_spelling_when_normalising_then_its_parser_decides_and_synonyms_meet() {
     let test_cases = [
-        PolyglotTypeTestCase {
-            description: "INTEGER is Polyglot's INT",
+        DatabricksTypeTestCase {
+            description: "INTEGER is INT",
             spelling: "INTEGER",
-            expected_name: "INT",
+            expected_type: Some(("INT", TypeFamily::Integer)),
+            expected_as_polyglot: true,
         },
-        PolyglotTypeTestCase {
-            description: "REAL is Polyglot's FLOAT",
+        DatabricksTypeTestCase {
+            description: "REAL is FLOAT",
             spelling: "real",
-            expected_name: "FLOAT",
+            expected_type: Some(("FLOAT", TypeFamily::Float)),
+            expected_as_polyglot: true,
         },
-        PolyglotTypeTestCase {
-            description: "DOUBLE PRECISION is Polyglot's DOUBLE, whatever the spacing",
-            spelling: "DOUBLE   PRECISION",
-            expected_name: "DOUBLE",
-        },
-        PolyglotTypeTestCase {
+        DatabricksTypeTestCase {
             description: "NUMERIC with arguments is DECIMAL with its precision and scale",
             spelling: "NUMERIC(9, 3)",
-            expected_name: "DECIMAL(9,3)",
+            expected_type: Some(("DECIMAL(9,3)", TypeFamily::Decimal)),
+            expected_as_polyglot: true,
         },
-        PolyglotTypeTestCase {
-            description: "NUMERIC alone is DECIMAL",
-            spelling: "NUMERIC",
-            expected_name: "DECIMAL",
-        },
-        PolyglotTypeTestCase {
-            description: "TIMESTAMP_NTZ is Polyglot's TIMESTAMPNTZ",
-            spelling: "TIMESTAMP_NTZ",
-            expected_name: "TIMESTAMPNTZ",
-        },
-        PolyglotTypeTestCase {
-            description: "TIMESTAMP_LTZ is Polyglot's TIMESTAMPLTZ",
-            spelling: "TIMESTAMP_LTZ",
-            expected_name: "TIMESTAMPLTZ",
-        },
-        PolyglotTypeTestCase {
-            description: "a name Polyglot keeps stays as written",
-            spelling: "LONG",
-            expected_name: "LONG",
-        },
-        PolyglotTypeTestCase {
-            description: "a word holding an alias is not changed inside",
-            spelling: "INTEGERS",
-            expected_name: "INTEGERS",
-        },
-        PolyglotTypeTestCase {
+        DatabricksTypeTestCase {
             description: "a sized string keeps its length",
             spelling: "VARCHAR(10)",
-            expected_name: "VARCHAR(10)",
+            expected_type: Some(("VARCHAR(10)", TypeFamily::String)),
+            expected_as_polyglot: true,
         },
-        PolyglotTypeTestCase {
-            description: "an alias inside an array, whose family ARRAY decides",
-            spelling: "ARRAY<INTEGER>",
-            expected_name: "ARRAY<INT>",
+        DatabricksTypeTestCase {
+            description: "VARCHAR alone is STRING",
+            spelling: "varchar",
+            expected_type: Some(("STRING", TypeFamily::String)),
+            expected_as_polyglot: true,
         },
-        PolyglotTypeTestCase {
-            description: "aliases inside a map and a struct, whose family MAP decides",
+        DatabricksTypeTestCase {
+            description: "TIMESTAMP_NTZ is Polyglot's TIMESTAMPNTZ",
+            spelling: "TIMESTAMP_NTZ",
+            expected_type: Some(("TIMESTAMPNTZ", TypeFamily::Timestamp)),
+            expected_as_polyglot: true,
+        },
+        DatabricksTypeTestCase {
+            description: "a struct field with or without its colon is one type",
+            spelling: "STRUCT<a INT>",
+            expected_type: Some(("STRUCT<A:INT>", TypeFamily::Other)),
+            expected_as_polyglot: true,
+        },
+        DatabricksTypeTestCase {
+            description: "synonyms inside a map and a struct",
             spelling: "MAP<STRING, STRUCT<a: NUMERIC(5,2), b: INTEGER>>",
-            expected_name: "MAP<STRING,STRUCT<A:DECIMAL(5,2),B:INT>>",
+            expected_type: Some((
+                "MAP<STRING,STRUCT<A:DECIMAL(5,2),B:INT>>",
+                TypeFamily::Other,
+            )),
+            expected_as_polyglot: true,
+        },
+        DatabricksTypeTestCase {
+            description: "LONG is BIGINT, where Polyglot keeps LONG",
+            spelling: "LONG",
+            expected_type: Some(("BIGINT", TypeFamily::Integer)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "SHORT is SMALLINT, where Polyglot knows no SHORT",
+            spelling: "SHORT",
+            expected_type: Some(("SMALLINT", TypeFamily::Integer)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "TIMESTAMP_LTZ is TIMESTAMP, where Polyglot keeps TIMESTAMPLTZ",
+            spelling: "TIMESTAMP_LTZ",
+            expected_type: Some(("TIMESTAMP", TypeFamily::Timestamp)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "DECIMAL alone is DECIMAL(10,0)",
+            spelling: "DECIMAL",
+            expected_type: Some(("DECIMAL(10,0)", TypeFamily::Decimal)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "DECIMAL(p) has scale 0",
+            spelling: "DEC(9)",
+            expected_type: Some(("DECIMAL(9,0)", TypeFamily::Decimal)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "a struct field's constraint and comment are not its type",
+            spelling: "STRUCT<a: INT NOT NULL COMMENT 'x'>",
+            expected_type: Some(("STRUCT<A:INT>", TypeFamily::Other)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "a collation is not its type",
+            spelling: "VARCHAR(10) COLLATE UTF8_BINARY",
+            expected_type: Some(("VARCHAR(10)", TypeFamily::String)),
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "an interval keeps its fields",
+            spelling: "INTERVAL YEAR TO MONTH",
+            expected_type: Some(("INTERVALYEARTOMONTH", TypeFamily::Other)),
+            expected_as_polyglot: true,
+        },
+        DatabricksTypeTestCase {
+            description: "DOUBLE PRECISION is not a Databricks spelling",
+            spelling: "DOUBLE PRECISION",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "TEXT is not a Databricks type",
+            spelling: "TEXT",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "BOOL is not a Databricks type",
+            spelling: "BOOL",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "INT64 is not a Databricks type",
+            spelling: "INT64",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "an array is ARRAY<T>, not T[]",
+            spelling: "INTEGER[]",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "a map is MAP<K, V>, not MAP(K, V)",
+            spelling: "MAP(VARCHAR, INTEGER)",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "an empty type",
+            spelling: "  ",
+            expected_type: None,
+            expected_as_polyglot: false,
+        },
+        DatabricksTypeTestCase {
+            description: "text that closes the cast is not a type",
+            spelling: "INT) FROM t WHERE (1",
+            expected_type: None,
+            expected_as_polyglot: false,
         },
     ];
     for test_case in test_cases {
-        let polyglot: NormalizedType = normalize_type(test_case.spelling, "databricks")
-            .expect("Polyglot normalizes every Databricks spelling")
-            .normalized;
         let native: Option<NormalizedType> = DatabricksDialect.normalize_type(test_case.spelling);
+        let polyglot: Option<NormalizedType> = normalize_type(test_case.spelling, "databricks")
+            .ok()
+            .map(|normalization| normalization.normalized);
         assert_eq!(
             (
-                native.as_ref().map(|native| native.normalized_name.as_str()),
-                native.as_ref()
+                native
+                    .as_ref()
+                    .map(|native| (native.normalized_name.as_str(), native.family)),
+                native.is_some() && native == polyglot
             ),
-            (Some(test_case.expected_name), Some(&polyglot)),
+            (test_case.expected_type, test_case.expected_as_polyglot),
             "{}",
             test_case.description
         );
@@ -194,6 +283,77 @@ fn given_sql_databricks_refuses_when_parsing_then_the_gap_says_whether_it_is_a_s
         assert_eq!(
             (gap.syntax, test_case.expected_offset.map(|_| gap.offset)),
             (test_case.expected_syntax, test_case.expected_offset),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_declared_and_an_inferred_databricks_type_when_matching_then_a_length_check_on_string_is_string()
+ {
+    let compared = |same_type: bool| TypeMatch::Compared {
+        same_type,
+        nullable_into_non_null: false,
+    };
+    let test_cases = [
+        NativeTypeMatchTestCase {
+            description: "a VARCHAR(n) column takes the STRING a cast to VARCHAR(n) gives",
+            declared: "VARCHAR(19)",
+            inferred: Some("STRING"),
+            expected_match: compared(true),
+        },
+        NativeTypeMatchTestCase {
+            description: "a CHAR(n) column takes a STRING too",
+            declared: "char(3)",
+            inferred: Some("string"),
+            expected_match: compared(true),
+        },
+        NativeTypeMatchTestCase {
+            description: "a STRING column takes a VARCHAR(n) column, which Databricks reads as STRING",
+            declared: "STRING",
+            inferred: Some("VARCHAR(19)"),
+            expected_match: compared(true),
+        },
+        NativeTypeMatchTestCase {
+            description: "a VARCHAR(n) column does not take an integer",
+            declared: "VARCHAR(19)",
+            inferred: Some("INT"),
+            expected_match: compared(false),
+        },
+        NativeTypeMatchTestCase {
+            description: "synonyms match through the alias fold",
+            declared: "INTEGER",
+            inferred: Some("INT"),
+            expected_match: compared(true),
+        },
+        NativeTypeMatchTestCase {
+            description: "sized strings of other lengths differ",
+            declared: "VARCHAR(19)",
+            inferred: Some("VARCHAR(20)"),
+            expected_match: compared(false),
+        },
+        NativeTypeMatchTestCase {
+            description: "a type Databricks refuses is not compared",
+            declared: "TEXT",
+            inferred: Some("STRING"),
+            expected_match: TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
+        },
+        NativeTypeMatchTestCase {
+            description: "an untyped output is not compared",
+            declared: "VARCHAR(19)",
+            inferred: None,
+            expected_match: TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            DatabricksDialect.type_match(test_case.declared, test_case.inferred, false),
+            test_case.expected_match,
             "{}",
             test_case.description
         );

@@ -2,15 +2,17 @@
 
 use sqlquack_semantics::dialects::constants::DATABRICKS;
 use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_databricks::{Parsed, StrictFailure, parse_strict};
 
 use crate::analysis_route::constants::{
-    DATABRICKS_DIALECT, DATABRICKS_STUB_PREFIX, DATABRICKS_TYPE_ALIASES, UNSCANNED_CONSTRUCT,
+    DATABRICKS_CAST_TYPE_PREFIX, DATABRICKS_DEFAULT_DECIMAL, DATABRICKS_DIALECT,
+    DATABRICKS_STRING_TYPE, DATABRICKS_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };
-use crate::analysis_route::models::{DatabricksDialect, ParserGap};
+use crate::analysis_route::models::{DatabricksDialect, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::{NormalizedType, TypeDialect};
+use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
 
 impl NativeDialect for DatabricksDialect {
     fn name(&self) -> &'static str {
@@ -39,40 +41,148 @@ impl NativeDialect for DatabricksDialect {
     }
 
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        let upper: String = spelling
-            .split_whitespace()
-            .collect::<Vec<&str>>()
-            .join(" ")
-            .to_ascii_uppercase();
-        if upper.is_empty() {
-            return None;
-        }
-        let spelt: String = DATABRICKS_TYPE_ALIASES
-            .iter()
-            .fold(upper, |text, (alias, name)| aliased(&text, alias, name));
+        let spelt: String = canonical(&cast_target(spelling)?)?;
         Some(normalize_text_type(&spelt, Some(TypeDialect::Databricks)))
     }
 
     fn stub_prefix(&self) -> &'static str {
         DATABRICKS_STUB_PREFIX
     }
+
+    fn type_match(
+        &self,
+        declared: &str,
+        inferred: Option<&str>,
+        inferred_nullable: bool,
+    ) -> TypeMatch {
+        let _ = inferred_nullable;
+        match (
+            self.normalize_type(declared),
+            inferred.and_then(|inferred| self.normalize_type(inferred)),
+        ) {
+            (Some(declared), Some(inferred)) => TypeMatch::Compared {
+                same_type: declared == inferred
+                    || overlays_string(&declared, &inferred)
+                    || overlays_string(&inferred, &declared),
+                nullable_into_non_null: false,
+            },
+            _ => TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
+        }
+    }
 }
 
-/// `text` with each whole word `alias` spelt `name`, at any nesting depth.
-fn aliased(text: &str, alias: &str, name: &str) -> String {
-    let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
-    let mut out: String = String::with_capacity(text.len());
-    let mut rest: &str = text;
-    while let Some(at) = rest.find(alias) {
-        let before: Option<char> = rest[..at].chars().next_back().or(out.chars().next_back());
-        let after: Option<char> = rest[at + alias.len()..].chars().next();
-        out.push_str(&rest[..at]);
-        match before.is_some_and(word) || after.is_some_and(word) {
-            true => out.push_str(alias),
-            false => out.push_str(name),
+/// The type `spelling` names when Databricks' parser reads it whole as a cast target.
+fn cast_target(spelling: &str) -> Option<DataType> {
+    let mut depth: usize = 0;
+    for character in spelling.chars() {
+        match character {
+            '(' => depth += 1,
+            ')' => depth = depth.checked_sub(1)?,
+            ';' => return None,
+            _ => {}
         }
-        rest = &rest[at + alias.len()..];
     }
-    out.push_str(rest);
-    out
+    if depth != 0 || spelling.trim().is_empty() {
+        return None;
+    }
+    let parsed: Parsed = parse_strict(&format!("{DATABRICKS_CAST_TYPE_PREFIX}{spelling})")).ok()?;
+    let ([Expression::Select(select)], []) = (parsed.statements.as_slice(), parsed.gaps.as_slice())
+    else {
+        return None;
+    };
+    match (select.expressions.as_slice(), &select.from) {
+        ([Expression::Cast(cast)], None) => Some(cast.to.clone()),
+        _ => None,
+    }
+}
+
+/// One spelling for every way of writing a Databricks type, in Polyglot's names where they agree.
+fn canonical(data_type: &DataType) -> Option<String> {
+    Some(match data_type {
+        DataType::Array { element_type, .. } => format!("ARRAY<{}>", canonical(element_type)?),
+        DataType::Map {
+            key_type,
+            value_type,
+        } => format!("MAP<{}, {}>", canonical(key_type)?, canonical(value_type)?),
+        DataType::Struct { fields, .. } => {
+            let fields: Vec<String> = fields
+                .iter()
+                .map(|field| {
+                    Some(format!(
+                        "{}: {}",
+                        field_name(&field.name),
+                        canonical(&field.data_type)?
+                    ))
+                })
+                .collect::<Option<_>>()?;
+            format!("STRUCT<{}>", fields.join(", "))
+        }
+        DataType::Char {
+            length: Some(length),
+        } => format!("CHAR({length})"),
+        DataType::VarChar {
+            length: Some(length),
+            ..
+        } => format!("VARCHAR({length})"),
+        DataType::String { .. } | DataType::Char { .. } | DataType::VarChar { .. } => {
+            DATABRICKS_STRING_TYPE.to_owned()
+        }
+        DataType::Decimal { precision, scale } => {
+            let (default_precision, default_scale) = DATABRICKS_DEFAULT_DECIMAL;
+            format!(
+                "DECIMAL({},{})",
+                precision.unwrap_or(default_precision),
+                scale.unwrap_or(default_scale)
+            )
+        }
+        DataType::Timestamp { timezone: true, .. } => "TIMESTAMP".to_owned(),
+        DataType::Timestamp { .. } => "TIMESTAMPNTZ".to_owned(),
+        DataType::Time { .. } => "TIME".to_owned(),
+        DataType::Interval { unit, to } => match (unit, to) {
+            (Some(unit), Some(to)) => format!("INTERVAL {unit} TO {to}"),
+            (Some(unit), None) => format!("INTERVAL {unit}"),
+            _ => "INTERVAL".to_owned(),
+        },
+        DataType::Boolean => "BOOLEAN".to_owned(),
+        DataType::TinyInt { .. } => "TINYINT".to_owned(),
+        DataType::SmallInt { .. } => "SMALLINT".to_owned(),
+        DataType::Int { .. } => "INT".to_owned(),
+        DataType::BigInt { .. } => "BIGINT".to_owned(),
+        DataType::Float { .. } => "FLOAT".to_owned(),
+        DataType::Double { .. } => "DOUBLE".to_owned(),
+        DataType::Date => "DATE".to_owned(),
+        DataType::Binary { .. } => "BINARY".to_owned(),
+        DataType::Geography { srid, .. } => spatial("GEOGRAPHY", *srid),
+        DataType::Geometry { srid, .. } => spatial("GEOMETRY", *srid),
+        DataType::Custom { name } => name.to_ascii_uppercase(),
+        _ => return None,
+    })
+}
+
+/// A STRUCT field's name, backquoted unless it is one word.
+fn field_name(name: &str) -> String {
+    match name
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        true => name.to_owned(),
+        false => format!("`{}`", name.replace('`', "``")),
+    }
+}
+
+/// A GEOGRAPHY or GEOMETRY type with its SRID, or `ANY`.
+fn spatial(base: &str, srid: Option<u32>) -> String {
+    match srid {
+        Some(srid) => format!("{base}({srid})"),
+        None => format!("{base}(ANY)"),
+    }
+}
+
+/// Whether `sized` is CHAR(n) or VARCHAR(n), a length check on STRING, and `other` is STRING.
+fn overlays_string(sized: &NormalizedType, other: &NormalizedType) -> bool {
+    sized.family == TypeFamily::String
+        && sized.length.is_some()
+        && other.normalized_name == DATABRICKS_STRING_TYPE
 }

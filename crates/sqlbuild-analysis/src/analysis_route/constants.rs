@@ -12,15 +12,12 @@ pub(crate) const DATABRICKS_DIALECT: &str = "databricks";
 pub(crate) const DATABRICKS_STUB_PREFIX: &str = "__sqlbuild_";
 /// The construct of a byte the native scanner reads as no token, blank or comment.
 pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
-/// Databricks type words Polyglot spells another way, so the text fallback matches it.
-pub(crate) const DATABRICKS_TYPE_ALIASES: &[(&str, &str)] = &[
-    ("INTEGER", "INT"),
-    ("REAL", "FLOAT"),
-    ("DOUBLE PRECISION", "DOUBLE"),
-    ("NUMERIC", "DECIMAL"),
-    ("TIMESTAMP_LTZ", "TIMESTAMPLTZ"),
-    ("TIMESTAMP_NTZ", "TIMESTAMPNTZ"),
-];
+/// The query a type spelling completes, with `)`, so Databricks' parser reads it as a cast target.
+pub(crate) const DATABRICKS_CAST_TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
+/// DECIMAL's precision and scale where Databricks' spelling leaves them out.
+pub(crate) const DATABRICKS_DEFAULT_DECIMAL: (u32, u32) = (10, 0);
+/// The type Databricks gives every string expression, a cast to CHAR(n) or VARCHAR(n) included.
+pub(crate) const DATABRICKS_STRING_TYPE: &str = "STRING";
 /// The dialect a project with no analysis dialect is named by.
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 /// The gap of SQL that holds more than one statement.

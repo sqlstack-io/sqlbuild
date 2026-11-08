@@ -7,7 +7,7 @@ use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -249,11 +249,13 @@ pub(super) struct NativeLineageTestCase {
     pub(super) expected_lines: &'static [&'static str],
 }
 
-pub(super) struct PolyglotTypeTestCase {
+pub(super) struct DatabricksTypeTestCase {
     pub(super) description: &'static str,
     pub(super) spelling: &'static str,
-    /// Polyglot's name for the spelling, which the native type must equal whole.
-    pub(super) expected_name: &'static str,
+    /// The type's name and family, or `None` for a spelling Databricks' parser refuses.
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+    /// Whether the whole type is the one Polyglot gives the spelling.
+    pub(super) expected_as_polyglot: bool,
 }
 
 pub(super) struct ParseFailureTestCase {
