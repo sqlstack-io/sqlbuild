@@ -1,3 +1,4 @@
+pub mod aligned_offset;
 pub mod analysis_route;
 pub mod clickhouse_type_match;
 pub mod fast_lineage;

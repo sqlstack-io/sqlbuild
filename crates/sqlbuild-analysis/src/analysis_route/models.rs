@@ -5,6 +5,7 @@ use sqlquack_semantics::lineage::types::LineageSchema;
 
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::models::{ColumnFact, LineageRow};
+use crate::compiled_project::models::TextPosition;
 use crate::semantic_validation::models::DiagnosticRow;
 
 /// The engine that analyses a dialect's SQL.
@@ -38,6 +39,28 @@ pub struct LocatedGap {
     pub line: usize,
     pub column: usize,
     pub syntax: bool,
+    /// The gap's character offset in the SQL as checked, before normalisation, when its text holds.
+    pub source_offset: Option<usize>,
+}
+
+/// Where P026 places a gap.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GapPosition {
+    /// In the file the site names.
+    File(TextPosition),
+    /// In the site's own SQL statement, such as a hook's.
+    Statement(TextPosition),
+    /// Only in the analysed SQL, at the gap's own line and column.
+    Analysed,
+}
+
+/// The SQL a gap stops: the hook it belongs to, if any, its file, and where the gap is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GapSite<'a> {
+    /// Such as `post_hooks[0] sql("record_refresh")`; none for the model's query.
+    pub label: Option<&'a str>,
+    pub path: &'a str,
+    pub position: GapPosition,
 }
 
 /// How an inferred column type meets its declared type: the type itself, then its nullability.

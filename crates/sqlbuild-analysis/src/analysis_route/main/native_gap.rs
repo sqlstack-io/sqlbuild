@@ -17,5 +17,5 @@ pub fn native_gap(
     Ok(dialect
         .read_whole(&analysed)
         .err()
-        .map(|gap| located(&analysed, gap)))
+        .map(|gap| located(&analysed, gap, Some(&check.sql))))
 }

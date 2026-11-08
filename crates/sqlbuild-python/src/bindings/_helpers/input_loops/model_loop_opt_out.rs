@@ -4,15 +4,18 @@ use std::path::Path;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
+use sqlbuild_analysis::analysis_route::main::aligned_offset::aligned_offset;
 use sqlbuild_analysis::analysis_route::main::native_gap::native_gap;
 use sqlbuild_analysis::analysis_route::main::skipped_analysis::skipped_analysis;
 use sqlbuild_analysis::analysis_route::main::unavailable_analysis::unavailable_analysis;
-use sqlbuild_analysis::analysis_route::models::{AnalysisRoute, LocatedGap};
+use sqlbuild_analysis::analysis_route::models::{AnalysisRoute, GapPosition, GapSite, LocatedGap};
 use sqlbuild_analysis::analysis_route::types::NativeDialect;
 use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxMode};
+use sqlbuild_analysis::compiled_project::main::authored_model_offset::authored_model_offset;
 use sqlbuild_analysis::compiled_project::main::opt_out_position::opt_out_position;
+use sqlbuild_analysis::compiled_project::main::text_position::text_position;
 use sqlbuild_analysis::compiled_project::models::ModelLoopSettings;
-use sqlbuild_analysis::compiled_project::models::TextPosition;
+use sqlbuild_analysis::compiled_project::models::{SplicedSpan, TextPosition};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
 
 use crate::bindings::_helpers::input_loops::model_loop::{
@@ -20,6 +23,7 @@ use crate::bindings::_helpers::input_loops::model_loop::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_inputs::{HOOK_KEYS, present};
 use crate::bindings::_helpers::project_assembly::resources::{syntax_error_message, syntax_valid};
+use crate::bindings::_helpers::project_assembly::syntax_validation::sql_entry_label;
 use crate::bindings::_helpers::records::construct::{new_helped_error, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
@@ -42,6 +46,7 @@ const LINE_FIELD: &str = "line";
 const COLUMN_FIELD: &str = "column";
 const HELP_ARGUMENT: &str = "help";
 const MODEL_RESOURCE: &str = "model";
+const RELATIVE_PATH_ATTRIBUTE: &str = "relative_path";
 
 /// Where the opt-out was authored, or a check the attachment still answers.
 pub(crate) enum OptOut<'py> {
@@ -58,6 +63,32 @@ pub(crate) struct OptOutModel<'a, 'py> {
     pub(crate) query_sql: &'a str,
     pub(crate) relative_path: &'a str,
     pub(crate) contents: &'a str,
+    /// How `query_sql` maps back to the model file; none when interpolation rewrote the query.
+    pub(crate) authored: Option<AuthoredQuery<'a>>,
+}
+
+/// The query as the model file holds it, as macros expanded it, and the passes between them.
+#[derive(Clone, Copy)]
+pub(crate) struct AuthoredQuery<'a> {
+    pub(crate) query: &'a str,
+    pub(crate) macro_sql: &'a str,
+    /// The declaration and macro expansion passes, in that order.
+    pub(crate) passes: &'a [Vec<SplicedSpan>],
+}
+
+/// One statement a native parser must read, with the site P026 names it by.
+struct SiteCheck {
+    check: SyntaxCheck,
+    /// The hook, such as `post_hooks[0] sql("record_refresh")`; none for the model's query.
+    label: Option<String>,
+    path: String,
+}
+
+/// A hook value being walked: its key, its file and the label its statements are named by.
+struct HookSite<'a> {
+    hook_name: &'a str,
+    path: String,
+    label: Option<String>,
 }
 
 /// Whether the opt-out is rejected, and where it was authored.
@@ -74,9 +105,13 @@ pub(crate) fn rejected_opt_out<'py>(
     {
         return Ok(OptOut::Accepted);
     }
-    let checks: Vec<SyntaxCheck> = model_checks(context, model)?;
+    let checks: Vec<SiteCheck> = model_checks(context, model)?;
     let readable: bool = match model_loop.route {
-        AnalysisRoute::Legacy => syntax_valid(model.config.py(), GENERIC_DIALECT, &checks)?,
+        AnalysisRoute::Legacy => {
+            let statements: Vec<SyntaxCheck> =
+                checks.iter().map(|site| site.check.clone()).collect();
+            syntax_valid(model.config.py(), GENERIC_DIALECT, &statements)?
+        }
         AnalysisRoute::Native(dialect) => first_gap(dialect, context, &checks)?.is_none(),
         AnalysisRoute::Unavailable => false,
     };
@@ -94,17 +129,47 @@ pub(crate) fn skip_unreadable(
     context: &LoopContext<'_, '_>,
     model: &OptOutModel<'_, '_>,
 ) -> PyResult<bool> {
-    let checks: Vec<SyntaxCheck> = model_checks(context, model)?;
-    let Some(gap) = first_gap(dialect, context, &checks)? else {
+    let checks: Vec<SiteCheck> = model_checks(context, model)?;
+    let Some((check, gap)) = first_gap(dialect, context, &checks)? else {
         return Ok(true);
+    };
+    let site: GapSite<'_> = GapSite {
+        label: check.label.as_deref(),
+        path: &check.path,
+        position: gap_position(model, check, &gap),
     };
     report_skip(
         settings,
         context,
         model,
-        skipped_analysis(model.name, dialect.name(), &gap),
+        skipped_analysis(model.name, dialect.name(), &gap, &site),
     )?;
     Ok(false)
+}
+
+/// A hook's gap in its statement; the query's in the model file, when its text maps back there.
+fn gap_position(model: &OptOutModel<'_, '_>, check: &SiteCheck, gap: &LocatedGap) -> GapPosition {
+    let Some(offset) = gap.source_offset else {
+        return GapPosition::Analysed;
+    };
+    if check.label.is_some() {
+        return GapPosition::Statement(text_position(&check.check.sql, offset));
+    }
+    model
+        .authored
+        .and_then(|authored| {
+            let query: usize = aligned_offset(&check.check.sql, offset, model.query_sql)?;
+            let expanded: usize = aligned_offset(model.query_sql, query, authored.macro_sql)?;
+            authored_model_offset(
+                model.contents,
+                authored.query,
+                (authored.macro_sql, expanded),
+                authored.passes,
+            )
+        })
+        .map_or(GapPosition::Analysed, |file| {
+            GapPosition::File(text_position(model.contents, file))
+        })
 }
 
 /// P026 for a model whose dialect no native parser reads; it warns, or raises, and is not analysed.
@@ -173,34 +238,47 @@ fn report_skip(
 fn model_checks(
     context: &LoopContext<'_, '_>,
     model: &OptOutModel<'_, '_>,
-) -> PyResult<Vec<SyntaxCheck>> {
-    let mut statements: Vec<String> = vec![analysis_sql(context, model)?];
+) -> PyResult<Vec<SiteCheck>> {
+    let mut statements: Vec<(Option<String>, String, String)> = vec![(
+        None,
+        model.file_path.to_owned(),
+        analysis_sql(context, model)?,
+    )];
     for key in HOOK_KEYS {
         if let Some(hooks) = model.values.get_item(key)? {
-            statements.extend(hook_statements(context, &hooks)?);
+            let site: HookSite<'_> = HookSite {
+                hook_name: key,
+                path: model.file_path.to_owned(),
+                label: None,
+            };
+            statements.extend(hook_statements(context, &hooks, site)?);
         }
     }
     let placeholders: Vec<(String, String)> = placeholders(model.values)?;
     Ok(statements
         .into_iter()
-        .map(|sql| SyntaxCheck {
-            sql,
-            placeholders: placeholders.clone(),
+        .map(|(label, path, sql)| SiteCheck {
+            check: SyntaxCheck {
+                sql,
+                placeholders: placeholders.clone(),
+            },
+            label,
+            path,
         })
         .collect())
 }
 
-/// The native parser's first gap across `checks`; none when it reads each one whole.
-fn first_gap(
+/// The native parser's first gap across `checks`, with its check; none when it reads each whole.
+fn first_gap<'a>(
     dialect: &dyn NativeDialect,
     context: &LoopContext<'_, '_>,
-    checks: &[SyntaxCheck],
-) -> PyResult<Option<LocatedGap>> {
-    for check in checks {
-        if let Some(gap) = native_gap(dialect, check)
+    checks: &'a [SiteCheck],
+) -> PyResult<Option<(&'a SiteCheck, LocatedGap)>> {
+    for site in checks {
+        if let Some(gap) = native_gap(dialect, &site.check)
             .map_err(|message| compile_error(context.classes, &message, None))?
         {
-            return Ok(Some(gap));
+            return Ok(Some((site, gap)));
         }
     }
     Ok(None)
@@ -262,21 +340,53 @@ fn opted_out(values: &Bound<'_, PyDict>) -> PyResult<bool> {
     Ok(false)
 }
 
-/// `hook_sql_statements`: strings, SQL hook statements, and nested lists or tuples, in order.
+/// `hook_sql_statements` as `(label, file, SQL)`, labelled as `validate_hook_sql_syntax` names them.
 fn hook_statements(
     context: &LoopContext<'_, '_>,
     value: &Bound<'_, PyAny>,
-) -> PyResult<Vec<String>> {
+    site: HookSite<'_>,
+) -> PyResult<Vec<(Option<String>, String, String)>> {
+    let sql_hook_entry: &Bound<'_, PyAny> = &context.classes.sql_hook_entry;
     if let Ok(text) = value.downcast::<PyString>() {
-        return Ok(vec![text.extract()?]);
+        let label: String = site.label.unwrap_or_else(|| site.hook_name.to_owned());
+        return Ok(vec![(Some(label), site.path, text.extract()?)]);
     }
-    if value.is_instance(&context.classes.sql_hook_entry)? {
-        return hook_statements(context, &native_field(value, STATEMENT_ATTRIBUTE)?);
+    if value.is_instance(sql_hook_entry)? {
+        let label: String = match site.label {
+            Some(label) => label,
+            None => sql_entry_label(site.hook_name, value)?,
+        };
+        let relative_path: Bound<'_, PyAny> = native_field(value, RELATIVE_PATH_ATTRIBUTE)?;
+        let path: String = if relative_path.is_truthy()? {
+            relative_path.str()?.to_string()
+        } else {
+            site.path
+        };
+        let inner: HookSite<'_> = HookSite {
+            hook_name: site.hook_name,
+            path,
+            label: Some(label),
+        };
+        return hook_statements(context, &native_field(value, STATEMENT_ATTRIBUTE)?, inner);
     }
-    let mut statements: Vec<String> = Vec::new();
+    let mut statements: Vec<(Option<String>, String, String)> = Vec::new();
     if value.is_instance_of::<PyList>() || value.is_instance_of::<PyTuple>() {
-        for item in value.try_iter()? {
-            statements.extend(hook_statements(context, &item?)?);
+        for (index, item) in value.try_iter()?.enumerate() {
+            let item: Bound<'_, PyAny> = item?;
+            let prefix: String = format!("{}[{index}]", site.hook_name);
+            let label: Option<String> = if item.is_instance(sql_hook_entry)? {
+                Some(sql_entry_label(&prefix, &item)?)
+            } else if item.is_instance_of::<PyString>() {
+                Some(format!("{prefix} inline_sql(\"...\")"))
+            } else {
+                None
+            };
+            let inner: HookSite<'_> = HookSite {
+                hook_name: site.hook_name,
+                path: site.path.clone(),
+                label,
+            };
+            statements.extend(hook_statements(context, &item, inner)?);
         }
     }
     Ok(statements)
