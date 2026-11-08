@@ -1732,7 +1732,7 @@ export interface components {
             grants: components["schemas"]["RoleOverviewGrant"][];
             /**
              * Format: int64
-             * @description Active people assigned the role here or everywhere; SSO group members are not counted.
+             * @description Active people holding the role here or everywhere, assigned directly or through an SSO group.
              */
             holders: number;
             key: string;

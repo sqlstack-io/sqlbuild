@@ -75,7 +75,7 @@ pub struct RoleOverview {
     pub description: Option<String>,
     /// Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants.
     pub grants: Vec<RoleOverviewGrant>,
-    /// Active people assigned the role here or everywhere; SSO group members are not counted.
+    /// Active people holding the role here or everywhere, assigned directly or through an SSO group.
     pub holders: u64,
 }
 

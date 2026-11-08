@@ -332,8 +332,8 @@ export type RoleDefinition = {
 	grants: RoleGrant[];
 	/** People holding the role somewhere. */
 	holders: number;
-	/** Nodes the role's selectors started matching in the last 7 days. */
-	recentlyMatched: number;
+	/** Nodes the role's selectors started matching in the last 7 days; null when unknown. */
+	recentlyMatched: number | null;
 };
 
 /** What one selector of a role matches in the current snapshot. */
@@ -349,8 +349,8 @@ export type RoleDetail = RoleDefinition & {
 	baseGrants: RoleGrant[];
 	selectors: SelectorMatch[];
 	assignments: RoleAssignment[];
-	/** The role's definition as written, read-only. */
-	definition: string;
+	/** The role's definition as published, read-only; null for built-in roles. */
+	definition: string | null;
 };
 
 /** `locationId: null` applies everywhere. */

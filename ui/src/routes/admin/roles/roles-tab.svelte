@@ -12,8 +12,8 @@
 
 <div class="px-6 pt-5 pb-8">
 	<p class="lede">
-		Roles in <b>{app.location?.name}</b>. Each custom role is a built-in role plus additions on chosen nodes. Roles are defined in code (the project's policy file or the server
-		config) and are read-only here.
+		Roles in <b>{app.location?.name}</b>. Built-in roles act on every node; custom roles add actions on chosen nodes. Custom roles come from the project's roles file and are
+		read-only here.
 	</p>
 	<table class="sb-list framed">
 		<thead>

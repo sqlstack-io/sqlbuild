@@ -35,10 +35,15 @@ pub(crate) async fn read_role_facts(
     .await?;
     let (transaction, holders) = query(
         transaction,
-        "SELECT a.role_key, COUNT(DISTINCT a.principal_id) AS holders FROM sqb_role_assignments a \
-         JOIN sqb_principals p ON p.principal_id=a.principal_id WHERE p.disabled_at IS NULL \
-         AND (a.location_id IS NULL OR a.location_id=$1) AND (a.target IS NULL OR a.target=$2) \
-         GROUP BY a.role_key",
+        "SELECT h.role_key, COUNT(DISTINCT h.principal_id) AS holders FROM (\
+            SELECT a.principal_id, a.role_key FROM sqb_role_assignments a \
+            WHERE (a.location_id IS NULL OR a.location_id=$1) AND (a.target IS NULL OR a.target=$2) \
+            UNION ALL \
+            SELECT m.principal_id, g.role_key FROM sqb_group_roles g \
+            JOIN sqb_person_groups m ON m.group_name=g.group_name \
+            WHERE (g.location_id IS NULL OR g.location_id=$1) AND (g.target IS NULL OR g.target=$2)\
+         ) h JOIN sqb_principals p ON p.principal_id=h.principal_id WHERE p.disabled_at IS NULL \
+         GROUP BY h.role_key",
         scope.clone(),
     )
     .await?;

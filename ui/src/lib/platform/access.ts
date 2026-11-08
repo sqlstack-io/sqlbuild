@@ -23,11 +23,11 @@ export function roleSummary(role: Pick<RoleDefinition, 'source' | 'extends' | 'g
 		return `${n} ${n === 1 ? 'action' : 'actions'} on everything`;
 	}
 	const n = additionCount(role);
-	const base = role.extends ? BUILT_IN_LABEL[role.extends] : 'Nothing';
-	return `${base} + ${n} ${n === 1 ? 'addition' : 'additions'}`;
+	const additions = `${n} ${n === 1 ? 'addition' : 'additions'}`;
+	return role.extends ? `${BUILT_IN_LABEL[role.extends]} + ${additions}` : `${additions} on chosen nodes`;
 }
 
-export const roleSourceLabel: Record<RoleSource, string> = { built_in: 'Built-in', server_config: 'Server config', project: 'Policy file' };
+export const roleSourceLabel: Record<RoleSource, string> = { built_in: 'Built-in', server_config: 'Server config', project: 'Project' };
 
 export const assignmentSourceLabel: Record<AssignmentSource, string> = { manual: 'Manual', sso: 'SSO group', policy: 'Server config', built_in: 'Default for everyone' };
 
