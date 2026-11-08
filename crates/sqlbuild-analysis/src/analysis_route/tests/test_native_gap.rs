@@ -20,6 +20,11 @@ fn given_a_dialect_when_routing_analysis_then_a_native_module_or_nothing_analyse
             expected_module: Some("postgres"),
         },
         RouteTestCase {
+            description: "postgresql, the name compile assembly gives postgres",
+            dialect: Some("postgresql"),
+            expected_module: Some("postgres"),
+        },
+        RouteTestCase {
             description: "snowflake",
             dialect: Some("snowflake"),
             expected_module: Some("snowflake"),

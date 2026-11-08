@@ -14,6 +14,7 @@ pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (DATABRICKS_DIALECT, &DatabricksDialect),
     (DUCKDB_DIALECT, &DuckDbDialect),
     (POSTGRES_DIALECT, &PostgresDialect),
+    (POSTGRESQL_DIALECT, &PostgresDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
     (SQLITE_DIALECT, &SqliteDialect),
     (TSQL_DIALECT, &TsqlDialect),
@@ -28,6 +29,8 @@ pub(crate) const DATABRICKS_DIALECT: &str = "databricks";
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 /// PostgreSQL's analysis dialect name.
 pub(crate) const POSTGRES_DIALECT: &str = "postgres";
+/// The name compile assembly gives PostgreSQL's analysis dialect, which routes the same way.
+pub(crate) const POSTGRESQL_DIALECT: &str = "postgresql";
 /// Snowflake's analysis dialect name.
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// SQLite's analysis dialect name.
