@@ -114,6 +114,8 @@ pub(crate) struct SqlTestPatterns {
     table_function: Regex,
     pub(crate) dbt_reference: Regex,
     pub(crate) test_reference: Regex,
+    /// Any relation marker call: `__name("x")`, or `__name("a", "b")` as `__dbt_ref` writes it.
+    pub(crate) relation_marker: Regex,
     pub(crate) lexical: LexicalSyntax,
     pub(crate) identifier: Regex,
 }
@@ -130,6 +132,9 @@ impl SqlTestPatterns {
                 r#"(?i)__dbt_ref\(\s*\"([^\"]+)\"\s*(?:,\s*\"([^\"]+)\"\s*)?\)"#,
             )?,
             test_reference: compile_pattern(r#"(?i)__(?:ref|source|seed|dbt_ref|table_fn)\("#)?,
+            relation_marker: compile_pattern(
+                r#"(?i)\b(__[a-z_]+)\(\s*"([^"]+)"\s*(?:,\s*"([^"]+)"\s*)?\)"#,
+            )?,
             lexical,
             identifier: compile_pattern(r"[A-Za-z_][A-Za-z0-9_$]*")?,
         })
@@ -1394,7 +1399,7 @@ fn analyze_and_resolve_sql(
 ) -> Result<Option<AnalysisResolvedSql>, String> {
     let Some(template) = analysis_template(
         request.query_sql,
-        (request.parser, &request.patterns.lexical),
+        (request.parser, request.patterns),
         request.templates,
     )?
     else {
@@ -1501,7 +1506,7 @@ fn analyze_and_resolve_sql(
 
 pub(crate) fn analysis_template(
     query_sql: &str,
-    reader: (&dyn NativeDialect, &LexicalSyntax),
+    reader: (&dyn NativeDialect, &SqlTestPatterns),
     templates: &AnalysisTemplateCache,
 ) -> Result<Option<AnalysisTemplate>, String> {
     cached_analysis_template(query_sql, templates, || {
@@ -1509,13 +1514,12 @@ pub(crate) fn analysis_template(
     })
 }
 
-/// The template the project's parser reads from `query_sql`, its relation markers as plain names,
-/// if it reads one statement whole.
+/// The template the parser reads whole from `query_sql`, its relation markers read as names.
 pub(crate) fn parsed_analysis_template(
     query_sql: &str,
-    (parser, syntax): (&dyn NativeDialect, &LexicalSyntax),
+    (parser, patterns): (&dyn NativeDialect, &SqlTestPatterns),
 ) -> Option<AnalysisTemplate> {
-    let (named_sql, named) = markers_as_names(query_sql, syntax);
+    let (named_sql, named) = markers_as_names(query_sql, patterns);
     let mut statements = match parser.parse(&named_sql) {
         Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
         _ => return None,

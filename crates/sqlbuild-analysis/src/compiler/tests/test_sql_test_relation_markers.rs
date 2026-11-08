@@ -1,6 +1,6 @@
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
-use crate::compiler::_helpers::sql_tests::planning::parsed_analysis_template;
+use crate::compiler::_helpers::sql_tests::planning::{SqlTestPatterns, parsed_analysis_template};
 use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::tests::relation_markers_helpers::{
     owned_marker_calls, relation_marker_oracle_mismatches, relation_markers_and_json_oracle,
@@ -183,13 +183,14 @@ fn given_marked_model_sql_when_reading_the_planning_template_then_every_parser_s
             ],
         },
     ];
-    let syntax: LexicalSyntax = LexicalSyntax {
+    let patterns: SqlTestPatterns = SqlTestPatterns::new(LexicalSyntax {
         line_comment_prefixes: vec!["--".to_owned()],
         ..LexicalSyntax::default()
-    };
+    })
+    .expect("the SQL-test patterns compile");
     for test_case in test_cases {
         let parser = sql_test_parser(Some(test_case.dialect)).expect(test_case.description);
-        let template = parsed_analysis_template(test_case.sql, (parser, &syntax))
+        let template = parsed_analysis_template(test_case.sql, (parser, &patterns))
             .expect(test_case.description);
         assert_eq!(
             Some(template.marker_calls.to_vec()),

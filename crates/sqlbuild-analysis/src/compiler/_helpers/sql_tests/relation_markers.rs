@@ -1,25 +1,15 @@
 //! Relation marker calls in a serialized pre-order walk of a parsed statement's relations.
 
-use std::sync::LazyLock;
-
-use regex::Regex;
-use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use sqlquack_syntax::expressions::queries::models::{From, Join};
 use sqlquack_syntax::{Expression, ExpressionWalk};
 
 use crate::compiler::_helpers::sql_tests::markers::ProtectedRanges;
-use crate::compiler::_helpers::sql_tests::planning::DBT_REF_FUNCTION;
+use crate::compiler::_helpers::sql_tests::planning::{DBT_REF_FUNCTION, SqlTestPatterns};
 
 pub(crate) type MarkerCall = (String, String);
 
 /// The name a relation marker call stands as while the planning template is parsed.
 const MARKER_NAME_PREFIX: &str = "__sqlbuild_relation_";
-
-/// A relation marker call: `__name("x")`, or `__name("a", "b")` as `__dbt_ref` writes it.
-static MARKER_CALL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)\b(__[a-z_]+)\(\s*"([^"]+)"\s*(?:,\s*"([^"]+)"\s*)?\)"#)
-        .expect("the marker call pattern compiles")
-});
 
 /// Return marker calls in node order, where children follow declared field order.
 pub(crate) fn relation_marker_calls(expression: &Expression) -> Vec<MarkerCall> {
@@ -33,14 +23,13 @@ pub(crate) fn named_marker_calls(expression: &Expression, named: &[MarkerCall]) 
     })
 }
 
-/// `sql` with each relation marker call outside comments and quoted text as one plain name, and
-/// the calls by name; every dialect reads a name in FROM, while Snowflake refuses a bare call.
-pub(crate) fn markers_as_names(sql: &str, syntax: &LexicalSyntax) -> (String, Vec<MarkerCall>) {
-    let mut protected: ProtectedRanges<'_> = ProtectedRanges::new(syntax, sql);
+/// `sql` with each relation marker call in code as a plain name, which Snowflake reads in FROM.
+pub(crate) fn markers_as_names(sql: &str, patterns: &SqlTestPatterns) -> (String, Vec<MarkerCall>) {
+    let mut protected: ProtectedRanges<'_> = ProtectedRanges::new(&patterns.lexical, sql);
     let mut named: String = String::with_capacity(sql.len());
     let mut calls: Vec<MarkerCall> = Vec::new();
     let mut cursor: usize = 0;
-    for captures in MARKER_CALL.captures_iter(sql) {
+    for captures in patterns.relation_marker.captures_iter(sql) {
         let (Some(full), Some(function), Some(first)) =
             (captures.get(0), captures.get(1), captures.get(2))
         else {
@@ -129,8 +118,10 @@ fn marker(expression: &Expression, named: &[MarkerCall]) -> Option<MarkerCall> {
             .name
             .name
             .strip_prefix(MARKER_NAME_PREFIX)
-            .and_then(|index| index.parse::<usize>().ok())
-            .and_then(|index| named.get(index).cloned()),
+            .and_then(|index| match index.parse::<usize>() {
+                Ok(index) => named.get(index).cloned(),
+                Err(_) => None,
+            }),
         _ => None,
     }
 }

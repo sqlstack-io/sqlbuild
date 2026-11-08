@@ -161,8 +161,7 @@ pub(crate) fn declarations_masked(sql: &str) -> String {
     masked
 }
 
-/// `sql` with each placeholder slot read in a `USING` list as one word of the same length, since
-/// `USING` names bare columns: `__sqlbuild_parameter__r.keys` reads as `__sqlbuild_parameter__r_keys`.
+/// `sql` with each slot read in a `USING` list as one bare word: `r.keys` reads as `r_keys`.
 pub(crate) fn using_reads_joined(sql: &str) -> String {
     let Ok(scanned) = tokens(sql) else {
         return sql.to_owned();
@@ -192,8 +191,7 @@ pub(crate) fn using_reads_joined(sql: &str) -> String {
     joined
 }
 
-/// `sql` with each placeholder right after `IN` as a parenthesised list of the same length, as a
-/// collection expands: `IN __sqlbuild_parameter__c` reads as `IN(_sqlbuild_parameter__c)`.
+/// `sql` with each placeholder after `IN` as a same-length list, as a collection expands.
 pub(crate) fn in_lists_parenthesised(sql: &str) -> String {
     let Ok(scanned) = tokens(sql) else {
         return sql.to_owned();
