@@ -4,6 +4,8 @@ use polyglot_sql::{ComplexityGuardOptions, Dialect, Expression, ParseOptions};
 use serde_json::{Map, Value, json};
 use sqlbuild_core::text::main::python_casefold::python_casefold;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::relation_names::constants::{
     CATALOG_KEY, CREATE_TABLE_KEY, CTE_ALIAS_KEY, CTE_LIST_KEY, GENERIC_DIALECT,
     MAX_FUNCTION_CALL_DEPTH, NAME_KEY, QUALIFIER_SEPARATOR, SCHEMA_KEY, TABLE_KEYS, TEMPORARY_KEY,
@@ -19,14 +21,12 @@ pub(crate) fn extracted_relations(
     let dialect: &str = dialect
         .filter(|name| !name.is_empty())
         .unwrap_or(GENERIC_DIALECT);
-    let Some(statements) = parsed_statements(sql, dialect)? else {
+    let Some(trees) = statement_trees(sql, dialect)? else {
         return Ok(None);
     };
     let mut extracted: ExtractedRelations = ExtractedRelations::default();
-    for statement in &statements {
-        let tree: Value = serde_json::to_value(statement)
-            .map_err(|error| RelationNamesFailure::Internal(error.to_string()))?;
-        let nodes: Vec<&Map<String, Value>> = walked(&tree);
+    for tree in &trees {
+        let nodes: Vec<&Map<String, Value>> = walked(tree);
         let cte_names: Vec<String> = nodes.iter().flat_map(|node| cte_names(node)).collect();
         extracted
             .temporary
@@ -43,6 +43,35 @@ pub(crate) fn extracted_relations(
         }
     }
     Ok(Some(extracted))
+}
+
+/// Each statement as a tree: SQLQuack's where native, with any gap or error None; else Polyglot's.
+fn statement_trees(sql: &str, dialect: &str) -> Result<Option<Vec<Value>>, RelationNamesFailure> {
+    let internal = |error: serde_json::Error| RelationNamesFailure::Internal(error.to_string());
+    if let AnalysisRoute::Native(native) = analysis_route(Some(dialect)) {
+        if sql.trim().is_empty() {
+            return Ok(Some(Vec::new()));
+        }
+        return match native.parse(sql) {
+            Ok(parsed) if parsed.gaps.is_empty() => parsed
+                .statements
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<Vec<Value>, _>>()
+                .map(Some)
+                .map_err(internal),
+            _ => Ok(None),
+        };
+    }
+    let Some(statements) = parsed_statements(sql, dialect)? else {
+        return Ok(None);
+    };
+    statements
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<Value>, _>>()
+        .map(Some)
+        .map_err(internal)
 }
 
 /// The wheel's guarded `parse`: Ok(None) is the `PolyglotError` Python catches.

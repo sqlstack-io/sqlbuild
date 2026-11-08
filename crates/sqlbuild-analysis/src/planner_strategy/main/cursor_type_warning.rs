@@ -11,7 +11,7 @@ fn cursor_type_name(cursor_type: CursorType) -> &'static str {
     }
 }
 
-/// An error (with SQL analysis) or warning when the warehouse type is the other cursor type, and any Polyglot parse error that left it unclassified.
+/// An error (with SQL analysis) or warning when the warehouse type is the other cursor type, and any parse error that left it unclassified.
 pub fn cursor_type_warning(
     check: &CursorTypeCheck,
 ) -> (Option<WarningRow>, Option<TypeParseFailure>) {

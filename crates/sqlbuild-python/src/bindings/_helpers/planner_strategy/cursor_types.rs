@@ -19,7 +19,7 @@ use crate::bindings::_helpers::records::ids::RecordId;
 
 const PLANNER_LOGGER: &str = "sqlbuild.planner";
 
-/// Log the Polyglot parse error that left a warehouse type unclassified.
+/// Log the parse error that left a warehouse type unclassified.
 fn log_parse_failure(py: Python<'_>, failure: &TypeParseFailure) -> PyResult<()> {
     let text = |value: &str| PyString::new(py, value).into_any();
     call_with(

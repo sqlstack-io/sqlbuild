@@ -72,10 +72,10 @@ pub const INTEGER_TYPE_NAMES: [&str; 17] = [
 ];
 /// Decimal type names whose zero-scale form is an integer cursor.
 pub const DECIMAL_TYPE_NAMES: [&str; 3] = ["DECIMAL", "NUMERIC", "NUMBER"];
-/// The type Polyglot reports for a type it does not know.
-pub const POLYGLOT_CUSTOM_TYPE_NAME: &str = "CUSTOM";
-/// The dialect cursor type classification parses unknown types with.
-pub const GENERIC_DIALECT: &str = "generic";
+/// The type the parser reports for a type it does not know.
+pub const CUSTOM_TYPE_NAME: &str = "CUSTOM";
+/// The parser cursor type classification reads an unknown warehouse type with.
+pub(crate) const TYPE_PARSE_DIALECT: sqlquack_syntax::Dialect = sqlquack_syntax::Dialect::DuckDB;
 /// Error code of an authored cursor input column its input does not expose.
 pub const CURSOR_INPUT_COLUMN_ERROR_CODE: &str = "S302";
 /// Incremental strategies whose microbatches replay one batch by default.

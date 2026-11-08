@@ -24,6 +24,8 @@ pub(crate) const OPAQUE_TUPLE_FIELDS: &[&str] = &[
 ];
 pub(crate) const HAVING_MAX_KEY: &str = "having_max";
 pub(crate) const WITH_KEY: &str = "with";
+/// A set operation's first branch.
+pub(crate) const SET_OPERATION_LEFT: &str = "left";
 pub(crate) const TABLE_KEY: &str = "table";
 pub(crate) const NUMBER_LITERAL: &str = "number";
 
@@ -49,3 +51,5 @@ pub(crate) const POLICY_FAIL: &str = "fail";
 pub(crate) const MODEL_DONE: &str = "done";
 pub(crate) const MODEL_RENAMED: &str = "renamed";
 pub(crate) const MODEL_CONFLICT: &str = "conflict";
+/// Marks a native dialect's normalized SQL, its canonical tree, so it never equals Polyglot's SQL text.
+pub(crate) const NATIVE_TREE_PREFIX: &str = "sqlquack-tree:";
