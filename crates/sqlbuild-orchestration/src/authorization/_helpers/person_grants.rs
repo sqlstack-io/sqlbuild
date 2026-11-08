@@ -12,7 +12,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 
-const ACTIONS: [Action; 14] = [
+const ACTIONS: [Action; 15] = [
     Action::View,
     Action::ViewSql,
     Action::ViewEvidence,
@@ -20,6 +20,7 @@ const ACTIONS: [Action; 14] = [
     Action::RunCancel,
     Action::RunRerun,
     Action::RunRewriteHistory,
+    Action::RunPrioritise,
     Action::TriggerToggle,
     Action::SensorResetCursor,
     Action::RunAdhoc,

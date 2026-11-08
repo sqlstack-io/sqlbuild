@@ -186,6 +186,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
             let mut last_request = Value::Null;
             let mut listed_person_runs = 0;
             let mut launched_person_runs = 0;
+            let mut prioritised_runs: Vec<Value> = Vec::new();
             let mut listed_seed_runs = 0;
             for role_case in roles {
                 for role in role_case.role.iter().copied() {
@@ -260,7 +261,10 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             ("parent_run_id", Value::Null),
                             ("trigger_name", Value::Null),
                             ("rerun_of_run_id", Value::Null),
-                            ("priority", json!(0)),
+                            (
+                                "priority",
+                                json!(i64::from(prioritised_runs.contains(&launched["run_id"]))),
+                            ),
                             ("rewrite_history", json!(false)),
                             ("cancel_requested_at", Value::Null),
                         ] {
@@ -421,6 +425,24 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         role_case.expected_job
                     );
                     launched_person_runs += usize::from(role_case.expected_job == 200);
+                    let urgent = json!({"run_id":Uuid::now_v7(), "location_id":location, "target":"development", "job_key":"orders", "reason":"Refresh orders first", "priority":1});
+                    assert_eq!(
+                        request(
+                            &provider.client,
+                            session,
+                            (Method::POST, "/api/control/runs"),
+                            (&urgent, &session.csrf)
+                        )
+                        .await
+                        .status()
+                        .as_u16(),
+                        role_case.expected_prioritised,
+                        "a priority above 0 needs run.prioritise"
+                    );
+                    let accepted = usize::from(role_case.expected_prioritised == 200);
+                    launched_person_runs += accepted;
+                    prioritised_runs
+                        .extend(std::iter::repeat_n(urgent["run_id"].clone(), accepted));
                     for (endpoint, request_body) in
                         [(&path[..], &body), ("/api/control/runs", &job)]
                     {
@@ -466,6 +488,8 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                 }
                 expected_work += usize::from(role_case.expected_connection == 200) * sessions.len();
                 expected_runs += usize::from(role_case.expected_job == 200) * sessions.len();
+                expected_runs +=
+                    usize::from(role_case.expected_prioritised == 200) * sessions.len();
                 assert_eq!(
                     queue_counts(store).await,
                     json!({"work":expected_work,"runs":expected_runs,"claims":0})

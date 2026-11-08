@@ -24,6 +24,7 @@ export const PERMISSIONS: Record<Capability, PermissionInfo> = {
 		description: 'Rebuild tables from scratch or reprocess earlier periods, replacing data already built.',
 		risk: 'changes_data'
 	},
+	'run.prioritise': { label: 'Put runs ahead of the queue', description: 'Start or rerun a run with a priority above 0, so it is claimed before waiting runs.', risk: 'operate' },
 	'trigger.toggle': { label: 'Pause and resume schedules and sensors', description: 'Stop or restart automatic runs.', risk: 'operate' },
 	'sensor.reset_cursor': { label: 'Reset where a sensor is up to', description: 'Move a sensor’s position so it looks at events again.', risk: 'operate' },
 	'run.adhoc': { label: 'Build any selection of nodes', description: 'Start an ad-hoc run of nodes outside a declared job, writing to the warehouse.', risk: 'changes_data' },

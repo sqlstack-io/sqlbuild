@@ -113,6 +113,7 @@ const PLAIN: Record<Capability, string> = {
 	'run.cancel': 'cancel runs',
 	'run.rerun': 'rerun runs',
 	'run.rewrite_history': 'full refresh or reprocess past data',
+	'run.prioritise': 'run ahead of the queue',
 	'trigger.toggle': 'pause and resume schedules and sensors',
 	'sensor.reset_cursor': 'reset where a sensor is up to',
 	'run.adhoc': 'build any selection of nodes',
