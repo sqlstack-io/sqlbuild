@@ -11,7 +11,7 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import type { AuditOutcome } from '$lib/api';
 	import { checkHref, personHref } from '$lib/platform/access';
-	import { AUDIT_ACTIONS, auditActionLabel } from '$lib/platform/permission-catalog';
+	import { auditActionLabel } from '$lib/platform/permission-catalog';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { formatAssignmentScope } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
@@ -30,8 +30,11 @@
 	const everyone = createResource((client) => (app.can('audit.view') ? client.listAuditEntries({ limit: 500 }) : Promise.resolve([])));
 
 	const actors = $derived([...new Set((everyone.data ?? []).map((e) => e.actor.name))].sort());
+	const actions = $derived([...new Set((everyone.data ?? []).map((e) => e.action))].sort());
 	const rows = $derived(entries.data ?? []);
 	const locations = $derived(app.bootstrap?.locations ?? []);
+	// The person page and the access checker both read people.
+	const linksPeople = $derived(app.client.supports('listAccounts'));
 </script>
 
 <AppTopbar title="Audit log">
@@ -55,7 +58,7 @@
 		</select>
 		<select class="field" bind:value={action} aria-label="Action">
 			<option value="">Any action</option>
-			{#each AUDIT_ACTIONS as a (a)}<option value={a}>{auditActionLabel(a)} ({a})</option>{/each}
+			{#each actions as a (a)}<option value={a}>{auditActionLabel(a)} ({a})</option>{/each}
 		</select>
 		<SegmentedFilter
 			bind:value={outcome}
@@ -90,31 +93,31 @@
 					<tr>
 						<td><RelativeTime value={formatAgo(e.at, app.now)} exact={formatStamp(e.at)} /></td>
 						<td>
-							{#if e.actor.kind === 'user'}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
+							{#if e.actor.kind === 'user' && linksPeople}<a class="link" href={personHref(e.actor)}>{e.actor.name}</a>{:else}{e.actor.name}{/if}
 							<div class="cell-desc">{e.ip}</div>
 						</td>
 						<td>
 							<span title={e.action}>{auditActionLabel(e.action)}</span>
 							{#if e.evidenceRead}<span class="evidence" title="They looked at stored sample or failing rows (evidence)"><EyeIcon size={12} /> read sample rows</span>{/if}
 						</td>
-						<td class="muted">
+						<td class="muted where">
 							{formatAssignmentScope(e.scope, locations)}
-							{#if e.scope.subject}<div class="cell-desc"><code>{e.scope.subject}</code></div>{/if}
+							{#if e.scope.subject}<div class="cell-desc clip" title={e.scope.subject}><code>{e.scope.subject}</code></div>{/if}
 						</td>
 						<td>
 							<StatusLabel tone={e.outcome === 'denied' ? 'var(--sb-error)' : 'var(--sb-success)'} label={e.outcome === 'denied' ? 'Denied' : 'Allowed'} />
 							{#if e.decisionId}
 								<div class="decision">
-									<code title="Decision ID, as shown in the error message">{e.decisionId}</code>
+									<code class="clip" title="Decision ID {e.decisionId}, as shown in the error message">{e.decisionId}</code>
 									<CopyButton value={e.decisionId} label="Copy decision ID" />
-									<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>
+									{#if linksPeople}<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>{/if}
 								</div>
 							{/if}
 						</td>
 						<td class="muted">{e.grantingRole ?? '—'}</td>
 						<td class="detail">
 							{e.summary}
-							<div class="cell-desc" title="Request {e.requestId}">
+							<div class="cell-desc clip" title="Request {e.requestId}">
 								{#if e.before !== null || e.after !== null}<code>{e.before ?? '∅'} → {e.after ?? '∅'}</code> ·{/if}
 								<code>{e.requestId}</code>
 							</div>
@@ -172,7 +175,21 @@
 		font-size: 11.5px;
 	}
 	.detail {
-		max-width: 420px;
+		max-width: 320px;
+	}
+	.where .clip {
+		max-width: 200px;
+	}
+	.decision .clip {
+		max-width: 110px;
+	}
+	.detail .clip {
+		max-width: 300px;
+	}
+	.clip {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.decision {
 		display: flex;

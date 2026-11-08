@@ -3,11 +3,13 @@ import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
 import { toCatalogNodes } from './http-catalog';
+import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
+import type { AuditEntry, AuditQuery } from './types/platform';
 import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
@@ -38,8 +40,13 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckSql',
 	'getCheckEvidence',
 	'listCatalogNodes',
-	'listSnapshotChanges'
+	'listSnapshotChanges',
+	'listAuditEntries'
 ]);
+
+/** The server's largest audit page, and how many the audit log reads before it stops looking. */
+const AUDIT_PAGE = 100;
+const AUDIT_PAGES = 10;
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -255,6 +262,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (snapshots.response.status === 401) onUnauthorized();
 			if (!snapshots.data) throw new ApiError(errorText(snapshots.error, snapshots.response), snapshots.response.status);
 			return toSnapshotChanges(snapshots.data, runs);
+		},
+		/** Newest first, reading at most `AUDIT_PAGES` server pages to find `limit` matching entries. */
+		async listAuditEntries(query: AuditQuery = {}): Promise<AuditEntry[]> {
+			const limit = query.limit ?? 100;
+			const found: AuditEntry[] = [];
+			let before = Number.MAX_SAFE_INTEGER;
+			for (let page = 0; page < AUDIT_PAGES && found.length < limit; page++) {
+				const { data, error, response } = await http.GET('/api/control/audit', { params: { query: { before, limit: AUDIT_PAGE } } });
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				found.push(...data.map(toAuditEntry).filter((entry) => auditMatches(entry, query)));
+				if (data.length < AUDIT_PAGE) break;
+				before = data[data.length - 1].storage_id;
+			}
+			return found.slice(0, limit);
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),

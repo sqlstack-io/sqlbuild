@@ -72,13 +72,32 @@ export function requiresText(action: Capability): string {
 	return `Requires “${PERMISSIONS[action].label}” (${action})`;
 }
 
-const AUDIT_ONLY: Record<Exclude<AuditEntry['action'], Capability>, string> = {
-	'session.login': 'Signed in'
+const AUDIT_ONLY: Record<string, string> = {
+	'session.login': 'Signed in',
+	'admin.granted': 'Changed administrators',
+	'authorization.denied': 'Denied',
+	'cli.login.started': 'Started CLI sign-in',
+	'cli.login.decided': 'Decided CLI sign-in',
+	'cli.login.exchanged': 'Completed CLI sign-in',
+	'evidence.read': 'Read sample rows',
+	'job.run_requested': 'Requested a job run',
+	'location.created': 'Created location',
+	'oidc.flow.created': 'Started SSO sign-in',
+	'oidc.authenticated': 'Signed in with SSO',
+	'password.changed': 'Changed password',
+	'principal.created': 'Added person',
+	'role.assigned': 'Changed role',
+	'run.cancel_requested': 'Requested cancel',
+	'run.rerun_requested': 'Requested rerun',
+	'session.created': 'Signed in',
+	'session.revoked': 'Signed out',
+	'sql.read': 'Read SQL',
+	'token.issued': 'Issued token',
+	'token.revoked': 'Revoked token',
+	'trigger.changed': 'Changed trigger'
 };
 
 /** Plain name of an audited action, including the audit-only ones. */
-export function auditActionLabel(action: AuditEntry['action']): string {
-	return action in PERMISSIONS ? PERMISSIONS[action as Capability].label : AUDIT_ONLY[action as keyof typeof AUDIT_ONLY];
+export function auditActionLabel(action: string): string {
+	return action in PERMISSIONS ? PERMISSIONS[action as Capability].label : (AUDIT_ONLY[action] ?? action);
 }
-
-export const AUDIT_ACTIONS: AuditEntry['action'][] = [...CAPABILITIES, 'session.login'];

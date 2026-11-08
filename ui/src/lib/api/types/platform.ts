@@ -395,7 +395,8 @@ export type AuditEntry = {
 	id: string;
 	at: Iso;
 	actor: Principal;
-	action: Capability | 'session.login';
+	/** A capability, or a recorded event such as `token.issued`; a denial carries the refused capability. */
+	action: string;
 	outcome: AuditOutcome;
 	scope: AssignmentScope & { subject: string | null };
 	/** Role that granted the action, or for denials null. */
