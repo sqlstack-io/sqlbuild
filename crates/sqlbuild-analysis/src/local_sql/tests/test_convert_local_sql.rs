@@ -1,4 +1,5 @@
 use crate::local_sql::main::convert_local_sql::convert_local_sql;
+use crate::local_sql::tests::helpers::columns;
 use crate::local_sql::tests::test_types::LocalSqlTestCase;
 
 const SCHEMA: &str = r#"{"__SQB_LOCAL__SOURCE__ORDERS": [["ID", "NUMBER(38,0)"], ["TOTAL", "NUMBER(10,2)"], ["PLACED_AT", "TIMESTAMP_NTZ(9)"], ["SHIPPED_AT", "TIMESTAMP_LTZ(9)"]]}"#;
@@ -61,11 +62,4 @@ fn given_captured_snowflake_sql_when_converting_then_matches_the_command_line_de
             );
         }
     }
-}
-
-fn columns(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
-    pairs
-        .iter()
-        .map(|(name, data_type)| ((*name).to_owned(), (*data_type).to_owned()))
-        .collect()
 }

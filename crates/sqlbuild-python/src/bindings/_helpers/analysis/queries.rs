@@ -33,7 +33,7 @@ fn convert_local_scenario_sql(
     sql: &str,
     schema_json: &str,
     name: &str,
-) -> PyResult<sqlbuild_analysis::local_sql::models::LocalSqlParts> {
+) -> PyResult<sqlbuild_analysis::local_sql::types::LocalSqlParts> {
     py.compiler_detach(|| {
         sqlbuild_analysis::local_sql::main::convert_local_sql::convert_local_sql(
             sql,

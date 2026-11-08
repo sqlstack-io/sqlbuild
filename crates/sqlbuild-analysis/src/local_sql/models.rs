@@ -1,7 +1,6 @@
 //! What converting one local scenario statement produced.
 
-/// The DuckDB SQL or None, the result columns, and the refusal text, as the Python binding returns them.
-pub type LocalSqlParts = (Option<String>, Vec<(String, String)>, String);
+use crate::local_sql::types::LocalSqlParts;
 
 /// One statement as DuckDB SQL with its result columns, or SQLQuack's reasons for refusing it.
 #[derive(Clone, Debug, PartialEq, Eq)]
