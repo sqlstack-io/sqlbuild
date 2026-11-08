@@ -19,6 +19,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use futures_util::{StreamExt, stream};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -36,6 +37,8 @@ use crate::store::tests::store_test_types::Backend;
 /// More than one due-trigger page of requesting triggers keeps every crash point reachable.
 const FAULT_TRIGGERS: usize = 400;
 const FAULT_BACKLOG_MINUTES: i64 = 1;
+/// Recovery must bring every trigger to the latest due time within this many minutes.
+const FAULT_CATCH_UP_MINUTES: i64 = 5;
 
 /// Calendar fixtures stay inside the tick-retention horizon: day 0 is midnight three days ago.
 pub(crate) fn calendar_time(day: i64) -> DateTime<Utc> {
@@ -618,21 +621,28 @@ pub(crate) async fn fault_run(
             .expect("recovery")
             .0;
     }
+    // Catch-up ticks only the latest missed time, so a trigger first evaluated after the next
+    // minute begins ticks that minute instead; each trigger must reach the latest due time.
     let settled = Utc::now();
-    for _ in 0..FAULT_TRIGGERS.div_ceil(100) {
-        survivor = scheduler_cycle(&second, survivor)
+    let latest = settled
+        .duration_trunc(TimeDelta::minutes(1))
+        .expect("minute");
+    let deadline = settled + TimeDelta::minutes(FAULT_CATCH_UP_MINUTES);
+    let recovering = &second;
+    stream::unfold(survivor, |survivor| async move {
+        let survivor = scheduler_cycle(recovering, survivor)
             .await
             .expect("final recovery")
             .0;
-    }
+        Some((triggers_behind(recovering, latest).await, survivor))
+    })
+    .take_while(|behind| std::future::ready(*behind > 0 && Utc::now() < deadline))
+    .for_each(|_| std::future::ready(()))
+    .await;
     let first = started
         .duration_trunc(TimeDelta::minutes(1))
         .expect("minute")
         + TimeDelta::minutes(1);
-    let expected: BTreeSet<DateTime<Utc>> = (0..)
-        .map(|minutes| first + TimeDelta::minutes(minutes))
-        .take_while(|time| *time <= settled)
-        .collect();
     let mut ticks: Vec<TickRecord> = Vec::new();
     for trigger in &trigger_ids {
         let trigger_ticks = list_ticks(store, *trigger, 1000).await.expect("ticks");
@@ -641,11 +651,8 @@ pub(crate) async fn fault_run(
             .map(|tick| tick.scheduled_for)
             .collect();
         anomalies.duplicate_ticks += trigger_ticks.len() - times.len();
-        anomalies.missing_latest_ticks += usize::from(
-            expected
-                .last()
-                .is_some_and(|latest| !times.contains(latest)),
-        );
+        anomalies.missing_latest_ticks +=
+            usize::from(times.last().is_none_or(|time| *time < latest));
         anomalies.off_schedule_ticks += times
             .iter()
             .filter(|time| **time < first || time.second() != 0 || time.nanosecond() != 0)
@@ -683,18 +690,38 @@ pub(crate) async fn fault_run(
     let requested =
         usize::try_from(rows[0]["requested"].as_i64().expect("count")).expect("nonnegative count");
     anomalies.request_event_mismatch = requested.abs_diff(requesting.len());
+    // A second tick for a time the trigger already ticked must be refused.
+    let ticked = ticks
+        .iter()
+        .find(|tick| tick.trigger_id == trigger_id)
+        .expect("the first trigger ticked")
+        .scheduled_for;
     let transaction = begin(store, TransactionMode::Write)
         .await
         .expect("duplicate");
     let duplicate = query(transaction,
         "INSERT INTO sqb_ticks (tick_id, trigger_id, scheduled_for, evaluated_at, epoch, outcome, run_id, covered_by_run_id) \
          VALUES ($1,$2,$3,$3,1,'covered',NULL,NULL)",
-        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(*expected.last().expect("a due time"))]).await;
+        vec![Parameter::Id(Uuid::now_v7()), Parameter::Id(trigger_id), Parameter::Time(ticked)]).await;
     anomalies.accepted_duplicate_ticks = usize::from(duplicate.is_ok());
     counts.insert("ticks", ticks.len());
     close_store(second).await;
     close_test_store(fixture).await;
     Some((anomalies, counts, point))
+}
+
+/// Count triggers whose last tick precedes `latest`.
+async fn triggers_behind(store: &ControlStore, latest: DateTime<Utc>) -> i64 {
+    let transaction = begin(store, TransactionMode::Read).await.expect("progress");
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT COUNT(*) AS behind FROM sqb_trigger_state WHERE last_tick_for IS NULL OR last_tick_for<$1",
+        vec![Parameter::Time(latest)],
+    )
+    .await
+    .expect("trigger progress");
+    commit(transaction).await.expect("read progress");
+    rows[0]["behind"].as_i64().expect("count")
 }
 
 /// Run one real scheduler loop until `deadline`, then stop it and return the trigger's ticks.
