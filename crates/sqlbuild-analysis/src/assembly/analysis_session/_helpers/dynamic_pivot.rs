@@ -7,6 +7,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlquack_syntax::{CallMode, Dialect, Expression, ExpressionWalk, ParseOptions};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
@@ -14,15 +15,19 @@ use crate::assembly::analysis_session::_helpers::dict_walk::{
     payload, relation_name, render_type, truthy, upper,
 };
 use crate::assembly::analysis_session::constants::{
-    ALIAS_AST_KIND, CAST_AST_KIND, DUCKDB_DIALECT, DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT,
-    PIVOT_AST_KIND, PIVOT_MAX_AST_DEPTH, QUERY_AST_KINDS, SELECT_AST_KIND,
-    SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT, SUPPORTED_PIVOT_DIALECTS,
-    TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    ALIAS_AST_KIND, CAST_AST_KIND, COLUMN_AST_KIND, DEPENDENCY_FUNCTION_NAMES, DUCKDB_DIALECT,
+    DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT, PIVOT_AST_KIND, PIVOT_MAX_AST_DEPTH,
+    QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT,
+    SUPPORTED_PIVOT_DIALECTS, TABLE_AST_KIND, TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY,
+    UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::models::{
     ColumnFact, ContractProof, DynamicFamily, PivotModel, PivotOutcome, PivotTables,
 };
 use crate::assembly::analysis_session::types::Shapes;
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
+use crate::relation_markers::main::markers_as_names::markers_as_names;
+use crate::relation_markers::types::MarkerCall;
 use sqlbuild_core::constants::CTE_AST_KIND;
 
 /// What an internal native failure of a pivot proof names.
@@ -117,15 +122,16 @@ pub(crate) fn pivot_outcome(
     .map_err(|reason| native_failure(PIVOT_CONTEXT, &reason))
 }
 
-/// The one statement of `sql` as SQLQuack's tagged JSON tree, or why it does not parse.
+/// The one statement of `sql` as SQLQuack's tagged JSON tree, marker relations as their names.
 fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
+    let (named, calls) = markers_as_names(sql, &dialect_lexical_syntax(dialect))?;
     let dialect: Dialect = if dialect == SNOWFLAKE_DIALECT {
         Dialect::Snowflake
     } else {
         Dialect::DuckDB
     };
     let parsed = sqlquack_syntax::parse_statements_with(
-        sql,
+        &named,
         dialect,
         &ParseOptions::default(),
         CallMode::Faithful,
@@ -147,9 +153,48 @@ fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
             PIVOT_MAX_AST_DEPTH + 1
         )));
     }
-    serde_json::to_value(statement)
-        .map(Ok)
-        .map_err(|error| error.to_string())
+    let mut root: Value = serde_json::to_value(statement).map_err(|error| error.to_string())?;
+    name_marker_tables(&mut root, &calls);
+    Ok(Ok(root))
+}
+
+/// Each `__ref`, `__source` or `__seed` marker, a table or column node, renamed to the relation its call names.
+fn name_marker_tables(root: &mut Value, calls: &[MarkerCall]) {
+    let mut stack: Vec<&mut Value> = vec![root];
+    while let Some(node) = stack.pop() {
+        match node {
+            Value::Object(object) => {
+                for kind in [TABLE_AST_KIND, COLUMN_AST_KIND] {
+                    if let Some(Value::Object(relation)) = object.get_mut(kind) {
+                        rename_marker(relation.get_mut("name"), calls);
+                    }
+                }
+                stack.extend(object.values_mut());
+            }
+            Value::Array(items) => stack.extend(items.iter_mut()),
+            _ => {}
+        }
+    }
+}
+
+/// The marker name in `name`, a plain string or an identifier object, replaced by its call's relation.
+fn rename_marker(name: Option<&mut Value>, calls: &[MarkerCall]) {
+    let text: Option<&mut Value> = match name {
+        Some(Value::Object(identifier)) => identifier.get_mut("name"),
+        other => other,
+    };
+    let Some(Value::String(text)) = text else {
+        return;
+    };
+    let call: Option<&MarkerCall> = text
+        .strip_prefix(MARKER_NAME_PREFIX)
+        .and_then(|index| index.parse::<usize>().ok())
+        .and_then(|index| calls.get(index));
+    if let Some((function, relation)) = call
+        && DEPENDENCY_FUNCTION_NAMES.contains(&function.as_str())
+    {
+        *text = relation.clone();
+    }
 }
 
 /// Whether `statement` nests more than `limit` levels, walked iteratively so depth cannot overflow.
