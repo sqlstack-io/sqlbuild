@@ -180,6 +180,7 @@ E2E_DUCKDB_CLI_DATA_PATHS := \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_fixture_columns.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_variant.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_lambda.py \
+	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_conversion.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_local_escaped_quotes.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_snapshot_staleness.py \
 	tests/e2e/src/sqlbuild/cli/commands/main/scenario/test_unmocked_inputs.py
