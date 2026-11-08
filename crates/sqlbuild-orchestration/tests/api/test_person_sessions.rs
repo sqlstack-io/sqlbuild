@@ -321,6 +321,8 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             "{read_path}"
                         );
                     }
+                    let granted = usize::from(role_case.expected_admin == StatusCode::OK.as_u16());
+                    let mut admin_reads = Vec::new();
                     for admin_read in ["/api/admin/people", "/api/admin/roles"] {
                         let listed = request(
                             &provider.client,
@@ -334,51 +336,50 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                             role_case.expected_admin,
                             "{admin_read}"
                         );
-                        let listed: Value = listed.json().await.expect("admin read");
-                        if role_case.expected_admin != StatusCode::OK.as_u16() {
-                            continue;
-                        }
-                        let entries = listed
-                            .as_array()
-                            .or(listed["assignments"].as_array())
-                            .expect("listed entries");
-                        let own = entries
-                            .iter()
-                            .find(|entry| entry["principal_id"] == json!(person))
-                            .expect("the person is listed");
-                        let mut keys: Vec<&str> = own
+                        admin_reads.push(listed.json::<Value>().await.expect("admin read"));
+                    }
+                    let own: Vec<&Value> = admin_reads[0]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|entry| entry["principal_id"] == json!(person))
+                        .collect();
+                    assert_eq!(own.len(), granted, "an administrator lists the person");
+                    for entry in own {
+                        let mut keys: Vec<&str> = entry
                             .as_object()
-                            .expect("entry")
+                            .expect("person")
                             .keys()
                             .map(String::as_str)
                             .collect();
                         keys.sort_unstable();
-                        if listed.is_array() {
-                            assert_eq!(
-                                keys,
-                                [
-                                    "active_sessions",
-                                    "created_at",
-                                    "disabled_at",
-                                    "groups",
-                                    "has_password",
-                                    "last_signed_in_at",
-                                    "name",
-                                    "principal_id"
-                                ],
-                                "sign-in facts only, never secrets"
-                            );
-                            assert!(own["active_sessions"].as_i64() >= Some(1));
-                        } else {
-                            assert!(
-                                entries
-                                    .iter()
-                                    .any(|entry| entry["principal_id"] == json!(person)
-                                        && entry["role_key"] == "admin"),
-                                "the person's admin assignment is listed"
-                            );
-                        }
+                        assert_eq!(
+                            keys,
+                            [
+                                "active_sessions",
+                                "created_at",
+                                "disabled_at",
+                                "groups",
+                                "has_password",
+                                "last_signed_in_at",
+                                "name",
+                                "principal_id"
+                            ],
+                            "sign-in facts only, never secrets"
+                        );
+                        assert!(entry["active_sessions"].as_i64() >= Some(1));
                     }
+                    assert_eq!(
+                        admin_reads[1]["assignments"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter(|entry| entry["principal_id"] == json!(person)
+                                && entry["role_key"] == "admin")
+                            .count(),
+                        granted,
+                        "an administrator sees the person's admin assignment"
+                    );
                     let jobs: Value = request(
                         &provider.client,
                         session,

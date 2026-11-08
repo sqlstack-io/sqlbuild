@@ -296,7 +296,8 @@ export type AccountSource = 'oidc' | 'trusted_proxy' | 'password';
 export type Account = Principal & {
 	kind: 'user';
 	email: string | null;
-	source: AccountSource;
+	/** Null when the server can't tell, such as a person with no password who hasn't used SSO. */
+	source: AccountSource | null;
 	ssoGroups: string[];
 	createdAt: Iso;
 	lastSeenAt: Iso | null;
@@ -369,7 +370,7 @@ export type RoleAssignment = {
 	/** For policy and built-in assignments: where they are set, `path:line`. */
 	definedIn: string | null;
 	assignedBy: Principal | null;
-	assignedAt: Iso;
+	assignedAt: Iso | null;
 	/** The role no longer exists in code; the assignment shows but grants nothing. */
 	stale: boolean;
 };

@@ -33,8 +33,8 @@
 	const actions = $derived([...new Set((everyone.data ?? []).map((e) => e.action))].sort());
 	const rows = $derived(entries.data ?? []);
 	const locations = $derived(app.bootstrap?.locations ?? []);
-	// The person page and the access checker both read people.
-	const linksPeople = $derived(app.client.supports('listAccounts'));
+	const linksPeople = $derived(app.client.supports('effectiveAccess'));
+	const checksDecisions = $derived(app.client.supports('lookupDecision'));
 </script>
 
 <AppTopbar title="Audit log">
@@ -110,7 +110,7 @@
 								<div class="decision">
 									<code class="clip" title="Decision ID {e.decisionId}, as shown in the error message">{e.decisionId}</code>
 									<CopyButton value={e.decisionId} label="Copy decision ID" />
-									{#if linksPeople}<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>{/if}
+									{#if checksDecisions}<a class="link" href={checkHref({ decision: e.decisionId })}>Check this</a>{/if}
 								</div>
 							{/if}
 						</td>

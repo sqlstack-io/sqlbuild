@@ -5,11 +5,12 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { toCatalogNodes } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
+import { toAccount, toRoleAssignments } from './http-people';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
-import type { AuditEntry, AuditQuery } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, RoleAssignment } from './types/platform';
 import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
@@ -41,7 +42,9 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckEvidence',
 	'listCatalogNodes',
 	'listSnapshotChanges',
-	'listAuditEntries'
+	'listAuditEntries',
+	'listAccounts',
+	'listRoleAssignments'
 ]);
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
@@ -278,6 +281,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			}
 			return found.slice(0, limit);
 		},
+		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
+		async listRoleAssignments(): Promise<RoleAssignment[]> {
+			const { data, error, response } = await http.GET('/api/admin/roles');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
+			return toRoleAssignments(data, await people().catch(() => []));
+		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
 		async getCheckSql(scope: Scope, checkId: string): Promise<CheckSql> {
@@ -358,6 +369,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}
 
 	/** The newest result of every check, or one check's results newest first. */
+	async function people() {
+		const { data, error, response } = await http.GET('/api/admin/people');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
 	async function checkResults(scope: Scope, bindingKey?: string) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = bindingKey
