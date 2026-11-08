@@ -330,7 +330,8 @@ impl AnalysisSession {
     ) -> Result<(), String> {
         let pool = self.catalog.native.analysis_pool()?;
         let request: &SessionRequest = &self.request;
-        let nullability: &ShapeTable = &self.available_nullability;
+        let tables: (&ShapeTable, &ShapeTable) =
+            (&self.available_types, &self.available_nullability);
         let declared: Vec<String> = request
             .function_return_types
             .iter()
@@ -344,7 +345,7 @@ impl AnalysisSession {
                     let model: &ModelRequest = &request.models[models[*position]];
                     let schema: Shapes = schemas[*position].clone();
                     let relations: SessionSchema =
-                        session_schema(dialect, &schema, nullability, &functions);
+                        session_schema(dialect, &schema, tables, &functions);
                     let analysis = (declared.as_slice(), request.quoted_ignore_case);
                     model_outcome(dialect, model, (schema, &relations), analysis)
                 })

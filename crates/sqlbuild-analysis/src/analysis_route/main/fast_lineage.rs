@@ -114,6 +114,7 @@ fn markers_schema(
     }
     SessionSchema {
         relations,
+        open: HashMap::new(),
         functions: SessionFunctions::default(),
     }
 }

@@ -3,8 +3,9 @@ use crate::analysis_route::main::model_outcome::model_outcome;
 use crate::analysis_route::tests::helpers::{column_line, session_relations};
 use crate::analysis_route::tests::test_types::{
     CataloguedDialect, FoldingDialect, MarkerLineageTestCase, NativeLineageTestCase,
-    NativeOutcomeTestCase, PivotlessDialect,
+    NativeOutcomeTestCase, OpenRelationTestCase, PivotlessDialect,
 };
+use crate::assembly::analysis_session::_helpers::mappings::{ShapeTable, session_schema};
 use crate::assembly::analysis_session::models::{
     ModelOutcome, ModelRequest, SessionFunctions, SessionSchema,
 };
@@ -186,6 +187,90 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_a_relation_with_declared_columns_only_when_analysing_natively_then_they_type_its_reads() {
+    let test_cases = [
+        OpenRelationTestCase {
+            description: "a declared VARCHAR read in arithmetic is a type error",
+            sql: "SELECT status + 1 AS bumped FROM raw_orders",
+            declared: &[("status", "VARCHAR"), ("amount", "DOUBLE")],
+            expected_lines: &["bumped - unknown", "findings=[\"B212\"]"],
+        },
+        OpenRelationTestCase {
+            description: "a declared column read as it is keeps its declared type",
+            sql: "SELECT amount FROM raw_orders",
+            declared: &[("status", "VARCHAR"), ("amount", "DOUBLE")],
+            expected_lines: &["amount DOUBLE unknown", "findings=[]"],
+        },
+        OpenRelationTestCase {
+            description: "an undeclared column of an open relation is still not refused",
+            sql: "SELECT region FROM raw_orders",
+            declared: &[("status", "VARCHAR")],
+            expected_lines: &["region - unknown", "findings=[]"],
+        },
+        OpenRelationTestCase {
+            description: "with nothing declared, nothing is typed",
+            sql: "SELECT status + 1 AS bumped FROM raw_orders",
+            declared: &[],
+            expected_lines: &["bumped - unknown", "findings=[]"],
+        },
+    ];
+    for test_case in test_cases {
+        let schema: Shapes = vec![("raw_orders".to_owned(), Vec::new())];
+        let declared: Shapes = vec![(
+            "raw_orders".to_owned(),
+            test_case
+                .declared
+                .iter()
+                .map(|(name, data_type)| ((*name).to_owned(), (*data_type).to_owned()))
+                .collect(),
+        )];
+        let relations: SessionSchema = session_schema(
+            &CataloguedDialect,
+            &schema,
+            (
+                &ShapeTable::from_shapes(&declared),
+                &ShapeTable::from_shapes(&Vec::new()),
+            ),
+            &SessionFunctions::default(),
+        );
+        let model: ModelRequest = ModelRequest {
+            name: "orders".to_owned(),
+            query_sql: test_case.sql.to_owned(),
+            required_names: vec!["raw_orders".to_owned()],
+            ..ModelRequest::default()
+        };
+        let (outcome, _): (ModelOutcome, Option<String>) = model_outcome(
+            &CataloguedDialect,
+            &model,
+            (schema, &relations),
+            (&[], false),
+        );
+        let mut lines: Vec<String> = outcome
+            .analysis
+            .columns
+            .iter()
+            .flatten()
+            .map(|column| {
+                format!(
+                    "{} {} {}",
+                    column.name,
+                    column.data_type.as_deref().unwrap_or("-"),
+                    column.nullability
+                )
+            })
+            .collect();
+        let findings: Vec<&str> = outcome
+            .analysis
+            .binding_diagnostics
+            .iter()
+            .map(|row| row.code.as_str())
+            .collect();
+        lines.push(format!("findings={findings:?}"));
+        assert_eq!(lines, test_case.expected_lines, "{}", test_case.description);
     }
 }
 

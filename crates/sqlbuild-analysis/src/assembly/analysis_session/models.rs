@@ -362,6 +362,8 @@ pub(crate) struct SessionFunctions {
 pub(crate) struct SessionSchema {
     /// Columns of each relation with a known shape, by the analysis name the query reads.
     pub(crate) relations: HashMap<String, Vec<SchemaColumn>>,
+    /// Declared columns of each relation whose full shape is not known, which type the ones read.
+    pub(crate) open: HashMap<String, Vec<SchemaColumn>>,
     pub(crate) functions: SessionFunctions,
 }
 
@@ -371,6 +373,18 @@ impl LineageSchema for SessionSchema {
             .get(relation)
             .or_else(|| {
                 self.relations
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(relation))
+                    .map(|(_, columns)| columns)
+            })
+            .map(Vec::as_slice)
+    }
+
+    fn open_columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        self.open
+            .get(relation)
+            .or_else(|| {
+                self.open
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case(relation))
                     .map(|(_, columns)| columns)

@@ -258,6 +258,15 @@ pub(super) struct NativeOutcomeTestCase {
     pub(super) expected_lines: &'static [&'static str],
 }
 
+pub(super) struct OpenRelationTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `raw_orders`' declared columns and types; its full shape is never known.
+    pub(super) declared: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type`, then the finding codes.
+    pub(super) expected_lines: &'static [&'static str],
+}
+
 pub(super) struct NativeLineageTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
