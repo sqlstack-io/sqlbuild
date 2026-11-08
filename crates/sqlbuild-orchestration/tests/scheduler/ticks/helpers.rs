@@ -657,6 +657,11 @@ pub(crate) async fn fault_run(
             .iter()
             .filter(|time| **time < first || time.second() != 0 || time.nanosecond() != 0)
             .count();
+        // A tick is never for a time after the clock reading it was planned and recorded with.
+        anomalies.off_schedule_ticks += trigger_ticks
+            .iter()
+            .filter(|tick| tick.scheduled_for > tick.evaluated_at)
+            .count();
         ticks.extend(trigger_ticks);
     }
     let runs: BTreeSet<Uuid> = list_runs(store, (location, "development"), 5_000)
