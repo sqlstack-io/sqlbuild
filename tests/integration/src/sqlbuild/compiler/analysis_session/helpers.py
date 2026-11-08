@@ -95,12 +95,6 @@ _INITIAL_RELATIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ('__source("raw_customers")', ("customer_id", "Customer_Name", "region")),
     ('__source("raw_events")', ("event_id", "order_id", "kind")),
 )
-_ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
-    value_renderer=DuckDbAdapter(),
-    collection_rendering=CollectionRendering.VALUE_LIST,
-    python_functions_inherit_default_namespace=True,
-    sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
-)
 _DUCKDB_PROFILE: ExpressionInferenceProfile = ExpressionInferenceProfile(
     sql_analysis_dialect="duckdb"
 )
@@ -473,8 +467,10 @@ def shared_analysis_files(
     }
 
 
-def compile_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputsView:
-    """Write a project and attach its compile inputs with the DuckDB compile context."""
+def compile_inputs(
+    *, project_dir: Path, files: dict[str, str], dialect: str | None = "duckdb"
+) -> CompileInputsView:
+    """Write a project and attach its compile inputs with DuckDB's compile context under `dialect`."""
 
     for relative_path, contents in files.items():
         path: Path = project_dir / relative_path
@@ -482,7 +478,13 @@ def compile_inputs(*, project_dir: Path, files: dict[str, str]) -> CompileInputs
         _ = path.write_text(contents, encoding="utf-8")
     return build_compile_inputs(
         discovered_inputs=discover_project_inputs(project_dir=project_dir),
-        adapter_context=_ADAPTER_CONTEXT,
+        adapter_context=CompileAdapterContext(
+            value_renderer=DuckDbAdapter(),
+            collection_rendering=CollectionRendering.VALUE_LIST,
+            python_functions_inherit_default_namespace=True,
+            sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=dialect,
+        ),
         run_id="integration_run",
     )
 

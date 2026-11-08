@@ -214,16 +214,17 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     rng: random.Random = random.Random(test_case.seed)
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
     for index in range(test_case.count):
-        inputs: CompileInputsView = compile_inputs(
-            project_dir=tmp_path / f"project_{index}",
-            files={
-                **generated_analysis_files(rng=rng, model_count=test_case.model_count),
-                **test_case.extra_files,
-            },
-        )
+        files: dict[str, str] = {
+            **generated_analysis_files(rng=rng, model_count=test_case.model_count),
+            **test_case.extra_files,
+        }
         for profile_index, profile in enumerate(test_case.inference_profiles):
             analyse_natively(
-                inputs=inputs,
+                inputs=compile_inputs(
+                    project_dir=tmp_path / f"project_{index}",
+                    files=files,
+                    dialect=profile.sql_analysis_dialect,
+                ),
                 inference_profile=profile,
                 lineage_mode=test_case.lineage_mode,
                 runs=runs,
@@ -270,17 +271,14 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
 def test_given_equal_model_queries_when_analysing_natively_then_each_is_analysed_and_runs_agree(
     test_case: SharedAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    inputs: CompileInputsView = compile_inputs(
-        project_dir=tmp_path / "project",
-        files=shared_analysis_files(
-            regions=test_case.regions, inexact_regions=test_case.inexact_regions
-        ),
+    files: dict[str, str] = shared_analysis_files(
+        regions=test_case.regions, inexact_regions=test_case.inexact_regions
     )
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
 
     _ = [
         analyse_natively(
-            inputs=inputs,
+            inputs=compile_inputs(project_dir=tmp_path / "project", files=files, dialect=dialect),
             inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
             lineage_mode=ColumnLineageMode.FAST,
             runs=runs,
@@ -330,14 +328,13 @@ def test_given_equal_model_queries_when_analysing_natively_then_each_is_analysed
 def test_given_cyclic_models_when_analysing_natively_then_session_answers_and_cached_runs_agree(
     test_case: CyclicAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    inputs: CompileInputsView = compile_inputs(
-        project_dir=tmp_path / "project", files=test_case.files
-    )
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
 
     _ = [
         analyse_natively(
-            inputs=inputs,
+            inputs=compile_inputs(
+                project_dir=tmp_path / "project", files=test_case.files, dialect=dialect
+            ),
             inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
             lineage_mode=lineage_mode,
             runs=runs,

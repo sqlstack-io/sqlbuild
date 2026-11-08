@@ -209,7 +209,7 @@ def captured_under_dialect(
 
     stage: dict[str, Any] | None = native_module.assembly_stage_inputs(
         "semantic_completion",
-        inputs=compile_inputs(project_dir=project_dir, files=files),
+        inputs=compile_inputs(project_dir=project_dir, files=files, dialect=dialect),
         inference_profile=replace(
             DuckDbAdapter().expression_inference_profile(), sql_analysis_dialect=dialect
         ),
