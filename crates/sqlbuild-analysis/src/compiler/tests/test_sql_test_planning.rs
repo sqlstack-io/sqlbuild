@@ -2,6 +2,7 @@ use serde_json::{Value, json};
 
 use crate::compiler::_helpers::sql_tests::planning::plan_and_render_json;
 use crate::compiler::_helpers::sql_tests::planning::resolve_chains_json;
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::main::sql_test_chains::resolve_sql_test_chains;
 use crate::compiler::main::sql_test_glue::plan_sql_test_batch;
 use crate::compiler::main::sql_test_plan_errors::sql_test_plan_error_messages;
@@ -25,6 +26,7 @@ use crate::compiler::tests::test_types::{
 
 /// A mocked model test, a test missing its source mock and a UDF test over two models.
 const GLUE_REQUEST: &str = r#"{
+  "sqlAnalysisDialect": "duckdb",
   "lexicalSyntax": {
     "backslashEscapeQuotes": [], "escapeStringPrefix": false, "rawStringPrefix": false,
     "tripleQuotedStrings": false, "nestedBlockComments": false, "lineCommentPrefixes": ["--"]
@@ -183,8 +185,8 @@ fn given_sql_test_planning_cases_when_exercising_native_planner_then_expected_be
 fn given_typed_requests_when_planning_then_plans_and_chains_equal_the_json_entry_points() {
     let test_cases = [
         GluePlanParityTestCase {
-            description: "generic SQL, planned without rendering",
-            dialect: None,
+            description: "DuckDB, planned without rendering",
+            dialect: Some("duckdb"),
             render_sql: false,
             expected_plan_count: 3,
             expected_missing_mock_severity: "error",
@@ -341,7 +343,10 @@ fn given_real_model_calling_udf_in_projection_when_planning_then_call_targets_th
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         let sql = projected_udf_call_sql(test_case.dialect);
 
         assert_eq!(

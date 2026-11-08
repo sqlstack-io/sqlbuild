@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::sql_macros::_helpers::parsing::body::macro_parser;
 use crate::sql_macros::_helpers::rendering::expansion::expand_text;
 use crate::sql_macros::errors::ExpansionFailure;
 use crate::sql_macros::errors::SqlMacroError;
@@ -109,11 +110,21 @@ impl SqlMacroHost for FakeHost {
     /// The adapter's analysis dialect; a fake with no adapter analyses as DuckDB, since SQL
     /// macros need a dialect with a native parser.
     fn analysis_dialect(&self) -> Option<&str> {
-        Some(match self.adapter {
-            "" | "motherduck" => "duckdb",
-            adapter => adapter,
-        })
+        Some(analysis_dialect_of(self.adapter))
     }
+}
+
+/// The analysis dialect the fake host gives `adapter`.
+fn analysis_dialect_of(adapter: &str) -> &str {
+    match adapter {
+        "" | "motherduck" => "duckdb",
+        adapter => adapter,
+    }
+}
+
+/// Whether SQL macros can expand for `adapter`, which needs a native parser for its dialect.
+pub(super) fn adapter_parses(adapter: &str) -> bool {
+    macro_parser(Some(analysis_dialect_of(adapter))).is_ok()
 }
 
 /// `sql` expanded with `macros` for `adapter`, or the SQL macro error it raised.

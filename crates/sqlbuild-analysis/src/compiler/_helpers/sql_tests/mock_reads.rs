@@ -3,8 +3,6 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 
-use sqlquack_syntax::expressions::queries::models::With;
-use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::graph_walk::models::VisitOrder;
 use sqlbuild_core::graph_walk::types::NodeSet;
@@ -13,6 +11,8 @@ use sqlbuild_core::text::main::is_word_char::is_word_char;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
+use sqlquack_syntax::expressions::queries::models::With;
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 
 use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::planning::MOCK_CTE_PREFIXES;

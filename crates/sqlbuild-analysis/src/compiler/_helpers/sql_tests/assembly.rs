@@ -4,12 +4,12 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::analysis_route::types::NativeDialect;
-use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::_helpers::sql_tests::case_identity::{FingerprintFailure, case_fingerprint};
 use crate::compiler::_helpers::sql_tests::macro_call_names::macro_call_names;
 use crate::compiler::_helpers::sql_tests::mock_reads::{
     MockReadsRequest, mock_reading_helper_diagnostics,
 };
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::models::{
     AssembledSqlTestFacts, SqlTestAssemblyBatch, SqlTestAssemblyFailure, SqlTestAssemblyModel,
     SqlTestAssemblyOutcome, SqlTestAssemblyPayload, SqlTestAssemblyTest, SqlTestHelperDiagnostic,

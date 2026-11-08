@@ -13,8 +13,8 @@ use crate::sql_macros::_helpers::parsing::captures::{output_selects, slot_captur
 use crate::sql_macros::_helpers::parsing::header::unquoted;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, tokens};
 use crate::sql_macros::_helpers::parsing::parameters::{
-    ParameterReference, alias_follows, parameter_references, placeholder, placeholder_parameter,
-    with_placeholders,
+    ParameterReference, alias_follows, declarations_masked, parameter_references, placeholder,
+    placeholder_parameter, with_placeholders,
 };
 use crate::sql_macros::_helpers::parsing::slots::{SlotRead, check_group_positions, slot_reads};
 use crate::sql_macros::_helpers::rendering::arguments::is_atomic;
@@ -63,7 +63,9 @@ pub(crate) fn parsed(
     let Parsed {
         mut statements,
         gaps,
-    } = parser.parse(&text).map_err(|gap| gap.message)?;
+    } = parser
+        .parse(&declarations_masked(&text))
+        .map_err(|gap| gap.message)?;
     if let Some(gap) = gaps.first() {
         return Err(format!(
             "the {} parser cannot read {}",
@@ -721,13 +723,13 @@ pub(crate) fn expand_body(
         slot_reads(definition, (body, &scanned, &references)).map_err(|(_, error)| error)?;
     check_group_positions(definition, (body, &scanned), &reads).map_err(|(_, error)| error)?;
     let parsed_text: String = with_placeholders(body, &references);
-    let parsed_body: ParsedBody =
-        parsed(parser, definition.form, &parsed_text).map_err(invalid)?;
+    let parsed_body: ParsedBody = parsed(parser, definition.form, &parsed_text).map_err(invalid)?;
     if let Some(problem) = shape_problem(definition.form, &parsed_body.select) {
         return Err(invalid(problem.to_owned()));
     }
     let names: Vec<String> =
-        defined_names(definition, (&parsed_text, &parsed_body.select), arguments).map_err(invalid)?;
+        defined_names(definition, (&parsed_text, &parsed_body.select), arguments)
+            .map_err(invalid)?;
     check_relation_values(definition, &parsed_body.select).map_err(|reason| {
         SqlMacroError::new(
             ARGUMENT_CODE,
@@ -752,11 +754,7 @@ pub(crate) fn expand_body(
         names,
         calls: within(calls, kept),
         like: None,
-        captures: slot_captures(
-            (parser, definition),
-            (body, &references, &reads),
-            arguments,
-        ),
+        captures: slot_captures((parser, definition), (body, &references, &reads), arguments),
     })
 }
 

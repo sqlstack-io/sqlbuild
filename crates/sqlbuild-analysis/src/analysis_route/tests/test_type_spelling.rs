@@ -1,6 +1,6 @@
-use crate::analysis_route::types::NativeDialect;
 use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDialect};
 use crate::analysis_route::tests::test_types::TypeSpellingTestCase;
+use crate::analysis_route::types::NativeDialect;
 use crate::type_system::models::{NormalizedType, TypeFamily};
 
 #[test]

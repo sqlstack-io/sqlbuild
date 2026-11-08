@@ -28,15 +28,23 @@ pub(crate) fn returns_type_error(
 
 /// The decimal's precision and scale, where `normalized` is a decimal with a stated precision.
 fn decimal_digits(normalized: &NormalizedType) -> Option<(u64, u64)> {
-    let number = |value: &Option<PythonInteger>| value.as_ref().and_then(|v| v.as_str().parse().ok());
+    let number =
+        |value: &Option<PythonInteger>| value.as_ref().and_then(|v| v.as_str().parse().ok());
     if normalized.family != TypeFamily::Decimal {
         return None;
     }
-    Some((number(&normalized.precision)?, number(&normalized.scale).unwrap_or(0)))
+    Some((
+        number(&normalized.precision)?,
+        number(&normalized.scale).unwrap_or(0),
+    ))
 }
 
 /// Why a BigQuery `NUMERIC(P, S)` or `BIGNUMERIC(P, S)` has more digits than the type holds.
-fn bigquery_numeric_error(type_sql: &str, normalized: &NormalizedType, dialect: &str) -> Option<String> {
+fn bigquery_numeric_error(
+    type_sql: &str,
+    normalized: &NormalizedType,
+    dialect: &str,
+) -> Option<String> {
     if dialect != "bigquery" {
         return None;
     }

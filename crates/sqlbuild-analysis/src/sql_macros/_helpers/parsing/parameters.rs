@@ -2,7 +2,7 @@
 
 use sqlbuild_render::macro_calls::main::opens_bare_call::opens_bare_call;
 
-use crate::sql_macros::_helpers::parsing::lexing::{DECLARATION_WORDS, Token, TokenKind};
+use crate::sql_macros::_helpers::parsing::lexing::{DECLARATION_WORDS, Token, TokenKind, tokens};
 
 const PLACEHOLDER_PREFIX: &str = "__sqlbuild_parameter__";
 /// Words that may follow a table reference without being its alias.
@@ -114,6 +114,49 @@ pub(crate) fn with_placeholders(sql: &str, references: &[ParameterReference]) ->
     }
     text.push_str(&sql[cursor..]);
     text
+}
+
+/// `sql` with each `@enum(...)[.NAME]`, `@const(...)` and `@param(...)` as a name of the same length.
+pub(crate) fn declarations_masked(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut masked: String = sql.to_owned();
+    let mut index: usize = 0;
+    while index + 2 < scanned.len() {
+        let (at, word, open) = (&scanned[index], &scanned[index + 1], &scanned[index + 2]);
+        let declaration: bool = at.is(sql, "@")
+            && word.kind == TokenKind::Word
+            && word.start == at.end
+            && DECLARATION_WORDS.contains(&word.text(sql))
+            && open.is(sql, "(");
+        if !declaration {
+            index += 1;
+            continue;
+        }
+        let mut depth: usize = 0;
+        let mut close: usize = index + 2;
+        for (offset, token) in scanned[index + 2..].iter().enumerate() {
+            depth = match (token.is(sql, "("), token.is(sql, ")")) {
+                (true, _) => depth + 1,
+                (_, true) => depth - 1,
+                _ => depth,
+            };
+            if depth == 0 {
+                close = index + 2 + offset;
+                break;
+            }
+        }
+        let member: bool = scanned.get(close + 1).is_some_and(|dot| dot.is(sql, "."))
+            && scanned
+                .get(close + 2)
+                .is_some_and(|name| name.kind == TokenKind::Word);
+        let last: usize = if member { close + 2 } else { close };
+        let (start, end) = (at.start, scanned[last].end);
+        masked.replace_range(start..end, &format!("d{}", "_".repeat(end - start - 1)));
+        index = last + 1;
+    }
+    masked
 }
 
 /// Whether the table reference whose last token is `index` is followed by an alias.

@@ -95,10 +95,7 @@ fn body_probe(
     let prefix: &str = "SELECT (";
     let unmarked: String = format!("{prefix}{}) AS b FROM {STAND_IN_RELATION}", expansion.sql);
     let calls: Vec<TypedCall> = shifted(expansion.calls, prefix.len()).collect();
-    let (probe, _) = typed_sql(
-        &unmarked,
-        &markable_calls(&unmarked, &calls, parser.name()),
-    );
+    let (probe, _) = typed_sql(&unmarked, &markable_calls(&unmarked, &calls, parser.name()));
     let table: Value = json!({"name": STAND_IN_RELATION, "columns": columns});
     Some((probe, table))
 }
@@ -250,9 +247,8 @@ pub(crate) fn check_body_types(
         return Ok(());
     };
     let key: String = format!("types\n{}\n{table}\n{probe}", parser.name());
-    let found: Option<String> = remembered(&TYPE_ERRORS, key, || {
-        body_type_error(parser, &probe, table)
-    });
+    let found: Option<String> =
+        remembered(&TYPE_ERRORS, key, || body_type_error(parser, &probe, table));
     let Some(found) = found else {
         return Ok(());
     };

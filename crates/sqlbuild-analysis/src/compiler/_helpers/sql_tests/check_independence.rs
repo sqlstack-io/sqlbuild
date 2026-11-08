@@ -4,10 +4,10 @@ use std::collections::{BTreeSet, HashMap};
 
 use sqlbuild_core::graph_walk::main::breadth_first_path::breadth_first_path;
 
-use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 use serde_json::Value;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, Unclosed};
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 
 use crate::analysis_route::types::NativeDialect;
 use crate::compiler::constants::{ALIAS_FIELD, CTES_FIELD, NAME_FIELD};

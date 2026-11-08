@@ -5,13 +5,13 @@ use std::convert::Infallible;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::Instant;
 
-use sqlquack_syntax::{Expression, Parsed};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use regex::Regex;
 #[cfg(test)]
 use serde::Serialize;
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::graph_walk::main::depth_first_postorder::depth_first_postorder;
+use sqlquack_syntax::{Expression, Parsed};
 
 use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
@@ -518,7 +518,9 @@ pub(crate) fn plan_batch(request: SqlTestPlanBatch) -> Result<SqlTestPlanBatchOu
                 rendering_ns: 0,
             });
         }
-        return Err(unavailable_sql_tests(request.sql_analysis_dialect.as_deref()));
+        return Err(unavailable_sql_tests(
+            request.sql_analysis_dialect.as_deref(),
+        ));
     };
     let rejects_nested_with =
         SliceDialect::new(request.sql_analysis_dialect.as_deref()).rejects_nested_with();
@@ -1388,8 +1390,7 @@ fn real_model_inputs(request: &TopoSortRequest<'_>, name: &str) -> Vec<String> {
 fn analyze_and_resolve_sql(
     request: AnalysisResolutionRequest<'_>,
 ) -> Result<Option<AnalysisResolvedSql>, String> {
-    let Some(template) =
-        analysis_template(request.query_sql, request.parser, request.templates)?
+    let Some(template) = analysis_template(request.query_sql, request.parser, request.templates)?
     else {
         return Ok(None);
     };

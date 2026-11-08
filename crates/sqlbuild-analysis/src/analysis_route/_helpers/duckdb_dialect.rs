@@ -5,7 +5,9 @@ use sqlquack_syntax::{Dialect, Parsed};
 use crate::analysis_route::_helpers::snowflake_dialect::shared_parsed;
 use crate::analysis_route::_helpers::type_spelling::respelt;
 use crate::analysis_route::_helpers::whole::one_statement;
-use crate::analysis_route::constants::{DUCKDB_DIALECT, DUCKDB_TYPE_SPELLING, UNQUOTED_STUB_PREFIX};
+use crate::analysis_route::constants::{
+    DUCKDB_DIALECT, DUCKDB_TYPE_SPELLING, UNQUOTED_STUB_PREFIX,
+};
 use crate::analysis_route::models::{DuckDbDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;

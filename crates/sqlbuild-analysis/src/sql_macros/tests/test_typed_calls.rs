@@ -213,7 +213,8 @@ fn given_the_reserved_analysis_function_when_comparing_then_authored_sql_rejects
         description: "the typed marker",
         authored_name:
             sqlbuild_attachments::cursor_intrinsics::constants::RESERVED_ANALYSIS_FUNCTION,
-        expected_parsed_name: sqlquack_syntax::expressions::tree::constants::TYPED_EXPRESSION_FUNCTION,
+        expected_parsed_name:
+            sqlquack_syntax::expressions::tree::constants::TYPED_EXPRESSION_FUNCTION,
     }];
 
     for test_case in test_cases {

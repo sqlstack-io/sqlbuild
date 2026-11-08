@@ -1,4 +1,3 @@
-use crate::analysis_route::types::NativeDialect;
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::main::skipped_analysis::skipped_analysis;
@@ -6,6 +5,7 @@ use crate::analysis_route::models::{AnalysisRoute, LocatedGap, TsqlDialect};
 use crate::analysis_route::tests::test_types::{
     NativeGapTestCase, PivotlessDialect, RouteTestCase, SkippedAnalysisTestCase,
 };
+use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
 use crate::type_system::models::TypeFamily;
 
@@ -25,7 +25,7 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
         RouteTestCase {
             description: "duckdb",
             dialect: Some("duckdb"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "sqlite",

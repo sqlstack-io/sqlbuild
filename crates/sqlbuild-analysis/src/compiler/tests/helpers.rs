@@ -4,10 +4,10 @@ use std::sync::{Arc, Barrier, Mutex};
 
 use serde_json::{Value, json};
 
-use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
 use crate::compiler::_helpers::sql_tests::cte_slices::{SliceDialect, split_top_level_with};
 use crate::compiler::_helpers::sql_tests::relation_markers::relation_marker_calls;
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::main::sql_test_extraction::extract_batch_json;
 use crate::compiler::tests::test_types::ExtractionRuleTestCase;
 use crate::compiler::tests::test_types::{
