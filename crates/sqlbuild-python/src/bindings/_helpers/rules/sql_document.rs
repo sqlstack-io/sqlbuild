@@ -1,5 +1,7 @@
 //! Custom rules' SQL documents: the SQLQuack syntax tree of one SQL text and its common structures.
 
+use std::sync::Arc;
+
 use pyo3::prelude::{Bound, Py, PyAny, PyErr, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
@@ -16,40 +18,62 @@ const DOCUMENT_KIND: &str = "document";
 /// The kind of an aggregate call, whose star argument, as in `COUNT(*)`, expands no columns.
 const AGGREGATE_KIND: &str = "aggregate_function";
 
-/// One node of a rule's SQL syntax tree.
+/// A parsed document's nodes and each node's children, shared by every node read from it.
+struct Tree {
+    nodes: Vec<TreeNode>,
+    /// Child indexes by parent index; the last entry holds the statements, the document's children.
+    children: Vec<Vec<usize>>,
+}
+
+/// One node of a rule's SQL syntax tree, held as an index into its shared tree.
+///
+/// No node owns another, so freeing a deep tree never recurses.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct SqlTreeNode {
-    #[pyo3(get)]
-    kind: &'static str,
-    #[pyo3(get)]
-    line: usize,
-    #[pyo3(get)]
-    column: usize,
-    children: Vec<Py<SqlTreeNode>>,
+    tree: Arc<Tree>,
+    index: usize,
 }
 
 #[pymethods]
 impl SqlTreeNode {
+    #[getter]
+    fn kind(&self) -> &'static str {
+        self.tree
+            .nodes
+            .get(self.index)
+            .map_or(DOCUMENT_KIND, |node| node.kind)
+    }
+
+    #[getter]
+    fn line(&self) -> usize {
+        self.tree.nodes.get(self.index).map_or(1, |node| node.line)
+    }
+
+    #[getter]
+    fn column(&self) -> usize {
+        self.tree
+            .nodes
+            .get(self.index)
+            .map_or(1, |node| node.column)
+    }
+
     /// The node's direct children, in SQLQuack's traversal order.
     #[getter]
     fn children<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        PyTuple::new(py, self.children.iter().map(|child| child.clone_ref(py)))
+        let children: PyResult<Vec<Py<SqlTreeNode>>> = self.tree.children[self.index]
+            .iter()
+            .map(|&index| tree_node(py, &self.tree, index))
+            .collect();
+        PyTuple::new(py, children?)
     }
 
     /// This node and every descendant, in pre-order.
-    fn walk(slf: Bound<'_, Self>) -> PyResult<Vec<Py<SqlTreeNode>>> {
-        let py: Python<'_> = slf.py();
+    fn walk(&self, py: Python<'_>) -> PyResult<Vec<Py<SqlTreeNode>>> {
         let mut walked: Vec<Py<SqlTreeNode>> = Vec::new();
-        let mut stack: Vec<Py<SqlTreeNode>> = vec![slf.unbind()];
-        while let Some(node) = stack.pop() {
-            stack.extend(
-                node.get()
-                    .children
-                    .iter()
-                    .rev()
-                    .map(|child| child.clone_ref(py)),
-            );
-            walked.push(node);
+        let mut stack: Vec<usize> = vec![self.index];
+        while let Some(index) = stack.pop() {
+            stack.extend(self.tree.children[index].iter().rev());
+            walked.push(tree_node(py, &self.tree, index)?);
         }
         Ok(walked)
     }
@@ -57,7 +81,9 @@ impl SqlTreeNode {
     fn __repr__(&self) -> String {
         format!(
             "SqlTreeNode(kind={:?}, line={}, column={})",
-            self.kind, self.line, self.column
+            self.kind(),
+            self.line(),
+            self.column()
         )
     }
 }
@@ -68,8 +94,7 @@ pub(crate) struct SqlDocument {
     #[pyo3(get)]
     source: String,
     dialect: String,
-    nodes: PyOnceLock<Vec<TreeNode>>,
-    tree: PyOnceLock<Py<SqlTreeNode>>,
+    tree: PyOnceLock<Arc<Tree>>,
 }
 
 #[pymethods]
@@ -80,18 +105,14 @@ impl SqlDocument {
         Self {
             source,
             dialect,
-            nodes: PyOnceLock::new(),
             tree: PyOnceLock::new(),
         }
     }
 
     /// The syntax tree: a `document` node whose children are the statements.
     fn ast(&self, py: Python<'_>) -> PyResult<Py<SqlTreeNode>> {
-        let tree = self.tree.get_or_try_init(py, || {
-            let nodes: &[TreeNode] = self.parsed(py)?;
-            python_tree(py, nodes)
-        })?;
-        Ok(tree.clone_ref(py))
+        let tree: &Arc<Tree> = self.parsed(py)?;
+        tree_node(py, tree, tree.nodes.len())
     }
 
     /// Every node of `kind`, compared without case, as a stable source location.
@@ -133,7 +154,7 @@ impl SqlDocument {
         keep: impl Fn(&[TreeNode], &TreeNode) -> bool,
     ) -> PyResult<Bound<'py, PyTuple>> {
         let wanted: String = kind.to_lowercase();
-        let nodes: &[TreeNode] = self.parsed(py)?;
+        let nodes: &[TreeNode] = &self.parsed(py)?.nodes;
         let mut found: Vec<Bound<'py, PyAny>> = Vec::new();
         for node in nodes
             .iter()
@@ -152,46 +173,31 @@ impl SqlDocument {
         PyTuple::new(py, found)
     }
 
-    /// The parsed nodes in pre-order; a failure raises `RuleUsageError` each time it is read.
-    fn parsed(&self, py: Python<'_>) -> PyResult<&[TreeNode]> {
-        self.nodes
-            .get_or_try_init(py, || {
-                py.detach(|| sql_tree_nodes(&self.source, &self.dialect))
-                    .map_err(|error| usage_error(py, &error))
-            })
-            .map(Vec::as_slice)
+    /// The parsed tree; a failure raises `RuleUsageError` each time it is read.
+    fn parsed(&self, py: Python<'_>) -> PyResult<&Arc<Tree>> {
+        self.tree.get_or_try_init(py, || {
+            py.detach(|| sql_tree_nodes(&self.source, &self.dialect).map(tree))
+                .map_err(|error| usage_error(py, &error))
+        })
     }
 }
 
-/// The Python tree of `nodes`, built from the last node back so children exist before parents.
-fn python_tree(py: Python<'_>, nodes: &[TreeNode]) -> PyResult<Py<SqlTreeNode>> {
-    let mut children: Vec<Vec<Py<SqlTreeNode>>> = (0..nodes.len()).map(|_| Vec::new()).collect();
-    let mut statements: Vec<Py<SqlTreeNode>> = Vec::new();
-    for (index, node) in nodes.iter().enumerate().rev() {
-        let mut own: Vec<Py<SqlTreeNode>> = std::mem::take(&mut children[index]);
-        own.reverse();
-        let built: Py<SqlTreeNode> = Py::new(
-            py,
-            SqlTreeNode {
-                kind: node.kind,
-                line: node.line,
-                column: node.column,
-                children: own,
-            },
-        )?;
-        match node.parent {
-            Some(parent) => children[parent].push(built),
-            None => statements.push(built),
-        }
+/// `nodes` with each node's children listed, in ascending index order, under its parent.
+fn tree(nodes: Vec<TreeNode>) -> Arc<Tree> {
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); nodes.len() + 1];
+    for (index, node) in nodes.iter().enumerate() {
+        children[node.parent.unwrap_or(nodes.len())].push(index);
     }
-    statements.reverse();
+    Arc::new(Tree { nodes, children })
+}
+
+/// The Python node at `index` of `tree`; `tree.nodes.len()` is the document root.
+fn tree_node(py: Python<'_>, tree: &Arc<Tree>, index: usize) -> PyResult<Py<SqlTreeNode>> {
     Py::new(
         py,
         SqlTreeNode {
-            kind: DOCUMENT_KIND,
-            line: 1,
-            column: 1,
-            children: statements,
+            tree: Arc::clone(tree),
+            index,
         },
     )
 }

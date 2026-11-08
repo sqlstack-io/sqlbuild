@@ -2,6 +2,7 @@
 
 use sqlquack_syntax::{CallMode, Expression, ParseOptions};
 
+use crate::sql_tree::constants::GUARD_CODE_PREFIX;
 use crate::sql_tree::errors::SqlTreeError;
 use crate::sql_tree::models::TreeParser;
 
@@ -14,7 +15,7 @@ pub(crate) fn parse(sql: &str, parser: TreeParser) -> Result<Vec<Expression>, Sq
             &ParseOptions::default(),
             CallMode::FaithfulLocated,
         )
-        .map_err(|error| SqlTreeError::Parse(error.to_string())),
+        .map_err(|error| shared_error(&error.to_string())),
         TreeParser::Postgres => {
             let parsed = sqlquack_syntax_postgres::parse_strict(sql).map_err(|failure| {
                 match failure.parse_error() {
@@ -30,5 +31,14 @@ pub(crate) fn parse(sql: &str, parser: TreeParser) -> Result<Vec<Expression>, Sq
             }
             Ok(parsed.statements)
         }
+    }
+}
+
+/// A shared-parser failure: a guard limit, such as nesting depth, is unanalysable, not a syntax error.
+fn shared_error(message: &str) -> SqlTreeError {
+    if message.contains(GUARD_CODE_PREFIX) {
+        SqlTreeError::Unanalysable(message.to_owned())
+    } else {
+        SqlTreeError::Parse(message.to_owned())
     }
 }

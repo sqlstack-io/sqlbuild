@@ -16,3 +16,5 @@ pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
 /// Stack for the parse-and-walk worker, so deep SQL reaches the parser's depth limit, not a stack overflow.
 pub(crate) const TREE_WORKER_STACK_BYTES: usize = 16 * 1024 * 1024;
+/// The prefix of the shared parser's guard codes, such as `E_GUARD_NESTING_DEPTH_EXCEEDED`.
+pub(crate) const GUARD_CODE_PREFIX: &str = "E_GUARD_";

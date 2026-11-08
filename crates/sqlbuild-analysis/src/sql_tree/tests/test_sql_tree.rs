@@ -93,6 +93,12 @@ fn given_sql_without_a_full_tree_when_building_a_rule_tree_then_the_reason_is_re
             expected_error: |error| matches!(error, SqlTreeError::Unanalysable(_)),
         },
         TreeFailureTestCase {
+            description: "the shared parser's nesting limit is unanalysable, not a syntax error",
+            dialect: "duckdb",
+            sql: format!("SELECT {}1{}", "(".repeat(1_000), ")".repeat(1_000)),
+            expected_error: |error| matches!(error, SqlTreeError::Unanalysable(_)),
+        },
+        TreeFailureTestCase {
             description: "a shared-parser syntax error",
             dialect: "sqlite",
             sql: "SELECT FROM WHERE (".to_owned(),
