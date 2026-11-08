@@ -6,15 +6,15 @@ use crate::analysis_route::constants::{
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeFamily};
 
-/// `spelling` with each SQL alias Polyglot renames respelt and read by the type fallback, with
-/// Polyglot's family for a top-level alias the fallback types differently; `None` when empty.
+/// `spelling` respelt through Polyglot's ClickHouse aliases, with Polyglot's family; `None` if empty.
 pub(crate) fn clickhouse_spelling(spelling: &str) -> Option<NormalizedType> {
     let written: &str = spelling.trim();
     if written.is_empty() {
         return None;
     }
-    let mut renamed: bool = false;
-    let respelt: Option<String> = respelt(written, &mut renamed).filter(|_| renamed);
+    let respelt: Option<String> = respelt(written)
+        .filter(|(_, renamed)| *renamed)
+        .map(|(text, _)| text);
     let text: &str = respelt.as_deref().unwrap_or(written);
     let mut normalized: NormalizedType = normalize_text_type(text, None);
     let family: Option<TypeFamily> = respelt
@@ -40,53 +40,52 @@ fn alias_family(name: &str) -> Option<TypeFamily> {
         .and_then(|(_, _, family)| *family)
 }
 
-/// One type: its name, renamed through the alias table, and its arguments, each type respelt.
-fn respelt(written: &str, renamed: &mut bool) -> Option<String> {
+/// One type respelt through the alias table, with whether any name in it was renamed.
+fn respelt(written: &str) -> Option<(String, bool)> {
     let (name, rest) = type_name(written)?;
     let rest: &str = rest.trim_start();
     if CLICKHOUSE_VERBATIM_TYPES
         .iter()
         .any(|verbatim| verbatim.eq_ignore_ascii_case(&name))
     {
-        return Some(format!("{name}{rest}"));
+        return Some((format!("{name}{rest}"), false));
     }
-    let arguments: String = if rest.is_empty() {
-        String::new()
+    let (arguments, renamed): (String, bool) = if rest.is_empty() {
+        (String::new(), false)
     } else {
         let inner: &str = rest.strip_prefix('(')?.strip_suffix(')')?;
         let written: Vec<&str> = split_arguments(inner)?;
-        let respelt: Vec<String> = written
+        let respelt: Vec<(String, bool)> = written
             .iter()
-            .map(|argument| argument_respelt(argument.trim(), renamed))
+            .map(|argument| argument_respelt(argument.trim()))
             .collect::<Option<_>>()?;
+        let renamed: bool = respelt.iter().any(|(_, renamed)| *renamed);
+        let respelt: Vec<String> = respelt.into_iter().map(|(text, _)| text).collect();
         if let ([only_written], [only]) = (written.as_slice(), respelt.as_slice())
             && name.eq_ignore_ascii_case(NULLABLE_WRAPPER)
             && !wraps_nullable(only_written.trim())
             && wraps_nullable(only)
         {
-            return Some(only.clone());
+            return Some((only.clone(), renamed));
         }
-        format!("({})", respelt.join(", "))
+        (format!("({})", respelt.join(", ")), renamed)
     };
     match alias(&name) {
-        Some(template) => {
-            *renamed = true;
-            Some(template.replacen("{}", &arguments, 1))
-        }
-        None => Some(format!("{name}{arguments}")),
+        Some(template) => Some((template.replacen("{}", &arguments, 1), true)),
+        None => Some((format!("{name}{arguments}"), renamed)),
     }
 }
 
-/// A literal argument as written, or a type argument respelt.
-fn argument_respelt(argument: &str, renamed: &mut bool) -> Option<String> {
+/// A literal argument as written, or a type argument respelt, with whether it was renamed.
+fn argument_respelt(argument: &str) -> Option<(String, bool)> {
     let literal: bool = argument
         .bytes()
         .next()
         .is_some_and(|byte| byte.is_ascii_digit() || matches!(byte, b'\'' | b'-'));
     if literal {
-        Some(argument.to_owned())
+        Some((argument.to_owned(), false))
     } else {
-        respelt(argument, renamed)
+        respelt(argument)
     }
 }
 

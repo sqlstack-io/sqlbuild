@@ -21,9 +21,7 @@ pub(crate) const CLICKHOUSE_STUB_PREFIX: &str = "__sqlbuild_";
 pub(crate) const STATEMENTS_CONSTRUCT: &str = "more than one statement";
 /// The construct of a statement a parser kept as unparsed text.
 pub(crate) const UNPARSED_STATEMENT_CONSTRUCT: &str = "unparsed statement";
-/// Each SQL type alias whose name Polyglot respells for ClickHouse, case-insensitive, with the
-/// spelling SQLBuild's type fallback reads as Polyglot's canonical name (`{}` keeps the arguments)
-/// and, where the fallback's family differs from Polyglot's, Polyglot's family at the top level.
+/// Polyglot's ClickHouse respelling of each SQL type alias (`{}` keeps the arguments) and family.
 pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str, Option<TypeFamily>)] = &[
     ("BOOLEAN", "Bool", None),
     ("CHAR", "String", None),
