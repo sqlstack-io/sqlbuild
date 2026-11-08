@@ -102,7 +102,7 @@ describe('column lineage mapping', () => {
 	const nodes = toCatalogNodes([node('model:raw_orders', { materialization: 'view' }), node('model:orders', { materialization: 'table' })]);
 	const edge = (source: string, target: string, transform: string): W['ColumnLineageEdge'] => ({ source_key: 'model:raw_orders', source_column: source, target_key: 'model:orders', target_column: target, transform });
 
-	it('keeps a name through direct or star as a passthrough, a new name as a rename, and anything else as a transform', () => {
+	it('keeps a name through direct or star as a passthrough, a new name as a rename, and names any other transform', () => {
 		const lineage = toColumnLineage(
 			{
 				snapshot_id: 's',
@@ -115,11 +115,11 @@ describe('column lineage mapping', () => {
 			},
 			nodes
 		);
-		expect(lineage?.edges.map(([, target, lens]) => [target, lens])).toEqual([
-			['model:orders.id', 'passthrough'],
-			['model:orders.note', 'passthrough'],
-			['model:orders.customer_id', 'rename'],
-			['model:orders.amount', 'transform']
+		expect(lineage?.edges.map(([, target, lens, label]) => [target, lens, label])).toEqual([
+			['model:orders.id', 'passthrough', undefined],
+			['model:orders.note', 'passthrough', undefined],
+			['model:orders.customer_id', 'rename', undefined],
+			['model:orders.amount', 'transform', 'Cast']
 		]);
 		expect(lineage?.models.map((m) => [m.id, m.name, m.kind, m.columns])).toEqual([
 			['model:raw_orders', 'raw_orders', 'view', [{ name: 'amount', type: '' }]],

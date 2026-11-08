@@ -9,7 +9,8 @@
 		kind: string;
 		status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none';
 		lens?: Lens;
-		lensLabel?: Record<Lens, string>;
+		/** What the incoming edge does, such as `Cast`. */
+		label?: string;
 		focal?: boolean;
 		active?: boolean;
 	};
@@ -32,21 +33,22 @@
 <div
 	class="overflow-hidden rounded-[2px] border bg-[var(--card)]"
 	data-colid={id}
-	style:width="190px"
+	style:min-width="190px"
+	style:max-width="320px"
 	style:border-color={d.focal || d.active ? 'var(--primary)' : 'var(--node-border)'}
 	style:box-shadow={d.focal ? '0 0 0 1px var(--primary)' : 'none'}
 >
 	<Handle type="target" position={Position.Left} style="width:7px;height:7px;background:var(--sb-edge);border:none;" />
 	<!-- column (primary) -->
 	<div class="flex items-center gap-2 px-3 py-2" style:border-left="3px solid {statusColor[d.status]}">
-		<span class="truncate font-mono text-[12.5px] font-medium text-foreground">{d.column}</span>
+		<span class="font-mono text-[12.5px] font-medium text-foreground [overflow-wrap:anywhere]">{d.column}</span>
 	</div>
 	<!-- model (context) -->
 	<div class="flex items-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-1.5">
-		<KindIcon size={11} color={kindColor} />
-		<span class="text-muted-foreground truncate text-[12px]">{d.model}</span>
-		{#if d.lens && d.lensLabel}
-			<span class="ml-auto shrink-0 text-[11.5px]" class:font-semibold={d.lens === 'transform'} style:color={d.lens === 'transform' ? 'var(--foreground)' : 'var(--sb-text-faint)'}>{d.lensLabel[d.lens]}</span>
+		<KindIcon size={11} color={kindColor} class="shrink-0" />
+		<span class="text-muted-foreground min-w-0 text-[12px] [overflow-wrap:anywhere]">{d.model}</span>
+		{#if d.lens && d.label}
+			<span class="ml-auto shrink-0 pl-2 text-[11.5px]" class:font-semibold={d.lens === 'transform'} style:color={d.lens === 'transform' ? 'var(--foreground)' : 'var(--sb-text-faint)'}>{d.label}</span>
 		{:else}
 			<span class="text-[var(--sb-text-faint)] ml-auto text-[11px]">{d.kind}</span>
 		{/if}

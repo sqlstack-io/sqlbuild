@@ -194,8 +194,8 @@ export type ColumnLens = 'raw' | 'passthrough' | 'rename' | 'transform';
 
 export type ColumnLineage = {
 	models: { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none'; columns: { name: string; type: string }[] }[];
-	/** `model.column` pairs from upstream to downstream. */
-	edges: [string, string, ColumnLens][];
+	/** `model.column` pairs from upstream to downstream, with an optional label naming the transform, such as `Cast`. */
+	edges: [string, string, ColumnLens, string?][];
 	sql: Record<string, string>;
 	/** The defining expression of each column, per model. */
 	expressions: Record<string, Record<string, string>>;

@@ -112,6 +112,12 @@ function lensOf(edge: Wire['ColumnLineageEdge']): ColumnLens {
 	return edge.source_column === edge.target_column ? 'passthrough' : 'rename';
 }
 
+/** The compiler's transform kind as a label, such as `Cast`; passthroughs and renames keep the lens's own name. */
+function transformLabel(edge: Wire['ColumnLineageEdge']): string | undefined {
+	if (lensOf(edge) !== 'transform') return undefined;
+	return edge.transform === 'unknown' ? 'Transformed' : edge.transform.charAt(0).toUpperCase() + edge.transform.slice(1);
+}
+
 /**
  * Column lineage around one node, named and coloured from the catalog listing. The read carries no
  * SQL or expressions, so those stay empty; null before a snapshot publishes lineage for the node.
@@ -125,7 +131,7 @@ export function toColumnLineage(read: Wire['ColumnLineageRead'], nodes: CatalogN
 			const columns = n.columns.map((c) => ({ name: c.name, type: c.data_type ?? '' }));
 			return node ? [{ id: n.node_key, name: shortName(n.node_key), kind: node.kind, status: cardStatus(node), columns }] : [];
 		}),
-		edges: read.edges.map((e) => [`${e.source_key}.${e.source_column}`, `${e.target_key}.${e.target_column}`, lensOf(e)]),
+		edges: read.edges.map((e) => [`${e.source_key}.${e.source_column}`, `${e.target_key}.${e.target_column}`, lensOf(e), transformLabel(e)]),
 		sql: {},
 		expressions: {}
 	};
