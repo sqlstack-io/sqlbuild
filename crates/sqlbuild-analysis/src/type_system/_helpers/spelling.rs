@@ -2,8 +2,6 @@
 
 use serde_json::Value;
 
-use crate::type_system::constants::GENERIC_TYPE_DIALECTS;
-
 /// A dialect whose type spellings SQLBuild knows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SpellingDialect {
@@ -16,7 +14,6 @@ pub(crate) enum SpellingDialect {
     Tsql,
     Sqlite,
     ClickHouse,
-    MySql,
 }
 
 impl SpellingDialect {
@@ -26,14 +23,12 @@ impl SpellingDialect {
             "" | "generic" => Self::Generic,
             "snowflake" => Self::Snowflake,
             "bigquery" => Self::BigQuery,
-            "duckdb" => Self::DuckDb,
+            "duckdb" | "motherduck" => Self::DuckDb,
             "databricks" => Self::Databricks,
             "postgres" | "postgresql" => Self::Postgres,
             "tsql" | "mssql" | "sqlserver" => Self::Tsql,
             "sqlite" => Self::Sqlite,
             "clickhouse" => Self::ClickHouse,
-            "mysql" => Self::MySql,
-            other if GENERIC_TYPE_DIALECTS.contains(&other) => Self::Generic,
             _ => return None,
         })
     }
@@ -102,7 +97,7 @@ impl Speller<'_> {
     /// A boolean or numeric type; false for any other tag.
     fn number_type(&mut self, tree: &Value, tag: &str, map_key: bool) -> bool {
         use SpellingDialect::{
-            BigQuery, ClickHouse, Databricks, MySql, Postgres, Snowflake, Sqlite, Tsql,
+            BigQuery, ClickHouse, Databricks, Postgres, Snowflake, Sqlite, Tsql,
         };
         let dialect: SpellingDialect = self.dialect;
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
@@ -166,7 +161,7 @@ impl Speller<'_> {
             }
             "float" => {
                 let name: &str = if flag("real_spelling")
-                    && !matches!(dialect, Databricks | Snowflake | BigQuery | MySql)
+                    && !matches!(dialect, Databricks | Snowflake | BigQuery)
                 {
                     "REAL"
                 } else {
@@ -205,7 +200,7 @@ impl Speller<'_> {
     /// A text, binary, JSON or UUID type; false for any other tag.
     fn text_type(&mut self, tree: &Value, tag: &str, map_key: bool) -> bool {
         use SpellingDialect::{
-            BigQuery, ClickHouse, Databricks, DuckDb, MySql, Postgres, Snowflake, Sqlite, Tsql,
+            BigQuery, ClickHouse, Databricks, DuckDb, Postgres, Snowflake, Sqlite, Tsql,
         };
         let dialect: SpellingDialect = self.dialect;
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
@@ -222,7 +217,6 @@ impl Speller<'_> {
             },
             "var_char" => match dialect {
                 DuckDb | Sqlite => self.sized("TEXT", length),
-                MySql if length.is_none() => self.write("TEXT"),
                 Databricks if length.is_none() => self.write("STRING"),
                 _ => self.sized("VARCHAR", length),
             },
@@ -238,7 +232,7 @@ impl Speller<'_> {
                 _ => self.sized("TEXT", length),
             },
             "string" => match dialect {
-                Postgres | MySql if length.is_none() => self.write("TEXT"),
+                Postgres if length.is_none() => self.write("TEXT"),
                 Postgres => self.sized("VARCHAR", length),
                 Tsql if length.is_none() => self.write("VARCHAR(MAX)"),
                 Tsql => self.sized("VARCHAR", length),
@@ -279,7 +273,6 @@ impl Speller<'_> {
             },
             "uuid" => match dialect {
                 Tsql => self.write("UNIQUEIDENTIFIER"),
-                MySql => self.write("CHAR(36)"),
                 BigQuery | Databricks => self.write("STRING"),
                 _ => self.write("UUID"),
             },
@@ -290,7 +283,7 @@ impl Speller<'_> {
 
     /// A date, time, timestamp or interval type; false for any other tag.
     fn time_type(&mut self, tree: &Value, tag: &str) -> bool {
-        use SpellingDialect::{BigQuery, ClickHouse, Databricks, DuckDb, MySql, Postgres, Tsql};
+        use SpellingDialect::{BigQuery, ClickHouse, Databricks, DuckDb, Postgres, Tsql};
         let dialect: SpellingDialect = self.dialect;
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
         let flag = |key: &str| tree.get(key).and_then(Value::as_bool).unwrap_or(false);
@@ -318,7 +311,6 @@ impl Speller<'_> {
                     BigQuery if timezone => self.write("TIMESTAMP"),
                     BigQuery => self.write("DATETIME"),
                     DuckDb if timezone => self.write("TIMESTAMPTZ"),
-                    MySql => self.sized("TIMESTAMP", precision),
                     _ if timezone => self.sized("TIMESTAMPTZ", precision),
                     _ => self.sized("TIMESTAMP", precision),
                 }
@@ -339,7 +331,7 @@ impl Speller<'_> {
 
     /// A nested, custom or other type.
     fn other_type(&mut self, tree: &Value, tag: &str) {
-        use SpellingDialect::{ClickHouse, DuckDb, Generic, MySql, Postgres, Snowflake, Tsql};
+        use SpellingDialect::{ClickHouse, DuckDb, Generic, Postgres, Snowflake, Tsql};
         let dialect: SpellingDialect = self.dialect;
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
         match tag {
@@ -363,7 +355,6 @@ impl Speller<'_> {
                         self.write(")");
                     }
                     Tsql => self.write("NVARCHAR(MAX)"),
-                    MySql => self.write("JSON"),
                     _ => {
                         self.write("ARRAY<");
                         self.data_type(element, false);
@@ -424,7 +415,7 @@ impl Speller<'_> {
                 let name: &str = tree.get("name").and_then(Value::as_str).unwrap_or("");
                 self.write(&custom_name(name, dialect));
             }
-            _ if matches!(dialect, Generic | MySql) => self.write(&tag.to_ascii_uppercase()),
+            _ if dialect == Generic => self.write(&tag.to_ascii_uppercase()),
             _ => self.write(&tag.to_ascii_uppercase().replace('_', "")),
         }
     }
@@ -492,13 +483,6 @@ fn custom_name(name: &str, dialect: SpellingDialect) -> String {
             format!("{}{arguments}", base_upper.replace('_', ""))
         }
         (SpellingDialect::Tsql, "VARIANT") => "SQL_VARIANT".to_owned(),
-        (SpellingDialect::MySql, "GEOGRAPHY") => {
-            let srid: &str = arguments.trim_matches(['(', ')']);
-            format!(
-                "GEOMETRY SRID {}",
-                if srid.is_empty() { "4326" } else { srid }
-            )
-        }
         (
             SpellingDialect::BigQuery | SpellingDialect::ClickHouse | SpellingDialect::Snowflake,
             _,

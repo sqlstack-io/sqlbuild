@@ -9,33 +9,6 @@ pub(crate) const FLOAT_TYPE_NAMES: &[&str] = &["DOUBLE", "FLOAT", "FLOAT64", "RE
 pub(crate) const INTEGER_TYPE_NAMES: &[&str] = &[
     "BIGINT", "INT", "INT64", "INTEGER", "LONG", "SMALLINT", "TINYINT",
 ];
-/// The other dialects SQL analysis accepts, which have no type rules of their own.
-pub(crate) const GENERIC_TYPE_DIALECTS: &[&str] = &[
-    "athena",
-    "cockroachdb",
-    "datafusion",
-    "doris",
-    "dremio",
-    "drill",
-    "druid",
-    "dune",
-    "exasol",
-    "fabric",
-    "hive",
-    "materialize",
-    "oracle",
-    "presto",
-    "redshift",
-    "risingwave",
-    "singlestore",
-    "solr",
-    "spark",
-    "starrocks",
-    "tableau",
-    "teradata",
-    "tidb",
-    "trino",
-];
 /// The deepest type nesting SQLBuild reads: SQLQuack's syntax tree depth.
 pub(crate) const MAX_TYPE_NESTING: usize = 512;
 /// The type nesting read on the caller's stack; deeper types get their own.

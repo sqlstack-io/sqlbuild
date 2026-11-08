@@ -213,9 +213,9 @@ def test_given_generated_types_when_normalizing_then_every_known_dialect_answers
             expected_parse_error_logged=True,
         ),
         TypeNormalizationTestCase(
-            description="a dialect outside the old native build",
+            description="MotherDuck reads types as DuckDB",
             type_sql="INT",
-            dialect="mysql",
+            dialect="motherduck",
             expected_type=NormalizedType(normalized_name="INT", family=TypeFamily.INTEGER),
             expected_parse_error_logged=False,
         ),
@@ -244,9 +244,9 @@ def test_given_type_when_normalizing_then_python_shape_is_returned(
     "test_case",
     [
         UnknownDialectTypeTestCase(
-            description="a dialect name SQLBuild does not know",
-            dialect="motherduck",
-            expected_error="ValueError: Unknown dialect: motherduck",
+            description="a dialect no SQLBuild adapter ships",
+            dialect="mysql",
+            expected_error="ValueError: Unknown dialect: mysql",
         ),
     ],
     ids=lambda case: case.description,

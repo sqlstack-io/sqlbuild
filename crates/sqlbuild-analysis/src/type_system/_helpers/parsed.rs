@@ -34,7 +34,6 @@ pub(crate) fn parse_type(type_sql: &str, dialect: SpellingDialect) -> Result<Val
         SpellingDialect::Postgres => TypeParser::Postgres,
         SpellingDialect::BigQuery => TypeParser::BigQuery,
         SpellingDialect::Generic
-        | SpellingDialect::MySql
         | SpellingDialect::Databricks
         | SpellingDialect::Tsql
         | SpellingDialect::ClickHouse => return read_type(type_sql, dialect),

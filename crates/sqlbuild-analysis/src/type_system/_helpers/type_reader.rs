@@ -26,6 +26,8 @@ pub(crate) fn read_type(type_sql: &str, dialect: SpellingDialect) -> Result<Valu
 enum Token {
     Word(String),
     Quoted(String),
+    /// A single-quoted string, such as a ClickHouse enum member or time zone.
+    Literal(String),
     Number(String),
     Punct(char),
 }
@@ -33,8 +35,20 @@ enum Token {
 impl Token {
     fn text(&self) -> String {
         match self {
-            Self::Word(text) | Self::Quoted(text) | Self::Number(text) => format!("'{text}'"),
+            Self::Word(text) | Self::Quoted(text) | Self::Literal(text) | Self::Number(text) => {
+                format!("'{text}'")
+            }
             Self::Punct(character) => format!("'{character}'"),
+        }
+    }
+
+    /// The token as a type name writes it.
+    fn source(&self) -> String {
+        match self {
+            Self::Word(text) | Self::Number(text) => text.clone(),
+            Self::Quoted(text) => format!("\"{text}\""),
+            Self::Literal(text) => format!("'{}'", text.replace('\'', "''")),
+            Self::Punct(character) => character.to_string(),
         }
     }
 }
@@ -78,7 +92,13 @@ fn tokens(type_sql: &str, dialect: SpellingDialect) -> Result<Vec<Token>, String
             }
             tokens.push(Token::Quoted(characters[start..index].iter().collect()));
             index += 1;
-        } else if "()<>,[]:;".contains(character) {
+        } else if character == '\'' && dialect == SpellingDialect::ClickHouse {
+            let (literal, end) = literal(&characters, index)?;
+            tokens.push(Token::Literal(literal));
+            index = end;
+        } else if "()<>,[]:;".contains(character)
+            || ("=-".contains(character) && dialect == SpellingDialect::ClickHouse)
+        {
             tokens.push(Token::Punct(character));
             index += 1;
         } else {
@@ -86,6 +106,30 @@ fn tokens(type_sql: &str, dialect: SpellingDialect) -> Result<Vec<Token>, String
         }
     }
     Ok(tokens)
+}
+
+/// The single-quoted string opening at `start`, with `''` and backslash escapes, and the index after it.
+fn literal(characters: &[char], start: usize) -> Result<(String, usize), String> {
+    let mut text: String = String::new();
+    let mut index: usize = start + 1;
+    loop {
+        match characters.get(index) {
+            None => return Err("unterminated string".to_owned()),
+            Some('\\') => {
+                text.extend(characters.get(index + 1));
+                index += 2;
+            }
+            Some('\'') if characters.get(index + 1) == Some(&'\'') => {
+                text.push('\'');
+                index += 2;
+            }
+            Some('\'') => return Ok((text, index + 1)),
+            Some(&character) => {
+                text.push(character);
+                index += 1;
+            }
+        }
+    }
 }
 
 /// The closing quote of a quoted name `open` starts in `dialect`.
@@ -354,10 +398,13 @@ impl Reader<'_> {
         }
         let mut parameters: Vec<String> = Vec::new();
         loop {
-            match self.next() {
-                Some(Token::Number(number)) => parameters.push(number),
-                Some(Token::Word(word)) => parameters.push(word),
-                _ => return Err(format!("expected a parameter of {name}")),
+            match self.dialect {
+                SpellingDialect::ClickHouse => parameters.push(self.clickhouse_parameter(&name)?),
+                _ => match self.next() {
+                    Some(Token::Number(number)) => parameters.push(number),
+                    Some(Token::Word(word)) => parameters.push(word),
+                    _ => return Err(format!("expected a parameter of {name}")),
+                },
             }
             if !self.eat_punct(',') {
                 break;
@@ -365,6 +412,42 @@ impl Reader<'_> {
         }
         self.expect_punct(')')?;
         Ok(json!({"data_type": "custom", "name": format!("{name}({})", parameters.join(", "))}))
+    }
+
+    /// One ClickHouse type parameter as written: a nested type, as in `Nullable(DateTime64(3))`,
+    /// a named tuple field, or an enum member and its value.
+    fn clickhouse_parameter(&mut self, name: &str) -> Result<String, String> {
+        let mut text: String = String::new();
+        let mut depth: usize = 0;
+        let mut spaced: bool = false;
+        loop {
+            let token: Token = match self.peek() {
+                None => return Err(format!("expected ')' after the parameters of {name}")),
+                Some(Token::Punct(',' | ')')) if depth == 0 => break,
+                Some(token) => token.clone(),
+            };
+            self.position += 1;
+            let word: bool = !matches!(token, Token::Punct(_));
+            match token {
+                Token::Punct('(') => depth += 1,
+                Token::Punct(')') => depth -= 1,
+                _ => {}
+            }
+            if token == Token::Punct('=') {
+                text.push_str(" = ");
+                spaced = false;
+                continue;
+            }
+            if word && spaced {
+                text.push(' ');
+            }
+            text.push_str(&token.source());
+            spaced = word;
+        }
+        if text.is_empty() {
+            return Err(format!("expected a parameter of {name}"));
+        }
+        Ok(text)
     }
 
     /// The optional length of an integer or character type; empty parentheses state none.

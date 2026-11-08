@@ -87,16 +87,44 @@ fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
             ),
         },
         NormalizeTypeTestCase {
-            description: "another SQL analysis dialect reads types as generic SQL",
-            type_sql: "INT",
-            dialect: "mysql",
-            expected_normalization: Ok("INT | integer | - | - | - | -"),
+            description: "MotherDuck reads and spells types as DuckDB",
+            type_sql: "STRUCT(a INT, b VARCHAR(10))[]",
+            dialect: "motherduck",
+            expected_normalization: Ok("STRUCT(AINT,BTEXT(10))[] | other | - | - | - | -"),
         },
         NormalizeTypeTestCase {
-            description: "a dialect name SQLBuild does not know raises Python's error",
+            description: "a ClickHouse nested type argument, as cursor types arrive upper-cased",
+            type_sql: "NULLABLE(DATETIME64(3))",
+            dialect: "clickhouse",
+            expected_normalization: Ok("NULLABLE(DATETIME64(3)) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "a ClickHouse enum member and its value",
+            type_sql: "ENUM8('a' = 1, 'it''s' = -2)",
+            dialect: "clickhouse",
+            expected_normalization: Ok("ENUM8('A'=1,'IT''S'=-2) | other | - | - | - | -"),
+        },
+        NormalizeTypeTestCase {
+            description: "a ClickHouse named tuple field",
+            type_sql: "TUPLE(a INT64, b LOWCARDINALITY(NULLABLE(STRING)))",
+            dialect: "clickhouse",
+            expected_normalization: Ok(
+                "TUPLE(AINT64,BLOWCARDINALITY(NULLABLE(STRING))) | other | - | - | - | -",
+            ),
+        },
+        NormalizeTypeTestCase {
+            description: "an enum member outside ClickHouse falls back to the text",
+            type_sql: "ENUM8('a' = 1)",
+            dialect: "tsql",
+            expected_normalization: Ok(
+                "ENUM8('A'=1) | other | - | - | - | unexpected character '''",
+            ),
+        },
+        NormalizeTypeTestCase {
+            description: "a dialect no SQLBuild adapter ships raises Python's error",
             type_sql: "INT",
-            dialect: "motherduck",
-            expected_normalization: Err("Unknown dialect: motherduck"),
+            dialect: "mysql",
+            expected_normalization: Err("Unknown dialect: mysql"),
         },
         NormalizeTypeTestCase {
             description: "non-ASCII text upper-cases with Python's Unicode mapping",
