@@ -5,8 +5,8 @@ use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax_postgres::{Parsed, StrictFailure, format_type, parse_strict, parse_type};
 
 use crate::analysis_route::constants::{
-    POSTGRES_DIALECT, POSTGRES_TEMPORAL_SPELLINGS, POSTGRES_TYPE_SPELLINGS,
-    UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+    POSTGRES_DIALECT, POSTGRES_TEMPORAL_SPELLINGS, POSTGRES_TYPE_SPELLINGS, UNQUOTED_STUB_PREFIX,
+    UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{ParserGap, PostgresDialect};
 use crate::analysis_route::types::NativeDialect;

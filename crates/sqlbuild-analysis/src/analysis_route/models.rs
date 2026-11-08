@@ -156,6 +156,7 @@ pub struct BigQueryDialect;
 #[derive(Debug)]
 pub(crate) struct BigQueryTypes<'a> {
     pub(crate) schema: &'a dyn LineageSchema,
+}
 
 /// ClickHouse, whose SQL SQLQuack's ClickHouse parser reads.
 #[derive(Clone, Copy, Debug)]

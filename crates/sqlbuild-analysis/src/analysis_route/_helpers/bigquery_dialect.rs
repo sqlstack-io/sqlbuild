@@ -9,10 +9,9 @@ use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 
 use crate::analysis_route::_helpers::native_analysis::native_analysis;
 use crate::analysis_route::constants::{
-    BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, CAST_TYPE_PREFIX, DECIMAL_RADIX,
-    NUMERIC_DIGITS, POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES,
-    POLYGLOT_TOP_LEVEL_TYPE_NAMES, RANGE_ELEMENT_TYPES, RANGE_TYPE_NAME, UNQUOTED_STUB_PREFIX,
-    UNSCANNED_CONSTRUCT,
+    BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, CAST_TYPE_PREFIX, DECIMAL_RADIX, NUMERIC_DIGITS,
+    POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES, POLYGLOT_TOP_LEVEL_TYPE_NAMES,
+    RANGE_ELEMENT_TYPES, RANGE_TYPE_NAME, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{
     AnalysisInput, BigQueryDialect, BigQueryTypes, NativeAnalysis, ParserGap,
