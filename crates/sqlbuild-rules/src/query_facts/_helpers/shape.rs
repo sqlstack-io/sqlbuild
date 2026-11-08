@@ -1,6 +1,6 @@
 use crate::query_facts::constants::{
-    CALL_STUB, PLACEHOLDER_PREFIX, PLACEHOLDER_VALUE, REF_STUB, SOURCE_STUB, TABLE_FUNCTION_CALL,
-    TABLE_FUNCTION_STUB, UDF_CALL, UDF_STUB,
+    CALL_STUB, PLACEHOLDER_PREFIX, PLACEHOLDER_VALUE, REF_STUB, SNOWFLAKE_DIALECT, SOURCE_STUB,
+    TABLE_FUNCTION_CALL, TABLE_FUNCTION_STUB, TABLE_WRAPPER, UDF_CALL, UDF_STUB,
 };
 use crate::query_facts::models::{CallKind, ModelCall, ModelShape};
 use crate::rules::main::compact_sql::compact_sql;
@@ -16,7 +16,12 @@ pub(crate) fn model_shape(sql: &str, dialect: &str) -> Result<ModelShape, String
         dollar_quotes: true,
         ..quote_policy(dialect)
     };
-    let (stubbed, stub_offsets, calls) = stub_calls(sql, policy, &dialect_lexical_syntax(dialect));
+    let (stubbed, stub_offsets, calls) = stub_calls(
+        sql,
+        policy,
+        &dialect_lexical_syntax(dialect),
+        dialect == SNOWFLAKE_DIALECT,
+    );
     let normalized = normalize_mapped(&stubbed, dialect)?;
     let end = stub_offsets.last().copied().unwrap_or_default();
     let offsets: Vec<usize> = normalized
@@ -118,10 +123,12 @@ fn quoted_name(sql: &str, open: usize) -> Option<(String, usize)> {
     (valid && sql.as_bytes().get(close) == Some(&b')')).then(|| (name.to_owned(), close))
 }
 
+/// `sql` with calls and placeholders stubbed, table functions optionally wrapped in `TABLE( )`.
 fn stub_calls(
     sql: &str,
     policy: QuotePolicy,
     syntax: &LexicalSyntax,
+    wrap_table_functions: bool,
 ) -> (String, Vec<usize>, Vec<ModelCall>) {
     let bytes = sql.as_bytes();
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
@@ -178,7 +185,25 @@ fn stub_calls(
             } else {
                 TABLE_FUNCTION_STUB
             };
-            edits.push((start, open, format!("{stub}{name}")));
+            let mut wrap_close = None;
+            if word == TABLE_FUNCTION_CALL
+                && wrap_table_functions
+                && !inside_table_wrapper(bytes, start)
+            {
+                let Ok(close) = dialect_matching_paren(bytes, open, syntax) else {
+                    continue;
+                };
+                wrap_close = Some(close);
+            }
+            let wrapper = if wrap_close.is_some() {
+                TABLE_WRAPPER
+            } else {
+                ""
+            };
+            edits.push((start, open, format!("{wrapper}{stub}{name}")));
+            if let Some(close) = wrap_close {
+                edits.push((close + 1, close + 1, ")".to_owned()));
+            }
             index = open;
             continue;
         }
@@ -201,8 +226,26 @@ fn stub_calls(
         edits.push((start, close + 1, format!("{}{number}", stub_prefix(kind))));
         index = close + 1;
     }
+    edits.sort_by_key(|(start, end, _)| (*start, *end));
     let (stubbed, offsets) = apply_edits(sql, edits);
     (stubbed, offsets, calls)
+}
+
+/// Whether the call at `start` is already written inside `TABLE( )`.
+fn inside_table_wrapper(bytes: &[u8], start: usize) -> bool {
+    let before = bytes[..start].trim_ascii_end();
+    let Some(before) = before.strip_suffix(b"(") else {
+        return false;
+    };
+    let before = before.trim_ascii_end();
+    let keyword = TABLE_WRAPPER.len() - 1;
+    before.len() >= keyword
+        && before[before.len() - keyword..]
+            .eq_ignore_ascii_case(&TABLE_WRAPPER.as_bytes()[..keyword])
+        && before
+            .len()
+            .checked_sub(keyword + 1)
+            .is_none_or(|index| !is_word_byte(before[index]))
 }
 
 /// `sql` with each edit applied, and per output character the input character it came from.
