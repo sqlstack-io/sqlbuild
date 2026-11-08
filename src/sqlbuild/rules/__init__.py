@@ -11,7 +11,9 @@ from sqlbuild._native import (
     RuleFile,
     RuleOption,
     RuleResult,
+    SqlDocument,
     SqlNode,
+    SqlTreeNode,
 )
 from sqlbuild.rule_engine.main.define import rule as _rule
 from sqlbuild.rule_engine.main.evaluate_rule import evaluate_rule
@@ -27,7 +29,9 @@ __all__ = (
     "RuleFile",
     "RuleOption",
     "RuleResult",
+    "SqlDocument",
     "SqlNode",
+    "SqlTreeNode",
     "evaluate_rule",
     "rule",
 )
