@@ -1,5 +1,21 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/admin/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPeople"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/people/{principal_id}": {
         parameters: {
             query?: never;
@@ -23,7 +39,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["listRoleHoldings"];
         put?: never;
         post: operations["assignBuiltinRole"];
         delete?: never;
@@ -1197,6 +1213,14 @@ export interface components {
             source_event_id: string;
             version_hash: string;
         };
+        /** @description A role every member of an SSO group holds. */
+        GroupRole: {
+            group_name: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            role_key: string;
+            target?: string | null;
+        };
         HeartbeatResponse: {
             cancel_requested: boolean;
         };
@@ -1492,6 +1516,38 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A role assigned to one person, everywhere or on one location and target. */
+        PersonRole: {
+            /** Format: uuid */
+            assignment_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+            role_key: string;
+            target?: string | null;
+        };
+        /** @description A person as administrators see them: how they sign in, their SSO groups and live sessions. */
+        PersonSummary: {
+            /**
+             * Format: int64
+             * @description Unrevoked, unexpired browser and CLI sessions.
+             */
+            active_sessions: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            disabled_at?: string | null;
+            /** @description Groups the identity provider reported at the person's last SSO sign-in. */
+            groups: string[];
+            has_password: boolean;
+            /** Format: date-time */
+            last_signed_in_at?: string | null;
+            name: string;
+            /** Format: uuid */
+            principal_id: string;
+        };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
             observation: components["schemas"]["CatalogObservation"];
@@ -1579,6 +1635,11 @@ export interface components {
             revoke?: boolean;
             role: components["schemas"]["RoleKey"];
             target?: string | null;
+        };
+        /** @description Who holds which role where: assigned to people here, or mapped to SSO groups in server config. */
+        RoleHoldings: {
+            assignments: components["schemas"]["PersonRole"][];
+            group_roles: components["schemas"]["GroupRole"][];
         };
         /** @description A built-in role by name, or a custom role a location publishes. */
         RoleKey: components["schemas"]["BuiltinRole"] | string;
@@ -2170,6 +2231,40 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listPeople: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonSummary"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     changeAdministrator: {
         parameters: {
             query?: never;
@@ -2203,6 +2298,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthenticationDenial"];
                 };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listRoleHoldings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleHoldings"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             403: {
                 headers: {

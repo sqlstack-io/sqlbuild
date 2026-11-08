@@ -44,6 +44,48 @@ pub struct SecurityAuditEvent {
     pub actor_name: Option<String>,
 }
 
+/// A person as administrators see them: how they sign in, their SSO groups and live sessions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonSummary {
+    pub principal_id: Uuid,
+    pub name: String,
+    pub created_at: DateTime<Utc>,
+    pub disabled_at: Option<DateTime<Utc>>,
+    pub has_password: bool,
+    /// Groups the identity provider reported at the person's last SSO sign-in.
+    pub groups: Vec<String>,
+    /// Unrevoked, unexpired browser and CLI sessions.
+    pub active_sessions: i64,
+    pub last_signed_in_at: Option<DateTime<Utc>>,
+}
+
+/// Who holds which role where: assigned to people here, or mapped to SSO groups in server config.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleHoldings {
+    pub assignments: Vec<PersonRole>,
+    pub group_roles: Vec<GroupRole>,
+}
+
+/// A role assigned to one person, everywhere or on one location and target.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonRole {
+    pub assignment_id: Uuid,
+    pub principal_id: Uuid,
+    pub name: String,
+    pub role_key: String,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// A role every member of an SSO group holds.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct GroupRole {
+    pub group_name: String,
+    pub role_key: String,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
 /// Installation configuration: rows past the horizon stay until every sink and retry lookup is done.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AuditRetention {
