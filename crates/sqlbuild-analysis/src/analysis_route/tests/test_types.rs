@@ -295,3 +295,29 @@ pub(super) struct TypeSpellingsTestCase {
     pub(super) spellings: &'static [&'static str],
     pub(super) expected_mismatches: &'static [&'static str],
 }
+
+pub(super) struct NormalizeTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
+pub(super) struct NormalizedTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: (&'static str, TypeFamily, [Option<i64>; 3]),
+}
+
+pub(super) struct ParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: String,
+    pub(super) expected_syntax: bool,
+    /// The byte offset of a syntax error; a limit has none worth comparing.
+    pub(super) expected_offset: Option<usize>,
+}
+
+pub(super) struct SessionTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: &'static str,
+}

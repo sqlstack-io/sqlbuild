@@ -1,5 +1,7 @@
 #[path = "tests/helpers.rs"]
 mod helpers;
+#[path = "tests/test_bigquery_dialect.rs"]
+mod test_bigquery_dialect;
 #[path = "tests/test_clickhouse_dialect.rs"]
 mod test_clickhouse_dialect;
 #[path = "tests/test_clickhouse_type_match.rs"]

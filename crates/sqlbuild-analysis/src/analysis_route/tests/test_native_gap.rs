@@ -34,7 +34,7 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
         RouteTestCase {
             description: "bigquery",
             dialect: Some("bigquery"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "databricks",

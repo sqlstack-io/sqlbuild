@@ -148,6 +148,15 @@ impl LineageSchema for StandInSchema {
     }
 }
 
+/// BigQuery, whose SQL SQLQuack's GoogleSQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct BigQueryDialect;
+
+/// A query's schema that also knows each type BigQuery's type grammar reads, such as RANGE<DATE>.
+#[derive(Debug)]
+pub(crate) struct BigQueryTypes<'a> {
+    pub(crate) schema: &'a dyn LineageSchema,
+
 /// ClickHouse, whose SQL SQLQuack's ClickHouse parser reads.
 #[derive(Clone, Copy, Debug)]
 pub struct ClickHouseDialect;

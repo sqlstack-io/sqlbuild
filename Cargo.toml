@@ -180,6 +180,7 @@ sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656
 sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 # The lossless SQL tokenizer behind query fingerprints.
 sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
+sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
