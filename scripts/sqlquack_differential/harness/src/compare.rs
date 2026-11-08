@@ -56,6 +56,8 @@ pub struct Comparison {
     pub polyglot_other: Vec<String>,
     /// SQLQuack's compared findings, as `<code> <message>`.
     pub sqlquack_findings: Vec<String>,
+    /// SQLQuack's other findings, such as its W2xx type findings, which no measure compares.
+    pub sqlquack_other: Vec<String>,
     pub differences: Vec<Difference>,
     /// The analysis SQL both engines read.
     pub sql: String,
@@ -155,9 +157,15 @@ pub fn compare_case(case: &Case) -> Comparison {
         sql: Some(&sql),
     };
     let lineage: QueryLineage = statement_lineage(statement, context);
-    let sqlquack_findings: Vec<String> = statement_name_findings(statement, context)
+    let (compared, other): (Vec<_>, Vec<_>) = statement_name_findings(statement, context)
+        .into_iter()
+        .partition(|finding| is_compared(finding.code));
+    let sqlquack_findings: Vec<String> = compared
         .iter()
-        .filter(|finding| is_compared(finding.code))
+        .map(|finding| format!("{} {}", finding.code, finding.message))
+        .collect();
+    let sqlquack_other: Vec<String> = other
+        .iter()
         .map(|finding| format!("{} {}", finding.code, finding.message))
         .collect();
     let resources: HashMap<String, (String, String)> = resources(case, profile);
@@ -183,6 +191,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         polyglot_findings,
         polyglot_other,
         sqlquack_findings,
+        sqlquack_other,
         differences,
         outputs: lineage
             .outputs
@@ -217,6 +226,7 @@ fn unmeasured(
         polyglot_findings,
         polyglot_other,
         sqlquack_findings: Vec::new(),
+        sqlquack_other: Vec::new(),
         differences: Vec::new(),
         sql: String::new(),
         outputs: Vec::new(),
