@@ -37,6 +37,8 @@ pub struct CompiledModelFacts {
     pub typed_calls: Vec<TypedCall>,
     /// The expansion passes from `authored_query_sql` to `query_sql`; empty when unknown.
     pub expansion_passes: Vec<Vec<CharSpan>>,
+    /// Whether analysis was skipped because the dialect's native parser cannot read the model.
+    pub sql_analysis_skipped: bool,
 }
 
 /// A model's effective config values with sorted keys, as the rules request has always read them.
@@ -222,6 +224,8 @@ pub struct PlainModel {
     pub typed_calls: Vec<TypedCall>,
     /// The expansion passes from `authored_query_sql` to `query_sql`; empty when unknown.
     pub expansion_passes: Vec<Vec<CharSpan>>,
+    /// Whether analysis was skipped because the dialect's native parser cannot read the model.
+    pub sql_analysis_skipped: bool,
 }
 
 /// A one-based line and column, counted in characters.

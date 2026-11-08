@@ -7,6 +7,8 @@ use pyo3::prelude::{
 };
 use pyo3::types::{PyDict, PyDictMethods, PyString, PyStringMethods, PyTuple};
 use pyo3::{FromPyObject, pyclass, pymethods};
+use sqlbuild_analysis::analysis_route::main::analysis_route::analysis_route;
+use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 use sqlbuild_analysis::compiled_project::main::analysis_gate::analysis_gate;
 use sqlbuild_analysis::compiled_project::main::calls_macros::calls_macros;
 use sqlbuild_analysis::compiled_project::main::located_scan_error::located_scan_error;
@@ -71,7 +73,7 @@ use crate::bindings::_helpers::input_loops::model_loop_macros::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
 use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out,
+    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out, skip_unreadable,
 };
 use crate::bindings::_helpers::input_loops::model_loop_prepass::{
     NativeHeader, all_header_facts, native_header,
@@ -139,8 +141,8 @@ positional_record! {
     }
 }
 
-/// `(analysis switches, project config path)`.
-type LoopSettingsInput = (LoopSwitches, String);
+/// `(analysis switches, project config path, the adapter's analysis dialect)`.
+type LoopSettingsInput = (LoopSwitches, String, Option<String>);
 
 /// The Python classes and error factory the loop builds usages, hooks and errors with.
 #[derive(FromPyObject)]
@@ -200,6 +202,8 @@ pub(crate) struct NativeModelLoop {
     pub(crate) reserved_markers: Vec<String>,
     pub(crate) settings: ModelLoopSettings,
     pub(crate) project_config_path: String,
+    /// Whether the dialect's SQL is analysed by Polyglot or by its native module.
+    pub(crate) route: AnalysisRoute,
     contract_classes: Py<PyDict>,
     loop_classes: Py<PyDict>,
 }
@@ -246,6 +250,7 @@ impl NativeModelLoop {
                 require_sql_analysis,
             },
             project_config_path,
+            dialect,
         ) = settings;
         Python::attach(|py| index_sql_hook_definitions(loop_classes.bind(py)))?;
         Ok(Self {
@@ -259,6 +264,7 @@ impl NativeModelLoop {
                 require_sql_analysis,
             },
             project_config_path,
+            route: analysis_route(dialect.as_deref()),
             contract_classes,
             loop_classes,
         })
@@ -707,7 +713,8 @@ impl NativeModelLoop {
             relative_path,
             contents,
         };
-        let (analysed, rejected_opt_out) = self.analysis(context, &opt_out_model)?;
+        let (analysed, rejected_opt_out, analysis_skipped) =
+            self.analysis(context, &opt_out_model)?;
         let scanned = match extract_sql_references(&query_sql, &self.syntax) {
             ReferenceExtraction::Extracted(scanned) => scanned,
             ReferenceExtraction::Failed(failure) => {
@@ -800,18 +807,20 @@ impl NativeModelLoop {
             references,
             declarations,
             analysis,
+            analysis_skipped,
             named_usages,
             macros: macros.map(|macros| macros.output),
             typed_calls,
         })
     }
 
-    /// Whether the model's SQL is analysed and its rejected opt-out; syntax is checked unless deferred.
+    /// Whether the model's SQL is analysed, its rejected opt-out, and whether its parser skipped it.
     fn analysis<'py>(
         &self,
         context: &LoopContext<'_, 'py>,
         model: &OptOutModel<'_, 'py>,
-    ) -> PyResult<(bool, Option<Bound<'py, PyAny>>)> {
+    ) -> PyResult<(bool, Option<Bound<'py, PyAny>>, bool)> {
+        let mut skipped: bool = false;
         let (analysed, rejected) =
             match analysis_gate(self.settings, analysis_override(model.values)?) {
                 AnalysisGate::Conflict => {
@@ -821,16 +830,24 @@ impl NativeModelLoop {
                         Some(ANALYSIS_CONFLICT_CODE),
                     ));
                 }
-                AnalysisGate::Enabled => (true, None),
+                AnalysisGate::Enabled => match self.route {
+                    AnalysisRoute::Legacy => (true, None),
+                    AnalysisRoute::Native(dialect) => {
+                        let read: bool = skip_unreadable(self.settings, dialect, context, model)?;
+                        skipped = !read;
+                        (read, None)
+                    }
+                },
                 AnalysisGate::Disabled => match rejected_opt_out(self, context, model)? {
                     OptOut::Accepted => (false, None),
                     OptOut::Rejected(location) => (true, Some(location)),
                 },
             };
-        if analysed && !self.settings.defer_sql_validation {
+        let legacy: bool = matches!(self.route, AnalysisRoute::Legacy);
+        if analysed && legacy && !self.settings.defer_sql_validation {
             reject_unparseable_query(context, model)?;
         }
-        Ok((analysed, rejected))
+        Ok((analysed, rejected, skipped))
     }
 
     /// The query with canonical cursor intrinsics, or the message the attachment raises.

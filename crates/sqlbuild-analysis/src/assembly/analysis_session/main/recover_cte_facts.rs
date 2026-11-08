@@ -5,17 +5,15 @@ use crate::assembly::analysis_session::_helpers::cte_facts::{
 };
 use crate::assembly::analysis_session::constants::CTE_FACT_WORKER_STACK_BYTES;
 use crate::assembly::analysis_session::models::{CteFactRequest, CteFacts};
+use crate::worker_stack::main::run_on_worker_stack::run_on_worker_stack;
 
 /// The facts enrichment recovers for the query, or why they are left to Python.
 pub fn recover_cte_facts(request: &CteFactRequest) -> Result<CteFacts, String> {
-    std::thread::scope(|scope| {
-        std::thread::Builder::new()
-            .stack_size(CTE_FACT_WORKER_STACK_BYTES)
-            .spawn_scoped(scope, || recovered_facts(request))
-            .map_err(|error| error.to_string())?
-            .join()
-            .map_err(|_| "native CTE fact recovery panicked".to_owned())?
-    })
+    run_on_worker_stack(
+        CTE_FACT_WORKER_STACK_BYTES,
+        "native CTE fact recovery panicked",
+        || recovered_facts(request),
+    )?
 }
 
 fn recovered_facts(request: &CteFactRequest) -> Result<CteFacts, String> {

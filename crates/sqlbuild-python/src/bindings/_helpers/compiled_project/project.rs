@@ -588,6 +588,7 @@ pub(crate) fn model_facts(model: ModelInputPy<'_>) -> PyResult<CompiledModelFact
         analysis: None,
         typed_calls: Vec::new(),
         expansion_passes: Vec::new(),
+        sql_analysis_skipped: false,
     })
 }
 

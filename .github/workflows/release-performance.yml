@@ -52,7 +52,7 @@ jobs:
         with:
           # Release tags identify the previous release before its wheels reach PyPI.
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.200.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.199.0...v0.200.0) (2026-11-08)
+
+
+### Features
+
+* **rules:** read custom-rule SQL syntax trees from SQLQuack parsers ([#1358](https://github.com/sqlstack-io/sqlbuild/issues/1358)) ([decd291](https://github.com/sqlstack-io/sqlbuild/commit/decd29162f9a47dd59c3690dd807d111e9937511))
+
+## [0.199.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.198.0...v0.199.0) (2026-11-08)
+
+
+### Features
+
+* **analysis:** route each dialect's SQL analysis to Polyglot or a native module ([#1354](https://github.com/sqlstack-io/sqlbuild/issues/1354)) ([97ab62c](https://github.com/sqlstack-io/sqlbuild/commit/97ab62c82a511e0fb79ff7f8626f3829a1845b80))
+
+
+### Bug Fixes
+
+* **ui:** wrap list toolbars instead of clipping their filters and counts ([#1349](https://github.com/sqlstack-io/sqlbuild/issues/1349)) ([702224e](https://github.com/sqlstack-io/sqlbuild/commit/702224e261e03f106e2a028acddedd3486e0939b))
+
 ## [0.198.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.197.0...v0.198.0) (2026-11-07)
 
 

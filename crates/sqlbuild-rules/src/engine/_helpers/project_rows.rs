@@ -64,6 +64,7 @@ pub(crate) fn model_row(facts: &CompiledModelFacts) -> Result<ModelRow, String> 
             .map(declaration)
             .collect(),
         typed_calls: facts.typed_calls.clone(),
+        sql_analysis_skipped: facts.sql_analysis_skipped,
     })
 }
 
