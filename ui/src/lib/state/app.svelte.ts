@@ -46,6 +46,7 @@ class AppState {
 	readonly capabilities = $derived([...(this.bootstrap?.capabilities ?? []), ...(this.location?.capabilities ?? [])]);
 
 	#started = false;
+	#syncRefused = new Set<string>();
 
 	constructor() {
 		this.client = createClient(new URLSearchParams(browser ? window.location.search : ''), () => this.#signIn());
@@ -154,11 +155,17 @@ class AppState {
 		if (!this.client.supports('getWarehouseSync')) return;
 		const scope = this.scope;
 		if (!scope) return;
+		// Each refusal is audited, so a target the person may not list is asked once per page load, not every poll.
+		if (this.#syncRefused.has(scope.locationId)) {
+			this.warehouseSync = null;
+			return;
+		}
 		try {
 			const sync = await this.client.getWarehouseSync(scope);
 			if (this.scope === scope) this.warehouseSync = sync;
-		} catch {
-			this.warehouseSync = null;
+		} catch (error) {
+			if (error instanceof ApiError && error.status === 403) this.#syncRefused.add(scope.locationId);
+			if (this.scope === scope) this.warehouseSync = null;
 		}
 	}
 
