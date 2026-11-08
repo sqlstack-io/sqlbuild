@@ -50,3 +50,4 @@ pub mod sql_test_attachment;
 pub mod sql_tokens;
 pub mod target_paths;
 pub mod type_system;
+pub mod warehouse_types;

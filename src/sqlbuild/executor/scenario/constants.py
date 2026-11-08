@@ -1,5 +1,9 @@
 """Scenario execution and local replay constants."""
 
+import re
+
+from sqlbuild.adapter.contract.types import TypeDialect
+
 SCENARIO_EXEC_FIXTURE_FAILED: str = "X501"
 SCENARIO_EXEC_SEED_FAILED: str = "X502"
 SCENARIO_EXEC_MODEL_FAILED: str = "X503"
@@ -35,6 +39,9 @@ LOCAL_TYPE_JSON: str = "JSON"
 LOCAL_TYPE_REAL: str = "REAL"
 LOCAL_TYPE_SMALLINT: str = "SMALLINT"
 LOCAL_TYPE_TEXT: str = "TEXT"
+LOCAL_TYPE_FLOAT: str = "FLOAT"
+LOCAL_TYPE_TIMETZ: str = "TIMETZ"
+LOCAL_TYPE_VARIANT: str = "VARIANT"
 LOCAL_TYPE_TIME: str = "TIME"
 LOCAL_TYPE_TIMESTAMP: str = "TIMESTAMP"
 LOCAL_TYPE_TIMESTAMPTZ: str = "TIMESTAMPTZ"
@@ -82,19 +89,29 @@ SNOWFLAKE_TIMESTAMP_NTZ_TYPE: str = "TIMESTAMP_NTZ"
 SNOWFLAKE_VECTOR_TYPE: str = "VECTOR"
 BIGQUERY_BIGNUMERIC_TYPE: str = "BIGNUMERIC"
 BIGQUERY_VARCHAR_TYPES: frozenset[str] = frozenset({"RANGE", "BYTES"})
-BIGQUERY_BYTES_TYPE: str = "BYTES"
 BIGQUERY_TIMESTAMP_TYPE: str = "TIMESTAMP"
 BIGQUERY_WIDEN_TO_DOUBLE_TYPES: frozenset[str] = frozenset({"FLOAT64"})
 DATABRICKS_TIMESTAMP_TYPE: str = "TIMESTAMP"
 DATABRICKS_TIMESTAMP_NTZ_TYPE: str = "TIMESTAMP_NTZ"
 DATABRICKS_VOID_TYPE: str = "VOID"
+DATABRICKS_INTERVAL_PREFIX: str = "INTERVAL"
+DATABRICKS_VARIANT_TYPE: str = "VARIANT"
+DATABRICKS_ARRAY_TYPE: str = "ARRAY"
+DATABRICKS_MAP_TYPE: str = "MAP"
+DATABRICKS_STRUCT_TYPE: str = "STRUCT"
+DATABRICKS_NESTED_TYPES: frozenset[str] = frozenset({"ARRAY", "MAP", "STRUCT"})
+DATABRICKS_MAP_ARGUMENT_COUNT: int = 2
+DATABRICKS_STRUCT_FIELD_PATTERN: re.Pattern[str] = re.compile(
+    r"\s*(?P<name>`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*|\s+)(?P<type>\S.*?)\s*"
+)
 DUCKDB_HUGEINT_TYPE: str = "HUGEINT"
 DUCKDB_UHUGEINT_TYPE: str = "UHUGEINT"
 DUCKDB_BLOB_TYPE: str = "BLOB"
+DUCKDB_SPATIAL_TYPES: frozenset[str] = frozenset({"GEOMETRY", "GEOGRAPHY"})
 DUCKDB_LIST_TYPE: str = "LIST"
 DUCKDB_INTEGER_TYPE: str = "INTEGER"
 
-FALLBACK_POLYGLOT_BASE_TYPES: frozenset[str] = frozenset(
+GENERIC_LOCAL_BASE_TYPES: frozenset[str] = frozenset(
     {
         "BOOL",
         "BOOLEAN",
@@ -118,18 +135,54 @@ FALLBACK_POLYGLOT_BASE_TYPES: frozenset[str] = frozenset(
         "JSON",
     }
 )
-POLYGLOT_DECIMAL_TYPES: frozenset[str] = frozenset({"BIGDECIMAL", "DECIMAL"})
-POLYGLOT_VARCHAR_TYPES: frozenset[str] = frozenset({"NULL", "RANGE", "XML"})
-POLYGLOT_OBJECT_TYPE: str = "OBJECT"
-POLYGLOT_ARRAY_TYPE: str = "ARRAY"
-POLYGLOT_COLLECTION_TYPES: frozenset[str] = frozenset({"ARRAY", "LIST"})
-POLYGLOT_SPATIAL_AND_MONEY_TYPES: frozenset[str] = frozenset({"GEOGRAPHY", "GEOMETRY", "MONEY"})
-POLYGLOT_CUSTOM_TYPE: str = "CUSTOM"
+TYPE_TREE_KIND: str = "data_type"
+TYPE_TREE_LOCAL_TYPES: dict[str, str] = {
+    "boolean": "BOOLEAN",
+    "tiny_int": "TINYINT",
+    "small_int": "SMALLINT",
+    "int": "INT",
+    "big_int": "BIGINT",
+    "int128": "HUGEINT",
+    "uint8": "UTINYINT",
+    "uint16": "USMALLINT",
+    "uint32": "UINTEGER",
+    "uint64": "UBIGINT",
+    "uint128": "UHUGEINT",
+    "double": "DOUBLE",
+    "date": "DATE",
+    "interval": "INTERVAL",
+    "json": "JSON",
+    "json_b": "JSON",
+    "uuid": "UUID",
+    "binary": "VARCHAR",
+    "var_binary": "VARCHAR",
+    "blob": "VARCHAR",
+    "geography": "VARCHAR",
+    "geometry": "VARCHAR",
+    "object": "JSON",
+}
+TYPE_TREE_TEXT_KINDS: frozenset[str] = frozenset({"char", "var_char", "string", "text"})
+TYPE_TREE_FLOAT: str = "float"
+TYPE_TREE_DECIMAL: str = "decimal"
+TYPE_TREE_TIME: str = "time"
+TYPE_TREE_TIMESTAMP: str = "timestamp"
+TYPE_TREE_COLLECTIONS: frozenset[str] = frozenset({"array", "list"})
+TYPE_TREE_STRUCT: str = "struct"
+TYPE_TREE_MAP: str = "map"
+STRUCT_FIELD_NAME_PATTERN: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+LOCAL_TYPE_DIALECTS: frozenset[TypeDialect] = frozenset(
+    {TypeDialect.DUCKDB, TypeDialect.MOTHERDUCK}
+)
 
 FALLBACK_BOOLEAN_TYPES: frozenset[str] = frozenset({"BOOL", "BOOLEAN"})
-FALLBACK_SIGNED_INTEGER_TYPES: frozenset[str] = frozenset(
-    {"TINYINT", "SMALLINT", "INT", "INTEGER", "BIGINT", "HUGEINT"}
-)
+FALLBACK_SIGNED_INTEGER_LOCAL_TYPES: dict[str, str] = {
+    "TINYINT": "TINYINT",
+    "SMALLINT": "SMALLINT",
+    "INT": "INT",
+    "INTEGER": "INT",
+    "BIGINT": "BIGINT",
+    "HUGEINT": "HUGEINT",
+}
 FALLBACK_UNSIGNED_INTEGER_TYPES: frozenset[str] = frozenset(
     {"UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT"}
 )
@@ -147,7 +200,7 @@ FALLBACK_VARCHAR_TYPES: frozenset[str] = frozenset(
 FALLBACK_JSON_TYPES: frozenset[str] = frozenset({"JSON", "JSONB"})
 FALLBACK_BINARY_TYPES: frozenset[str] = frozenset({"BLOB", "BYTEA", "BINARY", "VARBINARY"})
 FALLBACK_STRUCTURED_TYPES: frozenset[str] = frozenset(
-    {"ARRAY", "OBJECT", "VARIANT", "JSON", "JSONB"}
+    {"ARRAY", "OBJECT", "VARIANT", "JSON", "JSONB", "MAP", "STRUCT"}
 )
 SNOWFLAKE_WIDEN_TO_DOUBLE_TYPES: frozenset[str] = SNOWFLAKE_DOUBLE_TYPES
 GENERIC_WIDEN_TO_DOUBLE_TYPES: frozenset[str] = frozenset({"DOUBLE", "DOUBLE PRECISION", "FLOAT8"})
@@ -159,8 +212,6 @@ TYPE_ARGUMENT_OPEN_TOKENS: frozenset[str] = frozenset({"(", "<"})
 TYPE_ARGUMENT_CLOSE_TOKENS: frozenset[str] = frozenset({")", ">"})
 TYPE_ARGUMENT_SEPARATOR: str = ","
 TYPE_PATTERN_WILDCARD: str = "*"
-MALFORMED_RENDERED_TYPE_TOKEN: str = ")("
-UNTYPED_ARRAY_TYPE: str = "[]"
 JSONL_BLANK_LINE: str = ""
 LOCAL_SCENARIO_DIALECT: str = "duckdb"
 

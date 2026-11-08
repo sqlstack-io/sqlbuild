@@ -137,7 +137,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                                 ScenarioSnapshotColumn(
                                     name="customer_id",
                                     warehouse_type="DECIMAL(38,0)",
-                                    local_type="DECIMAL(38, 0)",
+                                    local_type="DECIMAL(38,0)",
                                 ),
                             ),
                         ),
@@ -151,7 +151,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                                 ScenarioSnapshotColumn(
                                     name="country_code",
                                     warehouse_type="VARCHAR",
-                                    local_type="TEXT",
+                                    local_type="VARCHAR",
                                 ),
                             ),
                         ),
@@ -170,7 +170,7 @@ class ScenarioSnapshotCaptureTestAdapter(BaseAdapter):
                                 ScenarioSnapshotColumn(
                                     name="amount",
                                     warehouse_type="DECIMAL(10,2)",
-                                    local_type="DECIMAL(10, 2)",
+                                    local_type="DECIMAL(10,2)",
                                 ),
                             ),
                         ),
