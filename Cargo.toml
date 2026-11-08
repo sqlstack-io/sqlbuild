@@ -177,12 +177,12 @@ sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
 sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656d247277a30bc81ef39b6dee420e721221" }
 # Scopes, name resolution, types and lineage for the native analysis route.
-sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "edfa30b26a0bab86661f96490b86a4f24b92db0a" }
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "eba399766f15c62e9d15ececd101b7d086a01839" }
 # The lossless SQL tokenizer behind query fingerprints.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "edfa30b26a0bab86661f96490b86a4f24b92db0a" }
-sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "edfa30b26a0bab86661f96490b86a4f24b92db0a" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "edfa30b26a0bab86661f96490b86a4f24b92db0a" }
-sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "edfa30b26a0bab86661f96490b86a4f24b92db0a" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "eba399766f15c62e9d15ececd101b7d086a01839" }
+sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "eba399766f15c62e9d15ececd101b7d086a01839" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "eba399766f15c62e9d15ececd101b7d086a01839" }
+sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "eba399766f15c62e9d15ececd101b7d086a01839" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"

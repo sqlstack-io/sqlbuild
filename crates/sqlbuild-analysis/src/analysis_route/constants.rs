@@ -1,12 +1,13 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
-use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, TypeSpelling};
+use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDialect, TypeSpelling};
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (DUCKDB_DIALECT, &DuckDbDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
+    (SQLITE_DIALECT, &SqliteDialect),
 ];
 /// DuckDB's (and MotherDuck's) analysis dialect name.
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
