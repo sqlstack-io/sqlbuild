@@ -26,6 +26,33 @@ fn parse_warehouse_type(py: Python<'_>, spelling: &str, dialect: &str) -> PyResu
     .map_err(value_error)
 }
 
+/// Captured Snowflake SQL as DuckDB SQL with its result columns, or None and SQLQuack's refusal.
+#[pyfunction]
+fn convert_local_scenario_sql(
+    py: Python<'_>,
+    sql: &str,
+    schema_json: &str,
+    name: &str,
+) -> PyResult<(Option<String>, Vec<(String, String)>, String)> {
+    let converted = py
+        .compiler_detach(|| {
+            sqlbuild_analysis::local_sql::main::convert_local_sql::convert_local_sql(
+                sql,
+                schema_json,
+                name,
+            )
+        })
+        .map_err(value_error)?;
+    Ok(match converted {
+        sqlbuild_analysis::local_sql::models::LocalSql::Converted { sql, columns } => {
+            (Some(sql), columns, String::new())
+        }
+        sqlbuild_analysis::local_sql::models::LocalSql::Refused(reason) => {
+            (None, Vec::new(), reason)
+        }
+    })
+}
+
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::bindings::_helpers::analysis::binding_catalog::register(module)?;
     crate::bindings::_helpers::analysis::required_columns::register(module)?;
@@ -33,5 +60,6 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::bindings::_helpers::analysis::binding_locations::register(module)?;
     module.add_function(wrap_pyfunction!(query_fingerprint, module)?)?;
     module.add_function(wrap_pyfunction!(parse_warehouse_type, module)?)?;
+    module.add_function(wrap_pyfunction!(convert_local_scenario_sql, module)?)?;
     Ok(())
 }

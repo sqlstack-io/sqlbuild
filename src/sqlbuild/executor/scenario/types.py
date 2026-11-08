@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import TypeAlias
 
 
 class ScenarioSnapshotState(StrEnum):
@@ -17,3 +18,7 @@ class ScenarioLocalRunStatus(StrEnum):
     FAIL = "FAIL"
     ERROR = "ERROR"
     SKIP = "SKIP"
+
+
+LocalSqlColumns: TypeAlias = tuple[tuple[str, str], ...]
+"""Result columns of one local statement as (name, Snowflake type) pairs."""

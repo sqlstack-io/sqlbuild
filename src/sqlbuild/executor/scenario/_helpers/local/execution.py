@@ -39,8 +39,9 @@ from sqlbuild.executor.scenario._helpers.local.snapshots import (
     local_snapshot_table_name,
 )
 from sqlbuild.executor.scenario._helpers.local.sql import (
+    convert_sql_for_local_duckdb,
+    function_sql_for_local_duckdb,
     replace_local_relations,
-    transpile_sql_for_local_duckdb,
 )
 from sqlbuild.executor.scenario._helpers.snapshots.core import (
     build_scenario_snapshot_input_fingerprint,
@@ -69,7 +70,11 @@ from sqlbuild.executor.scenario.models import (
     ScenarioRunResult,
     ScenarioSnapshotStateResult,
 )
-from sqlbuild.executor.scenario.types import ScenarioLocalRunStatus, ScenarioSnapshotState
+from sqlbuild.executor.scenario.types import (
+    LocalSqlColumns,
+    ScenarioLocalRunStatus,
+    ScenarioSnapshotState,
+)
 from sqlbuild.executor.scheduling.types import ExecutionStatus
 from sqlbuild.runtime.observability.classes.resource_attempt_lifecycle import (
     ResourceAttemptLifecycle,
@@ -203,6 +208,7 @@ def _build_local_execution_plan(
         scenario_plan=scenario_plan,
         load_result=load_result,
     )
+    schema: dict[str, LocalSqlColumns] = _snapshot_schema(load_result)
 
     function_entries: list[FunctionPlanEntry] = []
     function_entry: FunctionPlanEntry
@@ -212,7 +218,7 @@ def _build_local_execution_plan(
             relation_replacements=relation_replacements,
         )
         if function_entry.language == FunctionLanguage.SQL:
-            function_sql = transpile_sql_for_local_duckdb(
+            function_sql = function_sql_for_local_duckdb(
                 sql=function_sql,
                 source_dialect=source_dialect,
                 scenario_name=scenario_plan.name,
@@ -228,12 +234,17 @@ def _build_local_execution_plan(
             sql=entry.resolved_sql,
             relation_replacements=relation_replacements,
         )
-        local_sql = transpile_sql_for_local_duckdb(
+        local_columns: LocalSqlColumns
+        local_sql, local_columns = convert_sql_for_local_duckdb(
             sql=local_sql,
             source_dialect=source_dialect,
+            schema=schema,
             scenario_name=scenario_plan.name,
             resource_kind="model",
             resource_name=entry.name,
+        )
+        schema[_snowflake_stored_name(relation_plan.model_locations[entry.name].name)] = (
+            local_columns
         )
         model_entries.append(
             replace(
@@ -253,9 +264,10 @@ def _build_local_execution_plan(
             sql=expected_expectation.expected_sql,
             relation_replacements=relation_replacements,
         )
-        expected_sql = transpile_sql_for_local_duckdb(
+        expected_sql, _ = convert_sql_for_local_duckdb(
             sql=expected_sql,
             source_dialect=source_dialect,
+            schema=schema,
             scenario_name=scenario_plan.name,
             resource_kind="expected comparison",
             resource_name=expected_expectation.model_name,
@@ -275,9 +287,10 @@ def _build_local_execution_plan(
             sql=assertion_expectation.sql,
             relation_replacements=relation_replacements,
         )
-        assertion_sql = transpile_sql_for_local_duckdb(
+        assertion_sql, _ = convert_sql_for_local_duckdb(
             sql=assertion_sql,
             source_dialect=source_dialect,
+            schema=schema,
             scenario_name=scenario_plan.name,
             resource_kind="assertion",
             resource_name=assertion_expectation.name,
@@ -459,6 +472,28 @@ def _execute_local_functions(
         if result.status == ExecutionStatus.FAILED:
             break
     return tuple(results)
+
+
+def _snapshot_schema(load_result: ScenarioLocalSnapshotLoadResult) -> dict[str, LocalSqlColumns]:
+    columns: dict[tuple[ScenarioArtifactKind, str], LocalSqlColumns] = {
+        (relation.kind, relation.logical_name): tuple(
+            (_snowflake_stored_name(column.name), column.warehouse_type)
+            for column in relation.columns
+        )
+        for relation in load_result.manifest.relations
+    }
+    return {
+        _snowflake_stored_name(loaded.table_name): columns[(loaded.kind, loaded.logical_name)]
+        for loaded in load_result.relations
+    }
+
+
+def _snowflake_stored_name(name: str) -> str:
+    """The name Snowflake stores for a logical name: a quoted name as written, else upper case."""
+
+    if name.startswith('"') and name.endswith('"'):
+        return name[1:-1].replace('""', '"')
+    return name.upper()
 
 
 def _build_local_relation_plan(

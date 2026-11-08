@@ -22,6 +22,7 @@ pub mod janitor_planning;
 pub mod lineage;
 pub mod lineage_command;
 pub mod lineage_graph;
+pub mod local_sql;
 pub mod manifest;
 pub mod nullability_rules;
 pub mod planner_changes;
