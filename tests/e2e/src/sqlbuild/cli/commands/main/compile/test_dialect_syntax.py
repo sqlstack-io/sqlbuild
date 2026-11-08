@@ -173,7 +173,7 @@ _CONNECTIONS: dict[str, str] = {
                 "periods": dialect_syntax_model(
                     "Periods.",
                     "SELECT CAST(NULL AS RANGE<DATE>) AS period, "
-                    "CAST(NULL AS RANGE<TIMESTAMP>) AS window",
+                    "CAST(NULL AS RANGE<TIMESTAMP>) AS active_window",
                 ),
             },
             expected_exit_code=0,

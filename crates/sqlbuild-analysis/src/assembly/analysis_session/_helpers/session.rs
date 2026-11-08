@@ -325,7 +325,7 @@ impl AnalysisSession {
                 .map(|position| {
                     let model: &ModelRequest = &request.models[models[*position]];
                     let schema: Shapes = schemas[*position].clone();
-                    let relations: SessionSchema = session_schema(&schema, nullability);
+                    let relations: SessionSchema = session_schema(dialect, &schema, nullability);
                     model_outcome(dialect, model, (schema, &relations), &declared)
                 })
                 .collect()
