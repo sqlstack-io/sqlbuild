@@ -208,6 +208,12 @@ pub(super) struct UnavailableAnalysisTestCase {
     pub(super) expected_message: &'static str,
 }
 
+pub(super) struct FindingMessageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_messages: &'static [(&'static str, &'static str)],
+}
+
 pub(super) struct UnappliedRulesTestCase {
     pub(super) description: &'static str,
     pub(super) route: AnalysisRoute,

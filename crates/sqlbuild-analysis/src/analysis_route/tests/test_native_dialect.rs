@@ -3,9 +3,9 @@ use crate::analysis_route::main::unavailable_analysis::unavailable_analysis;
 use crate::analysis_route::models::{AnalysisRoute, NativeAnalysis, TypeMatch};
 use crate::analysis_route::tests::helpers::{analysed, resource_columns};
 use crate::analysis_route::tests::test_types::{
-    CataloguedDialect, ColumnTestCase, FindingTestCase, FoldingDialect, LineageTestCase,
-    MacroBodyTestCase, NativeTypeMatchTestCase, PivotlessDialect, ReadWholeTestCase, StarTestCase,
-    UnappliedRulesTestCase, UnavailableAnalysisTestCase,
+    CataloguedDialect, ColumnTestCase, FindingMessageTestCase, FindingTestCase, FoldingDialect,
+    LineageTestCase, MacroBodyTestCase, NativeTypeMatchTestCase, PivotlessDialect,
+    ReadWholeTestCase, StarTestCase, UnappliedRulesTestCase, UnavailableAnalysisTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 
@@ -132,6 +132,35 @@ fn given_no_native_parser_when_skipping_analysis_then_p026_names_the_dialect() {
         assert_eq!(
             unavailable_analysis("orders", test_case.dialect),
             ("P026", test_case.expected_message.to_owned()),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_an_unknown_quoted_column_when_analysing_then_its_message_quotes_the_name_as_written() {
+    let test_cases = [
+        FindingMessageTestCase {
+            description: "a quoted name keeps its authored case",
+            sql: "SELECT \"MiSsPeLlEd\" FROM orders",
+            expected_messages: &[("B002", "Unknown column 'MiSsPeLlEd' in table 'orders'")],
+        },
+        FindingMessageTestCase {
+            description: "a qualified quoted name keeps its authored case",
+            sql: "SELECT o.\"Missing\" FROM orders AS o",
+            expected_messages: &[("B002", "Unknown column 'Missing' in table 'orders'")],
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(&PivotlessDialect, test_case.sql, &[]);
+        let messages: Vec<(&str, &str)> = analysis
+            .diagnostics
+            .iter()
+            .map(|row| (row.code.as_str(), row.message.as_str()))
+            .collect();
+        assert_eq!(
+            messages, test_case.expected_messages,
             "{}",
             test_case.description
         );
