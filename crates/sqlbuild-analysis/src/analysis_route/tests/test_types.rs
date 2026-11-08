@@ -39,7 +39,9 @@ impl NativeDialect for PivotlessDialect {
         match refused {
             Some((offset, word)) => Err(ParserGap {
                 construct: word.to_owned(),
+                message: word.to_owned(),
                 offset,
+                syntax: false,
             }),
             None => Ok(()),
         }
