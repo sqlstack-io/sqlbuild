@@ -4187,7 +4187,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-cli"
-version = "0.198.0"
+version = "0.199.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4342,7 +4342,7 @@ dependencies = [
 
 [[package]]
 name = "sqlbuild-python"
-version = "0.198.0"
+version = "0.199.0"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -4531,7 +4531,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=a9dde6a00b144c6306425cfa84516ad816d8c49c#a9dde6a00b144c6306425cfa84516ad816d8c49c"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5#19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5"
 dependencies = [
  "serde",
  "serde_json",
@@ -4544,7 +4544,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-derive"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=a9dde6a00b144c6306425cfa84516ad816d8c49c#a9dde6a00b144c6306425cfa84516ad816d8c49c"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5#19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4554,9 +4554,10 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-postgres"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=a9dde6a00b144c6306425cfa84516ad816d8c49c#a9dde6a00b144c6306425cfa84516ad816d8c49c"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5#19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5"
 dependencies = [
  "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]

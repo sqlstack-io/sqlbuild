@@ -179,8 +179,8 @@ sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656
 # Scopes, name resolution, types and lineage for the native analysis route.
 sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "a9dde6a00b144c6306425cfa84516ad816d8c49c" }
 # The lossless SQL tokenizer behind query fingerprints.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "a9dde6a00b144c6306425cfa84516ad816d8c49c" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "a9dde6a00b144c6306425cfa84516ad816d8c49c" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "19c51fa29ab01dbef9dddd18e8bfc406ed8e65f5" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"
