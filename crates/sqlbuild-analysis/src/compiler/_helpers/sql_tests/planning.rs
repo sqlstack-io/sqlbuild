@@ -1493,16 +1493,6 @@ fn analyze_and_resolve_sql(
     }))
 }
 
-#[cfg(test)]
-thread_local! {
-    static TEMPLATE_AST_PARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
-
-#[cfg(test)]
-pub(crate) fn take_template_ast_parse_count() -> usize {
-    TEMPLATE_AST_PARSES.with(|count| count.replace(0))
-}
-
 pub(crate) fn analysis_template(
     query_sql: &str,
     parser: &dyn NativeDialect,
@@ -1518,8 +1508,6 @@ pub(crate) fn parsed_analysis_template(
     query_sql: &str,
     parser: &dyn NativeDialect,
 ) -> Option<AnalysisTemplate> {
-    #[cfg(test)]
-    TEMPLATE_AST_PARSES.with(|count| count.set(count.get() + 1));
     let mut statements = match parser.parse(query_sql) {
         Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
         _ => return None,

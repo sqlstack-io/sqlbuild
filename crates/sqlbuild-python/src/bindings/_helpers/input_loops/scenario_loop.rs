@@ -2,10 +2,10 @@
 
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyTuple};
-use sqlbuild_analysis::compiler::main::scenario_helper_scope::scenario_helper_scope;
-use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_ctes;
 use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 use sqlbuild_analysis::analysis_route::types::NativeDialect;
+use sqlbuild_analysis::compiler::main::scenario_helper_scope::scenario_helper_scope;
+use sqlbuild_analysis::compiler::main::scenario_reader_ctes::scenario_reader_ctes;
 use sqlbuild_analysis::compiler::main::sql_scenario_classification::extract_scenario;
 use sqlbuild_analysis::compiler::models::{
     ScenarioHelperScope, ScenarioScopeInput, SqlScenarioCtes, SqlTestCteText,
