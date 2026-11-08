@@ -181,3 +181,9 @@ pub(super) struct StarTestCase {
     /// Whether it projects a star, whether every star column is known, and the column count.
     pub(super) expected_star: (bool, bool, usize),
 }
+
+pub(super) struct TypeSpellingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) spellings: &'static [&'static str],
+    pub(super) expected_mismatches: &'static [&'static str],
+}
