@@ -6,6 +6,8 @@ pub(crate) const UDF_STUB: &str = "__sqlbuild_udf_";
 pub(crate) const PLACEHOLDER_PREFIX: &[u8] = b"@@@";
 pub(crate) const PLACEHOLDER_VALUE: &str = "NULL";
 pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 128;
+/// The deepest statement built-in rules read, Polyglot's former AST-depth limit.
+pub(crate) const MAX_AST_DEPTH: usize = 512;
 pub(crate) const UDF_CALL: &str = "__udf";
 pub(crate) const TABLE_FUNCTION_CALL: &str = "__table_fn";
 pub(crate) const MIN_CAST_TOKENS: usize = 2;

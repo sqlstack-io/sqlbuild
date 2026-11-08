@@ -1,7 +1,7 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH,
+    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH,
     POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT, TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
@@ -48,10 +48,28 @@ fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), S
         return Err("expected one statement".to_owned());
     }
     let statement = statements.remove(0);
+    if deeper_than(&statement, MAX_AST_DEPTH) {
+        return Err(format!(
+            "E_GUARD_AST_DEPTH_EXCEEDED: value {} exceeds configured limit {MAX_AST_DEPTH}",
+            MAX_AST_DEPTH + 1
+        ));
+    }
     if !is_query(&statement) {
         return Err("expected a query".to_owned());
     }
     Ok((statement, dialect))
+}
+
+/// Whether `statement` nests deeper than `limit` levels, measured without recursion.
+fn deeper_than(statement: &Expression, limit: usize) -> bool {
+    let mut stack: Vec<(&Expression, usize)> = vec![(statement, 1)];
+    while let Some((node, depth)) = stack.pop() {
+        if depth > limit {
+            return true;
+        }
+        stack.extend(node.children().into_iter().map(|child| (child, depth + 1)));
+    }
+    false
 }
 
 fn code_tokens(sql: &str, dialect: Dialect) -> Result<QueryTokens<'_>, String> {
