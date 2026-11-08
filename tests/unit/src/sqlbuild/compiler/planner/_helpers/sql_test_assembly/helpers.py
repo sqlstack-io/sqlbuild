@@ -147,7 +147,8 @@ def assert_native_artifact_matches_runtime_plan(
         sql_analysis_enabled=sql_analysis_enabled,
     )
 
-    dialect: str = adapter.sql_analysis_dialect()
+    dialect: str | None = adapter.sql_analysis_dialect()
+    assert dialect is not None
     assert query_fingerprint(artifact.sql, dialect) == query_fingerprint(expected_sql, dialect)
     assert artifact.model_names == tuple(step.model_name for step in entry.chain)
     assert artifact.error_messages == sql_test_plan_error_messages(warnings=warnings)
