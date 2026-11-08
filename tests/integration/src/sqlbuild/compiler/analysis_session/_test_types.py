@@ -72,7 +72,7 @@ class StandalonePivotProofTestCase:
 
 @dataclass(frozen=True)
 class SharedAnalysisTestCase:
-    """Models whose equal queries share one analysis, some inexact and so re-analysed alone."""
+    """Models with equal queries, some inexact, and how many analyses the session shares."""
 
     description: str
     regions: tuple[str, ...]

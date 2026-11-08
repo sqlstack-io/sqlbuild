@@ -246,20 +246,23 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     "test_case",
     [
         SharedAnalysisTestCase(
-            description="equal regional queries, missing-column readers and a unique summary",
+            description=(
+                "equal regional queries, missing-column readers and a unique summary, "
+                "each analysed by a native wave"
+            ),
             regions=("east", "west", "north", "south"),
             inexact_regions=("east", "west", "north"),
             dialects=("duckdb", "snowflake"),
             expected_analysed=24,
-            expected_shared=22,
-            expected_reanalysed=6,
-            expected_unshared=2,
+            expected_shared=0,
+            expected_reanalysed=0,
+            expected_unshared=24,
             expected_column_values=12,
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_equal_model_queries_when_analysing_natively_then_shares_and_cached_runs_agree(
+def test_given_equal_model_queries_when_analysing_natively_then_each_is_analysed_and_runs_agree(
     test_case: SharedAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     inputs: CompileInputsView = compile_inputs(
