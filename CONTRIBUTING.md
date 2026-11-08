@@ -95,9 +95,10 @@ make verify
 ```
 
 In CI, every push to a pull request runs a fast Linux core: static checks, unit and integration
-tests, native workspace checks and, for UI changes, the UI checks. The full matrix (wheels, Compose,
-Windows, macOS, DuckDB end-to-end, warehouse, compiler-golden and timing jobs) runs once a
-maintainer labels the pull request `full-verify`, normally when it is next to merge. The required
+tests and native workspace checks, plus the UI checks for UI changes. A change confined to the web
+UI and documentation runs only the UI checks. The full matrix (wheels, Compose, Windows, macOS,
+DuckDB end-to-end, warehouse, compiler-golden and timing jobs) runs once a maintainer labels a
+pull request that is not a draft `full-verify`, normally when it is next to merge. The required
 `Verify` check only reports after every suite the change needs has passed, so a pull request that
 needs the full matrix cannot merge until it has run.
 

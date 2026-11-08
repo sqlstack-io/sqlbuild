@@ -38,6 +38,9 @@ class VerifyCheckNameTestCase:
     head_ref: str | None
     head_repository: str | None
     expected_name: str
+    action: str | None = None
+    label: str | None = None
+    partial: str | None = None
 
 
 @dataclass(frozen=True)
@@ -55,6 +58,7 @@ class VerificationSuitesTestCase:
     checks: str
     native_checks: str
     expected_exit_code: int
+    environment: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
