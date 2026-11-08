@@ -2,12 +2,12 @@
 mod helpers;
 #[path = "tests/planning/helpers.rs"]
 mod planning_helpers;
+#[path = "tests/relation_markers/helpers.rs"]
+mod relation_markers_helpers;
 #[path = "tests/test_scenario_expected_columns.rs"]
 mod scenario_expected_columns;
 #[path = "tests/test_scenario_helper_ctes.rs"]
 mod scenario_helper_ctes;
-#[path = "tests/relation_markers/helpers.rs"]
-mod relation_markers_helpers;
 #[path = "tests/single_read/helpers.rs"]
 mod single_read_helpers;
 #[path = "tests/test_sql_test_cte_rename.rs"]
