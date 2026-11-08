@@ -267,24 +267,30 @@ pub(crate) fn session_functions(request: &SessionRequest) -> SessionFunctions {
     }
 }
 
-/// Each relation with a known shape, typed with the nullability the session knows, and the functions.
+/// Each relation's known shape, or else its declared columns, typed, with the session's functions.
 pub(crate) fn session_schema(
     dialect: &dyn NativeDialect,
     schema: &Shapes,
-    nullability: &ShapeTable,
+    (types, nullability): (&ShapeTable, &ShapeTable),
     functions: &SessionFunctions,
 ) -> SessionSchema {
-    let relations: HashMap<String, Vec<SchemaColumn>> = schema
-        .iter()
-        .filter(|(_, columns)| !columns.is_empty())
-        .map(|(relation, columns)| {
-            let typed: Vec<SchemaColumn> =
-                typed_columns(dialect, columns, nullability.get(relation));
-            (relation.clone(), typed)
-        })
-        .collect();
+    let mut relations: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    let mut open: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    for (relation, columns) in schema {
+        let (table, columns) = if columns.is_empty() {
+            match types.get(relation) {
+                Some(declared) if !declared.is_empty() => (&mut open, declared),
+                _ => continue,
+            }
+        } else {
+            (&mut relations, columns)
+        };
+        let typed: Vec<SchemaColumn> = typed_columns(dialect, columns, nullability.get(relation));
+        let _ = table.insert(relation.clone(), typed);
+    }
     SessionSchema {
         relations,
+        open,
         functions: SessionFunctions {
             return_types: functions
                 .return_types

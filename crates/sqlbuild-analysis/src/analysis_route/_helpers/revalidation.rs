@@ -42,18 +42,25 @@ pub(crate) fn revised(
     finished: &FinishedSession,
 ) -> Result<Option<Vec<RevisedBinding>>, String> {
     let sql: Cow<'_, str> = resolved_cleaned_sql(outcome)?;
+    let mut relations: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    let mut open: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
+    for (relation, columns) in &outcome.validated_schema {
+        let (table, columns) = if columns.is_empty() {
+            match declared_columns(finished, relation) {
+                Some(declared) => (&mut open, declared),
+                None => continue,
+            }
+        } else {
+            (&mut relations, columns)
+        };
+        let _ = table.insert(
+            relation.clone(),
+            schema_columns(dialect, relation, columns, poisoned),
+        );
+    }
     let relations: SessionSchema = SessionSchema {
-        relations: outcome
-            .validated_schema
-            .iter()
-            .filter(|(_, columns)| !columns.is_empty())
-            .map(|(relation, columns)| {
-                (
-                    relation.clone(),
-                    schema_columns(dialect, relation, columns, poisoned),
-                )
-            })
-            .collect::<HashMap<String, Vec<SchemaColumn>>>(),
+        relations,
+        open,
         functions: finished.functions.clone(),
     };
     let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
@@ -72,6 +79,16 @@ pub(crate) fn revised(
         .map(revised_binding)
         .collect::<Result<Vec<RevisedBinding>, String>>()
         .map(Some)
+}
+
+/// The declared columns of `relation`, whose full shape the session did not know, when it has any.
+fn declared_columns<'a>(finished: &'a FinishedSession, relation: &str) -> Option<&'a Pairs> {
+    finished
+        .tables
+        .column_types
+        .iter()
+        .find(|(name, columns)| name == relation && !columns.is_empty())
+        .map(|(_, columns)| columns)
 }
 
 /// The model's own findings, as type recovery matches them, kept as they are.

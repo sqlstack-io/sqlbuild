@@ -99,6 +99,7 @@ pub(super) fn session_relations(shape: &[(&str, &str, Nullability)]) -> (Shapes,
         vec![("raw_orders".to_owned(), pairs)],
         SessionSchema {
             relations,
+            open: HashMap::new(),
             functions: SessionFunctions::default(),
         },
     )
