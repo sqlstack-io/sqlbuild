@@ -258,6 +258,34 @@ fn given_a_type_spelling_when_a_dialect_normalises_it_then_it_is_polyglots_type_
             spelling: "NUMERIC(10,2)",
             expected_type: Some(("DECIMAL(10,2)", TypeFamily::Decimal)),
         },
+        TypeSpellingTestCase {
+            description: "a Snowflake timestamp name is the same type as Polyglot's compact spelling",
+            dialect: "duckdb",
+            normalize: |spelling| DuckDbDialect.normalize_type(spelling),
+            spelling: "TIMESTAMP_NTZ",
+            expected_type: Some(("TIMESTAMPNTZ", TypeFamily::Timestamp)),
+        },
+        TypeSpellingTestCase {
+            description: "a five-word type name is read whole",
+            dialect: "duckdb",
+            normalize: |spelling| DuckDbDialect.normalize_type(spelling),
+            spelling: "timestamp with local time zone",
+            expected_type: Some(("TIMESTAMPLTZ", TypeFamily::Timestamp)),
+        },
+        TypeSpellingTestCase {
+            description: "a timestamp without time zone is TIMESTAMP_NTZ",
+            dialect: "snowflake",
+            normalize: |spelling| SnowflakeDialect.normalize_type(spelling),
+            spelling: "TIMESTAMP WITHOUT TIME ZONE",
+            expected_type: Some(("TIMESTAMP_NTZ", TypeFamily::Timestamp)),
+        },
+        TypeSpellingTestCase {
+            description: "CHARACTER VARYING is TEXT",
+            dialect: "sqlite",
+            normalize: |spelling| SqliteDialect.normalize_type(spelling),
+            spelling: "CHARACTER VARYING",
+            expected_type: Some(("TEXT", TypeFamily::String)),
+        },
     ];
     for test_case in test_cases {
         let found: Option<(String, TypeFamily)> = (test_case.normalize)(test_case.spelling)

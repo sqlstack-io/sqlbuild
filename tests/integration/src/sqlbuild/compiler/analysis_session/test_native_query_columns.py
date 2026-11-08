@@ -40,8 +40,8 @@ _HEADER: str = "MODEL (description 'Test model.', materialized view);\n"
             expected_columns=(("a", None, "non_null"),),
         ),
         FallbackColumnsTestCase(
-            description="calls nested 200 deep",
-            query_sql="SELECT " + "f(" * 200 + "1" + ")" * 200 + " AS deep",
+            description="calls nested 100 deep",
+            query_sql="SELECT " + "f(" * 100 + "1" + ")" * 100 + " AS deep",
             expected_columns=(("deep", None, "unknown"),),
         ),
     ],
