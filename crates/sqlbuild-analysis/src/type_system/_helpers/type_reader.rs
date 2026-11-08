@@ -414,8 +414,7 @@ impl Reader<'_> {
         Ok(json!({"data_type": "custom", "name": format!("{name}({})", parameters.join(", "))}))
     }
 
-    /// One ClickHouse type parameter as written: a nested type, as in `Nullable(DateTime64(3))`,
-    /// a named tuple field, or an enum member and its value.
+    /// One ClickHouse type parameter as written: a nested type, a named tuple field or an enum member.
     fn clickhouse_parameter(&mut self, name: &str) -> Result<String, String> {
         let mut text: String = String::new();
         let mut depth: usize = 0;
