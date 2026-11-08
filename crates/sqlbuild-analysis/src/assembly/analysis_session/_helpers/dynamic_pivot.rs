@@ -8,6 +8,8 @@ use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
     parse_one_or_error, payload, relation_name, render_type, to_dict, truthy, upper,
@@ -98,6 +100,13 @@ pub(crate) fn pivot_outcome(
     if !SUPPORTED_PIVOT_DIALECTS.contains(&folded_dialect.as_str()) {
         return Ok(failure(format!(
             "adapter dialect '{}' does not support compiler-proven dynamic pivots",
+            facts.dialect
+        )));
+    }
+    // The proof reads Polyglot's tree; a dialect a native module analyses is never parsed by it.
+    if !matches!(analysis_route(Some(facts.dialect)), AnalysisRoute::Legacy) {
+        return Ok(failure(format!(
+            "dynamic pivot proofs do not read the {} native parser's tree",
             facts.dialect
         )));
     }
