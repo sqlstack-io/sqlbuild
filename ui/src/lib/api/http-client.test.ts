@@ -240,7 +240,7 @@ describe('feedAllowed', () => {
 
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
-	function serve(actions: string[]) {
+	function serve(actions: string[], sqlStatus = 200) {
 		const paths: string[] = [];
 		const answers: [string, unknown][] = [
 			['/bootstrap', { login_mode: 'password', access: { name: 'vic', principal_id: 'p', actions: [], locations: [{ location_id: '0191f0aa-orders', name: 'Orders', target: 'development', actions }] } }],
@@ -254,7 +254,8 @@ describe('getCatalogNode', () => {
 				const path = new URL(request.url).pathname;
 				paths.push(path);
 				const answer = answers.find(([end]) => path.endsWith(end));
-				return answer ? Response.json(answer[1]) : Response.json({ error: 'refused' }, { status: 403 });
+				const refused = !answer || (answer[0] === '/sql' && sqlStatus === 403);
+				return refused ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json(answer[1]);
 			})
 		);
 		return paths;
@@ -270,5 +271,14 @@ describe('getCatalogNode', () => {
 		const detail = await client.getCatalogNode(ORDERS, 'orders');
 		expect([detail?.key, detail?.sql?.raw ?? null]).toEqual(['model:orders', raw]);
 		expect(paths.filter((p) => p.endsWith('/sql'))).toHaveLength(raw ? 1 : 0);
+	});
+
+	it('asks for a refused node SQL once, when view.sql holds on only some nodes', async () => {
+		const paths = serve(['view', 'view.sql'], 403);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		const loads = [await client.getCatalogNode(ORDERS, 'orders'), await client.getCatalogNode(ORDERS, 'orders')];
+		expect(loads.map((d) => [d?.key, d?.sql])).toEqual([['model:orders', null], ['model:orders', null]]);
+		expect(paths.filter((p) => p.endsWith('/sql'))).toHaveLength(1);
 	});
 });

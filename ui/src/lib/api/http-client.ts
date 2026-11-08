@@ -187,8 +187,10 @@ export type HttpClientOptions = {
  */
 export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOptions): ApiClient {
 	const http = createFetch<paths>({ baseUrl, credentials: 'same-origin' });
-	// Locations whose bootstrap actions include view.sql; reading SQL without it is refused and audited.
+	// Locations whose bootstrap actions include view.sql, which may hold on only some nodes, and the
+	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
 	let sqlLocations = new Set<string>();
+	const sqlRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -269,12 +271,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const path = { location_id: locationId, target };
 			const [status, sql, checks] = await Promise.all([
 				http.GET('/api/control/locations/{location_id}/targets/{target}/node-status', { params: { path, query: { node_key: node.key } } }),
-				sqlLocations.has(scope.locationId)
+				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
 				checkResults(scope).catch(() => [])
 			]);
 			if (status.response.status === 401 || sql?.response.status === 401) onUnauthorized();
+			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
 			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck));
 		},
