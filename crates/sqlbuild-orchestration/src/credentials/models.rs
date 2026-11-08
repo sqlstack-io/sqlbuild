@@ -39,6 +39,9 @@ pub struct SecurityAuditEvent {
     pub scope_json: serde_json::Value,
     pub before_json: serde_json::Value,
     pub after_json: serde_json::Value,
+    /// The person's name when `actor` is a principal; person reads set it, exports leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_name: Option<String>,
 }
 
 /// Installation configuration: rows past the horizon stay until every sink and retry lookup is done.

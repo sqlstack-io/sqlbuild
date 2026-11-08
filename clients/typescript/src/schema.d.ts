@@ -1802,6 +1802,8 @@ export interface components {
         SecurityAuditEvent: {
             action: string;
             actor: string;
+            /** @description The person's name when `actor` is a principal; person reads set it, exports leave it out. */
+            actor_name?: string | null;
             after_json: unknown;
             before_json: unknown;
             /** Format: uuid */
@@ -2540,6 +2542,8 @@ export interface operations {
             query?: {
                 /** @description Exclusive storage-order cursor */
                 after?: number;
+                /** @description Exclusive upper cursor; when set, the page is newest first */
+                before?: number;
                 limit?: number;
             };
             header?: never;

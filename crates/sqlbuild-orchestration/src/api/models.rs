@@ -87,6 +87,7 @@ pub(crate) struct ReadQuery {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadAuditQuery {
     pub(crate) after: Option<i64>,
+    pub(crate) before: Option<i64>,
     pub(crate) limit: Option<u32>,
 }
 
