@@ -1,6 +1,7 @@
 """SQL Server adapter constants."""
 
 BOOLEAN_RETURN_TYPE: str = "BIT"
+TABLE_FUNCTION_RETURN_TYPE: str = "TABLE"
 DIFF_CHARACTER_LENGTH_TYPES: frozenset[str] = frozenset(
     {"binary", "char", "nchar", "nvarchar", "varbinary", "varchar"}
 )
