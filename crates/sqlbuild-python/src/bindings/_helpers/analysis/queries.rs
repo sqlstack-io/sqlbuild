@@ -14,9 +14,7 @@ fn query_fingerprint(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<Strin
     .map_err(value_error)
 }
 
-/// The type tree, as JSON, of a warehouse type name, or None when `dialect` has no parser.
-///
-/// A parser panic is a `ValueError`, so capture falls back as for any rejected spelling.
+/// A warehouse type name's JSON type tree, None without a parser, `ValueError` on a panic.
 #[pyfunction]
 fn parse_warehouse_type(py: Python<'_>, spelling: &str, dialect: &str) -> PyResult<Option<String>> {
     py.compiler_detach(|| {
