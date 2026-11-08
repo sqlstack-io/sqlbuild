@@ -26,7 +26,7 @@ pub(crate) fn native_outcome(
     let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) = match normalised {
         Ok(normalised) => {
             let sql: String = placeholder_defaults(&normalised, &model.placeholders);
-            let relations: SessionSchema = session_schema(&schema, nullability);
+            let relations: SessionSchema = session_schema(dialect, &schema, nullability);
             let analysed = dialect
                 .analyse(&AnalysisInput {
                     sql: &sql,
@@ -75,7 +75,11 @@ pub(crate) fn native_outcome(
 }
 
 /// Each relation with a known shape, its columns typed and with the nullability the session knows.
-fn session_schema(schema: &Shapes, nullability: &ShapeTable) -> SessionSchema {
+fn session_schema(
+    dialect: &dyn NativeDialect,
+    schema: &Shapes,
+    nullability: &ShapeTable,
+) -> SessionSchema {
     let relations: HashMap<String, Vec<SchemaColumn>> = schema
         .iter()
         .filter(|(_, columns)| !columns.is_empty())
@@ -87,7 +91,7 @@ fn session_schema(schema: &Shapes, nullability: &ShapeTable) -> SessionSchema {
                     name: name.clone(),
                     quoted: false,
                     data_type: (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
-                        .then(|| data_type.clone()),
+                        .then(|| dialect.session_type(data_type)),
                     nullability: column_nullability(known, name),
                 })
                 .collect();

@@ -210,3 +210,9 @@ pub(super) struct ParseFailureTestCase {
     /// The byte offset of a syntax error; a limit has none worth comparing.
     pub(super) expected_offset: Option<usize>,
 }
+
+pub(super) struct SessionTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: &'static str,
+}
