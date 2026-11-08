@@ -118,6 +118,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::ticks),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/snapshots",
+            get(crate::api::_helpers::resources::person_reads::snapshots),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/catalog",
             get(crate::api::_helpers::resources::person_operations::catalog),
         )

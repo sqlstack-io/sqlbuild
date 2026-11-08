@@ -315,11 +315,13 @@ export type SnapshotChange = {
 	snapshotId: string;
 	generation: number;
 	previousGeneration: number | null;
-	gitRevision: string;
+	/** Null when the project was published from outside a git checkout. */
+	gitRevision: string | null;
 	gitDirty: boolean;
-	gitAuthor: string;
+	gitAuthor: string | null;
 	publishedAt: Iso;
-	publishedBy: Principal;
+	/** Null when the server does not record who published. */
+	publishedBy: Principal | null;
 	nodes: NodeChange[];
 	orchestration: OrchestrationChange[];
 	roles: RoleChange[];
