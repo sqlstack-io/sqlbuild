@@ -34,8 +34,11 @@ fn given_bigquery_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole
             placeholders: &[],
             expected_gap: Some(LocatedGap {
                 construct: "Syntax error at or near 'FROM'".to_owned(),
+                message: "Syntax error at or near 'FROM'".to_owned(),
                 line: 1,
                 column: 15,
+                syntax: true,
+                source_offset: Some(14),
             }),
         },
         NativeGapTestCase {
@@ -44,8 +47,11 @@ fn given_bigquery_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole
             placeholders: &[],
             expected_gap: Some(LocatedGap {
                 construct: "declare".to_owned(),
+                message: "declare".to_owned(),
                 line: 1,
                 column: 1,
+                syntax: false,
+                source_offset: Some(0),
             }),
         },
         NativeGapTestCase {
@@ -54,8 +60,11 @@ fn given_bigquery_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole
             placeholders: &[],
             expected_gap: Some(LocatedGap {
                 construct: "more than one statement".to_owned(),
-                line: 2,
-                column: 9,
+                message: "more than one statement".to_owned(),
+                line: 1,
+                column: 1,
+                syntax: false,
+                source_offset: Some(0),
             }),
         },
     ];
@@ -76,7 +85,6 @@ fn given_bigquery_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole
         );
     }
 }
-
 
 #[test]
 fn given_a_bigquery_type_spelling_when_normalising_then_a_valid_one_keeps_polyglot_s_name() {
@@ -309,13 +317,9 @@ fn given_a_valid_bigquery_type_spelling_when_normalising_then_the_type_is_polygl
             expected_type: ("BYTES(MAX)", TypeFamily::Other, [None, None, None]),
         },
         NormalizedTypeTestCase {
-            description: "a top-level RANGE is read as text, so of the timestamp family",
+            description: "a top-level RANGE is read as text, so its top-level type decides: no family",
             spelling: "range<timestamp>",
-            expected_type: (
-                "RANGE<TIMESTAMP>",
-                TypeFamily::Timestamp,
-                [None, None, None],
-            ),
+            expected_type: ("RANGE<TIMESTAMP>", TypeFamily::Other, [None, None, None]),
         },
         NormalizedTypeTestCase {
             description: "an ARRAY is of no family",
@@ -327,11 +331,11 @@ fn given_a_valid_bigquery_type_spelling_when_normalising_then_the_type_is_polygl
             ),
         },
         NormalizedTypeTestCase {
-            description: "a RANGE closed by >> fails Polyglot's parse, so is read as text",
+            description: "a RANGE closed by >> fails Polyglot's parse, so is read as text, where ARRAY decides the family",
             spelling: "ARRAY<RANGE<TIMESTAMP>>",
             expected_type: (
                 "ARRAY<RANGE<TIMESTAMP>>",
-                TypeFamily::Timestamp,
+                TypeFamily::Other,
                 [None, None, None],
             ),
         },
@@ -354,11 +358,11 @@ fn given_a_valid_bigquery_type_spelling_when_normalising_then_the_type_is_polygl
             ),
         },
         NormalizedTypeTestCase {
-            description: "an unnamed RANGE field fails Polyglot's parse",
+            description: "an unnamed RANGE field fails Polyglot's parse, so STRUCT decides the family",
             spelling: "STRUCT< RANGE< TIMESTAMP > >",
             expected_type: (
                 "STRUCT<RANGE<TIMESTAMP>>",
-                TypeFamily::Timestamp,
+                TypeFamily::Other,
                 [None, None, None],
             ),
         },

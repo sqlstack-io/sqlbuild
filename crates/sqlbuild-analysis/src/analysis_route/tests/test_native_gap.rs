@@ -67,7 +67,6 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
     }
 }
 
-
 #[test]
 fn given_model_sql_when_probing_the_native_parser_then_its_gap_is_located_after_placeholders() {
     let test_cases = [
