@@ -186,9 +186,21 @@ FALLBACK_SIGNED_INTEGER_LOCAL_TYPES: dict[str, str] = {
 FALLBACK_UNSIGNED_INTEGER_TYPES: frozenset[str] = frozenset(
     {"UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "UHUGEINT"}
 )
-FALLBACK_FLOAT_TYPES: frozenset[str] = frozenset(
-    {"FLOAT", "FLOAT4", "REAL", "DOUBLE", "DOUBLE PRECISION", "FLOAT8"}
+FALLBACK_FLOAT_TYPES: frozenset[str] = frozenset({"FLOAT", "FLOAT4", "REAL"})
+FALLBACK_DOUBLE_TYPES: frozenset[str] = frozenset(
+    {"DOUBLE", "DOUBLE PRECISION", "FLOAT8", "FLOAT64"}
 )
+TSQL_LOCAL_TYPES: dict[str, str] = {
+    "BIT": "BOOLEAN",
+    "DATETIME2": "TIMESTAMP",
+    "SMALLDATETIME": "TIMESTAMP",
+    "DATETIMEOFFSET": "TIMESTAMPTZ",
+    "UNIQUEIDENTIFIER": "UUID",
+    "FLOAT": "DOUBLE",
+    "REAL": "FLOAT",
+    "MONEY": "DECIMAL(19,4)",
+    "SMALLMONEY": "DECIMAL(10,4)",
+}
 FALLBACK_DECIMAL_TYPES: frozenset[str] = frozenset({"DECIMAL", "DEC", "NUMERIC", "NUMBER"})
 FALLBACK_DATE_TYPE: str = "DATE"
 FALLBACK_TIME_TYPES: frozenset[str] = frozenset({"TIME", "TIME WITH TIME ZONE", "TIMETZ"})

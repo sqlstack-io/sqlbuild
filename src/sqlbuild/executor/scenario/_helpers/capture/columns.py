@@ -40,6 +40,7 @@ from sqlbuild.executor.scenario.constants import (
     FALLBACK_BOOLEAN_TYPES,
     FALLBACK_DATE_TYPE,
     FALLBACK_DECIMAL_TYPES,
+    FALLBACK_DOUBLE_TYPES,
     FALLBACK_FLOAT_TYPES,
     FALLBACK_JSON_TYPES,
     FALLBACK_SIGNED_INTEGER_LOCAL_TYPES,
@@ -86,6 +87,7 @@ from sqlbuild.executor.scenario.constants import (
     SNOWFLAKE_VECTOR_TYPE,
     SNOWFLAKE_WIDEN_TO_DOUBLE_TYPES,
     STRUCT_FIELD_NAME_PATTERN,
+    TSQL_LOCAL_TYPES,
     TYPE_ARGUMENT_CLOSE_ANGLE,
     TYPE_ARGUMENT_CLOSE_PAREN,
     TYPE_ARGUMENT_CLOSE_TOKENS,
@@ -296,6 +298,8 @@ def _dialect_pre_local_type(*, warehouse_type: str, sql_analysis_dialect: str | 
         return _databricks_local_type(warehouse_type)
     if dialect in LOCAL_TYPE_DIALECTS:
         return _duckdb_pre_local_type(base=base, args=args)
+    if dialect == TypeDialect.TSQL:
+        return TSQL_LOCAL_TYPES.get(base)
     if dialect is None and base not in GENERIC_LOCAL_BASE_TYPES:
         return LOCAL_TYPE_VARCHAR
     return None
@@ -509,6 +513,8 @@ def _known_local_type(warehouse_type: str) -> str | None:
     if base_type in FALLBACK_UNSIGNED_INTEGER_TYPES:
         return LOCAL_TYPE_BIGINT
     if base_type in FALLBACK_FLOAT_TYPES:
+        return LOCAL_TYPE_FLOAT
+    if base_type in FALLBACK_DOUBLE_TYPES:
         return LOCAL_TYPE_DOUBLE
     if base_type in FALLBACK_DECIMAL_TYPES:
         return _decimal_local_type(normalized_type)

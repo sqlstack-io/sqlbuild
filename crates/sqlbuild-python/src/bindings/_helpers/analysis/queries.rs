@@ -15,14 +15,17 @@ fn query_fingerprint(py: Python<'_>, sql: &str, dialect: &str) -> PyResult<Strin
 }
 
 /// The type tree, as JSON, of a warehouse type name, or None when `dialect` has no parser.
+///
+/// A parser panic is a `ValueError`, so capture falls back as for any rejected spelling.
 #[pyfunction]
-fn parse_warehouse_type(spelling: &str, dialect: &str) -> PyResult<Option<String>> {
-    let tree: Option<serde_json::Value> =
+fn parse_warehouse_type(py: Python<'_>, spelling: &str, dialect: &str) -> PyResult<Option<String>> {
+    py.compiler_detach(|| {
         sqlbuild_analysis::warehouse_types::main::parse_warehouse_type::parse_warehouse_type(
             spelling, dialect,
         )
-        .map_err(value_error)?;
-    Ok(tree.as_ref().map(serde_json::Value::to_string))
+        .map(|tree| tree.as_ref().map(serde_json::Value::to_string))
+    })
+    .map_err(value_error)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
