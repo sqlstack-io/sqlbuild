@@ -657,9 +657,7 @@ def test_given_project_dialect_when_running_built_in_rules_then_unparsed_dialect
     write_quality_project(
         project_dir=tmp_path,
         toml=(
-            'name = "orders"\n'
-            + test_case.adapter_toml
-            + '\n[rules]\nselect = ["SQBRMODEL102"]\n'
+            'name = "orders"\n' + test_case.adapter_toml + '\n[rules]\nselect = ["SQBRMODEL102"]\n'
         ),
         upstream=_RAW_HEADER + _UPSTREAM_SQL,
         summary=_SUMMARY_HEADER + 'SELECT * FROM __ref("raw_orders")\n',

@@ -2144,7 +2144,9 @@ FROM final
     "test_case",
     [
         RulesIntegrationTestCase(
-            "quoted comment marker" + ", reported unavailable until SQLBuild parses the dialect", 0, "SQBRMODEL101"
+            "quoted comment marker" + ", reported unavailable until SQLBuild parses the dialect",
+            0,
+            "SQBRMODEL101",
         )
     ],
     ids=lambda case: case.description,
