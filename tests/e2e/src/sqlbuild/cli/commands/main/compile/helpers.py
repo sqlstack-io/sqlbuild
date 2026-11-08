@@ -2847,6 +2847,27 @@ REQUIRE_SQL_ANALYSIS_PROJECT: str = (
     'name = "orders"\nadapter = "duckdb"\n\n[settings]\nrequire_sql_analysis = true\n'
 )
 OPTIONAL_SQL_ANALYSIS_PROJECT: str = 'name = "orders"\nadapter = "duckdb"\n'
+SQLSERVER_REQUIRE_SQL_ANALYSIS_PROJECT: str = (
+    'name = "orders"\nadapter = "sqlserver"\ndefault_target = "dev"\n\n'
+    '[targets.dev]\ndatabase = "warehouse"\nschema = "analytics"\n\n'
+    "[settings]\nrequire_sql_analysis = true\n"
+)
+SQLSERVER_EVENTS_SOURCE: str = (
+    "sources:\n  - name: raw_events\n    description: Event feed.\n    columns:\n"
+    "      - name: id\n        type: INTEGER\n      - name: amount\n        type: INTEGER\n"
+    "      - name: created_at\n        type: TIMESTAMP\n"
+)
+SQLSERVER_BRACKETED_CURSOR_MODEL: str = (
+    'MODEL (\n  description "Events whose bracket name holds a comment opener",\n'
+    "  materialized incremental,\n  incremental_strategy delete_insert,\n  unique_key [id],\n"
+    "  cursor created_at,\n  cursor_type timestamp,\n  cursor_grain day,\n"
+    "  incremental_mode microbatch,\n  microbatch_strategy rolling_window,\n  lookback 1d,\n"
+    "  batch_size 1d,\n  cursor_inputs (\n    raw_events created_at,\n  ),\n);\n\n"
+    "SELECT id, amount AS [x--y], "
+    "CASE WHEN created_at >= __cursor_start() THEN 1 END AS in_window, created_at\n"
+    'FROM __source("raw_events")\n'
+    "WHERE created_at >= __cursor_start() AND created_at < __cursor_end()\n"
+)
 PARSEABLE_OPT_OUT_MODEL: str = (
     'MODEL (\n  description "Order flags",\n  sql_analysis false\n);\n'
     "SELECT 1 = 'pending' AS is_pending, 2 = 'shipped' AS is_shipped\n"

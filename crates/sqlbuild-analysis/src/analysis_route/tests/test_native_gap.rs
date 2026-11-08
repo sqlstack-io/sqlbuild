@@ -203,6 +203,30 @@ fn given_tsql_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has
             expected_gap: None,
         },
         NativeGapTestCase {
+            description: "a quote inside a bracket name does not hide a later cursor stub",
+            sql: "SELECT [customer's name] AS n FROM t WHERE updated_at >= __cursor_start()",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "an escaped bracket keeps the name open past its quote, so the stub stays code",
+            sql: "SELECT [it]]'s] AS n FROM t WHERE updated_at >= __cursor_start()",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "a line-comment opener inside a bracket name does not hide a later cursor stub",
+            sql: "SELECT [x--y] AS n FROM t WHERE updated_at >= __cursor_start()",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "a block-comment opener inside a bracket name does not hide a later cursor stub",
+            sql: "SELECT [x /* y] AS n FROM t WHERE updated_at >= __cursor_start()",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
             description: "an unknown one-part function stops the parser at its call, where SQL Server raises 195",
             sql: "SELECT id,\n  LENGTH(name) AS n FROM t",
             placeholders: &[],
