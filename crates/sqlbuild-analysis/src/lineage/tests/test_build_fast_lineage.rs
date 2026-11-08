@@ -11,7 +11,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
             description: "joins, aggregation, cast, constant and expression columns",
             sql: "SELECT o.order_id, c.name AS customer_name, SUM(o.amount) AS total, \
                   CAST(o.amount AS BIGINT) AS amount_big, 1 AS one, o.amount + c.customer_id AS mix \
-                  FROM __ref('orders') o JOIN __ref('customers') c ON o.customer_id = c.customer_id \
+                  FROM __ref(\"orders\") o JOIN __ref(\"customers\") c ON o.customer_id = c.customer_id \
                   GROUP BY 1, 2",
             dialect: None,
             inferred_columns: &[],
@@ -29,7 +29,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "unqualified columns of one resource and an unknown qualifier",
-            sql: "SELECT order_id, amount * 2 AS doubled, missing.thing FROM __ref('orders')",
+            sql: "SELECT order_id, amount * 2 AS doubled, missing.thing FROM __ref(\"orders\")",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -43,7 +43,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "a root star expands known columns after explicit outputs",
-            sql: "SELECT *, amount AS amt FROM __ref('orders')",
+            sql: "SELECT *, amount AS amt FROM __ref(\"orders\")",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -58,7 +58,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "a qualified star expands every referenced resource",
-            sql: "SELECT o.* FROM __ref('orders') o JOIN __seed('regions') r ON TRUE",
+            sql: "SELECT o.* FROM __ref(\"orders\") o JOIN __seed(\"regions\") r ON TRUE",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -74,8 +74,8 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "a three-branch union merges branch sources",
-            sql: "SELECT order_id FROM __ref('orders') UNION ALL SELECT customer_id \
-                  FROM __ref('customers') UNION ALL SELECT region_id + 1 FROM __seed('regions')",
+            sql: "SELECT order_id FROM __ref(\"orders\") UNION ALL SELECT customer_id \
+                  FROM __ref(\"customers\") UNION ALL SELECT region_id + 1 FROM __seed(\"regions\")",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -88,7 +88,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "a union with a star branch takes inferred names",
-            sql: "SELECT order_id, amount FROM __ref('orders') UNION SELECT * FROM __ref('customers')",
+            sql: "SELECT order_id, amount FROM __ref(\"orders\") UNION SELECT * FROM __ref(\"customers\")",
             dialect: None,
             inferred_columns: &["first", "second"],
             expected_status: "built",
@@ -105,7 +105,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "a CTE collapses onto its referenced model",
-            sql: "WITH base AS (SELECT order_id, amount FROM __ref('orders')) \
+            sql: "WITH base AS (SELECT order_id, amount FROM __ref(\"orders\")) \
                   SELECT order_id, amount FROM base",
             dialect: None,
             inferred_columns: &[],
@@ -119,7 +119,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "unnamed projections take inferred names",
-            sql: "SELECT 1 + 1, COUNT(*) FROM __ref('orders')",
+            sql: "SELECT 1 + 1, COUNT(*) FROM __ref(\"orders\")",
             dialect: None,
             inferred_columns: &["a", "b"],
             expected_status: "built",
@@ -129,7 +129,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         },
         ParsedLineageTestCase {
             description: "quoted and case-varied identifiers keep their spelling",
-            sql: "SELECT \"Order_ID\", O.Amount FROM __ref('orders') AS O",
+            sql: "SELECT \"Order_ID\", O.Amount FROM __ref(\"orders\") AS O",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -148,7 +148,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
                   order_id IN (1, customer_id) AS listed, \
                   ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY amount) AS rn, \
                   EXTRACT(YEAR FROM amount) AS yr, order_id || '-' || amount AS joined \
-                  FROM __ref('orders')",
+                  FROM __ref(\"orders\")",
             dialect: None,
             inferred_columns: &[],
             expected_status: "built",
@@ -168,7 +168,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
         ParsedLineageTestCase {
             description: "a top-level EXCEPT has no fast lineage",
             dialect: None,
-            sql: "SELECT order_id FROM __ref('orders') EXCEPT SELECT customer_id FROM __ref('customers')",
+            sql: "SELECT order_id FROM __ref(\"orders\") EXCEPT SELECT customer_id FROM __ref(\"customers\")",
             inferred_columns: &[],
             expected_status: "omitted",
             expected_lines: &[],
@@ -256,8 +256,8 @@ fn given_compact_facts_with_unresolved_star_when_building_then_appends_unseen_co
     let test_cases = [
         StarExpansionTestCase {
             description: "existing outputs and repeated references are skipped",
-            sql: "SELECT *, 1 AS amount FROM __ref('orders') JOIN __ref('orders') USING (order_id) \
-                  JOIN __seed('regions') USING (region_id)",
+            sql: "SELECT *, 1 AS amount FROM __ref(\"orders\") JOIN __ref(\"orders\") USING (order_id) \
+                  JOIN __seed(\"regions\") USING (region_id)",
             existing_columns: &["amount"],
             expected_lines: &[
                 "order_id star medium [model:orders.order_id]",
@@ -268,7 +268,7 @@ fn given_compact_facts_with_unresolved_star_when_building_then_appends_unseen_co
         },
         StarExpansionTestCase {
             description: "resources without known columns add nothing",
-            sql: "SELECT * FROM __ref('empty') JOIN __source('raw') ON TRUE",
+            sql: "SELECT * FROM __ref(\"empty\") JOIN __source(\"raw\") ON TRUE",
             existing_columns: &[],
             expected_lines: &[],
         },

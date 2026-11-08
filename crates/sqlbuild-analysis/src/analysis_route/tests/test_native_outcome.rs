@@ -2,7 +2,8 @@ use crate::analysis_route::main::fast_lineage::fast_lineage;
 use crate::analysis_route::main::model_outcome::model_outcome;
 use crate::analysis_route::tests::helpers::{column_line, session_relations};
 use crate::analysis_route::tests::test_types::{
-    CataloguedDialect, NativeLineageTestCase, NativeOutcomeTestCase, PivotlessDialect,
+    CataloguedDialect, FoldingDialect, MarkerLineageTestCase, NativeLineageTestCase,
+    NativeOutcomeTestCase, PivotlessDialect,
 };
 use crate::assembly::analysis_session::models::{ModelOutcome, ModelRequest, SessionSchema};
 use crate::assembly::analysis_session::types::Shapes;
@@ -127,14 +128,6 @@ fn given_a_model_without_facts_when_fast_lineage_reads_it_natively_then_it_has_l
             columns: vec!["payment_id".to_owned()],
         },
     ];
-    let references: Vec<(String, String, String)> = [
-        ("orders", "model"),
-        ("unknown_model", "model"),
-        ("raw_payments", "source"),
-    ]
-    .iter()
-    .map(|(name, kind)| ((*name).to_owned(), (*kind).to_owned(), (*name).to_owned()))
-    .collect();
     let test_cases = [
         NativeLineageTestCase {
             description: "a referenced model's columns are the upstreams of direct and computed outputs",
@@ -178,13 +171,58 @@ fn given_a_model_without_facts_when_fast_lineage_reads_it_natively_then_it_has_l
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect();
-        let parts: LineageOutcomeParts<LineageColumn> = fast_lineage(
-            &PivotlessDialect,
-            (test_case.sql, &placeholders),
-            &references,
-            &schema,
-        )
-        .into_parts();
+        let parts: LineageOutcomeParts<LineageColumn> =
+            fast_lineage(&PivotlessDialect, (test_case.sql, &placeholders), &schema).into_parts();
+        let mut lines: Vec<String> = parts.columns.iter().map(column_line).collect();
+        lines.push(format!("{} star={}", parts.status, parts.has_star));
+        lines.extend(parts.detail);
+        assert_eq!(lines, test_case.expected_lines, "{}", test_case.description);
+    }
+}
+
+#[test]
+fn given_relation_markers_when_each_dialect_reads_fast_lineage_then_sources_keep_their_resource() {
+    let schema: Vec<LineageSchemaResource> = vec![
+        LineageSchemaResource {
+            resource_type: LineageResourceType::Source,
+            name: "orders".to_owned(),
+            columns: vec!["order_id".to_owned(), "loaded_at".to_owned()],
+        },
+        LineageSchemaResource {
+            resource_type: LineageResourceType::Model,
+            name: "orders".to_owned(),
+            columns: vec!["order_id".to_owned(), "amount".to_owned()],
+        },
+    ];
+    let sql: &str = r#"SELECT o.order_id, o.amount, s.loaded_at
+FROM __ref("orders") AS o JOIN __source("orders") AS s ON o.order_id = s.order_id"#;
+    let expected_lines: &[&str] = &[
+        "order_id direct high [model:orders.order_id]",
+        "amount direct high [model:orders.amount]",
+        "loaded_at direct high [source:orders.loaded_at]",
+        "built star=false",
+    ];
+    let test_cases = [
+        MarkerLineageTestCase {
+            description: "a lower-case folding dialect matches each marker's name",
+            dialect: &PivotlessDialect,
+            expected_lines,
+        },
+        MarkerLineageTestCase {
+            description: "a case-preserving dialect matches each marker's name",
+            dialect: &CataloguedDialect,
+            expected_lines,
+        },
+        MarkerLineageTestCase {
+            description: "an upper-case folding dialect matches each marker's name",
+            dialect: &FoldingDialect,
+            expected_lines,
+        },
+    ];
+
+    for test_case in test_cases {
+        let parts: LineageOutcomeParts<LineageColumn> =
+            fast_lineage(test_case.dialect, (sql, &[]), &schema).into_parts();
         let mut lines: Vec<String> = parts.columns.iter().map(column_line).collect();
         lines.push(format!("{} star={}", parts.status, parts.has_star));
         lines.extend(parts.detail);

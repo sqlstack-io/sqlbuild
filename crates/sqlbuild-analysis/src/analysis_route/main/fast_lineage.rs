@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
 use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
@@ -17,26 +18,56 @@ use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind,
 };
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
+use crate::relation_markers::main::markers_as_names::markers_as_names;
+use crate::relation_markers::types::MarkerCall;
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 
-/// Lineage over `schema` and the `(name, type, resource)` references, or why it is unreadable.
+/// Lineage over `schema` of `query_sql`, its relation markers read as names, or why it is unreadable.
 pub fn fast_lineage(
     dialect: &dyn NativeDialect,
     (query_sql, placeholders): (&str, &[(String, String)]),
-    references: &[(String, String, String)],
     schema: &[LineageSchemaResource],
 ) -> FastLineageOutcome {
+    let (named, calls): (String, Vec<MarkerCall>) =
+        match markers_as_names(query_sql, &dialect_lexical_syntax(dialect.name())) {
+            Ok(named) => named,
+            Err(reason) => return FastLineageOutcome::Unparsed(reason),
+        };
     let normalised: String =
-        match normalize_native_sql(query_sql, dialect.name(), dialect.stub_prefix()) {
+        match normalize_native_sql(&named, dialect.name(), dialect.stub_prefix()) {
             Ok(normalised) => normalised,
             Err(reason) => return FastLineageOutcome::Unparsed(reason),
         };
     let sql: String = placeholder_defaults(&normalised, placeholders);
-    let relations: SessionSchema = names_schema(schema);
+    let referenced: Vec<(String, LineageResourceType, String)> = calls
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, (function, name))| {
+            let resource_type: LineageResourceType = match function.as_str() {
+                "__ref" => LineageResourceType::Model,
+                "__source" => LineageResourceType::Source,
+                "__seed" => LineageResourceType::Seed,
+                _ => return None,
+            };
+            Some((format!("{MARKER_NAME_PREFIX}{index}"), resource_type, name))
+        })
+        .collect();
+    let references: Vec<(String, String, String)> = referenced
+        .iter()
+        .map(|(marker, resource_type, name)| {
+            (
+                marker.clone(),
+                resource_type.as_str().to_owned(),
+                name.clone(),
+            )
+        })
+        .collect();
+    let relations: SessionSchema = markers_schema(&referenced, schema);
     let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
         sql: &sql,
         schema: &relations,
-        references,
+        references: &references,
         extension_functions: &[],
     });
     match analysed {
@@ -50,25 +81,33 @@ pub fn fast_lineage(
     }
 }
 
-/// Each resource with known columns, untyped and of unknown nullability; the first of a name wins.
-fn names_schema(schema: &[LineageSchemaResource]) -> SessionSchema {
+/// Each marker name's resource columns, untyped and of unknown nullability, when the schema knows them.
+fn markers_schema(
+    referenced: &[(String, LineageResourceType, String)],
+    schema: &[LineageSchemaResource],
+) -> SessionSchema {
     let mut relations: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
-    for resource in schema
-        .iter()
-        .filter(|resource| !resource.columns.is_empty())
-    {
-        let _ = relations.entry(resource.name.clone()).or_insert_with(|| {
+    for (marker, resource_type, name) in referenced {
+        let Some(resource) = schema.iter().find(|resource| {
+            resource.resource_type == *resource_type
+                && resource.name == *name
+                && !resource.columns.is_empty()
+        }) else {
+            continue;
+        };
+        let _ = relations.insert(
+            marker.clone(),
             resource
                 .columns
                 .iter()
-                .map(|name| SchemaColumn {
-                    name: name.clone(),
+                .map(|column| SchemaColumn {
+                    name: column.clone(),
                     quoted: false,
                     data_type: None,
                     nullability: Nullability::Unknown,
                 })
-                .collect()
-        });
+                .collect(),
+        );
     }
     SessionSchema { relations }
 }
