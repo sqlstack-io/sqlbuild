@@ -5,12 +5,14 @@ use crate::analysis_route::tests::test_types::{
     CataloguedDialect, FoldingDialect, MarkerLineageTestCase, NativeLineageTestCase,
     NativeOutcomeTestCase, PivotlessDialect,
 };
-use crate::assembly::analysis_session::models::{ModelOutcome, ModelRequest, SessionSchema};
+use crate::assembly::analysis_session::models::{
+    ModelOutcome, ModelRequest, SessionFunctions, SessionSchema,
+};
 use crate::assembly::analysis_session::types::Shapes;
 use crate::lineage::models::{
     LineageColumn, LineageOutcomeParts, LineageResourceType, LineageSchemaResource,
 };
-use sqlquack_semantics::lineage::models::Nullability;
+use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule};
 
 #[test]
 fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_follow_them() {
@@ -23,6 +25,7 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
                 ("status", "VARCHAR", Nullability::Nullable),
             ],
             declared_functions: &[],
+            nullability_rules: &[],
             expected_lines: &[
                 "order_id INTEGER non_null",
                 "status VARCHAR nullable",
@@ -34,6 +37,7 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             sql: "SELECT * FROM raw_orders",
             shape: &[],
             declared_functions: &[],
+            nullability_rules: &[],
             expected_lines: &["succeeded=true star=true/false findings=[]"],
         },
         NativeOutcomeTestCase {
@@ -41,6 +45,7 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             sql: "SELECT FROM WHERE",
             shape: &[("order_id", "INTEGER", Nullability::NonNull)],
             declared_functions: &[],
+            nullability_rules: &[],
             expected_lines: &["succeeded=false star=false/false findings=[]"],
         },
         NativeOutcomeTestCase {
@@ -48,6 +53,7 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             sql: "SELECT CURRENT_TIMESTAMP() AS at FROM raw_orders",
             shape: &[("order_id", "INTEGER", Nullability::NonNull)],
             declared_functions: &[("CURRENT_TIMESTAMP", "TIMESTAMPTZ")],
+            nullability_rules: &[],
             expected_lines: &[
                 "at TIMESTAMPTZ unknown",
                 "succeeded=true star=false/true findings=[]",
@@ -58,15 +64,81 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             sql: "SELECT CURRENT_TIMESTAMP() AS at FROM raw_orders",
             shape: &[("order_id", "INTEGER", Nullability::NonNull)],
             declared_functions: &[],
+            nullability_rules: &[],
             expected_lines: &[
                 "at TIMESTAMPTZ unknown",
                 "succeeded=true star=false/true findings=[\"B101\"]",
             ],
         },
+        NativeOutcomeTestCase {
+            description: "a declared function's return type types its call",
+            sql: "SELECT shop_day(order_id) AS d FROM raw_orders",
+            shape: &[("order_id", "INTEGER", Nullability::NonNull)],
+            declared_functions: &[("SHOP_DAY", "DATE")],
+            nullability_rules: &[],
+            expected_lines: &[
+                "d DATE unknown",
+                "succeeded=true star=false/true findings=[]",
+            ],
+        },
+        NativeOutcomeTestCase {
+            description: "a declared function without a return type is untyped",
+            sql: "SELECT shop_day(order_id) AS d FROM raw_orders",
+            shape: &[("order_id", "INTEGER", Nullability::NonNull)],
+            declared_functions: &[("SHOP_DAY", "")],
+            nullability_rules: &[],
+            expected_lines: &["d - unknown", "succeeded=true star=false/true findings=[]"],
+        },
+        NativeOutcomeTestCase {
+            description: "an adapter's first-argument rule keeps a non-null argument non-null",
+            sql: "SELECT shop_label(status) AS s FROM raw_orders",
+            shape: &[("status", "VARCHAR", Nullability::NonNull)],
+            declared_functions: &[("SHOP_LABEL", "VARCHAR")],
+            nullability_rules: &[("SHOP_LABEL", NullabilityRule::FirstArgument)],
+            expected_lines: &[
+                "s VARCHAR non_null",
+                "succeeded=true star=false/true findings=[]",
+            ],
+        },
+        NativeOutcomeTestCase {
+            description: "without the rule the same call's nullability is unknown",
+            sql: "SELECT shop_label(status) AS s FROM raw_orders",
+            shape: &[("status", "VARCHAR", Nullability::NonNull)],
+            declared_functions: &[("SHOP_LABEL", "VARCHAR")],
+            nullability_rules: &[],
+            expected_lines: &[
+                "s VARCHAR unknown",
+                "succeeded=true star=false/true findings=[]",
+            ],
+        },
+        NativeOutcomeTestCase {
+            description: "a quoted stored name is the quoted column, its doubled quote one quote",
+            sql: "SELECT \"Say \"\"hi\"\"\" AS c FROM raw_orders",
+            shape: &[("\"Say \"\"hi\"\"\"", "VARCHAR", Nullability::NonNull)],
+            declared_functions: &[],
+            nullability_rules: &[],
+            expected_lines: &[
+                "c VARCHAR non_null",
+                "succeeded=true star=false/true findings=[]",
+            ],
+        },
     ];
 
     for test_case in test_cases {
-        let (schema, relations): (Shapes, SessionSchema) = session_relations(test_case.shape);
+        let (schema, mut relations): (Shapes, SessionSchema) = session_relations(test_case.shape);
+        relations.functions = SessionFunctions {
+            return_types: test_case
+                .declared_functions
+                .iter()
+                .filter(|(_, data_type)| !data_type.is_empty())
+                .map(|(name, data_type)| ((*name).to_owned(), (*data_type).to_owned()))
+                .collect(),
+            nullability: test_case
+                .nullability_rules
+                .iter()
+                .map(|(name, rule)| ((*name).to_owned(), *rule))
+                .collect(),
+        };
         let model: ModelRequest = ModelRequest {
             name: "orders".to_owned(),
             query_sql: test_case.sql.to_owned(),
@@ -78,8 +150,12 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             .iter()
             .map(|(name, _)| (*name).to_owned())
             .collect();
-        let (outcome, failure): (ModelOutcome, Option<String>) =
-            model_outcome(&CataloguedDialect, &model, (schema, &relations), &declared);
+        let (outcome, failure): (ModelOutcome, Option<String>) = model_outcome(
+            &CataloguedDialect,
+            &model,
+            (schema, &relations),
+            (&declared, false),
+        );
         let analysis = &outcome.analysis;
         let mut lines: Vec<String> = analysis
             .columns

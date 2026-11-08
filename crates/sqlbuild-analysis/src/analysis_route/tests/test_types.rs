@@ -1,10 +1,10 @@
 use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES, SNOWFLAKE};
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_semantics::lineage::models::Nullability;
+use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule};
 use sqlquack_syntax::expressions::statements::models::Command;
 use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 
-use crate::analysis_route::models::{GapSite, LocatedGap, ParserGap, TypeMatch};
+use crate::analysis_route::models::{AnalysisRoute, GapSite, LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::NormalizedType;
@@ -208,6 +208,13 @@ pub(super) struct UnavailableAnalysisTestCase {
     pub(super) expected_message: &'static str,
 }
 
+pub(super) struct UnappliedRulesTestCase {
+    pub(super) description: &'static str,
+    pub(super) route: AnalysisRoute,
+    pub(super) functions: &'static [&'static str],
+    pub(super) expected_warning: Option<&'static str>,
+}
+
 /// Each output's name, transform code, confidence code and the columns it reads.
 type ExpectedLineage = &'static [(&'static str, u8, u8, &'static [&'static str])];
 
@@ -239,6 +246,8 @@ pub(super) struct NativeOutcomeTestCase {
     pub(super) shape: &'static [(&'static str, &'static str, Nullability)],
     /// The adapter's declared functions as `(name, return type)`.
     pub(super) declared_functions: &'static [(&'static str, &'static str)],
+    /// The adapter's built-in nullability rules as `(function name, rule)`.
+    pub(super) nullability_rules: &'static [(&'static str, NullabilityRule)],
     /// Each output column as `name type nullability`, then success, star flags and finding codes.
     pub(super) expected_lines: &'static [&'static str],
 }

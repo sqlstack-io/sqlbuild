@@ -97,3 +97,12 @@ pub(crate) fn log_debug_message(py: Python<'_>, logger: &str, message: &str) -> 
     .call((), Some(&kwargs))
     .map(|_| ())
 }
+
+/// `logging.getLogger(logger).warning(message)`.
+pub(crate) fn log_warning_message(py: Python<'_>, logger: &str, message: &str) -> PyResult<()> {
+    py.import("logging")?
+        .getattr("getLogger")?
+        .call1((logger,))?
+        .call_method1("warning", (message,))
+        .map(|_| ())
+}

@@ -5,5 +5,7 @@ pub mod fast_lineage;
 pub(crate) mod model_outcome;
 pub mod native_gap;
 pub mod native_revalidation;
+pub mod schema_column;
 pub mod skipped_analysis;
+pub mod unapplied_nullability_rules;
 pub mod unavailable_analysis;

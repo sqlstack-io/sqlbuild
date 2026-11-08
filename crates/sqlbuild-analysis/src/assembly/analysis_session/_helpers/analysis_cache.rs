@@ -222,6 +222,7 @@ fn session_digest(request: &SessionRequest) -> ContentDigest {
     key.text(ANALYSIS_CACHE_FORMAT);
     key.text(&request.dialect);
     key.flag(request.case_sensitive_shapes);
+    key.flag(request.quoted_ignore_case);
     key.pairs(&request.function_return_types);
     key.optional_pairs(request.nullability_rules.as_ref());
     key.flag(request.rich_type_inference);
