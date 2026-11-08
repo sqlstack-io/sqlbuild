@@ -7,9 +7,8 @@ use crate::sql_tree::constants::{
 };
 use crate::sql_tree::models::TreeParser;
 
-/// The parser for `dialect`, or `None` when SQLQuack parses none of it; becomes `analysis_route` once a native module registers.
+/// The parser for `dialect`, or `None`; add a dialect (one line) only once its parser passes the depth probe with an empty allowlist.
 pub(crate) fn rules_tree_parser(dialect: &str) -> Option<TreeParser> {
-    // Add a dialect (one line) only once its parser passes the depth probe with an empty allowlist.
     if POSTGRES_DIALECTS.contains(&dialect) {
         return Some(TreeParser::Postgres);
     }
