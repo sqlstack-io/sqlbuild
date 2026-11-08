@@ -6,51 +6,13 @@
 			"description": "Build the selected nodes, running their tests and audits",
 			"flags": [
 				{
-					"flag": "--no-sql-analysis",
-					"aliases": [
-						"--no-sql-validation"
-					],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "disable SQL syntax, binding, type inference, and semantic validation"
-				},
-				{
-					"flag": "--no-cache",
+					"flag": "--selection-diagnostics",
 					"aliases": [],
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Bypass the compile analysis cache for this invocation"
-				},
-				{
-					"flag": "--defer-to",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Read unselected upstream nodes from another target"
-				},
-				{
-					"flag": "--defer-clone-from",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Clone unselected upstream nodes from another target"
-				},
-				{
-					"flag": "--defer-sources-to",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Read sources from another target"
+					"requires": null,
+					"description": "Include direct-mode stale-out-of-selection diagnostics."
 				},
 				{
 					"flag": "--no-python",
@@ -58,7 +20,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Skip Python nodes"
 				},
 				{
@@ -67,7 +29,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Skip unit tests during the build"
 				},
 				{
@@ -76,7 +38,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Skip audits during the build"
 				},
 				{
@@ -85,7 +47,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "override the start cursor, typed from the selected models' cursor type"
 				},
 				{
@@ -94,7 +56,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "override the end cursor, typed from the selected models' cursor type"
 				},
 				{
@@ -103,7 +65,7 @@
 					"type": "timestamp",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "timestamp start cursor override"
 				},
 				{
@@ -112,7 +74,7 @@
 					"type": "timestamp",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "timestamp end cursor override"
 				},
 				{
@@ -121,7 +83,7 @@
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "integer start cursor override"
 				},
 				{
@@ -130,7 +92,7 @@
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "integer end cursor override"
 				},
 				{
@@ -139,17 +101,8 @@
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Process at most this many microbatches per incremental model"
-				},
-				{
-					"flag": "--load",
-					"aliases": [],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Run loaders as part of the build"
 				},
 				{
 					"flag": "--no-load",
@@ -157,17 +110,8 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Skip loaders"
-				},
-				{
-					"flag": "--reload",
-					"aliases": [],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "Reload loader sources from the beginning"
 				},
 				{
 					"flag": "--fail-fast",
@@ -175,7 +119,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Stop at the first failed node"
 				},
 				{
@@ -184,7 +128,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "Rebuild incremental models and snapshots from scratch"
 				},
 				{
@@ -193,7 +137,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": true,
+					"requires": "run.rewrite_history",
 					"description": "Allow a full refresh of snapshot models"
 				},
 				{
@@ -202,7 +146,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.rewrite_history",
 					"description": "Allow replacing a table with a less durable table type"
 				},
 				{
@@ -211,17 +155,8 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.rewrite_history",
 					"description": "Allow lowering a table retention setting"
-				},
-				{
-					"flag": "--allow-missing-migration-origin",
-					"aliases": [],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Allow a migration whose origin relation no longer exists"
 				},
 				{
 					"flag": "--allow-snapshot-schema-change",
@@ -229,7 +164,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.rewrite_history",
 					"description": "Allow a schema change on snapshot models"
 				},
 				{
@@ -238,7 +173,7 @@
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Nodes to run in parallel within this run"
 				},
 				{
@@ -247,7 +182,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Per-test timeout for unit tests this build runs, such as '30s', or 'disabled'"
 				},
 				{
@@ -258,7 +193,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "More detailed output"
 				},
 				{
@@ -269,8 +204,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
 				},
 				{
 					"flag": "--exclude",
@@ -278,17 +213,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
 				},
 				{
 					"flag": "--warehouse",
@@ -296,7 +222,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.warehouse",
 					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
 				}
 			]
@@ -306,23 +232,12 @@
 			"description": "Run unit and scenario tests for the selection",
 			"flags": [
 				{
-					"flag": "--no-sql-analysis",
-					"aliases": [
-						"--no-sql-validation"
-					],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "disable SQL syntax, binding, type inference, and semantic validation"
-				},
-				{
 					"flag": "--concurrency",
 					"aliases": [],
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Nodes to run in parallel within this run"
 				},
 				{
@@ -331,7 +246,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Per-test timeout for this run, such as '30s' or '2m', or 'disabled'; overrides TEST() and project settings"
 				},
 				{
@@ -340,8 +255,17 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Run one named parameter case"
+				},
+				{
+					"flag": "--inspect",
+					"aliases": [],
+					"type": "bool",
+					"choices": null,
+					"repeatable": false,
+					"requires": null,
+					"description": "Show the resolved test plan"
 				},
 				{
 					"flag": "--select",
@@ -351,8 +275,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
 				},
 				{
 					"flag": "--exclude",
@@ -360,17 +284,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
 				},
 				{
 					"flag": "--warehouse",
@@ -378,7 +293,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.warehouse",
 					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
 				}
 			]
@@ -393,7 +308,7 @@
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Nodes to run in parallel within this run"
 				},
 				{
@@ -404,8 +319,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
 				},
 				{
 					"flag": "--exclude",
@@ -413,17 +328,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
 				},
 				{
 					"flag": "--warehouse",
@@ -431,123 +337,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
-				}
-			]
-		},
-		{
-			"name": "load",
-			"description": "Run loaders into their source tables",
-			"flags": [
-				{
-					"flag": "--reload",
-					"aliases": [],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "Reload loader sources from the beginning"
-				},
-				{
-					"flag": "--concurrency",
-					"aliases": [],
-					"type": "int",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Nodes to run in parallel within this run"
-				},
-				{
-					"flag": "--select",
-					"aliases": [
-						"-s"
-					],
-					"type": "selector",
-					"choices": null,
-					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
-				},
-				{
-					"flag": "--exclude",
-					"aliases": [],
-					"type": "selector",
-					"choices": null,
-					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--start-cursor",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "override the start cursor, typed from the selected models' cursor type"
-				},
-				{
-					"flag": "--end-cursor",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "override the end cursor, typed from the selected models' cursor type"
-				},
-				{
-					"flag": "--start-cursor-ts",
-					"aliases": [],
-					"type": "timestamp",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "timestamp start cursor override"
-				},
-				{
-					"flag": "--end-cursor-ts",
-					"aliases": [],
-					"type": "timestamp",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "timestamp end cursor override"
-				},
-				{
-					"flag": "--start-cursor-int",
-					"aliases": [],
-					"type": "int",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "integer start cursor override"
-				},
-				{
-					"flag": "--end-cursor-int",
-					"aliases": [],
-					"type": "int",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": true,
-					"description": "integer end cursor override"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
-				},
-				{
-					"flag": "--warehouse",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.warehouse",
 					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
 				}
 			]
@@ -557,32 +347,12 @@
 			"description": "Evaluate audits against what is already built",
 			"flags": [
 				{
-					"flag": "--no-sql-analysis",
-					"aliases": [
-						"--no-sql-validation"
-					],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "disable SQL syntax, binding, type inference, and semantic validation"
-				},
-				{
-					"flag": "--defer-to",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Read unselected upstream nodes from another target"
-				},
-				{
 					"flag": "--concurrency",
 					"aliases": [],
 					"type": "int",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Nodes to run in parallel within this run"
 				},
 				{
@@ -593,8 +363,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
 				},
 				{
 					"flag": "--exclude",
@@ -602,17 +372,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
 				},
 				{
 					"flag": "--warehouse",
@@ -620,7 +381,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.warehouse",
 					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
 				}
 			]
@@ -630,23 +391,12 @@
 			"description": "Check source freshness",
 			"flags": [
 				{
-					"flag": "--no-sql-analysis",
-					"aliases": [
-						"--no-sql-validation"
-					],
-					"type": "bool",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "disable SQL syntax, binding, type inference, and semantic validation"
-				},
-				{
 					"flag": "--state",
 					"aliases": [],
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Record freshness results in the state tables"
 				},
 				{
@@ -655,7 +405,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Fail when a freshness check errors"
 				},
 				{
@@ -664,7 +414,7 @@
 					"type": "bool",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Fail when a source is stale"
 				},
 				{
@@ -675,8 +425,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
-					"description": "Selector expression, e.g. +fact_orders, tag:finance, group:marts"
+					"requires": null,
+					"description": "Selector expression, e.g. +fact_orders, tag:finance, path:models/marts/"
 				},
 				{
 					"flag": "--exclude",
@@ -684,17 +434,8 @@
 					"type": "selector",
 					"choices": null,
 					"repeatable": true,
-					"rewritesHistory": false,
+					"requires": null,
 					"description": "Selector expression to leave out"
-				},
-				{
-					"flag": "--vars",
-					"aliases": [],
-					"type": "string",
-					"choices": null,
-					"repeatable": false,
-					"rewritesHistory": false,
-					"description": "Project variables as a JSON or key=value mapping"
 				},
 				{
 					"flag": "--warehouse",
@@ -702,7 +443,7 @@
 					"type": "string",
 					"choices": null,
 					"repeatable": false,
-					"rewritesHistory": false,
+					"requires": "run.warehouse",
 					"description": "warehouse for this invocation; overrides the target's command-group warehouse and the connection warehouse"
 				}
 			]

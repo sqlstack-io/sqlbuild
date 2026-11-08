@@ -562,6 +562,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/runs/adhoc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestAdhocRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/runs/adhoc/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["checkAdhocRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/runs/cancel": {
         parameters: {
             query?: never;
@@ -954,7 +986,50 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "run.warehouse" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        /** @description What launching the command would run and whether this person may launch it. */
+        AdhocCheck: {
+            /** @description Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector. */
+            error?: string | null;
+            launchable: boolean;
+            permissions: components["schemas"]["AdhocPermission"][];
+            selection: string[];
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            snapshot_id?: string | null;
+            verb?: string | null;
+            write_set: string[];
+        };
+        /** @description A dry run of a command; nothing is queued or audited. */
+        AdhocCheckRequest: {
+            command: string[];
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            priority: number;
+            target: string;
+        };
+        /** @description One permission the run needs and whether the person holds it on every resolved node. */
+        AdhocPermission: {
+            action: components["schemas"]["Action"];
+            allowed: boolean;
+            /** @description Why it is refused, as the launch would report it. */
+            reason?: string | null;
+        };
+        /** @description A person's command as argument tokens after `sqb`, never shell text; selectors resolve on the server. */
+        AdhocRunRequest: {
+            command: string[];
+            /** Format: uuid */
+            location_id: string;
+            /** Format: int64 */
+            priority: number;
+            reason: string;
+            /** Format: uuid */
+            run_id: string;
+            target: string;
+        };
         /**
          * @description Administrator membership and person eligibility share the final-admin invariant.
          * @enum {string}
@@ -3539,6 +3614,86 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    requestAdhocRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdhocRunRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    checkAdhocRun: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdhocCheckRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdhocCheck"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

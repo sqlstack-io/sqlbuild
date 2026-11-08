@@ -2,10 +2,12 @@
 // its claims, jobs, triggers and sensors. A small loop advances live runs so
 // cancels, launches and claims behave like they do on the server.
 
-import { flagSpec } from '$lib/run/command-table';
+import { parseCommand } from '$lib/run/command';
+import { flagSpec, VERBS } from '$lib/run/command-table';
 import { ApiError } from '../client';
 import type { LocalChangeBus } from '../signals';
 import type {
+	AdhocPermission,
 	AdhocRunCheck,
 	AdhocRunRequest,
 	BuiltInRole,
@@ -14,6 +16,7 @@ import type {
 	JobDetail,
 	JobGroupMember,
 	JobLaunchOptions,
+	LaunchVerb,
 	OverlapOutcome,
 	Principal,
 	QueueEntry,
@@ -501,20 +504,21 @@ export class MockOperate {
 
 	launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run> {
 		const check = this.#check(scope, request);
-		if (!check.adhoc.allowed) throw new ApiError(`Refused: run.adhoc doesn't cover ${check.adhoc.outOfScope.join(', ') || 'this run'}`, 403);
-		if (check.rewriteHistory.required && !check.rewriteHistory.allowed) throw new ApiError('Refused: requires run.rewrite_history', 403);
-		if (!check.ok) throw new ApiError(check.problems[0]?.message ?? 'Invalid request', 422);
+		if (check.error) throw new ApiError(check.error, 400);
+		const denied = check.permissions.find((p) => !p.allowed);
+		if (denied) throw new ApiError(denied.reason ?? `missing ${denied.action} permission for this target`, 403);
+		const parts = parseCommand(request.command.join(' '));
 		const rec = this.#create({
 			id: this.#newId(),
 			origin: 'manual',
 			jobKey: null,
 			by: this.#ctx.user(),
-			select: request.select,
-			exclude: request.exclude,
-			flags: request.flags,
-			nodes: check.writeSet.length ? check.writeSet : check.resolvedNodes.filter((n) => snapshotNode(n)?.kind !== 'source'),
-			priority: 0,
-			verb: request.verb
+			select: parts.select,
+			exclude: parts.exclude,
+			flags: parts.flags,
+			nodes: check.writeSet.length ? check.writeSet : check.selection.filter((n) => snapshotNode(n)?.kind !== 'source'),
+			priority: request.priority,
+			verb: parts.verb
 		});
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
@@ -864,7 +868,7 @@ export class MockOperate {
 		priority: number;
 		parent?: string;
 		rerunOf?: string;
-		verb?: AdhocRunRequest['verb'];
+		verb?: LaunchVerb;
 	}): RunRecord {
 		const now = new Date().toISOString();
 		const job = jobDef(spec.jobKey);
@@ -887,7 +891,7 @@ export class MockOperate {
 				rerunOfRunId: spec.rerunOf ?? null,
 				requestedBy: spec.by,
 				priority: spec.priority,
-				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.rewritesHistory),
+				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.requires === 'run.rewrite_history'),
 				locationId: '',
 				target: '',
 				snapshotId: 'snap-7d2e41a',
@@ -926,49 +930,44 @@ export class MockOperate {
 		if (!this.#ctx.can(capability)) throw new ApiError(`Missing permission: ${capability}`, 403);
 	}
 
+	/** The server's dry run, simplified: the same shape, verbs and permission rules. */
 	#check(scope: Scope, request: AdhocRunRequest): AdhocRunCheck {
-		const problems: AdhocRunCheck['problems'] = [];
-		const resolution = resolveSelection(request.select, request.exclude);
-		for (const term of resolution.unknown) problems.push({ code: 'unknown_selector', message: `No node or selector matches ${term}` });
-		if (!resolution.nodes.length) problems.push({ code: 'empty_selection', message: 'The selection resolves to no nodes' });
+		void scope;
+		const refused = (error: string): AdhocRunCheck => ({ verb: null, selection: [], writeSet: [], settings: {}, permissions: [], error, launchable: false });
+		const verbName = request.command[0] ?? '';
+		if (!VERBS.some((v) => v.name === verbName)) return refused(`sqb ${verbName} is not available for ad-hoc runs`);
+		const parts = parseCommand(request.command.join(' '));
+		const unknownFlag = Object.keys(parts.flags).find((f) => !flagSpec(parts.verb, f));
+		if (unknownFlag) return refused(`${unknownFlag} is not available for ad-hoc runs`);
+		const resolution = resolveSelection(parts.select, parts.exclude);
+		if (resolution.unknown.length) return refused(`no nodes match selector '${resolution.unknown[0]}'`);
+		if (!resolution.nodes.length) return refused('the selection resolves to no nodes');
 		const writable = resolution.nodes.filter((n) => snapshotNode(n)?.kind !== 'source');
 		const writeSet =
-			request.verb === 'build'
-				? writable.filter((n) => !(request.flags['--no-load'] && snapshotNode(n)?.kind === 'loader'))
-				: request.verb === 'seed'
+			parts.verb === 'build'
+				? writable.filter((n) => !(parts.flags['--no-load'] && snapshotNode(n)?.kind === 'loader'))
+				: parts.verb === 'seed'
 					? writable.filter((n) => snapshotNode(n)?.kind === 'seed')
-					: request.verb === 'load'
-						? writable.filter((n) => snapshotNode(n)?.kind === 'loader')
-						: [];
-		const reasons: string[] = [];
-		for (const [flag, value] of Object.entries(request.flags)) {
-			const spec = flagSpec(request.verb, flag);
-			if (!spec) {
-				problems.push({ code: 'unknown_flag', message: `sqb ${request.verb} has no flag ${flag}` });
-				continue;
-			}
-			if (spec.type !== 'bool' && value === true) problems.push({ code: 'missing_value', message: `${flag} needs a value` });
-			if (spec.type === 'int' && value !== true && !/^\d+$/.test(value)) problems.push({ code: 'invalid_value', message: `${flag} must be a whole number` });
-			if (spec.type === 'timestamp' && value !== true && Number.isNaN(Date.parse(value))) problems.push({ code: 'invalid_value', message: `${flag} must be a timestamp, e.g. 2026-10-01T00:00:00Z` });
-			if (spec.rewritesHistory) reasons.push(flag);
-			if (flag.includes('cursor') && !writeSet.some((n) => snapshotNode(n)?.cursor)) problems.push({ code: 'no_cursor', message: `${flag}: no selected node has a cursor` });
-		}
+					: [];
 		const scopeTerms = ADHOC_SCOPE[this.#ctx.role()];
 		const granted = scopeTerms === null ? null : new Set(writeSetOf(scopeTerms.length ? scopeTerms : ['__none__'], []));
-		const outOfScope = !this.#ctx.can('run.adhoc') ? writeSet : granted === null ? [] : writeSet.filter((n) => !granted.has(n));
-		const allowed = this.#ctx.can('run.adhoc') && outOfScope.length === 0;
-		const holders = this.#records.filter((r) => HOLDING.has(r.run.status));
-		const claimConflicts = writeSet.flatMap((n) => holders.filter((h) => h.script.nodes.includes(n)).map((h) => ({ runId: h.run.id, nodeKey: n })));
-		const rewriteAllowed = this.#ctx.can('run.rewrite_history');
-		void scope;
+		const covered = this.#ctx.can('run.adhoc') && (granted === null || resolution.nodes.every((n) => granted.has(n)));
+		const decide = (action: Capability, allowed: boolean): AdhocPermission => ({ action, allowed, reason: allowed ? null : `missing ${action} permission for this target` });
+		const gates = [...new Set(Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []))];
+		const permissions = [
+			decide('run.adhoc', covered),
+			...gates.map((action) => decide(action, this.#ctx.can(action))),
+			...(request.priority > 0 ? [decide('run.prioritise', this.#ctx.can('run.prioritise'))] : [])
+		];
+		const error = parts.verb === 'build' ? null : `workers do not run sqb ${parts.verb} yet; only build can launch`;
 		return {
-			resolvedNodes: resolution.nodes,
+			verb: parts.verb,
+			selection: resolution.nodes,
 			writeSet,
-			adhoc: { required: 'run.adhoc', allowed, outOfScope },
-			rewriteHistory: { required: reasons.length > 0, reasons, allowed: rewriteAllowed },
-			claimConflicts,
-			problems,
-			ok: problems.length === 0 && allowed && (!reasons.length || rewriteAllowed)
+			settings: Object.fromEntries(Object.entries(parts.flags).map(([f, v]) => [f.replace(/^--/, '').replaceAll('-', '_'), v])),
+			permissions,
+			error,
+			launchable: error === null && permissions.every((p) => p.allowed)
 		};
 	}
 

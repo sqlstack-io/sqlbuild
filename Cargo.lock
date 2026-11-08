@@ -4200,6 +4200,7 @@ dependencies = [
  "same-file",
  "serde",
  "serde_json",
+ "sqlbuild-analysis",
  "sqlbuild-build-features",
  "sqlbuild-cache",
  "sqlbuild-config",

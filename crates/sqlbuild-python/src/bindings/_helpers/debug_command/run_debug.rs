@@ -136,7 +136,7 @@ fn warehouse_checks(
                 checks.push(WarehouseCheck::NotUsed {
                     group: group_name,
                     adapter_name: adapter_name.clone(),
-                    source: found.authored.source(),
+                    source: found.source(),
                 });
             }
             continue;

@@ -13,7 +13,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 
-pub async fn cancel_person_run(
+pub(crate) async fn cancel_person_run(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     request: &CancelRunRequest,

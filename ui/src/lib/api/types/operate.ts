@@ -448,30 +448,31 @@ export type SnapshotNode = {
 
 // ---- ad-hoc runs (the run panel) ----
 
-export type LaunchVerb = 'build' | 'test' | 'seed' | 'load' | 'audit' | 'freshness';
+export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness';
 
+/** A command as argument tokens after `sqb`, never shell text; the server resolves its selectors. */
 export type AdhocRunRequest = {
-	verb: LaunchVerb;
-	select: string[];
-	exclude: string[];
-	/** Other flags exactly as typed, e.g. `{ '--full-refresh': true, '--max-microbatches': '4' }`. */
-	flags: Record<string, string | true>;
+	command: string[];
+	/** Above 0 the run jumps the queue and needs `run.prioritise`. */
+	priority: number;
 };
 
-export type RunCheckProblem = { code: string; message: string };
+/** One permission the run needs and whether the person holds it on every resolved node. */
+export type AdhocPermission = { action: Capability; allowed: boolean; reason: string | null };
 
+/** The server's dry run: what launching would run and whether this person may launch it. */
 export type AdhocRunCheck = {
-	resolvedNodes: string[];
-	/** Nodes the run would write; empty for read-only verbs. */
+	verb: LaunchVerb | null;
+	/** The exact nodes the worker would run. */
+	selection: string[];
+	/** Nodes the run would write and reserve; empty for read-only verbs. */
 	writeSet: string[];
-	/** `run.adhoc` must cover every node in the write set; otherwise the whole request is refused. */
-	adhoc: { required: Capability; allowed: boolean; outOfScope: string[] };
-	rewriteHistory: { required: boolean; reasons: string[]; allowed: boolean };
-	/** Active runs holding write claims on nodes in the write set: the run would queue behind them. */
-	claimConflicts: { runId: string; nodeKey: string }[];
-	problems: RunCheckProblem[];
-	/** Launchable as requested. */
-	ok: boolean;
+	/** Accepted flags as the worker receives them, by setting name. */
+	settings: Record<string, unknown>;
+	permissions: AdhocPermission[];
+	/** Why the command cannot run regardless of permissions, such as a refused flag or a verb workers can't run yet. */
+	error: string | null;
+	launchable: boolean;
 };
 
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */

@@ -1,5 +1,7 @@
 //! Person operations use person sessions, never the machine-resource bearer router.
 
+use std::sync::Arc;
+
 use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 use uuid::Uuid;
@@ -10,11 +12,15 @@ use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
-use crate::runs::main::cancel_person_run::cancel_person_run;
+use crate::runs::main::check_adhoc_run::check_adhoc_run;
 use crate::runs::main::list_person_runs::list_person_runs;
-use crate::runs::main::request_person_job_run::request_person_job_run;
+use crate::runs::main::request_person_run::request_person_run;
 use crate::runs::main::request_rerun::request_rerun;
-use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunRecord};
+use crate::runs::models::{
+    AdhocCheck, AdhocCheckRequest, AdhocRunRequest, CancelRunRequest, JobRunRequest,
+    PersonRunRequest, RerunRequest, RunRecord,
+};
+use crate::runs::types::CommandPlanner;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
 use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
@@ -64,8 +70,53 @@ pub(crate) async fn request_job(
     Json(request): Json<JobRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: request_person_job_run(&store, (&context, principal), &request).await?,
+        applied: request_person_run(
+            &store,
+            (&context, principal),
+            PersonRunRequest::Job(&request),
+        )
+        .await?,
     }))
+}
+
+#[utoipa::path(post, path = "/api/control/runs/adhoc", operation_id = "requestAdhocRun",
+    params(("x-sqb-csrf" = String, Header)), request_body = AdhocRunRequest,
+    responses((status = 200, body = MutationResponse), (status = 400, body = crate::api::models::ApiErrorBody),
+        (status = 401, description = "Session rejected"), (status = 403, body = crate::api::models::ApiErrorBody)),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn request_adhoc(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(AuthenticatedPerson(principal, _)), Extension(planner)): (
+        Extension<AuthenticatedPerson>,
+        Extension<Arc<dyn CommandPlanner>>,
+    ),
+    Json(request): Json<AdhocRunRequest>,
+) -> Result<Json<MutationResponse>, ApiError> {
+    Ok(Json(MutationResponse {
+        applied: request_person_run(
+            &store,
+            (&context, principal),
+            PersonRunRequest::Adhoc(planner.as_ref(), &request),
+        )
+        .await?,
+    }))
+}
+
+#[utoipa::path(post, path = "/api/control/runs/adhoc/check", operation_id = "checkAdhocRun",
+    params(("x-sqb-csrf" = String, Header)), request_body = AdhocCheckRequest,
+    responses((status = 200, body = AdhocCheck), (status = 401, description = "Session rejected")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn check_adhoc(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    (Extension(AuthenticatedPerson(principal, _)), Extension(planner)): (
+        Extension<AuthenticatedPerson>,
+        Extension<Arc<dyn CommandPlanner>>,
+    ),
+    Json(request): Json<AdhocCheckRequest>,
+) -> Result<Json<AdhocCheck>, ApiError> {
+    Ok(Json(
+        check_adhoc_run(&store, (&context, principal), planner.as_ref(), &request).await?,
+    ))
 }
 
 #[utoipa::path(post, path = "/api/control/runs/cancel", operation_id = "cancelPersonRun",
@@ -78,7 +129,12 @@ pub(crate) async fn cancel_run(
     Json(request): Json<CancelRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: cancel_person_run(&store, (&context, principal), &request).await?,
+        applied: request_person_run(
+            &store,
+            (&context, principal),
+            PersonRunRequest::Cancel(&request),
+        )
+        .await?,
     }))
 }
 

@@ -20,6 +20,8 @@ pub(crate) struct WorkerBuild {
     execution: RunExecution,
     completed: Mutex<BTreeMap<String, NodeOutcome>>,
     checks: Mutex<BTreeMap<String, Option<NodeOutcome>>>,
+    /// Why the worker refused the run before executing anything, reported as the run's status reason.
+    refusal: Mutex<Option<String>>,
 }
 
 impl WorkerBuild {
@@ -29,6 +31,7 @@ impl WorkerBuild {
             worker: worker.clone().unbind(),
             completed: Mutex::default(),
             checks: Mutex::default(),
+            refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
             state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None))?;
@@ -43,6 +46,12 @@ impl WorkerBuild {
             .selection
             .iter()
             .any(|key| !self.execution.skipped_nodes.contains_key(key))
+    }
+
+    /// Record why the run is refused; the terminal report carries it as the run's status reason.
+    pub(crate) fn refuse(&self, reason: &str) -> PyResult<()> {
+        *self.refusal.lock().map_err(|_| poisoned())? = Some(reason.to_owned());
+        Ok(())
     }
 
     pub(crate) fn check_cancelled(&self, py: Python<'_>) -> PyResult<()> {
@@ -332,12 +341,18 @@ impl WorkerBuild {
                 },
             )?;
         }
+        let reason: String = self
+            .refusal
+            .lock()
+            .map_err(|_| poisoned())?
+            .clone()
+            .unwrap_or_else(|| "worker executor completed and closed its connections".into());
         self.worker.bind(py).get().change(
             py,
             "worker-finished",
             RunChange::Finished {
                 outcome,
-                reason: "worker executor completed and closed its connections".into(),
+                reason,
                 exit_code: Some(i64::from(exit_code)),
             },
         )?;

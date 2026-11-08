@@ -67,12 +67,6 @@ pub(crate) struct CommandScope<'py> {
     pub(crate) cli_vars: Bound<'py, PyAny>,
 }
 
-/// A target's authored group warehouse with the `WarehouseGroup` it was found for.
-pub(crate) struct FoundWarehouse<'py> {
-    pub(crate) authored: AuthoredWarehouse,
-    pub(crate) group: Bound<'py, PyAny>,
-}
-
 /// The project inputs and target a warehouse is resolved against.
 #[derive(Clone, Copy)]
 pub(crate) struct WarehouseInputs<'a, 'py> {
@@ -122,11 +116,11 @@ fn resolved_warehouse<'py>(
     )
 }
 
-fn group_value(target: &Bound<'_, PyAny>, group: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+fn group_value(target: &Bound<'_, PyAny>, group_name: &str) -> PyResult<Option<String>> {
     if target.is_none() {
         return Ok(None);
     }
-    let attribute: &str = if group.str()?.extract::<String>()? == BUILD_GROUP {
+    let attribute: &str = if group_name == BUILD_GROUP {
         BUILD_GROUP
     } else {
         QUERY_GROUP
@@ -138,11 +132,20 @@ fn group_value(target: &Bound<'_, PyAny>, group: &Bound<'_, PyAny>) -> PyResult<
 }
 
 /// The active target's authored, unexpanded warehouse for one command group.
-pub(crate) fn find_authored<'py>(
+pub(crate) fn find_authored(
+    inputs: WarehouseInputs<'_, '_>,
+    group: &Bound<'_, PyAny>,
+) -> PyResult<Option<AuthoredWarehouse>> {
+    let group_name: String = native_field(group, "value")?.extract()?;
+    authored_group(inputs, &group_name)
+}
+
+/// The active target's authored, unexpanded warehouse for the group named `group_name`.
+fn authored_group<'py>(
     inputs: WarehouseInputs<'_, 'py>,
-    group: &Bound<'py, PyAny>,
-) -> PyResult<Option<FoundWarehouse<'py>>> {
-    let py: Python<'py> = group.py();
+    group_name: &str,
+) -> PyResult<Option<AuthoredWarehouse>> {
+    let py: Python<'py> = inputs.discovered_inputs.py();
     let project_config: Bound<'py, PyAny> =
         native_field(inputs.discovered_inputs, "project_config")?;
     let local_config: Bound<'py, PyAny> = native_field(inputs.discovered_inputs, "local_config")?;
@@ -161,25 +164,20 @@ pub(crate) fn find_authored<'py>(
     let project_target: Bound<'py, PyAny> =
         native_field(&project_config, "targets")?.call_method1("get", (&target_name,))?;
     let target_name: String = target_name.extract()?;
-    let group_name: String = native_field(group, "value")?.extract()?;
     Ok(authored_warehouse(
-        (&target_name, &group_name),
-        group_value(&local_target, group)?,
-        group_value(&project_target, group)?,
-    )
-    .map(|authored| FoundWarehouse {
-        authored,
-        group: group.clone(),
-    }))
+        (&target_name, group_name),
+        group_value(&local_target, group_name)?,
+        group_value(&project_target, group_name)?,
+    ))
 }
 
 /// The group warehouse with `${...}` templates expanded, checked as an identifier.
 fn expand_authored(
-    found: &FoundWarehouse<'_>,
+    authored: &AuthoredWarehouse,
     inputs: WarehouseInputs<'_, '_>,
     cli_vars: &Bound<'_, PyAny>,
 ) -> PyResult<String> {
-    let py: Python<'_> = found.group.py();
+    let py: Python<'_> = inputs.discovered_inputs.py();
     let runtime: Bound<'_, PyAny> = build_effective_runtime_config(
         &inputs.discovered_inputs.clone(),
         Some(inputs.selected_target.clone()).filter(|value| !value.is_none()),
@@ -187,7 +185,7 @@ fn expand_authored(
     )
     .and_then(|value| pyo3::IntoPyObjectExt::into_bound_py_any(value, py))?;
     let expanded: Bound<'_, PyAny> = expanded_template_data(
-        PyString::new(py, &found.authored.warehouse).as_any(),
+        PyString::new(py, &authored.warehouse).as_any(),
         (runtime.get_item(1)?.downcast()?, &PyDict::new(py)),
         (
             TemplateOptions {
@@ -195,11 +193,11 @@ fn expand_authored(
                 preserve_context_tokens: false,
                 preserve_unknown_context: false,
             },
-            &found.authored.context_label(),
+            &authored.context_label(),
         ),
     )?;
     let warehouse: String = expanded.str()?.extract()?;
-    check_expanded_warehouse(&found.authored, &warehouse).map_err(|error| raised(py, error))?;
+    check_expanded_warehouse(authored, &warehouse).map_err(|error| raised(py, error))?;
     Ok(warehouse)
 }
 
@@ -257,12 +255,28 @@ pub(crate) fn resolve_warehouse(
         && let Some(found) = find_authored(inputs, group)?
     {
         let warehouse: String = expand_authored(&found, inputs, cli_vars)?;
-        return Ok((Some(warehouse), found.authored.source()));
+        return Ok((Some(warehouse), found.source()));
     }
     Ok(match connection_warehouse(connection_config)? {
         Some(warehouse) => (Some(warehouse), CONNECTION_WAREHOUSE_SOURCE.to_owned()),
         None => (None, CONNECTION_DEFAULT_WAREHOUSE_SOURCE.to_owned()),
     })
+}
+
+/// Every warehouse the target configures: its `build` and `query` group warehouses and its connection warehouse.
+pub(crate) fn configured_warehouses(
+    inputs: WarehouseInputs<'_, '_>,
+    connection_config: &Bound<'_, PyAny>,
+) -> PyResult<std::collections::BTreeSet<String>> {
+    let none: Bound<'_, PyAny> = none(connection_config.py());
+    let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for group_name in [BUILD_GROUP, QUERY_GROUP] {
+        if let Some(authored) = authored_group(inputs, group_name)? {
+            names.insert(expand_authored(&authored, inputs, &none)?);
+        }
+    }
+    names.extend(connection_warehouse(connection_config)?);
+    Ok(names)
 }
 
 fn optional_inputs<'a, 'py>(
@@ -397,7 +411,7 @@ pub(crate) fn describe_connection_warehouse<'py>(
         discovered_inputs: &discovered_inputs,
         selected_target: &selected_target,
     };
-    let found: Option<FoundWarehouse<'py>> = if scope.group.is_none() {
+    let found: Option<AuthoredWarehouse> = if scope.group.is_none() {
         None
     } else {
         find_authored(inputs, &scope.group)?
@@ -409,7 +423,7 @@ pub(crate) fn describe_connection_warehouse<'py>(
             Err(error) => return Err(error),
         };
         if expands_to {
-            return resolved_warehouse(py, Some(&warehouse), &found.authored.source());
+            return resolved_warehouse(py, Some(&warehouse), &found.source());
         }
     }
     resolved_warehouse(py, Some(&warehouse), CONNECTION_WAREHOUSE_SOURCE)

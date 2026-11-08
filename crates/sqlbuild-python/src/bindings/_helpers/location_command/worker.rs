@@ -10,12 +10,16 @@ use sqlbuild_cli::argv::main::job_settings_arguments::job_settings_arguments;
 use sqlbuild_cli::dispatch::main::command_dispatch::command_dispatch;
 use sqlbuild_cli::dispatch::models::Dispatch;
 use sqlbuild_host::entries::models::ExecutorHost;
-use sqlbuild_orchestration::runs::models::{RunOutcome, RunWindow};
+use sqlbuild_orchestration::runs::models::{RunKind, RunOutcome, RunRequest, RunWindow};
 
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, within};
 use crate::bindings::_helpers::build_command::command::run_build;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
 use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, warehouse_scope};
+use crate::bindings::_helpers::command_runtime::warehouses::{
+    WarehouseInputs, configured_warehouses,
+};
+use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
@@ -89,6 +93,37 @@ fn build_request<'py>(
     ))
 }
 
+/// Why an ad-hoc run's `--warehouse` is refused; published jobs keep their authored warehouse.
+fn unconfigured_warehouse(
+    discovered: &Bound<'_, PyAny>,
+    frozen: &RunRequest,
+) -> PyResult<Option<&'static str>> {
+    if frozen.kind != RunKind::Adhoc {
+        return Ok(None);
+    }
+    let Some(warehouse) = frozen.settings.get("warehouse") else {
+        return Ok(None);
+    };
+    let warehouse: &str = warehouse
+        .as_str()
+        .ok_or_else(|| PyValueError::new_err("frozen run warehouse must be text"))?;
+    let selected_target: Bound<'_, PyAny> =
+        PyString::new(discovered.py(), &frozen.target).into_any();
+    let connection: Bound<'_, PyAny> =
+        build_effective_connection_config(discovered, Some(selected_target.clone()), None, false)?;
+    let inputs = WarehouseInputs {
+        discovered_inputs: discovered,
+        selected_target: &selected_target,
+    };
+    if configured_warehouses(inputs, &connection)?.contains(warehouse) {
+        return Ok(None);
+    }
+    Ok(Some(
+        "the requested warehouse is not configured for this target on this location; \
+         no warehouse statement ran",
+    ))
+}
+
 /// The heartbeat is native; only driver cancellation crosses the executor host boundary.
 fn run_cancellable(
     py: Python<'_>,
@@ -152,6 +187,12 @@ pub(super) fn execute_worker<'py>(
                 "Run inputs verified. All selected nodes are blocked by upstream failures.\n",
             )?;
             return Ok(0);
+        }
+        let frozen = owner.get().execution(py)?.claim.request;
+        if let Some(reason) = unconfigured_warehouse(&discovered, &frozen)? {
+            worker.refuse(reason)?;
+            write_stderr(py, &format!("Run refused: {reason}\n"))?;
+            return Err(PyValueError::new_err(reason));
         }
         let (request, scope) = build_request(py, discovered, arguments, &owner)?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
