@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.201.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.200.0...v0.201.0) (2026-11-08)
+
+
+### Features
+
+* **ui:** wire the lineage and changes pages to the live control API ([#1373](https://github.com/sqlstack-io/sqlbuild/issues/1373)) ([20c406a](https://github.com/sqlstack-io/sqlbuild/commit/20c406a4d09bc8d310b9a1537a618f77c12d9594))
+
 ## [0.200.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.199.0...v0.200.0) (2026-11-08)
 
 
