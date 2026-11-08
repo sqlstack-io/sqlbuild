@@ -127,5 +127,6 @@ pub(crate) fn syntax(quotes: &[&str], flags: [bool; 4], prefixes: &[&str]) -> Le
         triple_quoted_strings: flags[2],
         nested_block_comments: flags[3],
         line_comment_prefixes: prefixes.iter().map(|prefix| (*prefix).to_owned()).collect(),
+        bracket_identifiers: false,
     }
 }

@@ -37,6 +37,7 @@ pub(crate) fn non_code_end(
     match sql.get(index) {
         Some(b'$') => dollar_quote_end(sql, index),
         Some(b'\'' | b'"' | b'`') => quoted_text_end(sql, index, syntax).map(Some),
+        Some(b'[') if syntax.bracket_identifiers => bracket_identifier_end(sql, index).map(Some),
         _ => Ok(None),
     }
 }
@@ -44,6 +45,7 @@ pub(crate) fn non_code_end(
 /// Whether a comment or quoted text may open with `byte`; most code bytes are rejected here cheaply.
 fn may_open_non_code(byte: u8, syntax: &LexicalSyntax) -> bool {
     matches!(byte, b'/' | b'$' | b'\'' | b'"' | b'`')
+        || (byte == b'[' && syntax.bracket_identifiers)
         || syntax
             .line_comment_prefixes
             .iter()
@@ -129,6 +131,19 @@ fn quoted_text_end(sql: &[u8], start: usize, syntax: &LexicalSyntax) -> Result<u
             return Ok(index + delimiter.len());
         }
         index += 1;
+    }
+    Err(Unclosed::Quote)
+}
+
+/// The end of the bracket identifier opened at `start`, where `]]` is one `]`.
+fn bracket_identifier_end(sql: &[u8], start: usize) -> Result<usize, Unclosed> {
+    let mut index = start + 1;
+    while let Some(offset) = sql[index..].iter().position(|byte| *byte == b']') {
+        let close = index + offset;
+        if sql.get(close + 1) != Some(&b']') {
+            return Ok(close + 1);
+        }
+        index = close + 2;
     }
     Err(Unclosed::Quote)
 }
