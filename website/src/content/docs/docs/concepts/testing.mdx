@@ -36,6 +36,11 @@ Tests can chain several models, mock models, seeds, macros and table functions, 
 that must hold for every row, and test macros, UDFs and table functions directly. For end-to-end
 tests over physical warehouse relations, see [Scenarios](/docs/concepts/scenarios).
 
+SQL tests are planned with SQLBuild's native parser for the adapter's SQL analysis dialect. On an
+adapter whose dialect has no native parser, including a custom adapter without
+`sql_analysis_dialect_name`, a project with SQL tests fails to plan them, with a message that says
+SQL tests are unavailable for that dialect.
+
 ## How tests work
 
 The test above:
