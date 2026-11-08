@@ -2,15 +2,20 @@
 
 use sqlquack_semantics::dialects::constants::BIGQUERY;
 use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_semantics::lineage::models::{NullabilityRule, SchemaColumn};
+use sqlquack_semantics::lineage::types::LineageSchema;
 use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 
+use crate::analysis_route::_helpers::native_analysis::native_analysis;
 use crate::analysis_route::constants::{
     BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, BIGQUERY_STUB_PREFIX, CAST_TYPE_PREFIX, DECIMAL_RADIX,
     NUMERIC_DIGITS, POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES,
     POLYGLOT_TOP_LEVEL_TYPE_NAMES, RANGE_ELEMENT_TYPES, RANGE_TYPE_NAME, UNSCANNED_CONSTRUCT,
 };
-use crate::analysis_route::models::{BigQueryDialect, ParserGap};
+use crate::analysis_route::models::{
+    AnalysisInput, BigQueryDialect, BigQueryTypes, NativeAnalysis, ParserGap,
+};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
@@ -39,6 +44,22 @@ impl NativeDialect for BigQueryDialect {
 
     fn profile(&self) -> &'static dyn DialectProfile {
         &BIGQUERY
+    }
+
+    /// The query read against a schema that knows BigQuery's own types, which a cast may name.
+    fn analyse(&self, input: &AnalysisInput<'_>) -> Result<NativeAnalysis, ParserGap> {
+        let statement: Expression = self.read_whole(input.sql)?;
+        let types: BigQueryTypes<'_> = BigQueryTypes {
+            schema: input.schema,
+        };
+        Ok(native_analysis(
+            self,
+            &statement,
+            &AnalysisInput {
+                schema: &types,
+                ..*input
+            },
+        ))
     }
 
     /// A spelling BigQuery cannot read, such as TEXT or DOUBLE, takes its family's BigQuery type.
@@ -82,6 +103,36 @@ impl NativeDialect for BigQueryDialect {
 
     fn stub_prefix(&self) -> &'static str {
         BIGQUERY_STUB_PREFIX
+    }
+}
+
+impl LineageSchema for BigQueryTypes<'_> {
+    fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        self.schema.columns(relation)
+    }
+
+    fn open_columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        self.schema.open_columns(relation)
+    }
+
+    fn function_type(&self, name: &str) -> Option<&str> {
+        self.schema.function_type(name)
+    }
+
+    fn function_nullability(&self, name: &str) -> Option<NullabilityRule> {
+        self.schema.function_nullability(name)
+    }
+
+    fn known_function(&self, name: &str) -> bool {
+        self.schema.known_function(name)
+    }
+
+    fn function_arities(&self, name: &str, canonical: &str) -> Option<Vec<(usize, Option<usize>)>> {
+        self.schema.function_arities(name, canonical)
+    }
+
+    fn known_type(&self, name: &str) -> bool {
+        self.schema.known_type(name) || BigQueryDialect.normalize_type(name).is_some()
     }
 }
 
