@@ -193,7 +193,7 @@ impl QueryFacts {
     }
 }
 
-/// An SQL-test fixture query parsed with Polyglot, with the function-call facts its rules read.
+/// An SQL-test fixture query parsed with SQLQuack, with the function-call facts its rules read.
 #[derive(Debug)]
 pub(crate) struct ParsedFixture {
     pub(crate) statement: Expression,

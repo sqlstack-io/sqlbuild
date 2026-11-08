@@ -14,6 +14,7 @@ const NO_ROWS_ASSERTION: (&str, &str) = (
     "__assert__empty_inputs_produce_no_rows",
     "SELECT 1 AS unexpected_row FROM __ref(\"orders\")",
 );
+const UNAVAILABLE_MESSAGE: &str = "L007 tests/unit/test_orders__empty_inputs_produce_no_rows.sql: SQLBuild cannot parse mssql SQL for built-in rules yet, so these rules were not evaluated: SQBRTEST203";
 const FLAGGED_MESSAGE: &str = "SQBRTEST203 tests/unit/test_orders__empty_inputs_produce_no_rows.sql: unit test block 1 (\"orders__empty_inputs_produce_no_rows\") mocks only empty inputs and asserts only that no rows are produced";
 
 #[test]
@@ -419,7 +420,7 @@ fn given_cached_minimum_tests_when_filler_becomes_real_test_then_model_cache_is_
 }
 
 #[test]
-fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_arguments_are_not_calls()
+fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_reports_the_dialect_unavailable()
 -> Result<(), String> {
     let project_dir = TempDir::new().map_err(|error| error.to_string())?;
     let empty_orders = (
@@ -428,7 +429,7 @@ fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_argum
     );
     let test_cases = [
         test_types::EmptyInputTestRuleTestCase {
-            description: "a CONVERT to a parameterized type under a false predicate is an empty mock",
+            description: "a CONVERT to a parameterized type under a false predicate is an empty mock, reported unavailable until SQLBuild parses the dialect",
             test: helpers::empty_input_test_fact(
                 "orders__empty_inputs_produce_no_rows",
                 &[(
@@ -439,10 +440,10 @@ fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_argum
                 &[NO_ROWS_ASSERTION],
             ),
             allowed_tests: json!([]),
-            expected_messages: &[FLAGGED_MESSAGE],
+            expected_messages: &[UNAVAILABLE_MESSAGE],
         },
         test_types::EmptyInputTestRuleTestCase {
-            description: "a CONVERT with a style argument is an empty mock",
+            description: "a CONVERT with a style argument is an empty mock, reported unavailable until SQLBuild parses the dialect",
             test: helpers::empty_input_test_fact(
                 "orders__empty_inputs_produce_no_rows",
                 &[(
@@ -453,10 +454,10 @@ fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_argum
                 &[NO_ROWS_ASSERTION],
             ),
             allowed_tests: json!([]),
-            expected_messages: &[FLAGGED_MESSAGE],
+            expected_messages: &[UNAVAILABLE_MESSAGE],
         },
         test_types::EmptyInputTestRuleTestCase {
-            description: "a TRY_CONVERT to a parameterized type keeps a bare existence check",
+            description: "a TRY_CONVERT to a parameterized type keeps a bare existence check, reported unavailable until SQLBuild parses the dialect",
             test: helpers::empty_input_test_fact(
                 "orders__empty_inputs_produce_no_rows",
                 &[empty_orders],
@@ -467,10 +468,10 @@ fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_argum
                 )],
             ),
             allowed_tests: json!([]),
-            expected_messages: &[FLAGGED_MESSAGE],
+            expected_messages: &[UNAVAILABLE_MESSAGE],
         },
         test_types::EmptyInputTestRuleTestCase {
-            description: "a function call in a CONVERT value argument still counts",
+            description: "a function call in a CONVERT value argument still counts, reported unavailable until SQLBuild parses the dialect",
             test: helpers::empty_input_test_fact(
                 "orders__empty_inputs_produce_no_rows",
                 &[(
@@ -481,7 +482,7 @@ fn given_sql_server_conversions_when_evaluating_empty_input_rule_then_type_argum
                 &[NO_ROWS_ASSERTION],
             ),
             allowed_tests: json!([]),
-            expected_messages: &[],
+            expected_messages: &[UNAVAILABLE_MESSAGE],
         },
     ];
 

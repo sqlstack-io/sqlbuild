@@ -55,3 +55,6 @@ pub(crate) const ALLOWED_QUALIFIERS_OPTION: &str = "allowed_qualifiers";
 pub(crate) const ALLOWED_PATHS_KEY: &str = "paths";
 /// The published layers when a project does not configure them.
 pub(crate) const DEFAULT_PUBLISHED_LAYERS: [&str; 2] = ["mart", "mart_v"];
+/// What to do when SQLBuild does not parse a project's dialect for built-in rules.
+pub(crate) const RULES_UNAVAILABLE_REMEDIATION: &str =
+    "These rules did not run. Review this file by hand until built-in rules support this dialect.";

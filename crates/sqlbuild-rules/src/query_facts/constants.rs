@@ -19,6 +19,7 @@ pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// The SQLite dialect name.
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
 /// Snowflake calls whose quoted first argument is a date part when they take three arguments.
-pub(crate) const DATE_DIFF_CALLS: [&str; 4] = ["DATEDIFF", "DATE_DIFF", "TIMEDIFF", "TIMESTAMPDIFF"];
+pub(crate) const DATE_DIFF_CALLS: [&str; 4] =
+    ["DATEDIFF", "DATE_DIFF", "TIMEDIFF", "TIMESTAMPDIFF"];
 /// The argument count at which a `DATE_DIFF_CALLS` call reads its first argument as a date part.
 pub(crate) const DATE_DIFF_ARGUMENTS: usize = 3;

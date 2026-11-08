@@ -1,8 +1,8 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT,
-    TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
+    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH,
+    POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT, TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
@@ -10,7 +10,9 @@ use crate::query_facts::models::{
 };
 use sqlquack_syntax::expressions::names::models::{Identifier, Literal, TableRef};
 use sqlquack_syntax::expressions::queries::models::{Select, With};
-use sqlquack_syntax::{CallMode, ComplexityGuardOptions, Dialect, Expression, ExpressionWalk, ParseOptions};
+use sqlquack_syntax::{
+    CallMode, ComplexityGuardOptions, Dialect, Expression, ExpressionWalk, ParseOptions,
+};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -318,14 +320,16 @@ impl Builder<'_> {
         let range = item.map(|item| self.tokens.expression_range(item, alias.is_some()));
         let unwrapped = unwrap_paren(value);
         let cast_type = match unwrapped {
-            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => range
-                .as_ref()
-                .and_then(|range| self.tokens.cast_type(range))
-                .or_else(|| {
-                    let span = cast.span.0?;
-                    self.tokens
-                        .cast_type(&self.tokens.covering(span.start, span.end))
-                }),
+            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => {
+                range
+                    .as_ref()
+                    .and_then(|range| self.tokens.cast_type(range))
+                    .or_else(|| {
+                        let span = cast.span.0?;
+                        self.tokens
+                            .cast_type(&self.tokens.covering(span.start, span.end))
+                    })
+            }
             _ => None,
         };
         ItemFacts::Expression(ExpressionItem {

@@ -27,11 +27,13 @@ fn given_dependency_tokens_when_classifying_imports_then_preserves_dialect_and_o
             expected_messages: &[],
         },
         test_types::DependencyTokenTestCase {
-            description: "backtick quoting and comment-separated source arguments",
+            description: "backtick quoting and comment-separated source arguments, reported unavailable until SQLBuild parses the dialect",
             expected_columns: &[],
             dialect: "bigquery",
             query_sql: "WITH imported AS (SELECT * FROM __source /* ignored */ (`Orders`)) SELECT order_id FROM imported",
-            expected_messages: &[],
+            expected_messages: &[
+                "SQLBuild cannot parse bigquery SQL for built-in rules yet, so these rules were not evaluated: SQBRMODEL101",
+            ],
         },
         test_types::DependencyTokenTestCase {
             description: "dollar strings do not contribute spurious calls",
@@ -552,22 +554,22 @@ fn given_dialect_quoting_around_table_functions_when_evaluating_rules_then_model
             expected_code: "SQBRCONTRACT101",
         },
         test_types::DialectEvaluationTestCase {
-            description: "BigQuery backslash-escaped quote inside table function arguments",
+            description: "BigQuery backslash-escaped quote inside table function arguments, reported unavailable until SQLBuild parses the dialect",
             dialect: "bigquery",
             query_sql: concat!(
                 "SELECT item_id ",
                 "FROM __table_fn(\"inventory_items\", 'a\\')')(42)"
             ),
-            expected_code: "SQBRCONTRACT101",
+            expected_code: "L007",
         },
         test_types::DialectEvaluationTestCase {
-            description: "BigQuery backtick identifier containing a parenthesis in arguments",
+            description: "BigQuery backtick identifier containing a parenthesis in arguments, reported unavailable until SQLBuild parses the dialect",
             dialect: "bigquery",
             query_sql: concat!(
                 "SELECT item_id ",
                 "FROM __table_fn(\"inventory_items\", `batch)size`)(42)"
             ),
-            expected_code: "SQBRCONTRACT101",
+            expected_code: "L007",
         },
     ];
 
