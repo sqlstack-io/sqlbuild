@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
-use sqlquack_syntax::{CallMode, Dialect, Expression, ExpressionWalk, ParseOptions};
+use sqlquack_syntax::{CallMode, Dialect, Expression, ParseOptions};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
@@ -28,6 +28,7 @@ use crate::assembly::analysis_session::types::Shapes;
 use crate::relation_markers::constants::MARKER_NAME_PREFIX;
 use crate::relation_markers::main::markers_as_names::markers_as_names;
 use crate::relation_markers::types::MarkerCall;
+use crate::sql_tree::main::deeper_than::deeper_than;
 use sqlbuild_core::constants::CTE_AST_KIND;
 
 /// What an internal native failure of a pivot proof names.
@@ -186,27 +187,17 @@ fn rename_marker(name: Option<&mut Value>, calls: &[MarkerCall]) {
     let Some(Value::String(text)) = text else {
         return;
     };
-    let call: Option<&MarkerCall> = text
+    let Some(Ok(index)) = text
         .strip_prefix(MARKER_NAME_PREFIX)
-        .and_then(|index| index.parse::<usize>().ok())
-        .and_then(|index| calls.get(index));
-    if let Some((function, relation)) = call
+        .map(str::parse::<usize>)
+    else {
+        return;
+    };
+    if let Some((function, relation)) = calls.get(index)
         && DEPENDENCY_FUNCTION_NAMES.contains(&function.as_str())
     {
         *text = relation.clone();
     }
-}
-
-/// Whether `statement` nests more than `limit` levels, walked iteratively so depth cannot overflow.
-fn deeper_than(statement: &Expression, limit: usize) -> bool {
-    let mut stack: Vec<(&Expression, usize)> = vec![(statement, 1)];
-    while let Some((node, depth)) = stack.pop() {
-        if depth > limit {
-            return true;
-        }
-        stack.extend(node.children().into_iter().map(|child| (child, depth + 1)));
-    }
-    false
 }
 
 fn proof(
