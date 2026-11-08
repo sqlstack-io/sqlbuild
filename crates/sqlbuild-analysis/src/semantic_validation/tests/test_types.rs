@@ -55,6 +55,7 @@ pub(crate) struct NormalizationBatchTestCase {
 
 pub(crate) struct NativeStubTestCase {
     pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
     pub(crate) sql: &'static str,
     pub(crate) expected_sql: &'static str,
 }

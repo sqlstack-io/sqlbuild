@@ -8,6 +8,8 @@ mod test_native_arms;
 mod test_native_dialect;
 #[path = "tests/test_native_gap.rs"]
 mod test_native_gap;
+#[path = "tests/test_native_outcome.rs"]
+mod test_native_outcome;
 #[path = "tests/test_type_spelling.rs"]
 mod test_type_spelling;
 #[path = "tests/test_types.rs"]

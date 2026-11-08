@@ -109,34 +109,69 @@ fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names
  {
     let test_cases = [
         NativeStubTestCase {
+            dialect: "postgres",
             description: "a cursor stub in code takes the dialect's prefix",
             sql: "SELECT * FROM t WHERE ts > __cursor_start()",
             expected_sql: "SELECT * FROM t WHERE ts > __sqlbuild.cursor_start()",
         },
         NativeStubTestCase {
+            dialect: "postgres",
             description: "a cursor stub's text inside a string literal is left as written",
             sql: "SELECT '__cursor_start()' AS s FROM t",
             expected_sql: "SELECT '__cursor_start()' AS s FROM t",
         },
         NativeStubTestCase {
+            dialect: "postgres",
             description: "a cursor stub's text inside a comment is left as written",
             sql: "SELECT 1 FROM t -- __cursor_end()\n",
             expected_sql: "SELECT 1 FROM t -- __cursor_end()\n",
         },
         NativeStubTestCase {
+            dialect: "postgres",
             description: "a longer name ending in a cursor stub's text is another function",
             sql: "SELECT x__cursor_end() FROM t",
             expected_sql: "SELECT x__cursor_end() FROM t",
         },
         NativeStubTestCase {
+            dialect: "postgres",
             description: "a quoted stub beside a stub in code leaves only the code one respelt",
             sql: "SELECT '__cursor_end()', __cursor_end() FROM t",
             expected_sql: "SELECT '__cursor_end()', __sqlbuild.cursor_end() FROM t",
         },
+        NativeStubTestCase {
+            dialect: "duckdb",
+            description: "a DuckDB backslash before a closing quote is literal, so the stub after it is code",
+            sql: r"SELECT 'C:\' AS folder, __cursor_end() FROM t",
+            expected_sql: r"SELECT 'C:\' AS folder, __sqlbuild.cursor_end() FROM t",
+        },
+        NativeStubTestCase {
+            dialect: "postgres",
+            description: "a Postgres escape string's backslash-quoted quote keeps the stub after it quoted",
+            sql: r"SELECT E'O\'Brien __cursor_end()', __cursor_end() FROM t",
+            expected_sql: r"SELECT E'O\'Brien __cursor_end()', __sqlbuild.cursor_end() FROM t",
+        },
+        NativeStubTestCase {
+            dialect: "postgres",
+            description: "a plain Postgres string's backslash is literal, so the stub after it is code",
+            sql: r"SELECT 'C:\', __cursor_end() FROM t",
+            expected_sql: r"SELECT 'C:\', __sqlbuild.cursor_end() FROM t",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a Snowflake backslash-quoted quote keeps the stub after it quoted",
+            sql: r"SELECT 'it\'s __cursor_end()', __cursor_end() FROM t",
+            expected_sql: r"SELECT 'it\'s __cursor_end()', __sqlbuild.cursor_end() FROM t",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a cursor stub's text inside a Snowflake // comment is left as written",
+            sql: "SELECT 1 FROM t // __cursor_end()\n",
+            expected_sql: "SELECT 1 FROM t // __cursor_end()\n",
+        },
     ];
     for test_case in test_cases {
         assert_eq!(
-            normalize_native_sql(test_case.sql, "postgres", "__sqlbuild.").as_deref(),
+            normalize_native_sql(test_case.sql, test_case.dialect, "__sqlbuild.").as_deref(),
             Ok(test_case.expected_sql),
             "{}",
             test_case.description

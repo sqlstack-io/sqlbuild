@@ -234,6 +234,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
             FastLineageModel::Parse {
                 query_sql: test_case.sql.to_owned(),
                 inferred_columns: strings(test_case.inferred_columns),
+                placeholders: Vec::new(),
             },
         );
         assert_eq!(

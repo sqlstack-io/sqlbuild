@@ -9,7 +9,12 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::main::model_outcome::model_outcome;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::_helpers::analysis_cache::{
     CachedOutcome, decode_outcome, encode_outcome,
 };
@@ -26,7 +31,7 @@ use crate::assembly::analysis_session::_helpers::enrichment::{
     Enrichment, EnrichmentInput, enrichment,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{
-    ShapeTable, dict_from_pairs, same_keys, same_relations,
+    ShapeTable, dict_from_pairs, same_keys, same_relations, session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
@@ -34,9 +39,10 @@ use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_clea
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
     LineageRow, ModelAnalysis, ModelOutcome, ModelRequest, Phase, PivotOutcome, PivotTables,
-    RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
+    RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionSchema, SessionStep,
 };
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
+use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 use crate::semantic_validation::models::DiagnosticRow;
 use crate::semantic_validation::models::ProjectCatalog;
 use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_arguments;
@@ -231,6 +237,9 @@ impl AnalysisSession {
             .map(|model| self.binding_schema(&self.request.models[*model]))
             .collect();
         let misses: Vec<usize> = self.read_cache(models, &schemas)?;
+        if let AnalysisRoute::Native(dialect) = self.route() {
+            return self.analyze_native_wave(dialect, models, &misses, &schemas);
+        }
         let batch = Batch {
             dialect: &self.request.dialect,
             function_return_types: &self.request.function_return_types,
@@ -292,6 +301,45 @@ impl AnalysisSession {
             });
         }
         self.check_sql_macros(models)
+    }
+
+    /// Each model of the wave the cache did not answer, analysed by its dialect's native module.
+    fn analyze_native_wave(
+        &mut self,
+        dialect: &'static dyn NativeDialect,
+        models: &[usize],
+        misses: &[usize],
+        schemas: &[Shapes],
+    ) -> Result<(), String> {
+        let pool = self.catalog.native.analysis_pool()?;
+        let request: &SessionRequest = &self.request;
+        let nullability: &ShapeTable = &self.available_nullability;
+        let declared: Vec<String> = request
+            .function_return_types
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
+        let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
+            misses
+                .par_iter()
+                .map(|position| {
+                    let model: &ModelRequest = &request.models[models[*position]];
+                    let schema: Shapes = schemas[*position].clone();
+                    let relations: SessionSchema = session_schema(&schema, nullability);
+                    model_outcome(dialect, model, (schema, &relations), &declared)
+                })
+                .collect()
+        });
+        for (position, (outcome, failure)) in misses.iter().zip(outcomes) {
+            self.failures.extend(failure);
+            self.outcomes[models[*position]] = Some(outcome);
+        }
+        self.check_sql_macros(models)
+    }
+
+    /// The route of the session's dialect: a native module, or Polyglot.
+    pub(crate) fn route(&self) -> AnalysisRoute {
+        analysis_route(Some(&self.request.dialect))
     }
 
     /// Each model's SQL macro call arguments checked against its analysed types, cache hits too.
@@ -376,7 +424,7 @@ impl AnalysisSession {
 
     /// Python's `_complete_inferred_bindings` star and type pass for one wave.
     fn complete_wave(&mut self, wave: usize) -> Result<(), String> {
-        if self.cyclic {
+        if self.cyclic || matches!(self.route(), AnalysisRoute::Native(_)) {
             return Ok(());
         }
         let mut candidates: Vec<(usize, Shapes, bool)> = Vec::new();
@@ -542,22 +590,8 @@ impl AnalysisSession {
         let Some(mut cache) = self.cache.take() else {
             return Ok((0..models.len()).collect());
         };
-        let mut required: Vec<String> = Vec::new();
-        let mut seen: HashSet<&str> = HashSet::new();
-        for model in models {
-            for reference in &self.request.models[*model].references {
-                if seen.insert(reference.analysis_name.as_str()) {
-                    required.push(reference.analysis_name.clone());
-                }
-            }
-        }
-        self.catalog.prepare_analysis(
-            &required,
-            &self.available_types,
-            &self.available_nullability,
-        );
-        for schema in schemas {
-            let _ = self.catalog.prepare(&[("", schema)]);
+        if matches!(self.route(), AnalysisRoute::Legacy) {
+            self.prepare_catalog(models, schemas);
         }
         let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
         let session_digest: ContentDigest = cache.session_digest;
@@ -621,6 +655,27 @@ impl AnalysisSession {
         Ok(misses)
     }
 
+    /// Load the relations and schemas a Polyglot analysis of `models` reads into its catalog.
+    fn prepare_catalog(&mut self, models: &[usize], schemas: &[Shapes]) {
+        let mut required: Vec<String> = Vec::new();
+        let mut seen: HashSet<&str> = HashSet::new();
+        for model in models {
+            for reference in &self.request.models[*model].references {
+                if seen.insert(reference.analysis_name.as_str()) {
+                    required.push(reference.analysis_name.clone());
+                }
+            }
+        }
+        self.catalog.prepare_analysis(
+            &required,
+            &self.available_types,
+            &self.available_nullability,
+        );
+        for schema in schemas {
+            let _ = self.catalog.prepare(&[("", schema)]);
+        }
+    }
+
     /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
     fn ensure_cleaned(&mut self, models: &[usize]) -> Result<(), String> {
         let pending: Vec<usize> = models
@@ -629,6 +684,18 @@ impl AnalysisSession {
             .filter(|model| self.pending_cleaned[*model])
             .collect();
         if pending.is_empty() {
+            return Ok(());
+        }
+        if let AnalysisRoute::Native(dialect) = self.route() {
+            for model in pending {
+                let request: &ModelRequest = &self.request.models[model];
+                let sql: String =
+                    normalize_native_sql(&request.query_sql, dialect.name(), dialect.stub_prefix())
+                        .map(|normalised| placeholder_defaults(&normalised, &request.placeholders))
+                        .unwrap_or_default();
+                self.outcome_mut(model)?.cleaned_sql = sql;
+                self.pending_cleaned[model] = false;
+            }
             return Ok(());
         }
         let schemas: Vec<Shapes> = pending

@@ -1,5 +1,6 @@
 use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES};
 use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_semantics::lineage::models::Nullability;
 use sqlquack_syntax::expressions::statements::models::Command;
 use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 
@@ -196,4 +197,22 @@ pub(super) struct TypeSpellingTestCase {
     pub(super) normalize: fn(&str) -> Option<NormalizedType>,
     pub(super) spelling: &'static str,
     pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+}
+
+pub(super) struct NativeOutcomeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `raw_orders`' columns, types and nullability as the session knows them; empty when unknown.
+    pub(super) shape: &'static [(&'static str, &'static str, Nullability)],
+    /// The adapter's declared functions as `(name, return type)`.
+    pub(super) declared_functions: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type nullability`, then success, star flags and finding codes.
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct NativeLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_lines: &'static [&'static str],
 }

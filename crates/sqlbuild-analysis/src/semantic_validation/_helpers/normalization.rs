@@ -2,6 +2,8 @@
 
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
+use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
 use sqlbuild_sqltext::sql_scan::main::non_code_end::non_code_end;
 use sqlbuild_sqltext::sql_scan::models::QuotePolicy;
@@ -194,7 +196,8 @@ pub(crate) fn normalize_native_sql(
     let udf_prefix: String = format!("{stub_prefix}udf_");
     let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
-    let non_code: Vec<(usize, usize)> = non_code_ranges(&normalized)?;
+    let non_code: Vec<(usize, usize)> =
+        dialect_non_code_ranges(&normalized, &dialect_lexical_syntax(dialect));
     let mut native: String = String::with_capacity(normalized.len());
     let mut copied_until: usize = 0;
     for captures in stubs.captures_iter(&normalized) {
@@ -224,21 +227,6 @@ pub(crate) fn normalize_native_sql(
     }
     native.push_str(&normalized[copied_until..]);
     Ok(native)
-}
-
-/// The byte ranges of `sql`'s strings, quoted identifiers and comments, in order.
-fn non_code_ranges(sql: &str) -> Result<Vec<(usize, usize)>, String> {
-    let mut ranges: Vec<(usize, usize)> = Vec::new();
-    let mut index: usize = 0;
-    while index < sql.len() {
-        if let Some(end) = skip_non_code(sql, index)? {
-            ranges.push((index, end));
-            index = end;
-            continue;
-        }
-        index += sql[index..].chars().next().map_or(1, char::len_utf8);
-    }
-    Ok(ranges)
 }
 
 pub(crate) fn normalize_dialect_sql_mapped(

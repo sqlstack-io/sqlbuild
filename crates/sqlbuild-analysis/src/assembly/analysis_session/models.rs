@@ -7,6 +7,8 @@ use std::sync::Arc;
 use rayon::ThreadPool;
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
+use sqlquack_semantics::lineage::models::SchemaColumn;
+use sqlquack_semantics::lineage::types::LineageSchema;
 
 use crate::assembly::analysis_session::_helpers::catalog_state::SessionCatalog;
 use crate::assembly::analysis_session::_helpers::mappings::ShapeTable;
@@ -334,6 +336,27 @@ pub struct AnalysisCache {
     /// The whole-table digest each legacy analysis read; its entry also requires it.
     pub(crate) legacy_tables: Vec<Option<ContentDigest>>,
     pub(crate) stats: AnalysisCacheStats,
+}
+
+/// The relations one model reads, as the session knows them, for a native route's analysis.
+#[derive(Debug, Default)]
+pub(crate) struct SessionSchema {
+    /// Columns of each relation with a known shape, by the analysis name the query reads.
+    pub(crate) relations: HashMap<String, Vec<SchemaColumn>>,
+}
+
+impl LineageSchema for SessionSchema {
+    fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        self.relations
+            .get(relation)
+            .or_else(|| {
+                self.relations
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(relation))
+                    .map(|(_, columns)| columns)
+            })
+            .map(Vec::as_slice)
+    }
 }
 
 /// One compile's model analysis, advanced phase by phase.
