@@ -180,6 +180,27 @@ def test_given_project_when_compiling_then_fast_lineage_is_traced(
     )
 
 
+@pytest.mark.parametrize("warm", ["analysis cache", "compile reuse"])
+def test_given_a_warm_store_when_tracing_fast_lineage_then_it_matches_the_uncached_run(
+    warm: str, tmp_path: Path
+) -> None:
+    targets: tuple[str, ...] = (
+        "customer_totals.Total_Amount",
+        "order_copies.rounded",
+        "stg_orders.amount",
+    )
+    uncached: LineageRun = lineage_run(
+        project_dir=tmp_path / "uncached", files=_PROJECT_FILES, targets=targets
+    )
+    restored: LineageRun = lineage_run(
+        project_dir=tmp_path / "warm", files=_PROJECT_FILES, targets=targets, warm=warm
+    )
+
+    assert restored.compile_returncode == 0, restored.compile_report
+    assert (restored.compile_report, restored.traces) == (uncached.compile_report, uncached.traces)
+    assert warm != "analysis cache" or restored.analysis_cache_hits > 0
+
+
 @pytest.mark.parametrize(
     "test_case",
     [
