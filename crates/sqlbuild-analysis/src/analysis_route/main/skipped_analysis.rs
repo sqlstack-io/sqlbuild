@@ -1,4 +1,4 @@
-use crate::analysis_route::_helpers::located_gap::sited_reason;
+use crate::analysis_route::_helpers::analysis::located_gap::sited_reason;
 use crate::analysis_route::constants::SKIPPED_ANALYSIS_CODE;
 use crate::analysis_route::models::{GapSite, LocatedGap};
 

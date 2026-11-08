@@ -1,4 +1,4 @@
-use crate::analysis_route::_helpers::clickhouse_types::clickhouse_type_match;
+use crate::analysis_route::_helpers::dialects::clickhouse_types::clickhouse_type_match;
 use crate::analysis_route::models::TypeMatch;
 use crate::analysis_route::tests::test_types::TypeMatchTestCase;
 

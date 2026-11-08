@@ -1,21 +1,21 @@
-//! SQLite's native module: SQLQuack's native SQLite parser reads its SQL. Validation only.
+//! DuckDB's native module: SQLQuack's native DuckDB parser reads its SQL. Validation only.
 
-use sqlquack_semantics::dialects::constants::SQLITE;
+use sqlquack_semantics::dialects::constants::DUCKDB;
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_syntax_sqlite::{Parsed, StrictFailure, parse_strict};
+use sqlquack_syntax_duckdb::{Parsed, StrictFailure, parse_strict};
 
-use crate::analysis_route::_helpers::type_spelling::respelt;
+use crate::analysis_route::_helpers::dialects::type_spelling::respelt;
 use crate::analysis_route::constants::{
-    SQLITE_DIALECT, SQLITE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+    DUCKDB_DIALECT, DUCKDB_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };
-use crate::analysis_route::models::{ParserGap, SqliteDialect};
+use crate::analysis_route::models::{DuckDbDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeDialect};
 
-impl NativeDialect for SqliteDialect {
+impl NativeDialect for DuckDbDialect {
     fn name(&self) -> &'static str {
-        SQLITE_DIALECT
+        DUCKDB_DIALECT
     }
 
     fn stub_prefix(&self) -> &'static str {
@@ -40,11 +40,12 @@ impl NativeDialect for SqliteDialect {
     }
 
     fn profile(&self) -> &'static dyn DialectProfile {
-        &SQLITE
+        &DUCKDB
     }
 
     /// The type as Polyglot normalised it, or `None` (unknown) where the text fallback can't match it.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        respelt(spelling, &SQLITE_TYPE_SPELLING).map(|respelt| normalize_text_type(&respelt, None))
+        respelt(spelling, &DUCKDB_TYPE_SPELLING)
+            .map(|respelt| normalize_text_type(&respelt, Some(TypeDialect::DuckDb)))
     }
 }

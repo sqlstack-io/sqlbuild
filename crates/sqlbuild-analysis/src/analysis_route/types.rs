@@ -3,8 +3,8 @@
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{Expression, Parsed};
 
-use crate::analysis_route::_helpers::native_analysis::native_analysis;
-use crate::analysis_route::_helpers::whole_gap::whole_gap;
+use crate::analysis_route::_helpers::analysis::native_analysis::native_analysis;
+use crate::analysis_route::_helpers::analysis::whole_gap::whole_gap;
 use crate::analysis_route::constants::{
     MACRO_BODY_PREFIX, MORE_THAN_ONE_STATEMENT, NO_STATEMENT, NOT_ONE_EXPRESSION,
     UNPARSED_STATEMENT,

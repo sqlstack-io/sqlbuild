@@ -6,7 +6,7 @@ use sqlquack_syntax::{
     Dialect, Error, Expression, ParseOptions, Parsed, StrictFailure, TokenizeFailure, parse_strict,
 };
 
-use crate::analysis_route::_helpers::type_spelling::respelt;
+use crate::analysis_route::_helpers::dialects::type_spelling::respelt;
 use crate::analysis_route::constants::{
     SNOWFLAKE_DIALECT, SNOWFLAKE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
 };

@@ -1,8 +1,8 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
 use crate::analysis_route::models::{
-    BigQueryDialect, ClickHouseDialect, DatabricksDialect, DuckDbDialect, PostgresDialect, SnowflakeDialect,
-    SqliteDialect, TsqlDialect, TypeSpelling,
+    BigQueryDialect, ClickHouseDialect, DatabricksDialect, DuckDbDialect, PostgresDialect,
+    SnowflakeDialect, SqliteDialect, TsqlDialect, TypeSpelling,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::models::TypeFamily;

@@ -6,7 +6,7 @@ use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::Parsed;
 use sqlquack_syntax_clickhouse::parse_strict;
 
-use crate::analysis_route::_helpers::clickhouse_types::{
+use crate::analysis_route::_helpers::dialects::clickhouse_types::{
     clickhouse_spelling, clickhouse_type_match,
 };
 use crate::analysis_route::constants::{CLICKHOUSE_DIALECT, UNQUOTED_STUB_PREFIX};

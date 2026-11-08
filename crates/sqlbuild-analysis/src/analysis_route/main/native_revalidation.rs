@@ -5,7 +5,9 @@ use std::sync::Arc;
 use rayon::ThreadPool;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::analysis_route::_helpers::revalidation::{revised, session_outcome, unrevised};
+use crate::analysis_route::_helpers::analysis::revalidation::{
+    revised, session_outcome, unrevised,
+};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::models::{FinishedSession, ModelOutcome, PivotOutcome};
 use crate::semantic_checks::models::RecoveryModel;

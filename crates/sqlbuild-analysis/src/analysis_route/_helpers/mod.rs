@@ -1,15 +1,2 @@
-pub(crate) mod bigquery_dialect;
-pub(crate) mod clickhouse_dialect;
-pub(crate) mod clickhouse_types;
-pub(crate) mod databricks_dialect;
-pub(crate) mod duckdb_dialect;
-pub(crate) mod located_gap;
-pub(crate) mod marker_names;
-pub(crate) mod native_analysis;
-pub(crate) mod postgres_dialect;
-pub(crate) mod revalidation;
-pub(crate) mod snowflake_dialect;
-pub(crate) mod sqlite_dialect;
-pub(crate) mod tsql_dialect;
-pub(crate) mod type_spelling;
-pub(crate) mod whole_gap;
+pub(crate) mod analysis;
+pub(crate) mod dialects;

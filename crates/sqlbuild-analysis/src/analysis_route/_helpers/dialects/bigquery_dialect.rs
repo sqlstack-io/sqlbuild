@@ -7,7 +7,7 @@ use sqlquack_semantics::lineage::types::LineageSchema;
 use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 
-use crate::analysis_route::_helpers::native_analysis::native_analysis;
+use crate::analysis_route::_helpers::analysis::native_analysis::native_analysis;
 use crate::analysis_route::constants::{
     BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, CAST_TYPE_PREFIX, DECIMAL_RADIX, NUMERIC_DIGITS,
     POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES, POLYGLOT_TOP_LEVEL_TYPE_NAMES,

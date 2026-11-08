@@ -45,7 +45,11 @@ impl NativeDialect for PostgresDialect {
 
     /// The comparison shape of the type PostgreSQL names; `None` (unknown) when it cannot name it.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        let canonical: String = format_type(&parse_type(spelling).ok()?)?;
+        let parsed = match parse_type(spelling) {
+            Ok(parsed) => parsed,
+            Err(_refused) => return None,
+        };
+        let canonical: String = format_type(&parsed)?;
         Some(normalize_text_type(
             &fallback_spelling(&canonical),
             Some(TypeDialect::Postgres),

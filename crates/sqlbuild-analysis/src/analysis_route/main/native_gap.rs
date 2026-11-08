@@ -1,6 +1,6 @@
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
-use crate::analysis_route::_helpers::located_gap::located;
+use crate::analysis_route::_helpers::analysis::located_gap::located;
 use crate::analysis_route::models::LocatedGap;
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
