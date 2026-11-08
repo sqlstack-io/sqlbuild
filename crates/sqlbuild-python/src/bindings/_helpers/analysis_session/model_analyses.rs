@@ -129,6 +129,7 @@ fn session_request<'py>(
             profile,
             &native_field(profile, "sql_analysis_dialect")?,
         )?,
+        quoted_ignore_case: native_field(profile, "quoted_identifiers_ignore_case")?.is_truthy()?,
         function_return_types: return_types(profile)?,
         nullability_rules: Some(rules),
         rich_type_inference: request.rich_type_inference,

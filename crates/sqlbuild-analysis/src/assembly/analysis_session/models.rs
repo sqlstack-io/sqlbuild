@@ -7,7 +7,7 @@ use std::sync::Arc;
 use rayon::ThreadPool;
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
-use sqlquack_semantics::lineage::models::SchemaColumn;
+use sqlquack_semantics::lineage::models::{NullabilityRule, SchemaColumn};
 use sqlquack_semantics::lineage::types::LineageSchema;
 
 use crate::assembly::analysis_session::_helpers::catalog_state::SessionCatalog;
@@ -118,6 +118,10 @@ pub struct FinishedSession {
     pub(crate) model_names: Vec<String>,
     /// The adapter's declared functions, which the native analysis knew.
     pub(crate) declared_functions: Vec<String>,
+    /// The adapter's function return types and nullability rules the native analysis read.
+    pub(crate) functions: SessionFunctions,
+    /// Whether quoted identifiers compared without case in the session's analysis.
+    pub(crate) quoted_ignore_case: bool,
 }
 
 /// The session's typed result for one compiled model, borrowed from the finished session.
@@ -176,6 +180,8 @@ pub struct SessionRequest {
     pub dialect: String,
     /// Whether published shapes keep authored quoting, Python's `inferred_binding_shape` test.
     pub case_sensitive_shapes: bool,
+    /// Whether quoted identifiers compare without case, as Snowflake's session parameter sets.
+    pub quoted_ignore_case: bool,
     pub function_return_types: Pairs,
     /// Adapter nullability rules as `(function name, rule id)`.
     pub nullability_rules: Option<Pairs>,
@@ -342,11 +348,21 @@ pub struct AnalysisCache {
     pub(crate) stats: AnalysisCacheStats,
 }
 
+/// The adapter's function facts a native route gives SQLQuack: return types and nullability rules.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SessionFunctions {
+    /// `(function name, type)` of each function whose return type the adapter declares.
+    pub(crate) return_types: Vec<(String, String)>,
+    /// `(function name, rule)` of each built-in nullability rule the adapter names.
+    pub(crate) nullability: Vec<(String, NullabilityRule)>,
+}
+
 /// The relations one model reads, as the session knows them, for a native route's analysis.
 #[derive(Debug, Default)]
 pub(crate) struct SessionSchema {
     /// Columns of each relation with a known shape, by the analysis name the query reads.
     pub(crate) relations: HashMap<String, Vec<SchemaColumn>>,
+    pub(crate) functions: SessionFunctions,
 }
 
 impl LineageSchema for SessionSchema {
@@ -360,6 +376,22 @@ impl LineageSchema for SessionSchema {
                     .map(|(_, columns)| columns)
             })
             .map(Vec::as_slice)
+    }
+
+    fn function_type(&self, name: &str) -> Option<&str> {
+        self.functions
+            .return_types
+            .iter()
+            .find(|(function, _)| function.eq_ignore_ascii_case(name))
+            .map(|(_, data_type)| data_type.as_str())
+    }
+
+    fn function_nullability(&self, name: &str) -> Option<NullabilityRule> {
+        self.functions
+            .nullability
+            .iter()
+            .find(|(function, _)| function.eq_ignore_ascii_case(name))
+            .map(|(_, rule)| *rule)
     }
 }
 

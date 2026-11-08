@@ -99,6 +99,7 @@ pub(crate) struct ModelRow {
 pub(crate) struct RequestRow {
     pub(crate) dialect: String,
     pub(crate) case_sensitive_shapes: bool,
+    pub(crate) quoted_ignore_case: bool,
     pub(crate) function_return_types: Pairs,
     pub(crate) nullability_rules: Option<Pairs>,
     pub(crate) rich_type_inference: bool,
@@ -456,6 +457,7 @@ fn session_request(request: RequestRow) -> SessionRequest {
     let RequestRow {
         dialect,
         case_sensitive_shapes,
+        quoted_ignore_case,
         function_return_types,
         nullability_rules,
         rich_type_inference,
@@ -469,6 +471,7 @@ fn session_request(request: RequestRow) -> SessionRequest {
     SessionRequest {
         dialect,
         case_sensitive_shapes,
+        quoted_ignore_case,
         function_return_types,
         nullability_rules,
         nullability_callback: None,

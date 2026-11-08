@@ -88,7 +88,7 @@ class CteFactRecoveryParityTestCase:
 
 @dataclass(frozen=True)
 class AdapterRuleCallbackTestCase:
-    """A project-local adapter rule the native session calls back into, and what it raises."""
+    """A project-local adapter rule the Polyglot route calls back into, and what it raises."""
 
     description: str
     seed: int

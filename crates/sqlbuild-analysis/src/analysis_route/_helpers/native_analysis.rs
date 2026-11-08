@@ -27,8 +27,9 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
     statement: &Expression,
     input: &AnalysisInput<'_>,
 ) -> NativeAnalysis {
+    let profile: &'static dyn DialectProfile = dialect.profile_for(input);
     let context: LineageContext<'_> = LineageContext {
-        profile: dialect.profile(),
+        profile,
         schema: input.schema,
         sql: Some(input.sql),
     };
@@ -42,7 +43,7 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
         lineage: lineage
             .outputs
             .iter()
-            .map(|output| lineage_row(dialect.profile(), output, input.references))
+            .map(|output| lineage_row(profile, output, input.references))
             .collect(),
         row_sources: lineage
             .row_sources

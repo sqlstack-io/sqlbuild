@@ -24,7 +24,7 @@ pub fn native_revalidation(
             .par_iter()
             .map(|model| {
                 let outcome: &ModelOutcome = session_outcome(finished, outcomes, &model.name)?;
-                match revised(dialect, outcome, poisoned, &finished.declared_functions) {
+                match revised(dialect, outcome, poisoned, finished) {
                     Ok(Some(rows)) => Ok(rows),
                     Ok(None) => Ok(unrevised(model)),
                     Err(reason) => Err(format!("{}: {reason}", model.name)),
