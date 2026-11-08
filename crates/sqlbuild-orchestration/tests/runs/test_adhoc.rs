@@ -3,39 +3,150 @@
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::authorization::main::assign_builtin_role::assign_builtin_role;
-use crate::authorization::main::bootstrap_user::bootstrap_user;
-use crate::credentials::main::identities::create_principal::create_principal;
-use crate::credentials::models::{AuditContext, BuiltinRole, RoleAssignmentRequest};
-use crate::credentials::tests::location_helpers::create_location;
+use crate::credentials::models::AuditContext;
 use crate::runs::main::check_adhoc_run::check_adhoc_run;
 use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::models::{AdhocCheckRequest, AdhocRunRequest, PersonRunRequest};
-use crate::runs::tests::helpers::{ExactKeyPlanner, snapshot};
-use crate::snapshots::main::publish_snapshot::publish_snapshot;
-use crate::snapshots::models::SnapshotNode;
-use crate::store::errors::ControlError;
+use crate::runs::models::PersonRunRequest;
+use crate::runs::tests::helpers::{
+    adhoc_check, adhoc_fixture, adhoc_launch, check_projection, json_column, launch_outcome, rows,
+};
+use crate::runs::tests::test_types::{AdhocCommandTestCase, AdhocPerson, ExactKeyPlanner};
 use crate::store::main::migrate_store::migrate_store;
-use crate::store::main::query::query;
-use crate::store::main::{begin::begin, commit::commit};
-use crate::store::models::{ControlStore, Parameter, TransactionMode};
+use crate::store::models::Parameter;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
 
-async fn rows(store: &ControlStore, sql: &str, parameters: Vec<Parameter>) -> Vec<Value> {
-    let transaction = begin(store, TransactionMode::Read).await.expect("read");
-    let (transaction, rows) = query(transaction, sql, parameters).await.expect("query");
-    commit(transaction).await.expect("commit");
-    rows.into_iter().map(|row| json!(row)).collect()
-}
-
-fn command(tokens: &[&str]) -> Vec<String> {
-    tokens.iter().map(|token| (*token).to_owned()).collect()
-}
+const AUDIT: &str = "SELECT event_id FROM sqb_security_audit";
 
 #[test]
 fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_needs_its_own_permission()
  {
+    let test_cases = [
+        AdhocCommandTestCase {
+            description: "run.adhoc covers the resolved selection, not only its writers",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders", "source:shop.orders"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": ["model:orders", "source:shop.orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
+            description: "every gated flag is its own permission, and Developer holds none of them",
+            person: AdhocPerson::Developer,
+            command: &[
+                "build",
+                "model:orders",
+                "--full-refresh",
+                "--warehouse",
+                "BUILD_XS",
+            ],
+            priority: 1,
+            reason: "Rebuild orders now",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.rewrite_history", false], ["run.warehouse", false], ["run.prioritise", false]],
+                "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.rewrite_history alone",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders", "--full-refresh"],
+            priority: 0,
+            reason: "Rebuild orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.rewrite_history", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.warehouse alone",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders", "--warehouse", "BUILD_XS"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.warehouse", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Developer lacks run.prioritise alone",
+            person: AdhocPerson::Developer,
+            command: &["build", "model:orders"],
+            priority: 1,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.prioritise", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "Admin holds every gated permission",
+            person: AdhocPerson::Admin,
+            command: &[
+                "build",
+                "model:orders",
+                "--full-refresh",
+                "--warehouse",
+                "BUILD_XS",
+            ],
+            priority: 1,
+            reason: "Rebuild orders now",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true], ["run.rewrite_history", true], ["run.warehouse", true], ["run.prioritise", true]],
+                "error": null, "launchable": true}),
+            expected_launch: Ok(true),
+        },
+        AdhocCommandTestCase {
+            description: "Operator may run jobs but not ad-hoc commands",
+            person: AdhocPerson::Operator,
+            command: &["build", "model:orders"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", false]], "error": null, "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "without view the dry run reveals no node, and no role is the default",
+            person: AdhocPerson::Stranger,
+            command: &["build", "model:orders"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": [], "write_set": [], "permissions": [],
+                "error": "view on every node of this target is required", "launchable": false}),
+            expected_launch: Err(403),
+        },
+        AdhocCommandTestCase {
+            description: "verbs workers cannot run yet are refused at launch",
+            person: AdhocPerson::Developer,
+            command: &["test", "model:orders"],
+            priority: 0,
+            reason: "Check orders",
+            expected_check: json!({"selection": ["model:orders"], "write_set": [], "permissions": [["run.adhoc", true]],
+                "error": "workers do not run sqb test yet; only build can launch", "launchable": false}),
+            expected_launch: Err(400),
+        },
+        AdhocCommandTestCase {
+            description: "a refused flag is refused before any permission",
+            person: AdhocPerson::Admin,
+            command: &["build", "--vars"],
+            priority: 0,
+            reason: "Refresh orders",
+            expected_check: json!({"selection": [], "write_set": [], "permissions": [],
+                "error": "--vars is not available for ad-hoc runs", "launchable": false}),
+            expected_launch: Err(400),
+        },
+        AdhocCommandTestCase {
+            description: "a launch needs a reason, which the dry run does not",
+            person: AdhocPerson::Admin,
+            command: &["build", "model:orders"],
+            priority: 0,
+            reason: " ",
+            expected_check: json!({"selection": ["model:orders"], "write_set": ["model:orders"],
+                "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
+            expected_launch: Err(400),
+        },
+    ];
     for backend in [Backend::Sqlite, Backend::Postgres] {
         run(async {
             let Some(fixture) = open_test_store(backend).await else {
@@ -49,322 +160,101 @@ fn given_ad_hoc_commands_when_people_check_and_launch_them_then_each_gated_flag_
                 request_id: Uuid::now_v7(),
                 ip_address: None,
             };
-            let location_id = create_location(store, "orders", "test-owner")
+            let (location_id, snapshot_id, people) = adhoc_fixture(store, &context).await;
+            let mut run_ids: Vec<Uuid> = Vec::new();
+            for test_case in &test_cases {
+                let run_id = Uuid::now_v7();
+                run_ids.push(run_id);
+                let person = people.of(test_case.person);
+                let audited = rows(store, AUDIT, Vec::new()).await.len();
+                let check = check_adhoc_run(
+                    store,
+                    (&context, person),
+                    &ExactKeyPlanner,
+                    &adhoc_check(location_id, test_case),
+                )
                 .await
-                .expect("location");
-            let mut input = snapshot(location_id);
-            input.nodes = [
-                "model:orders",
-                "model:customers",
-                "seed:currencies",
-                "source:shop.orders",
-            ]
-            .into_iter()
-            .map(|key| {
-                let kind = key.split_once(':').expect("kind").0;
-                (
-                    key.to_owned(),
-                    SnapshotNode {
-                        kind: kind.into(),
-                        definition: json!({"materialization": "table"}),
-                        raw_sql: None,
-                        compiled_sql: Some("select 1 as id".into()),
-                        python_source: None,
-                    },
-                )
-            })
-            .collect();
-            let published = publish_snapshot(store, &input).await.expect("publish");
-            let admin = bootstrap_user(store, &context, "orders-admin")
-                .await
-                .expect("administrator");
-            let mut people = Vec::new();
-            for (name, role) in [
-                ("orders-developer", &[BuiltinRole::Developer][..]),
-                ("orders-operator", &[BuiltinRole::Operator][..]),
-                ("orders-stranger", &[][..]),
-            ] {
-                let person = create_principal(store, &context, name)
-                    .await
-                    .expect("person");
-                for role in role.iter().copied() {
-                    assign_builtin_role(
-                        store,
-                        (&context, admin),
-                        &RoleAssignmentRequest {
-                            principal_id: person,
-                            role: role.into(),
-                            location_id: None,
-                            target: None,
-                            revoke: false,
-                        },
-                    )
-                    .await
-                    .expect("assign role");
-                }
-                people.push(person);
-            }
-            let (developer, operator, stranger) = (people[0], people[1], people[2]);
-            let audited_before = rows(store, "SELECT event_id FROM sqb_security_audit", Vec::new())
-                .await
-                .len();
-            let context = &context;
-            let check = |person: Uuid, tokens: &[&str], priority: i64| {
-                let request = AdhocCheckRequest {
-                    location_id,
-                    target: "development".into(),
-                    command: command(tokens),
-                    priority,
-                };
-                async move {
-                    let check =
-                        check_adhoc_run(store, (context, person), &ExactKeyPlanner, &request)
-                            .await
-                            .expect("dry run");
-                    json!({
-                        "selection": check.selection,
-                        "write_set": check.write_set,
-                        "permissions": check.permissions.iter().map(|permission| json!([permission.action, permission.allowed])).collect::<Vec<Value>>(),
-                        "error": check.error,
-                        "launchable": check.launchable,
-                    })
-                }
-            };
-            assert_eq!(
-                check(
-                    developer,
-                    &["build", "model:orders", "source:shop.orders"],
-                    0
-                )
-                .await,
-                json!({"selection": ["model:orders", "source:shop.orders"], "write_set": ["model:orders"],
-                       "permissions": [["run.adhoc", true]], "error": null, "launchable": true}),
-                "{backend:?}: run.adhoc covers the resolved selection, not only its writers"
-            );
-            assert_eq!(
-                check(
-                    developer,
-                    &[
-                        "build",
-                        "model:orders",
-                        "--full-refresh",
-                        "--warehouse",
-                        "BUILD_XS"
-                    ],
-                    1
-                )
-                .await["permissions"],
-                json!([
-                    ["run.adhoc", true],
-                    ["run.rewrite_history", false],
-                    ["run.warehouse", false],
-                    ["run.prioritise", false]
-                ]),
-                "{backend:?}: every gated flag is its own permission, and Developer holds none of them"
-            );
-            assert_eq!(
-                check(
-                    admin,
-                    &[
-                        "build",
-                        "model:orders",
-                        "--full-refresh",
-                        "--warehouse",
-                        "BUILD_XS"
-                    ],
-                    1
-                )
-                .await["launchable"],
-                json!(true),
-                "{backend:?}: Admin holds every gated permission"
-            );
-            assert_eq!(
-                check(operator, &["build", "model:orders"], 0).await["permissions"],
-                json!([["run.adhoc", false]]),
-                "{backend:?}: Operator may run jobs but not ad-hoc commands"
-            );
-            assert_eq!(
-                check(stranger, &["build", "model:orders"], 0).await,
-                json!({"selection": [], "write_set": [], "permissions": [],
-                       "error": "view on every node of this target is required", "launchable": false}),
-                "{backend:?}: without view the dry run reveals no node"
-            );
-            assert_eq!(
-                check(developer, &["test", "model:orders"], 0).await["error"],
-                json!("workers do not run sqb test yet; only build can launch"),
-                "{backend:?}: verbs workers cannot run yet are refused at launch"
-            );
-            assert_eq!(
-                rows(store, "SELECT event_id FROM sqb_security_audit", Vec::new())
-                    .await
-                    .len(),
-                audited_before,
-                "{backend:?}: dry runs record no denial and no request"
-            );
-            let launch =
-                |person: Uuid, tokens: &[&str], (reason, priority): (&str, i64), run_id: Uuid| {
-                    let request = AdhocRunRequest {
-                        run_id,
-                        location_id,
-                        target: "development".into(),
-                        command: command(tokens),
-                        reason: reason.into(),
-                        priority,
-                    };
-                    async move {
-                        request_person_run(
-                            store,
-                            (context, person),
-                            PersonRunRequest::Adhoc(&ExactKeyPlanner, &request),
-                        )
-                        .await
-                    }
-                };
-            let launched = Uuid::now_v7();
-            for expected in [true, false] {
+                .expect("dry run");
                 assert_eq!(
-                    launch(
-                        developer,
-                        &["build", "model:orders"],
-                        ("Refresh orders", 0),
-                        launched
-                    )
-                    .await
-                    .ok(),
-                    Some(expected),
-                    "{backend:?}: a retry of the same run ID is not a second run"
+                    (
+                        check_projection(&check),
+                        rows(store, AUDIT, Vec::new()).await.len()
+                    ),
+                    (test_case.expected_check.clone(), audited),
+                    "{backend:?}: {}; a dry run records nothing",
+                    test_case.description
+                );
+                let launched = request_person_run(
+                    store,
+                    (&context, person),
+                    PersonRunRequest::Adhoc(
+                        &ExactKeyPlanner,
+                        &adhoc_launch(location_id, test_case, run_id),
+                    ),
+                )
+                .await;
+                assert_eq!(
+                    launch_outcome(launched),
+                    test_case.expected_launch,
+                    "{backend:?}: {}",
+                    test_case.description
                 );
             }
+            let retried = request_person_run(
+                store,
+                (&context, people.of(test_cases[0].person)),
+                PersonRunRequest::Adhoc(
+                    &ExactKeyPlanner,
+                    &adhoc_launch(location_id, &test_cases[0], run_ids[0]),
+                ),
+            )
+            .await;
+            assert_eq!(
+                launch_outcome(retried),
+                Ok(false),
+                "{backend:?}: a retry of the same run ID is not a second run"
+            );
             let frozen = rows(
                 store,
                 "SELECT request_json FROM sqb_runs WHERE run_id=$1",
-                vec![Parameter::Id(launched)],
+                vec![Parameter::Id(run_ids[0])],
             )
             .await;
-            let frozen: Value = serde_json::from_value(frozen[0]["request_json"].clone())
-                .map(|text: Value| {
-                    text.as_str().map_or(text.clone(), |text| {
-                        serde_json::from_str(text).expect("request JSON")
-                    })
-                })
-                .expect("frozen request");
+            let frozen = json_column(&frozen[0]["request_json"]);
             assert_eq!(
-                (
+                [
                     &frozen["kind"],
                     &frozen["selection"],
                     &frozen["write_set"],
                     &frozen["snapshot_id"]
-                ),
-                (
+                ],
+                [
                     &json!("adhoc"),
+                    &json!(["model:orders", "source:shop.orders"]),
                     &json!(["model:orders"]),
-                    &json!(["model:orders"]),
-                    &json!(published.snapshot_id)
-                ),
+                    &json!(snapshot_id)
+                ],
                 "{backend:?}: the worker receives the exact resolved selection of the pinned publication"
             );
-            for (person, tokens, priority, description) in [
-                (
-                    operator,
-                    &["build", "model:orders"][..],
-                    0,
-                    "Operator lacks run.adhoc",
-                ),
-                (
-                    developer,
-                    &["build", "model:orders", "--full-refresh"][..],
-                    0,
-                    "Developer lacks run.rewrite_history",
-                ),
-                (
-                    developer,
-                    &["build", "model:orders", "--warehouse", "BUILD_XS"][..],
-                    0,
-                    "Developer lacks run.warehouse",
-                ),
-                (
-                    developer,
-                    &["build", "model:orders"][..],
-                    1,
-                    "Developer lacks run.prioritise",
-                ),
-                (
-                    stranger,
-                    &["build", "model:orders"][..],
-                    0,
-                    "no role is the default",
-                ),
-            ] {
-                assert!(
-                    matches!(
-                        launch(person, tokens, ("Refresh orders", priority), Uuid::now_v7()).await,
-                        Err(ControlError::Denied { .. })
-                    ),
-                    "{backend:?}: {description}"
-                );
-            }
-            for (tokens, reason, description) in [
-                (&["build", "model:orders"][..], " ", "a reason is required"),
-                (
-                    &["test", "model:orders"][..],
-                    "Check orders",
-                    "workers run only build",
-                ),
-                (&["build", "--vars"][..], "Refresh orders", "refused flag"),
-            ] {
-                assert!(
-                    matches!(
-                        launch(admin, tokens, (reason, 0), Uuid::now_v7()).await,
-                        Err(ControlError::Invalid(_))
-                    ),
-                    "{backend:?}: {description}"
-                );
-            }
-            let urgent = Uuid::now_v7();
+            let audit = rows(
+                store,
+                "SELECT after_json FROM sqb_security_audit WHERE action='run.adhoc_requested'",
+                Vec::new(),
+            )
+            .await;
             assert_eq!(
-                launch(
-                    admin,
-                    &[
-                        "build",
-                        "model:orders",
-                        "--full-refresh",
-                        "--warehouse",
-                        "BUILD_XS"
-                    ],
-                    ("Rebuild orders now", 1),
-                    urgent
-                )
-                .await
-                .ok(),
-                Some(true),
-                "{backend:?}: Admin launches every gated flag"
-            );
-            let audit = rows(store, "SELECT granting_role, after_json FROM sqb_security_audit WHERE action='run.adhoc_requested'", Vec::new()).await;
-            let after: Vec<Value> = audit
-                .iter()
-                .map(|row| {
-                    let after = &row["after_json"];
-                    after.as_str().map_or(after.clone(), |text| {
-                        serde_json::from_str(text).expect("audit JSON")
-                    })
-                })
-                .collect();
-            assert_eq!(
-                after
+                audit
                     .iter()
-                    .map(|event| (
-                        event["verb"].clone(),
-                        event["frozen"]["settings"].clone(),
-                        event["request"]["reason"].clone()
-                    ))
-                    .collect::<Vec<_>>(),
+                    .map(|row| json_column(&row["after_json"]))
+                    .map(|event| json!([
+                        event["verb"],
+                        event["frozen"]["settings"],
+                        event["request"]["reason"]
+                    ]))
+                    .collect::<Vec<Value>>(),
                 vec![
-                    (json!("build"), json!({}), json!("Refresh orders")),
-                    (
-                        json!("build"),
-                        json!({"full_refresh": true, "warehouse": "BUILD_XS"}),
-                        json!("Rebuild orders now")
-                    ),
+                    json!(["build", {}, "Refresh orders"]),
+                    json!(["build", {"full_refresh": true, "warehouse": "BUILD_XS"}, "Rebuild orders now"]),
                 ],
                 "{backend:?}: each launch is audited once with its command, reason and warehouse"
             );

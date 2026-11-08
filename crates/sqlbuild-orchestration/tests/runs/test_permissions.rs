@@ -17,9 +17,9 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, cancel_person_run::cancel_person_run, change_run::change_run,
-    list_person_runs::list_person_runs, list_runs::list_runs, request_job_run::request_job_run,
-    request_person_run::request_person_run, request_rerun::request_rerun,
+    advance_groups::advance_groups, change_run::change_run, list_person_runs::list_person_runs,
+    list_runs::list_runs, request_job_run::request_job_run, request_person_run::request_person_run,
+    request_rerun::request_rerun,
 };
 use crate::runs::models::{
     CancelRunRequest, JobRunRequest, PersonRunRequest, RerunRequest, RunAuthority, RunChange,
@@ -229,9 +229,13 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         let can_cancel = test_case.role != BuiltinRole::Viewer;
                         for expected in [true, false] {
                             assert_eq!(
-                                cancel_person_run(store, (&context, credentials), &cancellation)
-                                    .await
-                                    .ok(),
+                                request_person_run(
+                                    store,
+                                    (&context, credentials),
+                                    PersonRunRequest::Cancel(&cancellation),
+                                )
+                                .await
+                                .ok(),
                                 can_cancel.then_some(expected),
                                 "cancellation permits stopping even sensitive or prioritised work"
                             );
@@ -308,14 +312,14 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     request_run(store, &adhoc)
                         .await
                         .expect("owner requests ad-hoc execution");
-                    cancel_person_run(
+                    request_person_run(
                         store,
                         (&context, sessions[0].identity.principal_id),
-                        &CancelRunRequest {
+                        PersonRunRequest::Cancel(&CancelRunRequest {
                             run_id: adhoc.run_id,
                             event_id: Uuid::now_v7(),
                             reason: "Stop ad-hoc source".into(),
-                        },
+                        }),
                     )
                     .await
                     .expect("administrator stops ad-hoc execution");

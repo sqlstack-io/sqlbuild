@@ -4,5 +4,5 @@
 pub(super) struct AdhocPlanTestCase {
     pub(super) description: &'static str,
     pub(super) command: &'static [&'static str],
-    pub(super) expected: Result<(&'static [&'static str], serde_json::Value), &'static str>,
+    pub(super) expected_plan: Result<(&'static [&'static str], serde_json::Value), &'static str>,
 }

@@ -12,7 +12,6 @@ use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
 use crate::declarations::models::TriggerChangeRequest;
-use crate::runs::main::cancel_person_run::cancel_person_run;
 use crate::runs::main::check_adhoc_run::check_adhoc_run;
 use crate::runs::main::list_person_runs::list_person_runs;
 use crate::runs::main::request_person_run::request_person_run;
@@ -130,7 +129,12 @@ pub(crate) async fn cancel_run(
     Json(request): Json<CancelRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
-        applied: cancel_person_run(&store, (&context, principal), &request).await?,
+        applied: request_person_run(
+            &store,
+            (&context, principal),
+            PersonRunRequest::Cancel(&request),
+        )
+        .await?,
     }))
 }
 

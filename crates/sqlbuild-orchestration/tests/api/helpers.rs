@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::api::main::serve_api::serve_api;
 use crate::api::models::ApiAuthentication;
 use crate::api::tests::test_types::TestApi;
-use crate::runs::tests::helpers::ExactKeyPlanner;
+use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {

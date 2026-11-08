@@ -4,27 +4,34 @@ use uuid::Uuid;
 
 use crate::credentials::models::AuditContext;
 use crate::runs::_helpers::requests::adhoc::request_adhoc_run_in;
+use crate::runs::_helpers::requests::cancel::cancel_person_run;
 use crate::runs::_helpers::requests::manual_job::request_job_run_in;
 use crate::runs::models::PersonRunRequest;
 use crate::store::errors::ControlError;
 use crate::store::main::write::write;
 use crate::store::models::ControlStore;
 
-/// A person queues a published job or an ad-hoc command; both are authorised on the nodes they would run.
+/// A person queues a published job or an ad-hoc command, or cancels a run; each is authorised on the nodes it covers.
 pub async fn request_person_run(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
     request: PersonRunRequest<'_>,
 ) -> Result<bool, ControlError> {
-    write(store, |transaction| async move {
-        match request {
-            PersonRunRequest::Job(request) => {
-                request_job_run_in(transaction, (context, Some(credentials)), request).await
-            }
-            PersonRunRequest::Adhoc(planner, request) => {
-                request_adhoc_run_in(transaction, (context, credentials), (planner, request)).await
-            }
+    match request {
+        PersonRunRequest::Cancel(request) => {
+            cancel_person_run(store, (context, credentials), request).await
         }
-    })
-    .await
+        PersonRunRequest::Job(request) => {
+            write(store, |transaction| async move {
+                request_job_run_in(transaction, (context, Some(credentials)), request).await
+            })
+            .await
+        }
+        PersonRunRequest::Adhoc(planner, request) => {
+            write(store, |transaction| async move {
+                request_adhoc_run_in(transaction, (context, credentials), (planner, request)).await
+            })
+            .await
+        }
+    }
 }

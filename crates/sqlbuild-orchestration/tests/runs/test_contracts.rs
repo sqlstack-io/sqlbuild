@@ -31,4 +31,4 @@ mod test_requests;
 #[path = "test_reruns.rs"]
 mod test_reruns;
 #[path = "test_types.rs"]
-mod test_types;
+pub(crate) mod test_types;

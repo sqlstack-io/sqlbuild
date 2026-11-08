@@ -4,6 +4,7 @@ use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use chrono::Utc;
@@ -24,6 +25,7 @@ use sqlbuild_orchestration::platform::models::{
     LocationHealth, LocationHealthReport, LocationWorkClient, LocationWorkPoll,
     WarehouseSyncFailure,
 };
+use sqlbuild_orchestration::runs::types::CommandPlanner;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::snapshots::main::next_remote_generation::next_remote_generation;
@@ -816,7 +818,7 @@ pub(crate) async fn open_control_store(
 /// Decode privileged CLI configuration before handing process ownership to the workers domain.
 pub(crate) fn open_control_workers(
     namespace: &Namespace,
-) -> Result<(Workers, Vec<DockerImageSource>), ControlError> {
+) -> Result<(Workers, (Vec<DockerImageSource>, Arc<dyn CommandPlanner>)), ControlError> {
     let workers = open_workers(
         text(namespace, "control_launchers").as_deref(),
         text(namespace, "control_database_env")
@@ -824,7 +826,7 @@ pub(crate) fn open_control_workers(
         !flag(namespace, "control_no_scheduler"),
     )?;
     let images = docker_image_sources(&workers);
-    Ok((workers, images))
+    Ok((workers, (images, adhoc_planner())))
 }
 
 pub(crate) async fn shutdown_signal() -> Result<(), ControlError> {

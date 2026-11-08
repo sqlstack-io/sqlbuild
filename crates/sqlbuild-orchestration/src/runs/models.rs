@@ -517,8 +517,9 @@ pub struct AdhocCheck {
     pub launchable: bool,
 }
 
-/// What a person asks to run: a published job, or a command the planner resolves on the server.
+/// A person's change to the run queue: a published job, a command the planner resolves on the server, or a cancellation.
 pub enum PersonRunRequest<'a> {
     Job(&'a JobRunRequest),
     Adhoc(&'a dyn CommandPlanner, &'a AdhocRunRequest),
+    Cancel(&'a CancelRunRequest),
 }

@@ -1,7 +1,5 @@
 """People check and launch ad-hoc commands through `sqb server`; workers run exactly what was resolved."""
 
-import json
-import sqlite3
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
@@ -16,7 +14,9 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication._test_
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.helpers import (
     duckdb_rows,
     scheduled_worker,
+    security_audit_rows,
     wait_for_run,
+    worker_statements,
 )
 from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person.helpers import (
     person_login,
@@ -29,32 +29,6 @@ WAREHOUSE_REFUSAL: str = (
     "warehouse ANALYST_XS is not configured for target development on this location; "
     "no warehouse statement ran"
 )
-
-
-def worker_statements(control_store: Path, run_id: str) -> int:
-    """Statements the run's worker invocations recorded, as the run's statement read selects them."""
-    with sqlite3.connect(control_store) as control:
-        invocations: list[str] = [
-            invocation
-            for (invocation, context) in control.execute(
-                "SELECT invocation_id, external_context FROM invocations "
-                "WHERE invocation_id LIKE 'worker/%' AND external_context IS NOT NULL"
-            ).fetchall()
-            if json.loads(context).get("run_id") == run_id
-        ]
-        assert invocations, f"run {run_id} has no worker invocation"
-        return sum(
-            control.execute(
-                "SELECT count(*) FROM statements WHERE invocation_id=? OR invocation_id LIKE ?",
-                (invocation, invocation + "/%"),
-            ).fetchone()[0]
-            for invocation in invocations
-        )
-
-
-def security_audit_rows(control_store: Path) -> int:
-    with sqlite3.connect(control_store) as control:
-        return control.execute("SELECT count(*) FROM sqb_security_audit").fetchone()[0]
 
 
 @pytest.mark.parametrize(

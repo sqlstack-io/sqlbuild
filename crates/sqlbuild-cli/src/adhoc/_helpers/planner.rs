@@ -11,8 +11,8 @@ use sqlbuild_orchestration::runs::models::{CommandPlan, PlannerResource};
 use sqlbuild_orchestration::runs::types::CommandPlanner;
 
 use crate::adhoc::constants::{
-    ADHOC_VERBS, ALLOWED_DESTS, INTEGER_CONVERTERS, POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS,
-    SELECTOR_DESTS,
+    ADHOC_VERBS, ALLOWED_DESTS, BUILD_VERB, COMMAND_DEST, INTEGER_CONVERTERS, LOAD_SOURCES_DEST,
+    POSITIVE_INTEGER_CONVERTER, REFUSED_DESTS, SELECTOR_DESTS,
 };
 use crate::argv::main::job_settings_arguments::job_settings_arguments;
 use crate::argv::main::parse_cli_arguments::parse_cli_arguments;
@@ -41,7 +41,7 @@ impl CommandPlanner for CliPlanner {
         let mut selectors: BTreeMap<&str, Vec<String>> = BTreeMap::new();
         let mut settings: BTreeMap<String, Json> = BTreeMap::new();
         for (dest, value) in &parsed.entries {
-            if bare.value(dest) == *value || dest == "command" {
+            if bare.value(dest) == *value || dest == COMMAND_DEST {
                 continue;
             }
             if let Some(selector) = SELECTOR_DESTS.iter().find(|name| **name == dest) {
@@ -50,7 +50,7 @@ impl CommandPlanner for CliPlanner {
             }
             settings.insert(dest.clone(), setting(dest, value)?);
         }
-        if verb == "build" {
+        if verb == BUILD_VERB {
             job_settings_arguments(&settings)?;
         }
         let mut select: Vec<String> = selectors.remove("select").unwrap_or_default();
@@ -127,24 +127,35 @@ fn setting(dest: &str, value: &Value) -> Result<Json, String> {
     if let Some((_, flag, reason)) = REFUSED_DESTS.iter().find(|(name, _, _)| *name == dest) {
         return Err(format!("{flag} is not available for ad-hoc runs: {reason}"));
     }
-    if dest == "load_sources" && *value == Value::Bool(true) {
+    if dest == LOAD_SOURCES_DEST && *value == Value::Bool(true) {
         return Err(
             "--load is not available for ad-hoc runs: source loads are not part of ad-hoc runs yet"
                 .into(),
         );
     }
     if !ALLOWED_DESTS.contains(&dest) {
-        return Err(format!("{dest} is not available for ad-hoc runs"));
+        return Err(format!(
+            "{} is not available for ad-hoc runs",
+            flag_of(dest)
+        ));
     }
     match value {
         Value::Bool(flag) => Ok(json!(flag)),
         Value::Int(text) => text
             .parse::<i64>()
             .map(|number| json!(number))
-            .map_err(|_| format!("{dest} must be a whole number")),
+            .map_err(|_| format!("{} must be a whole number", flag_of(dest))),
         Value::Str(text) => Ok(json!(text)),
-        _ => Err(format!("{dest} is not available for ad-hoc runs")),
+        _ => Err(format!(
+            "{} is not available for ad-hoc runs",
+            flag_of(dest)
+        )),
     }
+}
+
+/// The flag people type for a parser destination that has its own `--name` flag.
+fn flag_of(dest: &str) -> String {
+    format!("--{}", dest.replace('_', "-"))
 }
 
 /// Exact `kind:name` keys, as `sqb build` would select them from this publication.
@@ -153,21 +164,7 @@ fn resolve(
     select: &[String],
     exclude: &[String],
 ) -> Result<BTreeSet<String>, String> {
-    let graph_resources: Vec<GraphResource> = resources
-        .iter()
-        .filter_map(|resource| {
-            Some(GraphResource {
-                key: object_key(&resource.key)?,
-                deps: resource
-                    .deps
-                    .iter()
-                    .filter_map(|dep| object_key(dep))
-                    .collect(),
-                tags: resource.tags.clone(),
-                folder: resource.folder.clone(),
-            })
-        })
-        .collect();
+    let graph_resources: Vec<GraphResource> = resources.iter().filter_map(graph_resource).collect();
     let graph = build_project_graph(&graph_resources);
     let selected: BTreeSet<String> = resolve_selectors(&graph, select, exclude)
         .map_err(|error| format!("{}: {}", error.code, error.message))?
@@ -178,6 +175,21 @@ fn resolve(
         return Err("the selectors match no nodes in the current publication".into());
     }
     Ok(selected)
+}
+
+/// A published node as the selector graph sees it; keys without a kind are not selectable.
+fn graph_resource(resource: &PlannerResource) -> Option<GraphResource> {
+    Some(GraphResource {
+        key: object_key(&resource.key)?,
+        deps: resource
+            .deps
+            .iter()
+            .map(String::as_str)
+            .filter_map(object_key)
+            .collect(),
+        tags: resource.tags.clone(),
+        folder: resource.folder.clone(),
+    })
 }
 
 fn object_key(key: &str) -> Option<(String, String)> {

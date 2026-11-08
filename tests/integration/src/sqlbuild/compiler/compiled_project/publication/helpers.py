@@ -1352,3 +1352,30 @@ def audit_node_keys(api: SnapshotApi, target: str) -> frozenset[str]:
     """Keys of the current snapshot's audit nodes."""
     nodes: dict[str, Any] = current_snapshot(api, target)["nodes"]
     return frozenset(filter(lambda key: nodes[key]["kind"] == "audit", nodes))
+
+
+def worker_statements(control_store: Path, run_id: str) -> int:
+    """Statements the run's worker invocations recorded, as the run statement read selects them."""
+    with sqlite3.connect(control_store) as control:
+        invocations: list[str] = [
+            invocation
+            for (invocation,) in control.execute(
+                "SELECT invocation_id FROM invocations WHERE invocation_id LIKE 'worker/%' "
+                "AND json_extract(external_context, '$.run_id') = ?",
+                (run_id,),
+            ).fetchall()
+        ]
+        assert invocations, f"run {run_id} has no worker invocation"
+        return sum(
+            control.execute(
+                "SELECT count(*) FROM statements WHERE invocation_id=? OR invocation_id LIKE ?",
+                (invocation, invocation + "/%"),
+            ).fetchone()[0]
+            for invocation in invocations
+        )
+
+
+def security_audit_rows(control_store: Path) -> int:
+    """Rows in the security audit, so a test can show a request recorded nothing."""
+    with sqlite3.connect(control_store) as control:
+        return control.execute("SELECT count(*) FROM sqb_security_audit").fetchone()[0]

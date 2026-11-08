@@ -3,14 +3,21 @@
 /// Verbs a person may plan; workers launch only those the control plane lists.
 pub(crate) const ADHOC_VERBS: [&str; 5] = ["build", "test", "seed", "audit", "freshness"];
 
+/// The verb whose settings must also form valid job settings.
+pub(crate) const BUILD_VERB: &str = "build";
+
+/// The parser destination holding the verb itself, which is not a setting.
+pub(crate) const COMMAND_DEST: &str = "command";
+
+/// The destination `--load` and `--no-load` share; only `--no-load` is accepted.
+pub(crate) const LOAD_SOURCES_DEST: &str = "load_sources";
+
 /// Parser destinations that carry selectors, resolved to exact node keys on the server.
 pub(crate) const SELECTOR_DESTS: [&str; 3] = ["select", "exclude", "positional_select"];
 
-/// Destinations an ad-hoc run may set. Rewriting history and choosing a warehouse are gated by the
-/// control plane from the frozen settings (`run.rewrite_history`, `run.warehouse`), not here.
-pub(crate) const ALLOWED_DESTS: [&str; 28] = [
+/// Destinations an ad-hoc run may set; the control plane gates history rewrites and warehouses.
+pub(crate) const ALLOWED_DESTS: [&str; 27] = [
     "max_microbatches",
-    "changed",
     "run_tests",
     "run_audits",
     "include_python",

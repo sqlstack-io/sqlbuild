@@ -1,5 +1,4 @@
 pub mod advance_groups;
-pub mod cancel_person_run;
 pub mod change_run;
 pub mod check_adhoc_run;
 pub mod claim_next_run;
