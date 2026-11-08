@@ -140,11 +140,8 @@ impl MigrationFingerprintCache {
             None => None,
         };
         let shared_digest = if root.is_some() {
-            fingerprint_cache_shared_digest(
-                &package_version(py, "sqlbuild")?,
-                &package_version(py, "polyglot-sql-chio")?,
-            )
-            .map_err(|error| PyValueError::new_err(format!("{error:?}")))?
+            fingerprint_cache_shared_digest(&package_version(py, "sqlbuild")?)
+                .map_err(|error| PyValueError::new_err(format!("{error:?}")))?
         } else {
             String::new()
         };

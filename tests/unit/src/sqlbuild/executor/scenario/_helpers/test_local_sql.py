@@ -3,7 +3,10 @@ from __future__ import annotations
 import pytest
 
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
-from sqlbuild.executor.scenario._helpers.local.sql import convert_sql_for_local_duckdb
+from sqlbuild.executor.scenario._helpers.local.sql import (
+    convert_sql_for_local_duckdb,
+    function_sql_for_local_duckdb,
+)
 from sqlbuild.executor.scenario.constants import SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
 from sqlbuild.executor.scenario.types import LocalSqlColumns
 from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
@@ -101,6 +104,23 @@ def test_given_unconvertible_sql_when_preparing_local_scenario_sql_then_refuses_
     assert raised.value.code == SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
     for fragment in test_case.expected_message_fragments:
         assert fragment in str(raised.value)
+
+
+def test_given_snowflake_sql_function_when_preparing_local_scenario_then_refuses_with_x607() -> (
+    None
+):
+    with pytest.raises(ExecutorInputError) as raised:
+        function_sql_for_local_duckdb(
+            sql="create function order_margin(total number) returns number as 'total * 0.1'",
+            source_dialect="snowflake",
+            scenario_name="order_totals",
+            resource_kind="function",
+            resource_name="order_margin",
+        )
+
+    assert raised.value.code == SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
+    assert "function 'order_margin'" in str(raised.value)
+    assert "local execution of snowflake SQL functions is unavailable" in str(raised.value)
 
 
 if __name__ == "__main__":

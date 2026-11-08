@@ -142,10 +142,6 @@ pub(crate) fn identity_context<'py>(
             JsonValue::String(ALGORITHM_FINGERPRINT.to_owned()),
         ),
         ("sqlbuild_version", package_version(py, "sqlbuild")?),
-        (
-            "polyglot_version",
-            package_version(py, "polyglot-sql-chio")?,
-        ),
         ("python_version", orjson_value(&version_tuple)?),
         (
             "adapter_class",

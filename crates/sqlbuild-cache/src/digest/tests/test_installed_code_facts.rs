@@ -10,7 +10,7 @@ fn given_search_paths_when_reading_installed_facts_then_importlib_metadata_is_re
         InstalledCodeFactsTestCase {
             description: "nothing installed is unknown and editable",
             files: &[(0, "other.txt", "")],
-            expected_versions: ["unknown", "unknown", "unknown"],
+            expected_versions: ["unknown", "unknown"],
             expected_editable: true,
         },
         InstalledCodeFactsTestCase {
@@ -22,18 +22,9 @@ fn given_search_paths_when_reading_installed_facts_then_importlib_metadata_is_re
                     "Name: sqlbuild\nVersion: 1.2.0\n\nbody",
                 ),
                 (1, "sqlbuild-9.0.0.dist-info/METADATA", "Version: 9.0.0\n"),
-                (
-                    1,
-                    "polyglot_sql_chio-0.4.dist-info/METADATA",
-                    "version:  0.4 \n",
-                ),
-                (
-                    1,
-                    "PyYAML-6.0.2.dist-info/METADATA",
-                    "Metadata-Version: 2.1\nVersion: 6.0.2\n",
-                ),
+                (1, "pyyaml-6.0.2.dist-info/METADATA", "version:  6.0.2 \n"),
             ],
-            expected_versions: ["1.2.0", "0.4", "6.0.2"],
+            expected_versions: ["1.2.0", "6.0.2"],
             expected_editable: false,
         },
         InstalledCodeFactsTestCase {
@@ -46,7 +37,7 @@ fn given_search_paths_when_reading_installed_facts_then_importlib_metadata_is_re
                     "{\"url\": \"file:///src\", \"dir_info\": {\"editable\": true}}",
                 ),
             ],
-            expected_versions: ["1.0", "unknown", "unknown"],
+            expected_versions: ["1.0", "unknown"],
             expected_editable: true,
         },
         InstalledCodeFactsTestCase {
@@ -55,7 +46,7 @@ fn given_search_paths_when_reading_installed_facts_then_importlib_metadata_is_re
                 (0, "sqlbuild-1.0.dist-info/METADATA", "Version: 1.0\n"),
                 (0, "sqlbuild-1.0.dist-info/direct_url.json", "not json"),
             ],
-            expected_versions: ["1.0", "unknown", "unknown"],
+            expected_versions: ["1.0", "unknown"],
             expected_editable: true,
         },
     ];

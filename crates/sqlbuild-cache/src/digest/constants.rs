@@ -37,7 +37,7 @@ pub(crate) const CODE_SOURCE_SUFFIXES: &[&str] = &["py", "so", "pyd"];
 pub(crate) const BYTECODE_CACHE_DIRECTORY: &str = "__pycache__";
 
 /// Distributions whose installed versions identify the code behind cached results.
-pub const CODE_IDENTITY_DISTRIBUTIONS: [&str; 3] = ["sqlbuild", "polyglot-sql-chio", "PyYAML"];
+pub const CODE_IDENTITY_DISTRIBUTIONS: [&str; 2] = ["sqlbuild", "PyYAML"];
 /// The distribution an editable install's `direct_url.json` describes.
 pub(crate) const SQLBUILD_DISTRIBUTION: &str = "sqlbuild";
 /// The version reported for a distribution no search path holds.

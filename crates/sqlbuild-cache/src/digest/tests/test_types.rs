@@ -56,6 +56,6 @@ pub(crate) struct InstalledCodeFactsTestCase {
     pub(crate) description: &'static str,
     /// `(search path index, relative path, contents)`.
     pub(crate) files: &'static [(usize, &'static str, &'static str)],
-    pub(crate) expected_versions: [&'static str; 3],
+    pub(crate) expected_versions: [&'static str; 2],
     pub(crate) expected_editable: bool,
 }

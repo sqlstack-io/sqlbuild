@@ -8,11 +8,8 @@ use sqlbuild_core::json::errors::JsonEmitError;
 use sqlbuild_core::json::main::dumps::dumps;
 use sqlbuild_core::json::models::{JsonDialect, JsonInteger, JsonValue, StdlibJsonOptions};
 
-/// SHA-256 of the sorted JSON of the algorithm, cache version and package versions.
-pub fn fingerprint_cache_shared_digest(
-    sqlbuild_version: &str,
-    polyglot_version: &str,
-) -> Result<String, JsonEmitError> {
+/// SHA-256 of the sorted JSON of the algorithm, cache version and SQLBuild version.
+pub fn fingerprint_cache_shared_digest(sqlbuild_version: &str) -> Result<String, JsonEmitError> {
     let value = JsonValue::Object(vec![
         (
             "algorithm".to_owned(),
@@ -25,10 +22,6 @@ pub fn fingerprint_cache_shared_digest(
         (
             "sqlbuild_version".to_owned(),
             JsonValue::String(sqlbuild_version.to_owned()),
-        ),
-        (
-            "polyglot_version".to_owned(),
-            JsonValue::String(polyglot_version.to_owned()),
         ),
     ]);
     let options = StdlibJsonOptions {

@@ -21,7 +21,7 @@ fn given_key_parts_when_hashing_then_matches_stored_digests() {
             visible_renames: vec![("orders".to_owned(), "abc".to_owned())],
         },
         expected_key: "835490d6bfb10f11b9649eb56324524a30685ef55634d585940417179b4e28ad",
-        expected_shared: "ca6125db465a1a7f10fc6b210bb82bc6641998ca007324621992c1285325a121",
+        expected_shared: "5f90bf52c3459f6c880d8307b8e528cb97766198a73310cd20681ca1b06fe15f",
         expected_entry: "391ffa0fdaf437fff6e7f6d1f0fc01e5509751580667cc37f101ba020c707eb6\n{\"f\":\"fp1\",\"k\":\"k1\",\"v\":1}",
     }];
     for test_case in test_cases {
@@ -32,7 +32,7 @@ fn given_key_parts_when_hashing_then_matches_stored_digests() {
             test_case.description
         );
         assert_eq!(
-            fingerprint_cache_shared_digest("1.0", "2.0").unwrap_or_default(),
+            fingerprint_cache_shared_digest("1.0").unwrap_or_default(),
             test_case.expected_shared,
             "{}",
             test_case.description

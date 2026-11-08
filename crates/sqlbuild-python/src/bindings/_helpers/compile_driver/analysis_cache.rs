@@ -45,10 +45,6 @@ pub(crate) fn analysis_cache_context<'py>(
     shared.set_item("cache_version", ANALYSIS_CACHE_VERSION)?;
     shared.set_item("sqlbuild_version", package_version(py, "sqlbuild")?)?;
     shared.set_item(
-        "polyglot_version",
-        package_version(py, "polyglot-sql-chio")?,
-    )?;
-    shared.set_item(
         "python_version",
         imported(py, "platform", "python_version_tuple")?
             .call0()?

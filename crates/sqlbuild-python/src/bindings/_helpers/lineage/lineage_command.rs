@@ -57,7 +57,7 @@ use crate::bindings::_helpers::records::registry;
 
 const UNKNOWN_SELECTOR_ERROR_CODE: &str = "S007";
 const RICH_MODE: &str = "rich";
-const ANALYSIS_HELP: &str = "enable SQL analysis or install SQLBuild with Polyglot support";
+const ANALYSIS_HELP: &str = "enable SQL analysis";
 /// Selector views every planner selector function reads.
 const GRAPH_VIEW_NAMES: [&str; 5] = [
     "all_keys",
