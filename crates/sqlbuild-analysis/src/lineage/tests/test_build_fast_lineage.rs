@@ -196,7 +196,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
             expected_detail: Some("Expected 1 statement, found 2"),
         },
         ParsedLineageTestCase {
-            description: "truncated T-SQL reports its parse error",
+            description: "truncated T-SQL reports its parse error where SQL Server's 156 does, at IF",
             sql: "SELECT IF(region > 1, re",
             dialect: Some("tsql"),
             inferred_columns: &[],
@@ -204,7 +204,7 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
             expected_lines: &[],
             expected_has_star: false,
             expected_detail: Some(
-                "Parse error at line 1, column 25: Expected ')' to close the IF condition",
+                "the tsql parser cannot read Incorrect syntax near 'IF'. at line 1, column 8",
             ),
         },
         ParsedLineageTestCase {
