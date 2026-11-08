@@ -1,3 +1,5 @@
+#[path = "tests/test_clickhouse_dialect.rs"]
+mod test_clickhouse_dialect;
 #[path = "tests/test_clickhouse_type_match.rs"]
 mod test_clickhouse_type_match;
 #[path = "tests/test_native_dialect.rs"]

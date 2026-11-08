@@ -125,3 +125,7 @@ impl LineageSchema for StandInSchema {
             .then_some(self.columns.as_slice())
     }
 }
+
+/// ClickHouse, whose SQL SQLQuack's ClickHouse parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct ClickHouseDialect;
