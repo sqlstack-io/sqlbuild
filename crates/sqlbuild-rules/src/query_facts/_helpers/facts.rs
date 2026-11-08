@@ -1,33 +1,47 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    MAX_FUNCTION_CALL_DEPTH, TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
+    DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT,
+    TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
     ModelShape, ParsedFixture, QueryFacts, RelationFacts, SelectFacts, SetFacts, SourceText,
 };
-use polyglot_sql::dialects::Dialect;
-use polyglot_sql::expressions::{Identifier, Literal, Select, TableRef, With};
-use polyglot_sql::{ComplexityGuardOptions, Expression, ExpressionWalk, ParseOptions};
-use sqlbuild_analysis::lineage::main::parser_dialect::parser_dialect;
+use sqlquack_syntax::expressions::names::models::{Identifier, Literal, TableRef};
+use sqlquack_syntax::expressions::queries::models::{Select, With};
+use sqlquack_syntax::{CallMode, ComplexityGuardOptions, Dialect, Expression, ExpressionWalk, ParseOptions};
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
+/// The SQLQuack grammar that reads `dialect_name` for built-in rules, or `None` when none does.
+pub(crate) fn facts_dialect(dialect_name: &str) -> Option<Dialect> {
+    if DUCKDB_DIALECTS.contains(&dialect_name) {
+        return Some(Dialect::DuckDB);
+    }
+    if POSTGRES_DIALECTS.contains(&dialect_name) {
+        return Some(Dialect::PostgreSQL);
+    }
+    match dialect_name {
+        SNOWFLAKE_DIALECT => Some(Dialect::Snowflake),
+        SQLITE_DIALECT => Some(Dialect::SQLite),
+        _ => None,
+    }
+}
+
 fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), String> {
-    let dialect_type = parser_dialect(Some(dialect_name))
-        .map_err(|unknown| format!("unknown dialect {unknown}"))?;
-    let dialect = Dialect::get(dialect_type);
+    let dialect = facts_dialect(dialect_name)
+        .ok_or_else(|| format!("no SQL parser for dialect {dialect_name}"))?;
     let options = ParseOptions {
         complexity_guard: Some(ComplexityGuardOptions {
             max_function_call_depth: Some(MAX_FUNCTION_CALL_DEPTH),
             ..Default::default()
         }),
     };
-    let mut statements = dialect
-        .parse_with_options(sql, &options)
-        .map_err(|error| error.to_string())?;
+    let mut statements =
+        sqlquack_syntax::parse_statements_with(sql, dialect, &options, CallMode::FaithfulLocated)
+            .map_err(|error| error.to_string())?;
     if statements.len() != 1 {
         return Err("expected one statement".to_owned());
     }
@@ -38,16 +52,18 @@ fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), S
     Ok((statement, dialect))
 }
 
+fn code_tokens(sql: &str, dialect: Dialect) -> Result<QueryTokens<'_>, String> {
+    let tokens = sqlquack_syntax::tokenize(sql, dialect).map_err(|error| error.to_string())?;
+    Ok(QueryTokens::new(tokens, sql))
+}
+
 /// Parse a stubbed SQL-test fixture as one query.
 pub(crate) fn parse_fixture(
     shape: ModelShape,
     dialect_name: &str,
 ) -> Result<ParsedFixture, String> {
     let (statement, dialect) = parse_query(&shape.sql, dialect_name)?;
-    let tokens = dialect
-        .tokenize(&shape.sql)
-        .map_err(|error| error.to_string())?;
-    let tokens = QueryTokens::new(tokens, &shape.sql);
+    let tokens = code_tokens(&shape.sql, dialect)?;
     let selects = tokens.selects();
     let order = tokens.top_level_word("ORDER").unwrap_or(tokens.len());
     let order_end = ["LIMIT", "OFFSET", "FETCH"]
@@ -72,15 +88,13 @@ pub(crate) fn parse_fixture(
     })
 }
 
-/// Parse normalized model SQL with Polyglot and read the facts built-in rules evaluate.
+/// Parse normalized model SQL with SQLQuack and read the facts built-in rules evaluate.
 pub(crate) fn query_facts(sql: &str, dialect_name: &str) -> Result<QueryFacts, String> {
     let (statement, dialect) = parse_query(sql, dialect_name)?;
-    let tokens = dialect.tokenize(sql).map_err(|error| error.to_string())?;
-    let tokens = QueryTokens::new(tokens, sql);
+    let tokens = code_tokens(sql, dialect)?;
     let builder = Builder {
         selects: tokens.selects(),
         tokens,
-        dialect,
         spans: RefCell::default(),
         cursor: Cell::default(),
         claimed: RefCell::default(),
@@ -104,7 +118,6 @@ fn is_query(expression: &Expression) -> bool {
 struct Builder<'a> {
     tokens: QueryTokens<'a>,
     selects: Vec<SelectTokens>,
-    dialect: Dialect,
     spans: RefCell<HashMap<*const Expression, Option<ComparisonSpan>>>,
     cursor: Cell<usize>,
     claimed: RefCell<HashSet<usize>>,
@@ -303,18 +316,9 @@ impl Builder<'_> {
         let range = item.map(|item| self.tokens.expression_range(item, alias.is_some()));
         let unwrapped = unwrap_paren(value);
         let cast_type = match unwrapped {
-            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => {
-                Some(
-                    range
-                        .as_ref()
-                        .and_then(|range| self.tokens.cast_type(range))
-                        .unwrap_or_else(|| {
-                            self.dialect
-                                .generate(&Expression::DataType(cast.to.clone()))
-                                .unwrap_or_default()
-                        }),
-                )
-            }
+            Expression::Cast(_) | Expression::TryCast(_) | Expression::SafeCast(_) => range
+                .as_ref()
+                .and_then(|range| self.tokens.cast_type(range)),
             _ => None,
         };
         ItemFacts::Expression(ExpressionItem {
@@ -361,15 +365,13 @@ impl Builder<'_> {
         if let Some(span) = self.spans.borrow().get(&key) {
             return *span;
         }
-        let anchors = anchors(parts);
-        let generated = if anchors == (None, None) {
-            self.dialect.generate(node).unwrap_or_default()
-        } else {
-            String::new()
+        let anchors = match anchors(parts) {
+            (None, None) => (node.source_span().map(|span| span.start), None),
+            anchors => anchors,
         };
         let span = self
             .tokens
-            .comparison_range(parts.operator, anchors, parts.negated, &generated);
+            .comparison_range(parts.operator, anchors, parts.negated);
         self.spans.borrow_mut().insert(key, span);
         span
     }
@@ -404,7 +406,10 @@ impl Builder<'_> {
         let mut fact = ComparisonFacts {
             span,
             generated_sql: if span.is_none() {
-                self.dialect.generate(node).unwrap_or_default()
+                node.source_span()
+                    .and_then(|span| self.tokens.slice(span.start, span.end))
+                    .unwrap_or_default()
+                    .to_owned()
             } else {
                 String::new()
             },
@@ -432,7 +437,8 @@ impl Builder<'_> {
                     if let Some(generated) = string_literal(literal) {
                         let position = string_tokens
                             .iter()
-                            .position(|(_, _, text)| *text == literal.value_str());
+                            .position(|(_, _, text)| *text == generated)
+                            .or_else(|| (!string_tokens.is_empty()).then_some(0));
                         let range = position.map(|index| {
                             let (start, end, _) = string_tokens.remove(index);
                             (start, end)
@@ -668,7 +674,7 @@ fn own_span(expression: &Expression) -> Option<usize> {
         Expression::Column(column) => column.span.or(column.name.span),
         Expression::Identifier(identifier) => identifier.span,
         Expression::Star(star) => star.table.as_ref().and_then(|table| table.span),
-        Expression::Function(function) => function.span,
+        Expression::Function(function) => function.span.0,
         Expression::Table(table) => table
             .catalog
             .as_ref()
@@ -692,7 +698,7 @@ fn span_bounds(expression: &Expression) -> Option<(usize, usize)> {
             Expression::Column(column) => column.span.or(column.name.span),
             Expression::Identifier(identifier) => identifier.span,
             Expression::Star(star) => star.table.as_ref().and_then(|table| table.span),
-            Expression::Function(function) => function.span,
+            Expression::Function(function) => function.span.0,
             Expression::Count(count) => count.span,
             Expression::Table(table) => table.name.span,
             _ => None,
