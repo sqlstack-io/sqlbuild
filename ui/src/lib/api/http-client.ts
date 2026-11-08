@@ -5,11 +5,11 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toNodeRuns } from './http-catalog';
 import { toSnapshotChanges } from './http-changes';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
+import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunEvent, toRunNode, toRunOutput, toRuns, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
-import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
+import type { Job, JobDetail, RerunMode, Run, RunDetail, RunEventPage, RunListQuery, RunOutputLine, RunRowPage, RunRowQuery, RunStatement, RunTabCounts, StatementSql, Trigger, TriggerDetail, TriggerState } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -23,6 +23,10 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRuns',
 	'getRun',
 	'getRunDetail',
+	'listRunEvents',
+	'listRunStatements',
+	'getStatementSql',
+	'listRunOutput',
 	'cancelRun',
 	'rerunRun',
 	'listJobs',
@@ -191,6 +195,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
 	let sqlLocations = new Set<string>();
 	const sqlRefused = new Set<string>();
+	// The same for run output, which needs view.evidence on every node the run selected.
+	let evidenceLocations = new Set<string>();
+	const outputRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -200,6 +207,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			const bootstrap = toBootstrap(data);
 			sqlLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.sql')).map((l) => l.id));
+			evidenceLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.evidence')).map((l) => l.id));
 			return bootstrap;
 		},
 		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> => runRowPage(await listedRuns(scope), scope.locationId, query),
@@ -212,6 +220,42 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const owners = [run, ...listed.filter((r) => r.parentRunId === run.id)];
 			const nodes = (await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))))).flat();
 			return runDetailOf(run, wire, listed, nodes);
+		},
+		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
+			const limit = query.limit ?? 1000;
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
+				params: { path: runPath(scope, runId), query: { after: query.after, limit } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
+		},
+		async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements', { params: { path: runPath(scope, runId) } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toRunStatements(data, runId);
+		},
+		async getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!sqlLocations.has(scope.locationId) || sqlRefused.has(refusal)) throw new ApiError('You may not view the SQL of this run', 403);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql', {
+				params: { path: runPath(scope, runId), query: { statement_id: statementId } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) sqlRefused.add(refusal);
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { statementId: data.statement_id, sql: data.sql ?? null };
+		},
+		async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return [];
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output', { params: { path: runPath(scope, runId) } });
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) outputRefused.add(refusal);
+			if (response.status === 403) return [];
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toRunOutput(data);
 		},
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
@@ -337,6 +381,11 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return detail;
 		}
 	};
+
+	function runPath(scope: Scope, runId: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		return { location_id: locationId, target, run_id: runId };
+	}
 
 	async function listedJobs(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);

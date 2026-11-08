@@ -133,6 +133,28 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                     )
                 })
                 .collect();
+            for part in [
+                "events",
+                "statements",
+                "statements/sql?statement_id=s",
+                "output",
+            ] {
+                cases.push((
+                    format!("run {part}"),
+                    "view",
+                    vec![
+                        (
+                            read(inventory, &format!("runs/{}/{part}", queued.run_id)),
+                            None,
+                        ),
+                        (read(inventory, &format!("runs/{unknown_run}/{part}")), None),
+                        (
+                            read(roles.location_id, &format!("runs/{unknown_run}/{part}")),
+                            None,
+                        ),
+                    ],
+                ));
+            }
             cases.extend([
                 (
                     "run nodes".to_owned(),

@@ -5,3 +5,7 @@ pub mod read_person_checks;
 pub mod read_person_maintenance;
 pub mod read_person_microbatch_coverage;
 pub mod read_person_node_runs;
+pub mod read_person_run_events;
+pub mod read_person_run_output;
+pub mod read_person_run_statement_sql;
+pub mod read_person_run_statements;

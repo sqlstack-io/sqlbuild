@@ -19,7 +19,7 @@
 	const shownOutput = $derived(filtering ? output.filter((l) => view.selected.some((k) => l.text.includes(k))) : output);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 
-	const TABS = $derived(bottomTabs(app.client));
+	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c)));
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});

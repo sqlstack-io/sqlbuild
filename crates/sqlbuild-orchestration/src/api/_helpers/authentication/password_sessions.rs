@@ -138,6 +138,22 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_operations::node_status),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events",
+            get(crate::api::_helpers::resources::person_reads::run_events),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements",
+            get(crate::api::_helpers::resources::person_reads::run_statements),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql",
+            get(crate::api::_helpers::resources::person_reads::run_statement_sql),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output",
+            get(crate::api::_helpers::resources::person_reads::run_output),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs",
             get(crate::api::_helpers::resources::person_reads::node_runs),
         )

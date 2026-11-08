@@ -482,6 +482,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRunEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes": {
         parameters: {
             query?: never;
@@ -490,6 +506,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonRunNodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonRunStatements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunStatementSql"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1683,8 +1747,39 @@ export interface components {
             claim_id: string;
             request: components["schemas"]["RunRequest"];
         };
+        RunErrorText: {
+            error_type?: string | null;
+            invocation_id: string;
+            message: string;
+            occurred_at?: string | null;
+        };
         /** @enum {string} */
         RunEventKind: "completed" | "success" | "warn" | "partial" | "failed" | "cancelled";
+        /** @description Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text. */
+        RunEventRecord: {
+            /** Format: int64 */
+            affected_rows?: number | null;
+            /** Format: double */
+            duration_ms?: number | null;
+            error_code?: string | null;
+            error_type?: string | null;
+            event_id: string;
+            event_type: string;
+            invocation_id: string;
+            occurred_at: string;
+            outcome?: string | null;
+            producer?: string | null;
+            resource_attempt_id?: string | null;
+            resource_id?: string | null;
+            resource_kind?: string | null;
+            resource_name?: string | null;
+            /** Format: int64 */
+            row_count?: number | null;
+            severity?: string | null;
+            statement_id?: string | null;
+            /** Format: int64 */
+            storage_id: number;
+        };
         /** @description Workers compile locally and compare against this immutable snapshot, not the current deploy. */
         RunExecution: {
             claim: components["schemas"]["RunClaim"];
@@ -1719,6 +1814,21 @@ export interface components {
          * @enum {string}
          */
         RunOutcome: "success" | "warn" | "partial" | "failed" | "cancelled";
+        /** @description Captured output and error text of a run's invocations; both can quote warehouse data. */
+        RunOutput: {
+            /** @description Invocation failures and error diagnostics, oldest first. */
+            errors: components["schemas"]["RunErrorText"][];
+            /** @description The newest captured lines per invocation, oldest first. */
+            lines: components["schemas"]["RunOutputLine"][];
+        };
+        RunOutputLine: {
+            invocation_id: string;
+            occurred_at: string;
+            /** Format: int64 */
+            sequence: number;
+            stream: string;
+            text: string;
+        };
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
@@ -1800,6 +1910,36 @@ export interface components {
             trigger_id?: string | null;
             window?: null | components["schemas"]["RunWindow"];
             write_set: string[];
+        };
+        /** @description Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text. */
+        RunStatementRecord: {
+            /** Format: int64 */
+            affected_rows?: number | null;
+            /** Format: double */
+            duration_ms?: number | null;
+            ended_at?: string | null;
+            error_code?: string | null;
+            error_type?: string | null;
+            intent?: string | null;
+            invocation_id: string;
+            outcome?: string | null;
+            purpose?: string | null;
+            query_id?: string | null;
+            resource_id?: string | null;
+            resource_kind?: string | null;
+            resource_name?: string | null;
+            /** Format: int64 */
+            row_count?: number | null;
+            sql_available: boolean;
+            sql_unavailable_reason?: string | null;
+            started_at?: string | null;
+            statement_id: string;
+            statement_kind?: string | null;
+        };
+        /** @description One statement's executed SQL; `sql` is null when capture was off or retention dropped it. */
+        RunStatementSql: {
+            sql?: string | null;
+            statement_id: string;
         };
         /** @enum {string} */
         RunStatus: "queued" | "launched" | "running" | "unresponsive" | "success" | "warn" | "partial" | "failed" | "cancelled";
@@ -3354,6 +3494,57 @@ export interface operations {
             };
         };
     };
+    listPersonRunEvents: {
+        parameters: {
+            query?: {
+                /** @description Return events after this storage cursor */
+                after?: number;
+                /** @description Maximum events; defaults to 1000, capped at 5000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event metadata oldest first, without payloads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunEventRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listPersonRunNodes: {
         parameters: {
             query?: never;
@@ -3391,6 +3582,150 @@ export interface operations {
                 };
             };
             /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOutput"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPersonRunStatements: {
+        parameters: {
+            query?: {
+                /** @description Maximum statements; defaults to 1000, capped at 5000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Statement metadata in start order, without SQL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatementRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunStatementSql: {
+        parameters: {
+            query: {
+                /** @description One statement of this run */
+                statement_id: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStatementSql"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.sql on every node the run selected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Run or statement not found */
             404: {
                 headers: {
                     [name: string]: unknown;
