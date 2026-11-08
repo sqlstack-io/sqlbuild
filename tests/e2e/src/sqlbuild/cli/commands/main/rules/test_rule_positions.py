@@ -140,7 +140,24 @@ def test_given_model_query_layout_when_running_rules_then_findings_use_file_posi
                 "Star/3:o.*,",
                 "Subquery/3:(SEL",
             ),
-        )
+        ),
+        SyntaxTreeRuleE2ETestCase(
+            description="Snowflake reads relation markers as tables at their source positions",
+            adapter="snowflake",
+            model_sql=(
+                'MODEL (description "Orders", database analytics, schema analytics);\n'
+                'WITH c AS (SELECT * FROM __ref("customers"))\n'
+                'SELECT o.*, c.name FROM __ref("raw_orders") o JOIN c ON o.id = c.id\n'
+            ),
+            other_models={
+                name: (
+                    f'MODEL (description "{name}", database analytics, schema analytics);\n'
+                    "SELECT 1 AS id, 'a' AS name\n"
+                )
+                for name in ("customers", "raw_orders")
+            },
+            expected_messages=("CTE/2:c AS", "Join/2:JOIN", "Star/2:SELE", "Star/2:o.*,"),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -150,7 +167,11 @@ def test_given_custom_rule_over_the_syntax_tree_when_compiling_then_nodes_point_
     write_custom_rule_project(
         project_dir=tmp_path,
         selected_rules=("XSQBRTREE001",),
-        files=(("rules/tree.py", _TREE_RULE),),
+        files=(
+            ("rules/tree.py", _TREE_RULE),
+            *((f"models/{name}.sql", sql) for name, sql in test_case.other_models.items()),
+        ),
+        adapter=test_case.adapter,
     )
     (tmp_path / "models" / "orders.sql").write_text(test_case.model_sql, encoding="utf-8")
 

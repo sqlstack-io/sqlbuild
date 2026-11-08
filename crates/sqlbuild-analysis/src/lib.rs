@@ -37,6 +37,7 @@ pub mod python_plan;
 pub mod python_selection;
 pub mod python_values;
 pub mod query_analysis;
+pub mod relation_markers;
 pub mod relation_names;
 pub mod required_columns;
 pub mod resource_diagnostics;
