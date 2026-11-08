@@ -4,10 +4,14 @@ use crate::analysis_route::models::PostgresDialect;
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
-pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] =
-    &[(POSTGRES_DIALECT, &PostgresDialect)];
+pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
+    (POSTGRES_DIALECT, &PostgresDialect),
+    (POSTGRESQL_DIALECT, &PostgresDialect),
+];
 /// PostgreSQL's analysis dialect name.
 pub(crate) const POSTGRES_DIALECT: &str = "postgres";
+/// The name compile assembly gives PostgreSQL's analysis dialect, which routes the same way.
+pub(crate) const POSTGRESQL_DIALECT: &str = "postgresql";
 /// The stub prefix PostgreSQL reads as one unquoted name.
 pub(crate) const POSTGRES_STUB_PREFIX: &str = "__sqlbuild_";
 /// `format_type`'s time and timestamp names, `(name, zone words, respelt)`, around any precision.

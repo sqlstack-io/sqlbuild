@@ -17,6 +17,11 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
             expected_legacy: false,
         },
         RouteTestCase {
+            description: "postgresql, the name compile assembly gives postgres",
+            dialect: Some("postgresql"),
+            expected_legacy: false,
+        },
+        RouteTestCase {
             description: "snowflake",
             dialect: Some("snowflake"),
             expected_legacy: true,
