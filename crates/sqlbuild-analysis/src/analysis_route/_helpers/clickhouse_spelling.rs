@@ -1,21 +1,43 @@
-//! A ClickHouse type as written, respelt so SQLBuild's type fallback gives Polyglot's canonical name.
+//! A ClickHouse type as written, normalized as Polyglot normalizes it for ClickHouse.
 
 use crate::analysis_route::constants::{
     CLICKHOUSE_TYPE_ALIASES, CLICKHOUSE_VERBATIM_TYPES, NULLABLE_WRAPPER,
 };
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
-/// `spelling` with each SQL alias Polyglot renames respelt, or as written when none applies.
-pub(crate) fn clickhouse_spelling(spelling: &str) -> Option<String> {
+/// `spelling` with each SQL alias Polyglot renames respelt and read by the type fallback, with
+/// Polyglot's family for a top-level alias the fallback types differently; `None` when empty.
+pub(crate) fn clickhouse_spelling(spelling: &str) -> Option<NormalizedType> {
     let written: &str = spelling.trim();
     if written.is_empty() {
         return None;
     }
     let mut renamed: bool = false;
-    let respelt: Option<String> = respelt(written, &mut renamed);
-    Some(match respelt {
-        Some(respelt) if renamed => respelt,
-        _ => written.to_owned(),
-    })
+    let respelt: Option<String> = respelt(written, &mut renamed).filter(|_| renamed);
+    let text: &str = respelt.as_deref().unwrap_or(written);
+    let mut normalized: NormalizedType = normalize_text_type(text, None);
+    let family: Option<TypeFamily> = respelt
+        .as_ref()
+        .and(type_name(written))
+        .and_then(|(name, _)| alias_family(&name));
+    if let Some(family) = family {
+        normalized.normalized_name = text
+            .to_uppercase()
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect();
+        normalized.family = family;
+    }
+    Some(normalized)
+}
+
+/// Polyglot's family for a top-level alias whose family the type fallback misreads.
+fn alias_family(name: &str) -> Option<TypeFamily> {
+    CLICKHOUSE_TYPE_ALIASES
+        .iter()
+        .find(|(alias, _, _)| alias.eq_ignore_ascii_case(name))
+        .and_then(|(_, _, family)| *family)
 }
 
 /// One type: its name, renamed through the alias table, and its arguments, each type respelt.
@@ -98,8 +120,8 @@ fn type_name(written: &str) -> Option<(String, &str)> {
 fn alias(name: &str) -> Option<&'static str> {
     CLICKHOUSE_TYPE_ALIASES
         .iter()
-        .find(|(alias, _)| alias.eq_ignore_ascii_case(name))
-        .map(|(_, template)| *template)
+        .find(|(alias, _, _)| alias.eq_ignore_ascii_case(name))
+        .map(|(_, template, _)| *template)
 }
 
 /// The top-level comma-separated arguments, with commas inside quotes or parentheses kept.

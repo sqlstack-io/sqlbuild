@@ -1,12 +1,9 @@
+use crate::analysis_route::constants::CLICKHOUSE_DIALECT;
 use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::models::{ClickHouseDialect, LocatedGap, TypeMatch};
-use crate::analysis_route::tests::test_types::{
-    ClickHouseSpellingTestCase, NativeGapTestCase, TypeMatchTestCase,
-};
+use crate::analysis_route::tests::test_types::{NativeGapTestCase, TypeMatchTestCase};
 use crate::assembly::project::models::SyntaxCheck;
-use crate::type_system::_helpers::dialects::coerce_type_dialect;
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
-use crate::type_system::models::TypeFamily;
+use crate::type_system::main::normalize_type::normalize_type;
 
 #[test]
 fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadable_sql_has_a_gap() {
@@ -87,70 +84,119 @@ fn given_invalid_clickhouse_sql_when_probing_the_native_parser_then_it_has_a_gap
     );
 }
 
+/// Type spellings from SQLBuild's compiled ClickHouse corpus, with case, nesting and width variants.
+const CLICKHOUSE_SPELLINGS: &[&str] = &[
+    "Array(INT(11))",
+    "Array(Int32)",
+    "Array(String)",
+    "BIGINT",
+    "BIGINT(20)",
+    "BIGINT(20) UNSIGNED",
+    "BINARY",
+    "BINARY(5)",
+    "BOOLEAN",
+    "Bool",
+    "CHAR",
+    "DATE",
+    "DECIMAL(10,2)",
+    "DOUBLE",
+    "DOUBLE PRECISION",
+    "DOUBLE(10,2)",
+    "Date32",
+    "DateTime",
+    "DateTime('UTC')",
+    "DateTime64( 6 , 'Europe/Amsterdam' )",
+    "DateTime64(3)",
+    "DateTime64(3, 'UTC')",
+    "DateTime64(3,'UTC')",
+    "Decimal",
+    "Decimal(10, 2)",
+    "Decimal(38, 4)",
+    "Decimal32(2)",
+    "FLOAT",
+    "FLOAT(12)",
+    "FLOAT(53)",
+    "FixedString",
+    "FixedString(3)",
+    "FixedString(4)",
+    "Float32",
+    "Float64",
+    "Float64(3)",
+    "INT UNSIGNED",
+    "INT(11)",
+    "INTEGER",
+    "INTEGER(11)",
+    "IPv4",
+    "Int128",
+    "Int16",
+    "Int32",
+    "Int32(11)",
+    "Int64",
+    "Int8",
+    "JSON",
+    "LowCardinality(Nullable(String))",
+    "LowCardinality(String)",
+    "Map(String, Int64)",
+    "NUMERIC(10)",
+    "NUMERIC(12, 3)",
+    "Nothing",
+    "Nullable(DateTime64(3,'UTC'))",
+    "Nullable(Int32)",
+    "Nullable(Int64)",
+    "Nullable(String)",
+    "REAL",
+    "SMALLINT",
+    "SMALLINT(5)",
+    "String",
+    "TEXT",
+    "TIMESTAMP",
+    "TINYINT",
+    "TINYINT(1)",
+    "UInt16",
+    "UInt256",
+    "UInt32",
+    "UInt64",
+    "UInt8",
+    "UUID",
+    "VARCHAR",
+    "VARCHAR(10)",
+    "VARCHAR(22)",
+    "int",
+    "Float",
+    "double",
+    "timestamp",
+    "varchar(5)",
+    "boolean",
+    "Array(Nullable(INT))",
+    "Tuple(a INT)",
+    "Enum8('a' = 1)",
+    "Nullable(INT)",
+    "LowCardinality(VARCHAR)",
+    "REAL(5)",
+    "TIMESTAMP(3)",
+    "DECIMAL(10)",
+    "numeric",
+    "Map(String, BIGINT)",
+    "Array(Array(TEXT))",
+    "Nullable(TIMESTAMP)",
+    "Array(VARCHAR(10))",
+    "Array(BOOLEAN)",
+    "LowCardinality(INT)",
+    "Nullable(Nullable(INT))",
+    "Nullable(BOOLEAN)",
+    "Tuple(INT, VARCHAR)",
+];
+
 #[test]
-fn given_a_clickhouse_type_when_normalising_then_the_fallback_gives_polyglots_canonical_name() {
-    let test_cases = [
-        ClickHouseSpellingTestCase {
-            description: "VARCHAR is Polyglot's STRING",
-            spelling: "VARCHAR(22)",
-            expected_name: "STRING",
-            expected_family: TypeFamily::String,
-        },
-        ClickHouseSpellingTestCase {
-            description: "BOOLEAN is Polyglot's BOOL",
-            spelling: "boolean",
-            expected_name: "BOOL",
-            expected_family: TypeFamily::Boolean,
-        },
-        ClickHouseSpellingTestCase {
-            description: "NUMERIC keeps its precision as DECIMAL",
-            spelling: "NUMERIC(10)",
-            expected_name: "DECIMAL(10)",
-            expected_family: TypeFamily::Decimal,
-        },
-        ClickHouseSpellingTestCase {
-            description: "an alias inside an array is renamed",
-            spelling: "Array(INT(11))",
-            expected_name: "ARRAY(NULLABLE(INT32))",
-            expected_family: TypeFamily::Other,
-        },
-        ClickHouseSpellingTestCase {
-            description: "an alias Polyglot makes nullable is not wrapped twice",
-            spelling: "Nullable(INT)",
-            expected_name: "NULLABLE(INT32)",
-            expected_family: TypeFamily::Other,
-        },
-        ClickHouseSpellingTestCase {
-            description: "LowCardinality keeps its argument as written",
-            spelling: "LowCardinality(VARCHAR)",
-            expected_name: "LOWCARDINALITY(VARCHAR)",
-            expected_family: TypeFamily::Other,
-        },
-        ClickHouseSpellingTestCase {
-            description: "an engine type keeps its spacing-free name",
-            spelling: "DateTime64(3, 'UTC')",
-            expected_name: "DATETIME64(3,'UTC')",
-            expected_family: TypeFamily::Other,
-        },
-        ClickHouseSpellingTestCase {
-            description: "INTEGER gets Polyglot's name; Polyglot's family is Integer, the fallback's Other",
-            spelling: "INTEGER",
-            expected_name: "NULLABLE(INT32)",
-            expected_family: TypeFamily::Other,
-        },
-    ];
-    for test_case in test_cases {
-        let normalized = ClickHouseDialect
-            .normalize_type(test_case.spelling)
-            .map(|spelling| normalize_with_fallback(&spelling, coerce_type_dialect("clickhouse")));
+fn given_a_clickhouse_type_when_normalising_then_it_is_polyglots_type_family_included() {
+    for spelling in CLICKHOUSE_SPELLINGS {
+        let polyglot = normalize_type(spelling, CLICKHOUSE_DIALECT)
+            .expect("Polyglot normalises every corpus spelling")
+            .normalized;
         assert_eq!(
-            normalized.map(|normalized| (normalized.normalized_name, normalized.family)),
-            Some((
-                test_case.expected_name.to_owned(),
-                test_case.expected_family
-            )),
-            "{}",
-            test_case.description
+            ClickHouseDialect.normalize_type(spelling),
+            Some(polyglot),
+            "{spelling}"
         );
     }
 }
@@ -206,9 +252,18 @@ fn given_clickhouse_contract_types_when_matching_then_aliases_compare_as_the_eng
                 test_case.inferred,
                 test_case.inferred_nullable
             ),
-            test_case.expected_match,
+            Some(test_case.expected_match),
             "{}",
             test_case.description
         );
     }
+}
+
+#[test]
+fn given_a_type_clickhouse_refuses_when_matching_then_it_is_not_compared() {
+    assert_eq!(
+        ClickHouseDialect.type_match("FixedString", "String", false),
+        None
+    );
+    assert_eq!(ClickHouseDialect.type_match("String", "Strng", false), None);
 }

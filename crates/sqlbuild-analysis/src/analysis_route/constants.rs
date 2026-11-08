@@ -2,6 +2,7 @@
 
 use crate::analysis_route::models::ClickHouseDialect;
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::models::TypeFamily;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] =
@@ -19,24 +20,29 @@ pub(crate) const CLICKHOUSE_STUB_PREFIX: &str = "__sqlbuild_";
 /// The construct of SQL holding more than one statement.
 pub(crate) const STATEMENTS_CONSTRUCT: &str = "more than one statement";
 /// Each SQL type alias whose name Polyglot respells for ClickHouse, case-insensitive, with the
-/// spelling SQLBuild's type fallback reads as Polyglot's canonical name; `{}` keeps the arguments.
-pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str)] = &[
-    ("BOOLEAN", "Bool"),
-    ("CHAR", "String"),
-    ("TEXT", "String"),
-    ("VARCHAR", "String"),
-    ("NUMERIC", "Decimal{}"),
-    ("BINARY", "Nullable(BINARY{})"),
-    ("TINYINT", "Nullable(Int8)"),
-    ("SMALLINT", "Nullable(Int16)"),
-    ("INT", "Nullable(Int32)"),
-    ("INTEGER", "Nullable(Int32)"),
-    ("BIGINT", "Nullable(Int64)"),
-    ("REAL", "Nullable(Float32){}"),
-    ("FLOAT", "Nullable(Float32){}"),
-    ("DOUBLE", "Nullable(Float64){}"),
-    ("DOUBLE PRECISION", "Nullable(Float64){}"),
-    ("TIMESTAMP", "DateTime{}"),
+/// spelling SQLBuild's type fallback reads as Polyglot's canonical name (`{}` keeps the arguments)
+/// and, where the fallback's family differs from Polyglot's, Polyglot's family at the top level.
+pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str, Option<TypeFamily>)] = &[
+    ("BOOLEAN", "Bool", None),
+    ("CHAR", "String", None),
+    ("TEXT", "String", None),
+    ("VARCHAR", "String", None),
+    ("NUMERIC", "Decimal{}", None),
+    ("BINARY", "Nullable(BINARY{})", None),
+    ("TINYINT", "Nullable(Int8)", Some(TypeFamily::Integer)),
+    ("SMALLINT", "Nullable(Int16)", Some(TypeFamily::Integer)),
+    ("INT", "Nullable(Int32)", Some(TypeFamily::Integer)),
+    ("INTEGER", "Nullable(Int32)", Some(TypeFamily::Integer)),
+    ("BIGINT", "Nullable(Int64)", Some(TypeFamily::Integer)),
+    ("REAL", "Nullable(Float32){}", Some(TypeFamily::Float)),
+    ("FLOAT", "Nullable(Float32){}", Some(TypeFamily::Float)),
+    ("DOUBLE", "Nullable(Float64){}", Some(TypeFamily::Float)),
+    (
+        "DOUBLE PRECISION",
+        "Nullable(Float64){}",
+        Some(TypeFamily::Float),
+    ),
+    ("TIMESTAMP", "DateTime{}", Some(TypeFamily::Timestamp)),
 ];
 /// The ClickHouse types whose arguments Polyglot keeps as written, aliases unrenamed.
 pub(crate) const CLICKHOUSE_VERBATIM_TYPES: &[&str] = &["LowCardinality", "Tuple"];

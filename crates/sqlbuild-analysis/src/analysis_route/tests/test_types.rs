@@ -1,6 +1,5 @@
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
-use crate::type_system::models::TypeFamily;
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -57,11 +56,4 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred: &'static str,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
-}
-
-pub(super) struct ClickHouseSpellingTestCase {
-    pub(super) description: &'static str,
-    pub(super) spelling: &'static str,
-    pub(super) expected_name: &'static str,
-    pub(super) expected_family: TypeFamily,
 }

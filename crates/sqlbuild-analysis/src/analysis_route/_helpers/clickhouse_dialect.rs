@@ -13,6 +13,7 @@ use crate::analysis_route::constants::{
 use crate::analysis_route::main::clickhouse_type_match::clickhouse_type_match;
 use crate::analysis_route::models::{ClickHouseDialect, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::models::NormalizedType;
 
 impl NativeDialect for ClickHouseDialect {
     fn name(&self) -> &'static str {
@@ -54,18 +55,26 @@ impl ClickHouseDialect {
         &CLICKHOUSE
     }
 
-    /// A type spelt so the type fallback gives Polyglot's canonical name; `None` when empty.
+    /// A type normalized as Polyglot normalizes it for ClickHouse; `None` when empty.
     #[must_use]
-    pub fn normalize_type(&self, spelling: &str) -> Option<String> {
+    pub fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         clickhouse_spelling(spelling)
     }
 
     /// A declared and an inferred type compared as ClickHouse's `toTypeName` spells them, wrappers
-    /// apart: Polyglot's spellings wrap SQL aliases such as `INTEGER` in `Nullable`, the engine's don't.
+    /// apart: Polyglot's spellings wrap SQL aliases such as `INTEGER` in `Nullable`, the engine's
+    /// don't. `None`, not compared, when either side is no type ClickHouse accepts.
     #[must_use]
-    pub fn type_match(&self, declared: &str, inferred: &str, inferred_nullable: bool) -> TypeMatch {
-        let spelled =
-            |written: &str| clickhouse_type(written).unwrap_or_else(|| written.to_owned());
-        clickhouse_type_match(&spelled(declared), &spelled(inferred), inferred_nullable)
+    pub fn type_match(
+        &self,
+        declared: &str,
+        inferred: &str,
+        inferred_nullable: bool,
+    ) -> Option<TypeMatch> {
+        Some(clickhouse_type_match(
+            &clickhouse_type(declared)?,
+            &clickhouse_type(inferred)?,
+            inferred_nullable,
+        ))
     }
 }
