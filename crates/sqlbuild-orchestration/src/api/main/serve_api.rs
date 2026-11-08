@@ -7,11 +7,9 @@ use crate::api::_helpers::authentication::{bearer::local_request, configure::con
 use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
-use crate::api::models::{
-    ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource, GroupRole,
-};
+use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole};
 use crate::authorization::main::publish_group_roles::publish_group_roles;
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
@@ -23,7 +21,7 @@ pub async fn serve_api(
     listener: tokio::net::TcpListener,
     (authentication, (images, planner), retention): (
         ApiAuthentication,
-        (Vec<DockerImageSource>, std::sync::Arc<dyn CommandPlanner>),
+        RunHandoff,
         StatisticsRetention,
     ),
     (ready, shutdown): (

@@ -11,3 +11,9 @@ pub trait CommandPlanner: Send + Sync {
         resources: &[PlannerResource],
     ) -> Result<CommandPlan, String>;
 }
+
+/// What the API hands runs to workers with: their Docker images and the command planner.
+pub type RunHandoff = (
+    Vec<crate::api::models::DockerImageSource>,
+    std::sync::Arc<dyn CommandPlanner>,
+);
