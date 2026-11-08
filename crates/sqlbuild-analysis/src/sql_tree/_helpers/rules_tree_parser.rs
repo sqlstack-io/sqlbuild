@@ -1,7 +1,4 @@
 //! `rules_tree_parser`: the parser that reads a dialect's SQL for rules.
-//!
-//! A dialect is added here, one line, only once its parser passes the depth probe with an empty
-//! allowlist; BigQuery is next, after its depth work lands.
 
 use sqlquack_syntax::Dialect;
 
@@ -12,6 +9,7 @@ use crate::sql_tree::models::TreeParser;
 
 /// The parser for `dialect`, or `None` when SQLQuack parses none of it; becomes `analysis_route` once a native module registers.
 pub(crate) fn rules_tree_parser(dialect: &str) -> Option<TreeParser> {
+    // Add a dialect (one line) only once its parser passes the depth probe with an empty allowlist.
     if POSTGRES_DIALECTS.contains(&dialect) {
         return Some(TreeParser::Postgres);
     }

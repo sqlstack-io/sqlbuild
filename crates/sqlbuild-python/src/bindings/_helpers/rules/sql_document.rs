@@ -25,9 +25,7 @@ struct Tree {
     children: Vec<Vec<usize>>,
 }
 
-/// One node of a rule's SQL syntax tree, held as an index into its shared tree.
-///
-/// No node owns another, so freeing a deep tree never recurses.
+/// One node of a rule's SQL syntax tree: an index into its shared tree, so freeing never recurses.
 #[pyclass(module = "sqlbuild._native", frozen)]
 pub(crate) struct SqlTreeNode {
     tree: Arc<Tree>,
