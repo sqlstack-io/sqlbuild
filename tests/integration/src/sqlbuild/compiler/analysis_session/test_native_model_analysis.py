@@ -368,36 +368,22 @@ def test_given_cyclic_models_when_analysing_natively_then_session_answers_and_ca
             lineage_mode=ColumnLineageMode.RICH,
             expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
         ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_typed_source_when_analysing_natively_then_its_columns_are_typed(
-    test_case: SourceTypesTestCase, tmp_path: Path
-) -> None:
-    assert (
-        first_model_types(
-            files=test_case.files, lineage_mode=test_case.lineage_mode, tmp_path=tmp_path
-        )
-        == test_case.expected_types
-    )
-
-
-@pytest.mark.xfail(
-    strict=True, reason="native analysis reads only authoritative shapes, not declared types"
-)
-@pytest.mark.parametrize(
-    "test_case",
-    [
         SourceTypesTestCase(
             description="a source's declared types type the columns read from it",
             files=_DECLARED_SOURCE_PROJECT,
             lineage_mode=ColumnLineageMode.RICH,
             expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
         ),
+        SourceTypesTestCase(
+            description="a source's declared types type its reads in fast lineage too",
+            files=_DECLARED_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_pending_declared_source_types_when_analysing_natively_then_columns_are_typed(
+def test_given_typed_source_when_analysing_natively_then_its_columns_are_typed(
     test_case: SourceTypesTestCase, tmp_path: Path
 ) -> None:
     assert (
