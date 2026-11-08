@@ -8,7 +8,7 @@ use crate::analysis_route::tests::test_types::{
 use crate::assembly::project::models::SyntaxCheck;
 
 #[test]
-fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
+fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_legacy_path() {
     let test_cases = [
         RouteTestCase {
             description: "postgres",
@@ -36,9 +36,9 @@ fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
             expected_legacy: true,
         },
         RouteTestCase {
-            description: "databricks",
+            description: "databricks, read by SQLQuack's Databricks SQL parser",
             dialect: Some("databricks"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "clickhouse",

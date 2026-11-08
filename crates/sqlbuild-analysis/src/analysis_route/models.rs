@@ -11,11 +11,17 @@ pub enum AnalysisRoute {
     Native(&'static dyn NativeDialect),
 }
 
-/// The first construct a native parser cannot read, and its byte offset in the SQL it read.
+/// The first construct or error that stops a native parser.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParserGap {
+    /// The construct, such as `PIVOT`, or the parser's error message.
     pub construct: String,
+    /// The parser's message as the engine words it.
+    pub message: String,
+    /// Byte offset in the SQL given to `parse`.
     pub offset: usize,
+    /// Whether the parser reports invalid syntax, not an unsupported construct or a limit.
+    pub syntax: bool,
 }
 
 /// A gap with the line and column, from 1, of its offset in the analysed SQL.
@@ -33,3 +39,7 @@ pub struct TypeMatch {
     /// The inferred column may be null, but its declared type does not allow it.
     pub nullable_into_non_null: bool,
 }
+
+/// Databricks, whose SQL SQLQuack's Databricks SQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct DatabricksDialect;

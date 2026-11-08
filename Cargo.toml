@@ -174,6 +174,10 @@ sqlbuild-recall = { path = "crates/sqlbuild-recall" }
 sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
+# SQLQuack's native parsers and semantics, on the analysis route; a branch revision until launch.
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "4fb11060adbb186ceeb813299dc51c80460a6489" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "4fb11060adbb186ceeb813299dc51c80460a6489" }
+sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "4fb11060adbb186ceeb813299dc51c80460a6489" }
 # SQL lint Rules, quality Rules, the formatter and the canonical token stream.
 sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656d247277a30bc81ef39b6dee420e721221" }
 stacker = "0.1"

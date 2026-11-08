@@ -1,3 +1,8 @@
+use sqlquack_semantics::dialects::constants::POSTGRES;
+use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_syntax::expressions::names::models::Identifier;
+use sqlquack_syntax::{Expression, Parsed};
+
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 
@@ -31,7 +36,11 @@ impl NativeDialect for PivotlessDialect {
         "postgres"
     }
 
-    fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild."
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
         let refused = ["PIVOT", "@@@", "__sqlbuild_udf_", "__cursor_", "@'"]
             .iter()
             .filter_map(|word| sql.find(word).map(|offset| (offset, *word)))
@@ -39,14 +48,23 @@ impl NativeDialect for PivotlessDialect {
         match refused {
             Some((offset, word)) => Err(ParserGap {
                 construct: word.to_owned(),
+                message: word.to_owned(),
                 offset,
+                syntax: false,
             }),
-            None => Ok(()),
+            None => Ok(Parsed {
+                statements: vec![Expression::Identifier(Identifier::new(sql.to_owned()))],
+                gaps: Vec::new(),
+            }),
         }
     }
 
-    fn stub_prefix(&self) -> &'static str {
-        "__sqlbuild."
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &POSTGRES
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<String> {
+        Some(spelling.to_owned())
     }
 }
 
@@ -56,4 +74,15 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred: &'static str,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
+}
+
+pub(super) struct ReadWholeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_gap: Option<(&'static str, usize, bool)>,
+}
+
+pub(super) struct NormalizeTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
 }

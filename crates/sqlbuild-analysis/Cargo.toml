@@ -25,6 +25,9 @@ sqlbuild-model-config.workspace = true
 sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
+sqlquack-semantics.workspace = true
+sqlquack-syntax.workspace = true
+sqlquack-syntax-databricks.workspace = true
 sqlclean.workspace = true
 
 [lints]
