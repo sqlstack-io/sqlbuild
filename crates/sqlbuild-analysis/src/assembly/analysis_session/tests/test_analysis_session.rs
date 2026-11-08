@@ -445,6 +445,20 @@ fn given_dynamic_pivots_when_proving_then_matches_python_or_defers() {
             ),
         },
         PivotTestCase {
+            description: "a Snowflake cast aggregate renders its target type",
+            dialect: "snowflake",
+            sql: "WITH base AS (SELECT customer_id, status, amount FROM __source(\"raw_orders\")) \
+                SELECT * FROM base \
+                PIVOT (MAX(CAST(amount AS DECIMAL(12, 2))) FOR status IN (ANY ORDER BY status))",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: proven(
+                &[("customer_id", "INTEGER", "non_null")],
+                Some("DECIMAL(12, 2)"),
+                "raw_orders",
+                false,
+            ),
+        },
+        PivotTestCase {
             description: "a passthrough redeclaring the upstream families",
             dialect: "duckdb",
             sql: "SELECT * FROM __ref(\"status_amounts\")",

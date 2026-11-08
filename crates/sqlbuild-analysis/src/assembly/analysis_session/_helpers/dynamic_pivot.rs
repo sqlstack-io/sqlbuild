@@ -7,14 +7,15 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlquack_syntax::{CallMode, Dialect, Expression, ParseOptions};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
-    parse_one_or_error, payload, relation_name, render_type, to_dict, truthy, upper,
+    payload, relation_name, render_type, truthy, upper,
 };
 use crate::assembly::analysis_session::constants::{
     ALIAS_AST_KIND, CAST_AST_KIND, DUCKDB_DIALECT, DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT,
-    PIVOT_AST_KIND, QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS,
+    PIVOT_AST_KIND, QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT,
     SUPPORTED_PIVOT_DIALECTS, TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::models::{
@@ -115,11 +116,33 @@ pub(crate) fn pivot_outcome(
     .map_err(|reason| native_failure(PIVOT_CONTEXT, &reason))
 }
 
-/// Python's `parse_one(...).to_dict()`, or the parse error Python reports.
+/// The one statement of `sql` as SQLQuack's tagged JSON tree, or why it does not parse.
 fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
-    parse_one_or_error(sql, dialect)?
-        .map(|expression| to_dict(&expression))
-        .map_or_else(|error| Ok(Err(error)), |value| value.map(Ok))
+    let dialect: Dialect = if dialect == SNOWFLAKE_DIALECT {
+        Dialect::Snowflake
+    } else {
+        Dialect::DuckDB
+    };
+    let parsed = sqlquack_syntax::parse_statements_with(
+        sql,
+        dialect,
+        &ParseOptions::default(),
+        CallMode::Faithful,
+    );
+    let mut statements: Vec<Expression> = match parsed {
+        Ok(statements) => statements,
+        Err(error) => return Ok(Err(error.to_string())),
+    };
+    if statements.len() != 1 {
+        return Ok(Err(format!(
+            "Expected 1 statement, found {}",
+            statements.len()
+        )));
+    }
+    let statement: Expression = statements.pop().ok_or_else(|| "no statement".to_owned())?;
+    serde_json::to_value(statement)
+        .map(Ok)
+        .map_err(|error| error.to_string())
 }
 
 fn proof(
@@ -362,6 +385,18 @@ fn has_dynamic_values(field: &Value) -> bool {
         .any(|value| DYNAMIC_VALUE_SOURCE_KINDS.contains(&node_key(Some(value))))
 }
 
+/// The one argument of a call SQLQuack keeps by name, such as Snowflake's `SUM(amount)`.
+fn sole_argument(payload: &Map<String, Value>) -> Option<&Value> {
+    match payload
+        .get("args")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+    {
+        Some([argument]) => Some(argument),
+        _ => None,
+    }
+}
+
 /// Python's `_aggregate_fact`: aggregate name, value column and type-preserving inferred type.
 fn aggregate_fact<'a>(
     aggregate: &'a Value,
@@ -380,7 +415,7 @@ fn aggregate_fact<'a>(
         name = upper(authored);
     }
     let preserving: bool = TYPE_PRESERVING_AGGREGATES.contains(&name.as_str());
-    let value: Option<&Value> = payload.get("this");
+    let value: Option<&Value> = payload.get("this").or_else(|| sole_argument(payload));
     let mut value_name: Option<&str> = column_name(value);
     let mut inferred: Option<String> = None;
     let cast: Option<&Map<String, Value>> = value

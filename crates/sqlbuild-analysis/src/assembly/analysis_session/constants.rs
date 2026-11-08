@@ -63,6 +63,7 @@ pub(crate) const SUPPORTED_PIVOT_DIALECTS: [&str; 3] = ["duckdb", "motherduck", 
 pub(crate) const SIMPLIFIED_PIVOT_DIALECTS: [&str; 2] = ["duckdb", "motherduck"];
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 pub(crate) const MOTHERDUCK_DIALECT: &str = "motherduck";
+pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// The `to_dict()` node keys Python's dynamic pivot proof walks.
 pub(crate) const PIVOT_AST_KIND: &str = "pivot";
 pub(crate) const SELECT_AST_KIND: &str = "select";
