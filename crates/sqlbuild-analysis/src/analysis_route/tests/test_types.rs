@@ -30,8 +30,7 @@ pub(super) struct SkippedAnalysisTestCase {
     pub(super) expected_message: &'static str,
 }
 
-/// A test dialect over the PostgreSQL parser that also refuses PIVOT, unfilled placeholders and
-/// one-part stubs, keeps SQL after `RAW ` as raw text, and refuses the type `NOT_A_TYPE`.
+/// The PostgreSQL parser, refusing PIVOT, placeholders, one-part stubs and the type `NOT_A_TYPE`.
 pub(super) struct PivotlessDialect;
 
 impl NativeDialect for PivotlessDialect {
@@ -81,8 +80,7 @@ impl NativeDialect for PivotlessDialect {
     }
 }
 
-/// DuckDB's shared parser under the DuckDB profile, which knows DuckDB's keyword-only functions, as
-/// MotherDuck projects are analysed.
+/// DuckDB's shared parser under the DuckDB profile, as MotherDuck projects are analysed.
 pub(super) struct CataloguedDialect;
 
 impl NativeDialect for CataloguedDialect {
@@ -152,4 +150,34 @@ pub(super) struct MacroBodyTestCase {
     pub(super) body: &'static str,
     /// `(construct, offset in the body)` of the gap, when the body is not read.
     pub(super) expected_gap: Option<(&'static str, usize)>,
+}
+
+pub(super) struct UnavailableAnalysisTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: Option<&'static str>,
+    pub(super) expected_message: &'static str,
+}
+
+/// Each output's name, transform code, confidence code and the columns it reads.
+type ExpectedLineage = &'static [(&'static str, u8, u8, &'static [&'static str])];
+
+pub(super) struct LineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_lineage: ExpectedLineage,
+    pub(super) expected_row_sources: &'static [(&'static str, &'static str)],
+}
+
+pub(super) struct ColumnTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// Each output's name, type and nullability.
+    pub(super) expected_columns: &'static [(&'static str, Option<&'static str>, &'static str)],
+}
+
+pub(super) struct StarTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// Whether it projects a star, whether every star column is known, and the column count.
+    pub(super) expected_star: (bool, bool, usize),
 }

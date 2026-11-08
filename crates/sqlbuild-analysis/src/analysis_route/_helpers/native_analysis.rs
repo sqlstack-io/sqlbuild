@@ -1,7 +1,8 @@
 //! The provided native analysis: sqlquack-semantics lineage and findings as SQLBuild's facts.
 
 use sqlquack_semantics::lineage::models::{
-    LineageContext, NameFinding, Nullability, OutputLineage, QueryLineage, TransformKind,
+    LineageContext, NameFinding, Nullability, OutputLineage, QueryLineage, SourceColumn,
+    TransformKind,
 };
 use sqlquack_semantics::{statement_lineage, statement_name_findings};
 use sqlquack_syntax::Expression;
@@ -15,7 +16,7 @@ use crate::assembly::analysis_session::constants::{
     TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, UNKNOWN_NULLABILITY,
 };
 use crate::assembly::analysis_session::models::{ColumnFact, LineageRow};
-use crate::semantic_validation::main::diagnostics::sqlbuild_code;
+use crate::semantic_validation::main::sqlbuild_code::sqlbuild_code;
 use crate::semantic_validation::models::DiagnosticRow;
 
 /// The analysis of `statement`, the one statement of `input.sql`, under `dialect`'s profile.
@@ -73,9 +74,7 @@ fn column_fact<D: NativeDialect + ?Sized>(dialect: &D, output: &OutputLineage) -
     }
 }
 
-/// An output column's lineage over the model's referenced resources, as the legacy rows give it:
-/// columns of relations the model does not reference are left out, and a column reading none of
-/// its references is of unknown confidence unless it is a constant.
+/// An output column's lineage over the model's referenced resources, as the legacy rows give it.
 fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) -> LineageRow {
     let transform_code: u8 = match output.kind {
         TransformKind::Constant => TRANSFORM_CONSTANT,
@@ -87,18 +86,7 @@ fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) 
     let sources: Vec<(String, String, String)> = output
         .sources
         .iter()
-        .filter_map(|source| {
-            references
-                .iter()
-                .find(|(analysis_name, _, _)| *analysis_name == source.relation)
-                .map(|(_, resource_type, resource_name)| {
-                    (
-                        resource_type.clone(),
-                        resource_name.clone(),
-                        source.column.clone(),
-                    )
-                })
-        })
+        .filter_map(|source| referenced_source(source, references))
         .collect();
     let confidence_code: u8 = if sources.is_empty() && transform_code != TRANSFORM_CONSTANT {
         CONFIDENCE_UNKNOWN
@@ -115,8 +103,22 @@ fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) 
     }
 }
 
-/// A finding in SQLBuild's code at its position in `input.sql`; `None` for a code SQLBuild does
-/// not report, and for an unknown function the dialect declares as an extension.
+/// `(resource type, resource name, column)` of a source column the model references.
+fn referenced_source(
+    source: &SourceColumn,
+    references: &[(String, String, String)],
+) -> Option<(String, String, String)> {
+    let (_, resource_type, resource_name) = references
+        .iter()
+        .find(|(analysis_name, _, _)| *analysis_name == source.relation)?;
+    Some((
+        resource_type.clone(),
+        resource_name.clone(),
+        source.column.clone(),
+    ))
+}
+
+/// A finding in SQLBuild's code at its position in `input.sql`, unless SQLBuild does not report it.
 fn diagnostic_row(input: &AnalysisInput<'_>, finding: NameFinding) -> Option<DiagnosticRow> {
     if finding.code == UNKNOWN_FUNCTION_CODE
         && input
@@ -145,8 +147,7 @@ fn diagnostic_row(input: &AnalysisInput<'_>, finding: NameFinding) -> Option<Dia
     })
 }
 
-/// The function an unknown-function finding names: the name as written when the finding keeps
-/// it, else the one its message quotes, as in `Unknown function 'NAME' for dialect DuckDB`.
+/// The function an unknown-function finding names, as written or as its message quotes it.
 fn function_name(finding: &NameFinding) -> &str {
     if finding.written.is_empty() {
         finding.message.split('\'').nth(1).unwrap_or_default()

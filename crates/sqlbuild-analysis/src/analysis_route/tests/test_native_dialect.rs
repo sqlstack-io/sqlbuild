@@ -1,47 +1,12 @@
-use crate::analysis_route::main::skipped_analysis::{skipped_analysis, unavailable_analysis};
-use crate::analysis_route::models::{
-    AnalysisInput, LocatedGap, NativeAnalysis, StandInSchema, TypeMatch,
-};
+use crate::analysis_route::main::unavailable_analysis::unavailable_analysis;
+use crate::analysis_route::models::{NativeAnalysis, TypeMatch};
+use crate::analysis_route::tests::helpers::{analysed, resource_columns};
 use crate::analysis_route::tests::test_types::{
-    CataloguedDialect, FindingTestCase, MacroBodyTestCase, NativeTypeMatchTestCase,
-    PivotlessDialect, ReadWholeTestCase,
+    CataloguedDialect, ColumnTestCase, FindingTestCase, LineageTestCase, MacroBodyTestCase,
+    NativeTypeMatchTestCase, PivotlessDialect, ReadWholeTestCase, StarTestCase,
+    UnavailableAnalysisTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
-use crate::assembly::analysis_session::models::LineageRow;
-
-/// `orders` with a non-null INTEGER id and a nullable VARCHAR status.
-fn orders() -> StandInSchema {
-    StandInSchema::new(
-        "orders",
-        &[("id", "INTEGER", false), ("status", "VARCHAR", true)],
-    )
-}
-
-/// The analysis of `sql` over `orders`, which the model references as the model `shop.orders`.
-fn analysed(
-    dialect: &dyn NativeDialect,
-    sql: &str,
-    extension_functions: &[&str],
-) -> NativeAnalysis {
-    let schema: StandInSchema = orders();
-    let references: [(String, String, String); 1] = [(
-        "orders".to_owned(),
-        "model".to_owned(),
-        "shop.orders".to_owned(),
-    )];
-    let extension_functions: Vec<String> = extension_functions
-        .iter()
-        .map(|name| (*name).to_owned())
-        .collect();
-    dialect
-        .analyse(&AnalysisInput {
-            sql,
-            schema: &schema,
-            references: &references,
-            extension_functions: &extension_functions,
-        })
-        .expect("the test query is read whole")
-}
 
 #[test]
 fn given_sql_when_reading_it_whole_then_only_one_parsed_statement_without_a_gap_is_read() {
@@ -147,38 +112,29 @@ fn given_a_type_the_dialect_refuses_when_matching_types_then_nothing_is_compared
 }
 
 #[test]
-fn given_a_parser_message_or_no_parser_when_skipping_analysis_then_p026_says_why() {
-    let syntax: LocatedGap = LocatedGap {
-        construct: "syntax error".to_owned(),
-        message: "syntax error at or near \"FROM\"".to_owned(),
-        line: 1,
-        column: 15,
-        syntax: true,
-    };
-    assert_eq!(
-        skipped_analysis("orders", "postgres", &syntax),
-        (
-            "P026",
-            "SQL analysis skipped for model 'orders': the postgres parser cannot read syntax \
-             error at line 1, column 15: syntax error at or near \"FROM\""
-                .to_owned()
-        ),
-        "the parser's message follows the construct"
-    );
-    assert_eq!(
-        unavailable_analysis("orders", Some("trino")),
-        (
-            "P026",
-            "SQL analysis skipped for model 'orders': no native parser reads the trino dialect"
-                .to_owned()
-        ),
-        "an unknown dialect is named"
-    );
-    assert_eq!(
-        unavailable_analysis("orders", None).1,
-        "SQL analysis skipped for model 'orders': no native parser reads the generic dialect",
-        "no dialect is the generic dialect"
-    );
+fn given_no_native_parser_when_skipping_analysis_then_p026_names_the_dialect() {
+    let test_cases = [
+        UnavailableAnalysisTestCase {
+            description: "an unknown dialect is named",
+            dialect: Some("trino"),
+            expected_message: "SQL analysis skipped for model 'orders': no native parser reads \
+                               the trino dialect",
+        },
+        UnavailableAnalysisTestCase {
+            description: "no dialect is the generic dialect",
+            dialect: None,
+            expected_message: "SQL analysis skipped for model 'orders': no native parser reads \
+                               the generic dialect",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            unavailable_analysis("orders", test_case.dialect),
+            ("P026", test_case.expected_message.to_owned()),
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
@@ -228,109 +184,146 @@ fn given_findings_when_analysing_then_they_take_sqlbuild_codes_and_positions() {
         },
     ];
     for test_case in test_cases {
-        let findings: Vec<(String, Option<usize>, Option<usize>)> = analysed(
+        let analysis: NativeAnalysis = analysed(
             test_case.dialect,
             test_case.sql,
             test_case.extension_functions,
-        )
-        .diagnostics
-        .into_iter()
-        .map(|row| (row.code, row.line, row.column))
-        .collect();
-        let expected: Vec<(String, Option<usize>, Option<usize>)> = test_case
-            .expected_findings
+        );
+        let findings: Vec<(&str, Option<(usize, usize)>)> = analysis
+            .diagnostics
             .iter()
-            .map(|&(code, position)| {
-                (
-                    code.to_owned(),
-                    position.map(|(line, _)| line),
-                    position.map(|(_, column)| column),
-                )
-            })
+            .map(|row| (row.code.as_str(), row.line.zip(row.column)))
             .collect();
-        assert_eq!(findings, expected, "{}", test_case.description);
+        assert_eq!(
+            findings, test_case.expected_findings,
+            "{}",
+            test_case.description
+        );
     }
 }
 
 #[test]
 fn given_a_query_over_referenced_columns_when_analysing_then_lineage_reads_the_resources() {
-    let analysis: NativeAnalysis = analysed(
-        &PivotlessDialect,
-        "SELECT id, CAST(id AS TEXT) AS id_text, 1 AS one, nope FROM orders WHERE status = 'paid'",
-        &[],
-    );
-    let source = |column: &str| {
-        (
-            "model".to_owned(),
-            "shop.orders".to_owned(),
-            column.to_owned(),
-        )
-    };
-    assert_eq!(
-        analysis.lineage,
-        vec![
-            LineageRow {
-                output_column: "id".to_owned(),
-                transform_code: 0,
-                confidence_code: 1,
-                sources: vec![source("id")],
-            },
-            LineageRow {
-                output_column: "id_text".to_owned(),
-                transform_code: 1,
-                confidence_code: 1,
-                sources: vec![source("id")],
-            },
-            LineageRow {
-                output_column: "one".to_owned(),
-                transform_code: 5,
-                confidence_code: 1,
-                sources: Vec::new(),
-            },
-            LineageRow {
-                output_column: "nope".to_owned(),
-                transform_code: 0,
-                confidence_code: 2,
-                sources: vec![source("nope")],
-            },
-        ],
-        "direct, cast and constant columns read the referenced model; an unresolved column is \
-         read from the one relation at medium confidence"
-    );
-    assert_eq!(
-        analysis.row_sources,
-        vec![("orders".to_owned(), "status".to_owned())],
-        "the filter's column decides rows"
-    );
-    assert_eq!(
-        (
-            analysis.columns[0].data_type.clone(),
-            analysis.columns[0].nullability.as_str()
-        ),
-        (
-            PivotlessDialect
-                .normalize_type("INTEGER")
-                .map(|normalized| normalized.normalized_name),
-            "non_null"
-        ),
-        "a column is typed through the dialect and keeps the schema's nullability"
-    );
+    let test_cases = [
+        LineageTestCase {
+            description: "direct, cast and constant columns read the model; an unresolved one is \
+                          read from the one relation at medium confidence",
+            sql: "SELECT id, CAST(id AS TEXT) AS id_text, 1 AS one, nope FROM orders \
+                  WHERE status = 'paid'",
+            expected_lineage: &[
+                ("id", 0, 1, &["id"]),
+                ("id_text", 1, 1, &["id"]),
+                ("one", 5, 1, &[]),
+                ("nope", 0, 2, &["nope"]),
+            ],
+            expected_row_sources: &[("orders", "status")],
+        },
+        LineageTestCase {
+            description: "a query without a filter has no columns deciding rows",
+            sql: "SELECT status FROM orders",
+            expected_lineage: &[("status", 0, 1, &["status"])],
+            expected_row_sources: &[],
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(&PivotlessDialect, test_case.sql, &[]);
+        let lineage: Vec<(&str, u8, u8, Vec<&str>)> = analysis
+            .lineage
+            .iter()
+            .map(|row| {
+                (
+                    row.output_column.as_str(),
+                    row.transform_code,
+                    row.confidence_code,
+                    resource_columns(row),
+                )
+            })
+            .collect();
+        let row_sources: Vec<(&str, &str)> = analysis
+            .row_sources
+            .iter()
+            .map(|(relation, column)| (relation.as_str(), column.as_str()))
+            .collect();
+        assert_eq!(
+            (lineage, row_sources),
+            (
+                test_case
+                    .expected_lineage
+                    .iter()
+                    .map(|&(name, transform, confidence, columns)| {
+                        (name, transform, confidence, columns.to_vec())
+                    })
+                    .collect::<Vec<_>>(),
+                test_case.expected_row_sources.to_vec()
+            ),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_schema_columns_when_analysing_then_they_keep_their_types_and_nullability() {
+    let test_cases = [
+        ColumnTestCase {
+            description: "a non-null INTEGER column",
+            sql: "SELECT id FROM orders",
+            expected_columns: &[("id", Some("INTEGER"), "non_null")],
+        },
+        ColumnTestCase {
+            description: "a nullable VARCHAR column",
+            sql: "SELECT status FROM orders",
+            expected_columns: &[("status", Some("VARCHAR"), "nullable")],
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(&PivotlessDialect, test_case.sql, &[]);
+        let columns: Vec<(&str, Option<&str>, &str)> = analysis
+            .columns
+            .iter()
+            .map(|column| {
+                (
+                    column.name.as_str(),
+                    column.data_type.as_deref(),
+                    column.nullability.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            columns, test_case.expected_columns,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]
 fn given_a_star_when_analysing_then_it_is_resolved_only_over_known_columns() {
-    let known: NativeAnalysis = analysed(&PivotlessDialect, "SELECT * FROM orders", &[]);
-    assert_eq!(
-        (known.has_star, known.star_resolved, known.columns.len()),
-        (true, true, 2),
-        "a star over a known relation projects its columns"
-    );
-    let unknown: NativeAnalysis = analysed(&PivotlessDialect, "SELECT * FROM elsewhere", &[]);
-    assert_eq!(
-        (unknown.has_star, unknown.star_resolved),
-        (true, false),
-        "a star over an unknown relation leaves columns out"
-    );
+    let test_cases = [
+        StarTestCase {
+            description: "a star over a known relation projects its columns",
+            sql: "SELECT * FROM orders",
+            expected_star: (true, true, 2),
+        },
+        StarTestCase {
+            description: "a star over an unknown relation leaves columns out",
+            sql: "SELECT * FROM elsewhere",
+            expected_star: (true, false, 0),
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(&PivotlessDialect, test_case.sql, &[]);
+        assert_eq!(
+            (
+                analysis.has_star,
+                analysis.star_resolved,
+                analysis.columns.len()
+            ),
+            test_case.expected_star,
+            "{}",
+            test_case.description
+        );
+    }
 }
 
 #[test]

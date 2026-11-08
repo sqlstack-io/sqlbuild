@@ -202,7 +202,6 @@ pub(crate) fn normalize_native_sql(
         let quoted: bool = non_code
             .iter()
             .any(|&(start, end)| start <= whole.start() && whole.start() < end);
-        // A cursor stub is a whole name: `x__cursor_start()` is another function.
         let glued: bool = captures.get(1).is_some()
             && normalized[..whole.start()]
                 .chars()

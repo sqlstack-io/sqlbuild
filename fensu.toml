@@ -2932,3 +2932,13 @@ reason = "The override keeps queue.Queue.put's positional protocol, which every 
 rule = "FFS201"
 path = "src/sqlbuild/orchestration_declarations/models/sensor_context.py"
 reason = "Only SensorContext lives here: invocation-local ctx.cursor assignment proposes progress, committed solely by native fenced completion. The package regression guards this declaration-only scope; class-symbol exceptions are unsupported."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSL105"
+path = "crates/sqlbuild-analysis/src/type_system/main/normalize_text_type.rs"
+reason = "Native dialect modules in analysis_route type their spellings through this entry; each dialect's module lands in its own change."
+
+[[targets.rust.rule_exceptions]]
+rule = "FPRSL105"
+path = "crates/sqlbuild-analysis/src/analysis_route/main/clickhouse_type_match.rs"
+reason = "The ClickHouse native dialect module's type_match calls this entry; that module lands in its own change."

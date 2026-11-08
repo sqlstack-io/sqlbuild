@@ -43,8 +43,7 @@ pub struct LocatedGap {
 /// How an inferred column type meets its declared type: the type itself, then its nullability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeMatch {
-    /// One side is a type the dialect cannot spell, refuses or does not know: no type finding and
-    /// no match, though the declared type alone may still forbid null.
+    /// One side's type is unknown or refused: no type finding, though null may still be forbidden.
     NotCompared {
         /// The inferred column may be null, but its declared type does not allow it.
         nullable_into_non_null: bool,
@@ -65,8 +64,7 @@ pub struct AnalysisInput<'a> {
     pub schema: &'a dyn LineageSchema,
     /// `(analysis name, resource type, resource name)` of each relation the model references.
     pub references: &'a [(String, String, String)],
-    /// Functions the dialect's catalogue cannot know, such as MotherDuck's `md_*`, matched without
-    /// case: no unknown-function finding names them, and they stay untyped.
+    /// Functions the catalogue cannot know, such as MotherDuck's `md_*`; never reported unknown.
     pub extension_functions: &'a [String],
 }
 
@@ -87,8 +85,7 @@ pub struct NativeAnalysis {
     pub diagnostics: Vec<DiagnosticRow>,
 }
 
-/// One relation of known columns, standing in for what a probe query reads, such as a macro
-/// body's arguments as the columns of `SELECT (<body>) AS b FROM <relation>`.
+/// One relation of known columns, standing in for what a probe query such as a macro's reads.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StandInSchema {
     relation: String,

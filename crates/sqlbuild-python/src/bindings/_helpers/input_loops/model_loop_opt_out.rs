@@ -5,9 +5,8 @@ use std::path::Path;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use sqlbuild_analysis::analysis_route::main::native_gap::native_gap;
-use sqlbuild_analysis::analysis_route::main::skipped_analysis::{
-    skipped_analysis, unavailable_analysis,
-};
+use sqlbuild_analysis::analysis_route::main::skipped_analysis::skipped_analysis;
+use sqlbuild_analysis::analysis_route::main::unavailable_analysis::unavailable_analysis;
 use sqlbuild_analysis::analysis_route::models::{AnalysisRoute, LocatedGap};
 use sqlbuild_analysis::analysis_route::types::NativeDialect;
 use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxMode};
@@ -99,8 +98,12 @@ pub(crate) fn skip_unreadable(
     let Some(gap) = first_gap(dialect, context, &checks)? else {
         return Ok(true);
     };
-    let (code, message) = skipped_analysis(model.name, dialect.name(), &gap);
-    report_skip(settings, context, model, code, message)?;
+    report_skip(
+        settings,
+        context,
+        model,
+        skipped_analysis(model.name, dialect.name(), &gap),
+    )?;
     Ok(false)
 }
 
@@ -111,8 +114,12 @@ pub(crate) fn skip_unavailable(
     context: &LoopContext<'_, '_>,
     model: &OptOutModel<'_, '_>,
 ) -> PyResult<()> {
-    let (code, message) = unavailable_analysis(model.name, dialect);
-    report_skip(settings, context, model, code, message)
+    report_skip(
+        settings,
+        context,
+        model,
+        unavailable_analysis(model.name, dialect),
+    )
 }
 
 /// Reports P026 as a warning, or raises it under `require_sql_analysis`.
@@ -120,8 +127,7 @@ fn report_skip(
     settings: ModelLoopSettings,
     context: &LoopContext<'_, '_>,
     model: &OptOutModel<'_, '_>,
-    code: &str,
-    message: String,
+    (code, message): (&str, String),
 ) -> PyResult<()> {
     let py: Python<'_> = model.config.py();
     let help: &str = &context.classes.syntax_help;

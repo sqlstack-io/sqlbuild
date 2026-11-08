@@ -132,21 +132,39 @@ fn given_model_sql_when_probing_the_native_parser_then_its_gap_is_located_after_
 
 #[test]
 fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_and_the_gap() {
-    let test_cases = [SkippedAnalysisTestCase {
-        description: "a PIVOT gap on line 3",
-        model: "orders_pivot",
-        dialect: "postgres",
-        gap: LocatedGap {
-            construct: "PIVOT".to_owned(),
-            message: "PIVOT".to_owned(),
-            line: 3,
-            column: 3,
-            syntax: false,
+    let test_cases = [
+        SkippedAnalysisTestCase {
+            description: "the parser's message follows the construct",
+            model: "orders",
+            dialect: "postgres",
+            gap: LocatedGap {
+                construct: "syntax error".to_owned(),
+                message: "syntax error at or near \"FROM\"".to_owned(),
+                line: 1,
+                column: 15,
+                syntax: true,
+            },
+            expected_code: "P026",
+            expected_message: "SQL analysis skipped for model 'orders': the postgres parser \
+                               cannot read syntax error at line 1, column 15: syntax error at \
+                               or near \"FROM\"",
         },
-        expected_code: "P026",
-        expected_message: "SQL analysis skipped for model 'orders_pivot': the postgres parser \
+        SkippedAnalysisTestCase {
+            description: "a PIVOT gap on line 3",
+            model: "orders_pivot",
+            dialect: "postgres",
+            gap: LocatedGap {
+                construct: "PIVOT".to_owned(),
+                message: "PIVOT".to_owned(),
+                line: 3,
+                column: 3,
+                syntax: false,
+            },
+            expected_code: "P026",
+            expected_message: "SQL analysis skipped for model 'orders_pivot': the postgres parser \
                            cannot read PIVOT at line 3, column 3",
-    }];
+        },
+    ];
     for test_case in test_cases {
         assert_eq!(
             skipped_analysis(test_case.model, test_case.dialect, &test_case.gap),

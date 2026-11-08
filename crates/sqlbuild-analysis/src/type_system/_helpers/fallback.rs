@@ -97,7 +97,6 @@ pub(crate) fn normalize_with_fallback(
         let name: &str = if bigquery { "BOOL" } else { base_type };
         return simple(name, TypeFamily::Boolean);
     }
-    // The top-level type decides the family, so a MAP or STRUCT holding a timestamp is not one.
     let top_level: &str = base_type
         .split(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
         .next()

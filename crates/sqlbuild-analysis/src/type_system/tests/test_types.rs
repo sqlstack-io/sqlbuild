@@ -30,3 +30,9 @@ pub(super) struct SameTypeTestCase {
     pub(super) types: (&'static str, &'static str),
     pub(super) expected_same: bool,
 }
+
+pub(super) struct TextFamilyTestCase {
+    pub(super) description: &'static str,
+    pub(super) type_sql: &'static str,
+    pub(super) expected_family: crate::type_system::models::TypeFamily,
+}

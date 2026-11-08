@@ -4,6 +4,7 @@ use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{Expression, Parsed};
 
 use crate::analysis_route::_helpers::native_analysis::native_analysis;
+use crate::analysis_route::_helpers::whole_gap::whole_gap;
 use crate::analysis_route::constants::{
     MACRO_BODY_PREFIX, MORE_THAN_ONE_STATEMENT, NO_STATEMENT, NOT_ONE_EXPRESSION,
     UNPARSED_STATEMENT,
@@ -25,8 +26,7 @@ pub trait NativeDialect: Sync {
     /// The dialect's sqlquack-semantics profile: how its names resolve, compare and type.
     fn profile(&self) -> &'static dyn DialectProfile;
 
-    /// A type as written in this dialect, as SQLBuild compares types; `None` when the dialect
-    /// cannot spell it or its engine refuses it, and nothing is compared against it.
+    /// A type as written in this dialect, as SQLBuild compares it; `None` when unknown or refused.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType>;
 
     /// The one statement of `sql` when the parser reads it whole: no gap, and not raw text.
@@ -49,15 +49,13 @@ pub trait NativeDialect: Sync {
         }
     }
 
-    /// The outputs, lineage and findings of the query `input.sql`, read whole, against
-    /// `input.schema`; findings are in SQLBuild's codes, as the Polyglot path reports them.
+    /// The outputs, lineage and findings of the query `input.sql` in SQLBuild's facts and codes.
     fn analyse(&self, input: &AnalysisInput<'_>) -> Result<NativeAnalysis, ParserGap> {
         let statement: Expression = self.read_whole(input.sql)?;
         Ok(native_analysis(self, &statement, input))
     }
 
-    /// A macro body's one expression, read as the projection of `SELECT <body>`; a gap's offset
-    /// is in `body`.
+    /// A macro body's one expression, read as the projection of `SELECT <body>`.
     fn macro_body(&self, body: &str) -> Result<Expression, ParserGap> {
         let statement: Expression = self
             .read_whole(&format!("{MACRO_BODY_PREFIX}{body}"))
@@ -77,9 +75,7 @@ pub trait NativeDialect: Sync {
         }
     }
 
-    /// Whether a declared and an inferred type match, nullability apart; `NotCompared` when the
-    /// inferred type is unknown or `normalize_type` gives `None` for either side. An override must
-    /// keep that rule, and may still say whether the declared type alone forbids null.
+    /// Whether a declared and an inferred type match; an override keeps `NotCompared` for unknowns.
     fn type_match(
         &self,
         declared: &str,
@@ -99,15 +95,5 @@ pub trait NativeDialect: Sync {
                 nullable_into_non_null: false,
             },
         }
-    }
-}
-
-/// A gap `read_whole` names itself, which no parser reports as invalid syntax.
-fn whole_gap(construct: &str, offset: usize) -> ParserGap {
-    ParserGap {
-        construct: construct.to_owned(),
-        message: construct.to_owned(),
-        offset,
-        syntax: false,
     }
 }
