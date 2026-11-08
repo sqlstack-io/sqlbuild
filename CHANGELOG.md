@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.200.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.199.0...v0.200.0) (2026-11-08)
+
+
+### Features
+
+* **rules:** read custom-rule SQL syntax trees from SQLQuack parsers ([#1358](https://github.com/sqlstack-io/sqlbuild/issues/1358)) ([decd291](https://github.com/sqlstack-io/sqlbuild/commit/decd29162f9a47dd59c3690dd807d111e9937511))
+
 ## [0.199.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.198.0...v0.199.0) (2026-11-08)
 
 
