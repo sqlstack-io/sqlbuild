@@ -160,8 +160,11 @@ fn canonical(data_type: &DataType) -> Option<String> {
                 scale.unwrap_or(default_scale)
             )
         }
-        DataType::Timestamp { timezone: true, .. } => "TIMESTAMP".to_owned(),
-        DataType::Timestamp { .. } => "TIMESTAMPNTZ".to_owned(),
+        DataType::Timestamp { timezone, .. } => match timezone {
+            true => "TIMESTAMP",
+            false => "TIMESTAMPNTZ",
+        }
+        .to_owned(),
         DataType::Time { .. } => "TIME".to_owned(),
         DataType::Interval { unit, to } => match (unit, to) {
             (Some(unit), Some(to)) => format!("INTERVAL {unit} TO {to}"),
