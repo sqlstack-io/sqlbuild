@@ -197,3 +197,16 @@ pub(super) struct NativeLineageTestCase {
     pub(super) placeholders: &'static [(&'static str, &'static str)],
     pub(super) expected: &'static [&'static str],
 }
+
+pub(super) struct PolyglotTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+}
+
+pub(super) struct ParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: String,
+    pub(super) expected_syntax: bool,
+    /// The byte offset of a syntax error; a limit has none worth comparing.
+    pub(super) expected_offset: Option<usize>,
+}

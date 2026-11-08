@@ -28,6 +28,7 @@ sqlbuild-sqltext.workspace = true
 sqlclean.workspace = true
 sqlquack-semantics.workspace = true
 sqlquack-syntax.workspace = true
+sqlquack-syntax-databricks.workspace = true
 sqlquack-syntax-postgres.workspace = true
 
 [lints]

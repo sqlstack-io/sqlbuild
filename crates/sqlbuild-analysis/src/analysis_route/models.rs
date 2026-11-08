@@ -122,3 +122,7 @@ impl LineageSchema for StandInSchema {
             .then_some(self.columns.as_slice())
     }
 }
+
+/// Databricks, whose SQL SQLQuack's Databricks SQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct DatabricksDialect;
