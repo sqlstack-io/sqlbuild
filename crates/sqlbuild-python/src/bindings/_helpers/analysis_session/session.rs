@@ -215,6 +215,11 @@ impl NativeModelAnalysisSession {
         self.finished.as_ref()
     }
 
+    /// Each requested model's finished outcome and dynamic pivot proof, in request order.
+    pub(crate) fn outcomes(&self) -> &[(ModelOutcome, PivotOutcome)] {
+        &self.outcomes
+    }
+
     /// The finished outcome and dynamic pivot proof of the model requested at `index`.
     pub(crate) fn outcome(&self, index: usize) -> PyResult<&(ModelOutcome, PivotOutcome)> {
         self.outcomes
