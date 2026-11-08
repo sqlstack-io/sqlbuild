@@ -3,9 +3,10 @@
 use uuid::Uuid;
 
 use crate::authorization::_helpers::person_grants::{
-    GrantDecision, decide_grant, person_role_rows, snapshot_nodes,
+    GrantDecision, decide_grant, person_role_rows,
 };
 use crate::credentials::models::{Action, DefaultRole, PermissionScope};
+use crate::snapshots::main::read_snapshot_keys::read_snapshot_keys;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -29,7 +30,7 @@ pub(crate) async fn person_lists_target(
         commit(transaction).await?;
         return Ok(false);
     };
-    let (transaction, nodes) = snapshot_nodes(
+    let (transaction, nodes) = read_snapshot_keys(
         transaction,
         serde_json::from_value(snapshot_id["snapshot_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?,

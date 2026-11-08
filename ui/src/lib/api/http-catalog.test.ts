@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, nodeJobsOf, toCatalogNodes, toColumnLineage, toNodeRuns } from './http-catalog';
 import { toCheck } from './http-checks';
 
 type W = components['schemas'];
@@ -130,5 +130,40 @@ describe('catalog node runs and jobs', () => {
 		const nodes = toCatalogNodes([node('model:orders', { materialization: 'table' })]);
 		const d = nodeDetailOf(nodes, nodes[0], null, null, [], { runs, jobs: [] });
 		expect([d.recentOutcomes, d.lastDurationMs, d.jobs]).toEqual([['success', 'failed', 'skipped'], 1500, []]);
+	});
+});
+
+describe('column lineage mapping', () => {
+	const nodes = toCatalogNodes([node('model:raw_orders', { materialization: 'view' }), node('model:orders', { materialization: 'table' })]);
+	const edge = (source: string, target: string, transform: string): W['ColumnLineageEdge'] => ({ source_key: 'model:raw_orders', source_column: source, target_key: 'model:orders', target_column: target, transform });
+
+	it('keeps a name through direct or star as a passthrough, a new name as a rename, and names any other transform', () => {
+		const lineage = toColumnLineage(
+			{
+				snapshot_id: 's',
+				nodes: [
+					{ node_key: 'model:raw_orders', kind: 'model', columns: [{ name: 'amount', data_type: null }] },
+					{ node_key: 'model:orders', kind: 'model', columns: [{ name: 'amount', data_type: 'DECIMAL(10,2)' }] },
+					{ node_key: 'model:retired', kind: 'model', columns: [] }
+				],
+				edges: [edge('id', 'id', 'direct'), edge('note', 'note', 'star'), edge('cust', 'customer_id', 'direct'), edge('amount', 'amount', 'cast')]
+			},
+			nodes
+		);
+		expect(lineage?.edges.map(([, target, lens, label]) => [target, lens, label])).toEqual([
+			['model:orders.id', 'passthrough', undefined],
+			['model:orders.note', 'passthrough', undefined],
+			['model:orders.customer_id', 'rename', undefined],
+			['model:orders.amount', 'transform', 'Cast']
+		]);
+		expect(lineage?.models.map((m) => [m.id, m.name, m.kind, m.columns])).toEqual([
+			['model:raw_orders', 'raw_orders', 'view', [{ name: 'amount', type: '' }]],
+			['model:orders', 'orders', 'table', [{ name: 'amount', type: 'DECIMAL(10,2)' }]]
+		]);
+		expect([lineage?.sql, lineage?.expressions]).toEqual([{}, {}]);
+	});
+
+	it('has nothing to show when no lineage reaches the node', () => {
+		expect(toColumnLineage({ snapshot_id: 's', nodes: [], edges: [] }, nodes)).toBeNull();
 	});
 });

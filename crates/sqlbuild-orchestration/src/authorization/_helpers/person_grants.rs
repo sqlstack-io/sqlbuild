@@ -118,26 +118,6 @@ pub(crate) fn decide_grant(
     GrantDecision::Denied(missing)
 }
 
-/// The node keys of one snapshot.
-pub(crate) async fn snapshot_nodes(
-    transaction: ControlTransaction,
-    snapshot_id: Uuid,
-) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
-    let (transaction, nodes) = query(
-        transaction,
-        "SELECT node_key FROM sqb_snapshot_nodes WHERE snapshot_id=$1",
-        vec![Parameter::Id(snapshot_id)],
-    )
-    .await?;
-    Ok((
-        transaction,
-        nodes
-            .iter()
-            .map(|row| row["node_key"].as_str().unwrap_or_default().to_owned())
-            .collect(),
-    ))
-}
-
 /// Actions granted on every node, or on at least one node of a non-empty set.
 pub(crate) fn allowed(
     rows: &[Row],

@@ -12,7 +12,7 @@
 	import { highlightSqlbuild } from '$lib/sql/highlight';
 	import { tick } from 'svelte';
 
-	type ColModel = { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src'; columns: { name: string; type: string }[] };
+	type ColModel = { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none'; columns: { name: string; type: string }[] };
 	type Lens = 'raw' | 'passthrough' | 'rename' | 'transform';
 
 	let {
@@ -24,7 +24,7 @@
 	}: {
 		focal: string;
 		models: ColModel[];
-		colEdges: [string, string, Lens][];
+		colEdges: [string, string, Lens, string?][];
 		/** per-model SQL: modelId -> SQL text */
 		modelSql?: Record<string, string>;
 		/** per-model column expressions: modelId -> { colName -> defining substring } */
@@ -70,6 +70,9 @@
 	const kindOf = (id: string) => models.find((m) => m.id === id)?.kind ?? 'table';
 	const statusOf = (id: string) => models.find((m) => m.id === id)?.status ?? 'ok';
 	const incomingLens = $derived(new Map<string, Lens>(colEdges.map(([, t, lens]) => [t, lens])));
+	// What a column's incoming edge does: the published transform, such as Cast, or the lens's name.
+	const incomingLabel = $derived(new Map<string, string>(colEdges.map(([, t, lens, label]) => [t, label ?? lensLabel[lens]])));
+	const labelOf = (cid: string) => incomingLabel.get(cid) ?? lensLabel.raw;
 
 	const focalModel = $derived(models.find((m) => m.id === focal));
 	let colQuery = $state('');
@@ -223,7 +226,7 @@
 				kind: kindOf(modelOf(cid)),
 				status: statusOf(modelOf(cid)),
 				lens: incomingLens.get(cid),
-				lensLabel,
+				label: incomingLens.has(cid) ? labelOf(cid) : undefined,
 				focal: cid === selectedCol,
 				active: cid === activeStep
 			}
@@ -284,9 +287,9 @@
 					onclick={() => (selectedCol = cid)}
 				>
 					{#if selectedCol === cid}<span class="bg-primary absolute left-0 h-5 w-[2px]"></span>{/if}
-					<span class="truncate" style:color={selectedCol === cid ? 'var(--foreground)' : 'var(--muted-foreground)'}>{c.name}</span>
-					<span class="ml-auto shrink-0 text-[11.5px]" class:text-foreground={lens === 'transform'} class:text-muted-foreground={lens !== 'transform'}>{lens ? lensLabel[lens] : ''}</span>
-					<span class="text-[var(--sb-text-faint)] w-[52px] shrink-0 text-right font-mono text-[11px]">{c.type.toLowerCase()}</span>
+					<span class="col-name" style:color={selectedCol === cid ? 'var(--foreground)' : 'var(--muted-foreground)'}>{c.name}</span>
+					<span class="ml-auto shrink-0 text-[11.5px]" class:text-foreground={lens === 'transform'} class:text-muted-foreground={lens !== 'transform'}>{lens ? labelOf(cid) : ''}</span>
+					{#if c.type}<span class="text-[var(--sb-text-faint)] shrink-0 whitespace-nowrap text-right font-mono text-[11px]">{c.type.toLowerCase()}</span>{/if}
 				</button>
 			{:else}
 				<div class="text-[var(--sb-text-faint)] px-3 py-4 text-center text-[11.5px]">No columns match.</div>
@@ -369,8 +372,8 @@
 						<li class:focal={st.depth === 0} class:active={activeStep === st.cid}>
 							<button onmouseenter={() => (hoverNode = st.cid)} onmouseleave={() => (hoverNode = null)} onclick={() => (pinnedNode = pinnedNode === st.cid ? null : st.cid)}>
 								<i></i>
-								<span class="dv-name"><span class="m">{st.model}.</span>{st.col}</span>
-								<span class="dv-lens" class:strong={st.lens === 'transform'}>{lensLabel[st.lens]}</span>
+								<span class="dv-name" title="{st.model}.{st.col}"><span class="m">{st.model}.</span>{st.col}</span>
+								<span class="dv-lens" class:strong={st.lens === 'transform'}>{labelOf(st.cid)}</span>
 								{#if st.expr && st.lens !== 'raw'}<code>{@html highlightSqlbuild(st.expr)}</code>{/if}
 							</button>
 						</li>
@@ -383,8 +386,8 @@
 							<li class:active={activeStep === st.cid}>
 								<button onmouseenter={() => (hoverNode = st.cid)} onmouseleave={() => (hoverNode = null)} onclick={() => (pinnedNode = pinnedNode === st.cid ? null : st.cid)}>
 									<i></i>
-									<span class="dv-name"><span class="m">{st.model}.</span>{st.col}</span>
-									<span class="dv-lens" class:strong={st.lens === 'transform'}>{lensLabel[st.lens]}</span>
+									<span class="dv-name" title="{st.model}.{st.col}"><span class="m">{st.model}.</span>{st.col}</span>
+									<span class="dv-lens" class:strong={st.lens === 'transform'}>{labelOf(st.cid)}</span>
 									{#if st.expr}<code>{@html highlightSqlbuild(st.expr)}</code>{/if}
 								</button>
 							</li>
@@ -394,7 +397,7 @@
 				{#if sqlParts && pinnedNode}
 					<div class="dv-sub">SQL · {sqlParts.model}.sql</div>
 					<pre class="dv-sql">{@html sqlParts.before}{#if sqlParts.match}<mark bind:this={markEl}>{@html sqlParts.match}</mark>{/if}{@html sqlParts.after}</pre>
-				{:else}
+				{:else if modelSql && Object.keys(modelSql).length}
 					<p class="dv-hint">Select a step to see it in the model's SQL.</p>
 				{/if}
 			</aside>
@@ -498,11 +501,14 @@
 		border-color: var(--primary);
 		background: var(--primary);
 	}
+	/* The identifier being traced wraps rather than truncates. */
 	.dv-name {
-		overflow: hidden;
 		font: 12.5px var(--font-mono);
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		overflow-wrap: anywhere;
+	}
+	.col-name {
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 	.dv-name .m {
 		color: var(--muted-foreground);

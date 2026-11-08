@@ -76,6 +76,13 @@ pub(crate) struct LocationWorkTestCase {
     pub(crate) expected_generation: i64,
 }
 
+pub(crate) struct ColumnLineageTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_orders_edges: Vec<(&'static str, &'static str)>,
+    pub(crate) expected_leaf_edges: usize,
+}
+
 pub(crate) struct WarehouseMetadataTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
