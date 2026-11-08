@@ -1,6 +1,7 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -9,14 +10,16 @@ use sqlbuild_core::cli_text::models::CliStyle;
 use sqlbuild_core::freshness_text::main::freshness_exit_code::freshness_exit_code;
 use sqlbuild_core::freshness_text::main::freshness_json::freshness_json;
 use sqlbuild_core::freshness_text::main::render_freshness_text::render_freshness_text;
-use sqlbuild_core::freshness_text::models::FreshnessSourceResult;
+use sqlbuild_core::freshness_text::models::{FreshnessSourceResult, FreshnessStatus};
 
 use sqlbuild_host::entries::models::AdapterHost;
+use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::freshness::freshness_observe::{PreviousState, observe_freshness};
 use crate::bindings::_helpers::freshness::observation::Observer;
@@ -255,6 +258,15 @@ fn observe(
     Ok(results)
 }
 
+/// An unreadable source or an age policy error fails; an unknown or warning age warns.
+fn source_outcome(result: &FreshnessSourceResult) -> NodeOutcome {
+    match (result.status, result.age_status.as_deref()) {
+        (FreshnessStatus::Error, _) | (_, Some("error")) => NodeOutcome::Failed,
+        (FreshnessStatus::Unknown, _) | (_, Some("warn" | "unknown")) => NodeOutcome::Warn,
+        _ => NodeOutcome::Success,
+    }
+}
+
 fn write_json_output(
     py: Python<'_>,
     payload: &str,
@@ -268,8 +280,12 @@ fn write_json_output(
     )
 }
 
-/// Run one `sqb freshness` request.
-pub(crate) fn run_freshness_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
+/// Run one `sqb freshness` request, reporting each source to a claimed run's `worker`.
+pub(crate) fn run_freshness_command(
+    py: Python<'_>,
+    request: &Bound<'_, PyAny>,
+    worker: Option<Arc<WorkerBuild>>,
+) -> PyResult<i32> {
     let fail_on_stale: bool = native_field(request, "fail_on_stale")?.extract()?;
     let fail_on_error: bool = native_field(request, "fail_on_error")?.extract()?;
     if fail_on_stale && !native_field(request, "compare_state")?.extract::<bool>()? {
@@ -312,6 +328,11 @@ pub(crate) fn run_freshness_command(py: Python<'_>, request: &Bound<'_, PyAny>) 
         )?),
     )?;
     let names: Vec<String> = selected_source_names(&graph, (&select, &exclude))?;
+    if let Some(worker) = &worker {
+        for name in &names {
+            worker.start_key(py, &format!("source:{name}"))?;
+        }
+    }
     let results: Vec<FreshnessSourceResult> = if names.is_empty() {
         Vec::new()
     } else {
@@ -322,6 +343,15 @@ pub(crate) fn run_freshness_command(py: Python<'_>, request: &Bound<'_, PyAny>) 
             &names,
         )?
     };
+    if let Some(worker) = &worker {
+        for result in &results {
+            worker.finish_key(
+                py,
+                &format!("source:{}", result.name),
+                source_outcome(result),
+            )?;
+        }
+    }
     let payload: String =
         freshness_json(&results).map_err(|error| PyValueError::new_err(format!("{error:?}")))?;
     let json_output_path: Bound<'_, PyAny> = native_field(request, "json_output_path")?;

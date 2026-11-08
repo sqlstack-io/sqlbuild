@@ -1,6 +1,7 @@
 //! `sqb seed`: compile the selected seeds, load them, and report.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 use pyo3::exceptions::PyKeyError;
@@ -25,6 +26,7 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_command_invo
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
@@ -115,6 +117,7 @@ fn connection_relay<'py>(
 /// Write each finished seed's row and its execution event.
 #[pyclass(module = "sqlbuild._native", frozen)]
 struct SeedCompletionRelay {
+    worker: Option<Arc<WorkerBuild>>,
     stream: Py<PyAny>,
     use_color: bool,
     ordinals: HashMap<String, usize>,
@@ -128,6 +131,9 @@ struct SeedCompletionRelay {
 impl SeedCompletionRelay {
     fn on_seed_complete(&self, py: Python<'_>, result: Bound<'_, PyAny>) -> PyResult<()> {
         let name: String = native_field(&result, "seed_name")?.extract()?;
+        if let Some(worker) = &self.worker {
+            worker.completed(&result, &format!("seed:{name}"))?;
+        }
         let mut result: Bound<'_, PyAny> = result;
         if let Some(projector) = &self.projector {
             let duration: Bound<'_, PyAny> = call_with(
@@ -321,7 +327,7 @@ fn write_header(
 fn load_seeds<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
-    concurrency: i64,
+    (concurrency, worker): (i64, Option<Arc<WorkerBuild>>),
 ) -> PyResult<Vec<Bound<'py, PyAny>>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = native_field(invocation, "progress_stream")?;
@@ -356,6 +362,7 @@ fn load_seeds<'py>(
     let completion: Bound<'py, SeedCompletionRelay> = Bound::new(
         py,
         SeedCompletionRelay {
+            worker,
             stream: stream.clone().unbind(),
             use_color: use_color.is_truthy()?,
             ordinals,
@@ -435,9 +442,28 @@ fn load_seeds<'py>(
 #[pyfunction]
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_seed_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
+    run_seed(py, request, None)
+}
+
+/// Run one `sqb seed` request; a claimed run's `worker` refuses seeds outside its write set.
+pub(crate) fn run_seed(
+    py: Python<'_>,
+    request: &Bound<'_, PyAny>,
+    worker: Option<Arc<WorkerBuild>>,
+) -> PyResult<i32> {
     let invocation: Bound<'_, PyAny> =
         resolve_command_invocation(request, &record_class(py, RecordId::SeedInvocation)?)?;
     let pipeline: Bound<'_, PyAny> = compile_seeds(request, &invocation)?;
+    if let Some(worker) = &worker {
+        let seeds: Vec<String> = seed_names(&pipeline)?
+            .into_iter()
+            .map(|name| format!("seed:{name}"))
+            .collect();
+        worker.enforce_writers(py, &seeds)?;
+        for seed in &seeds {
+            worker.start_key(py, seed)?;
+        }
+    }
     let concurrency: i64 = resolve_concurrency(
         &native_field(request, "concurrency")?,
         &native_field(&invocation, "discovered_inputs")?,
@@ -447,7 +473,7 @@ pub(crate) fn run_seed_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
     .max(1);
     write_header(&invocation, &pipeline, concurrency)?;
     let started: Instant = Instant::now();
-    let results: Vec<Bound<'_, PyAny>> = load_seeds(&invocation, &pipeline, concurrency)?;
+    let results: Vec<Bound<'_, PyAny>> = load_seeds(&invocation, &pipeline, (concurrency, worker))?;
     let elapsed: f64 = started.elapsed().as_secs_f64();
     let mut passed: usize = 0;
     let mut failed: usize = 0;

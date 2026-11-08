@@ -13,10 +13,10 @@ use crate::runs::_helpers::requests::permissions::{authorize_execution, executio
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
-use crate::runs::constants::{ADHOC_AUDIT_TAG, LAUNCHABLE_VERBS};
+use crate::runs::constants::ADHOC_AUDIT_TAG;
 use crate::runs::models::{
-    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunKind, RunOrigin,
-    RunRequest,
+    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunCommand, RunKind,
+    RunOrigin, RunRequest,
 };
 use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::job_write_set::job_write_set;
@@ -49,6 +49,10 @@ pub(crate) async fn frozen_adhoc_request(
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
+    let Some(command) = RunCommand::of_verb(&plan.verb) else {
+        let refusal = format!("workers do not run sqb {}", plan.verb);
+        return Ok((transaction, Err(refusal)));
+    };
     let (transaction, writers) =
         job_write_set(transaction, snapshot.snapshot_id, &plan.selection).await?;
     let (transaction, images) = query(
@@ -80,6 +84,7 @@ pub(crate) async fn frozen_adhoc_request(
                 snapshot_id: snapshot.snapshot_id,
                 image_id,
                 kind: RunKind::Adhoc,
+                command,
                 origin: RunOrigin::Manual,
                 job_key: None,
                 parent_run_id: None,
@@ -231,11 +236,6 @@ pub(in crate::runs) async fn request_adhoc_run_in(
     let (transaction, frozen) =
         frozen_adhoc_request(transaction, (&context, planner), (&check, request.run_id)).await?;
     let (verb, frozen) = frozen.map_err(ControlError::Invalid)?;
-    if !LAUNCHABLE_VERBS.contains(&verb.as_str()) {
-        return Err(ControlError::Invalid(format!(
-            "workers do not run sqb {verb} yet; only build can launch"
-        )));
-    }
     let (transaction, context) = authorize_execution(
         transaction,
         (&context, principal_id),

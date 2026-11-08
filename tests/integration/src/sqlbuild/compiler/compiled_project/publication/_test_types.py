@@ -343,6 +343,17 @@ class ChangedJobTestCase(WorkerExecutionTestCase):
 
 
 @dataclass(frozen=True)
+class AdhocVerbTestCase:
+    """An ad-hoc verb a worker runs after its prerequisites, and the run's node and check rows."""
+
+    description: str
+    prerequisites: list[list[str]]
+    command: list[str]
+    expected_selection: list[str]
+    expected_run_nodes: list[tuple[str, str, str]]
+
+
+@dataclass(frozen=True)
 class AdhocRunTestCase:
     """An ad-hoc command a person checks and launches through `sqb server`, and what follows."""
 

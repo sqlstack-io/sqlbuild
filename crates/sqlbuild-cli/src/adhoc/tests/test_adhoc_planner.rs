@@ -180,6 +180,34 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             command: &["test", "-s", "orders", "--case", "happy_path"],
             expected_plan: Ok((&["model:orders"], json!({"case": "happy_path"}))),
         },
+        AdhocPlanTestCase {
+            description: "audit settings come from the audit parser",
+            command: &["audit", "-s", "orders", "--concurrency", "2"],
+            expected_plan: Ok((&["model:orders"], json!({"concurrency": 2}))),
+        },
+        AdhocPlanTestCase {
+            description: "seed runs only the seeds its selectors reach",
+            command: &["seed", "+orders"],
+            expected_plan: Ok((&["seed:currencies"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "seed refuses a selection without seeds, which would run nothing",
+            command: &["seed", "orders"],
+            expected_plan: Err("the selectors match no seeds"),
+        },
+        AdhocPlanTestCase {
+            description: "freshness observes every source upstream of a selected model",
+            command: &["freshness", "order_totals", "--state", "--fail-on-stale"],
+            expected_plan: Ok((
+                &["source:shop.raw_orders"],
+                json!({"fail_on_stale": true, "state": true}),
+            )),
+        },
+        AdhocPlanTestCase {
+            description: "freshness excludes the sources an excluded model reads",
+            command: &["freshness", "--exclude", "orders"],
+            expected_plan: Err("no sources are selected or upstream of the selection"),
+        },
     ];
     let planner = adhoc_planner();
     for test_case in test_cases {

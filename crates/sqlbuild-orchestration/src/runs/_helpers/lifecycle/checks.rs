@@ -1,4 +1,4 @@
-//! Attached checks are recorded beside nodes, but never join the frozen execution selection.
+//! Attached checks, audits and SQL tests are recorded beside nodes, but never join the frozen execution selection.
 
 use crate::runs::constants::NODE_RUNNING;
 use crate::runs::models::{NodeOutcome, RunChange, RunChangeRequest};
@@ -16,10 +16,18 @@ pub(crate) async fn check_execution_history(
         _ => return Err(ControlError::Invalid("check fact required".into())),
     };
     let (transaction, nodes) = query(transaction,
-        "SELECT n.node_key FROM sqb_runs r JOIN sqb_snapshot_nodes n ON n.snapshot_id=r.snapshot_id \
-         WHERE r.run_id=$1 AND n.node_key=$2 AND n.node_kind='check' LIMIT 1",
+        "SELECT n.node_kind FROM sqb_runs r JOIN sqb_snapshot_nodes n ON n.snapshot_id=r.snapshot_id \
+         WHERE r.run_id=$1 AND n.node_key=$2 AND n.node_kind IN ('check','audit','sql_test') LIMIT 1",
         vec![Parameter::Id(request.run_id), Parameter::Text(node_key.clone())]).await?;
-    if !node_key.starts_with("check:") || nodes.is_empty() {
+    let attached = nodes
+        .first()
+        .and_then(|row| row["node_kind"].as_str())
+        .is_some_and(|kind| {
+            node_key
+                .strip_prefix(kind)
+                .is_some_and(|rest| rest.starts_with(':'))
+        });
+    if !attached {
         return Err(ControlError::Invalid(
             "check is outside the frozen snapshot".into(),
         ));

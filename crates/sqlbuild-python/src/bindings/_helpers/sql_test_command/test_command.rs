@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -20,6 +21,8 @@ use sqlbuild_core::test_command::main::test_outcome_status::test_outcome_status;
 use sqlbuild_core::test_command::models::{TestFailure, TestInspectionEntry, TestPlanWarning};
 use sqlbuild_host::entries::models::ExecutorHost;
 use sqlbuild_host::models::{SqlTestExecutionResult, SqlTestOutcome};
+use sqlbuild_host::types::ResultEnum;
+use sqlbuild_orchestration::runs::models::NodeOutcome;
 
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with};
@@ -42,6 +45,7 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
@@ -104,6 +108,13 @@ fn name_width(entries: &Bound<'_, PyAny>) -> PyResult<usize> {
 
 fn outcome_status(outcome: &Bound<'_, PyAny>) -> PyResult<&'static str> {
     Ok(test_outcome_status(
+        test_outcome(outcome)?.map_or("", ResultEnum::value),
+    ))
+}
+
+/// The typed outcome of a test or step outcome member; `None` for a value this build does not know.
+fn test_outcome(outcome: &Bound<'_, PyAny>) -> PyResult<Option<SqlTestOutcome>> {
+    Ok(SqlTestOutcome::from_value(
         &outcome.getattr("value")?.extract::<String>()?,
     ))
 }
@@ -163,6 +174,7 @@ fn entry_group(entry: &Bound<'_, PyAny>) -> PyResult<String> {
 /// Forward test progress, completions and connection timing to their reporters.
 #[pyclass(module = "sqlbuild._native", frozen)]
 struct TestCallbackRelay {
+    worker: Option<Arc<WorkerBuild>>,
     progress: Py<PyAny>,
     event_writer: Py<PyAny>,
     plan_output: Py<PyAny>,
@@ -172,6 +184,9 @@ struct TestCallbackRelay {
 #[pymethods]
 impl TestCallbackRelay {
     fn on_test_start(&self, py: Python<'_>, entry: &Bound<'_, PyAny>) -> PyResult<()> {
+        if let Some(worker) = &self.worker {
+            worker.start_attached(py, &sql_test_identity(entry, "name")?)?;
+        }
         call_with(
             &self.progress.bind(py).getattr("on_item_start")?,
             &[
@@ -191,16 +206,24 @@ impl TestCallbackRelay {
         if group.is_empty() {
             group = UNKNOWN_GROUP.to_owned();
         }
-        let resource_id: Bound<'_, PyAny> = text(py, &sql_test_identity(result, "test_name")?);
+        let identity: String = sql_test_identity(result, "test_name")?;
+        let outcome: Bound<'_, PyAny> = result.getattr("outcome")?;
+        let status: &str = outcome_status(&outcome)?;
+        if let Some(worker) = &self.worker {
+            let outcome = if test_outcome(&outcome)? == Some(SqlTestOutcome::Pass) {
+                NodeOutcome::Success
+            } else {
+                NodeOutcome::Failed
+            };
+            worker.finish_attached(py, &identity, outcome)?;
+        }
+        let resource_id: Bound<'_, PyAny> = text(py, &identity);
         call_with(
             &self.progress.bind(py).getattr("on_item_complete")?,
             &[
                 ("group_name", text(py, &group)),
                 ("item_name", text(py, &test_label(result, "test_name")?)),
-                (
-                    "status_text",
-                    text(py, outcome_status(&result.getattr("outcome")?)?),
-                ),
+                ("status_text", text(py, status)),
                 ("child_rows", expectation_rows(result)?.into_any()),
                 ("detail", text(py, &real_model_detail(result)?)),
                 ("error_code", result.getattr("error_code")?),
@@ -481,7 +504,7 @@ fn select_changed<'py>(
 fn run_tests<'py>(
     invocation: &Bound<'py, PyAny>,
     pipeline: &Bound<'py, PyAny>,
-    (concurrency, timeout): (i64, &RunTimeout),
+    (concurrency, timeout, worker): (i64, &RunTimeout, Option<Arc<WorkerBuild>>),
 ) -> PyResult<Vec<SqlTestExecutionResult<Bound<'py, PyAny>>>> {
     let py: Python<'py> = invocation.py();
     let stream: Bound<'py, PyAny> = invocation.getattr("progress_stream")?;
@@ -555,6 +578,7 @@ fn run_tests<'py>(
     let relay: Bound<'py, TestCallbackRelay> = Bound::new(
         py,
         TestCallbackRelay {
+            worker,
             progress: progress.unbind(),
             event_writer: event_writer.clone().unbind(),
             plan_output: plan_output.clone().unbind(),
@@ -666,6 +690,15 @@ fn complete(
 #[pyfunction]
 #[pyo3(signature = (*, request))]
 pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> PyResult<i32> {
+    run_test(py, request, None)
+}
+
+/// Run one `sqb test` request, reporting each test to a claimed run's `worker`.
+pub(crate) fn run_test(
+    py: Python<'_>,
+    request: &Bound<'_, PyAny>,
+    worker: Option<Arc<WorkerBuild>>,
+) -> PyResult<i32> {
     let inspect_only: bool = request.getattr("inspect")?.is_truthy()?;
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
@@ -729,7 +762,7 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
         TimeoutKind::Test,
     )?;
     let results: Vec<SqlTestExecutionResult<Bound<'_, PyAny>>> =
-        run_tests(&invocation, &pipeline, (concurrency, &timeout))?;
+        run_tests(&invocation, &pipeline, (concurrency, &timeout, worker))?;
     write_test_runtime_target(
         (
             &native_field(&invocation, "effective_project_dir")?
