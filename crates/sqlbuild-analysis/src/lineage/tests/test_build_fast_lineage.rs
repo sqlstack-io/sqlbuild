@@ -297,23 +297,23 @@ fn given_deep_union_chain_when_building_from_small_stack_then_runs_on_the_analys
     let test_cases = [
         DeepUnionTestCase {
             description: "the deepest chain the parser guard accepts",
-            branches: 512,
+            branches: 8000,
             stack_bytes: 256 * 1024,
             expected_status: "built",
             expected_lines: &[
-                "order_id direct medium [model:orders.order_id]",
-                "amount direct medium [model:orders.amount]",
+                "order_id direct high [model:orders.order_id]",
+                "amount direct high [model:orders.amount]",
             ],
             expected_detail: None,
         },
         DeepUnionTestCase {
             description: "one branch past the parser guard reports its parse error",
-            branches: 513,
+            branches: 8001,
             stack_bytes: 256 * 1024,
             expected_status: "unparsed",
             expected_lines: &[],
             expected_detail: Some(
-                "Parse error at line 0, column 0: E_GUARD_AST_DEPTH_EXCEEDED: value 513 exceeds configured limit 512",
+                "the duckdb parser cannot read the statement nests too deeply at line 1, column 1",
             ),
         },
     ];
