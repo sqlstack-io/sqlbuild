@@ -2,7 +2,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, StaleReason } from '$lib/api';
-import { kindLine, nodeIconKey } from '$lib/build-area/labels';
+import { kindLine, nodeIconKey, shortName } from '$lib/build-area/labels';
 
 export type CardStatus = 'ok' | 'fail' | 'warn' | 'src' | 'none';
 export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';
@@ -35,6 +35,7 @@ export function checksBadge(node: CatalogNode): { checks?: string; checksColor?:
 export function cardData(node: CatalogNode): Record<string, unknown> {
 	return {
 		name: node.key,
+		label: shortName(node.key),
 		kind: kindLine(node),
 		group: node.group,
 		nodeKind: node.kind,

@@ -174,3 +174,6 @@ export function relationName(relation: { database: string | null; schema: string
 	if (!relation) return '—';
 	return [relation.database, relation.schema, relation.name].filter(Boolean).join('.');
 }
+
+/** A node key without its kind, e.g. `customer_summary` for `model:customer_summary`. */
+export const shortName = (key: string) => key.slice(key.indexOf(':') + 1);

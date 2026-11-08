@@ -177,12 +177,15 @@ export type CatalogNodeDetail = Omit<CatalogNode, 'stale' | 'checks'> & {
 	code: { file: string; source: string } | null;
 	/** As built in this target, newest first. */
 	builds: BuiltDefinition[];
-	jobs: NodeJob[];
-	runs: NodeRunEntry[];
+	/** Null when the server does not report which jobs select the node. */
+	jobs: NodeJob[] | null;
+	/** Null when the server does not report the node's run history. */
+	runs: NodeRunEntry[] | null;
 	checkResults: Check[];
 	warehouse: WarehouseObject | null;
 	microbatch: MicrobatchCoverage | null;
-	history: NodeHistory;
+	/** Null when the server does not report renames and moves. */
+	history: NodeHistory | null;
 };
 
 // ---- column lineage ----

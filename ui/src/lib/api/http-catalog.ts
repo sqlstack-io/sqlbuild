@@ -1,5 +1,6 @@
 import type { components } from '$control/schema.d.ts';
-import type { CatalogNode } from './types/build';
+import { shortName } from '$lib/build-area/labels';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, StaleReason } from './types/build';
 import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
@@ -47,4 +48,59 @@ export function toCatalogNodes(wire: Wire['CatalogNodeRecord'][]): CatalogNode[]
 	const nodes = wire.flatMap((node) => toCatalogNode(node) ?? []);
 	const listed = new Set(nodes.map((node) => node.key));
 	return nodes.map((node) => ({ ...node, upstream: node.upstream.filter((key) => listed.has(key)) }));
+}
+
+/** Passing, warning and failing by each check's newest result; checks without one count only towards the total. */
+export function checkCountsOf(checks: Check[]): CheckCounts {
+	const outcome = (c: Check) => c.latest?.outcome;
+	return {
+		total: checks.length,
+		passing: checks.filter((c) => outcome(c) === 'pass').length,
+		warning: checks.filter((c) => outcome(c) === 'warn').length,
+		failing: checks.filter((c) => ['fail', 'error'].includes(outcome(c) ?? '')).length
+	};
+}
+
+/** A definition that changed since its last recorded build here; other staleness is not reported by the server. */
+function staleOf(status: Wire['NodeStatus'] | null): StaleReason[] {
+	if (status?.definition.status !== 'changed' || !status.build) return [];
+	return [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: status.build.observed_at }];
+}
+
+
+/** The listed node a key or bare name refers to, preferring a model; migrations name models without their kind. */
+export function findNode(nodes: CatalogNode[], ref: string): CatalogNode | null {
+	return nodes.find((n) => n.key === ref) ?? nodes.find((n) => n.key === `model:${ref}`) ?? nodes.find((n) => shortName(n.key) === ref) ?? null;
+}
+
+/**
+ * A listed node with its status and SQL reads and its checks. The server keeps no
+ * per-node run history, row counts, cost, jobs or migrations, so those stay empty or null and the
+ * pages hide them. `sql` is null when the person may not see SQL.
+ */
+export function nodeDetailOf(nodes: CatalogNode[], node: CatalogNode, status: Wire['NodeStatus'] | null, sql: Wire['NodeSql'] | null, checks: Check[]): CatalogNodeDetail {
+	// Checks name their node without its kind, so the attachment tells a source from a model of the same name.
+	const own = checks.filter((c) => c.node === node.key || `${c.attachment}:${c.node}` === node.key);
+	const physical = status?.physical.status === 'observed' ? status.physical.observation.record : null;
+	return {
+		...node,
+		stale: staleOf(status),
+		checks: checkCountsOf(own),
+		downstream: nodes.filter((n) => n.upstream.includes(node.key)).map((n) => n.key),
+		recentOutcomes: [],
+		lastRows: null,
+		rowsDelta: null,
+		lastDurationMs: null,
+		cost: null,
+		columns: (physical?.columns ?? []).map((c) => ({ name: c.name, type: c.data_type, description: '', audits: [] })),
+		sql: sql?.raw_sql ? { raw: sql.raw_sql, compiled: sql.compiled_sql ?? sql.raw_sql } : null,
+		code: null,
+		builds: [],
+		jobs: null,
+		runs: null,
+		checkResults: own,
+		warehouse: null,
+		microbatch: null,
+		history: null
+	};
 }

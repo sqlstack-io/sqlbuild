@@ -22,6 +22,8 @@
 
 	type AssetData = {
 		name: string;
+		/** Shown instead of the key when set; the key stays in the tooltip. */
+		label?: string;
 		kind: string;
 		/** The last build outcome; staleness is shown separately. */
 		status: 'ok' | 'fail' | 'warn' | 'run' | 'src' | 'none';
@@ -98,7 +100,7 @@
 
 	<div class="head">
 		<Glyph size={14} strokeWidth={1.75} class="glyph" />
-		<span class="name" title={d.name}>{d.name}</span>
+		<span class="name" title={d.name}>{d.label ?? d.name}</span>
 		{#if f.kind}<span class="kind">{kindShort}</span>{/if}
 	</div>
 
