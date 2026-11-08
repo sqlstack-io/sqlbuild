@@ -2,7 +2,7 @@ use sqlbuild_render::macro_arguments::main::parse_macro_arguments::parse_macro_a
 use sqlbuild_render::macro_arguments::models::ArgumentValue;
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites;
 
-use crate::sql_macros::tests::helpers::{adapter_parses, expanded_for};
+use crate::sql_macros::tests::helpers::{adapter_parses, assert_unavailable, expanded_for};
 use crate::sql_macros::tests::test_types::{
     AsciiArguments, ExpansionErrorTestCase, ExpansionTestCase, PythonArgumentTestCase,
 };
@@ -509,10 +509,14 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
     ];
 
-    for test_case in test_cases
+    let (runnable, unavailable): (Vec<&ExpansionTestCase>, Vec<&ExpansionTestCase>) = test_cases
         .iter()
-        .filter(|test_case| adapter_parses(test_case.adapter))
-    {
+        .partition(|test_case| adapter_parses(test_case.adapter));
+    for test_case in unavailable {
+        let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
+        assert_unavailable(&result, test_case.description);
+    }
+    for test_case in runnable {
         let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
 
         assert_eq!(
@@ -761,12 +765,17 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
     ];
 
-    for test_case in test_cases
-        .iter()
-        .filter(|test_case| adapter_parses(test_case.adapter))
-    {
-        let error = expanded_for(test_case.adapter, test_case.macros, test_case.sql)
-            .expect_err(test_case.description);
+    let (runnable, unavailable): (Vec<&ExpansionErrorTestCase>, Vec<&ExpansionErrorTestCase>) =
+        test_cases
+            .iter()
+            .partition(|test_case| adapter_parses(test_case.adapter));
+    for test_case in unavailable {
+        let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
+        assert_unavailable(&result, test_case.description);
+    }
+    for test_case in runnable {
+        let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
+        let error = result.expect_err(test_case.description);
 
         assert_eq!(
             error.code, test_case.expected_code,

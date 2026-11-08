@@ -129,6 +129,22 @@ pub(super) fn adapter_parses(adapter: &str) -> bool {
     macro_parser(Some(analysis_dialect_of(adapter))).is_ok()
 }
 
+/// Asserts `result` is the P015 a project gets when its dialect has no native parser.
+pub(super) fn assert_unavailable<T: std::fmt::Debug>(
+    result: &Result<T, SqlMacroError>,
+    description: &str,
+) {
+    let error: &SqlMacroError = result.as_ref().expect_err(description);
+    assert_eq!(error.code, "P015", "{description}: {}", error.message);
+    assert!(
+        error
+            .message
+            .contains("SQL macros are unavailable for SQL analysis dialect"),
+        "{description}: {}",
+        error.message
+    );
+}
+
 /// `sql` expanded with `macros` for `adapter`, or the SQL macro error it raised.
 pub(super) fn expanded_for(
     adapter: &'static str,
