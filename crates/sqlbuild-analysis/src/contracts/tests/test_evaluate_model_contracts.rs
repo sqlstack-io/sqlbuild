@@ -286,7 +286,7 @@ fn given_a_dialect_no_native_module_reads_when_comparing_types_then_types_are_no
     let test_cases = [
         UnknownDialectTestCase {
             description: "an enforced contract under a dialect no native module reads",
-            dialect: "motherduck",
+            dialect: "trino",
             expected_compared: false,
         },
         UnknownDialectTestCase {

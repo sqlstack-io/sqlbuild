@@ -7,6 +7,7 @@ use crate::analysis_route::tests::test_types::{
     TsqlTypeTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
+use crate::assembly::analysis_session::main::native_dialect::native_dialect;
 use crate::assembly::project::models::SyntaxCheck;
 use crate::compiled_project::models::TextPosition;
 use crate::type_system::models::TypeFamily;
@@ -23,6 +24,16 @@ fn given_a_dialect_when_routing_analysis_then_a_native_module_or_nothing_analyse
             description: "postgresql, the name compile assembly gives postgres",
             dialect: Some("postgresql"),
             expected_module: Some("postgres"),
+        },
+        RouteTestCase {
+            description: "motherduck, an alias of duckdb",
+            dialect: Some("motherduck"),
+            expected_module: Some("duckdb"),
+        },
+        RouteTestCase {
+            description: "sqlserver, an alias of tsql",
+            dialect: Some("sqlserver"),
+            expected_module: Some("tsql"),
         },
         RouteTestCase {
             description: "snowflake",
@@ -71,18 +82,22 @@ fn given_a_dialect_when_routing_analysis_then_a_native_module_or_nothing_analyse
         },
     ];
     for test_case in test_cases {
-        let route: AnalysisRoute = analysis_route(test_case.dialect);
-        assert!(
-            matches!(
-                (route, test_case.expected_module),
-                (AnalysisRoute::Native(module), Some(name)) if module.name() == name
-            ) || matches!(
-                (route, test_case.expected_module),
-                (AnalysisRoute::Unavailable, None)
-            ),
-            "{}",
-            test_case.description
-        );
+        let assembled: Option<&str> = native_dialect(test_case.dialect);
+        let routes: [AnalysisRoute; 2] =
+            [analysis_route(test_case.dialect), analysis_route(assembled)];
+        for route in routes {
+            assert!(
+                matches!(
+                    (route, test_case.expected_module),
+                    (AnalysisRoute::Native(module), Some(name)) if module.name() == name
+                ) || matches!(
+                    (route, test_case.expected_module),
+                    (AnalysisRoute::Unavailable, None)
+                ),
+                "{}",
+                test_case.description
+            );
+        }
     }
 }
 

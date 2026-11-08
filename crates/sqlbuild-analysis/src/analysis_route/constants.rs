@@ -13,10 +13,12 @@ pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (CLICKHOUSE_DIALECT, &ClickHouseDialect),
     (DATABRICKS_DIALECT, &DatabricksDialect),
     (DUCKDB_DIALECT, &DuckDbDialect),
+    (MOTHERDUCK_DIALECT, &DuckDbDialect),
     (POSTGRES_DIALECT, &PostgresDialect),
     (POSTGRESQL_DIALECT, &PostgresDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
     (SQLITE_DIALECT, &SqliteDialect),
+    (SQLSERVER_DIALECT, &TsqlDialect),
     (TSQL_DIALECT, &TsqlDialect),
 ];
 /// BigQuery's analysis dialect name.
@@ -31,6 +33,10 @@ pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 /// The name compile assembly gives PostgreSQL's analysis dialect, which routes the same way.
 pub(crate) const POSTGRESQL_DIALECT: &str = "postgresql";
+/// MotherDuck's name in the analysis alias tables, read by DuckDB's module.
+pub(crate) const MOTHERDUCK_DIALECT: &str = "motherduck";
+/// SQL Server's name in the analysis alias tables, read by T-SQL's module.
+pub(crate) const SQLSERVER_DIALECT: &str = "sqlserver";
 /// Snowflake's analysis dialect name.
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// SQLite's analysis dialect name.
