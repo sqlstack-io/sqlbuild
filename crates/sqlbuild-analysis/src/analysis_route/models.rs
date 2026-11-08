@@ -145,3 +145,7 @@ impl LineageSchema for StandInSchema {
             .then_some(self.columns.as_slice())
     }
 }
+
+/// BigQuery, whose SQL SQLQuack's GoogleSQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct BigQueryDialect;

@@ -9,7 +9,7 @@ use crate::assembly::project::models::SyntaxCheck;
 use crate::compiled_project::models::TextPosition;
 
 #[test]
-fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
+fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_legacy_path() {
     let test_cases = [
         RouteTestCase {
             description: "postgres",
@@ -34,7 +34,7 @@ fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
         RouteTestCase {
             description: "bigquery",
             dialect: Some("bigquery"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "databricks",
@@ -66,6 +66,7 @@ fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
         );
     }
 }
+
 
 #[test]
 fn given_model_sql_when_probing_the_native_parser_then_its_gap_is_located_after_placeholders() {
