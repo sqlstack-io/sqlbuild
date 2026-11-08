@@ -8,7 +8,7 @@
      "phase": "compile",
      "severity": "error",
      "code": "P026",
-     "message": "SQL analysis skipped for model 'customer_totals': the duckdb parser cannot read Syntax error at or near 'WHERE' at line 1, column 13",
+     "message": "SQL analysis skipped for model 'customer_totals' post_hooks[0] sql(\"record_refresh\") (hooks/sql/record_refresh.sql): the duckdb parser cannot read Syntax error at or near 'WHERE' at line 1, column 13 of its SQL",
      "help": "if this SQL is valid for your warehouse, skip SQL analysis for this model, add this to the MODEL header:\n            MODEL (\n              sql_analysis false,\n              ...\n            );\n          and please report the SQL so the parser can support it\n  = help: SQL analysis is on for this project; to turn it off for every model, set this in sqlbuild_project.toml:\n            [settings]\n            sql_analysis = false\n  = help: to skip SQL analysis for one run, use `--no-sql-analysis`"
     }
    ]
