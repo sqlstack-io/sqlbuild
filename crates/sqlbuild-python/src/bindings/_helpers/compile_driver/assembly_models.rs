@@ -4,6 +4,8 @@ use pyo3::IntoPyObject;
 use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyFrozenSetMethods, PyList, PyString, PyTuple};
+use sqlbuild_analysis::analysis_route::main::analysis_route::analysis_route;
+use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 
 use crate::bindings::_helpers::analysis_session::model_analyses::ModelAnalyses;
 use crate::bindings::_helpers::analysis_session::profile_inputs::profile_dialect;
@@ -116,7 +118,13 @@ fn compiled_model<'py>(
             syntax()?,
         )
     };
-    let validates: bool = input_validated && !syntax_validated;
+    let analysis_dialect: Option<String> =
+        native_field(&context.profile, "sql_analysis_dialect")?.extract()?;
+    let legacy_route: bool = matches!(
+        analysis_route(analysis_dialect.as_deref()),
+        AnalysisRoute::Legacy
+    );
+    let validates: bool = input_validated && !syntax_validated && legacy_route;
     if request.sql_validation_enabled && validates {
         for hook_name in HOOK_NAMES {
             validate_hook_sql_syntax(
