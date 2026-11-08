@@ -20,8 +20,8 @@ pub fn dialect_lexical_syntax(dialect: &str) -> LexicalSyntax {
             ..LexicalSyntax::default()
         },
         "clickhouse" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'"]),
-            line_comment_prefixes: lines(&["--", "#", "//"]),
+            backslash_escape_quotes: strings(&["'", "\"", "`"]),
+            line_comment_prefixes: lines(&["--", "# ", "#!", "//"]),
             ..LexicalSyntax::default()
         },
         "databricks" | "duckdb" => LexicalSyntax {
@@ -31,6 +31,7 @@ pub fn dialect_lexical_syntax(dialect: &str) -> LexicalSyntax {
         "mssql" | "sqlserver" | "tsql" => LexicalSyntax {
             nested_block_comments: true,
             line_comment_prefixes: lines(&["--"]),
+            bracket_identifiers: true,
             ..LexicalSyntax::default()
         },
         _ => LexicalSyntax {

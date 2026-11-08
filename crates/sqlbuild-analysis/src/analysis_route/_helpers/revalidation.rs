@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::analysis_route::models::{AnalysisInput, NativeAnalysis};
+use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::UNKNOWN_TYPE;
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
@@ -13,6 +13,7 @@ use crate::assembly::analysis_session::models::{
     FinishedSession, ModelOutcome, PivotOutcome, SessionSchema,
 };
 use crate::assembly::analysis_session::types::Pairs;
+use crate::semantic_checks::models::RecoveryModel;
 use crate::semantic_checks::types::RevisedBinding;
 use crate::semantic_validation::models::DiagnosticRow;
 
@@ -32,13 +33,13 @@ pub(crate) fn session_outcome<'a>(
         .ok_or_else(|| format!("the session analysed no model {name}"))
 }
 
-/// The findings of `outcome`'s analysed SQL over its bound schema, the poisoned columns untyped.
+/// The findings of `outcome`'s SQL with the poisoned columns untyped; `None` when it is unreadable.
 pub(crate) fn revised(
     dialect: &dyn NativeDialect,
     outcome: &ModelOutcome,
     poisoned: &[(String, String)],
     declared: &[String],
-) -> Result<Vec<RevisedBinding>, String> {
+) -> Result<Option<Vec<RevisedBinding>>, String> {
     let sql: Cow<'_, str> = resolved_cleaned_sql(outcome)?;
     let relations: SessionSchema = SessionSchema {
         relations: outcome
@@ -53,18 +54,29 @@ pub(crate) fn revised(
             })
             .collect::<HashMap<String, Vec<SchemaColumn>>>(),
     };
-    let analysis: NativeAnalysis = dialect
-        .analyse(&AnalysisInput {
-            sql: &sql,
-            schema: &relations,
-            references: &[],
-            extension_functions: declared,
-        })
-        .map_err(|gap| gap.message)?;
+    let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
+        sql: &sql,
+        schema: &relations,
+        references: &[],
+        extension_functions: declared,
+    });
+    let Ok(analysis) = analysed else {
+        return Ok(None);
+    };
     analysis
         .diagnostics
         .into_iter()
         .map(revised_binding)
+        .collect::<Result<Vec<RevisedBinding>, String>>()
+        .map(Some)
+}
+
+/// The model's own findings, as type recovery matches them, kept as they are.
+pub(crate) fn unrevised(model: &RecoveryModel) -> Vec<RevisedBinding> {
+    model
+        .raw_bindings
+        .iter()
+        .map(|raw| (raw.code.clone(), raw.start, raw.end))
         .collect()
 }
 

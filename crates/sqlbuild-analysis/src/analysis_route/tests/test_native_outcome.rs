@@ -149,6 +149,15 @@ fn given_a_model_without_facts_when_fast_lineage_reads_it_natively_then_it_has_l
             ],
         },
         NativeLineageTestCase {
+            description: "repeated calls of one marker read as one relation, so a union stays direct",
+            sql: r#"SELECT order_id FROM __ref("orders") UNION ALL SELECT order_id FROM __ref("orders")"#,
+            placeholders: &[],
+            expected_lines: &[
+                "order_id direct high [model:orders.order_id]",
+                "built star=false",
+            ],
+        },
+        NativeLineageTestCase {
             description: "a star over a relation of unknown columns is a star without outputs",
             sql: r#"SELECT * FROM __ref("unknown_model")"#,
             placeholders: &[],

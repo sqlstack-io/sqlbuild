@@ -19,6 +19,9 @@ pub fn reads_differently_from_generic(syntax: &LexicalSyntax, sql: &str) -> bool
     if syntax.nested_block_comments && sql.matches(BLOCK_COMMENT_OPEN).count() > 1 {
         return true;
     }
+    if syntax.bracket_identifiers && sql.contains('[') {
+        return true;
+    }
     syntax
         .line_comment_prefixes
         .iter()

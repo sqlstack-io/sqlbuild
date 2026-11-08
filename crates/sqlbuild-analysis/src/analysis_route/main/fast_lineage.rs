@@ -7,6 +7,7 @@ use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_sy
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
 use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
+use crate::analysis_route::_helpers::marker_names::{distinct_calls, first_call_names};
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{
@@ -34,15 +35,15 @@ pub fn fast_lineage(
             Ok(named) => named,
             Err(reason) => return FastLineageOutcome::Unparsed(reason),
         };
-    let normalised: String =
-        match normalize_native_sql(&named, dialect.name(), dialect.stub_prefix()) {
-            Ok(normalised) => normalised,
-            Err(reason) => return FastLineageOutcome::Unparsed(reason),
-        };
+    let normalised: Result<String, String> = first_call_names(&named, &calls)
+        .and_then(|named| normalize_native_sql(&named, dialect.name(), dialect.stub_prefix()));
+    let normalised: String = match normalised {
+        Ok(normalised) => normalised,
+        Err(reason) => return FastLineageOutcome::Unparsed(reason),
+    };
     let sql: String = placeholder_defaults(&normalised, placeholders);
-    let referenced: Vec<(String, LineageResourceType, String)> = calls
+    let referenced: Vec<(String, LineageResourceType, String)> = distinct_calls(&calls)
         .into_iter()
-        .enumerate()
         .filter_map(|(index, (function, name))| {
             let resource_type: LineageResourceType = match function.as_str() {
                 "__ref" => LineageResourceType::Model,
@@ -50,7 +51,11 @@ pub fn fast_lineage(
                 "__seed" => LineageResourceType::Seed,
                 _ => return None,
             };
-            Some((format!("{MARKER_NAME_PREFIX}{index}"), resource_type, name))
+            Some((
+                format!("{MARKER_NAME_PREFIX}{index}"),
+                resource_type,
+                name.clone(),
+            ))
         })
         .collect();
     let references: Vec<(String, String, String)> = referenced
