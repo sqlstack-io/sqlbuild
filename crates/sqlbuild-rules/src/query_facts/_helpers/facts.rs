@@ -1,14 +1,14 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    DUCKDB_DIALECTS, MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS,
-    SNOWFLAKE_DATE_PART_ARGUMENTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT, TABLE_FUNCTION_STUB,
+    MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH, SNOWFLAKE_DATE_PART_ARGUMENTS, TABLE_FUNCTION_STUB,
     TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
     ModelShape, ParsedFixture, QueryFacts, RelationFacts, SelectFacts, SetFacts, SourceText,
 };
+use sqlbuild_analysis::sql_tree::main::shared_dialect::shared_dialect;
 use sqlquack_syntax::expressions::names::models::{Identifier, Literal, TableRef};
 use sqlquack_syntax::expressions::queries::models::{Select, With};
 use sqlquack_syntax::{
@@ -18,23 +18,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
-/// The SQLQuack grammar that reads `dialect_name` for built-in rules, or `None` when none does.
-pub(crate) fn facts_dialect(dialect_name: &str) -> Option<Dialect> {
-    if DUCKDB_DIALECTS.contains(&dialect_name) {
-        return Some(Dialect::DuckDB);
-    }
-    if POSTGRES_DIALECTS.contains(&dialect_name) {
-        return Some(Dialect::PostgreSQL);
-    }
-    match dialect_name {
-        SNOWFLAKE_DIALECT => Some(Dialect::Snowflake),
-        SQLITE_DIALECT => Some(Dialect::SQLite),
-        _ => None,
-    }
-}
-
 fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), String> {
-    let dialect = facts_dialect(dialect_name)
+    let dialect = shared_dialect(dialect_name)
         .ok_or_else(|| format!("no SQL parser for dialect {dialect_name}"))?;
     let options = ParseOptions {
         complexity_guard: Some(ComplexityGuardOptions {
