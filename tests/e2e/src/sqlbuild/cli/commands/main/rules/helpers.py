@@ -73,11 +73,13 @@ def write_custom_rule_project(
     selected_rules: tuple[str, ...],
     files: tuple[tuple[str, str], ...],
     configuration: str = "",
+    adapter: str = "duckdb",
 ) -> None:
-    """Write a DuckDB project whose selected custom Rules live in the given files."""
+    """Write a project, DuckDB by default, whose selected custom Rules live in the given files."""
 
     (project_dir / "sqlbuild_project.toml").write_text(
-        f'name = "orders"\nadapter = "duckdb"\n\n[rules]\nselect = {json.dumps(selected_rules)}\n'
+        f'name = "orders"\nadapter = "{adapter}"\n\n'
+        f"[rules]\nselect = {json.dumps(selected_rules)}\n"
         "\n[rules.thresholds]\nmin_custom_rule_test_cases = 0\n" + configuration,
         encoding="utf-8",
     )

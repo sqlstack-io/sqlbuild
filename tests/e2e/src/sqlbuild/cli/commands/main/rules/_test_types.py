@@ -384,3 +384,5 @@ class SyntaxTreeRuleE2ETestCase:
     description: str
     model_sql: str
     expected_messages: tuple[str, ...]
+    adapter: str = "duckdb"
+    other_models: dict[str, str] = field(default_factory=dict)
