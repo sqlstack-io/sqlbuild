@@ -285,13 +285,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			}
 			return found.slice(0, limit);
 		},
-		/** Each location the person sees, with health only where they may list the whole target. */
 		async listPlatformEvents(): Promise<PlatformEvent[]> {
 			const { data, error, response } = await http.GET('/api/control/platform/problems');
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toPlatformEvents(data, Date.now());
 		},
+		/** Each location the person sees, with health only where they may list the whole target. */
 		async listLocations(): Promise<LocationSummary[]> {
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();
