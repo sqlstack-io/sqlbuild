@@ -648,11 +648,13 @@ dependencies = [
 name = "sqlquack-semantics"
 version = "0.2.0"
 dependencies = [
+ "regex",
  "serde",
  "serde_json",
  "sqlquack-core",
  "sqlquack-snowflake",
  "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]
@@ -680,6 +682,7 @@ name = "sqlquack-syntax-bigquery"
 version = "0.2.0"
 dependencies = [
  "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]

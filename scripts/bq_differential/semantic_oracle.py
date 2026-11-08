@@ -137,7 +137,7 @@ def analyse(tool, item):
         match = OUTPUT.match(line.strip())
         if not match:
             break
-        outputs.append([match.group(1), match.group(2)])
+        outputs.append([match.group(1).strip("`"), match.group(2)])
     return {"id": case_id, "status": "ok", "detail": "lenient" if "-- lenient" in text else None, "outputs": outputs}
 
 

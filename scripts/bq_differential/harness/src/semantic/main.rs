@@ -7,7 +7,6 @@
 
 mod cases;
 mod compare;
-mod profile;
 
 use std::io::{BufRead, Write};
 

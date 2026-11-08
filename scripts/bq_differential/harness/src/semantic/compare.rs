@@ -9,6 +9,7 @@ use sqlbuild_analysis::semantic_validation::main::validation_json;
 use sqlbuild_analysis::semantic_validation::models::NormalizationInput;
 use sqlbuild_analysis::type_system::main::normalize_type::normalize_type;
 use sqlbuild_analysis::type_system::main::same_type::same_type;
+use sqlquack_semantics::dialects::constants::BIGQUERY;
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{
     LineageContext, Nullability, OutputLineage, QueryLineage, SchemaColumn, TransformKind,
@@ -140,7 +141,7 @@ pub fn compare_case(case: &Case) -> Comparison {
         let detail: String = format!("{count} statements");
         return unmeasured(case, "parse_error", Some(detail), polyglot_findings);
     };
-    let profile: &'static dyn DialectProfile = &crate::profile::BIGQUERY;
+    let profile: &'static dyn DialectProfile = &BIGQUERY;
     let catalog: Catalog = catalog(case, profile);
     let context = LineageContext {
         profile,
