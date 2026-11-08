@@ -87,7 +87,10 @@ fn cast_target(spelling: &str) -> Option<DataType> {
     if depth != 0 || spelling.trim().is_empty() {
         return None;
     }
-    let parsed: Parsed = parse_strict(&format!("{DATABRICKS_CAST_TYPE_PREFIX}{spelling})")).ok()?;
+    let parsed: Parsed = match parse_strict(&format!("{DATABRICKS_CAST_TYPE_PREFIX}{spelling})")) {
+        Ok(parsed) => parsed,
+        Err(StrictFailure::Parse(_) | StrictFailure::Uncovered { .. }) => return None,
+    };
     let ([Expression::Select(select)], []) = (parsed.statements.as_slice(), parsed.gaps.as_slice())
     else {
         return None;
