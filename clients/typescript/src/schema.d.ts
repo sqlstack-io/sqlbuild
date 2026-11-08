@@ -434,6 +434,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonNodeRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql": {
         parameters: {
             query?: never;
@@ -1409,6 +1425,23 @@ export interface components {
         NodeEventKind: "success" | "failed" | "recovered";
         /** @enum {string} */
         NodeOutcome: "success" | "warn" | "failed" | "skipped" | "cancelled";
+        /** @description One build attempt of a node by a run in this target; the same metadata as the run's node list. */
+        NodeRunRecord: {
+            /** Format: date-time */
+            ended_at?: string | null;
+            error_code?: string | null;
+            job_key?: string | null;
+            /** Format: date-time */
+            queued_at: string;
+            /** Format: int64 */
+            rows_affected?: number | null;
+            /** Format: uuid */
+            run_id: string;
+            skipped_because_of?: string | null;
+            /** Format: date-time */
+            started_at?: string | null;
+            status: string;
+        };
         /** @description SQL inspection never returns Python source, execution artifacts or unrelated node metadata. */
         NodeSql: {
             compiled_sql?: string | null;
@@ -3183,6 +3216,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogNodeRecord"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    listPersonNodeRuns: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent runs; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs that built the node, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeRunRecord"][];
                 };
             };
             /** @description Session rejected */

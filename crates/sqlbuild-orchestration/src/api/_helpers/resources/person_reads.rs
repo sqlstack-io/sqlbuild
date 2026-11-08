@@ -1,4 +1,4 @@
-//! Person reads of run nodes, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
+//! Person reads of run nodes, node run history, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -12,12 +12,13 @@ use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::declarations::models::{JobRecord, TriggerRecord};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
-use crate::runs::models::RunNodeRecord;
+use crate::runs::models::{NodeRunRecord, RunNodeRecord};
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
+use crate::warehouse_history::main::read_person_node_runs::read_person_node_runs;
 use crate::warehouse_metadata::main::list_person_catalog_nodes::list_person_catalog_nodes;
 use crate::warehouse_metadata::models::CatalogNodeRecord;
 
@@ -61,6 +62,32 @@ pub(crate) async fn nodes(
             (&context, principal),
             (location_id, &target),
             default_role,
+        )
+        .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs", operation_id = "listPersonNodeRuns",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("node_key" = String, Path),
+        ("limit" = Option<u32>, Query, description = "Maximum recent runs; defaults to 100, capped at 1000")),
+    responses((status = 200, body = Vec<NodeRunRecord>, description = "Runs that built the node, newest first"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn node_runs(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, node_key)), Query(options)): (
+        Path<(Uuid, String, String)>,
+        Query<ReadQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<NodeRunRecord>>, ApiError> {
+    Ok(Json(
+        read_person_node_runs(
+            &store,
+            (&context, principal),
+            (location_id, &target, &node_key),
+            (options.limit.unwrap_or(100), default_role),
         )
         .await?,
     ))

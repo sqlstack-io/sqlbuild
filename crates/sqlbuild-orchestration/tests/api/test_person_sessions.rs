@@ -286,6 +286,9 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     let known_reads = [
                         format!("{metadata}/{}/nodes", seed_run.run_id),
                         format!("/api/control/locations/{location}/targets/development/nodes"),
+                        format!(
+                            "/api/control/locations/{location}/targets/development/nodes/orders/runs"
+                        ),
                         format!("/api/control/locations/{location}/targets/development/jobs"),
                         format!("/api/control/locations/{location}/targets/development/triggers"),
                         format!("/api/control/locations/{location}/targets/development/snapshots"),
@@ -346,6 +349,49 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         listed_jobs,
                         expected_jobs[..expected_jobs.len() * usize::from(jobs.is_array())],
                         "jobs list declared metadata and never settings"
+                    );
+                    let node_runs: Value = request(
+                        &provider.client,
+                        session,
+                        (
+                            Method::GET,
+                            &format!("/api/control/locations/{location}/targets/development/nodes/orders/runs"),
+                        ),
+                        (&Value::Null, &session.csrf),
+                    )
+                    .await
+                    .json()
+                    .await
+                    .expect("node runs response");
+                    let seeded_node_runs: Vec<&Value> = node_runs
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|row| row["run_id"] == json!(seed_run.run_id))
+                        .collect();
+                    assert_eq!(
+                        seeded_node_runs.len(),
+                        usize::from(node_runs.is_array()),
+                        "the seed run built orders once"
+                    );
+                    for seeded in seeded_node_runs {
+                        for (key, expected) in [
+                            ("job_key", Value::Null),
+                            ("status", json!("pending")),
+                            ("error_code", Value::Null),
+                        ] {
+                            assert_eq!(seeded[key], expected, "node run {key}");
+                        }
+                    }
+                    assert_eq!(
+                        node_runs
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter(|row| row["job_key"] == json!("orders"))
+                            .count(),
+                        launched_person_runs * usize::from(node_runs.is_array()),
+                        "every person launch of the orders job built orders"
                     );
                     for read_path in &unknown_reads {
                         let missing = request(

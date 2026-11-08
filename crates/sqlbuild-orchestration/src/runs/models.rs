@@ -213,6 +213,20 @@ pub struct RunNodeRecord {
     pub skipped_because_of: Option<String>,
 }
 
+/// One build attempt of a node by a run in this target; the same metadata as the run's node list.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NodeRunRecord {
+    pub run_id: Uuid,
+    pub job_key: Option<String>,
+    pub queued_at: DateTime<Utc>,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub rows_affected: Option<i64>,
+    pub error_code: Option<String>,
+    pub skipped_because_of: Option<String>,
+}
+
 /// The database owns the claim before a launcher sees the pinned request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunClaim {

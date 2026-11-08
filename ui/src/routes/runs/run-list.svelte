@@ -65,8 +65,8 @@
 			<col style:width="150px" />
 			<col />
 			<col style:width="230px" />
-			<col style:width="300px" />
-			<col style:width="130px" />
+			<col style:width="280px" />
+			<col style:width="150px" />
 			<col style:width="90px" />
 		</colgroup>
 		<thead>
