@@ -1,13 +1,15 @@
 use crate::query_facts::constants::{
     CALL_STUB, PLACEHOLDER_PREFIX, PLACEHOLDER_VALUE, REF_STUB, SNOWFLAKE_DIALECT, SOURCE_STUB,
-    TABLE_FUNCTION_CALL, TABLE_FUNCTION_STUB, TABLE_WRAPPER, UDF_CALL, UDF_STUB,
+    TABLE_FUNCTION_CALL, TABLE_FUNCTION_STUB, UDF_CALL, UDF_STUB,
 };
 use crate::query_facts::models::{CallKind, ModelCall, ModelShape};
 use crate::rules::main::compact_sql::compact_sql;
 use sqlbuild_analysis::semantic_validation::main::normalize_mapped::normalize_mapped;
+use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
+use sqlbuild_sqltext::sql_scan::main::follows_table_wrapper::follows_table_wrapper;
 use sqlbuild_sqltext::sql_scan::main::quote_policy::quote_policy;
 use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, QuotePolicy};
 
@@ -188,7 +190,7 @@ fn stub_calls(
             let mut wrap_close = None;
             if word == TABLE_FUNCTION_CALL
                 && wrap_table_functions
-                && !inside_table_wrapper(bytes, start)
+                && !follows_table_wrapper(&bytes[..start])
             {
                 let Ok(close) = dialect_matching_paren(bytes, open, syntax) else {
                     continue;
@@ -229,23 +231,6 @@ fn stub_calls(
     edits.sort_by_key(|(start, end, _)| (*start, *end));
     let (stubbed, offsets) = apply_edits(sql, edits);
     (stubbed, offsets, calls)
-}
-
-/// Whether the call at `start` is already written inside `TABLE( )`.
-fn inside_table_wrapper(bytes: &[u8], start: usize) -> bool {
-    let before = bytes[..start].trim_ascii_end();
-    let Some(before) = before.strip_suffix(b"(") else {
-        return false;
-    };
-    let before = before.trim_ascii_end();
-    let keyword = TABLE_WRAPPER.len() - 1;
-    before.len() >= keyword
-        && before[before.len() - keyword..]
-            .eq_ignore_ascii_case(&TABLE_WRAPPER.as_bytes()[..keyword])
-        && before
-            .len()
-            .checked_sub(keyword + 1)
-            .is_none_or(|index| !is_word_byte(before[index]))
 }
 
 /// `sql` with each edit applied, and per output character the input character it came from.
