@@ -8,7 +8,8 @@ use crate::sql_macros::constants::{
     BIGQUERY_BIG_DECIMAL_NAMES, BIGQUERY_BIGNUMERIC_LIMITS, BIGQUERY_DIALECT,
     BIGQUERY_NUMERIC_LIMITS, DECIMAL_PRECISION_LIMITS,
 };
-use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::{NormalizedType, PythonInteger, TypeDialect, TypeFamily};
 
 /// Why `returns` is not a type the adapter's SQL analysis dialect reads and can hold.
 pub(crate) fn returns_type_error(
@@ -20,7 +21,12 @@ pub(crate) fn returns_type_error(
     let reason: String = match parser.normalize_type(returns) {
         Some(normalized) => decimal_error(&normalized, parser.name())
             .or_else(|| bigquery_numeric_error(returns, &normalized, parser.name()))?,
-        None => format!("the {} parser does not know this type", parser.name()),
+        None => bigquery_numeric_error(
+            returns,
+            &normalize_text_type(returns, Some(TypeDialect::BigQuery)),
+            parser.name(),
+        )
+        .unwrap_or_else(|| format!("the {} parser does not know this type", parser.name())),
     };
     Some(format!(
         "{context} type '{returns}' is not valid for adapter '{adapter}' SQL analysis dialect \
