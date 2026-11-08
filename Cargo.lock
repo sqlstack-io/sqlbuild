@@ -4091,7 +4091,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4501,7 +4501,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-core"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "serde",
  "serde_json",
@@ -4511,7 +4511,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-semantics"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "serde",
  "serde_json",
@@ -4523,7 +4523,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-snowflake"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "serde",
  "sqlquack-core",
@@ -4532,7 +4532,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "serde",
  "serde_json",
@@ -4545,7 +4545,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-bigquery"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "sqlquack-syntax",
  "stacker",
@@ -4554,7 +4554,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-derive"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4564,7 +4564,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-postgres"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=2ae61390aa3217c4b3017575a2761dd06cccfec9#2ae61390aa3217c4b3017575a2761dd06cccfec9"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=bfa48dc9c24eb566c7905793d682283ca3cd2a50#bfa48dc9c24eb566c7905793d682283ca3cd2a50"
 dependencies = [
  "sqlquack-syntax",
 ]
@@ -4660,7 +4660,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5096,7 +5096,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
