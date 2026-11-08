@@ -14,6 +14,8 @@ pub(crate) const BIGQUERY_STUB_PREFIX: &str = "__sqlbuild_";
 pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
 /// The query a type spelling completes, with `)`, so BigQuery's parser reads it as a cast target.
 pub(crate) const CAST_TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
+/// The name of BigQuery's RANGE type.
+pub(crate) const RANGE_TYPE_NAME: &str = "RANGE";
 /// The element types of a BigQuery RANGE.
 pub(crate) const RANGE_ELEMENT_TYPES: &[&str] = &["DATE", "DATETIME", "TIMESTAMP"];
 /// The base type parameters are written in.

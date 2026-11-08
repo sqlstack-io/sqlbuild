@@ -4,6 +4,7 @@ use sqlquack_syntax::Parsed;
 
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -62,7 +63,7 @@ impl NativeDialect for PivotlessDialect {
         &POSTGRES
     }
 
-    fn normalize_type(&self, _spelling: &str) -> Option<String> {
+    fn normalize_type(&self, _spelling: &str) -> Option<NormalizedType> {
         None
     }
 
@@ -83,6 +84,12 @@ pub(super) struct NormalizeTypeTestCase {
     pub(super) description: &'static str,
     pub(super) spelling: &'static str,
     pub(super) expected_name: Option<&'static str>,
+}
+
+pub(super) struct NormalizedTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: (&'static str, TypeFamily, [Option<i64>; 3]),
 }
 
 pub(super) struct ParseFailureTestCase {

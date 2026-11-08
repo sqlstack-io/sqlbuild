@@ -3,11 +3,12 @@ use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::main::skipped_analysis::skipped_analysis;
 use crate::analysis_route::models::{AnalysisRoute, BigQueryDialect, LocatedGap};
 use crate::analysis_route::tests::test_types::{
-    NativeGapTestCase, NormalizeTypeTestCase, ParseFailureTestCase, PivotlessDialect,
-    RouteTestCase, SkippedAnalysisTestCase,
+    NativeGapTestCase, NormalizeTypeTestCase, NormalizedTypeTestCase, ParseFailureTestCase,
+    PivotlessDialect, RouteTestCase, SkippedAnalysisTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
+use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
 #[test]
 fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_legacy_path() {
@@ -412,8 +413,122 @@ fn given_a_bigquery_type_spelling_when_normalising_then_a_valid_one_keeps_polygl
         assert_eq!(
             BigQueryDialect
                 .normalize_type(test_case.spelling)
+                .map(|normalized| normalized.normalized_name)
                 .as_deref(),
             test_case.expected_name,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+/// Each expected type is the one Polyglot's `normalize_type(spelling, "bigquery")` gives.
+#[test]
+fn given_a_valid_bigquery_type_spelling_when_normalising_then_the_type_is_polyglot_s() {
+    let test_cases = [
+        NormalizedTypeTestCase {
+            description: "TIMESTAMP is Polyglot's DATETIME of the timestamp family",
+            spelling: "TIMESTAMP",
+            expected_type: ("DATETIME", TypeFamily::Timestamp, [None, None, None]),
+        },
+        NormalizedTypeTestCase {
+            description: "BOOL is Polyglot's BOOLEAN",
+            spelling: "BOOL",
+            expected_type: ("BOOLEAN", TypeFamily::Boolean, [None, None, None]),
+        },
+        NormalizedTypeTestCase {
+            description: "TINYINT keeps its name in the integer family",
+            spelling: "TINYINT",
+            expected_type: ("TINYINT", TypeFamily::Integer, [None, None, None]),
+        },
+        NormalizedTypeTestCase {
+            description: "a NUMERIC alias keeps its precision and scale",
+            spelling: "DECIMAL(38, 9)",
+            expected_type: (
+                "NUMERIC(38,9)",
+                TypeFamily::Decimal,
+                [Some(38), Some(9), None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "a sized STRING keeps its length",
+            spelling: "STRING( 10 )",
+            expected_type: ("STRING(10)", TypeFamily::String, [None, None, Some(10)]),
+        },
+        NormalizedTypeTestCase {
+            description: "BYTES(MAX) is of no family Polyglot knows",
+            spelling: "BYTES(MAX)",
+            expected_type: ("BYTES(MAX)", TypeFamily::Other, [None, None, None]),
+        },
+        NormalizedTypeTestCase {
+            description: "a top-level RANGE is read as text, so of the timestamp family",
+            spelling: "range<timestamp>",
+            expected_type: (
+                "RANGE<TIMESTAMP>",
+                TypeFamily::Timestamp,
+                [None, None, None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "an ARRAY is of no family",
+            spelling: "ARRAY<STRUCT<a TIMESTAMP>>",
+            expected_type: (
+                "ARRAY<STRUCT<ADATETIME>>",
+                TypeFamily::Other,
+                [None, None, None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "a RANGE closed by >> fails Polyglot's parse, so is read as text",
+            spelling: "ARRAY<RANGE<TIMESTAMP>>",
+            expected_type: (
+                "ARRAY<RANGE<TIMESTAMP>>",
+                TypeFamily::Timestamp,
+                [None, None, None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "a RANGE closed by > > parses",
+            spelling: "ARRAY< RANGE< TIMESTAMP > >",
+            expected_type: (
+                "ARRAY<RANGE<TIMESTAMP>>",
+                TypeFamily::Other,
+                [None, None, None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "a named RANGE field parses",
+            spelling: "STRUCT<a RANGE<TIMESTAMP> >",
+            expected_type: (
+                "STRUCT<ARANGE<TIMESTAMP>>",
+                TypeFamily::Other,
+                [None, None, None],
+            ),
+        },
+        NormalizedTypeTestCase {
+            description: "an unnamed RANGE field fails Polyglot's parse",
+            spelling: "STRUCT< RANGE< TIMESTAMP > >",
+            expected_type: (
+                "STRUCT<RANGE<TIMESTAMP>>",
+                TypeFamily::Timestamp,
+                [None, None, None],
+            ),
+        },
+    ];
+    let normalized =
+        |(name, family, [precision, scale, length]): (&str, TypeFamily, [Option<i64>; 3])| {
+            NormalizedType {
+                normalized_name: name.to_owned(),
+                family,
+                precision: precision.map(PythonInteger::from),
+                scale: scale.map(PythonInteger::from),
+                length: length.map(PythonInteger::from),
+            }
+        };
+    for test_case in test_cases {
+        assert_eq!(
+            BigQueryDialect.normalize_type(test_case.spelling),
+            Some(normalized(test_case.expected_type)),
             "{}",
             test_case.description
         );

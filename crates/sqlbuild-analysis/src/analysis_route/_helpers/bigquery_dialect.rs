@@ -8,10 +8,13 @@ use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 use crate::analysis_route::constants::{
     BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, BIGQUERY_STUB_PREFIX, CAST_TYPE_PREFIX, DECIMAL_RADIX,
     NUMERIC_DIGITS, POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES,
-    POLYGLOT_TOP_LEVEL_TYPE_NAMES, RANGE_ELEMENT_TYPES, STATEMENTS_CONSTRUCT, UNSCANNED_CONSTRUCT,
+    POLYGLOT_TOP_LEVEL_TYPE_NAMES, RANGE_ELEMENT_TYPES, RANGE_TYPE_NAME, STATEMENTS_CONSTRUCT,
+    UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{BigQueryDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
 
 impl NativeDialect for BigQueryDialect {
     fn name(&self) -> &'static str {
@@ -39,7 +42,7 @@ impl NativeDialect for BigQueryDialect {
         &BIGQUERY
     }
 
-    fn normalize_type(&self, spelling: &str) -> Option<String> {
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         let sql: String = format!("{CAST_TYPE_PREFIX}{spelling})");
         let parsed: Parsed = match parse_strict(&sql) {
             Ok(parsed) => parsed,
@@ -58,7 +61,7 @@ impl NativeDialect for BigQueryDialect {
             .0
             .is_some_and(|span| span.end == sql.chars().count());
         (ends_the_query && native_type(&cast.to).is_some())
-            .then(|| polyglot_name(spelling, &cast.to, true))
+            .then(|| polyglot_type(spelling, &cast.to))
     }
 
     fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
@@ -207,6 +210,54 @@ fn sized(base: &str, length: Option<u32>) -> Option<String> {
         None => Some(base.to_owned()),
         Some(0) => None,
         Some(length) => Some(format!("{base}({length})")),
+    }
+}
+
+/// The type Polyglot gives `spelling`: its name, the text fallback's parameters, and its family.
+fn polyglot_type(spelling: &str, data_type: &DataType) -> NormalizedType {
+    let name: String = polyglot_name(spelling, data_type, true);
+    let read: NormalizedType = normalize_text_type(&name, Some(TypeDialect::BigQuery));
+    let family: TypeFamily = match data_type {
+        DataType::Array { .. } | DataType::Struct { .. }
+            if !polyglot_reads_as_text(spelling, data_type) =>
+        {
+            TypeFamily::Other
+        }
+        DataType::Timestamp { timezone: true, .. } => TypeFamily::Timestamp,
+        _ => read.family,
+    };
+    NormalizedType {
+        normalized_name: name,
+        family,
+        ..read
+    }
+}
+
+/// Whether Polyglot cannot parse nested `spelling`: a RANGE closed by `>>`, or an unnamed RANGE field.
+fn polyglot_reads_as_text(spelling: &str, data_type: &DataType) -> bool {
+    let upper: String = spelling.to_ascii_uppercase();
+    let closed_by_shift: bool = upper.match_indices(RANGE_TYPE_NAME).any(|(at, _)| {
+        let rest: &str = upper[at + RANGE_TYPE_NAME.len()..].trim_start();
+        rest.starts_with('<')
+            && rest
+                .find('>')
+                .is_some_and(|close| rest[close + 1..].starts_with('>'))
+    });
+    closed_by_shift || unnamed_range_field(data_type)
+}
+
+/// Whether a STRUCT within `data_type` has an unnamed RANGE field.
+fn unnamed_range_field(data_type: &DataType) -> bool {
+    match data_type {
+        DataType::Array { element_type, .. } => unnamed_range_field(element_type),
+        DataType::Struct { fields, .. } => fields.iter().any(|field| {
+            let range: bool = matches!(
+                &field.data_type,
+                DataType::Custom { name } if compact(name).starts_with(RANGE_TYPE_NAME)
+            );
+            field.name.is_empty() && range || unnamed_range_field(&field.data_type)
+        }),
+        _ => false,
     }
 }
 
