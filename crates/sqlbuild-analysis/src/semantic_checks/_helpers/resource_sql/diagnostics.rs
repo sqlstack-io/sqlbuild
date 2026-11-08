@@ -266,7 +266,8 @@ pub(crate) fn missing_column_diagnostic(
     })
 }
 
-/// Every audit, SQL test and SQL hook finding, in Python's first-seen order.
+/// Every audit, SQL test and SQL hook finding, in Python's first-seen order; where no native
+/// parser reads the dialect, only the audits of declared columns, as no SQL is read.
 pub(crate) fn resource_sql_findings(
     request: &ResourceSqlRequest,
     catalog: &ProjectCatalog,
@@ -275,6 +276,12 @@ pub(crate) fn resource_sql_findings(
         .iter()
         .map(missing_column_diagnostic)
         .collect::<Result<_, _>>()?;
+    if matches!(
+        analysis_route(request.dialect.as_deref()),
+        AnalysisRoute::Unavailable
+    ) {
+        return Ok(diagnostics);
+    }
     let pool = || catalog.analysis_pool();
     let checked = resources(request, &pool).map_err(ResourceSqlFailure::Internal)?;
     if checked.is_empty() {
