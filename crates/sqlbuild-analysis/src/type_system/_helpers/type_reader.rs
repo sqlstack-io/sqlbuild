@@ -228,6 +228,7 @@ impl Reader<'_> {
                 self.expect_punct(close)?;
                 Ok(json!({"data_type": "array", "element_type": element}))
             }
+            "NULLABLE" if self.dialect == SpellingDialect::ClickHouse => self.nullable(),
             "MAP" => {
                 let close: char = self.open_nested()?;
                 let key: Value = self.data_type()?;
@@ -266,6 +267,19 @@ impl Reader<'_> {
             "TIMESTAMP" => self.time_type("timestamp", self.dialect == SpellingDialect::BigQuery),
             "TIME" => self.time_type("time", false),
             _ => self.scalar_type(word, &upper),
+        }
+    }
+
+    /// ClickHouse's `Nullable(T)`, which wraps one scalar type: not another Nullable or a nested type.
+    fn nullable(&mut self) -> Result<Value, String> {
+        self.expect_punct('(')?;
+        let inner: Value = self.data_type()?;
+        self.expect_punct(')')?;
+        match inner.get("data_type").and_then(Value::as_str) {
+            Some(tag @ ("nullable" | "array" | "map" | "struct")) => {
+                Err(format!("Nullable cannot wrap the {tag} type"))
+            }
+            _ => Ok(json!({"data_type": "nullable", "inner_type": inner})),
         }
     }
 
@@ -315,7 +329,13 @@ impl Reader<'_> {
             }
             "CHAR" | "CHARACTER" => tagged("char", self.text_length(Self::sized_length)?),
             "STRING" => tagged("string", self.text_length(Self::length)?),
-            "BINARY" => tagged("binary", self.length()?),
+            "BINARY" => {
+                let length: Option<u32> = self.length()?;
+                if length.is_none() && self.dialect == SpellingDialect::ClickHouse {
+                    return Err("ClickHouse's BINARY needs a length".to_owned());
+                }
+                tagged("binary", length)
+            }
             "GEOGRAPHY" if self.single_geography() => {
                 if !self.max_length() {
                     self.length()?;

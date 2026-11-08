@@ -206,7 +206,7 @@ impl Speller<'_> {
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
         let length: Option<u64> = number("length");
         match tag {
-            "text_with_length" if dialect == ClickHouse => self.write("Nullable(String)"),
+            "text_with_length" if dialect == ClickHouse => self.clickhouse("String", map_key),
             "char" | "var_char" | "string" | "text" if dialect == ClickHouse => {
                 self.write("String");
             }
@@ -243,6 +243,7 @@ impl Speller<'_> {
             "binary" => match dialect {
                 Postgres => self.sized("BYTEA", length),
                 DuckDb | Sqlite => self.sized("BLOB", length),
+                ClickHouse => self.sized("FixedString", length),
                 _ => self.sized("BINARY", length),
             },
             "var_binary" => match dialect {
@@ -257,7 +258,7 @@ impl Speller<'_> {
                 Tsql | DuckDb => self.write("VARBINARY"),
                 BigQuery => self.write("BYTES"),
                 Databricks => self.write("BINARY"),
-                ClickHouse => self.write("Nullable(String)"),
+                ClickHouse => self.clickhouse("String", map_key),
                 _ => self.write("BLOB"),
             },
             "bit" => match dialect {
@@ -335,6 +336,11 @@ impl Speller<'_> {
         let dialect: SpellingDialect = self.dialect;
         let number = |key: &str| tree.get(key).and_then(Value::as_u64);
         match tag {
+            "nullable" => {
+                self.write("Nullable(");
+                self.data_type(tree.get("inner_type").unwrap_or(&Value::Null), true);
+                self.write(")");
+            }
             "array" => {
                 let element: &Value = tree.get("element_type").unwrap_or(&Value::Null);
                 match dialect {
