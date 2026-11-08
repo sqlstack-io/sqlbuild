@@ -103,7 +103,7 @@ pub(crate) fn model_contract_diagnostics(
             continue;
         };
         if validate_declared_shape {
-            diagnostics.extend(nullability(index, declared, inferred));
+            diagnostics.extend(nullability(types, index, declared, inferred));
         }
         let Some(declared_type) = declared.declared_type.as_deref() else {
             continue;
@@ -205,11 +205,12 @@ fn extra_columns(
 }
 
 fn nullability(
+    types: &TypeComparer<'_>,
     index: usize,
     declared: &DeclaredColumn,
     inferred: &InferredOutputColumn,
 ) -> Option<ContractDiagnostic> {
-    if !declared.not_null || !inferred.nullable {
+    if !types.nullable_into_non_null(declared, inferred) {
         return None;
     }
     Some(ContractDiagnostic {

@@ -182,6 +182,10 @@ fn compile_inputs<'py>(py: Python<'py>, request: &InputsRequest) -> PyResult<Bou
                 "declaration_resolver",
                 native_field(&declaration_scope, "resolver")?,
             ),
+            (
+                "sql_analysis_dialect",
+                native_field(&adapter_context, "sql_analysis_dialect")?,
+            ),
         ],
     )?;
     let models: ModelBuild<'py> = model_build(request, &discovered, &model_context)?;

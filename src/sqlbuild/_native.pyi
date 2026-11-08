@@ -9176,12 +9176,14 @@ class CompileAdapterContext(NativeRecord):
     collection_rendering: CollectionRendering
     python_functions_inherit_default_namespace: bool
     sql_lexical_syntax: SqlLexicalSyntax
+    sql_analysis_dialect: str | None
     def __init__(
         self,
         value_renderer: TypedSqlValueRenderer,
         collection_rendering: CollectionRendering,
         python_functions_inherit_default_namespace: bool,
         sql_lexical_syntax: SqlLexicalSyntax,
+        sql_analysis_dialect: str | None = None,
     ) -> None: ...
 
 class InvalidSqlReferenceCall(NativeRecord):
