@@ -1,8 +1,10 @@
 use crate::analysis_route::main::native_gap::native_gap;
+use crate::analysis_route::models::NativeAnalysis;
 use crate::analysis_route::models::{BigQueryDialect, LocatedGap};
+use crate::analysis_route::tests::helpers::analysed;
 use crate::analysis_route::tests::test_types::{
-    NativeGapTestCase, NormalizeTypeTestCase, NormalizedTypeTestCase, ParseFailureTestCase,
-    SessionTypeTestCase,
+    FindingTestCase, NativeGapTestCase, NormalizeTypeTestCase, NormalizedTypeTestCase,
+    ParseFailureTestCase, SessionTypeTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
@@ -461,6 +463,50 @@ fn given_a_session_type_when_bigquery_reads_it_then_spellings_it_cannot_read_tak
         assert_eq!(
             BigQueryDialect.session_type(test_case.spelling),
             test_case.expected_type,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_cast_to_a_bigquery_type_when_analysing_then_only_types_bigquery_lacks_are_b218() {
+    let test_cases = [
+        FindingTestCase {
+            description: "RANGE<DATE> is a BigQuery type the engine families do not name",
+            dialect: &BigQueryDialect,
+            sql: "SELECT CAST(NULL AS RANGE<DATE>) AS period FROM orders",
+            extension_functions: &[],
+            expected_findings: &[],
+        },
+        FindingTestCase {
+            description: "RANGE<TIMESTAMP> is a BigQuery type",
+            dialect: &BigQueryDialect,
+            sql: "SELECT CAST(NULL AS RANGE<TIMESTAMP>) AS active_window FROM orders",
+            extension_functions: &[],
+            expected_findings: &[],
+        },
+        FindingTestCase {
+            description: "RANGE<INT64> is no BigQuery type, so its cast stays B218, unplaced",
+            dialect: &BigQueryDialect,
+            sql: "SELECT CAST(NULL AS RANGE<INT64>) AS span FROM orders",
+            extension_functions: &[],
+            expected_findings: &[("B218", None)],
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(
+            test_case.dialect,
+            test_case.sql,
+            test_case.extension_functions,
+        );
+        let findings: Vec<(&str, Option<(usize, usize)>)> = analysis
+            .diagnostics
+            .iter()
+            .map(|row| (row.code.as_str(), row.line.zip(row.column)))
+            .collect();
+        assert_eq!(
+            findings, test_case.expected_findings,
             "{}",
             test_case.description
         );
