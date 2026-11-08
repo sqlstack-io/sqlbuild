@@ -8,5 +8,7 @@ mod test_native_dialect;
 mod test_native_gap;
 #[path = "tests/test_native_outcome.rs"]
 mod test_native_outcome;
+#[path = "tests/test_native_revalidation.rs"]
+mod test_native_revalidation;
 #[path = "tests/test_types.rs"]
 mod test_types;

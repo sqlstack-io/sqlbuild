@@ -4,9 +4,12 @@ use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
-use crate::assembly::analysis_session::models::{LineageRow, SessionSchema};
+use crate::assembly::analysis_session::models::{
+    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, SessionSchema,
+};
 use crate::assembly::analysis_session::types::Shapes;
 use crate::lineage::models::{LineageColumn, LineageSource};
+use crate::semantic_checks::types::RevisedBinding;
 
 /// `orders` with a non-null INTEGER id and a nullable VARCHAR status.
 pub(super) fn orders() -> StandInSchema {
@@ -103,4 +106,41 @@ fn schema_column(&(name, data_type, nullability): &(&str, &str, Nullability)) ->
         data_type: Some(data_type.to_owned()),
         nullability,
     }
+}
+
+/// A finished outcome of `sql` over `orders`, as the session bound it.
+pub(super) fn outcome(sql: &str) -> ModelOutcome {
+    ModelOutcome {
+        analysis: ModelAnalysis {
+            analysis_succeeded: true,
+            columns: None,
+            lineage: LineageFacts::Native(Vec::new()),
+            has_star: false,
+            star_resolved: false,
+            binding_diagnostics: Vec::new(),
+            binding_validated: true,
+        },
+        cleaned_sql: sql.to_owned(),
+        deferred_cleaning: None,
+        validated_schema: vec![(
+            "orders".to_owned(),
+            vec![
+                ("id".to_owned(), "INTEGER".to_owned()),
+                ("status".to_owned(), "VARCHAR".to_owned()),
+            ],
+        )],
+        fused_binding_validated: true,
+        sql_macro_findings: Vec::new(),
+    }
+}
+
+/// Each revised finding of every model as `(code, start, end)`, in order.
+pub(super) fn finding_rows(
+    models: &[Vec<RevisedBinding>],
+) -> Vec<(&str, Option<i64>, Option<i64>)> {
+    let mut rows: Vec<(&str, Option<i64>, Option<i64>)> = Vec::new();
+    for (code, start, end) in models.iter().flatten() {
+        rows.push((code.as_str(), *start, *end));
+    }
+    rows
 }

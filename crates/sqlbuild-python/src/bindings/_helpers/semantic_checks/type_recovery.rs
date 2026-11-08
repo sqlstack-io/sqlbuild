@@ -107,9 +107,12 @@ pub(crate) fn recovered_types<'py>(
     let poisoned: Vec<(String, String)> = plan.poisoned_outputs();
     let models_to_revalidate: Vec<usize> = plan.revalidated_models();
     let revised: Vec<Vec<RevisedBinding>> = match analysis_route(request.dialect.as_deref()) {
-        AnalysisRoute::Native(dialect) => {
-            natively_revalidated(dialect, project, (&models_to_revalidate, &poisoned), shared)?
-        }
+        AnalysisRoute::Native(dialect) => natively_revalidated(
+            py,
+            dialect,
+            (&request, &models_to_revalidate, &poisoned),
+            shared,
+        )?,
         AnalysisRoute::Legacy | AnalysisRoute::Unavailable => {
             revalidated(classes, project, &models_to_revalidate, &poisoned)?
         }
@@ -256,32 +259,35 @@ fn recovery_model(
 
 /// Each planned model revalidated by the dialect's native analysis, never the Polyglot catalog.
 fn natively_revalidated(
+    py: Python<'_>,
     dialect: &'static dyn NativeDialect,
-    project: &Bound<'_, PyAny>,
-    (models, poisoned): (&[usize], &[(String, String)]),
+    (request, models, poisoned): (&TypeRecoveryRequest, &[usize], &[(String, String)]),
     shared: &StageShared<'_>,
 ) -> PyResult<Vec<Vec<RevisedBinding>>> {
     if models.is_empty() {
         return Ok(Vec::new());
     }
-    let py: Python<'_> = project.py();
     let session: &NativeModelAnalysisSession = shared
         .session
         .ok_or_else(|| internal_error("revalidating a native route without its session"))?;
     let finished = session
         .finished_session()
         .ok_or_else(|| internal_error("revalidating before the session finished"))?;
-    let project_models: Bound<'_, PyAny> = native_field(project, "models")?;
-    let mut names: Vec<String> = Vec::with_capacity(models.len());
+    let mut planned: Vec<&RecoveryModel> = Vec::with_capacity(models.len());
     for index in models {
-        names.push(native_field(&project_models.get_item(*index)?, "name")?.extract()?);
+        planned.push(
+            request
+                .models
+                .get(*index)
+                .ok_or_else(|| internal_error("type recovery planned a model it does not hold"))?,
+        );
     }
-    count_stage(py, SCHEMA_REVALIDATIONS, names.len() as u64)?;
+    count_stage(py, SCHEMA_REVALIDATIONS, planned.len() as u64)?;
     py.compiler_detach(|| {
         Ok(native_revalidation(
             dialect,
             (finished, session.outcomes()),
-            &names,
+            &planned,
             poisoned,
         ))
     })

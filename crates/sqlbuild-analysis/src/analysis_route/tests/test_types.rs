@@ -157,6 +157,13 @@ pub(super) struct MarkerLineageTestCase {
     pub(super) expected_lines: &'static [&'static str],
 }
 
+pub(super) struct RevalidationTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) poisoned: &'static [(&'static str, &'static str)],
+    pub(super) expected_rows: &'static [(&'static str, Option<i64>, Option<i64>)],
+}
+
 pub(super) struct ReadWholeTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
