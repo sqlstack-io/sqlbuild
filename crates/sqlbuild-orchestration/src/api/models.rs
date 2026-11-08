@@ -431,3 +431,11 @@ pub(crate) struct UiAsset {
     pub(crate) path: &'static str,
     pub(crate) body: &'static [u8],
 }
+
+/// A decompressing reader that fails once it would yield more than `remaining` bytes.
+#[derive(Debug)]
+pub(crate) struct BoundedReader<R> {
+    pub(crate) inner: R,
+    pub(crate) remaining: usize,
+    pub(crate) exceeded: bool,
+}
