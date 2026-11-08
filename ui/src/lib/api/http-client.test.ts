@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpChangeFeed, feedAllowed } from './http-client';
+import { HttpChangeFeed, createHttpClient, feedAllowed } from './http-client';
 import type { ChangedSignal, ConnectionState } from './signals';
 
 /** A stand-in `EventSource` the test opens, fails and feeds by hand. */
@@ -235,5 +235,45 @@ describe('feedAllowed', () => {
 	it('rejects when the network fails, so the feed keeps retrying', async () => {
 		vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('network down'))));
 		await expect(feedAllowed('', ORDERS, () => {})).rejects.toThrow('network down');
+	});
+});
+
+describe('listing requests', () => {
+	const tick = { tick_id: 'k-2', trigger_id: 't-orders', scheduled_for: '2026-11-07T06:00:00Z', evaluated_at: '2026-11-07T06:00:02Z', epoch: 1, outcome: 'requested', run_id: null, covered_by_run_id: null };
+	const declaration = { description: 'Daily orders', job_key: 'orders', schedule: { kind: 'cron', expression: '0 6 * * *', timezone: 'UTC' } };
+	const triggers = [
+		{ trigger_id: 't-orders', name: 'orders_daily', job_key: 'orders', definition_json: declaration, status: 'running', last_tick_for: null, next_due_at: null, latest_tick: tick },
+		{ trigger_id: 't-stock', name: 'stock_daily', job_key: 'stock', definition_json: declaration, status: 'running', last_tick_for: null, next_due_at: null, latest_tick: null }
+	];
+
+	function server() {
+		const calls: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname.replace('/api/control/locations/0191f0aa-orders/targets/development', '');
+				calls.push(`${request.method} ${path}`);
+				const body = request.method === 'POST' ? { applied: true } : path === '/triggers' ? triggers : [];
+				return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+			})
+		);
+		return { calls, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('lists triggers with their newest tick in one request, never one per trigger', async () => {
+		const { calls, client } = server();
+		const listed = await client.listTriggers(ORDERS);
+		expect(listed.map((t) => t.lastTick?.id ?? null)).toEqual(['k-2', null]);
+		expect(calls.sort()).toEqual(['GET /runs', 'GET /triggers']);
+	});
+
+	it('shares listings between pages that refresh together, and reads again after a write', async () => {
+		const { calls, client } = server();
+		await Promise.all([client.listJobs(ORDERS), client.listTriggers(ORDERS)]);
+		expect(calls.sort()).toEqual(['GET /jobs', 'GET /runs', 'GET /triggers']);
+		calls.length = 0;
+		await client.setTriggerStates(ORDERS, ['t-orders'], 'paused');
+		expect([calls[0], ...calls.slice(1).sort()]).toEqual(['POST /api/control/triggers', 'GET /runs', 'GET /triggers']);
 	});
 });

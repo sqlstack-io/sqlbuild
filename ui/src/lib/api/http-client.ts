@@ -227,6 +227,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, runId);
@@ -235,6 +236,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const source = await requireRun(scope, runId);
 			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -253,6 +255,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -387,7 +390,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		}
 	};
 
-	async function listedJobs(scope: Scope) {
+	/**
+	 * One request per listing at a time: pages that refresh together on a change notice share it
+	 * instead of each asking the server again. A write clears it, so reads after a write see it.
+	 */
+	const inFlight = new Map<string, Promise<unknown>>();
+	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
+		const pending = inFlight.get(key) as Promise<T> | undefined;
+		if (pending) return pending;
+		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
+		inFlight.set(key, started);
+		return started;
+	}
+
+	const listedJobs = (scope: Scope) => shared(`jobs ${scope.locationId}`, () => fetchJobs(scope));
+
+	async function fetchJobs(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/jobs', { params: { path: { location_id: locationId, target } } });
 		if (response.status === 401) onUnauthorized();
@@ -395,7 +413,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
-	async function listedTriggers(scope: Scope) {
+	const listedTriggers = (scope: Scope) => shared(`triggers ${scope.locationId}`, () => fetchTriggers(scope));
+
+	/** Published triggers, each with its newest tick. */
+	async function fetchTriggers(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers', { params: { path: { location_id: locationId, target } } });
 		if (response.status === 401) onUnauthorized();
@@ -446,8 +467,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	/** Triggers with their latest tick and the newest listed run each started. */
 	async function triggersOf(scope: Scope): Promise<Trigger[]> {
 		const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
-		const latest = await Promise.all(wires.map(async (t) => (await ticksOf(scope, t.trigger_id, 1)).map(toTick)[0] ?? null));
-		return wires.map((t, i) => toTrigger(t, runs, latest[i]));
+		return wires.map((t) => toTrigger(t, runs, t.latest_tick ? toTick(t.latest_tick) : null));
 	}
 
 	async function requireTrigger(scope: Scope, id: string): Promise<Trigger> {
@@ -460,12 +480,15 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
 		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
 		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		inFlight.clear();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 	}
 
+	const listedRuns = (scope: Scope) => shared(`runs ${scope.locationId}`, () => fetchRuns(scope));
+
 	/** The newest runs of the location, up to the server's cap. */
-	async function listedRuns(scope: Scope) {
+	async function fetchRuns(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
 			params: { path: { location_id: locationId, target }, query: { limit: RUN_WINDOW } }

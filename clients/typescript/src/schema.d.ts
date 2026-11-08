@@ -1617,6 +1617,10 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
+        PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
+            latest_tick?: null | components["schemas"]["TickRecord"];
+        };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {
             observation: components["schemas"]["CatalogObservation"];
@@ -3740,12 +3744,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Published triggers with their newest tick */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TriggerRecord"][];
+                    "application/json": components["schemas"]["PersonTriggerRecord"][];
                 };
             };
             /** @description Session rejected */

@@ -3,8 +3,11 @@
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
 use crate::credentials::main::identities::create_principal::create_principal;
-use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
+use crate::declarations::main::list_person_triggers::list_person_triggers;
+use crate::scheduler::tests::contracts::ticks::helpers::{calendar_text, calendar_time};
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
+use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::models::{Parameter, TransactionMode};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -49,13 +52,13 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             description: "SQLite scoped HTTP reads",
             backend: Backend::Sqlite,
             expected_runs: 3,
-            expected_ticks: 1,
+            expected_ticks: 2,
         },
         ApiReadTestCase {
             description: "PostgreSQL scoped HTTP reads",
             backend: Backend::Postgres,
             expected_runs: 3,
-            expected_ticks: 1,
+            expected_ticks: 2,
         },
     ];
     for test_case in test_cases {
@@ -322,6 +325,19 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             let events = read_json(&client, (&event_path, &token.bearer)).await;
             assert_eq!(events.as_array().expect("events").len(), 1);
             assert_eq!(events[0]["request_json"], json!(change));
+            let (transaction, _) = query(
+                begin(store, TransactionMode::Write).await.expect("seed older tick"),
+                "INSERT INTO sqb_ticks (tick_id,trigger_id,scheduled_for,evaluated_at,epoch,outcome) \
+                 VALUES ($1,$2,$3,$3,1,'covered')",
+                vec![
+                    Parameter::Id(Uuid::now_v7()),
+                    Parameter::Id(trigger_id),
+                    Parameter::Time(calendar_time(1)),
+                ],
+            )
+            .await
+            .expect("older tick");
+            commit(transaction).await.expect("commit older tick");
             let ticks = read_json(&client, (&tick_path, &token.bearer)).await;
             assert_eq!(
                 ticks.as_array().expect("ticks").len(),
@@ -329,9 +345,29 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             );
             assert_eq!(ticks[0]["outcome"], "requested");
             assert_eq!(ticks[0]["scheduled_for"], calendar_text(2));
+            assert_eq!(ticks[1]["outcome"], "covered");
             let administrator = bootstrap_user(store, &audit, "orders-admin")
                 .await
                 .expect("administrator");
+            for (target, expected) in [
+                ("development", ticks[0].clone()),
+                ("validation", json!(null)),
+            ] {
+                let listed = list_person_triggers(
+                    store,
+                    (&audit, administrator),
+                    (location_id, target),
+                    DefaultRole::None,
+                )
+                .await
+                .expect("person triggers");
+                assert_eq!(listed.len(), 1, "{target}");
+                assert_eq!(
+                    json!(listed[0].latest_tick),
+                    expected,
+                    "newest tick only, never another target's"
+                );
+            }
             let mut extra = input.clone();
             extra.generation += 1;
             extra.nodes.remove("products");
