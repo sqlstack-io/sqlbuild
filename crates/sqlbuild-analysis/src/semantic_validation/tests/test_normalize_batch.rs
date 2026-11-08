@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::semantic_validation::main::normalize_batch::normalize_analysis_sqls;
-use crate::semantic_validation::tests::test_types::NormalizationBatchTestCase;
+use crate::semantic_validation::main::normalize_native::normalize_native_sql;
+use crate::semantic_validation::tests::test_types::{
+    NativeStubTestCase, NormalizationBatchTestCase,
+};
 use crate::semantic_validation::types::NormalizationRequest;
 
 #[test]
@@ -95,6 +98,46 @@ fn given_batch_when_normalizing_on_pool_or_in_turn_then_matches_single_calls_in_
         assert_eq!(
             normalize_analysis_sqls(test_case.dialect, requests(), None),
             expected,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names_in_code_are_respelt()
+ {
+    let test_cases = [
+        NativeStubTestCase {
+            description: "a cursor stub in code takes the dialect's prefix",
+            sql: "SELECT * FROM t WHERE ts > __cursor_start()",
+            expected_sql: "SELECT * FROM t WHERE ts > __sqlbuild.cursor_start()",
+        },
+        NativeStubTestCase {
+            description: "a cursor stub's text inside a string literal is left as written",
+            sql: "SELECT '__cursor_start()' AS s FROM t",
+            expected_sql: "SELECT '__cursor_start()' AS s FROM t",
+        },
+        NativeStubTestCase {
+            description: "a cursor stub's text inside a comment is left as written",
+            sql: "SELECT 1 FROM t -- __cursor_end()\n",
+            expected_sql: "SELECT 1 FROM t -- __cursor_end()\n",
+        },
+        NativeStubTestCase {
+            description: "a longer name ending in a cursor stub's text is another function",
+            sql: "SELECT x__cursor_end() FROM t",
+            expected_sql: "SELECT x__cursor_end() FROM t",
+        },
+        NativeStubTestCase {
+            description: "a quoted stub beside a stub in code leaves only the code one respelt",
+            sql: "SELECT '__cursor_end()', __cursor_end() FROM t",
+            expected_sql: "SELECT '__cursor_end()', __sqlbuild.cursor_end() FROM t",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            normalize_native_sql(test_case.sql, "postgres", "__sqlbuild.").as_deref(),
+            Ok(test_case.expected_sql),
             "{}",
             test_case.description
         );

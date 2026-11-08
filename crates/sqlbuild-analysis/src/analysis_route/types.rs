@@ -77,16 +77,27 @@ pub trait NativeDialect: Sync {
         }
     }
 
-    /// Whether a declared and an inferred type match, nullability apart; `NotCompared` when
-    /// `normalize_type` gives `None` for either. An override must keep that rule.
-    fn type_match(&self, declared: &str, inferred: &str, inferred_nullable: bool) -> TypeMatch {
+    /// Whether a declared and an inferred type match, nullability apart; `NotCompared` when the
+    /// inferred type is unknown or `normalize_type` gives `None` for either side. An override must
+    /// keep that rule, and may still say whether the declared type alone forbids null.
+    fn type_match(
+        &self,
+        declared: &str,
+        inferred: Option<&str>,
+        inferred_nullable: bool,
+    ) -> TypeMatch {
         let _ = inferred_nullable;
-        match (self.normalize_type(declared), self.normalize_type(inferred)) {
+        match (
+            self.normalize_type(declared),
+            inferred.and_then(|inferred| self.normalize_type(inferred)),
+        ) {
             (Some(declared), Some(inferred)) => TypeMatch::Compared {
                 same_type: declared == inferred,
                 nullable_into_non_null: false,
             },
-            _ => TypeMatch::NotCompared,
+            _ => TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
         }
     }
 }

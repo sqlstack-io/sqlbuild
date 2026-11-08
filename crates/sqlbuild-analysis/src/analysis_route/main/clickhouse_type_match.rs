@@ -1,15 +1,41 @@
 use crate::analysis_route::constants::{LOW_CARDINALITY_WRAPPER, NULLABLE_WRAPPER};
 use crate::analysis_route::models::TypeMatch;
 
-/// A declared and an inferred ClickHouse type compared without top-level wrappers, nullability apart.
+/// A declared and an inferred ClickHouse type compared without top-level wrappers or spacing,
+/// nullability apart. A declared type without `Nullable` forbids null even when the inferred type
+/// is unknown. An arm compares spellings it has respelt through its aliases.
 #[must_use]
-pub fn clickhouse_type_match(declared: &str, inferred: &str, inferred_nullable: bool) -> TypeMatch {
+pub fn clickhouse_type_match(
+    declared: &str,
+    inferred: Option<&str>,
+    inferred_nullable: bool,
+) -> TypeMatch {
     let (declared_base, declared_nullable) = unwrapped(declared);
+    let Some(inferred) = inferred else {
+        return TypeMatch::NotCompared {
+            nullable_into_non_null: !declared_nullable && inferred_nullable,
+        };
+    };
     let (inferred_base, wrapped_nullable) = unwrapped(inferred);
     TypeMatch::Compared {
-        same_type: declared_base == inferred_base,
+        same_type: unspaced(declared_base) == unspaced(inferred_base),
         nullable_into_non_null: !declared_nullable && (inferred_nullable || wrapped_nullable),
     }
+}
+
+/// `type_sql` without whitespace outside its quoted strings, so `Decimal(10, 2)` is `Decimal(10,2)`
+/// and an `Enum8('a b' = 1)` value keeps its space.
+fn unspaced(type_sql: &str) -> String {
+    let mut quoted: bool = false;
+    type_sql
+        .chars()
+        .filter(|character| {
+            if *character == '\'' {
+                quoted = !quoted;
+            }
+            quoted || !character.is_whitespace()
+        })
+        .collect()
 }
 
 /// The type inside its top-level `Nullable` and `LowCardinality` wrappers, and whether it is nullable.

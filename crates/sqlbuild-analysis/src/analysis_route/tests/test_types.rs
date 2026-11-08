@@ -126,14 +126,14 @@ pub(super) struct ReadWholeTestCase {
 pub(super) struct NativeTypeMatchTestCase {
     pub(super) description: &'static str,
     pub(super) declared: &'static str,
-    pub(super) inferred: &'static str,
+    pub(super) inferred: Option<&'static str>,
     pub(super) expected_match: TypeMatch,
 }
 
 pub(super) struct TypeMatchTestCase {
     pub(super) description: &'static str,
     pub(super) declared: &'static str,
-    pub(super) inferred: &'static str,
+    pub(super) inferred: Option<&'static str>,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
 }

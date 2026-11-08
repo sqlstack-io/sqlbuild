@@ -52,8 +52,8 @@ impl<'a> TypeComparer<'a> {
             AnalysisRoute::Legacy => {}
             AnalysisRoute::Unavailable => return Ok(TypeComparison::NotCompared),
             AnalysisRoute::Native(dialect) => {
-                return Ok(match dialect.type_match(left, right, false) {
-                    TypeMatch::NotCompared => TypeComparison::NotCompared,
+                return Ok(match dialect.type_match(left, Some(right), false) {
+                    TypeMatch::NotCompared { .. } => TypeComparison::NotCompared,
                     TypeMatch::Compared {
                         same_type: true, ..
                     } => TypeComparison::Equal,
@@ -79,18 +79,22 @@ impl<'a> TypeComparer<'a> {
         if declared.not_null && inferred.nullable {
             return true;
         }
-        let (AnalysisRoute::Native(dialect), Some(declared_type), Some(inferred_type)) = (
-            self.route,
-            declared.declared_type.as_deref(),
-            inferred.inferred_type.as_deref(),
-        ) else {
+        let (AnalysisRoute::Native(dialect), Some(declared_type)) =
+            (self.route, declared.declared_type.as_deref())
+        else {
             return false;
         };
         matches!(
-            dialect.type_match(declared_type, inferred_type, inferred.nullable),
+            dialect.type_match(
+                declared_type,
+                inferred.inferred_type.as_deref(),
+                inferred.nullable
+            ),
             TypeMatch::Compared {
                 nullable_into_non_null: true,
                 ..
+            } | TypeMatch::NotCompared {
+                nullable_into_non_null: true
             }
         )
     }

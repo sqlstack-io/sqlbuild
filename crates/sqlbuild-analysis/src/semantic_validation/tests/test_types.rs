@@ -53,6 +53,12 @@ pub(crate) struct NormalizationBatchTestCase {
     pub(crate) expected_failures: &'static [usize],
 }
 
+pub(crate) struct NativeStubTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_sql: &'static str,
+}
+
 pub(crate) struct TruthTestScanTestCase {
     pub(crate) description: &'static str,
     pub(crate) sql: &'static str,

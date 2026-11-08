@@ -43,8 +43,12 @@ pub struct LocatedGap {
 /// How an inferred column type meets its declared type: the type itself, then its nullability.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TypeMatch {
-    /// One side is a type the dialect cannot spell or refuses: no finding and no match.
-    NotCompared,
+    /// One side is a type the dialect cannot spell, refuses or does not know: no type finding and
+    /// no match, though the declared type alone may still forbid null.
+    NotCompared {
+        /// The inferred column may be null, but its declared type does not allow it.
+        nullable_into_non_null: bool,
+    },
     Compared {
         same_type: bool,
         /// The inferred column may be null, but its declared type does not allow it.

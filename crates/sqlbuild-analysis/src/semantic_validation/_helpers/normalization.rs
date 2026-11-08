@@ -194,17 +194,52 @@ pub(crate) fn normalize_native_sql(
     let udf_prefix: String = format!("{stub_prefix}udf_");
     let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
-    Ok(stubs
-        .replace_all(&normalized, |captures: &regex::Captures<'_>| {
-            match (captures.get(1), captures.get(2)) {
-                (Some(bound), _) => format!("{stub_prefix}cursor_{}()", bound.as_str()),
-                (None, Some(parameter)) => {
-                    format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str())
-                }
-                (None, None) => captures[0].to_owned(),
+    let non_code: Vec<(usize, usize)> = non_code_ranges(&normalized)?;
+    let mut native: String = String::with_capacity(normalized.len());
+    let mut copied_until: usize = 0;
+    for captures in stubs.captures_iter(&normalized) {
+        let whole = captures.get(0).ok_or("missing stub match")?;
+        let quoted: bool = non_code
+            .iter()
+            .any(|&(start, end)| start <= whole.start() && whole.start() < end);
+        // A cursor stub is a whole name: `x__cursor_start()` is another function.
+        let glued: bool = captures.get(1).is_some()
+            && normalized[..whole.start()]
+                .chars()
+                .next_back()
+                .is_some_and(|character| character.is_alphanumeric() || character == '_');
+        if quoted || glued {
+            continue;
+        }
+        native.push_str(&normalized[copied_until..whole.start()]);
+        match (captures.get(1), captures.get(2)) {
+            (Some(bound), _) => {
+                native.push_str(&format!("{stub_prefix}cursor_{}()", bound.as_str()));
             }
-        })
-        .into_owned())
+            (None, Some(parameter)) => {
+                native.push_str(&format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str()));
+            }
+            (None, None) => native.push_str(whole.as_str()),
+        }
+        copied_until = whole.end();
+    }
+    native.push_str(&normalized[copied_until..]);
+    Ok(native)
+}
+
+/// The byte ranges of `sql`'s strings, quoted identifiers and comments, in order.
+fn non_code_ranges(sql: &str) -> Result<Vec<(usize, usize)>, String> {
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    let mut index: usize = 0;
+    while index < sql.len() {
+        if let Some(end) = skip_non_code(sql, index)? {
+            ranges.push((index, end));
+            index = end;
+            continue;
+        }
+        index += sql[index..].chars().next().map_or(1, char::len_utf8);
+    }
+    Ok(ranges)
 }
 
 pub(crate) fn normalize_dialect_sql_mapped(

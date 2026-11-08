@@ -96,19 +96,31 @@ fn given_a_type_the_dialect_refuses_when_matching_types_then_nothing_is_compared
         NativeTypeMatchTestCase {
             description: "a refused declared type is not compared",
             declared: "NOT_A_TYPE",
-            inferred: "INTEGER",
-            expected_match: TypeMatch::NotCompared,
+            inferred: Some("INTEGER"),
+            expected_match: TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
         },
         NativeTypeMatchTestCase {
             description: "a refused inferred type is not compared",
             declared: "INTEGER",
-            inferred: "NOT_A_TYPE",
-            expected_match: TypeMatch::NotCompared,
+            inferred: Some("NOT_A_TYPE"),
+            expected_match: TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
+        },
+        NativeTypeMatchTestCase {
+            description: "an unknown inferred type is not compared",
+            declared: "INTEGER",
+            inferred: None,
+            expected_match: TypeMatch::NotCompared {
+                nullable_into_non_null: false,
+            },
         },
         NativeTypeMatchTestCase {
             description: "two known, different types still mismatch",
             declared: "INTEGER",
-            inferred: "TEXT",
+            inferred: Some("TEXT"),
             expected_match: TypeMatch::Compared {
                 same_type: false,
                 nullable_into_non_null: false,
@@ -117,7 +129,7 @@ fn given_a_type_the_dialect_refuses_when_matching_types_then_nothing_is_compared
         NativeTypeMatchTestCase {
             description: "the same type matches",
             declared: "INTEGER",
-            inferred: "integer",
+            inferred: Some("integer"),
             expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: false,
