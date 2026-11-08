@@ -1,4 +1,7 @@
 //! `rules_tree_parser`: the parser that reads a dialect's SQL for rules.
+//!
+//! A dialect is added here, one line, only once its parser passes the depth probe with an empty
+//! allowlist; BigQuery is next, after its depth work lands.
 
 use sqlquack_syntax::Dialect;
 

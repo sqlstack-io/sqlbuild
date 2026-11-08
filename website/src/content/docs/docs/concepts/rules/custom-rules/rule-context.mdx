@@ -91,9 +91,15 @@ The tree comes from the SQLQuack parser SQLBuild uses for the project's dialect:
 | Other dialects | Unavailable |
 
 For the shared parser, a node the parser records no position for, such as a bare `*` or the query
-inside a subquery, reports the position of its parent. Reading the tree, or any common structure,
-raises `RuleUsageError` when the dialect has no syntax tree, when the SQL does not parse, or when a
-statement uses syntax the parser keeps as unparsed text.
+inside a subquery, reports the position of its parent.
+
+Reading the tree, or any common structure, raises `RuleUsageError` when:
+
+| Cause | Message starts with |
+| --- | --- |
+| The dialect has no syntax tree | `SQL syntax trees are unavailable for the <dialect> dialect` |
+| The SQL does not parse | `SQL could not be parsed:` |
+| A statement uses syntax the parser keeps as unparsed text, or nests too deeply | `SQL syntax tree is unavailable:` |
 
 ## Project structure
 
