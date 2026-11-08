@@ -255,6 +255,8 @@ pub struct PlatformEventPayload {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PlatformProblems {
     pub scheduler_leader: bool,
+    /// When the last scheduler lease ran out, or will run out; absent until a server first leads.
+    pub scheduler_lease_expires_at: Option<DateTime<Utc>>,
     pub broken_locations: Vec<BrokenLocation>,
     pub overdue_ticks: Vec<OverdueTick>,
 }
@@ -263,6 +265,7 @@ pub struct PlatformProblems {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct BrokenLocation {
     pub location_id: Uuid,
+    pub location_name: String,
     pub target: String,
     pub last_seen_at: DateTime<Utc>,
 }
@@ -273,12 +276,27 @@ pub struct OverdueTick {
     pub trigger_id: Uuid,
     pub name: String,
     pub location_id: Uuid,
+    pub location_name: String,
     pub target: String,
     pub scheduled_for: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SchedulerLease {
+    pub(crate) expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct LateTarget {
     pub(crate) location_id: Uuid,
     pub(crate) target: String,
+}
+
+/// Problems found at one instant: the scheduler lease, broken location targets and targets with late ticks.
+#[derive(Debug)]
+pub(crate) struct ProblemScan {
+    pub(crate) now: DateTime<Utc>,
+    pub(crate) lease: Option<SchedulerLease>,
+    pub(crate) broken: Vec<BrokenLocation>,
+    pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
 }

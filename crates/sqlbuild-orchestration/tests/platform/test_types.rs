@@ -56,4 +56,5 @@ pub(crate) struct ProblemsTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,
     pub(crate) leaders: usize,
+    pub(crate) expected_leader: bool,
 }

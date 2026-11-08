@@ -30,11 +30,13 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             description: "SQLite without a leader",
             backend: Backend::Sqlite,
             leaders: 0,
+            expected_leader: false,
         },
         ProblemsTestCase {
             description: "PostgreSQL with a leader",
             backend: Backend::Postgres,
             leaders: 1,
+            expected_leader: true,
         },
     ];
     for test_case in test_cases {
@@ -115,12 +117,22 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             let read = |principal: Uuid| read_person_problems(store, principal, DefaultRole::None);
             let everything = read(admin).await.expect("administrator problems");
             assert_eq!(
-                everything.scheduler_leader,
-                test_case.leaders > 0,
+                everything.scheduler_leader, test_case.expected_leader,
                 "{}",
                 test_case.description
             );
-            assert_eq!(everything.broken_locations.len(), 2);
+            assert_eq!(
+                everything.scheduler_lease_expires_at.is_some(),
+                test_case.expected_leader
+            );
+            assert_eq!(
+                everything
+                    .broken_locations
+                    .iter()
+                    .map(|location| location.location_name.as_str())
+                    .collect::<std::collections::BTreeSet<_>>(),
+                std::collections::BTreeSet::from(["inventory", "orders"])
+            );
             assert_eq!(
                 everything.overdue_ticks.len(),
                 200,
@@ -142,7 +154,8 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 scoped
                     .overdue_ticks
                     .iter()
-                    .all(|tick| tick.location_id == locations[1]),
+                    .all(|tick| tick.location_id == locations[1]
+                        && tick.location_name == "inventory"),
                 "another location's late ticks stay hidden"
             );
             let hidden = read(outsider).await.expect("outsider problems");

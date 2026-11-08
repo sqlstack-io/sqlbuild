@@ -7,10 +7,11 @@ import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { toLocationSummary } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
+import { toPlatformEvents } from './http-problems';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope } from './types';
 import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment } from './types/platform';
 import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
@@ -46,7 +47,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listAuditEntries',
 	'listAccounts',
 	'listRoleAssignments',
-	'listLocations'
+	'listLocations',
+	'listPlatformEvents'
 ]);
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
@@ -284,6 +286,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return found.slice(0, limit);
 		},
 		/** Each location the person sees, with health only where they may list the whole target. */
+		async listPlatformEvents(): Promise<PlatformEvent[]> {
+			const { data, error, response } = await http.GET('/api/control/platform/problems');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toPlatformEvents(data, Date.now());
+		},
 		async listLocations(): Promise<LocationSummary[]> {
 			const { data, error, response } = await http.GET('/api/control/bootstrap');
 			if (response.status === 401) onUnauthorized();

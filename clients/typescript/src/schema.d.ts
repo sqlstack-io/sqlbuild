@@ -1032,6 +1032,7 @@ export interface components {
             last_seen_at: string;
             /** Format: uuid */
             location_id: string;
+            location_name: string;
             target: string;
         };
         /** @enum {string} */
@@ -1540,6 +1541,7 @@ export interface components {
         OverdueTick: {
             /** Format: uuid */
             location_id: string;
+            location_name: string;
             name: string;
             /** Format: date-time */
             scheduled_for: string;
@@ -1616,6 +1618,11 @@ export interface components {
             broken_locations: components["schemas"]["BrokenLocation"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
             scheduler_leader: boolean;
+            /**
+             * Format: date-time
+             * @description When the last scheduler lease ran out, or will run out; absent until a server first leads.
+             */
+            scheduler_lease_expires_at?: string | null;
         };
         /** @description A changed subject, such as `model:orders` or `role:analyst`, without its content hashes. */
         PublishedChange: {
