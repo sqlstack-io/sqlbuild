@@ -80,9 +80,10 @@ pub fn fast_lineage(
             columns: native.lineage.iter().map(lineage_column).collect(),
             has_star: native.has_star,
         },
-        Err(gap) => {
-            FastLineageOutcome::Unparsed(unreadable_reason(dialect.name(), &located(&sql, gap)))
-        }
+        Err(gap) => FastLineageOutcome::Unparsed(unreadable_reason(
+            dialect.name(),
+            &located(&sql, gap, None),
+        )),
     }
 }
 

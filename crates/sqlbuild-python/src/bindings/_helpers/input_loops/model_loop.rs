@@ -73,8 +73,8 @@ use crate::bindings::_helpers::input_loops::model_loop_macros::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
 use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out, skip_unavailable,
-    skip_unreadable,
+    AuthoredQuery, OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out,
+    skip_unavailable, skip_unreadable,
 };
 use crate::bindings::_helpers::input_loops::model_loop_prepass::{
     NativeHeader, all_header_facts, native_header,
@@ -708,6 +708,16 @@ impl NativeModelLoop {
             (&declarations.spliced.sql, &macro_sql, &query_sql),
             &macro_spans,
         );
+        let authored_passes: Vec<Vec<SplicedSpan>> = vec![
+            declarations.spliced.spans.clone(),
+            spliced_spans(&macro_spans),
+        ];
+        let authored_body: Option<AuthoredQuery<'_>> = (interpolated.as_str() == &**authored_query)
+            .then_some(AuthoredQuery {
+                query: authored_query,
+                macro_sql: &macro_sql,
+                passes: &authored_passes,
+            });
         let opt_out_model: OptOutModel<'_, 'py> = OptOutModel {
             name,
             file_path,
@@ -716,6 +726,7 @@ impl NativeModelLoop {
             query_sql: &query_sql,
             relative_path,
             contents,
+            authored: authored_body,
         };
         let legacy_gate = match self.route {
             AnalysisRoute::Legacy => Some(self.analysis(context, &opt_out_model, true)?),
@@ -797,6 +808,7 @@ impl NativeModelLoop {
                     query_sql: &query_sql,
                     relative_path,
                     contents,
+                    authored: authored_body,
                 };
                 self.analysis(context, &expanded_model, scanned.invalid_calls.is_empty())?
             }
