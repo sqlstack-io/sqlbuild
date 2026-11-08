@@ -13,8 +13,9 @@ use crate::sql_macros::_helpers::parsing::captures::{output_selects, slot_captur
 use crate::sql_macros::_helpers::parsing::header::unquoted;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, tokens};
 use crate::sql_macros::_helpers::parsing::parameters::{
-    ParameterReference, alias_follows, declarations_masked, parameter_references, placeholder,
-    placeholder_parameter, using_reads_joined, with_placeholders,
+    ParameterReference, alias_follows, declarations_masked, in_lists_parenthesised,
+    parameter_references, placeholder, placeholder_parameter, using_reads_joined,
+    with_placeholders,
 };
 use crate::sql_macros::_helpers::parsing::slots::{SlotRead, check_group_positions, slot_reads};
 use crate::sql_macros::_helpers::rendering::arguments::is_atomic;
@@ -64,7 +65,9 @@ pub(crate) fn parsed(
         mut statements,
         gaps,
     } = parser
-        .parse(&using_reads_joined(&declarations_masked(&text)))
+        .parse(&in_lists_parenthesised(&using_reads_joined(
+            &declarations_masked(&text),
+        )))
         .map_err(|gap| gap.message)?;
     if let Some(gap) = gaps.first() {
         return Err(format!(

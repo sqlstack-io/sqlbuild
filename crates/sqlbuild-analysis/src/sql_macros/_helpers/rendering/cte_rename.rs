@@ -8,8 +8,8 @@ use crate::analysis_route::types::NativeDialect;
 
 use crate::sql_macros::_helpers::parsing::lexing::{Token, tokens};
 use crate::sql_macros::_helpers::parsing::parameters::{
-    ParameterReference, declarations_masked, parameter_references, placeholder, using_reads_joined,
-    with_placeholders,
+    ParameterReference, declarations_masked, in_lists_parenthesised, parameter_references,
+    placeholder, using_reads_joined, with_placeholders,
 };
 use crate::sql_macros::_helpers::typing::typed_calls::spliced;
 use crate::sql_macros::constants::{ARGUMENT_CODE, CTE_ARGUMENT, CTE_NAME_SEPARATOR};
@@ -332,7 +332,9 @@ fn parsed(parser: &dyn NativeDialect, text: &str) -> Result<Expression, String> 
         mut statements,
         gaps,
     } = parser
-        .parse(&using_reads_joined(&declarations_masked(text)))
+        .parse(&in_lists_parenthesised(&using_reads_joined(
+            &declarations_masked(text),
+        )))
         .map_err(|gap| gap.message)?;
     if let Some(gap) = gaps.first() {
         return Err(format!(

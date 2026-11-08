@@ -192,6 +192,27 @@ pub(crate) fn using_reads_joined(sql: &str) -> String {
     joined
 }
 
+/// `sql` with each placeholder right after `IN` as a parenthesised list of the same length, as a
+/// collection expands: `IN __sqlbuild_parameter__c` reads as `IN(_sqlbuild_parameter__c)`.
+pub(crate) fn in_lists_parenthesised(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut parenthesised: String = sql.to_owned();
+    for pair in scanned.windows(2) {
+        let (keyword, list) = (&pair[0], &pair[1]);
+        if keyword.is_word(sql, "IN")
+            && list.kind == TokenKind::Word
+            && placeholder_parameter(list.text(sql)).is_some()
+            && list.start == keyword.end + 1
+        {
+            let list_text: &str = list.text(sql);
+            parenthesised.replace_range(keyword.end..list.end, &format!("({})", &list_text[1..]));
+        }
+    }
+    parenthesised
+}
+
 /// Whether the table reference whose last token is `index` is followed by an alias.
 pub(crate) fn alias_follows(sql: &str, scanned: &[Token], index: usize) -> bool {
     match scanned.get(index + 1) {

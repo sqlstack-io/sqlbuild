@@ -322,6 +322,13 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
         },
         ExpansionTestCase {
+            description: "a list after IN is a list, not SQLite's IN table-name",
+            adapter: "sqlite",
+            macros: &[IN_SUPPORTED_COUNTRY],
+            sql: "SELECT @sql.in_supported_country(o.country_code) AS supported FROM orders AS o",
+            expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
+        },
+        ExpansionTestCase {
             description: "a COLUMNS slot of a relation",
             adapter: "",
             macros: &[LATEST_PER_KEY],

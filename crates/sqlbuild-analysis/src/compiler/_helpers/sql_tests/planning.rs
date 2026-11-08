@@ -35,7 +35,9 @@ use crate::compiler::_helpers::sql_tests::reader_references::{
 use crate::compiler::_helpers::sql_tests::real_model_limit::{
     RealModelChain, real_model_limit_message,
 };
-use crate::compiler::_helpers::sql_tests::relation_markers::relation_marker_calls;
+use crate::compiler::_helpers::sql_tests::relation_markers::{
+    markers_as_names, named_marker_calls,
+};
 use crate::compiler::_helpers::sql_tests::rendering::{
     RenderRequest, render_comparison_sql, rendered_chain_steps, sql_test_parser,
 };
@@ -1390,7 +1392,11 @@ fn real_model_inputs(request: &TopoSortRequest<'_>, name: &str) -> Vec<String> {
 fn analyze_and_resolve_sql(
     request: AnalysisResolutionRequest<'_>,
 ) -> Result<Option<AnalysisResolvedSql>, String> {
-    let Some(template) = analysis_template(request.query_sql, request.parser, request.templates)?
+    let Some(template) = analysis_template(
+        request.query_sql,
+        (request.parser, &request.patterns.lexical),
+        request.templates,
+    )?
     else {
         return Ok(None);
     };
@@ -1495,20 +1501,22 @@ fn analyze_and_resolve_sql(
 
 pub(crate) fn analysis_template(
     query_sql: &str,
-    parser: &dyn NativeDialect,
+    reader: (&dyn NativeDialect, &LexicalSyntax),
     templates: &AnalysisTemplateCache,
 ) -> Result<Option<AnalysisTemplate>, String> {
     cached_analysis_template(query_sql, templates, || {
-        parsed_analysis_template(query_sql, parser)
+        parsed_analysis_template(query_sql, reader)
     })
 }
 
-/// The template the project's parser reads from `query_sql`, if it reads one statement whole.
+/// The template the project's parser reads from `query_sql`, its relation markers as plain names,
+/// if it reads one statement whole.
 pub(crate) fn parsed_analysis_template(
     query_sql: &str,
-    parser: &dyn NativeDialect,
+    (parser, syntax): (&dyn NativeDialect, &LexicalSyntax),
 ) -> Option<AnalysisTemplate> {
-    let mut statements = match parser.parse(query_sql) {
+    let (named_sql, named) = markers_as_names(query_sql, syntax);
+    let mut statements = match parser.parse(&named_sql) {
         Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
         _ => return None,
     };
@@ -1518,7 +1526,7 @@ pub(crate) fn parsed_analysis_template(
     let expression = statements.remove(0);
     Some(AnalysisTemplate {
         existing_cte_names: top_level_cte_names(&expression),
-        marker_calls: relation_marker_calls(&expression).into(),
+        marker_calls: named_marker_calls(&expression, &named).into(),
     })
 }
 
