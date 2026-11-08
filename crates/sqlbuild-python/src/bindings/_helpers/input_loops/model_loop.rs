@@ -73,7 +73,8 @@ use crate::bindings::_helpers::input_loops::model_loop_macros::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
 use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out, skip_unreadable,
+    OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out, skip_unavailable,
+    skip_unreadable,
 };
 use crate::bindings::_helpers::input_loops::model_loop_prepass::{
     NativeHeader, all_header_facts, native_header,
@@ -204,6 +205,8 @@ pub(crate) struct NativeModelLoop {
     pub(crate) project_config_path: String,
     /// Whether the dialect's SQL is analysed by Polyglot or by its native module.
     pub(crate) route: AnalysisRoute,
+    /// The adapter's analysis dialect name, which P026 names when no native parser reads it.
+    pub(crate) dialect: Option<String>,
     contract_classes: Py<PyDict>,
     loop_classes: Py<PyDict>,
 }
@@ -265,6 +268,7 @@ impl NativeModelLoop {
             },
             project_config_path,
             route: analysis_route(dialect.as_deref()),
+            dialect,
             contract_classes,
             loop_classes,
         })
@@ -836,6 +840,11 @@ impl NativeModelLoop {
                         let read: bool = skip_unreadable(self.settings, dialect, context, model)?;
                         skipped = !read;
                         (read, None)
+                    }
+                    AnalysisRoute::Unavailable => {
+                        skip_unavailable(self.settings, self.dialect.as_deref(), context, model)?;
+                        skipped = true;
+                        (false, None)
                     }
                 },
                 AnalysisGate::Disabled => match rejected_opt_out(self, context, model)? {

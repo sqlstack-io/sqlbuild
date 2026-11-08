@@ -6,7 +6,7 @@ use crate::analysis_route::models::TypeMatch;
 pub fn clickhouse_type_match(declared: &str, inferred: &str, inferred_nullable: bool) -> TypeMatch {
     let (declared_base, declared_nullable) = unwrapped(declared);
     let (inferred_base, wrapped_nullable) = unwrapped(inferred);
-    TypeMatch {
+    TypeMatch::Compared {
         same_type: declared_base == inferred_base,
         nullable_into_non_null: !declared_nullable && (inferred_nullable || wrapped_nullable),
     }

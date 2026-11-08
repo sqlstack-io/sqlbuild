@@ -4,9 +4,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
-use crate::analysis_route::main::clickhouse_type_match::clickhouse_type_match;
-use crate::analysis_route::models::AnalysisRoute;
-use crate::contracts::constants::{CLICKHOUSE_DIALECT, UPPER_FOLDING_DIALECT};
+use crate::analysis_route::models::{AnalysisRoute, TypeMatch};
+use crate::contracts::constants::UPPER_FOLDING_DIALECT;
 use crate::contracts::models::{DeclaredColumn, InferredOutputColumn};
 use crate::type_system::errors::TypeNormalizationError;
 use crate::type_system::main::normalize_type::normalize_type;
@@ -17,13 +16,15 @@ use crate::type_system::models::{NormalizedType, TypeNormalization};
 pub(crate) enum TypeComparison {
     Equal,
     Different,
+    /// A native route cannot spell one of the types, or has no parser: no finding either way.
+    NotCompared,
 }
 
 /// One request's type comparisons, normalizing each type string once as Python's cache does.
 pub(crate) struct TypeComparer<'a> {
     dialect: &'a str,
-    /// ClickHouse on its native route, whose types are compared without top-level wrappers.
-    native_clickhouse: bool,
+    /// The dialect's route: a native module compares types itself, and no route compares none.
+    route: AnalysisRoute,
     normalized: RefCell<HashMap<String, Result<NormalizedType, TypeNormalizationError>>>,
 }
 
@@ -36,8 +37,7 @@ impl<'a> TypeComparer<'a> {
     pub(crate) fn new(dialect: &'a str) -> Self {
         Self {
             dialect,
-            native_clickhouse: dialect == CLICKHOUSE_DIALECT
-                && matches!(analysis_route(Some(dialect)), AnalysisRoute::Native(_)),
+            route: analysis_route(Some(dialect)),
             normalized: RefCell::new(HashMap::new()),
         }
     }
@@ -48,12 +48,18 @@ impl<'a> TypeComparer<'a> {
         left: &str,
         right: &str,
     ) -> Result<TypeComparison, TypeNormalizationError> {
-        if self.native_clickhouse {
-            return Ok(if clickhouse_type_match(left, right, false).same_type {
-                TypeComparison::Equal
-            } else {
-                TypeComparison::Different
-            });
+        match self.route {
+            AnalysisRoute::Legacy => {}
+            AnalysisRoute::Unavailable => return Ok(TypeComparison::NotCompared),
+            AnalysisRoute::Native(dialect) => {
+                return Ok(match dialect.type_match(left, right, false) {
+                    TypeMatch::NotCompared => TypeComparison::NotCompared,
+                    TypeMatch::Compared {
+                        same_type: true, ..
+                    } => TypeComparison::Equal,
+                    TypeMatch::Compared { .. } => TypeComparison::Different,
+                });
+            }
         }
         let left: NormalizedType = self.normalized(left)?;
         let right: NormalizedType = self.normalized(right)?;
@@ -73,15 +79,20 @@ impl<'a> TypeComparer<'a> {
         if declared.not_null && inferred.nullable {
             return true;
         }
-        let (true, Some(declared_type), Some(inferred_type)) = (
-            self.native_clickhouse,
+        let (AnalysisRoute::Native(dialect), Some(declared_type), Some(inferred_type)) = (
+            self.route,
             declared.declared_type.as_deref(),
             inferred.inferred_type.as_deref(),
         ) else {
             return false;
         };
-        clickhouse_type_match(declared_type, inferred_type, inferred.nullable)
-            .nullable_into_non_null
+        matches!(
+            dialect.type_match(declared_type, inferred_type, inferred.nullable),
+            TypeMatch::Compared {
+                nullable_into_non_null: true,
+                ..
+            }
+        )
     }
 
     fn normalized(&self, type_sql: &str) -> Result<NormalizedType, TypeNormalizationError> {

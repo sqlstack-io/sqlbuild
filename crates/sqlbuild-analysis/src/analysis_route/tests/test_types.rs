@@ -1,5 +1,10 @@
+use sqlquack_syntax::expressions::statements::models::Command;
+use sqlquack_syntax::{Expression, Parsed};
+
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::NormalizedType;
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -23,7 +28,8 @@ pub(super) struct SkippedAnalysisTestCase {
     pub(super) expected_message: &'static str,
 }
 
-/// A test dialect whose parser refuses PIVOT, unfilled placeholders and one-part stubs.
+/// A test dialect over the PostgreSQL parser that also refuses PIVOT, unfilled placeholders and
+/// one-part stubs, keeps SQL after `RAW ` as raw text, and refuses the type `NOT_A_TYPE`.
 pub(super) struct PivotlessDialect;
 
 impl NativeDialect for PivotlessDialect {
@@ -31,23 +37,55 @@ impl NativeDialect for PivotlessDialect {
         "postgres"
     }
 
-    fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild."
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
         let refused = ["PIVOT", "@@@", "__sqlbuild_udf_", "__cursor_", "@'"]
             .iter()
             .filter_map(|word| sql.find(word).map(|offset| (offset, *word)))
             .min();
-        match refused {
-            Some((offset, word)) => Err(ParserGap {
-                construct: word.to_owned(),
-                offset,
-            }),
-            None => Ok(()),
+        if let Some(text) = sql.strip_prefix("RAW ") {
+            return Ok(Parsed {
+                statements: vec![Expression::Command(Box::new(Command {
+                    this: text.to_owned(),
+                }))],
+                gaps: Vec::new(),
+            });
         }
+        if let Some((offset, word)) = refused {
+            return Err(ParserGap {
+                construct: word.to_owned(),
+                message: word.to_owned(),
+                offset,
+                syntax: false,
+            });
+        }
+        sqlquack_syntax_postgres::parse(sql).map_err(|error| ParserGap {
+            construct: error.message.clone(),
+            message: error.message,
+            offset: error.position,
+            syntax: error.syntax,
+        })
     }
 
-    fn stub_prefix(&self) -> &'static str {
-        "__sqlbuild."
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        (!spelling.eq_ignore_ascii_case("NOT_A_TYPE")).then(|| normalize_text_type(spelling, None))
     }
+}
+
+pub(super) struct ReadWholeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_gap: Option<&'static str>,
+}
+
+pub(super) struct NativeTypeMatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) declared: &'static str,
+    pub(super) inferred: &'static str,
+    pub(super) expected_match: TypeMatch,
 }
 
 pub(super) struct TypeMatchTestCase {

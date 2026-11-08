@@ -27,7 +27,9 @@ fn located(sql: &str, gap: ParserGap) -> LocatedGap {
     let position: TextPosition = text_position(sql, before.chars().count());
     LocatedGap {
         construct: gap.construct,
+        message: gap.message,
         line: position.line,
         column: position.column,
+        syntax: gap.syntax,
     }
 }
