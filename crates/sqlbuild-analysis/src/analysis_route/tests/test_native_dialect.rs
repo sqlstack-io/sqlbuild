@@ -1,10 +1,11 @@
+use crate::analysis_route::main::unapplied_nullability_rules::unapplied_nullability_rules;
 use crate::analysis_route::main::unavailable_analysis::unavailable_analysis;
-use crate::analysis_route::models::{NativeAnalysis, TypeMatch};
+use crate::analysis_route::models::{AnalysisRoute, NativeAnalysis, TypeMatch};
 use crate::analysis_route::tests::helpers::{analysed, resource_columns};
 use crate::analysis_route::tests::test_types::{
-    CataloguedDialect, ColumnTestCase, FindingTestCase, FoldingDialect, LineageTestCase,
-    MacroBodyTestCase, NativeTypeMatchTestCase, PivotlessDialect, ReadWholeTestCase, StarTestCase,
-    UnavailableAnalysisTestCase,
+    CataloguedDialect, ColumnTestCase, FindingMessageTestCase, FindingTestCase, FoldingDialect,
+    LineageTestCase, MacroBodyTestCase, NativeTypeMatchTestCase, PivotlessDialect,
+    ReadWholeTestCase, StarTestCase, UnappliedRulesTestCase, UnavailableAnalysisTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 
@@ -131,6 +132,82 @@ fn given_no_native_parser_when_skipping_analysis_then_p026_names_the_dialect() {
         assert_eq!(
             unavailable_analysis("orders", test_case.dialect),
             ("P026", test_case.expected_message.to_owned()),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_an_unknown_quoted_column_when_analysing_then_its_message_quotes_the_name_as_written() {
+    let test_cases = [
+        FindingMessageTestCase {
+            description: "a quoted name keeps its authored case",
+            sql: "SELECT \"MiSsPeLlEd\" FROM orders",
+            expected_messages: &[("B002", "Unknown column 'MiSsPeLlEd' in table 'orders'")],
+        },
+        FindingMessageTestCase {
+            description: "a qualified quoted name keeps its authored case",
+            sql: "SELECT o.\"Missing\" FROM orders AS o",
+            expected_messages: &[("B002", "Unknown column 'Missing' in table 'orders'")],
+        },
+    ];
+    for test_case in test_cases {
+        let analysis: NativeAnalysis = analysed(&PivotlessDialect, test_case.sql, &[]);
+        let messages: Vec<(&str, &str)> = analysis
+            .diagnostics
+            .iter()
+            .map(|row| (row.code.as_str(), row.message.as_str()))
+            .collect();
+        assert_eq!(
+            messages, test_case.expected_messages,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_adapter_nullability_rules_when_routing_then_only_a_native_route_warns_they_are_unapplied()
+{
+    let test_cases = [
+        UnappliedRulesTestCase {
+            description: "a native route names the adapter and each function it leaves alone",
+            route: AnalysisRoute::Native(&PivotlessDialect),
+            functions: &["UPPER", "IFF"],
+            expected_warning: Some(
+                "Adapter 'acme' defines its own nullability rule for UPPER, IFF; native SQL \
+                 analysis does not apply it, so these calls take the dialect's own nullability",
+            ),
+        },
+        UnappliedRulesTestCase {
+            description: "Polyglot calls the adapter's rules, so nothing is unapplied",
+            route: AnalysisRoute::Legacy,
+            functions: &["UPPER"],
+            expected_warning: None,
+        },
+        UnappliedRulesTestCase {
+            description: "no model is analysed where no parser reads the dialect",
+            route: AnalysisRoute::Unavailable,
+            functions: &["UPPER"],
+            expected_warning: None,
+        },
+        UnappliedRulesTestCase {
+            description: "an adapter with no rules of its own has nothing to warn about",
+            route: AnalysisRoute::Native(&PivotlessDialect),
+            functions: &[],
+            expected_warning: None,
+        },
+    ];
+    for test_case in test_cases {
+        let functions: Vec<String> = test_case
+            .functions
+            .iter()
+            .map(|f| (*f).to_owned())
+            .collect();
+        assert_eq!(
+            unapplied_nullability_rules(&test_case.route, "acme", &functions),
+            test_case.expected_warning.map(str::to_owned),
             "{}",
             test_case.description
         );

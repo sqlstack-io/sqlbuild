@@ -757,7 +757,10 @@ class RecordingNullabilityRule:
 def adapter_rule_project(
     *, test_case: AdapterRuleCallbackTestCase, rule: RecordingNullabilityRule, tmp_path: Path
 ) -> tuple[CompileInputsView, ExpressionInferenceProfile]:
-    """A generated project with the adapter-rule models, and a profile calling `rule`."""
+    """A generated project with the adapter-rule models, and a Polyglot profile calling `rule`.
+
+    A native route does not call an adapter's own rules; compile warns instead.
+    """
 
     return (
         compile_inputs(
@@ -770,7 +773,7 @@ def adapter_rule_project(
             },
         ),
         ExpressionInferenceProfile(
-            sql_analysis_dialect="duckdb",
+            sql_analysis_dialect=None,
             function_nullability_rules={"UPPER": rule, "IFF": rule},
         ),
     )

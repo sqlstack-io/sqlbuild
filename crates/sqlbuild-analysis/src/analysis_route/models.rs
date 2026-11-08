@@ -89,6 +89,8 @@ pub struct AnalysisInput<'a> {
     pub references: &'a [(String, String, String)],
     /// Functions the catalogue cannot know, such as MotherDuck's `md_*`; never reported unknown.
     pub extension_functions: &'a [String],
+    /// Whether quoted identifiers compare without case, as Snowflake's session parameter sets.
+    pub quoted_ignore_case: bool,
 }
 
 /// One query's analysis, in the facts the analysis session keeps for a model.

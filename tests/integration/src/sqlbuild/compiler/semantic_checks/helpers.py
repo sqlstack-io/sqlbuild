@@ -26,6 +26,7 @@ from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
 if TYPE_CHECKING:
     from sqlbuild._native import DiagnosticRow
 
+_NATIVE_SESSION_REQUIRED: str = "revalidating a native route without its session"
 _RELATIONS: dict[str, tuple[str, ...]] = {
     '__source("raw_orders")': (
         "order_id",
@@ -260,6 +261,17 @@ def without_session(inputs: SemanticInputs) -> SemanticInputs:
     """The same stage inputs with every model's output names and lineage in the payload."""
 
     return replace(inputs, session=None)
+
+
+def payload_completion_view(inputs: SemanticInputs) -> tuple[object, ...] | None:
+    """The completion from payload facts alone; `None` where a native route requires the session."""
+
+    try:
+        completed: CompiledProjectView = completed_natively(without_session(inputs))
+    except ValueError as error:
+        assert _NATIVE_SESSION_REQUIRED in str(error)
+        return None
+    return completion_view(completed)
 
 
 def session_fact_models(inputs: SemanticInputs) -> frozenset[str]:

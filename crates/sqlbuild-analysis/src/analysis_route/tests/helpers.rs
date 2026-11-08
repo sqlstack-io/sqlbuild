@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
+use crate::analysis_route::main::schema_column::schema_column as stored_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::models::{
-    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, SessionSchema,
+    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, SessionFunctions, SessionSchema,
 };
 use crate::assembly::analysis_session::types::Shapes;
 use crate::lineage::models::{LineageColumn, LineageSource};
@@ -41,6 +42,7 @@ pub(super) fn analysed(
             schema: &schema,
             references: &references,
             extension_functions: &extension_functions,
+            quoted_ignore_case: false,
         })
         .expect("the test query is read whole")
 }
@@ -95,17 +97,15 @@ pub(super) fn session_relations(shape: &[(&str, &str, Nullability)]) -> (Shapes,
         .collect();
     (
         vec![("raw_orders".to_owned(), pairs)],
-        SessionSchema { relations },
+        SessionSchema {
+            relations,
+            functions: SessionFunctions::default(),
+        },
     )
 }
 
 fn schema_column(&(name, data_type, nullability): &(&str, &str, Nullability)) -> SchemaColumn {
-    SchemaColumn {
-        name: name.to_owned(),
-        quoted: false,
-        data_type: Some(data_type.to_owned()),
-        nullability,
-    }
+    stored_column(name, Some(data_type.to_owned()), nullability)
 }
 
 /// A finished outcome of `sql` over `orders`, as the session bound it.

@@ -15,7 +15,7 @@ use crate::bindings::_helpers::records::fields::mapping_items;
 use crate::bindings::_helpers::records::ids::RecordId;
 
 const GENERIC_DIALECT: &str = "generic";
-const ADAPTER_RULE_ID: &str = "python";
+pub(crate) const ADAPTER_RULE_ID: &str = "python";
 /// The nullability rules the native analysis knows, with their native rule ids.
 const KNOWN_RULES: [(AdapterHost, &str); 3] = [
     (AdapterHost::FirstArgNullability, "first_arg"),

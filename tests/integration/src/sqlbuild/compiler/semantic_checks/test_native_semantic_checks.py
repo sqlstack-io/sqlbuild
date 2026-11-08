@@ -38,12 +38,12 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     native_completion,
     note_kinds,
     outcome_label,
+    payload_completion_view,
     proven_output_count,
     semantic_outcome,
     session_corpus_files,
     session_fact_models,
     with_dialect,
-    without_session,
 )
 
 _NOTE_KINDS: tuple[str, ...] = ("downstream output uses", "downstream uses of", " has: ")
@@ -261,14 +261,14 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
     selections: list[frozenset[str]] = [session_fact_models(inputs) for inputs in captured]
     codes: Counter[str] = Counter()
     golden: list[GoldenEntry] = []
-    payload_views: list[tuple[object, ...]] = []
+    payload_views: list[tuple[object, ...] | None] = []
     session_views: list[tuple[object, ...]] = []
     for index, inputs in enumerate(captured):
         completed: CompiledProjectView = completed_natively(inputs)
         codes.update(item.code for item in completed.diagnostics)
         codes.update(note_kinds(completed, _NOTE_KINDS))
         session_views.append(completion_view(completed))
-        payload_views.append(completion_view(completed_natively(without_session(inputs))))
+        payload_views.append(payload_completion_view(inputs))
         golden.append(
             golden_entry(
                 "completion", session_views[-1], masked=(str(tmp_path / f"project_{index}"),)
@@ -284,7 +284,10 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
         )
         == []
     )
-    assert payload_views == session_views
+    assert all(
+        payload in (None, session)
+        for payload, session in zip(payload_views, session_views, strict=True)
+    )
     assert (
         session_models,
         model_count - session_models,

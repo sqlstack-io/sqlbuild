@@ -19,8 +19,8 @@ use crate::assembly::analysis_session::main::take_analysis_cache::take_analysis_
 use crate::assembly::analysis_session::models::{
     AnalysisCacheStats, AnalysisSession, ColumnFact, ContractProof, DynamicFamily, FinishedSession,
     LineageRow, ModelColumns, ModelOutcome, ModelReference, ModelRequest, PivotBatchRequest,
-    PivotModel, PivotOutcome, PivotTables, SessionModelAnalysis, SessionModelFacts, SessionOutcome,
-    SessionRequest, SessionStep,
+    PivotModel, PivotOutcome, PivotTables, SessionFunctions, SessionModelAnalysis,
+    SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
 };
 use crate::assembly::analysis_session::tests::test_types::{
     CachedRun, ColumnView, ModelSpec, RecoveredFacts,
@@ -121,6 +121,7 @@ pub(crate) fn orders_request(models: Vec<ModelRequest>) -> SessionRequest {
     SessionRequest {
         dialect: "duckdb".to_owned(),
         case_sensitive_shapes: false,
+        quoted_ignore_case: false,
         function_return_types: Vec::new(),
         nullability_rules: Some(Vec::new()),
         nullability_callback: None,
@@ -402,6 +403,8 @@ pub(crate) fn finished_session(tables: PivotTables) -> FinishedSession {
         relations: None,
         model_names: Vec::new(),
         declared_functions: Vec::new(),
+        functions: SessionFunctions::default(),
+        quoted_ignore_case: false,
     }
 }
 

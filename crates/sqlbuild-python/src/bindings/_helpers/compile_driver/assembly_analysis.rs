@@ -4,6 +4,9 @@ use pyo3::IntoPyObjectExt;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyFrozenSet, PyString, PyTuple, PyTupleMethods};
 
+use sqlbuild_analysis::analysis_route::main::analysis_route::analysis_route;
+use sqlbuild_analysis::analysis_route::main::unapplied_nullability_rules::unapplied_nullability_rules;
+use sqlbuild_analysis::analysis_route::models::AnalysisRoute;
 use sqlbuild_analysis::assembly::analysis_session::main::native_dialect::native_dialect;
 use sqlbuild_analysis::assembly::analysis_session::types::Pairs;
 use sqlbuild_host::compile_context::main::record_compile_cpu_timing::record_compile_cpu_timing;
@@ -16,7 +19,9 @@ use crate::bindings::_helpers::analysis::binding_catalog::{
 use crate::bindings::_helpers::analysis_session::model_analyses::{
     ModelAnalyses, ModelAnalysisRequest, analyze_models,
 };
-use crate::bindings::_helpers::analysis_session::profile_inputs::text_pairs;
+use crate::bindings::_helpers::analysis_session::profile_inputs::{
+    ADAPTER_RULE_ID, nullability_rules, text_pairs,
+};
 use crate::bindings::_helpers::analysis_session::stage_functions::expression_source_shapes;
 use crate::bindings::_helpers::boundary::python_calls::keywords;
 use crate::bindings::_helpers::compile_context::compile_timings::PythonProcessClock;
@@ -27,6 +32,7 @@ use crate::bindings::_helpers::compile_driver::stage_work::{
 };
 use crate::bindings::_helpers::compiled_views::model_input_view::attached_schema;
 use crate::bindings::_helpers::compiled_views::source_views::read_source_view;
+use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::project_assembly::declared_relations::{
     DeclaredRelations, DeclaredShapes, declared_relations,
@@ -45,6 +51,7 @@ use std::collections::HashMap;
 
 const GENERIC_DIALECT: &str = "generic";
 const UDF_PREFIX: &str = "__sqlbuild_udf_";
+const COMPILE_LOGGER: &str = "sqlbuild.compile";
 
 /// The analysis state every assembled model and the project share.
 pub(crate) struct AnalysisContext<'py> {
@@ -278,6 +285,38 @@ fn function_return_types<'py>(
     Ok(types)
 }
 
+/// Warn that a native route leaves the adapter's own nullability rules uncalled.
+fn warn_unapplied_nullability_rules(
+    inputs: &Bound<'_, PyAny>,
+    profile: &Bound<'_, PyAny>,
+) -> PyResult<()> {
+    let (rows, adapter_rules) = nullability_rules(profile)?;
+    if adapter_rules.is_none() {
+        return Ok(());
+    }
+    let mut functions: Vec<String> = rows
+        .into_iter()
+        .filter(|(_, id)| id == ADAPTER_RULE_ID)
+        .map(|(function, _)| function)
+        .collect();
+    functions.sort();
+    let dialect: Option<String> = native_field(profile, "sql_analysis_dialect")?.extract()?;
+    let adapter: Option<String> = resolve_effective_adapter_name(
+        &native_field(inputs, "project_config")?,
+        &native_field(inputs, "local_config")?,
+    )?
+    .extract()?;
+    let route: AnalysisRoute = analysis_route(dialect.as_deref());
+    let named: &str = adapter
+        .as_deref()
+        .or(dialect.as_deref())
+        .unwrap_or(GENERIC_DIALECT);
+    match unapplied_nullability_rules(&route, named, &functions) {
+        Some(warning) => host::log_warning_message(inputs.py(), COMPILE_LOGGER, &warning),
+        None => Ok(()),
+    }
+}
+
 /// Record each expression source's analysed shape as its declared relation.
 fn record_expression_shapes<'py>(
     request: &AssemblyRequest,
@@ -391,6 +430,7 @@ fn model_analyses<'py>(
         return Ok(None);
     }
     let inputs: &Bound<'py, PyAny> = request.inputs.bind(py);
+    warn_unapplied_nullability_rules(inputs, &context.profile)?;
     let names: &Bound<'py, PyAny> = request.analysis_model_names.bind(py);
     let mode: &Bound<'py, PyAny> = request.column_lineage_mode.bind(py);
     let lineage_mode: Bound<'py, PyAny> = record_class(py, RecordId::ColumnLineageMode)?;

@@ -26,6 +26,12 @@ pub trait NativeDialect: Sync {
     /// The dialect's sqlquack-semantics profile: how its names resolve, compare and type.
     fn profile(&self) -> &'static dyn DialectProfile;
 
+    /// The profile `input` is analysed under; a dialect whose name rules follow a setting overrides it.
+    fn profile_for(&self, input: &AnalysisInput<'_>) -> &'static dyn DialectProfile {
+        let _ = input;
+        self.profile()
+    }
+
     /// A type as written in this dialect, as SQLBuild compares it; `None` when unknown or refused.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType>;
 

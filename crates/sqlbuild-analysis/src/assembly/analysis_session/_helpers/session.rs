@@ -31,7 +31,7 @@ use crate::assembly::analysis_session::_helpers::enrichment::{
     Enrichment, EnrichmentInput, enrichment,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{
-    ShapeTable, dict_from_pairs, same_keys, same_relations, session_schema,
+    ShapeTable, dict_from_pairs, same_keys, same_relations, session_functions, session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
@@ -39,7 +39,8 @@ use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_clea
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
     LineageRow, ModelAnalysis, ModelOutcome, ModelRequest, Phase, PivotOutcome, PivotTables,
-    RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionSchema, SessionStep,
+    RelationTables, SessionFunctions, SessionModelFacts, SessionOutcome, SessionRequest,
+    SessionSchema, SessionStep,
 };
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
@@ -181,6 +182,8 @@ impl AnalysisSession {
             .iter()
             .map(|(name, _)| name.clone())
             .collect();
+        let functions: SessionFunctions = session_functions(&request);
+        let quoted_ignore_case: bool = request.quoted_ignore_case;
         let finished = FinishedSession {
             tables: PivotTables {
                 dialect: request.dialect,
@@ -195,6 +198,8 @@ impl AnalysisSession {
             relations,
             model_names,
             declared_functions,
+            functions,
+            quoted_ignore_case,
         };
         let outcome = SessionOutcome {
             models,
@@ -331,14 +336,17 @@ impl AnalysisSession {
             .iter()
             .map(|(name, _)| name.clone())
             .collect();
+        let functions: SessionFunctions = session_functions(request);
         let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
             misses
                 .par_iter()
                 .map(|position| {
                     let model: &ModelRequest = &request.models[models[*position]];
                     let schema: Shapes = schemas[*position].clone();
-                    let relations: SessionSchema = session_schema(dialect, &schema, nullability);
-                    model_outcome(dialect, model, (schema, &relations), &declared)
+                    let relations: SessionSchema =
+                        session_schema(dialect, &schema, nullability, &functions);
+                    let analysis = (declared.as_slice(), request.quoted_ignore_case);
+                    model_outcome(dialect, model, (schema, &relations), analysis)
                 })
                 .collect()
         });

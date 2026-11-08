@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
+use crate::analysis_route::main::schema_column::schema_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::UNKNOWN_TYPE;
@@ -38,7 +39,7 @@ pub(crate) fn revised(
     dialect: &dyn NativeDialect,
     outcome: &ModelOutcome,
     poisoned: &[(String, String)],
-    declared: &[String],
+    finished: &FinishedSession,
 ) -> Result<Option<Vec<RevisedBinding>>, String> {
     let sql: Cow<'_, str> = resolved_cleaned_sql(outcome)?;
     let relations: SessionSchema = SessionSchema {
@@ -53,12 +54,14 @@ pub(crate) fn revised(
                 )
             })
             .collect::<HashMap<String, Vec<SchemaColumn>>>(),
+        functions: finished.functions.clone(),
     };
     let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
         sql: &sql,
         schema: &relations,
         references: &[],
-        extension_functions: declared,
+        extension_functions: &finished.declared_functions,
+        quoted_ignore_case: finished.quoted_ignore_case,
     });
     let Ok(analysis) = analysed else {
         return Ok(None);
@@ -94,12 +97,11 @@ fn schema_columns(
             || poisoned
                 .iter()
                 .any(|(model, output)| model == relation && output == name);
-        schema.push(SchemaColumn {
-            name: name.clone(),
-            quoted: false,
-            data_type: (!untyped).then(|| dialect.session_type(data_type)),
-            nullability: Nullability::Unknown,
-        });
+        schema.push(schema_column(
+            name,
+            (!untyped).then(|| dialect.session_type(data_type)),
+            Nullability::Unknown,
+        ));
     }
     schema
 }

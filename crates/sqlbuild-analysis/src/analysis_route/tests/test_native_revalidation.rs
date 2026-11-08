@@ -5,7 +5,7 @@ use crate::analysis_route::main::native_revalidation::native_revalidation;
 use crate::analysis_route::tests::helpers::{finding_rows, outcome};
 use crate::analysis_route::tests::test_types::{PivotlessDialect, RevalidationTestCase};
 use crate::assembly::analysis_session::models::{
-    FinishedSession, ModelOutcome, PivotOutcome, PivotTables,
+    FinishedSession, ModelOutcome, PivotOutcome, PivotTables, SessionFunctions,
 };
 use crate::semantic_checks::models::{RawBinding, RecoveryModel};
 use crate::semantic_checks::types::RevisedBinding;
@@ -43,6 +43,8 @@ fn given_poisoned_outputs_when_revalidating_natively_then_findings_keep_session_
             relations: None,
             model_names: vec!["other".to_owned(), "downstream".to_owned()],
             declared_functions: Vec::new(),
+            functions: SessionFunctions::default(),
+            quoted_ignore_case: false,
         };
         let outcomes: Vec<(ModelOutcome, PivotOutcome)> = vec![
             (outcome("SELECT 1"), PivotOutcome::Absent),

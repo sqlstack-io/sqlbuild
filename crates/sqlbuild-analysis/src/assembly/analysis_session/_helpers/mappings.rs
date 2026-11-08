@@ -4,11 +4,16 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
-use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
+use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule, SchemaColumn};
 
+use crate::analysis_route::main::schema_column::schema_column;
 use crate::analysis_route::types::NativeDialect;
-use crate::assembly::analysis_session::constants::{DIALECT_ALIASES, UNKNOWN_TYPE};
-use crate::assembly::analysis_session::models::{ModelRequest, SessionSchema};
+use crate::assembly::analysis_session::constants::{
+    CONDITIONAL_RESULT_RULE, DIALECT_ALIASES, FIRST_ARG_RULE, SAFE_CAST_RULE, UNKNOWN_TYPE,
+};
+use crate::assembly::analysis_session::models::{
+    ModelRequest, SessionFunctions, SessionRequest, SessionSchema,
+};
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::semantic_validation::models::Columns;
 use crate::semantic_validation::types::Relations;
@@ -241,11 +246,33 @@ pub(crate) fn waves(producers: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
     (scheduled == producers.len()).then_some(waves)
 }
 
-/// Each relation with a known shape, its columns typed and with the nullability the session knows.
+/// The request's function return types, and its built-in nullability rules; adapter callbacks are not.
+pub(crate) fn session_functions(request: &SessionRequest) -> SessionFunctions {
+    SessionFunctions {
+        return_types: request.function_return_types.clone(),
+        nullability: request
+            .nullability_rules
+            .iter()
+            .flatten()
+            .filter_map(|(function, id)| {
+                let rule: NullabilityRule = match id.as_str() {
+                    FIRST_ARG_RULE => NullabilityRule::FirstArgument,
+                    CONDITIONAL_RESULT_RULE => NullabilityRule::ConditionalResult,
+                    SAFE_CAST_RULE => NullabilityRule::SafeCast,
+                    _ => return None,
+                };
+                Some((function.clone(), rule))
+            })
+            .collect(),
+    }
+}
+
+/// Each relation with a known shape, typed with the nullability the session knows, and the functions.
 pub(crate) fn session_schema(
     dialect: &dyn NativeDialect,
     schema: &Shapes,
     nullability: &ShapeTable,
+    functions: &SessionFunctions,
 ) -> SessionSchema {
     let relations: HashMap<String, Vec<SchemaColumn>> = schema
         .iter()
@@ -256,7 +283,17 @@ pub(crate) fn session_schema(
             (relation.clone(), typed)
         })
         .collect();
-    SessionSchema { relations }
+    SessionSchema {
+        relations,
+        functions: SessionFunctions {
+            return_types: functions
+                .return_types
+                .iter()
+                .map(|(function, data_type)| (function.clone(), dialect.session_type(data_type)))
+                .collect(),
+            nullability: functions.nullability.clone(),
+        },
+    }
 }
 
 /// Each column with its known type as `dialect` reads it, and the nullability `known` spells.
@@ -267,12 +304,13 @@ fn typed_columns(
 ) -> Vec<SchemaColumn> {
     columns
         .iter()
-        .map(|(name, data_type)| SchemaColumn {
-            name: name.clone(),
-            quoted: false,
-            data_type: (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
-                .then(|| dialect.session_type(data_type)),
-            nullability: column_nullability(known, name),
+        .map(|(name, data_type)| {
+            schema_column(
+                name,
+                (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
+                    .then(|| dialect.session_type(data_type)),
+                column_nullability(known, name),
+            )
         })
         .collect()
 }
