@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 use sha2::{Digest, Sha256};
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
+use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{DIALECT_ALIASES, UNKNOWN_TYPE};
 use crate::assembly::analysis_session::models::{ModelRequest, SessionSchema};
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
@@ -241,27 +242,36 @@ pub(crate) fn waves(producers: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
 }
 
 /// Each relation with a known shape, its columns typed and with the nullability the session knows.
-pub(crate) fn session_schema(schema: &Shapes, nullability: &ShapeTable) -> SessionSchema {
+pub(crate) fn session_schema(
+    dialect: &dyn NativeDialect,
+    schema: &Shapes,
+    nullability: &ShapeTable,
+) -> SessionSchema {
     let relations: HashMap<String, Vec<SchemaColumn>> = schema
         .iter()
         .filter(|(_, columns)| !columns.is_empty())
         .map(|(relation, columns)| {
-            let typed: Vec<SchemaColumn> = typed_columns(columns, nullability.get(relation));
+            let typed: Vec<SchemaColumn> =
+                typed_columns(dialect, columns, nullability.get(relation));
             (relation.clone(), typed)
         })
         .collect();
     SessionSchema { relations }
 }
 
-/// Each column with its known type and the nullability `known` spells for it.
-fn typed_columns(columns: &Pairs, known: Option<&Pairs>) -> Vec<SchemaColumn> {
+/// Each column with its known type as `dialect` reads it, and the nullability `known` spells.
+fn typed_columns(
+    dialect: &dyn NativeDialect,
+    columns: &Pairs,
+    known: Option<&Pairs>,
+) -> Vec<SchemaColumn> {
     columns
         .iter()
         .map(|(name, data_type)| SchemaColumn {
             name: name.clone(),
             quoted: false,
             data_type: (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
-                .then(|| data_type.clone()),
+                .then(|| dialect.session_type(data_type)),
             nullability: column_nullability(known, name),
         })
         .collect()

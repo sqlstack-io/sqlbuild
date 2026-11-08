@@ -41,6 +41,23 @@ impl NativeDialect for BigQueryDialect {
         &BIGQUERY
     }
 
+    /// A spelling BigQuery cannot read, such as TEXT or DOUBLE, takes its family's BigQuery type.
+    fn session_type(&self, spelling: &str) -> String {
+        if self.normalize_type(spelling).is_some() {
+            return spelling.to_owned();
+        }
+        let native: &str = match normalize_text_type(spelling, None).family {
+            TypeFamily::String => "STRING",
+            TypeFamily::Integer => "INT64",
+            TypeFamily::Float => "FLOAT64",
+            TypeFamily::Decimal => "NUMERIC",
+            TypeFamily::Boolean => "BOOL",
+            TypeFamily::Date => "DATE",
+            _ => spelling,
+        };
+        native.to_owned()
+    }
+
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         let sql: String = format!("{CAST_TYPE_PREFIX}{spelling})");
         let parsed: Parsed = match parse_strict(&sql) {

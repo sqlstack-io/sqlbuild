@@ -2,6 +2,7 @@ use crate::analysis_route::main::native_gap::native_gap;
 use crate::analysis_route::models::{BigQueryDialect, LocatedGap};
 use crate::analysis_route::tests::test_types::{
     NativeGapTestCase, NormalizeTypeTestCase, NormalizedTypeTestCase, ParseFailureTestCase,
+    SessionTypeTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::project::models::SyntaxCheck;
@@ -407,6 +408,56 @@ fn given_sql_bigquery_refuses_when_parsing_then_the_gap_says_whether_it_is_a_syn
         assert_eq!(
             (gap.syntax, test_case.expected_offset.map(|_| gap.offset)),
             (test_case.expected_syntax, test_case.expected_offset),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_session_type_when_bigquery_reads_it_then_spellings_it_cannot_read_take_their_family_type()
+ {
+    let test_cases = [
+        SessionTypeTestCase {
+            description: "a BigQuery spelling is kept",
+            spelling: "NUMERIC(10, 2)",
+            expected_type: "NUMERIC(10, 2)",
+        },
+        SessionTypeTestCase {
+            description: "Polyglot's DATETIME name is a BigQuery type, so it is kept",
+            spelling: "DATETIME",
+            expected_type: "DATETIME",
+        },
+        SessionTypeTestCase {
+            description: "Polyglot's TEXT for string literals reads as STRING",
+            spelling: "TEXT",
+            expected_type: "STRING",
+        },
+        SessionTypeTestCase {
+            description: "a sized VARCHAR reads as STRING",
+            spelling: "VARCHAR(12)",
+            expected_type: "STRING",
+        },
+        SessionTypeTestCase {
+            description: "DOUBLE reads as FLOAT64",
+            spelling: "DOUBLE",
+            expected_type: "FLOAT64",
+        },
+        SessionTypeTestCase {
+            description: "a zoned timestamp has no one BigQuery type, so stays unread",
+            spelling: "TIMESTAMPTZ",
+            expected_type: "TIMESTAMPTZ",
+        },
+        SessionTypeTestCase {
+            description: "a MAP has no BigQuery type",
+            spelling: "MAP(VARCHAR, INTEGER)",
+            expected_type: "MAP(VARCHAR, INTEGER)",
+        },
+    ];
+    for test_case in test_cases {
+        assert_eq!(
+            BigQueryDialect.session_type(test_case.spelling),
+            test_case.expected_type,
             "{}",
             test_case.description
         );
