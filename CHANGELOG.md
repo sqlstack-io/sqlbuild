@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.202.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.201.0...v0.202.0) (2026-11-08)
+
+
+### Features
+
+* **ui:** show catalog node detail and finish the lineage pages ([#1377](https://github.com/sqlstack-io/sqlbuild/issues/1377)) ([0624bde](https://github.com/sqlstack-io/sqlbuild/commit/0624bded052898af855378a8f74afac04d60be9f))
+
 ## [0.201.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.200.0...v0.201.0) (2026-11-08)
 
 
