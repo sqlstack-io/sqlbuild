@@ -5,14 +5,14 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { toCatalogNodes } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { toLocationSummary } from './http-locations';
+import { toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
 import { toPlatformEvents } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
 import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
@@ -51,7 +51,8 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listLocations',
 	'listPlatformEvents',
 	'listRoles',
-	'getRole'
+	'getRole',
+	'getWarehouseSync'
 ]);
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
@@ -287,6 +288,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				before = data[data.length - 1].storage_id;
 			}
 			return found.slice(0, limit);
+		},
+		async getWarehouseSync(scope: Scope): Promise<WarehouseSync | null> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return warehouseSyncOf(data);
 		},
 		async listPlatformEvents(): Promise<PlatformEvent[]> {
 			const { data, error, response } = await http.GET('/api/control/platform/problems');

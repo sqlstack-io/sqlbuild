@@ -18,8 +18,8 @@ import {
 } from '$lib/api';
 
 const SCOPE_KEY = 'sb-scope';
-/** How often the banner rereads live problems; locations check in every 30 seconds. */
-const PROBLEM_POLL_MS = 30_000;
+/** How often the shell rereads live problems and warehouse sync; locations report every 30 seconds. */
+const POLL_MS = 30_000;
 
 /**
  * App-wide state: the bootstrap, the selected location, and the
@@ -90,8 +90,11 @@ class AppState {
 		this.#restoreScope();
 		this.client.changes.follow(this.scope);
 		void this.#loadPlatformEvents();
-		// Problems are derived from time passing, such as a missed check-in, so no change notice announces them.
-		if (this.client.supports('listPlatformEvents')) setInterval(() => void this.#loadPlatformEvents(), PROBLEM_POLL_MS);
+		// Problems and sync reports come from time passing and location reports, so no change notice announces them.
+		setInterval(() => {
+			void this.#loadPlatformEvents();
+			void this.#loadWarehouseSync();
+		}, POLL_MS);
 		this.#loadScoped();
 	}
 
