@@ -1,23 +1,24 @@
 //! A SQL macro's declared `returns` type checked against the adapter's SQL analysis dialect.
 
-use polyglot_sql::expressions::DataType;
-use polyglot_sql::{Dialect, DialectType, Expression};
-
+use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::typing::returns_check::adapter_dialect;
 use crate::sql_macros::constants::{
     BIGQUERY_BIG_DECIMAL_NAMES, BIGQUERY_BIGNUMERIC_LIMITS, BIGQUERY_NUMERIC_LIMITS,
+    DECIMAL_PRECISION_LIMITS,
 };
+use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
-/// Why `returns` is not a type the adapter's SQL analysis dialect parses and can hold.
-pub(crate) fn returns_type_error(returns: &str, adapter: &str, context: &str) -> Option<String> {
+/// Why `returns` is not a type the adapter's SQL analysis dialect reads and can hold.
+pub(crate) fn returns_type_error(
+    returns: &str,
+    (adapter, parser): (&str, &dyn NativeDialect),
+    context: &str,
+) -> Option<String> {
     let dialect_name: &str = adapter_dialect(adapter);
-    let Ok(dialect) = dialect_name.parse::<DialectType>() else {
-        return None;
-    };
-    let reason: String = match polyglot_sql::parse_data_type(returns, dialect) {
-        Ok(parsed) => decimal_error(&parsed, dialect)
-            .or_else(|| bigquery_numeric_error(returns, &parsed, dialect))?,
-        Err(error) => error.to_string(),
+    let reason: String = match parser.normalize_type(returns) {
+        Some(normalized) => decimal_error(&normalized, parser.name())
+            .or_else(|| bigquery_numeric_error(returns, &normalized, parser.name()))?,
+        None => format!("the {} parser does not know this type", parser.name()),
     };
     Some(format!(
         "{context} type '{returns}' is not valid for adapter '{adapter}' SQL analysis dialect \
@@ -25,23 +26,21 @@ pub(crate) fn returns_type_error(returns: &str, adapter: &str, context: &str) ->
     ))
 }
 
-/// Why a BigQuery `NUMERIC(P, S)` or `BIGNUMERIC(P, S)` has more digits than the type holds.
-fn bigquery_numeric_error(
-    type_sql: &str,
-    data_type: &DataType,
-    dialect: DialectType,
-) -> Option<String> {
-    let DataType::Decimal {
-        precision: Some(precision),
-        scale,
-    } = data_type
-    else {
-        return None;
-    };
-    if dialect != DialectType::BigQuery {
+/// The decimal's precision and scale, where `normalized` is a decimal with a stated precision.
+fn decimal_digits(normalized: &NormalizedType) -> Option<(u64, u64)> {
+    let number = |value: &Option<PythonInteger>| value.as_ref().and_then(|v| v.as_str().parse().ok());
+    if normalized.family != TypeFamily::Decimal {
         return None;
     }
-    let scale: u32 = scale.unwrap_or(0);
+    Some((number(&normalized.precision)?, number(&normalized.scale).unwrap_or(0)))
+}
+
+/// Why a BigQuery `NUMERIC(P, S)` or `BIGNUMERIC(P, S)` has more digits than the type holds.
+fn bigquery_numeric_error(type_sql: &str, normalized: &NormalizedType, dialect: &str) -> Option<String> {
+    if dialect != "bigquery" {
+        return None;
+    }
+    let (precision, scale) = decimal_digits(normalized)?;
     let big: bool = BIGQUERY_BIG_DECIMAL_NAMES
         .iter()
         .any(|name| type_sql.trim_start().to_ascii_uppercase().starts_with(name));
@@ -50,8 +49,8 @@ fn bigquery_numeric_error(
     } else {
         BIGQUERY_NUMERIC_LIMITS
     };
-    let integer_digits: u32 = precision.saturating_sub(scale);
-    (integer_digits > max_integer_digits || scale > max_scale).then(|| {
+    let integer_digits: u64 = precision.saturating_sub(scale);
+    (integer_digits > u64::from(max_integer_digits) || scale > u64::from(max_scale)).then(|| {
         format!(
             "precision {precision} and scale {scale} exceed BigQuery's limits of {max_integer_digits} \
              integer digits and scale {max_scale}"
@@ -59,35 +58,17 @@ fn bigquery_numeric_error(
     })
 }
 
-/// Why a decimal within `data_type` has a precision or scale `dialect` cannot hold.
-fn decimal_error(data_type: &DataType, dialect: DialectType) -> Option<String> {
-    match data_type {
-        DataType::Decimal {
-            precision: Some(precision),
-            scale,
-        } => {
-            if let Some(scale) = scale.filter(|scale| scale > precision) {
-                return Some(format!(
-                    "DECIMAL scale {scale} is larger than its precision {precision}"
-                ));
-            }
-            match Dialect::get(dialect).generate(&Expression::DataType(data_type.clone())) {
-                Ok(_) => None,
-                Err(polyglot_sql::error::Error::Unsupported { feature, .. }) => Some(feature),
-                Err(_) => None,
-            }
-        }
-        DataType::Array { element_type, .. } | DataType::List { element_type } => {
-            decimal_error(element_type, dialect)
-        }
-        DataType::Nullable { inner } => decimal_error(inner, dialect),
-        DataType::Map {
-            key_type,
-            value_type,
-        } => decimal_error(key_type, dialect).or_else(|| decimal_error(value_type, dialect)),
-        DataType::Struct { fields, .. } => fields
-            .iter()
-            .find_map(|field| decimal_error(&field.data_type, dialect)),
-        _ => None,
+/// Why a decimal has a precision or scale `dialect` cannot hold.
+fn decimal_error(normalized: &NormalizedType, dialect: &str) -> Option<String> {
+    let (precision, scale) = decimal_digits(normalized)?;
+    if scale > precision {
+        return Some(format!(
+            "DECIMAL scale {scale} is larger than its precision {precision}"
+        ));
     }
+    let (_, max) = DECIMAL_PRECISION_LIMITS
+        .iter()
+        .find(|(name, _)| *name == dialect)?;
+    (precision == 0 || precision > *max)
+        .then(|| format!("DECIMAL precision {precision} exceeds the target range 1..={max}"))
 }

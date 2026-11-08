@@ -1,6 +1,9 @@
 //! What a dialect's native analysis module provides.
 
+use sqlquack_syntax::Parsed;
+
 use crate::analysis_route::models::ParserGap;
+use crate::type_system::models::NormalizedType;
 
 /// A dialect whose SQL SQLQuack analyses in place of Polyglot.
 pub trait NativeDialect: Sync {
@@ -12,4 +15,10 @@ pub trait NativeDialect: Sync {
 
     /// The engine-accepted prefix of UDF and cursor stubs: `__sqlbuild_`, or `__sqlbuild.` for T-SQL.
     fn stub_prefix(&self) -> &'static str;
+
+    /// Every statement of `sql` with the parser's named gaps, or the first error.
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap>;
+
+    /// A type as written in this dialect, as SQLBuild compares it; `None` when unknown.
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType>;
 }

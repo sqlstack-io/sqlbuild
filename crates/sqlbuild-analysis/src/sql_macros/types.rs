@@ -56,6 +56,12 @@ pub trait SqlMacroHost {
         ""
     }
 
+    /// The project's SQL analysis dialect, whose native parser reads macro bodies; `None` when the
+    /// adapter has none, which leaves SQL macros unavailable.
+    fn analysis_dialect(&self) -> Option<&str> {
+        None
+    }
+
     /// The lexical rules the project's SQL is authored in; `None` reads it under generic rules.
     fn lexical_syntax(&self) -> Option<&LexicalSyntax> {
         None

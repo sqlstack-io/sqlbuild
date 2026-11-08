@@ -1,9 +1,10 @@
 //! Probe queries that read the caller's column types at each SQL macro call, and their verdicts.
 
-use polyglot_sql::ValidationSchema;
 use serde_json::{Value, json};
 
-use crate::query_analysis::main::output_types::output_types;
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::parsing::header::unquoted;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, TokenKind, tokens};
 use crate::sql_macros::_helpers::rendering::arguments::{fits, type_family};
@@ -531,23 +532,41 @@ pub(crate) fn analysed_probes(
     analysed
 }
 
-/// One model's probes' output columns, inferred against its bound relations.
+/// One model's probes' output columns, inferred against its bound relations; none where the
+/// dialect has no native parser, since its SQL is not analysed.
 fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Vec<ProbeColumns> {
-    if probes.is_empty() {
-        return Vec::new();
-    }
+    let AnalysisRoute::Native(parser) = analysis_route(Some(dialect)) else {
+        return vec![None; probes.len()];
+    };
     let mut tables: Vec<Value> = Vec::with_capacity(schema.len());
     for (name, columns) in schema {
         tables.push(table(name, columns));
     }
-    let Ok(schema) = serde_json::from_value::<ValidationSchema>(json!({ "tables": tables })) else {
-        return vec![None; probes.len()];
-    };
     let mut columns: Vec<ProbeColumns> = Vec::with_capacity(probes.len());
     for sql in probes {
-        columns.push(output_types(sql, dialect, &schema).and_then(probe_columns));
+        columns.push(probe_outputs(parser, sql, &tables).and_then(probe_columns));
     }
     columns
+}
+
+/// The output columns of `sql` and their type hints, typed by the native route's analysis over
+/// `tables`; `None` until that analysis is available to SQL macros, so no probe finds anything.
+pub(crate) fn probe_outputs(
+    _parser: &dyn NativeDialect,
+    _sql: &str,
+    _tables: &[Value],
+) -> Option<Vec<(String, Option<String>)>> {
+    None
+}
+
+/// The findings, as `(code, message)`, the native route's analysis raises on `sql` over
+/// `tables`; none until that analysis is available to SQL macros.
+pub(crate) fn probe_type_errors(
+    _parser: &dyn NativeDialect,
+    _sql: &str,
+    _tables: &[Value],
+) -> Vec<(String, String)> {
+    Vec::new()
 }
 
 /// One bound relation as a validation schema table, its qualified name split into parts.

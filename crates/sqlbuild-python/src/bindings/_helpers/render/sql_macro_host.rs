@@ -92,6 +92,7 @@ struct PyHost<'r, 'a, 'py> {
     source: SqlMacroSource<'a, 'py>,
     facts: RefCell<SqlMacroFacts<'py>>,
     adapter: String,
+    analysis_dialect: Option<String>,
 }
 
 /// Whether a scanned reference is a SQL macro call.
@@ -123,6 +124,7 @@ pub(crate) fn expanded_sql_macro_calls<'py>(
         source,
         facts: RefCell::new(SqlMacroFacts::default()),
         adapter: request.rendering.adapter_name(request.context.py()),
+        analysis_dialect: request.rendering.analysis_dialect(request.context.py()),
     };
     let owner: String = owner_label(request)?;
     let context = TextContext {
@@ -605,6 +607,10 @@ impl<'py> SqlMacroHost for PyHost<'_, '_, 'py> {
 
     fn adapter(&self) -> &str {
         &self.adapter
+    }
+
+    fn analysis_dialect(&self) -> Option<&str> {
+        self.analysis_dialect.as_deref()
     }
 
     fn record_check(&self, check: SqlMacroCheck, call: (usize, usize)) {

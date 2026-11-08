@@ -131,15 +131,10 @@ pub(crate) const ALIAS_PRECEDING_KEYWORDS: [&str; 13] = [
     "FROM", "JOIN", "ON", "AND", "OR", "NOT", "WHERE", "USING", "LATERAL", "IN", "IS", "BY",
     "SELECT",
 ];
-/// Dialects tried in turn to judge whether typed markers keep a query parseable.
-pub(crate) const MARKER_PARSE_DIALECTS: [polyglot_sql::DialectType; 4] = [
-    polyglot_sql::DialectType::Generic,
-    polyglot_sql::DialectType::DuckDB,
-    polyglot_sql::DialectType::Snowflake,
-    polyglot_sql::DialectType::BigQuery,
-];
 /// The literal a typed marker still types, though it is one bare word.
 pub(crate) const NULL_KEYWORD: &str = "NULL";
+/// The largest DECIMAL precision each dialect that bounds it holds, by analysis dialect name.
+pub(crate) const DECIMAL_PRECISION_LIMITS: [(&str, u64); 2] = [("duckdb", 38), ("postgres", 1000)];
 /// BigQuery's most integer digits and scale of a `NUMERIC`.
 pub(crate) const BIGQUERY_NUMERIC_LIMITS: (u32, u32) = (29, 9);
 /// BigQuery's most integer digits and scale of a `BIGNUMERIC`.

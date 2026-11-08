@@ -1,3 +1,7 @@
+use sqlquack_syntax::Parsed;
+
+use crate::type_system::models::NormalizedType;
+
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 
@@ -49,6 +53,17 @@ impl NativeDialect for PivotlessDialect {
 
     fn stub_prefix(&self) -> &'static str {
         "__sqlbuild."
+    }
+
+    fn normalize_type(&self, _spelling: &str) -> Option<NormalizedType> {
+        None
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        self.read_whole(sql).map(|()| Parsed {
+            statements: Vec::new(),
+            gaps: Vec::new(),
+        })
     }
 }
 

@@ -242,8 +242,8 @@ fn given_tsql_parser_errors_when_parsing_then_syntax_errors_are_told_from_gaps()
 
 #[test]
 fn given_tsql_type_spellings_when_normalizing_then_they_take_polyglots_canonical_names() {
-    // Polyglot's T-SQL names (D460), measured on the compiled corpus's spellings; `None` where
-    // neither SQL Server 16.0.4305.5 nor SQLBuild's logical types know the type (D467).
+    // Polyglot's T-SQL names, measured on the compiled corpus's spellings; `None` where
+    // neither SQL Server 16.0.4305.5 nor SQLBuild's logical types know the type.
     let test_cases = [
         ("int", Some(("INTEGER", TypeFamily::Integer))),
         (

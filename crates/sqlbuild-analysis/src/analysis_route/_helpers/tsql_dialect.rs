@@ -1,7 +1,7 @@
 //! SQL Server's native module: SQLQuack's T-SQL parser and its sqlquack-semantics profile.
 //!
-//! `parse`, `profile` and `normalize_type` follow the proposed `NativeDialect` signature (D454,
-//! D471); they move into the trait implementation when the trait gains them.
+//! `profile` follows the proposed `NativeDialect` signature; it moves into the trait
+//! implementation when the trait gains it.
 
 use sqlquack_semantics::dialects::constants::SQL_SERVER;
 use sqlquack_semantics::dialects::types::DialectProfile;
@@ -19,61 +19,9 @@ use crate::analysis_route::models::{ParserGap, TsqlDialect};
 use crate::analysis_route::types::NativeDialect;
 
 impl TsqlDialect {
-    /// Every statement of `sql` with the parser's named gaps, or the first error. An unknown
-    /// one-part function (SQL Server's 195) is a syntax error, as the engine raises it parsing.
-    pub fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
-        let parsed = parse_strict(sql).map_err(|failure| {
-            let error = failure.parse_error();
-            ParserGap {
-                construct: error.message.clone(),
-                message: error.message.clone(),
-                offset: error.position,
-                syntax: error.syntax,
-            }
-        })?;
-        Ok(Parsed {
-            statements: parsed.statements,
-            gaps: parsed
-                .gaps
-                .into_iter()
-                .map(|gap| Gap {
-                    construct: gap.construct,
-                    start: gap.start,
-                    end: gap.end,
-                })
-                .collect(),
-        })
-    }
-
     /// SQL Server's sqlquack-semantics profile.
     pub fn profile(&self) -> &'static dyn DialectProfile {
         &SQL_SERVER
-    }
-
-    /// A type as SQLBuild compares it, spelt with Polyglot's T-SQL canonical names so no golden
-    /// moves (D460, D471); `None` for a type neither SQL Server nor SQLBuild's logical types know.
-    pub fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        let written: String = spelling
-            .split_whitespace()
-            .collect::<Vec<&str>>()
-            .join(" ")
-            .to_ascii_uppercase();
-        let (base, arguments): (&str, String) = match written.find('(') {
-            Some(open) => (written[..open].trim(), written[open..].replace(' ', "")),
-            None => (written.as_str(), String::new()),
-        };
-        if let Some(direct) = canonical_type(base, &arguments) {
-            return Some(direct);
-        }
-        if !LOGICAL_TYPES.contains(&base) && !self.built_in_type(&written) {
-            return None;
-        }
-        let aliased: String = match type_alias(base) {
-            Some(alias) if alias.contains('(') => alias.to_owned(),
-            Some(alias) => format!("{alias}{arguments}"),
-            None => written.clone(),
-        };
-        Some(normalize_with_fallback(&aliased, Some(TypeDialect::Tsql)))
     }
 
     /// Whether SQL Server reads `spelling` as one of its built-in types.
@@ -153,5 +101,57 @@ impl NativeDialect for TsqlDialect {
 
     fn stub_prefix(&self) -> &'static str {
         TSQL_STUB_PREFIX
+    }
+
+    /// A type as SQLBuild compares it, spelt with Polyglot's T-SQL canonical names so no golden
+    /// moves; `None` for a type neither SQL Server nor SQLBuild's logical types know.
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        let written: String = spelling
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join(" ")
+            .to_ascii_uppercase();
+        let (base, arguments): (&str, String) = match written.find('(') {
+            Some(open) => (written[..open].trim(), written[open..].replace(' ', "")),
+            None => (written.as_str(), String::new()),
+        };
+        if let Some(direct) = canonical_type(base, &arguments) {
+            return Some(direct);
+        }
+        if !LOGICAL_TYPES.contains(&base) && !self.built_in_type(&written) {
+            return None;
+        }
+        let aliased: String = match type_alias(base) {
+            Some(alias) if alias.contains('(') => alias.to_owned(),
+            Some(alias) => format!("{alias}{arguments}"),
+            None => written.clone(),
+        };
+        Some(normalize_with_fallback(&aliased, Some(TypeDialect::Tsql)))
+    }
+
+    /// Every statement of `sql` with the parser's named gaps, or the first error. An unknown
+    /// one-part function (SQL Server's 195) is a syntax error, as the engine raises it parsing.
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        let parsed = parse_strict(sql).map_err(|failure| {
+            let error = failure.parse_error();
+            ParserGap {
+                construct: error.message.clone(),
+                message: error.message.clone(),
+                offset: error.position,
+                syntax: error.syntax,
+            }
+        })?;
+        Ok(Parsed {
+            statements: parsed.statements,
+            gaps: parsed
+                .gaps
+                .into_iter()
+                .map(|gap| Gap {
+                    construct: gap.construct,
+                    start: gap.start,
+                    end: gap.end,
+                })
+                .collect(),
+        })
     }
 }

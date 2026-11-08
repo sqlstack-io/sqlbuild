@@ -1,7 +1,13 @@
 //! A SQL macro body parsed as SQL, its parameter references located and replaced in place.
 
-use polyglot_sql::expressions::{Identifier, Select};
-use polyglot_sql::{DialectType, Expression, ExpressionWalk};
+use sqlquack_syntax::expressions::names::models::{Column, Identifier};
+use sqlquack_syntax::expressions::operators::models::DotAccess;
+use sqlquack_syntax::expressions::queries::models::Select;
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
+
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
+use crate::analysis_route::types::NativeDialect;
 
 use crate::sql_macros::_helpers::parsing::captures::{output_selects, slot_captures};
 use crate::sql_macros::_helpers::parsing::header::unquoted;
@@ -22,17 +28,6 @@ use crate::sql_macros::models::{
     SqlMacroDefinition, SqlMacroForm, SqlMacroParameter, TextSplice, TypedCall,
 };
 
-/// Dialects tried in turn to parse a body; the first that parses it locates its references.
-const PARSE_DIALECTS: [DialectType; 8] = [
-    DialectType::Generic,
-    DialectType::DuckDB,
-    DialectType::Snowflake,
-    DialectType::BigQuery,
-    DialectType::PostgreSQL,
-    DialectType::Databricks,
-    DialectType::ClickHouse,
-    DialectType::TSQL,
-];
 const EXPRESSION_PREFIX: &str = "SELECT ";
 const CTE_SUFFIX: &str = "\nSELECT 1";
 
@@ -41,30 +36,46 @@ pub(crate) struct ParsedBody {
     pub(crate) select: Box<Select>,
 }
 
-pub(crate) fn parsed(form: SqlMacroForm, body: &str) -> Result<ParsedBody, String> {
+/// The native parser of the project's SQL analysis `dialect`, or why SQL macros are unavailable.
+pub(crate) fn macro_parser(dialect: Option<&str>) -> Result<&'static dyn NativeDialect, String> {
+    match analysis_route(dialect) {
+        AnalysisRoute::Native(parser) => Ok(parser),
+        _ => Err(match dialect {
+            Some(dialect) => format!(
+                "SQL macros are unavailable for SQL analysis dialect '{dialect}', which SQLBuild has no native parser for"
+            ),
+            None => "SQL macros are unavailable without a SQL analysis dialect".to_owned(),
+        }),
+    }
+}
+
+/// The body parsed as SQL by the project's parser, or why that parser cannot read it.
+pub(crate) fn parsed(
+    parser: &dyn NativeDialect,
+    form: SqlMacroForm,
+    body: &str,
+) -> Result<ParsedBody, String> {
     let text: String = match form {
         SqlMacroForm::Expression => format!("{EXPRESSION_PREFIX}{body}"),
         SqlMacroForm::CteList => format!("{body}{CTE_SUFFIX}"),
         SqlMacroForm::ColumnList => body.to_owned(),
     };
-    let mut first_error: Option<String> = None;
-    for dialect in PARSE_DIALECTS {
-        match polyglot_sql::parse(&text, dialect) {
-            Ok(mut statements) if statements.len() == 1 => {
-                if let Some(Expression::Select(select)) = statements.pop() {
-                    return Ok(ParsedBody { select });
-                }
-                first_error.get_or_insert_with(|| "it is not a SELECT fragment".to_owned());
-            }
-            Ok(_) => {
-                first_error.get_or_insert_with(|| "it holds more than one statement".to_owned());
-            }
-            Err(error) => {
-                first_error.get_or_insert_with(|| error.to_string());
-            }
-        }
+    let Parsed {
+        mut statements,
+        gaps,
+    } = parser.parse(&text).map_err(|gap| gap.message)?;
+    if let Some(gap) = gaps.first() {
+        return Err(format!(
+            "the {} parser cannot read {}",
+            parser.name(),
+            gap.construct
+        ));
     }
-    Err(first_error.unwrap_or_default())
+    match (statements.pop(), statements.is_empty()) {
+        (Some(Expression::Select(select)), true) => Ok(ParsedBody { select }),
+        (Some(_), true) => Err("it is not a SELECT fragment".to_owned()),
+        _ => Err("it holds more than one statement".to_owned()),
+    }
 }
 
 /// The reason the parsed select is not exactly the form's fragment, if it is not.
@@ -122,7 +133,7 @@ fn parameter_of<'a>(
 /// The names a body defines: CTE names, or the output column names of a column list.
 fn defined_names(
     definition: &SqlMacroDefinition,
-    select: &Select,
+    (text, select): (&str, &Select),
     arguments: &[RenderedArgument],
 ) -> Result<Vec<String>, String> {
     match definition.form {
@@ -135,7 +146,7 @@ fn defined_names(
             .collect()),
         SqlMacroForm::ColumnList => {
             let mut names: Vec<String> = Vec::new();
-            for projection in &select.expressions {
+            for (index, projection) in select.expressions.iter().enumerate() {
                 match projection {
                     Expression::Alias(alias) => names.push(alias.alias.name.clone()),
                     Expression::Column(column) => {
@@ -148,7 +159,7 @@ fn defined_names(
                     _ => {
                         return Err(format!(
                             "every column of a column-list macro needs a name; add AS <name> to {}",
-                            shown_projection(projection)
+                            shown_projection(text, index)
                         ));
                     }
                 }
@@ -161,7 +172,7 @@ fn defined_names(
 /// The output names of a bare column projection: a `COLUMNS` slot's columns, or the name.
 fn column_output_names(
     definition: &SqlMacroDefinition,
-    column: &polyglot_sql::expressions::Column,
+    column: &Column,
     arguments: &[RenderedArgument],
 ) -> Result<Vec<String>, String> {
     if let Some(parameter) = parameter_of(definition, &column.name) {
@@ -185,7 +196,7 @@ fn column_output_names(
 /// The relation and slot an aliased slot read `alias.@relation.slot` names, if `dot` is one.
 fn aliased_slot<'d>(
     definition: &'d SqlMacroDefinition,
-    dot: &'d polyglot_sql::expressions::DotAccess,
+    dot: &'d DotAccess,
 ) -> Option<(&'d str, &'d str)> {
     let Expression::Column(column) = &dot.this else {
         return None;
@@ -223,10 +234,32 @@ fn slot_output_names(
     }
 }
 
-fn shown_projection(projection: &Expression) -> String {
-    let text: String = polyglot_sql::generate(projection, DialectType::Generic)
-        .unwrap_or_else(|_| projection.variant_name().to_owned());
-    text.replace(&placeholder(""), "@")
+/// The `index`th item of the select list `text` as written, its placeholders shown as `@name`.
+fn shown_projection(text: &str, index: usize) -> String {
+    let scanned: Vec<Token> = tokens(text).unwrap_or_default();
+    let mut items: Vec<Option<(usize, usize)>> = vec![None];
+    let mut depth: usize = 0;
+    for token in scanned.iter().skip(1) {
+        if depth == 0 && token.is(text, ",") {
+            items.push(None);
+            continue;
+        }
+        if token.is(text, "(") {
+            depth += 1;
+        } else if token.is(text, ")") {
+            depth = depth.saturating_sub(1);
+        }
+        if let Some(item) = items.last_mut() {
+            let start: usize = item.map_or(token.start, |(start, _)| start);
+            *item = Some((start, token.end));
+        }
+    }
+    items
+        .get(index)
+        .copied()
+        .flatten()
+        .map_or("", |(start, end)| &text[start..end])
+        .replace(&placeholder(""), "@")
 }
 
 /// Rejects a RELATION parameter read as a plain value, as in `SELECT @src`.
@@ -429,7 +462,7 @@ pub(crate) fn marked_text(
 
 /// Rejects a mapped single-column slot read in a select-list item without `AS`.
 fn check_mapped_reads(
-    definition: &SqlMacroDefinition,
+    (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     (body, references, reads): (&str, &[ParameterReference], &[SlotRead]),
     arguments: &[RenderedArgument],
 ) -> Result<(), SqlMacroError> {
@@ -444,7 +477,7 @@ fn check_mapped_reads(
     }
     let marked: Vec<&SlotRead> = mapped.iter().map(|(read, _)| *read).collect();
     let text: String = marked_text((body, references), &marked);
-    let Ok(parsed_text) = parsed(definition.form, &text) else {
+    let Ok(parsed_text) = parsed(parser, definition.form, &text) else {
         return Ok(());
     };
     let root: Expression = Expression::Select(parsed_text.select);
@@ -665,6 +698,7 @@ fn within(calls: Vec<TypedCall>, (start, end): (usize, usize)) -> Vec<TypedCall>
 
 /// `body` with each parameter replaced by its argument, as the form inserts it at a call.
 pub(crate) fn expand_body(
+    parser: &dyn NativeDialect,
     (definition, outer): (&SqlMacroDefinition, Option<&SqlMacroDefinition>),
     body: &ExpandedText,
     arguments: &[RenderedArgument],
@@ -686,13 +720,14 @@ pub(crate) fn expand_body(
     let reads: Vec<SlotRead> =
         slot_reads(definition, (body, &scanned, &references)).map_err(|(_, error)| error)?;
     check_group_positions(definition, (body, &scanned), &reads).map_err(|(_, error)| error)?;
+    let parsed_text: String = with_placeholders(body, &references);
     let parsed_body: ParsedBody =
-        parsed(definition.form, &with_placeholders(body, &references)).map_err(invalid)?;
+        parsed(parser, definition.form, &parsed_text).map_err(invalid)?;
     if let Some(problem) = shape_problem(definition.form, &parsed_body.select) {
         return Err(invalid(problem.to_owned()));
     }
     let names: Vec<String> =
-        defined_names(definition, &parsed_body.select, arguments).map_err(invalid)?;
+        defined_names(definition, (&parsed_text, &parsed_body.select), arguments).map_err(invalid)?;
     check_relation_values(definition, &parsed_body.select).map_err(|reason| {
         SqlMacroError::new(
             ARGUMENT_CODE,
@@ -700,7 +735,7 @@ pub(crate) fn expand_body(
         )
     })?;
     check_group_clashes(definition, &parsed_body.select, arguments)?;
-    check_mapped_reads(definition, (body, &references, &reads), arguments)?;
+    check_mapped_reads((parser, definition), (body, &references, &reads), arguments)?;
     check_forwarded_kinds(definition, arguments, outer)?;
     let (expanded, calls) = substituted_body(
         (definition, outer),
@@ -717,7 +752,11 @@ pub(crate) fn expand_body(
         names,
         calls: within(calls, kept),
         like: None,
-        captures: slot_captures(definition, (body, &references, &reads), arguments),
+        captures: slot_captures(
+            (parser, definition),
+            (body, &references, &reads),
+            arguments,
+        ),
     })
 }
 
