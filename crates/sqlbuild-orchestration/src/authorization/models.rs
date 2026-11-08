@@ -22,3 +22,22 @@ pub struct PersonAccess {
     pub actions: Vec<Action>,
     pub locations: Vec<LocationAccess>,
 }
+
+/// What a target's role overview is built from, read in one transaction.
+#[derive(Debug)]
+pub(crate) struct RoleFacts {
+    pub(crate) custom: Vec<crate::store::types::Row>,
+    pub(crate) holders: std::collections::BTreeMap<String, u64>,
+    pub(crate) descriptions: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct RoleHolderCount {
+    pub(crate) role_key: String,
+    pub(crate) holders: u64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct CurrentSnapshotId {
+    pub(crate) snapshot_id: Uuid,
+}

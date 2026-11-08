@@ -58,6 +58,14 @@ fn role_allows(role: BuiltinRole, action: Action) -> bool {
     }
 }
 
+/// A built-in role's actions on every node, in vocabulary order.
+pub(crate) fn builtin_actions(role: BuiltinRole) -> Vec<Action> {
+    ACTIONS
+        .into_iter()
+        .filter(|action| role_allows(role, *action))
+        .collect()
+}
+
 /// The assigned and group roles of an active person for `target`; `None` when the person is disabled or unknown.
 pub(crate) async fn person_role_rows(
     transaction: ControlTransaction,

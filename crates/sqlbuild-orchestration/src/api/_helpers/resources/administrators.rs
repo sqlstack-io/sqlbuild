@@ -9,10 +9,12 @@ use crate::api::models::MutationResponse;
 use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::change_administrator::change_administrator;
 use crate::authorization::main::list_people::list_people;
+use crate::authorization::main::list_role_definitions::list_role_definitions;
 use crate::authorization::main::list_role_holdings::list_role_holdings;
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{
     AdministratorChange, AuditContext, PersonSummary, RoleAssignmentRequest, RoleHoldings,
+    RoleOverview,
 };
 use crate::store::models::ControlStore;
 
@@ -68,5 +70,20 @@ pub(crate) async fn holdings(
 ) -> Result<Json<RoleHoldings>, ApiError> {
     Ok(Json(
         list_role_holdings(&store, (&context, principal)).await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/admin/locations/{location_id}/targets/{target}/roles", operation_id = "listRoleDefinitions",
+    params(("location_id" = Uuid, Path), ("target" = String, Path)),
+    responses((status = 200, body = Vec<RoleOverview>, description = "Built-in roles, then the target's published custom roles"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn definitions(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Path((location_id, target)): Path<(Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<RoleOverview>>, ApiError> {
+    Ok(Json(
+        list_role_definitions(&store, (&context, principal), (location_id, &target)).await?,
     ))
 }

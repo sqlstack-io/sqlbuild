@@ -1,5 +1,21 @@
 // Generated from sqb server --openapi. Run npm run generate; do not edit.
 export interface paths {
+    "/api/admin/locations/{location_id}/targets/{target}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRoleDefinitions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/people": {
         parameters: {
             query?: never;
@@ -1707,6 +1723,28 @@ export interface components {
         };
         /** @description A built-in role by name, or a custom role a location publishes. */
         RoleKey: components["schemas"]["BuiltinRole"] | string;
+        /** @description A role usable on one location target: built in, or published by the location's project. */
+        RoleOverview: {
+            builtin: boolean;
+            /** @description The project's description; absent for built-in roles. */
+            description?: string | null;
+            /** @description Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants. */
+            grants: components["schemas"]["RoleOverviewGrant"][];
+            /**
+             * Format: int64
+             * @description Active people assigned the role here or everywhere; SSO group members are not counted.
+             */
+            holders: number;
+            key: string;
+        };
+        /** @description Node selectors, the actions they grant, and the nodes each selector matched when published. */
+        RoleOverviewGrant: {
+            matched: {
+                [key: string]: string[];
+            };
+            nodes: string[];
+            permissions: components["schemas"]["Action"][];
+        };
         /** @description This is a server-owned instruction, not an arbitrary status supplied by a worker. */
         RunChange: {
             container_id?: string | null;
@@ -2295,6 +2333,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listRoleDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Built-in roles, then the target's published custom roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOverview"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPeople: {
         parameters: {
             query?: never;

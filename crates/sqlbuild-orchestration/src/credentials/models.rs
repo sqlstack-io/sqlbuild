@@ -66,6 +66,27 @@ pub struct RoleHoldings {
     pub group_roles: Vec<GroupRole>,
 }
 
+/// A role usable on one location target: built in, or published by the location's project.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleOverview {
+    pub key: String,
+    pub builtin: bool,
+    /// The project's description; absent for built-in roles.
+    pub description: Option<String>,
+    /// Built-in roles: one grant without selectors, meaning every node. Custom roles: their published grants.
+    pub grants: Vec<RoleOverviewGrant>,
+    /// Active people assigned the role here or everywhere; SSO group members are not counted.
+    pub holders: u64,
+}
+
+/// Node selectors, the actions they grant, and the nodes each selector matched when published.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RoleOverviewGrant {
+    pub nodes: Vec<String>,
+    pub permissions: Vec<Action>,
+    pub matched: std::collections::BTreeMap<String, Vec<String>>,
+}
+
 /// A role assigned to one person, everywhere or on one location and target.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonRole {

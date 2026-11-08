@@ -324,11 +324,15 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                     }
                     let granted = usize::from(role_case.expected_admin == StatusCode::OK.as_u16());
                     let mut admin_reads = Vec::new();
-                    for admin_read in ["/api/admin/people", "/api/admin/roles"] {
+                    for admin_read in [
+                        "/api/admin/people".to_owned(),
+                        "/api/admin/roles".to_owned(),
+                        format!("/api/admin/locations/{location}/targets/development/roles"),
+                    ] {
                         let listed = request(
                             &provider.client,
                             session,
-                            (Method::GET, admin_read),
+                            (Method::GET, &admin_read),
                             (&Value::Null, &session.csrf),
                         )
                         .await;

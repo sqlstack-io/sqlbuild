@@ -16,6 +16,7 @@ use crate::api::_helpers::resources::{
     administrators::assign,
     administrators::people,
     administrators::holdings,
+    administrators::definitions,
     audit::read,
     person_operations::request_job,
     person_operations::cancel_run,

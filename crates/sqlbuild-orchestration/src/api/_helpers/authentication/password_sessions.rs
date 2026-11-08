@@ -70,6 +70,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::administrators::people),
         )
         .route(
+            "/api/admin/locations/{location_id}/targets/{target}/roles",
+            get(crate::api::_helpers::resources::administrators::definitions),
+        )
+        .route(
             "/api/admin/roles",
             post(crate::api::_helpers::resources::administrators::assign)
                 .get(crate::api::_helpers::resources::administrators::holdings),
