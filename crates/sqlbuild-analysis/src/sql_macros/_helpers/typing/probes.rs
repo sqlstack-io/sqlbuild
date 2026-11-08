@@ -1,9 +1,11 @@
 //! Probe queries that read the caller's column types at each SQL macro call, and their verdicts.
 
-use polyglot_sql::ValidationSchema;
-use serde_json::{Value, json};
+use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
+use sqlquack_semantics::lineage::types::LineageSchema;
 
-use crate::query_analysis::main::output_types::output_types;
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::{AnalysisInput, AnalysisRoute, NativeAnalysis};
+use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::parsing::header::unquoted;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, TokenKind, tokens};
 use crate::sql_macros::_helpers::rendering::arguments::{fits, type_family};
@@ -531,41 +533,117 @@ pub(crate) fn analysed_probes(
     analysed
 }
 
-/// One model's probes' output columns, inferred against its bound relations.
+/// One model's probes' output columns, inferred against its bound relations by the native route.
 fn model_probes(dialect: &str, probes: &[String], schema: &RelationShapes) -> Vec<ProbeColumns> {
-    if probes.is_empty() {
-        return Vec::new();
-    }
-    let mut tables: Vec<Value> = Vec::with_capacity(schema.len());
-    for (name, columns) in schema {
-        tables.push(table(name, columns));
-    }
-    let Ok(schema) = serde_json::from_value::<ValidationSchema>(json!({ "tables": tables })) else {
+    let AnalysisRoute::Native(parser) = analysis_route(Some(dialect)) else {
         return vec![None; probes.len()];
     };
+    let schema: ProbeSchema = ProbeSchema::new(schema);
     let mut columns: Vec<ProbeColumns> = Vec::with_capacity(probes.len());
     for sql in probes {
-        columns.push(output_types(sql, dialect, &schema).and_then(probe_columns));
+        columns.push(probe_outputs(parser, sql, &schema).and_then(probe_columns));
     }
     columns
 }
 
-/// One bound relation as a validation schema table, its qualified name split into parts.
-fn table(name: &str, columns: &[(String, String)]) -> Value {
-    let mut parts: Vec<&str> = name.split('.').collect();
-    let table_name: &str = parts.pop().unwrap_or(name);
-    let columns: Vec<Value> = columns
+/// The relations a probe reads, by name; each also answers to the trailing parts of its name.
+#[derive(Debug)]
+pub(crate) struct ProbeSchema {
+    relations: Vec<(String, Vec<SchemaColumn>)>,
+}
+
+impl ProbeSchema {
+    /// Each relation with its `(column, type)` list; an unknown type leaves the column untyped.
+    pub(crate) fn new(relations: &RelationShapes) -> Self {
+        Self {
+            relations: relations
+                .iter()
+                .map(|(name, columns)| (unquoted_parts(name), schema_columns(columns)))
+                .collect(),
+        }
+    }
+}
+
+impl LineageSchema for ProbeSchema {
+    fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
+        let relation: String = relation.to_ascii_lowercase();
+        let suffix: String = format!(".{relation}");
+        self.relations
+            .iter()
+            .find(|(name, _)| *name == relation || name.ends_with(&suffix))
+            .map(|(_, columns)| columns.as_slice())
+    }
+}
+
+/// A relation name with each dotted part unquoted, lower-cased as the schema compares it.
+fn unquoted_parts(name: &str) -> String {
+    let parts: Vec<String> = name.split('.').map(unquoted).collect();
+    parts.join(".").to_ascii_lowercase()
+}
+
+/// Columns of the given spellings, of unknown nullability.
+fn schema_columns(columns: &[(String, String)]) -> Vec<SchemaColumn> {
+    columns
         .iter()
-        .map(|(column, data_type)| json!({"name": column, "type": data_type}))
-        .collect();
-    let mut entry: Value = json!({"name": table_name, "columns": columns});
-    if let Some(schema) = parts.pop() {
-        entry["schema"] = json!(schema);
+        .map(|(name, data_type)| SchemaColumn {
+            name: name.clone(),
+            quoted: false,
+            data_type: known_type(data_type).then(|| data_type.clone()),
+            nullability: Nullability::Unknown,
+        })
+        .collect()
+}
+
+/// The native analysis of probe `sql` over `schema`; `None` where the parser cannot read it whole.
+fn probe_analysis(
+    parser: &dyn NativeDialect,
+    sql: &str,
+    schema: &ProbeSchema,
+) -> Option<NativeAnalysis> {
+    let input = AnalysisInput {
+        sql,
+        schema,
+        references: &[],
+        extension_functions: &[],
+    };
+    let Ok(analysis) = parser.analyse(&input) else {
+        return None;
+    };
+    Some(analysis)
+}
+
+/// The output columns of `sql` over `schema` with their types, unless a star stayed unexpanded.
+pub(crate) fn probe_outputs(
+    parser: &dyn NativeDialect,
+    sql: &str,
+    schema: &ProbeSchema,
+) -> Option<Vec<(String, Option<String>)>> {
+    let analysis: NativeAnalysis = probe_analysis(parser, sql, schema)?;
+    if analysis.has_star && !analysis.star_resolved {
+        return None;
     }
-    if let Some(catalog) = parts.pop() {
-        entry["catalog"] = json!(catalog);
-    }
-    entry
+    Some(
+        analysis
+            .columns
+            .into_iter()
+            .map(|column| (column.name, column.data_type))
+            .collect(),
+    )
+}
+
+/// The `(code, message)` findings, in SQLBuild codes, of the native analysis of `sql`.
+pub(crate) fn probe_type_errors(
+    parser: &dyn NativeDialect,
+    sql: &str,
+    schema: &ProbeSchema,
+) -> Vec<(String, String)> {
+    probe_analysis(parser, sql, schema).map_or_else(Vec::new, |analysis| {
+        analysis
+            .diagnostics
+            .into_iter()
+            .map(|finding| (finding.code, finding.message))
+            .collect()
+    })
 }
 
 /// A probe's typed output columns, unless analysis left a star unexpanded.

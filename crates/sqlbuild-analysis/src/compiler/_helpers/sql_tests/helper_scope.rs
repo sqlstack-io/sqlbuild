@@ -4,9 +4,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use sqlbuild_core::graph_walk::main::depth_first_postorder::depth_first_postorder;
 
-use polyglot_sql::Dialect;
 use rustc_hash::FxHashSet;
 
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::cte_rename::defined_cte_keys;
 use crate::compiler::_helpers::sql_tests::cte_slices::SliceDialect;
 use crate::compiler::_helpers::sql_tests::cte_sql::{with_leading_ctes, with_unique_ctes};
@@ -84,7 +84,7 @@ pub(crate) struct ScopeRequest<'a> {
     pub(crate) fixtures: &'a TestFixtures,
     pub(crate) patterns: &'a SqlTestPatterns,
     pub(crate) file_label: &'a str,
-    pub(crate) rename_dialect: Option<&'a Dialect>,
+    pub(crate) rename_dialect: Option<&'a dyn NativeDialect>,
     pub(crate) flat_dialect: bool,
     pub(crate) slice_dialect: SliceDialect,
     /// Helpers the compiler found the test reads; an unread helper calling a reference is left out.
@@ -221,7 +221,7 @@ impl ScopeGraph {
     fn rewrite_readers(
         &self,
         readers: &[(String, &str)],
-        dialect: &Dialect,
+        dialect: &dyn NativeDialect,
         patterns: &SqlTestPatterns,
     ) -> Option<HashMap<String, String>> {
         let names: HashMap<String, String> = self

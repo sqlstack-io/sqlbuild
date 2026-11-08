@@ -22,11 +22,14 @@ const SQL_TEST_DECIMAL_OVERFLOW: &str = "decimal_overflow";
 /// Every compiled SQL test, raising each assembly failure in the tests' order.
 pub(crate) fn assembled_sql_tests<'py>(
     inputs: &Bound<'py, PyAny>,
+    sql_analysis_dialect: Option<String>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let py: Python<'py> = inputs.py();
     count_stage(py, SQL_TEST_ASSEMBLY, 1)?;
     let assemblies: Vec<Bound<'py, PyAny>> =
-        assemble_native_sql_tests(py, inputs)?.iter().collect();
+        assemble_native_sql_tests(py, inputs, sql_analysis_dialect)?
+            .iter()
+            .collect();
     let test_inputs: Vec<Bound<'py, PyAny>> = native_field(inputs, "test_inputs")?
         .try_iter()?
         .collect::<PyResult<_>>()?;

@@ -3,10 +3,6 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 
-use polyglot_sql::expressions::With;
-use polyglot_sql::{
-    ComplexityGuardOptions, Dialect, DialectType, Expression, ExpressionWalk, ParseOptions,
-};
 use sqlbuild_core::graph_walk::main::breadth_first_reach::breadth_first_reach;
 use sqlbuild_core::graph_walk::models::VisitOrder;
 use sqlbuild_core::graph_walk::types::NodeSet;
@@ -15,7 +11,10 @@ use sqlbuild_core::text::main::is_word_char::is_word_char;
 use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_references;
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
+use sqlquack_syntax::expressions::queries::models::With;
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
 
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::planning::MOCK_CTE_PREFIXES;
 use crate::compiler::models::{
     SqlTestAssemblyFailure, SqlTestAssemblyModel, SqlTestAssemblyModelPayload,
@@ -32,8 +31,6 @@ const RELATION_KINDS: [&str; 5] = [
     DBT_REF_KIND,
     TABLE_FUNCTION_KIND,
 ];
-/// The function call depth SQLBuild's Polyglot proxy allows `parse_one`.
-const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 
 type Deferrable<T> = Result<T, SqlTestAssemblyFailure>;
 
@@ -52,6 +49,8 @@ pub(crate) struct MockReadsRequest<'a> {
     pub(crate) models: &'a [SqlTestAssemblyModel],
     pub(crate) target_model_names: &'a [String],
     pub(crate) syntax: &'a LexicalSyntax,
+    /// The project's native parser; without one, reads come from the token scan.
+    pub(crate) parser: Option<&'a dyn NativeDialect>,
 }
 
 /// A Python dict by string key: a repeated key keeps its first position and takes the new value.
@@ -155,7 +154,7 @@ pub(crate) fn mock_reading_helper_diagnostics(
         .iter()
         .chain(&payload.assertion_ctes)
         .collect();
-    let graph = cte_graph(&payload.authored_ctes, &readers)?;
+    let graph = cte_graph(request.parser, &payload.authored_ctes, &readers)?;
     let mut scanned: Vec<&str> = readers.iter().map(|cte| cte.sql_body.as_str()).collect();
     for key in read_helper_keys(&graph) {
         if let Some(cte) = graph.cte(&key) {
@@ -241,7 +240,11 @@ fn model_reference(reference: &SqlTestAssemblyReference) -> Reference {
 }
 
 /// Python's `sql_test_cte_graph`.
-fn cte_graph<'a>(authored: &'a [SqlTestCte], readers: &[&SqlTestCte]) -> Deferrable<CteGraph<'a>> {
+fn cte_graph<'a>(
+    parser: Option<&dyn NativeDialect>,
+    authored: &'a [SqlTestCte],
+    readers: &[&SqlTestCte],
+) -> Deferrable<CteGraph<'a>> {
     let mut ctes: OrderedEntries<&'a SqlTestCte> = OrderedEntries::new();
     for cte in authored {
         ctes.assign(fold(&cte.name), cte);
@@ -250,7 +253,7 @@ fn cte_graph<'a>(authored: &'a [SqlTestCte], readers: &[&SqlTestCte]) -> Deferra
     let mut reads: OrderedEntries<Vec<String>> = OrderedEntries::new();
     for (key, cte) in &ctes.entries {
         let others: Vec<String> = keys.iter().filter(|other| *other != key).cloned().collect();
-        let cte_reads = match parsed_reads(&cte.sql_body, &others)? {
+        let cte_reads = match parsed_reads(parser, &cte.sql_body, &others) {
             Some(parsed) => parsed,
             None => token_reads(&cte.sql_body, &others),
         };
@@ -258,7 +261,7 @@ fn cte_graph<'a>(authored: &'a [SqlTestCte], readers: &[&SqlTestCte]) -> Deferra
     }
     let mut reader_reads: Vec<String> = Vec::new();
     for reader in readers {
-        let parsed = match parsed_reads(&reader.sql_body, &keys)? {
+        let parsed = match parsed_reads(parser, &reader.sql_body, &keys) {
             Some(parsed) => parsed,
             None => token_reads(&reader.sql_body, &keys),
         };
@@ -276,18 +279,24 @@ fn cte_graph<'a>(authored: &'a [SqlTestCte], readers: &[&SqlTestCte]) -> Deferra
 }
 
 /// Python's `_parsed_reads`: unqualified reads of `keys` no nested CTE shadows, or None unparsed.
-fn parsed_reads(sql: &str, keys: &[String]) -> Deferrable<Option<Vec<String>>> {
+fn parsed_reads(
+    parser: Option<&dyn NativeDialect>,
+    sql: &str,
+    keys: &[String],
+) -> Option<Vec<String>> {
     let folded = fold(sql);
     if !keys.iter().any(|key| folded.contains(key.as_str())) {
-        return Ok(Some(Vec::new()));
+        return Some(Vec::new());
     }
-    let options = proxy_parse_options()?;
-    let Ok(mut statements) = Dialect::get(DialectType::Generic).parse_with_options(sql, &options)
+    let Ok(Parsed {
+        mut statements,
+        gaps,
+    }) = parser?.parse(sql)
     else {
-        return Ok(None);
+        return None;
     };
-    if statements.len() != 1 {
-        return Ok(None);
+    if statements.len() != 1 || !gaps.is_empty() {
+        return None;
     }
     let parsed: Expression = statements.remove(0);
     let nested = defined_cte_keys(&parsed);
@@ -304,18 +313,7 @@ fn parsed_reads(sql: &str, keys: &[String]) -> Deferrable<Option<Vec<String>>> {
             reads.push(key);
         }
     }
-    Ok(Some(reads))
-}
-
-/// The parse options SQLBuild's Polyglot proxy gives `parse_one`.
-fn proxy_parse_options() -> Deferrable<ParseOptions> {
-    let guard: ComplexityGuardOptions = serde_json::from_value(serde_json::json!({
-        "maxFunctionCallDepth": MAX_FUNCTION_CALL_DEPTH,
-    }))
-    .map_err(|error| SqlTestAssemblyFailure::Internal(error.to_string()))?;
-    Ok(ParseOptions {
-        complexity_guard: Some(guard),
-    })
+    Some(reads)
 }
 
 /// Python's `_defined_cte_keys` over `to_dict()`.

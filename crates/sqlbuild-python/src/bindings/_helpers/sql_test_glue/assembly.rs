@@ -38,6 +38,7 @@ pub(crate) struct AssemblyRequest<'py> {
     pub(crate) model_inputs: Vec<Bound<'py, PyAny>>,
     pub(crate) test_inputs: Vec<Bound<'py, PyAny>>,
     pub(crate) lexical_syntax: LexicalSyntaxInput,
+    pub(crate) sql_analysis_dialect: Option<String>,
 }
 
 /// Each test input's assembled facts, or the error its assembly raises.
@@ -57,6 +58,7 @@ pub(crate) fn assemble_compiled_sql_tests(
             .map(assembly_test)
             .collect::<PyResult<_>>()?,
         lexical_syntax: request.lexical_syntax.into(),
+        sql_analysis_dialect: request.sql_analysis_dialect,
     };
     let outcomes = py
         .compiler_detach(|| Ok(assemble_sql_test_batch(&batch)))

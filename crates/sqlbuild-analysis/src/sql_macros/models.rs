@@ -487,11 +487,6 @@ pub struct ParameterSpan {
 pub(crate) enum BodyType {
     /// A completely known type.
     Known(String),
-    /// A type with unknown components, as shown, and as annotation typed it.
-    PartlyKnown {
-        shown: String,
-        data_type: polyglot_sql::expressions::DataType,
-    },
     /// Nothing, or only a guess.
     Unknown,
 }

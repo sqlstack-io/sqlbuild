@@ -304,10 +304,11 @@ fn assembly<'py>(
 
 /// One assembly per test input, with the error its assembly raises, if any.
 #[pyfunction]
-#[pyo3(signature = (*, inputs))]
+#[pyo3(signature = (*, inputs, sql_analysis_dialect=None))]
 pub(crate) fn assemble_native_sql_tests<'py>(
     py: Python<'py>,
     inputs: &Bound<'py, PyAny>,
+    sql_analysis_dialect: Option<String>,
 ) -> PyResult<Bound<'py, PyTuple>> {
     let test_inputs: Vec<Bound<'py, PyAny>> = native_field(inputs, "test_inputs")?.extract()?;
     let request = AssemblyRequest {
@@ -318,6 +319,7 @@ pub(crate) fn assemble_native_sql_tests<'py>(
             "native_mapping",
         )?
         .extract()?,
+        sql_analysis_dialect,
     };
     let rows: Vec<AssemblyRow> = assemble_compiled_sql_tests(py, request)?;
     if rows.len() != test_inputs.len() {

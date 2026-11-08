@@ -186,25 +186,6 @@ pub(crate) struct SqlTestAssemblyTestCase {
     pub(crate) batch: crate::compiler::models::SqlTestAssemblyBatch,
     pub(crate) expected_outcomes: Vec<crate::compiler::models::SqlTestAssemblyOutcome>,
 }
-pub(crate) struct SimpleTemplateTestCase {
-    pub description: &'static str,
-    pub dialect: &'static str,
-    pub sql: &'static str,
-    pub expected_ast_parses: usize,
-}
-
-pub(crate) struct SimpleTemplateCorpusTestCase {
-    pub description: &'static str,
-    pub dialect: &'static str,
-    pub expected_min_recognized: usize,
-    pub expected_mismatches: &'static [&'static str],
-}
-
-pub(crate) struct SimpleTemplateCorpusOutcome {
-    pub recognized: usize,
-    pub mismatches: Vec<String>,
-}
-
 #[derive(Debug)]
 pub(crate) struct ScenarioExpectedColumnsTestCase {
     pub(crate) description: &'static str,

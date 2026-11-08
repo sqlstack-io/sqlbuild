@@ -2,7 +2,7 @@ use sqlbuild_render::macro_arguments::main::parse_macro_arguments::parse_macro_a
 use sqlbuild_render::macro_arguments::models::ArgumentValue;
 use sqlbuild_render::macro_calls::main::scan_macro_call_sites::scan_macro_call_sites;
 
-use crate::sql_macros::tests::helpers::expanded_for;
+use crate::sql_macros::tests::helpers::{adapter_parses, expanded_for};
 use crate::sql_macros::tests::test_types::{
     AsciiArguments, ExpansionErrorTestCase, ExpansionTestCase, PythonArgumentTestCase,
 };
@@ -61,6 +61,10 @@ const PLUS_ONE: (&str, &str) = (
     "plus_one",
     "MACRO (description \"Plus one\", arguments (v BIGINT), returns BIGINT);\n\n@v + 1\n",
 );
+const MONEY_TYPE: (&str, &str) = (
+    "money_type",
+    "MACRO (description \"Money type\", returns VARCHAR);\n\nDECIMAL(18, 2)\n",
+);
 const ROUND_TO: (&str, &str) = (
     "round_to",
     "MACRO (description \"Rounded\", arguments (v DECIMAL(18, 4), places INT), returns DECIMAL(18, 2));\n\nROUND(@v, @places)\n",
@@ -116,6 +120,14 @@ const TRAILING_COMMENT: (&str, &str) = (
 const SPACED_DECLARATIONS: (&str, &str) = (
     "spaced",
     "MACRO (description \"Spaced\", arguments (status VARCHAR, places INT), returns BOOLEAN);\n\n@status <> @enum (\"order_status\").CLOSED AND @places = @const (\"price_places\")\n",
+);
+const ENUM_DECLARATION: (&str, &str) = (
+    "with_closed",
+    "MACRO (description \"With closed\", arguments (status VARCHAR));\n\nCONCAT(@status, @enum (\"order_status\").CLOSED)\n",
+);
+const CONST_DECLARATION: (&str, &str) = (
+    "plus_places",
+    "MACRO (description \"Plus places\", arguments (places INT));\n\n@places + @const (\"price_places\")\n",
 );
 const ORDER_KEY: (&str, &str) = (
     "order_key",
@@ -186,6 +198,13 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             macros: &[NET_AMOUNT, CENTS_TO_DOLLARS],
             sql: "SELECT 'it\\'s @sql.x(' AS note, @sql.net_amount(o.a, o.b) AS net FROM orders AS o",
             expected_sql: "SELECT 'it\\'s @sql.x(' AS note, CAST(ROUND((o.a - COALESCE(o.b, 0)) / 100, 2) AS DECIMAL(18, 2)) AS net FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a body that only reads as a type fills a cast's type",
+            adapter: "duckdb",
+            macros: &[MONEY_TYPE],
+            sql: "SELECT CAST(o.v AS @sql.money_type()) AS m FROM orders AS o",
+            expected_sql: "SELECT CAST(o.v AS DECIMAL(18, 2)) AS m FROM orders AS o",
         },
         ExpansionTestCase {
             description: "an expression call before AT TIME ZONE is parenthesised",
@@ -309,6 +328,13 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         ExpansionTestCase {
             description: "inline list default renders like a constant",
             adapter: "",
+            macros: &[IN_SUPPORTED_COUNTRY],
+            sql: "SELECT @sql.in_supported_country(o.country_code) AS supported FROM orders AS o",
+            expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a list after IN is a list, not SQLite's IN table-name",
+            adapter: "sqlite",
             macros: &[IN_SUPPORTED_COUNTRY],
             sql: "SELECT @sql.in_supported_country(o.country_code) AS supported FROM orders AS o",
             expected_sql: "SELECT o.country_code IN ('GB', 'FR') AS supported FROM orders AS o",
@@ -440,6 +466,20 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             expected_sql: "SELECT o.status <> @enum (\"order_status\").CLOSED AND o.places = @const (\"price_places\") AS s FROM orders AS o",
         },
         ExpansionTestCase {
+            description: "a spaced enum declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[ENUM_DECLARATION],
+            sql: "SELECT @sql.with_closed(o.status) AS s FROM orders AS o",
+            expected_sql: "SELECT CONCAT(o.status, @enum (\"order_status\").CLOSED) AS s FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a spaced constant declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[CONST_DECLARATION],
+            sql: "SELECT @sql.plus_places(o.places) AS s FROM orders AS o",
+            expected_sql: "SELECT o.places + @const (\"price_places\") AS s FROM orders AS o",
+        },
+        ExpansionTestCase {
             description: "generic SQL checks no adapter types",
             adapter: "",
             macros: &[ODD],
@@ -469,7 +509,10 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| adapter_parses(test_case.adapter))
+    {
         let result = expanded_for(test_case.adapter, test_case.macros, test_case.sql);
 
         assert_eq!(
@@ -541,36 +584,12 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
             expected_message: "column \"created_at\" from macro audit_columns() clashes with a column already defined in model:orders_clean",
         },
         ExpansionErrorTestCase {
-            description: "a body whose known type is not returns",
-            adapter: "duckdb",
-            macros: &[SHOUTED_WRONG],
-            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
-            expected_code: "P024",
-            expected_message: "macro shouted() declares returns BIGINT, but its body is VARCHAR",
-        },
-        ExpansionErrorTestCase {
-            description: "a body typed through a nested call",
-            adapter: "duckdb",
-            macros: &[SHOUTED_NESTED, PLUS_ONE],
-            sql: "SELECT @sql.shouted_twice(o.status) FROM orders AS o",
-            expected_code: "P024",
-            expected_message: "macro shouted_twice() declares returns BIGINT, but its body is VARCHAR",
-        },
-        ExpansionErrorTestCase {
             description: "a literal outside an ANY family",
             adapter: "duckdb",
             macros: &[ROUND_ANY],
             sql: "SELECT @sql.round_any('ten')",
             expected_code: "P017",
             expected_message: "argument v of macro round_any() expects a number; 'ten' is a string",
-        },
-        ExpansionErrorTestCase {
-            description: "a body that misuses an ANY family argument",
-            adapter: "duckdb",
-            macros: &[SHOUT_NUMBER],
-            sql: "SELECT @sql.shout_number(o.amount) FROM orders AS o",
-            expected_code: "P025",
-            expected_message: "body of macro shout_number() does not accept every value of v ANY NUMERIC",
         },
         ExpansionErrorTestCase {
             description: "cycle",
@@ -742,7 +761,10 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .iter()
+        .filter(|test_case| adapter_parses(test_case.adapter))
+    {
         let error = expanded_for(test_case.adapter, test_case.macros, test_case.sql)
             .expect_err(test_case.description);
 
@@ -753,6 +775,52 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
         );
         assert!(
             error.message.starts_with(test_case.expected_message),
+            "{}: {}",
+            test_case.description,
+            error.message
+        );
+    }
+}
+
+#[test]
+fn given_a_body_whose_type_breaks_its_declaration_when_expanding_then_the_error_names_it() {
+    let test_cases = [
+        ExpansionErrorTestCase {
+            description: "a body whose known type is not returns",
+            adapter: "duckdb",
+            macros: &[SHOUTED_WRONG],
+            sql: "SELECT @sql.shouted(o.status) FROM orders AS o",
+            expected_code: "P024",
+            expected_message: "macro shouted() declares returns BIGINT, but its body is VARCHAR",
+        },
+        ExpansionErrorTestCase {
+            description: "a body typed through a nested call",
+            adapter: "duckdb",
+            macros: &[SHOUTED_NESTED, PLUS_ONE],
+            sql: "SELECT @sql.shouted_twice(o.status) FROM orders AS o",
+            expected_code: "P024",
+            expected_message: "macro shouted_twice() declares returns BIGINT, but its body is VARCHAR",
+        },
+        ExpansionErrorTestCase {
+            description: "a body that misuses an ANY family argument",
+            adapter: "duckdb",
+            macros: &[SHOUT_NUMBER],
+            sql: "SELECT @sql.shout_number(o.amount) FROM orders AS o",
+            expected_code: "P025",
+            expected_message: "body of macro shout_number() does not accept every value of v ANY NUMERIC",
+        },
+    ];
+
+    for test_case in test_cases {
+        let error = expanded_for(test_case.adapter, test_case.macros, test_case.sql)
+            .expect_err(test_case.description);
+
+        assert_eq!(
+            (
+                error.code,
+                error.message.starts_with(test_case.expected_message)
+            ),
+            (test_case.expected_code, true),
             "{}: {}",
             test_case.description,
             error.message
