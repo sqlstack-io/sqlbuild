@@ -138,13 +138,13 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
             expected_gap: None,
         },
         NativeGapTestCase {
-            description: "INTO OUTFILE is a named gap at its line and column",
-            sql: "SELECT 'é' AS a\nFROM t\n  INTO OUTFILE 'x.csv'",
+            description: "WITH TIES is a named gap at its line and column",
+            sql: "SELECT 'é' AS a\nFROM t\n  ORDER BY a LIMIT 1 WITH TIES",
             placeholders: &[],
             expected_gap: Some(LocatedGap {
-                construct: "into_outfile".to_owned(),
+                construct: "with_ties".to_owned(),
                 line: 3,
-                column: 3,
+                column: 22,
             }),
         },
         NativeGapTestCase {

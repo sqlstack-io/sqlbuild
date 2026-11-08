@@ -76,3 +76,36 @@ pub(super) struct TypeSpellingsTestCase {
     pub(super) spellings: &'static [&'static str],
     pub(super) expected_mismatches: &'static [&'static str],
 }
+
+pub(super) struct QueryShapeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_projections: Option<&'static [&'static str]>,
+}
+
+pub(super) struct FingerprintTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// Whether the fingerprint equals `READABLE`'s, or None for no fingerprint.
+    pub(super) expected_same: Option<bool>,
+}
+
+pub(super) struct RawShapeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// The root kind and whether it writes or locks, or None for a refusal.
+    pub(super) expected_shape: Option<(&'static str, bool)>,
+}
+
+pub(super) struct RelationNamesTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// The qualified relations and temporary tables, or None when the SQL is not read.
+    pub(super) expected_names: Option<(&'static [&'static str], &'static [&'static str])>,
+}
+
+pub(super) struct StarKeysTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) expected_relations: &'static [&'static str],
+}

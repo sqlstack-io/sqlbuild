@@ -1,5 +1,4 @@
-//! Parse one raw diff query with the dialect's parser and read its shape: SQLQuack where native,
-//! else as the Polyglot wheel's guarded `parse_one` does.
+//! A raw diff query's shape, parsed by SQLQuack where native, else by guarded Polyglot.
 
 use polyglot_sql::dialects::Dialect;
 use polyglot_sql::traversal::ExpressionWalk;

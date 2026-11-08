@@ -1,5 +1,6 @@
 use crate::explicit_references::models::{
-    ModelReferences, NamedRelation, ReferenceRequest, Relation, SourceRelation,
+    LiteralSql, ModelReferences, NamedRelation, ReferenceRequest, Relation, SourceRelation,
+    SqlOwner,
 };
 
 pub(crate) fn relation(name: &str, schema: Option<&str>, database: Option<&str>) -> Relation {
@@ -63,5 +64,30 @@ pub(crate) fn request() -> ReferenceRequest {
         audits: Vec::new(),
         hooks: Vec::new(),
         owners: Vec::new(),
+    }
+}
+
+/// `request()` for ClickHouse with one node running `statements` as literal SQL, in line order.
+pub(crate) fn clickhouse_request(statements: &[&str]) -> ReferenceRequest {
+    let literals: Vec<LiteralSql> = statements
+        .iter()
+        .enumerate()
+        .map(|(index, sql)| LiteralSql {
+            method: "execute_sql".to_owned(),
+            sql: (*sql).to_owned(),
+            line: index + 1,
+        })
+        .collect();
+    ReferenceRequest {
+        dialect: Some("clickhouse".to_owned()),
+        owners: vec![SqlOwner {
+            label: "task 'export_orders'".to_owned(),
+            kind: "node".to_owned(),
+            path_order: 0,
+            own_refs: Vec::new(),
+            upstream_loaders: Vec::new(),
+            literals,
+        }],
+        ..request()
     }
 }

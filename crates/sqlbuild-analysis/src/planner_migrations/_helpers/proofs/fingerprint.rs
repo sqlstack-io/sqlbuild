@@ -7,7 +7,7 @@ use crate::planner_changes::models::IdentityPayload;
 use crate::planner_migrations::_helpers::proofs::ast::strip_formatting;
 use crate::planner_migrations::_helpers::proofs::encoding::encode;
 use crate::planner_migrations::_helpers::proofs::local_names::{local_names, rewrite, unambiguous};
-use crate::planner_migrations::_helpers::proofs::parse::parse;
+use crate::planner_migrations::_helpers::proofs::parse::proof_tree;
 use crate::planner_migrations::constants::{EXCLUDED_CONFIG, NATIVE_TREE_PREFIX, REF_MARKER};
 use polyglot_sql::{Expression, dialects::Dialect};
 use regex::Regex;
@@ -55,7 +55,7 @@ pub(crate) fn normalized(
         let digest = format!("{:x}", Sha256::digest(identity.as_bytes()));
         format!("__sqb_migration_ref__{}", &digest[..16])
     });
-    let Some(mut parsed) = parse(&placeholder, dialect)? else {
+    let Some(mut parsed) = proof_tree(&placeholder, dialect)? else {
         return Ok(None);
     };
     strip_formatting(&mut parsed);

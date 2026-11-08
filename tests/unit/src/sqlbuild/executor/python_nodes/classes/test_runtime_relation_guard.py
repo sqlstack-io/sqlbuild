@@ -109,6 +109,29 @@ _PROJECT_RELATIONS: dict[SqlResourceRef, str] = {
             expected_warning_count=0,
         ),
         RuntimeRelationGuardTestCase(
+            description="ClickHouse TRUNCATE, ALTER DELETE and INTO OUTFILE warn",
+            statements=(
+                "TRUNCATE TABLE main.orders",
+                "ALTER TABLE main.orders DELETE WHERE order_id = 1",
+                "SELECT * FROM main.customers INTO OUTFILE 'customers.csv'",
+            ),
+            expected_warning_fragments=("named model:orders", "named model:customers"),
+            expected_warning_count=2,
+            dialect="clickhouse",
+        ),
+        RuntimeRelationGuardTestCase(
+            description="ClickHouse temporary table, OPTIMIZE and ALTER UPDATE do not warn",
+            statements=(
+                "CREATE TEMPORARY TABLE customers AS SELECT 1 AS id",
+                "SELECT * FROM customers",
+                "OPTIMIZE TABLE main.orders FINAL",
+                "ALTER TABLE main.orders UPDATE status = 'x' WHERE 1",
+            ),
+            expected_warning_fragments=(),
+            expected_warning_count=0,
+            dialect="clickhouse",
+        ),
+        RuntimeRelationGuardTestCase(
             description="unparseable SQL is not blocked and does not warn",
             statements=("VACUUM ((( customers",),
             expected_warning_fragments=(),
@@ -125,7 +148,7 @@ def test_given_python_sql_when_checking_then_warns_for_hard_coded_project_relati
         owner_label=test_case.owner_label,
         owner_kind=test_case.owner_kind,
         project_relations=_PROJECT_RELATIONS,
-        dialect="duckdb",
+        dialect=test_case.dialect,
         default_database=None,
         default_schema="main",
         warnings=warnings,
