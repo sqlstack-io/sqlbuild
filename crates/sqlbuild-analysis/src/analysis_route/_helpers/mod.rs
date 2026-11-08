@@ -1,6 +1,7 @@
 pub(crate) mod bigquery_dialect;
 pub(crate) mod clickhouse_dialect;
 pub(crate) mod clickhouse_types;
+pub(crate) mod databricks_dialect;
 pub(crate) mod duckdb_dialect;
 pub(crate) mod located_gap;
 pub(crate) mod marker_names;

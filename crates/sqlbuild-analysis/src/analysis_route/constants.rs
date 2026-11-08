@@ -1,7 +1,7 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
 use crate::analysis_route::models::{
-    BigQueryDialect, ClickHouseDialect, DuckDbDialect, PostgresDialect, SnowflakeDialect,
+    BigQueryDialect, ClickHouseDialect, DatabricksDialect, DuckDbDialect, PostgresDialect, SnowflakeDialect,
     SqliteDialect, TsqlDialect, TypeSpelling,
 };
 use crate::analysis_route::types::NativeDialect;
@@ -11,6 +11,7 @@ use crate::type_system::models::TypeFamily;
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (BIGQUERY_DIALECT, &BigQueryDialect),
     (CLICKHOUSE_DIALECT, &ClickHouseDialect),
+    (DATABRICKS_DIALECT, &DatabricksDialect),
     (DUCKDB_DIALECT, &DuckDbDialect),
     (POSTGRES_DIALECT, &PostgresDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
@@ -21,6 +22,8 @@ pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
 pub(crate) const BIGQUERY_DIALECT: &str = "bigquery";
 /// ClickHouse's analysis dialect name.
 pub(crate) const CLICKHOUSE_DIALECT: &str = "clickhouse";
+/// Databricks' analysis dialect name.
+pub(crate) const DATABRICKS_DIALECT: &str = "databricks";
 /// DuckDB's (and MotherDuck's) analysis dialect name.
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 /// PostgreSQL's analysis dialect name.
@@ -29,7 +32,7 @@ pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// SQLite's analysis dialect name.
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
-/// The stub prefix BigQuery, ClickHouse, PostgreSQL, Snowflake and SQLite read as one unquoted name.
+/// The stub prefix BigQuery, ClickHouse, Databricks, PostgreSQL, Snowflake and SQLite read as one unquoted name.
 pub(crate) const UNQUOTED_STUB_PREFIX: &str = "__sqlbuild_";
 /// The word that makes SQLBuild's type fallback call a type it cannot split into name and flat parameters a timestamp.
 pub(crate) const FALLBACK_TIMESTAMP_WORD: &str = "TIMESTAMP";
@@ -85,6 +88,16 @@ pub(crate) const POLYGLOT_NESTED_TYPE_NAMES: &[(&str, &str)] = &[
 ];
 /// The whole types whose MAX parameter Polyglot drops; BYTES and nested types keep it.
 pub(crate) const POLYGLOT_MAX_DROPPED: &[&str] = &["BIGDECIMAL", "BIGNUMERIC", "STRING"];
+/// The query a type spelling completes, with `)`, so Databricks' parser reads it as a cast target.
+pub(crate) const DATABRICKS_CAST_TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
+/// DECIMAL's precision and scale where Databricks' spelling leaves them out.
+pub(crate) const DATABRICKS_DEFAULT_DECIMAL: (u32, u32) = (10, 0);
+/// The type Databricks gives every string expression, a cast to CHAR(n) or VARCHAR(n) included.
+pub(crate) const DATABRICKS_STRING_TYPE: &str = "STRING";
+/// Databricks' one boolean type.
+pub(crate) const DATABRICKS_BOOLEAN_TYPE: &str = "BOOLEAN";
+/// Databricks' one date type.
+pub(crate) const DATABRICKS_DATE_TYPE: &str = "DATE";
 /// The dialect a project with no analysis dialect is named by.
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 /// The gap of SQL that holds more than one statement.

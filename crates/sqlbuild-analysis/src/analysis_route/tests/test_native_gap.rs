@@ -40,9 +40,9 @@ fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_leg
             expected_legacy: false,
         },
         RouteTestCase {
-            description: "databricks",
+            description: "databricks, read by SQLQuack's Databricks SQL parser",
             dialect: Some("databricks"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "clickhouse",

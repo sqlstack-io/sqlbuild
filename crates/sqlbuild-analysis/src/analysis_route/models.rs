@@ -162,6 +162,10 @@ pub(crate) struct BigQueryTypes<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct ClickHouseDialect;
 
+/// Databricks, whose SQL SQLQuack's Databricks SQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct DatabricksDialect;
+
 /// DuckDB and MotherDuck, whose type spellings the native route compares as Polyglot did.
 #[derive(Clone, Copy, Debug)]
 pub struct DuckDbDialect;

@@ -182,6 +182,7 @@ sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev 
 sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
+sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }

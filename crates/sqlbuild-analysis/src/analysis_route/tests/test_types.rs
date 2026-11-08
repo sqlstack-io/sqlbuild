@@ -290,6 +290,15 @@ pub(super) struct NativeLineageTestCase {
     pub(super) expected_lines: &'static [&'static str],
 }
 
+pub(super) struct DatabricksTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    /// The type's name and family, or `None` for a spelling Databricks' parser refuses.
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+    /// Whether the whole type is the one Polyglot gives the spelling.
+    pub(super) expected_as_polyglot: bool,
+}
+
 pub(super) struct TypeSpellingsTestCase {
     pub(super) description: &'static str,
     pub(super) spellings: &'static [&'static str],
