@@ -248,3 +248,9 @@ pub(super) struct NativeLineageTestCase {
     pub(super) placeholders: &'static [(&'static str, &'static str)],
     pub(super) expected_lines: &'static [&'static str],
 }
+
+pub(super) struct TypeSpellingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) spellings: &'static [&'static str],
+    pub(super) expected_mismatches: &'static [&'static str],
+}
