@@ -482,7 +482,7 @@ def native_assembly_answers(*, project_dir: Path) -> Counter[str]:
         run_id="integration_run",
     )
     assemblies: tuple[NativeSqlTestAssembly, ...] = native_module.assemble_native_sql_tests(
-        inputs=inputs
+        inputs=inputs, sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name
     )
     answers: Counter[str] = Counter()
     failures: list[NativeSqlTestFailure | None] = [item.failure for item in assemblies]

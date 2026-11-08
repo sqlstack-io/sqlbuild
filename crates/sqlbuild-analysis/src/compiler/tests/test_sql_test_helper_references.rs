@@ -589,6 +589,7 @@ fn given_compiled_sql_test_inputs_when_assembling_then_facts_match_python() {
         models: models(),
         tests,
         lexical_syntax: generic_syntax(),
+        sql_analysis_dialect: Some("duckdb".to_owned()),
     };
     let macro_test = SqlTestAssemblyTest {
         block_name: None,

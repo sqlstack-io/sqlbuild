@@ -3,11 +3,13 @@
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
+use crate::analysis_route::types::NativeDialect;
 use crate::compiler::_helpers::sql_tests::case_identity::{FingerprintFailure, case_fingerprint};
 use crate::compiler::_helpers::sql_tests::macro_call_names::macro_call_names;
 use crate::compiler::_helpers::sql_tests::mock_reads::{
     MockReadsRequest, mock_reading_helper_diagnostics,
 };
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::models::{
     AssembledSqlTestFacts, SqlTestAssemblyBatch, SqlTestAssemblyFailure, SqlTestAssemblyModel,
     SqlTestAssemblyOutcome, SqlTestAssemblyPayload, SqlTestAssemblyTest, SqlTestHelperDiagnostic,
@@ -37,6 +39,7 @@ pub(crate) fn assemble_batch(batch: &SqlTestAssemblyBatch) -> Vec<SqlTestAssembl
         models: &batch.models,
         macro_names: &macro_names,
         syntax: &batch.lexical_syntax,
+        parser: sql_test_parser(batch.sql_analysis_dialect.as_deref()),
     };
     batch
         .tests
@@ -55,6 +58,7 @@ struct Project<'a> {
     models: &'a [SqlTestAssemblyModel],
     macro_names: &'a [MacroNames],
     syntax: &'a LexicalSyntax,
+    parser: Option<&'static dyn NativeDialect>,
 }
 
 fn assemble(
@@ -94,6 +98,7 @@ fn assemble(
                 models,
                 target_model_names: &target_model_names,
                 syntax,
+                parser: project.parser,
             })?;
             target_model_names
                 .iter()

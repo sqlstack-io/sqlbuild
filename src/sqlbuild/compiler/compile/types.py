@@ -366,6 +366,7 @@ class TypedSqlValueRenderer(Protocol):
     """Adapter rendering operations consumed by authored SQL expansion."""
 
     adapter_name: str
+    sql_analysis_dialect_name: str | None
     sql_lexical_syntax: SqlLexicalSyntax
 
     def render_typed_scalar(self, *, value: SqlValue) -> str: ...

@@ -2,7 +2,9 @@
 
 use sqlbuild_render::macro_calls::main::opens_bare_call::opens_bare_call;
 
-use crate::sql_macros::_helpers::parsing::lexing::{DECLARATION_WORDS, Token, TokenKind};
+use crate::sql_macros::_helpers::parsing::lexing::{
+    DECLARATION_WORDS, Token, TokenKind, closing_token, tokens,
+};
 
 const PLACEHOLDER_PREFIX: &str = "__sqlbuild_parameter__";
 /// Words that may follow a table reference without being its alias.
@@ -114,6 +116,99 @@ pub(crate) fn with_placeholders(sql: &str, references: &[ParameterReference]) ->
     }
     text.push_str(&sql[cursor..]);
     text
+}
+
+/// `sql` with each `@enum(...)[.NAME]`, `@const(...)` and `@param(...)` as a name of the same length.
+pub(crate) fn declarations_masked(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut masked: String = sql.to_owned();
+    let mut index: usize = 0;
+    while index + 2 < scanned.len() {
+        let (at, word, open) = (&scanned[index], &scanned[index + 1], &scanned[index + 2]);
+        let declaration: bool = at.is(sql, "@")
+            && word.kind == TokenKind::Word
+            && word.start == at.end
+            && DECLARATION_WORDS.contains(&word.text(sql))
+            && open.is(sql, "(");
+        if !declaration {
+            index += 1;
+            continue;
+        }
+        let mut depth: usize = 0;
+        let mut close: usize = index + 2;
+        for (offset, token) in scanned[index + 2..].iter().enumerate() {
+            depth = match (token.is(sql, "("), token.is(sql, ")")) {
+                (true, _) => depth + 1,
+                (_, true) => depth - 1,
+                _ => depth,
+            };
+            if depth == 0 {
+                close = index + 2 + offset;
+                break;
+            }
+        }
+        let member: bool = scanned.get(close + 1).is_some_and(|dot| dot.is(sql, "."))
+            && scanned
+                .get(close + 2)
+                .is_some_and(|name| name.kind == TokenKind::Word);
+        let last: usize = if member { close + 2 } else { close };
+        let (start, end) = (at.start, scanned[last].end);
+        masked.replace_range(start..end, &format!("d{}", "_".repeat(end - start - 1)));
+        index = last + 1;
+    }
+    masked
+}
+
+/// `sql` with each slot read in a `USING` list as one bare word: `r.keys` reads as `r_keys`.
+pub(crate) fn using_reads_joined(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut joined: String = sql.to_owned();
+    let mut index: usize = 0;
+    while index + 1 < scanned.len() {
+        if !(scanned[index].is_word(sql, "USING") && scanned[index + 1].is(sql, "(")) {
+            index += 1;
+            continue;
+        }
+        let close: usize = closing_token(sql, &scanned, index + 1).unwrap_or(scanned.len());
+        for read in scanned[index + 2..close].windows(3) {
+            let (relation, dot, slot) = (&read[0], &read[1], &read[2]);
+            if relation.kind == TokenKind::Word
+                && placeholder_parameter(relation.text(sql)).is_some()
+                && dot.is(sql, ".")
+                && dot.start == relation.end
+                && slot.kind == TokenKind::Word
+                && slot.start == dot.end
+            {
+                joined.replace_range(dot.start..dot.end, "_");
+            }
+        }
+        index = close;
+    }
+    joined
+}
+
+/// `sql` with each placeholder after `IN` as a same-length list, as a collection expands.
+pub(crate) fn in_lists_parenthesised(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut parenthesised: String = sql.to_owned();
+    for pair in scanned.windows(2) {
+        let (keyword, list) = (&pair[0], &pair[1]);
+        if keyword.is_word(sql, "IN")
+            && list.kind == TokenKind::Word
+            && placeholder_parameter(list.text(sql)).is_some()
+            && list.start == keyword.end + 1
+        {
+            let list_text: &str = list.text(sql);
+            parenthesised.replace_range(keyword.end..list.end, &format!("({})", &list_text[1..]));
+        }
+    }
+    parenthesised
 }
 
 /// Whether the table reference whose last token is `index` is followed by an alias.

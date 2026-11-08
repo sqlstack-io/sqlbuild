@@ -135,6 +135,7 @@ class PlannerTestAdapter(BaseAdapter):
     """Minimal adapter for planner helper tests."""
 
     adapter_name: ClassVar[str] = "planner-test"
+    sql_analysis_dialect_name: ClassVar[str | None] = "duckdb"
 
     def connect(self, config: dict[str, object]) -> object:
         del config

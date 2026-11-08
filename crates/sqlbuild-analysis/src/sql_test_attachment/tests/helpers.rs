@@ -3,6 +3,7 @@ use sqlbuild_sqltext::sql_references::main::extract_sql_references::extract_sql_
 use sqlbuild_sqltext::sql_references::models::{ReferenceExtraction, SqlReference};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
+use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::main::sql_scenario_classification::extract_scenario;
 use crate::compiler::main::sql_test_extraction::extract_batch_json;
 use crate::compiler::models::SqlTestCteText;
@@ -12,7 +13,7 @@ use crate::sql_test_attachment::types::SqlTestTextMatcher;
 
 /// A scenario's classification as `{"scenario": ...}`, or its error as `{"error": ...}`.
 pub(crate) fn scenario_json(sql: &str, file_label: &str, syntax: &LexicalSyntax) -> String {
-    extract_scenario(sql, file_label, syntax)
+    extract_scenario(sql, file_label, (syntax, sql_test_parser(Some("duckdb"))))
         .map_or_else(
             |error| json!({"error": error}),
             |scenario| json!({"scenario": scenario}),

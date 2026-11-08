@@ -2,7 +2,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use polyglot_sql::{Dialect, Expression, ExpressionWalk};
+use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
+
+use crate::analysis_route::types::NativeDialect;
 
 pub(crate) const HELPER_PREFIX: &str = "__helper__";
 
@@ -15,11 +17,11 @@ pub(crate) fn helper_cte_name(name: &str) -> String {
 pub(crate) fn rename_helper_references(
     sql: &str,
     helpers: &HashMap<String, String>,
-    dialect: &Dialect,
+    parser: &dyn NativeDialect,
 ) -> Option<String> {
-    let statements = match dialect.parse(sql) {
-        Ok(statements) => statements,
-        Err(_) => return None,
+    let statements = match parser.parse(sql) {
+        Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
+        _ => return None,
     };
     let [statement] = statements.as_slice() else {
         return None;
