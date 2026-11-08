@@ -109,7 +109,7 @@ impl BindingCatalog {
         })
     }
 
-    /// `BindingCatalog.prepare`: add unknown closed relations, then override changed ones.
+    /// `BindingCatalog.prepare`: add unknown closed relations (overrides while in use), then changed ones.
     fn prepared(
         &self,
         py: Python<'_>,
@@ -121,16 +121,21 @@ impl BindingCatalog {
             let schema: Bound<'_, PyAny> = native_field(request, "schema")?;
             for item in mapping_items(&schema)?.try_iter()? {
                 let (name, columns): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
-                if columns.is_truthy()? && !schemas.contains(&name)? {
+                if columns.is_truthy()?
+                    && !schemas.contains(&name)?
+                    && !additions.contains(&name)?
+                {
                     additions.set_item(&name, &columns)?;
-                    schemas.set_item(&name, &columns)?;
                 }
             }
         }
-        if !additions.is_empty() {
+        if !additions.is_empty()
+            && let Ok(mut native) = self.native.try_borrow_mut(py)
+        {
             self.extended.store(true, Ordering::Relaxed);
+            schemas.update(additions.as_mapping())?;
             let relations: Relations = conversions::relations(additions.as_any())?;
-            self.native.borrow_mut(py).inner.update_relations(relations);
+            native.inner.update_relations(relations);
         }
         let mut prepared: Vec<BindingRequest> = Vec::with_capacity(requests.len());
         for request in requests {

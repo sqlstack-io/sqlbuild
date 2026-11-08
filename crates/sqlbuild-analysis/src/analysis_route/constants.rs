@@ -38,6 +38,8 @@ pub(crate) const NULLABLE_WRAPPER: &str = "Nullable";
 pub(crate) const LOW_CARDINALITY_WRAPPER: &str = "LowCardinality";
 /// The finding of a function the dialect's catalogue does not know.
 pub(crate) const UNKNOWN_FUNCTION_CODE: &str = "E202";
+/// The finding of a column no referenced relation has.
+pub(crate) const UNKNOWN_COLUMN_CODE: &str = "E201";
 /// The severity of every finding the native analysis reports, as the Polyglot path blocks them.
 pub(crate) const ERROR_SEVERITY: &str = "error";
 /// What `macro_body` puts before a body to read it as the one projection of a query.

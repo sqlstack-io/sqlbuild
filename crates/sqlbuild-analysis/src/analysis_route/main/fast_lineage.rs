@@ -8,13 +8,14 @@ use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
 use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
 use crate::analysis_route::_helpers::marker_names::{distinct_calls, first_call_names};
+use crate::analysis_route::main::schema_column::schema_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{
     CONFIDENCE_HIGH, CONFIDENCE_MEDIUM, TRANSFORM_AGGREGATION, TRANSFORM_CAST, TRANSFORM_CONSTANT,
     TRANSFORM_DIRECT, TRANSFORM_STAR,
 };
-use crate::assembly::analysis_session::models::{LineageRow, SessionSchema};
+use crate::assembly::analysis_session::models::{LineageRow, SessionFunctions, SessionSchema};
 use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind,
@@ -74,6 +75,7 @@ pub fn fast_lineage(
         schema: &relations,
         references: &references,
         extension_functions: &[],
+        quoted_ignore_case: false,
     });
     match analysed {
         Ok(native) => FastLineageOutcome::Built {
@@ -106,16 +108,14 @@ fn markers_schema(
             resource
                 .columns
                 .iter()
-                .map(|column| SchemaColumn {
-                    name: column.clone(),
-                    quoted: false,
-                    data_type: None,
-                    nullability: Nullability::Unknown,
-                })
+                .map(|column| schema_column(column, None, Nullability::Unknown))
                 .collect(),
         );
     }
-    SessionSchema { relations }
+    SessionSchema {
+        relations,
+        functions: SessionFunctions::default(),
+    }
 }
 
 /// A session lineage row as a fast lineage column; sources of other resource kinds are dropped.

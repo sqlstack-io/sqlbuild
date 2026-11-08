@@ -15,7 +15,7 @@ pub(crate) fn model_outcome(
     dialect: &dyn NativeDialect,
     model: &ModelRequest,
     (schema, relations): (Shapes, &SessionSchema),
-    extension_functions: &[String],
+    (extension_functions, quoted_ignore_case): (&[String], bool),
 ) -> (ModelOutcome, Option<String>) {
     let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) =
         match normalize_native_sql(&model.query_sql, dialect.name(), dialect.stub_prefix()) {
@@ -27,6 +27,7 @@ pub(crate) fn model_outcome(
                         schema: relations,
                         references: &model.lineage_references,
                         extension_functions,
+                        quoted_ignore_case,
                     })
                     .map_err(|gap: ParserGap| gap.message);
                 (sql, analysed)
