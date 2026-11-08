@@ -6,7 +6,7 @@ use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -180,4 +180,24 @@ pub(super) struct StarTestCase {
     pub(super) sql: &'static str,
     /// Whether it projects a star, whether every star column is known, and the column count.
     pub(super) expected_star: (bool, bool, usize),
+}
+
+pub(super) struct NormalizeTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_name: Option<&'static str>,
+}
+
+pub(super) struct NormalizedTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: (&'static str, TypeFamily, [Option<i64>; 3]),
+}
+
+pub(super) struct ParseFailureTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: String,
+    pub(super) expected_syntax: bool,
+    /// The byte offset of a syntax error; a limit has none worth comparing.
+    pub(super) expected_offset: Option<usize>,
 }
