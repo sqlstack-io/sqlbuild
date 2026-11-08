@@ -27,6 +27,11 @@ use crate::api::_helpers::resources::{
     person_operations::recent_runs,
     person_reads::run_nodes,
     person_reads::nodes,
+    person_reads::node_runs,
+    person_reads::run_events,
+    person_reads::run_statements,
+    person_reads::run_statement_sql,
+    person_reads::run_output,
     person_reads::jobs,
     person_reads::triggers,
     person_reads::ticks,
@@ -88,6 +93,19 @@ pub(crate) struct ControlApi;
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadQuery {
     pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunEventsQuery {
+    pub(crate) after: Option<i64>,
+    pub(crate) limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StatementSqlQuery {
+    pub(crate) statement_id: String,
 }
 
 #[derive(Debug, Deserialize)]

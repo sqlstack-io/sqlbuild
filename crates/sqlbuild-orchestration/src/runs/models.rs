@@ -216,6 +216,100 @@ pub struct RunNodeRecord {
     pub skipped_because_of: Option<String>,
 }
 
+/// Recall event metadata of a run. Payloads are left out: they can carry SQL, request settings and error text.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunEventRecord {
+    pub storage_id: i64,
+    pub event_id: String,
+    pub invocation_id: String,
+    pub occurred_at: String,
+    pub event_type: String,
+    pub severity: Option<String>,
+    pub producer: Option<String>,
+    pub resource_id: Option<String>,
+    pub resource_kind: Option<String>,
+    pub resource_name: Option<String>,
+    pub resource_attempt_id: Option<String>,
+    pub statement_id: Option<String>,
+    pub error_type: Option<String>,
+    pub error_code: Option<String>,
+    pub duration_ms: Option<f64>,
+    pub outcome: Option<String>,
+    pub row_count: Option<i64>,
+    pub affected_rows: Option<i64>,
+}
+
+/// Warehouse statement metadata of a run: kind, timing, counts and outcome, never the SQL text.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunStatementRecord {
+    pub invocation_id: String,
+    pub statement_id: String,
+    pub resource_id: Option<String>,
+    pub resource_name: Option<String>,
+    pub resource_kind: Option<String>,
+    pub intent: Option<String>,
+    pub statement_kind: Option<String>,
+    pub purpose: Option<String>,
+    pub query_id: Option<String>,
+    pub started_at: Option<String>,
+    pub ended_at: Option<String>,
+    pub outcome: Option<String>,
+    pub error_type: Option<String>,
+    pub error_code: Option<String>,
+    pub duration_ms: Option<f64>,
+    pub row_count: Option<i64>,
+    pub affected_rows: Option<i64>,
+    pub sql_available: bool,
+    pub sql_unavailable_reason: Option<String>,
+}
+
+/// One statement's executed SQL; `sql` is null when capture was off or retention dropped it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunStatementSql {
+    pub statement_id: String,
+    pub sql: Option<String>,
+}
+
+/// Captured output and error text of a run's invocations; both can quote warehouse data.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunOutput {
+    /// The newest captured lines per invocation, oldest first.
+    pub lines: Vec<RunOutputLine>,
+    /// Invocation failures and error diagnostics, oldest first.
+    pub errors: Vec<RunErrorText>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunOutputLine {
+    pub invocation_id: String,
+    pub sequence: i64,
+    pub stream: String,
+    pub occurred_at: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunErrorText {
+    pub invocation_id: String,
+    pub occurred_at: Option<String>,
+    pub error_type: Option<String>,
+    pub message: String,
+}
+
+/// One build attempt of a node by a run in this target; the same metadata as the run's node list.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NodeRunRecord {
+    pub run_id: Uuid,
+    pub job_key: Option<String>,
+    pub queued_at: DateTime<Utc>,
+    pub status: String,
+    pub started_at: Option<DateTime<Utc>>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub rows_affected: Option<i64>,
+    pub error_code: Option<String>,
+    pub skipped_because_of: Option<String>,
+}
+
 /// The database owns the claim before a launcher sees the pinned request.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct RunClaim {

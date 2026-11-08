@@ -1,7 +1,8 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
+import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -224,3 +225,86 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 		reruns: listed.filter((r) => r.rerunOfRunId === run.id)
 	};
 }
+
+const KNOWN_EVENTS: ReadonlySet<string> = new Set(RECALL_EVENT_TYPES);
+/** Scheduler facts are stored as `run_<fact>` events in the scheduler invocation. */
+const SCHEDULER_EVENTS: ReadonlySet<string> = new Set(SCHEDULER_FACTS.map((f) => `run_${f}`));
+
+/** The node key a Recall resource ID names: `[invocation, key]`, or null for run-level rows. */
+function recallNodeKey(resourceId: string | null | undefined): string | null {
+	if (!resourceId) return null;
+	try {
+		const parsed: unknown = JSON.parse(resourceId);
+		return Array.isArray(parsed) && typeof parsed[1] === 'string' ? parsed[1] : null;
+	} catch {
+		return null;
+	}
+}
+
+function levelOf(severity: string | null | undefined): RunEventLevel {
+	if (severity === 'warning' || severity === 'warn') return 'warn';
+	if (severity === 'error' || severity === 'critical') return 'error';
+	return severity === 'debug' ? 'debug' : 'info';
+}
+
+function durationText(ms: number | null | undefined): string {
+	if (ms === null || ms === undefined) return '';
+	return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
+
+/**
+ * A run event from its metadata. The server leaves payloads out because they can carry SQL and
+ * error text, so the message is built from the type, counts, duration and error code only.
+ * Event kinds the run page does not show (operations, node projections) are dropped.
+ */
+export function toRunEvent(wire: Wire['RunEventRecord'], runId: string): RunEvent | null {
+	const scheduler = SCHEDULER_EVENTS.has(wire.event_type);
+	if (!scheduler && !KNOWN_EVENTS.has(wire.event_type)) return null;
+	const type = (scheduler ? wire.event_type.slice('run_'.length) : wire.event_type) as RunEvent['type'];
+	const rows = wire.affected_rows ?? wire.row_count;
+	const failure = [wire.error_type, wire.error_code].filter(Boolean).join(': ');
+	const facts = [durationText(wire.duration_ms), rows === null || rows === undefined ? '' : `${rows} ${rows === 1 ? 'row' : 'rows'}`].filter(Boolean).join(' · ');
+	const message = type === 'requested' ? 'Requested' : type === 'cancel_requested' ? 'Cancel requested' : wire.event_type.endsWith('_failed') ? failure || facts || 'no error code recorded' : type === 'audit_completed' ? (wire.outcome ?? '') : facts;
+	return {
+		id: wire.event_id,
+		storageId: wire.storage_id,
+		runId,
+		producer: wire.invocation_id.startsWith('scheduler/') ? 'scheduler' : 'sqb',
+		type,
+		occurredAt: wire.occurred_at,
+		level: levelOf(wire.severity),
+		invocationId: wire.invocation_id,
+		nodeKey: recallNodeKey(wire.resource_id),
+		statementId: wire.statement_id ?? null,
+		attempt: null,
+		message
+	};
+}
+
+/** Statement metadata in start order; error text is never sent, only its type and code. */
+export function toRunStatements(wire: Wire['RunStatementRecord'][], runId: string): RunStatement[] {
+	return wire.map((s, i) => ({
+		id: s.statement_id,
+		runId,
+		invocationId: s.invocation_id,
+		sequence: i + 1,
+		nodeKey: recallNodeKey(s.resource_id) ?? s.resource_name ?? '',
+		kind: s.statement_kind ?? s.purpose ?? 'statement',
+		status: s.outcome === 'failed' ? 'failed' : s.outcome === 'cancelled' ? 'cancelled' : s.ended_at || s.outcome ? 'completed' : 'running',
+		startedAt: s.started_at ?? '',
+		endedAt: s.ended_at ?? null,
+		rowsAffected: s.affected_rows ?? s.row_count ?? null,
+		rowsSoFar: null,
+		queryId: s.query_id ?? null,
+		sqlRecorded: s.sql_available,
+		error: [s.error_type, s.error_code].filter(Boolean).join(': ') || null
+	}));
+}
+
+/** Captured lines and error text in time order; error text reads as stderr of its invocation. */
+export function toRunOutput(wire: Wire['RunOutput']): RunOutputLine[] {
+	const lines: RunOutputLine[] = wire.lines.map((l) => ({ invocationId: l.invocation_id, stream: l.stream === 'stderr' ? 'stderr' : 'stdout', at: l.occurred_at, text: l.text }));
+	const errors: RunOutputLine[] = wire.errors.map((e) => ({ invocationId: e.invocation_id, stream: 'stderr', at: e.occurred_at ?? '', text: e.message }));
+	return [...lines, ...errors].sort((a, b) => a.at.localeCompare(b.at));
+}
+
