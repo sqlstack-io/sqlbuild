@@ -462,7 +462,7 @@ def test_given_a_returns_type_when_checking_contracts_then_the_call_has_that_typ
 
 @pytest.mark.xfail(
     strict=True,
-    reason="native DuckDB analysis does not type list literals yet",
+    reason="native DuckDB analysis does not type list literals yet (CHI-1102)",
 )
 @pytest.mark.parametrize(
     "test_case",
