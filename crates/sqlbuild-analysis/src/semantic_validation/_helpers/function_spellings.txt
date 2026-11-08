@@ -1,0 +1,48 @@
+# Built-in spellings SQLBuild's compile-time name check (B101) rejects, with the spelling the
+# dialect accepts for the same function. A call is rejected only when its spelling and argument
+# count appear here, so user-defined and unknown functions are never rejected.
+#
+# Columns: analysis dialect, upper-case spelling, argument count, accepted spelling.
+# Every Snowflake spelling is absent from Snowflake's function reference; every DuckDB spelling
+# is unknown to DuckDB 2.0.0 with its core extensions. Add a row only with that evidence.
+snowflake CEILING          1 CEIL
+snowflake CEILING          2 CEIL
+snowflake CHARACTER_LENGTH 1 LENGTH
+snowflake CHAR_LENGTH      1 LENGTH
+snowflake COUNTIF          1 COUNT_IF
+snowflake DATEPART         2 DATE_PART
+snowflake DAY_OF_MONTH     1 DAYOFMONTH
+snowflake DAY_OF_WEEK      1 DAYOFWEEK
+snowflake DAY_OF_YEAR      1 DAYOFYEAR
+snowflake ENDS_WITH        2 ENDSWITH
+snowflake IF               2 IFF
+snowflake IF               3 IFF
+snowflake IIF              2 IFF
+snowflake IIF              3 IFF
+snowflake INSTR            2 POSITION
+snowflake INSTR            3 POSITION
+snowflake LCASE            1 LOWER
+snowflake LOCATE           2 POSITION
+snowflake LOCATE           3 POSITION
+snowflake RAND             1 RANDOM
+snowflake STARTS_WITH      2 STARTSWITH
+snowflake STRPOS           2 POSITION
+snowflake STRPOS           3 POSITION
+snowflake TEXTLEN          1 LEN
+snowflake TOTYPENAME       1 TYPEOF
+snowflake UCASE            1 UPPER
+snowflake WEEK_OF_YEAR     1 WEEKOFYEAR
+duckdb    DAY_OF_MONTH     1 DAYOFMONTH
+duckdb    DAY_OF_WEEK      1 DAYOFWEEK
+duckdb    DAY_OF_YEAR      1 DAYOFYEAR
+duckdb    ENDSWITH         2 ENDS_WITH
+duckdb    EVERY            1 BOOL_AND
+duckdb    LOCATE           2 INSTR
+duckdb    LOCATE           3 INSTR
+duckdb    LOGICAL_AND      1 BOOL_AND
+duckdb    LOGICAL_OR       1 BOOL_OR
+duckdb    RAND             1 RANDOM
+duckdb    STARTSWITH       2 STARTS_WITH
+duckdb    TEXTLEN          1 LEN
+duckdb    TOTYPENAME       1 TYPEOF
+duckdb    WEEK_OF_YEAR     1 WEEKOFYEAR

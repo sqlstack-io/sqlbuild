@@ -12,7 +12,7 @@ pub(crate) struct SemanticValidationBatchTestCase {
 
 pub(crate) struct UnsupportedFunctionTestCase {
     pub(crate) description: &'static str,
-    pub(crate) dialect: polyglot_sql::DialectType,
+    pub(crate) dialect: &'static str,
     pub(crate) sql: &'static str,
     pub(crate) expected_calls: &'static [(&'static str, &'static str)],
 }

@@ -37,12 +37,11 @@ pub(crate) fn unsupported_truth_test_errors(
                 spelling(&test),
                 rewrite(dialect, &test)
             );
-            cursor.advance(sql, test.start);
-            let start: usize = cursor.characters;
-            let end: usize = start + sql[test.start..test.end].chars().count();
-            ValidationError::error(message, UNSUPPORTED_TRUTH_TEST_CODE)
-                .with_location(cursor.line, cursor.column)
-                .with_span(Some(start), Some(end))
+            cursor.locate(
+                sql,
+                (test.start, test.end),
+                ValidationError::error(message, UNSUPPORTED_TRUTH_TEST_CODE),
+            )
         })
         .collect()
 }
