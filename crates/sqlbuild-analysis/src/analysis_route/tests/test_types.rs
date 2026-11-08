@@ -181,3 +181,12 @@ pub(super) struct StarTestCase {
     /// Whether it projects a star, whether every star column is known, and the column count.
     pub(super) expected_star: (bool, bool, usize),
 }
+
+pub(super) struct NativeOutcomeTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `raw_orders`' shape as the session knows it; empty when it does not.
+    pub(super) shape: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type nullability`, then `succeeded star=<has>/<resolved>`.
+    pub(super) expected: &'static [&'static str],
+}

@@ -6,5 +6,7 @@ mod test_clickhouse_type_match;
 mod test_native_dialect;
 #[path = "tests/test_native_gap.rs"]
 mod test_native_gap;
+#[path = "tests/test_native_outcome.rs"]
+mod test_native_outcome;
 #[path = "tests/test_types.rs"]
 mod test_types;
