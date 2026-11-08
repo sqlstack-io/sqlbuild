@@ -19,6 +19,3 @@ pub(crate) const LAUNCHABLE_VERBS: [&str; 1] = ["build"];
 
 /// Ad-hoc requests derive their audit event ID from the run ID so retries find the original.
 pub(crate) const ADHOC_AUDIT_TAG: &[u8] = b"adhoc-run-request";
-
-/// The snapshot document listing the warehouse names a target may run on.
-pub(crate) const WAREHOUSES_DOCUMENT: &str = "warehouses";

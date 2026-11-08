@@ -6,6 +6,8 @@ pub(crate) mod helpers;
 mod monitor_helpers;
 #[path = "termination/helpers.rs"]
 pub(crate) mod terminal_helpers;
+#[path = "test_adhoc.rs"]
+mod test_adhoc;
 #[path = "test_checks.rs"]
 mod test_checks;
 #[path = "test_claims.rs"]

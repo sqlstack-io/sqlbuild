@@ -13,15 +13,14 @@ use crate::runs::_helpers::requests::permissions::{authorize_execution, executio
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
 };
-use crate::runs::constants::{ADHOC_AUDIT_TAG, LAUNCHABLE_VERBS, WAREHOUSES_DOCUMENT};
+use crate::runs::constants::{ADHOC_AUDIT_TAG, LAUNCHABLE_VERBS};
 use crate::runs::models::{
-    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunKind,
-    RunOrigin, RunRequest,
+    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunKind, RunOrigin,
+    RunRequest,
 };
 use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::snapshots::main::read_current_record::read_current_record;
-use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
 use crate::store::errors::ControlError;
@@ -50,11 +49,6 @@ pub(crate) async fn frozen_adhoc_request(
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
-    let (transaction, unknown_warehouse) =
-        unknown_warehouse(transaction, snapshot.snapshot_id, &plan).await?;
-    if let Some(refusal) = unknown_warehouse {
-        return Ok((transaction, Err(refusal)));
-    }
     let (transaction, writers) =
         job_write_set(transaction, snapshot.snapshot_id, &plan.selection).await?;
     let (transaction, images) = query(
@@ -153,30 +147,6 @@ fn texts(value: Option<&Value>) -> Vec<String> {
         .flatten()
         .filter_map(|item| item.as_str().map(str::to_owned))
         .collect()
-}
-
-/// A `--warehouse` the location did not publish for this target is refused before anyone is authorised.
-async fn unknown_warehouse(
-    transaction: ControlTransaction,
-    snapshot_id: Uuid,
-    plan: &CommandPlan,
-) -> Result<(ControlTransaction, Option<String>), ControlError> {
-    let Some(warehouse) = plan.settings.get("warehouse").and_then(Value::as_str) else {
-        return Ok((transaction, None));
-    };
-    let (transaction, documents) =
-        read_snapshot_documents(transaction, snapshot_id, Some(&[WAREHOUSES_DOCUMENT])).await?;
-    let configured = documents
-        .get(WAREHOUSES_DOCUMENT)
-        .and_then(|document| document.get("names"))
-        .and_then(Value::as_array)
-        .is_some_and(|names| names.iter().any(|name| name.as_str() == Some(warehouse)));
-    Ok((
-        transaction,
-        (!configured).then(|| {
-            format!("warehouse {warehouse} is not configured for this target on its location")
-        }),
-    ))
 }
 
 /// Whether the person may view every current node, decided without recording a denial.
