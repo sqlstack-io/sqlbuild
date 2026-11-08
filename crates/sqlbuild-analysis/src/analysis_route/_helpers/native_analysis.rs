@@ -8,7 +8,9 @@ use sqlquack_semantics::lineage::models::{
 use sqlquack_semantics::{statement_lineage, statement_name_findings};
 use sqlquack_syntax::Expression;
 
-use crate::analysis_route::constants::{ERROR_SEVERITY, UNKNOWN_FUNCTION_CODE};
+use crate::analysis_route::constants::{
+    ERROR_SEVERITY, UNKNOWN_COLUMN_CODE, UNKNOWN_FUNCTION_CODE,
+};
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{
@@ -156,13 +158,25 @@ fn diagnostic_row(input: &AnalysisInput<'_>, finding: NameFinding) -> Option<Dia
     };
     Some(DiagnosticRow {
         code,
-        message: finding.message,
+        message: authored_message(&finding),
         line,
         column,
         start,
         end,
         severity: ERROR_SEVERITY.to_owned(),
     })
+}
+
+/// An unknown column's message with a quoted name as written, which SQLQuack quotes in lower case.
+fn authored_message(finding: &NameFinding) -> String {
+    if finding.code != UNKNOWN_COLUMN_CODE || finding.written.is_empty() {
+        return finding.message.clone();
+    }
+    finding.message.replacen(
+        &format!("'{}'", finding.written.to_lowercase()),
+        &format!("'{}'", finding.written),
+        1,
+    )
 }
 
 /// The function an unknown-function finding names, as written or as its message quotes it.
