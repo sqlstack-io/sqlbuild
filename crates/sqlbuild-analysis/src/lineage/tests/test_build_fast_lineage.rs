@@ -176,14 +176,16 @@ fn given_models_without_compact_facts_when_building_then_matches_python_lineage(
             expected_detail: None,
         },
         ParsedLineageTestCase {
-            description: "an unterminated query reports the parse error Python logs",
+            description: "an unterminated query reports where the dialect's parser stops",
             dialect: Some("duckdb"),
             sql: "SELECT order_id FROM (",
             inferred_columns: &[],
             expected_status: "unparsed",
             expected_lines: &[],
             expected_has_star: false,
-            expected_detail: Some("Parse error at line 1, column 23: Unexpected end of input"),
+            expected_detail: Some(
+                "the duckdb parser cannot read Syntax error at or near end of input at line 1, column 23",
+            ),
         },
         ParsedLineageTestCase {
             description: "two statements report the statement count",
