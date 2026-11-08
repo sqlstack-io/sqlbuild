@@ -80,6 +80,20 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             ],
         },
         TreeShapeTestCase {
+            description: "a Snowflake table function marker closing a subquery keeps the columns after it",
+            dialect: "snowflake",
+            sql: "SELECT 1\nFROM (SELECT * FROM __table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("select", 2, 6, Some("subquery")),
+                ("star", 2, 6, Some("select")),
+                ("subquery", 2, 6, Some("select")),
+                ("join", 2, 43, Some("select")),
+                ("select", 2, 48, Some("subquery")),
+                ("subquery", 2, 48, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
             description: "a Snowflake table function marker already inside TABLE( ) is not wrapped twice",
             dialect: "snowflake",
             sql: "SELECT 1\nFROM TABLE(__table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",

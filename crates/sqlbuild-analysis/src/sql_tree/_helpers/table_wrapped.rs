@@ -10,7 +10,7 @@ use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 use crate::relation_markers::constants::{MARKER_NAME_PREFIX, TABLE_FUNCTION_MARKER};
 use crate::relation_markers::types::MarkerCall;
 
-/// `named` with each table function marker call in `TABLE( )`, written over adjacent spaces where present.
+/// `named` with each table function marker call in `TABLE( )`, written over padding so later text keeps its column.
 pub(crate) fn table_wrapped(named: &str, calls: &[MarkerCall], syntax: &LexicalSyntax) -> String {
     let bytes = named.as_bytes();
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
@@ -38,14 +38,10 @@ pub(crate) fn table_wrapped(named: &str, calls: &[MarkerCall], syntax: &LexicalS
             .iter()
             .take_while(|byte| **byte == b' ')
             .count();
-        let borrowed = if spaces >= TABLE_WRAPPER.len() {
-            TABLE_WRAPPER.len()
-        } else {
-            0
-        };
-        edits.push((start, name_end + borrowed, format!("{TABLE_WRAPPER}{name}")));
         let after = close + 1;
         let replaced = usize::from(matches!(bytes.get(after), Some(b' ' | b'\t')));
+        let borrowed = spaces.min(TABLE_WRAPPER.len() + 1 - replaced);
+        edits.push((start, name_end + borrowed, format!("{TABLE_WRAPPER}{name}")));
         edits.push((after, after + replaced, ")".to_owned()));
     }
     edits.sort_by_key(|(start, _, _)| Reverse(*start));
