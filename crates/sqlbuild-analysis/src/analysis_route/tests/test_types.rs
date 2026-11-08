@@ -187,7 +187,9 @@ pub(super) struct NativeOutcomeTestCase {
     pub(super) sql: &'static str,
     /// `raw_orders`' shape as the session knows it; empty when it does not.
     pub(super) shape: &'static [(&'static str, &'static str)],
-    /// Each output column as `name type nullability`, then `succeeded star=<has>/<resolved>`.
+    /// The adapter's declared functions as `(name, return type)`.
+    pub(super) declared_functions: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type nullability`, then success, star flags and finding codes.
     pub(super) expected: &'static [&'static str],
 }
 

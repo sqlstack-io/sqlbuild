@@ -16,10 +16,13 @@ use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 
 /// The model's outcome read against `schema`, its complete input shapes, and why it failed if it did.
+///
+/// `extension_functions` are the functions the adapter declares, which are never unknown.
 pub(crate) fn native_outcome(
     dialect: &dyn NativeDialect,
     model: &ModelRequest,
     (schema, nullability): (Shapes, &ShapeTable),
+    extension_functions: &[String],
 ) -> (ModelOutcome, Option<String>) {
     let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) =
         match native_cleaned_sql(dialect, model) {
@@ -30,7 +33,7 @@ pub(crate) fn native_outcome(
                         sql: &sql,
                         schema: &relations,
                         references: &model.lineage_references,
-                        extension_functions: &[],
+                        extension_functions,
                     })
                     .map_err(|gap: ParserGap| gap.message);
                 (sql, analysed)

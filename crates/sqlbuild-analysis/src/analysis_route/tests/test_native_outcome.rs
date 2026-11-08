@@ -15,23 +15,46 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             description: "a closed source expands a star with its types and known nullability",
             sql: "SELECT * FROM raw_orders",
             shape: &[("order_id", "INTEGER"), ("status", "VARCHAR")],
+            declared_functions: &[],
             expected: &[
                 "order_id INTEGER non_null",
                 "status VARCHAR nullable",
-                "succeeded=true star=true/true",
+                "succeeded=true star=true/true findings=[]",
             ],
         },
         NativeOutcomeTestCase {
             description: "a relation the session has no shape for is unknown, not empty",
             sql: "SELECT * FROM raw_orders",
             shape: &[],
-            expected: &["succeeded=true star=true/false"],
+            declared_functions: &[],
+            expected: &["succeeded=true star=true/false findings=[]"],
         },
         NativeOutcomeTestCase {
             description: "SQL the dialect cannot read fails the analysis",
             sql: "SELECT FROM WHERE",
             shape: &[("order_id", "INTEGER")],
-            expected: &["succeeded=false star=false/false"],
+            declared_functions: &[],
+            expected: &["succeeded=false star=false/false findings=[]"],
+        },
+        NativeOutcomeTestCase {
+            description: "a function the adapter declares is not unknown",
+            sql: "SELECT CURRENT_TIMESTAMP() AS at FROM raw_orders",
+            shape: &[("order_id", "INTEGER")],
+            declared_functions: &[("CURRENT_TIMESTAMP", "TIMESTAMPTZ")],
+            expected: &[
+                "at TIMESTAMPTZ unknown",
+                "succeeded=true star=false/true findings=[]",
+            ],
+        },
+        NativeOutcomeTestCase {
+            description: "the same function without the declaration is unknown",
+            sql: "SELECT CURRENT_TIMESTAMP() AS at FROM raw_orders",
+            shape: &[("order_id", "INTEGER")],
+            declared_functions: &[],
+            expected: &[
+                "at TIMESTAMPTZ unknown",
+                "succeeded=true star=false/true findings=[\"B101\"]",
+            ],
         },
     ];
 
@@ -55,8 +78,17 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             required_names: vec!["raw_orders".to_owned()],
             ..ModelRequest::default()
         };
-        let (outcome, failure): (ModelOutcome, Option<String>) =
-            native_outcome(&CataloguedDialect, &model, (schema, &nullability));
+        let declared: Vec<String> = test_case
+            .declared_functions
+            .iter()
+            .map(|(name, _)| (*name).to_owned())
+            .collect();
+        let (outcome, failure): (ModelOutcome, Option<String>) = native_outcome(
+            &CataloguedDialect,
+            &model,
+            (schema, &nullability),
+            &declared,
+        );
         let analysis = &outcome.analysis;
         let mut lines: Vec<String> = analysis
             .columns
@@ -71,8 +103,13 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
                 )
             })
             .collect();
+        let findings: Vec<&str> = analysis
+            .binding_diagnostics
+            .iter()
+            .map(|row| row.code.as_str())
+            .collect();
         lines.push(format!(
-            "succeeded={} star={}/{}",
+            "succeeded={} star={}/{} findings={findings:?}",
             analysis.analysis_succeeded, analysis.has_star, analysis.star_resolved
         ));
         assert_eq!(lines, test_case.expected, "{}", test_case.description);

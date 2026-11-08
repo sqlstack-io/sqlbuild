@@ -314,12 +314,18 @@ impl AnalysisSession {
         let pool = self.catalog.native.analysis_pool()?;
         let request: &SessionRequest = &self.request;
         let nullability: &ShapeTable = &self.available_nullability;
+        let declared: Vec<String> = request
+            .function_return_types
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
         let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
             misses
                 .par_iter()
                 .map(|position| {
                     let model: &ModelRequest = &request.models[models[*position]];
-                    native_outcome(dialect, model, (schemas[*position].clone(), nullability))
+                    let schema: Shapes = schemas[*position].clone();
+                    native_outcome(dialect, model, (schema, nullability), &declared)
                 })
                 .collect()
         });
@@ -669,7 +675,7 @@ impl AnalysisSession {
         }
     }
 
-        /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
+    /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
     fn ensure_cleaned(&mut self, models: &[usize]) -> Result<(), String> {
         let pending: Vec<usize> = models
             .iter()
