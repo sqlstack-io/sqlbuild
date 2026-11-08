@@ -1442,6 +1442,12 @@ sources:
                 "optional_suffix": None,
             },
             run_id="run_123",
+            expected_diagnostic_codes=("P026",),
+            expected_diagnostic_messages=(
+                "SQL analysis skipped for model 'orders' post_hooks[0] inline_sql(\"...\")"
+                " (<project>/models/staging/orders.sql): the duckdb parser cannot read"
+                " Syntax error at or near 'GRANT' at line 1, column 1 of its SQL",
+            ),
             expected_model_schema_names=("orders",),
             expected_model_config_values=(
                 {
@@ -1794,6 +1800,12 @@ def notify(ctx, message):
             selected_target=None,
             cli_vars=None,
             run_id=None,
+            expected_diagnostic_codes=("P026",),
+            expected_diagnostic_messages=(
+                "SQL analysis skipped for model 'orders' post_hooks[1] inline_sql(\"...\")"
+                " (<project>/models/orders.sql): the duckdb parser cannot read"
+                " Syntax error at or near 'returns' at line 1, column 52 of its SQL",
+            ),
             expected_model_schema_names=("orders",),
             expected_model_config_values=(
                 {
@@ -2935,7 +2947,10 @@ def test_given_discovered_inputs_when_building_compile_inputs_then_it_attaches_m
         == test_case.expected_diagnostic_codes
     )
     assert (
-        tuple(diagnostic.message for diagnostic in compile_inputs.diagnostics)
+        tuple(
+            diagnostic.message.replace(str(tmp_path), "<project>")
+            for diagnostic in compile_inputs.diagnostics
+        )
         == test_case.expected_diagnostic_messages
     )
     assert (
@@ -4249,16 +4264,6 @@ path = "${CTX:schema}"
             selected_target=None,
             run_id=None,
             expected_error_fragment="effective connection does not allow CTX templates",
-        ),
-        BuildCompileInputsErrorTestCase(
-            description="raises when model query sql has invalid syntax",
-            repo_files=base_repo_files()
-            | {
-                "models/staging/broken.sql": "MODEL (description 'Test model broken.');\n\nSELEC id FROM (SELECT 1\n",
-            },
-            selected_target=None,
-            run_id=None,
-            expected_error_fragment="SQL syntax error in model 'broken'",
         ),
         BuildCompileInputsErrorTestCase(
             description="raises when plural hooks use bare SQL strings",

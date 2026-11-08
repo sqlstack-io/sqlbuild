@@ -164,12 +164,16 @@ def test_given_root_star_over_opted_out_model_when_building_fast_lineage_then_re
         UnparsedLineageTestCase(
             description="an unterminated subquery",
             query_sql='SELECT order_id FROM (SELECT * FROM __ref("orders_model_0")',
-            expected_messages=("fast column lineage parse failed; falling back",),
+            expected_messages=(
+                "fast column lineage not built: the native parser cannot read the model",
+            ),
         ),
         UnparsedLineageTestCase(
             description="two statements",
             query_sql="SELECT 1; SELECT 2",
-            expected_messages=("fast column lineage parse failed; falling back",),
+            expected_messages=(
+                "fast column lineage not built: the native parser cannot read the model",
+            ),
         ),
     ],
     ids=lambda case: case.description,
@@ -197,7 +201,7 @@ def test_given_unparsable_model_when_building_fast_lineage_then_logs_and_omits_i
 
     with caplog.at_level(logging.DEBUG, logger="sqlbuild.lineage"):
         native: ProjectColumnLineage | None = fast_column_lineage(
-            project=broken, dialect=None, model_names=None
+            project=broken, dialect="duckdb", model_names=None
         )
         native_records: list[tuple[str, str, object]] = lineage_log_records(caplog)
 
@@ -210,18 +214,10 @@ def test_given_unparsable_model_when_building_fast_lineage_then_logs_and_omits_i
     "test_case",
     [
         FormerlyDeferredLineageTestCase(
-            description="a dialect outside the old native parser build",
-            dialect="mysql",
-            keeps_catalog=True,
-            expected_models_with_lineage=_MODEL_COUNT,
-            expected_error=None,
-        ),
-        FormerlyDeferredLineageTestCase(
             description="a project restored without its analysis catalog",
             dialect="duckdb",
             keeps_catalog=False,
             expected_models_with_lineage=_MODEL_COUNT,
-            expected_error=None,
         ),
     ],
     ids=lambda case: case.description,
@@ -253,16 +249,21 @@ def test_given_formerly_deferred_models_when_building_fast_lineage_then_native_a
     "test_case",
     [
         FormerlyDeferredLineageTestCase(
-            description="a dialect name Polyglot does not know raises Python's error",
+            description="a dialect without a native parser",
+            dialect="mysql",
+            keeps_catalog=True,
+            expected_models_with_lineage=0,
+        ),
+        FormerlyDeferredLineageTestCase(
+            description="a dialect name no parser knows",
             dialect="nonsense",
             keeps_catalog=True,
             expected_models_with_lineage=0,
-            expected_error="Unknown dialect: nonsense",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_unknown_dialect_when_building_fast_lineage_then_python_error_raises(
+def test_given_dialect_without_native_parser_when_building_fast_lineage_then_no_model_is_answered(
     test_case: FormerlyDeferredLineageTestCase,
     tmp_path: Path,
 ) -> None:
@@ -276,8 +277,13 @@ def test_given_unknown_dialect_when_building_fast_lineage_then_python_error_rais
         project=compiled, binding_catalog=(None, compiled.binding_catalog)[test_case.keeps_catalog]
     )
 
-    with pytest.raises(ValueError, match=test_case.expected_error):
-        _ = lineage_views(project=project, dialect=test_case.dialect, model_names=None)
+    lineage: ProjectColumnLineage = cast(
+        ProjectColumnLineage,
+        fast_column_lineage(project=project, dialect=test_case.dialect, model_names=None),
+    )
+    models_with_lineage: int = sum(lineage.has_model(model.name) for model in project.models)
+
+    assert models_with_lineage == test_case.expected_models_with_lineage, test_case.description
 
 
 @pytest.mark.parametrize(

@@ -26,13 +26,12 @@ class RootStarLineageTestCase:
 
 @dataclass(frozen=True)
 class FormerlyDeferredLineageTestCase:
-    """Parsed models Python once built, now answered natively or raising Python's error."""
+    """Parsed models Python once built: answered natively, or not at all without a native parser."""
 
     description: str
     dialect: str
     keeps_catalog: bool
     expected_models_with_lineage: int
-    expected_error: str | None
 
 
 @dataclass(frozen=True)

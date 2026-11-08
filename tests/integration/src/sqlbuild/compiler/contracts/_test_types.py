@@ -27,12 +27,3 @@ class FormerlyDeferredContractTestCase:
     declared_type: str
     dialect: str | None
     expected_diagnostics: tuple[tuple[str, str | None, str | None, str], ...]
-
-
-@dataclass(frozen=True)
-class UnknownDialectContractTestCase:
-    """A dialect Polyglot does not know, and the error Python's type normalization raised."""
-
-    description: str
-    dialect: str
-    expected_error: str

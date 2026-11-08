@@ -17,11 +17,11 @@ class GeneratedAssemblyParityTestCase:
 
 @dataclass(frozen=True)
 class AssemblyDeferralTestCase:
-    """A project whose model SQL Python rejects with a syntax error."""
+    """A project whose model or hook SQL the native parser cannot read."""
 
     description: str
     files: dict[str, str]
-    expected_error: str
+    expected_warning: str
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class OptOutTestCase:
 
 @dataclass(frozen=True)
 class TruncatedHookTestCase:
-    """A project whose hook SQL ends mid-expression, which assembly reports as invalid input."""
+    """A project whose hook SQL ends mid-expression, which the dialect's parser reports."""
 
     description: str
     files: dict[str, str]
