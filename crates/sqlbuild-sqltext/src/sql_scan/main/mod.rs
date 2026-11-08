@@ -3,6 +3,7 @@ pub mod dialect_lexical_syntax;
 pub mod dialect_matching_paren;
 pub mod dialect_non_code_end;
 pub mod dialect_non_code_ranges;
+pub mod follows_table_wrapper;
 pub mod lexical_syntax_key;
 pub mod matching_paren;
 pub mod non_code_end;

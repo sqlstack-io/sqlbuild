@@ -16,3 +16,5 @@ pub const ESCAPE_CHARACTER: char = '\\';
 pub const BLOCK_COMMENT_OPEN: &str = "/*";
 /// What a lexical key adds for bracket identifiers.
 pub(crate) const BRACKET_IDENTIFIERS_KEY: &str = "brackets";
+/// The wrapper Snowflake takes around a table function call in FROM.
+pub const TABLE_WRAPPER: &str = "TABLE(";

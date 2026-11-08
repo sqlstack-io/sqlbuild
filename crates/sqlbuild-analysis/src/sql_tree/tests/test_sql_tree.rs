@@ -68,6 +68,29 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
             ],
         },
         TreeShapeTestCase {
+            description: "a Snowflake table function marker reads as SQLBuild renders it, inside TABLE( ), at its columns",
+            dialect: "snowflake",
+            sql: "SELECT l.*\nFROM __table_fn(\"lines_for\")('B-1', __ref(\"orders\").k) AS l JOIN (SELECT 1 AS k) s ON s.k = l.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("star", 1, 8, Some("select")),
+                ("join", 2, 61, Some("select")),
+                ("select", 2, 66, Some("subquery")),
+                ("subquery", 2, 66, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
+            description: "a Snowflake table function marker already inside TABLE( ) is not wrapped twice",
+            dialect: "snowflake",
+            sql: "SELECT 1\nFROM TABLE(__table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("join", 2, 34, Some("select")),
+                ("select", 2, 39, Some("subquery")),
+                ("subquery", 2, 39, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
             description: "a comma-separated FROM item after an explicit join is not a join",
             dialect: "duckdb",
             sql: "SELECT 1\nFROM a JOIN b ON a.id = b.id, (SELECT 2) c",
