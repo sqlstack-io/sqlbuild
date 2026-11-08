@@ -1,5 +1,6 @@
 //! Analysis normalization with a character-offset provenance map.
 
+use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
 use sqlbuild_sqltext::sql_scan::main::matching_paren::matching_paren;
 use sqlbuild_sqltext::sql_scan::main::non_code_end::non_code_end;
@@ -9,6 +10,8 @@ use std::sync::LazyLock;
 
 const DBT_REF: &str = "dbt_ref";
 const UDF: &str = "udf";
+/// A hook parameter `@'name'` becomes a string literal with this prefix, as SQLBuild fills it.
+const HOOK_PARAMETER_PREFIX: &str = "__sqlbuild_parameter__";
 /// Snowflake's second line comment prefix; only Snowflake SQL reaches the variant scan.
 const SNOWFLAKE_LINE_COMMENT: &str = "//";
 type Edit = (usize, usize, MappedSql);
@@ -18,6 +21,10 @@ static REFERENCES: LazyLock<Result<Regex, String>> = LazyLock::new(|| {
 });
 static FUNCTIONS: LazyLock<Result<Regex, String>> = LazyLock::new(|| {
     Regex::new(r#"__(udf|table_fn)\("([A-Za-z_][A-Za-z0-9_]*)"\)\s*"#)
+        .map_err(|error| error.to_string())
+});
+static NATIVE_STUBS: LazyLock<Result<Regex, String>> = LazyLock::new(|| {
+    Regex::new(r"__cursor_(start|end)\(\s*\)|@'([A-Za-z_][A-Za-z0-9_]*)'")
         .map_err(|error| error.to_string())
 });
 static PLACEHOLDERS: LazyLock<Result<Regex, String>> =
@@ -85,8 +92,8 @@ impl MappedSql {
 pub(super) fn normalize(
     sql: &str,
     dialect: &str,
-    stubs: &HashMap<String, String>,
-    placeholders: &HashMap<String, String>,
+    (stubs, placeholders): (&HashMap<String, String>, &HashMap<String, String>),
+    udf_prefix: &str,
 ) -> Result<MappedSql, String> {
     let mut result = MappedSql::new(sql);
     let mut edits: Vec<Edit> = Vec::new();
@@ -125,7 +132,7 @@ pub(super) fn normalize(
         let name = captures.get(2).ok_or("missing function name")?;
         let mut end = whole.end();
         let stub = if &captures[1] == UDF {
-            format!("__sqlbuild_udf_{}", name.as_str())
+            format!("{udf_prefix}{}", name.as_str())
         } else {
             end = matching_paren(result.sql.as_bytes(), whole.end(), QuotePolicy::COMPILER)
                 .map_err(|error| format!("invalid table-function analysis input: {error:?}"))?
@@ -174,7 +181,30 @@ pub(crate) fn normalize_analysis_sql(
     stubs: HashMap<String, String>,
     placeholders: HashMap<String, String>,
 ) -> Result<String, String> {
-    normalize(sql, dialect, &stubs, &placeholders).map(|mapped| mapped.sql)
+    normalize(sql, dialect, (&stubs, &placeholders), UDF_NAME_PREFIX).map(|mapped| mapped.sql)
+}
+
+/// Analysis SQL as a native parser reads it, with every stub spelled under `stub_prefix`.
+pub(crate) fn normalize_native_sql(
+    sql: &str,
+    dialect: &str,
+    stub_prefix: &str,
+) -> Result<String, String> {
+    let none: HashMap<String, String> = HashMap::new();
+    let udf_prefix: String = format!("{stub_prefix}udf_");
+    let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
+    let stubs: &Regex = NATIVE_STUBS.as_ref()?;
+    Ok(stubs
+        .replace_all(&normalized, |captures: &regex::Captures<'_>| {
+            match (captures.get(1), captures.get(2)) {
+                (Some(bound), _) => format!("{stub_prefix}cursor_{}()", bound.as_str()),
+                (None, Some(parameter)) => {
+                    format!("'{HOOK_PARAMETER_PREFIX}{}'", parameter.as_str())
+                }
+                (None, None) => captures[0].to_owned(),
+            }
+        })
+        .into_owned())
 }
 
 pub(crate) fn normalize_dialect_sql_mapped(

@@ -213,11 +213,6 @@ rule = 3
 note = "Project-tree fact view user rules read through RuleContext; the walk, path validation, file resolution and the children, descendants, glob, relative_parts and read_text queries are native (project_tree_*), and only the model lookup stays here."
 
 [[stays]]
-path = "rule_engine/classes/sql_document.py"
-rule = 4
-note = "Lazy Polyglot SQL document user rules read through RuleContext."
-
-[[stays]]
 path = "rule_engine/classes/fact_reads.py"
 rule = 2
 note = "Records the fact-view reads of one user rule evaluation."
@@ -571,11 +566,6 @@ note = "Decorator that declares project audit factories."
 path = "compiler/auditing/main/get_audit_factory_definition.py"
 rule = 3
 note = "Reads the declaration attached to a project audit factory."
-
-[[stays]]
-path = "compiler/sql_analysis/main/import_polyglot.py"
-rule = 4
-note = "Imports the Polyglot Python package for the Python API."
 
 [[stays]]
 path = "compiler/sql_analysis/main/import_polyglot_sql.py"

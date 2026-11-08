@@ -13,6 +13,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyDictMethods, PyString, PyTuple};
 use pyo3::{IntoPyObjectExt, pyfunction, wrap_pyfunction};
 use sqlbuild_core::text::main::python_splitlines::python_splitlines;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 use sqlbuild_rules::rule_cache::main::file_rule_key::file_rule_key;
 use sqlbuild_rules::rule_results::main::duplicate_literal_hints::duplicate_literal_hints;
 use sqlbuild_rules::rule_results::models::RuleFinding;
@@ -670,7 +671,7 @@ fn lint_expansion_context(
     })
 }
 
-/// The findings of the selected SQL rules' violations; an engine failure leaves each unevaluated.
+/// The selected SQL rules' findings and lint-unavailable warnings; an engine failure leaves each rule unevaluated.
 fn violation_findings(
     run: &SqlRun<'_, '_>,
     violations: &[(PathBuf, LintViolationRow)],
@@ -686,6 +687,8 @@ fn violation_findings(
         let code: &str = &violation.code;
         if code == SQL_RULE_SUPPRESSION_CODE || run.codes.iter().any(|known| known == code) {
             evaluated.push(lint_finding((path, violation), &resolved_dir, model_paths));
+        } else if !counts_toward_exit(code) {
+            evaluated.push(lint_finding((path, violation), &resolved_dir, &no_paths));
         } else if code == engine_error {
             let finding: RuleFinding = lint_finding((path, violation), &resolved_dir, &no_paths);
             for rule_code in run.codes {

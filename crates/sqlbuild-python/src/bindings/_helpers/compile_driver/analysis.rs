@@ -6,6 +6,7 @@ use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyRes
 use pyo3::types::{PyBool, PyDict, PyDictMethods, PyString, PyTuple, PyTupleMethods};
 use pyo3::{IntoPyObject, pyfunction, wrap_pyfunction};
 use sqlbuild_host::entries::models::ExecutorHost;
+use sqlbuild_rules::lint_text::main::counts_toward_exit::counts_toward_exit;
 
 use crate::bindings::_helpers::boundary::python_calls::{
     Status, call_with, imported, keywords, within,
@@ -546,7 +547,7 @@ impl<'py> Driver<'_, 'py> {
     }
 }
 
-/// The core diagnostics followed by one rule-phase error per rule finding.
+/// The core diagnostics followed by one rule-phase error per rule finding; lint-unavailable ones only warn.
 fn with_rule_diagnostics<'py>(
     py: Python<'py>,
     core: &Bound<'py, PyTuple>,
@@ -554,6 +555,7 @@ fn with_rule_diagnostics<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let phase: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticPhase, "RULE")?;
     let severity: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "ERROR")?;
+    let unavailable: Bound<'py, PyAny> = enum_member(py, RecordId::DiagnosticSeverity, "WARNING")?;
     let fix_note: Bound<'py, PyAny> = PyString::new(py, RULE_FIX_AVAILABLE_NOTE).into_any();
     let mut diagnostics: Vec<Bound<'py, PyAny>> = core.iter().collect();
     for fault in native_field(rules_result, "findings")?.try_iter()? {
@@ -568,7 +570,13 @@ fn with_rule_diagnostics<'py>(
             RecordId::CompilerDiagnostic,
             &[
                 ("phase", phase.clone()),
-                ("severity", severity.clone()),
+                (
+                    "severity",
+                    match counts_toward_exit(&native_field(&fault, "code")?.extract::<String>()?) {
+                        true => severity.clone(),
+                        false => unavailable.clone(),
+                    },
+                ),
                 ("code", native_field(&fault, "code")?),
                 ("message", native_field(&fault, "message")?),
                 ("path", native_field(&fault, "path")?),

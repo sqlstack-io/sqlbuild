@@ -6,9 +6,12 @@ use crate::constants::{
 };
 use crate::constants::{
     MIN_CUSTOM_RULE_TEST_CASES_KEY, MODEL_NAME_LAYERS, PUBLISHED_READ_CODE, PUBLISHED_SHAPE_CODE,
+    RULES_UNAVAILABLE_REMEDIATION,
 };
+use crate::lint_text::constants::LINT_UNAVAILABLE_CODE;
 use crate::models::{Declaration, EvaluateRequest, Fault, Model, RuleMetadata, RulesConfig};
 use crate::query_facts::main::dependency_texts::dependency_texts;
+use crate::query_facts::main::facts_available::facts_available;
 use crate::query_facts::main::model_shape::model_shape;
 use crate::query_facts::main::query_facts::query_facts;
 use crate::query_facts::models::{
@@ -133,6 +136,17 @@ fn evaluate_model_inner(request: ModelEvaluationRequest<'_>) -> Result<Vec<Fault
     }
     if !requires_parsed_model(selected) {
         return Ok(faults.into_inner());
+    }
+    if !facts_available(&request.dialect) {
+        let codes = selected
+            .values()
+            .filter(|rule| requires_model_query(rule))
+            .map(|rule| rule.code.as_str());
+        return Ok(vec![rules_unavailable(
+            &model.relative_path,
+            codes,
+            &request.dialect,
+        )]);
     }
     let unparsed =
         |error: &str| format!("could not parse {} for rules: {error}", model.relative_path);
@@ -290,6 +304,26 @@ pub(crate) fn evaluate_project_rules(request: &ProjectEvaluationRequest<'_>) -> 
         );
     }
     faults.into_inner()
+}
+
+/// One non-failing warning that `dialect` SQL is not parsed, so the built-in rules `codes` did not run on `path`.
+pub(crate) fn rules_unavailable<'a>(
+    path: &str,
+    codes: impl Iterator<Item = &'a str>,
+    dialect: &str,
+) -> Fault {
+    Fault {
+        unevaluated: false,
+        code: LINT_UNAVAILABLE_CODE.to_owned(),
+        path: path.to_owned(),
+        line: 1,
+        column: 1,
+        message: format!(
+            "SQLBuild cannot parse {dialect} SQL for built-in rules yet, so these rules were not evaluated: {}",
+            codes.collect::<Vec<_>>().join(", ")
+        ),
+        remediation: RULES_UNAVAILABLE_REMEDIATION.to_owned(),
+    }
 }
 
 fn requires_parsed_model(selected: &BTreeMap<String, &RuleMetadata>) -> bool {

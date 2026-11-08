@@ -146,6 +146,14 @@ class ScenarioSnapshotLocalTypeMappingTestCase:
 
 
 @dataclass(frozen=True)
+class ScenarioSnapshotLocalTypeRefusalTestCase:
+    description: str
+    sql_analysis_dialect: str | None
+    warehouse_type: str
+    expected_message: str
+
+
+@dataclass(frozen=True)
 class ExecuteScenarioSnapshotCaptureStepsTestCase:
     description: str
     retain: bool

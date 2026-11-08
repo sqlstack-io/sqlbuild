@@ -56,6 +56,22 @@ pub(crate) struct LintBodiesTestCase {
     pub(crate) expected_findings: Vec<Finding<'static>>,
 }
 
+pub(crate) struct ExitCountTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) code: &'static str,
+    pub(crate) expected_counts: bool,
+}
+
+pub(crate) struct UnavailableLintTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) response: serde_json::Value,
+    pub(crate) bodies_in_file: usize,
+    pub(crate) expected_findings: Vec<UnavailableFinding<'static>>,
+}
+
+/// One authored finding: code, line, column, whether it is a fault, and its message.
+pub(crate) type UnavailableFinding<'a> = (&'a str, i64, i64, bool, &'a str);
+
 /// One mapped finding: code, line, column and optional end position.
 pub(crate) type Finding<'a> = (&'a str, i64, i64, Option<(i64, i64)>);
 

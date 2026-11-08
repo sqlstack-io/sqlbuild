@@ -1,4 +1,5 @@
 pub mod comment_end;
+pub mod dialect_lexical_syntax;
 pub mod dialect_matching_paren;
 pub mod dialect_non_code_end;
 pub mod dialect_non_code_ranges;

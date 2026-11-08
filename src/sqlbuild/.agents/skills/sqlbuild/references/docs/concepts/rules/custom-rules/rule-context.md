@@ -6,6 +6,15 @@
 
 Online: https://sqlbuild.com/docs/concepts/rules/custom-rules/rule-context/
 
+## Contents
+
+- Authored and expanded SQL
+- Common SQL structures
+- Declared enum types
+- Syntax tree
+- Project structure
+- Choose the subject deliberately
+
 `RuleContext` exposes typed, read-only views over the compiled project:
 
 - `ctx.sql`: authored and expanded SQL
@@ -32,15 +41,28 @@ the expanded SQL after interpolation, declarations, and macros.
 
 ## Common SQL structures
 
-Common structures are available through typed source nodes:
+Common structures are available on expanded SQL as `SqlNode` source locations, each with a `kind`,
+a `line` and a `column`:
 
 ```python
 for cte in sql.expanded.ctes():
     ...
 
-for star in sql.authored.star_projections():
+for star in sql.expanded.star_projections():
     ...
 ```
+
+| Method | Finds |
+| --- | --- |
+| `ctes()` | Each common table expression, at its name |
+| `joins()` | Each explicit join clause, at its join keyword, not a comma-separated `FROM` item |
+| `subqueries()` | Each parenthesized subquery, at its opening parenthesis |
+| `star_projections()` | Each `*` and `table.*` that expands columns, including a function argument such as `OBJECT_CONSTRUCT(*)`, but not an aggregate's `*`, as in `COUNT(*)` |
+| `nodes(kind=...)` | Each syntax tree node of that kind, compared without case |
+
+`line` and `column` count within the document's `source`. For expanded SQL that is the query
+text, not the model file. Authored SQL is the whole model file, including its `MODEL` header, so it
+does not parse as SQL; read its text through `source`.
 
 ## Declared enum types
 
@@ -54,18 +76,42 @@ if enum_types.get("fulfillment_method") != "fulfillment_method":
     ...
 ```
 
-## Lazy Polyglot access
+## Syntax tree
 
-Use the full Polyglot AST only when common projections are insufficient:
+Use the syntax tree only when the common structures are insufficient:
 
 ```python
-ast = sql.expanded.polyglot_ast()
-for node in ast.walk():
-    ...
+for node in sql.expanded.ast().walk():
+    if node.kind == "window_function":
+        ...
 ```
 
-AST construction is lazy. A path or contract Rule does not pay for SQL parsing merely because AST
+`ast()` returns a `document` node whose children are the statements. Every `SqlTreeNode` has a
+`kind`, a `line` and `column` where it starts, `children`, and `walk()`, which yields the node and
+its descendants in pre-order. Kinds are SQLQuack's snake_case names, such as `select`, `subquery`,
+`star`, `join`, `cte`, `column`, `function` and `window_function`.
+
+Parsing is lazy. A path or contract Rule does not pay for SQL parsing merely because syntax tree
 access exists elsewhere.
+
+The tree comes from the SQLQuack parser SQLBuild uses for the project's dialect:
+
+| Dialect | Syntax tree |
+| --- | --- |
+| PostgreSQL | Native PostgreSQL parser |
+| DuckDB, MotherDuck, Snowflake, SQLite | SQLQuack's shared parser |
+| Other dialects | Unavailable |
+
+For the shared parser, a node the parser records no position for, such as a bare `*` or the query
+inside a subquery, reports the position of its parent.
+
+Reading the tree, or any common structure, raises `RuleUsageError` when:
+
+| Cause | Message starts with |
+| --- | --- |
+| The dialect has no syntax tree | `SQL syntax trees are unavailable for the <dialect> dialect` |
+| The SQL does not parse | `SQL could not be parsed:` |
+| A statement uses syntax the parser keeps as unparsed text, or nests too deeply | `SQL syntax tree is unavailable:` |
 
 ## Project structure
 

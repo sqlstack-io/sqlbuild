@@ -1,6 +1,8 @@
 use crate::query_facts::constants::MIN_CAST_TOKENS;
-use crate::query_facts::models::ComparisonSpan;
-use polyglot_sql::tokens::{Token, TokenType};
+use crate::query_facts::models::{CodeToken, ComparisonSpan};
+use sqlquack_syntax::LosslessToken;
+use sqlquack_syntax::TokenKind;
+use sqlquack_syntax::tokens::models::TokenType;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ops::Range;
@@ -150,32 +152,35 @@ pub(crate) struct SelectTokens {
 
 /// The code tokens of a normalized query, without comments, over its text.
 pub(crate) struct QueryTokens<'a> {
-    tokens: Vec<Token>,
+    tokens: Vec<CodeToken<'a>>,
     sql: &'a str,
     bytes: Vec<usize>,
     used: RefCell<HashSet<usize>>,
 }
 
 impl<'a> QueryTokens<'a> {
-    pub(crate) fn new(tokens: Vec<Token>, sql: &'a str) -> Self {
+    /// The code tokens of `tokens`, a lossless tokenization of `sql`, at character offsets.
+    pub(crate) fn new(tokens: Vec<LosslessToken>, sql: &'a str) -> Self {
         let mut bytes: Vec<usize> = sql.char_indices().map(|(byte, _)| byte).collect();
         bytes.push(sql.len());
+        let character = |byte: usize| bytes.partition_point(|offset| *offset < byte);
+        let tokens: Vec<CodeToken<'a>> = tokens
+            .into_iter()
+            .filter_map(|token| match token.kind {
+                TokenKind::Significant(token_type) => Some(CodeToken {
+                    token_type,
+                    text: &sql[token.start..token.end],
+                    start: character(token.start),
+                    end: character(token.end),
+                }),
+                TokenKind::Whitespace | TokenKind::LineComment | TokenKind::BlockComment => None,
+            })
+            .collect();
         Self {
             sql,
             bytes,
             used: RefCell::default(),
-            tokens: tokens
-                .into_iter()
-                .filter(|token| {
-                    !matches!(
-                        token.token_type,
-                        TokenType::BlockComment
-                            | TokenType::LineComment
-                            | TokenType::Space
-                            | TokenType::Break
-                    )
-                })
-                .collect(),
+            tokens,
         }
     }
 
@@ -185,11 +190,11 @@ impl<'a> QueryTokens<'a> {
     }
 
     pub(crate) fn start(&self, index: usize) -> usize {
-        self.tokens[index].span.start
+        self.tokens[index].start
     }
 
     pub(crate) fn end(&self, index: usize) -> usize {
-        self.tokens[index].span.end
+        self.tokens[index].end
     }
 
     fn kind(&self, index: usize) -> Option<TokenType> {
@@ -369,14 +374,21 @@ impl<'a> QueryTokens<'a> {
         parameterized && (cast || conversion)
     }
 
-    /// The string-literal tokens within a normalized range, as character range and parsed text.
+    /// The tokens within characters `start` to `end`, as a token range.
+    pub(crate) fn covering(&self, start: usize, end: usize) -> Range<usize> {
+        let first = self.tokens.partition_point(|token| token.start < start);
+        let last = self.tokens.partition_point(|token| token.end <= end);
+        first..last.max(first)
+    }
+
+    /// The string-literal tokens within a normalized range, as character range and source text.
     pub(crate) fn string_tokens(&self, start: usize, end: usize) -> Vec<(usize, usize, &str)> {
         self.tokens
             .iter()
             .filter(|token| {
-                token.span.start >= start && token.span.end <= end && string_token(token.token_type)
+                token.start >= start && token.end <= end && string_token(token.token_type)
             })
-            .map(|token| (token.span.start, token.span.end, token.text.as_str()))
+            .map(|token| (token.start, token.end, token.text))
             .collect()
     }
 
@@ -595,7 +607,6 @@ impl<'a> QueryTokens<'a> {
         operator: ComparisonOperator,
         (left_end, right_start): (Option<usize>, Option<usize>),
         negated: bool,
-        generated: &str,
     ) -> Option<ComparisonSpan> {
         let anchor = match (left_end, right_start) {
             (Some(end), _) => (0..self.tokens.len()).find(|index| {
@@ -608,16 +619,7 @@ impl<'a> QueryTokens<'a> {
                     && self.operator(*index, operator)
                     && !self.used.borrow().contains(index)
             }),
-            (None, None) => {
-                let wanted = compact(generated);
-                (0..self.tokens.len()).find(|index| {
-                    self.operator(*index, operator) && !self.used.borrow().contains(index) && {
-                        let (first, last) = self.extent(*index, operator, negated);
-                        self.slice(self.start(first), self.end(last))
-                            .is_some_and(|text| compact(text) == wanted)
-                    }
-                })
-            }
+            (None, None) => None,
         }?;
         self.used.borrow_mut().insert(anchor);
         let (first, last) = self.extent(anchor, operator, negated);
@@ -683,13 +685,6 @@ impl<'a> QueryTokens<'a> {
         }
         (first, last)
     }
-}
-
-fn compact(text: &str) -> String {
-    text.chars()
-        .filter(|character| !character.is_whitespace())
-        .flat_map(char::to_lowercase)
-        .collect()
 }
 
 fn string_token(token_type: TokenType) -> bool {

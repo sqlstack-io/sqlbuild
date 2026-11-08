@@ -180,6 +180,22 @@ class RankingSortDefaultCase:
 
 
 @dataclass(frozen=True)
+class UnparsedDialectRulesCase:
+    description: str
+    adapter_toml: str
+    expected_codes: tuple[str, ...]
+    expected_message: str
+    expected_exit: int
+
+
+@dataclass(frozen=True)
+class ReplayedFindingExitCase:
+    description: str
+    code: str
+    expected_exit: int
+
+
+@dataclass(frozen=True)
 class FixableReportingCase:
     description: str
     summary_sql: str
@@ -375,3 +391,14 @@ class SqlRuleTargetVarsCase:
     commands: tuple[tuple[str, ...], ...]
     expected_outcomes: tuple[tuple[int, bool, bool], ...]
     extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SyntaxTreeRuleE2ETestCase:
+    """A model whose expanded query a custom rule reads through the syntax tree."""
+
+    description: str
+    model_sql: str
+    expected_messages: tuple[str, ...]
+    adapter: str = "duckdb"
+    other_models: dict[str, str] = field(default_factory=dict)

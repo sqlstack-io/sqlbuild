@@ -32,7 +32,7 @@ from tests.integration.src.sqlbuild.executor.scenario._test_types import (
         ScenarioSnapshotCaptureTypesIntegrationTestCase(
             description="typed duckdb capture jsonl reloads with manifest schema",
             expected_local_types={
-                "decimal_scale_col": "DECIMAL(12, 2)",
+                "decimal_scale_col": "DECIMAL(12,2)",
                 "date_col": "DATE",
                 "timestamp_col": "TIMESTAMP",
                 "json_col": "JSON",

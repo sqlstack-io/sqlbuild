@@ -1,5 +1,6 @@
 //! Native authored positions, including macro-expansion passes.
 
+use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use crate::semantic_validation::_helpers::diagnostics::column_pattern;
 use crate::semantic_validation::_helpers::normalization::normalize;
 use crate::semantic_validation::models::{BindingPositions, Expansion, PositionInput};
@@ -20,7 +21,12 @@ impl BindingPositions {
             cleaned,
             passes,
         } = request;
-        let mapped = normalize(&expanded, "snowflake", &HashMap::new(), &HashMap::new());
+        let mapped = normalize(
+            &expanded,
+            "snowflake",
+            (&HashMap::new(), &HashMap::new()),
+            UDF_NAME_PREFIX,
+        );
         let offsets = match mapped {
             Ok(mapped) if mapped.sql == cleaned => mapped.offsets,
             _ if expanded == cleaned => (0..=expanded.chars().count()).collect(),
