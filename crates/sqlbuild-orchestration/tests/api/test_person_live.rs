@@ -216,6 +216,33 @@ fn given_people_with_different_roles_when_they_bootstrap_and_subscribe_then_only
                 .await
                 .expect("disabled bootstrap")
                 .status();
+            let people: Value = client
+                .get(format!("{}/api/admin/people", api.url))
+                .header(header::HOST, "control.example.com")
+                .header(
+                    header::COOKIE,
+                    format!("__Host-sqb-session={}", roles.administrator.bearer),
+                )
+                .send()
+                .await
+                .expect("people")
+                .json()
+                .await
+                .expect("people body");
+            let member = people
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|person| person["principal_id"] == json!(roles.member_id))
+                .expect("disabled member is listed");
+            assert_eq!(
+                (
+                    member["disabled_at"].is_string(),
+                    &member["active_sessions"]
+                ),
+                (true, &json!(0)),
+                "a disabled person's sessions no longer count as active"
+            );
             let logout = client
                 .post(format!("{}/api/auth/logout", api.url))
                 .header(header::HOST, "control.example.com")

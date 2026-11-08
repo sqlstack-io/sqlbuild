@@ -32,7 +32,7 @@ pub async fn list_people(
         "SELECT p.principal_id, p.name, p.created_at, p.disabled_at, \
            CASE WHEN c.principal_id IS NULL THEN 0 ELSE 1 END AS has_password, \
            (SELECT COUNT(*) FROM sqb_sessions s WHERE s.principal_id=p.principal_id \
-              AND s.revoked_at IS NULL AND s.expires_at>$1) AS active_sessions, \
+              AND s.revoked_at IS NULL AND s.expires_at>$1 AND p.disabled_at IS NULL) AS active_sessions, \
            (SELECT MAX(s.created_at) FROM sqb_sessions s WHERE s.principal_id=p.principal_id) AS last_signed_in_at \
          FROM sqb_principals p LEFT JOIN sqb_password_credentials c ON c.principal_id=p.principal_id ORDER BY p.name",
         vec![Parameter::Time(now)]).await?;

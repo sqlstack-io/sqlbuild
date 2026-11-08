@@ -368,7 +368,6 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
-	/** The newest result of every check, or one check's results newest first. */
 	async function people() {
 		const { data, error, response } = await http.GET('/api/admin/people');
 		if (response.status === 401) onUnauthorized();
@@ -376,6 +375,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
+	/** The newest result of every check, or one check's results newest first. */
 	async function checkResults(scope: Scope, bindingKey?: string) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = bindingKey

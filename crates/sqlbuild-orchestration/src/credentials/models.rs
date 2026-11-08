@@ -54,7 +54,7 @@ pub struct PersonSummary {
     pub has_password: bool,
     /// Groups the identity provider reported at the person's last SSO sign-in.
     pub groups: Vec<String>,
-    /// Unrevoked, unexpired browser and CLI sessions.
+    /// Unrevoked, unexpired browser and CLI sessions; none while the person is disabled.
     pub active_sessions: i64,
     pub last_signed_in_at: Option<DateTime<Utc>>,
 }
