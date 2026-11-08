@@ -9,9 +9,9 @@ use crate::assembly::analysis_session::tests::helpers::{
     session_lines, session_steps,
 };
 use crate::assembly::analysis_session::tests::test_types::{
-    CteRecoveryTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase, ModelSpec, PivotTestCase,
-    SessionFactsTestCase, SessionFailureTestCase, SessionTestCase, StarExpansionTestCase,
-    UnscheduledTestCase,
+    CteRecoveryTestCase, DeepPivotTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase,
+    ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase, SessionTestCase,
+    StarExpansionTestCase, UnscheduledTestCase,
 };
 
 /// A model whose missing column stays untyped over a known input, so completion re-analyses it.
@@ -754,5 +754,45 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_deeply_nested_pivot_input_when_proving_then_the_proof_fails_without_aborting() {
+    let too_deep = failed(
+        "dynamic pivot SQL could not be parsed: \
+         E_GUARD_AST_DEPTH_EXCEEDED: value 513 exceeds configured limit 512",
+    );
+    let test_cases = [
+        DeepPivotTestCase {
+            description: "a 50,000-term DuckDB projection",
+            dialect: "duckdb",
+            terms: 50_000,
+            expected_outcome: too_deep.clone(),
+        },
+        DeepPivotTestCase {
+            description: "a 50,000-term Snowflake projection",
+            dialect: "snowflake",
+            terms: 50_000,
+            expected_outcome: too_deep,
+        },
+    ];
+    for test_case in test_cases {
+        let sql = format!(
+            "WITH base AS (SELECT customer_id, status, amount, 1{} AS k \
+             FROM __source(\"raw_orders\")) \
+             SELECT * FROM base PIVOT (MAX(amount) FOR status IN (ANY ORDER BY status))",
+            " + 1".repeat(test_case.terms)
+        );
+        let request = pivot_request(test_case.dialect, &sql, Some(("status", "amount", "MAX")));
+        let session = finished_session(request.tables.clone());
+
+        let standalone = prove_dynamic_contracts(&request).expect("the proofs run");
+        let in_session =
+            prove_finished_dynamic_contracts(&session, &request.models).expect("the proofs run");
+
+        let expected = vec![test_case.expected_outcome, PivotOutcome::Absent];
+        assert_eq!(standalone, expected, "{}", test_case.description);
+        assert_eq!(in_session, expected, "{}", test_case.description);
     }
 }

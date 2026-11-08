@@ -94,6 +94,8 @@ pub(crate) const RENDERED_TYPE_NAMES: [(&str, &str); 12] = [
 ];
 /// The stack a standalone dynamic pivot proof parses on, as the analysis workers have.
 pub(crate) const PIVOT_WORKER_STACK_BYTES: usize = 16 * 1024 * 1024;
+/// The deepest pivot statement the proof serialises; deeper SQL fails the proof instead of the stack.
+pub(crate) const PIVOT_MAX_AST_DEPTH: usize = 512;
 /// Python's `COMPACT_RELATION_STUB_PREFIX`: the relation name a shared query binds instead.
 pub(crate) const RELATION_STUB_PREFIX: &str = "__sqlbuild_project_input_";
 /// Python's `COMPACT_REFERENCE_MARKER_PATTERN`: a reference call and the name it reads.

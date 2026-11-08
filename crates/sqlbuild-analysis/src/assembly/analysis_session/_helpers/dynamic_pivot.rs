@@ -7,7 +7,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
-use sqlquack_syntax::{CallMode, Dialect, Expression, ParseOptions};
+use sqlquack_syntax::{CallMode, Dialect, Expression, ExpressionWalk, ParseOptions};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
@@ -15,8 +15,9 @@ use crate::assembly::analysis_session::_helpers::dict_walk::{
 };
 use crate::assembly::analysis_session::constants::{
     ALIAS_AST_KIND, CAST_AST_KIND, DUCKDB_DIALECT, DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT,
-    PIVOT_AST_KIND, QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT,
-    SUPPORTED_PIVOT_DIALECTS, TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    PIVOT_AST_KIND, PIVOT_MAX_AST_DEPTH, QUERY_AST_KINDS, SELECT_AST_KIND,
+    SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT, SUPPORTED_PIVOT_DIALECTS,
+    TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::models::{
     ColumnFact, ContractProof, DynamicFamily, PivotModel, PivotOutcome, PivotTables,
@@ -140,9 +141,27 @@ fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
         )));
     }
     let statement: Expression = statements.pop().ok_or_else(|| "no statement".to_owned())?;
+    if deeper_than(&statement, PIVOT_MAX_AST_DEPTH) {
+        return Ok(Err(format!(
+            "E_GUARD_AST_DEPTH_EXCEEDED: value {} exceeds configured limit {PIVOT_MAX_AST_DEPTH}",
+            PIVOT_MAX_AST_DEPTH + 1
+        )));
+    }
     serde_json::to_value(statement)
         .map(Ok)
         .map_err(|error| error.to_string())
+}
+
+/// Whether `statement` nests more than `limit` levels, walked iteratively so depth cannot overflow.
+fn deeper_than(statement: &Expression, limit: usize) -> bool {
+    let mut stack: Vec<(&Expression, usize)> = vec![(statement, 1)];
+    while let Some((node, depth)) = stack.pop() {
+        if depth > limit {
+            return true;
+        }
+        stack.extend(node.children().into_iter().map(|child| (child, depth + 1)));
+    }
+    false
 }
 
 fn proof(
