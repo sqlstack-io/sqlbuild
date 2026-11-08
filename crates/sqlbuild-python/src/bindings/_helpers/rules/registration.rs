@@ -7,11 +7,12 @@ use pyo3::{types::PyModuleMethods, wrap_pyfunction};
 use crate::bindings::_helpers::rules::{
     catalogue, custom_rule_cache, custom_rule_evidence, dsl_headers, early_sql_lint, evaluation,
     guidance, lint, lint_expansion, lint_sql_bodies, lint_text, results, rule_api, rule_cache,
-    rule_plan, rule_run, rules_config, run_lint, selection, sql_rules,
+    rule_plan, rule_run, rules_config, run_lint, selection, sql_document, sql_rules,
 };
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     rule_api::register(module)?;
+    sql_document::register(module)?;
     crate::bindings::_helpers::rules::project_tree_queries::register(module)?;
     module.add_function(wrap_pyfunction!(
         crate::bindings::_helpers::rules::lint_headers::lint_file_role,

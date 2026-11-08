@@ -46,5 +46,6 @@ pub(crate) mod rules_config;
 pub(crate) mod run_lint;
 pub(crate) mod selection;
 pub(crate) mod skills;
+pub(crate) mod sql_document;
 pub(crate) mod sql_rules;
 pub(crate) mod sql_test_objects;

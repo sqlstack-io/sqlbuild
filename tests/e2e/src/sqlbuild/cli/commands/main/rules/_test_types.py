@@ -375,3 +375,12 @@ class SqlRuleTargetVarsCase:
     commands: tuple[tuple[str, ...], ...]
     expected_outcomes: tuple[tuple[int, bool, bool], ...]
     extra_files: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SyntaxTreeRuleE2ETestCase:
+    """A model whose expanded query a custom rule reads through the syntax tree."""
+
+    description: str
+    model_sql: str
+    expected_messages: tuple[str, ...]

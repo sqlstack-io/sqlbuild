@@ -210,7 +210,6 @@ CUSTOM_RULE_PROJECT_SUBJECT: str
 CONTRACT_ENFORCED: str
 LAUNCH_RECORD_OPTION: str
 ZERO_DAY_CURSOR_DURATION: str
-AST_CTE_KIND: str
 SQL_TEXT_FIELD: str
 SQL_DIGEST_FIELD: str
 SQL_PRIVATE_RECORD_FIELD: str
@@ -4297,6 +4296,27 @@ class NativeModelValidator:
     def references(
         self, model: tuple[str, str], references: list[tuple[str, str, bool]]
     ) -> int | NativeConfigError | None: ...
+
+class SqlDocument:
+    """One SQL text a custom rule reads, parsed on first use by its dialect's SQLQuack parser."""
+
+    source: str
+    def __init__(self, *, source: str, dialect: str) -> None: ...
+    def ast(self) -> SqlTreeNode: ...
+    def nodes(self, *, kind: str) -> tuple[SqlNode, ...]: ...
+    def ctes(self) -> tuple[SqlNode, ...]: ...
+    def joins(self) -> tuple[SqlNode, ...]: ...
+    def subqueries(self) -> tuple[SqlNode, ...]: ...
+    def star_projections(self) -> tuple[SqlNode, ...]: ...
+
+class SqlTreeNode:
+    """One node of a rule's SQL syntax tree."""
+
+    kind: str
+    line: int
+    column: int
+    children: tuple[SqlTreeNode, ...]
+    def walk(self) -> list[SqlTreeNode]: ...
 
 class SqlCodeScanner:
     def __init__(self, sql: str, syntax: dict[str, object] | None, context: str) -> None: ...

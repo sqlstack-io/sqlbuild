@@ -1114,7 +1114,6 @@ def _hardware_payload() -> dict[str, object]:
 def _version_payload() -> dict[str, str]:
     return {
         "sqlbuild": importlib.metadata.version("sqlbuild"),
-        "polyglot_sql": importlib.metadata.version("polyglot-sql-chio"),
     }
 
 
