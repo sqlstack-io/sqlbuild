@@ -4091,7 +4091,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4146,6 +4146,7 @@ dependencies = [
  "sqlquack-syntax",
  "sqlquack-syntax-bigquery",
  "sqlquack-syntax-clickhouse",
+ "sqlquack-syntax-databricks",
  "sqlquack-syntax-duckdb",
  "sqlquack-syntax-postgres",
  "sqlquack-syntax-sqlite",
@@ -4567,6 +4568,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlquack-syntax-databricks"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=c2e78ffb575764e798328358f4bedaf28e997307#c2e78ffb575764e798328358f4bedaf28e997307"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
 name = "sqlquack-syntax-derive"
 version = "0.2.0"
 source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=c2e78ffb575764e798328358f4bedaf28e997307#c2e78ffb575764e798328358f4bedaf28e997307"
@@ -4703,7 +4713,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5139,7 +5149,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
