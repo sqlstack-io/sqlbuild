@@ -38,7 +38,7 @@ export function healthWords(location: Pick<LocationSummary, 'health' | 'failedDe
 		if (location.brokenDeployPolicy === 'fallback') return `Deploy failed — running previous version${version != null ? ` ${version}` : ''}`;
 		return 'Deploy failed — scheduled runs wait until a deploy works';
 	}
-	return healthLabel[location.health];
+	return location.health ? healthLabel[location.health] : 'Unknown';
 }
 
 export const eventKindLabel: Record<PlatformEventKind, string> = {

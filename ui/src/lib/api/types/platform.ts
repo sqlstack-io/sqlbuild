@@ -163,7 +163,11 @@ export type LocationDetail = {
 	connectionTest: ConnectionTest | null;
 };
 
-export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'health' | 'brokenDeployPolicy' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+	/** Null when the server can't report it to this person. */
+	health: LocationHealth | null;
+	/** Null when the server doesn't report the policy. */
+	brokenDeployPolicy: BrokenDeployPolicy | null;
 	/** Unresolved platform events of this location. */
 	activeProblems: number;
 	liveInstances: number;
