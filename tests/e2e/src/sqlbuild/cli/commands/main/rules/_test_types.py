@@ -180,6 +180,15 @@ class RankingSortDefaultCase:
 
 
 @dataclass(frozen=True)
+class UnparsedDialectRulesCase:
+    description: str
+    adapter_toml: str
+    expected_codes: tuple[str, ...]
+    expected_message: str
+    expected_exit: int
+
+
+@dataclass(frozen=True)
 class ReplayedFindingExitCase:
     description: str
     code: str

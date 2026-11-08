@@ -18,6 +18,7 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     RankingSortDefaultCase,
     ReplayedFindingExitCase,
     SqlQualityRuleCase,
+    UnparsedDialectRulesCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
     diagnostic_codes,
@@ -622,3 +623,64 @@ def test_given_cached_sql_finding_when_running_commands_then_only_rule_findings_
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        UnparsedDialectRulesCase(
+            description="a parsed dialect reports the built-in rule finding",
+            adapter_toml='adapter = "duckdb"\n',
+            expected_codes=("SQBRMODEL102",),
+            expected_message="SELECT * is allowed only",
+            expected_exit=1,
+        ),
+        UnparsedDialectRulesCase(
+            description="an unparsed dialect warns once per model and fails nothing",
+            adapter_toml=(
+                'adapter = "bigquery"\ndefault_target = "dev"\n\n'
+                '[targets.dev]\ndatabase = "warehouse"\nschema = "analytics"\n'
+            ),
+            expected_codes=("L007", "L007"),
+            expected_message=(
+                "SQLBuild cannot parse bigquery SQL for built-in rules yet,"
+                " so these rules were not evaluated: SQBRMODEL102"
+            ),
+            expected_exit=0,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_project_dialect_when_running_built_in_rules_then_unparsed_dialects_only_warn(
+    test_case: UnparsedDialectRulesCase, tmp_path: Path
+) -> None:
+    write_quality_project(
+        project_dir=tmp_path,
+        toml=(
+            'name = "orders"\n'
+            + test_case.adapter_toml
+            + '\n[rules]\nselect = ["SQBRMODEL102"]\n'
+        ),
+        upstream=_RAW_HEADER + _UPSTREAM_SQL,
+        summary=_SUMMARY_HEADER + 'SELECT * FROM __ref("raw_orders")\n',
+    )
+
+    compiled: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "compile", "--json"
+    )
+    ran: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "rules", "run", "SQBRMODEL102"
+    )
+
+    messages: list[str] = [
+        str(item["message"]) for item in json.loads(compiled.stdout)["diagnostics"]
+    ]
+    assert (
+        diagnostic_codes(compiled),
+        all(test_case.expected_message in message for message in messages),
+        (compiled.returncode, ran.returncode),
+    ) == (
+        test_case.expected_codes,
+        True,
+        (test_case.expected_exit, test_case.expected_exit),
+    ), compiled.stdout + compiled.stderr + ran.stdout + ran.stderr
