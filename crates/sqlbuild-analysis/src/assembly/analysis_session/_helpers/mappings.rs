@@ -4,9 +4,10 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 use sha2::{Digest, Sha256};
+use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::assembly::analysis_session::constants::DIALECT_ALIASES;
-use crate::assembly::analysis_session::models::ModelRequest;
+use crate::assembly::analysis_session::constants::{DIALECT_ALIASES, UNKNOWN_TYPE};
+use crate::assembly::analysis_session::models::{ModelRequest, SessionSchema};
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
 use crate::semantic_validation::models::Columns;
 use crate::semantic_validation::types::Relations;
@@ -237,4 +238,45 @@ pub(crate) fn waves(producers: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
         waves.push(std::mem::replace(&mut ready, next));
     }
     (scheduled == producers.len()).then_some(waves)
+}
+
+/// Each relation with a known shape, its columns typed and with the nullability the session knows.
+pub(crate) fn session_schema(schema: &Shapes, nullability: &ShapeTable) -> SessionSchema {
+    let relations: HashMap<String, Vec<SchemaColumn>> = schema
+        .iter()
+        .filter(|(_, columns)| !columns.is_empty())
+        .map(|(relation, columns)| {
+            let typed: Vec<SchemaColumn> = typed_columns(columns, nullability.get(relation));
+            (relation.clone(), typed)
+        })
+        .collect();
+    SessionSchema { relations }
+}
+
+/// Each column with its known type and the nullability `known` spells for it.
+fn typed_columns(columns: &Pairs, known: Option<&Pairs>) -> Vec<SchemaColumn> {
+    columns
+        .iter()
+        .map(|(name, data_type)| SchemaColumn {
+            name: name.clone(),
+            quoted: false,
+            data_type: (!data_type.is_empty() && data_type != UNKNOWN_TYPE)
+                .then(|| data_type.clone()),
+            nullability: column_nullability(known, name),
+        })
+        .collect()
+}
+
+fn column_nullability(known: Option<&Pairs>, column: &str) -> Nullability {
+    let spelled: Option<&str> = known.and_then(|pairs| {
+        pairs
+            .iter()
+            .find(|(name, _)| name == column)
+            .map(|(_, value)| value.as_str())
+    });
+    match spelled {
+        Some("non_null") => Nullability::NonNull,
+        Some("nullable") => Nullability::Nullable,
+        _ => Nullability::Unknown,
+    }
 }

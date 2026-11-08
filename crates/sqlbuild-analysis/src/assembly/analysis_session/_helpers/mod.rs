@@ -6,6 +6,5 @@ pub(crate) mod dict_walk;
 pub(crate) mod dynamic_pivot;
 pub(crate) mod enrichment;
 pub(crate) mod mappings;
-pub(crate) mod native_outcome;
 pub(crate) mod query_columns;
 pub(crate) mod session;

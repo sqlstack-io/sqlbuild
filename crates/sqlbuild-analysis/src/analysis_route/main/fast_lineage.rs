@@ -5,8 +5,7 @@ use std::collections::HashMap;
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::analysis_route::main::native_gap::located;
-use crate::analysis_route::main::skipped_analysis::unreadable_reason;
+use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{
@@ -14,18 +13,17 @@ use crate::assembly::analysis_session::constants::{
     TRANSFORM_DIRECT, TRANSFORM_STAR,
 };
 use crate::assembly::analysis_session::models::{LineageRow, SessionSchema};
-use crate::lineage::_helpers::references::physical_resources;
 use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind,
 };
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 
-/// The model's lineage over `schema`'s column names, or why the dialect's parser cannot read it.
-pub(crate) fn native_model_lineage(
+/// Lineage over `schema` and the `(name, type, resource)` references, or why it is unreadable.
+pub fn fast_lineage(
     dialect: &dyn NativeDialect,
-    query_sql: &str,
-    placeholders: &[(String, String)],
+    (query_sql, placeholders): (&str, &[(String, String)]),
+    references: &[(String, String, String)],
     schema: &[LineageSchemaResource],
 ) -> FastLineageOutcome {
     let normalised: String =
@@ -34,24 +32,11 @@ pub(crate) fn native_model_lineage(
             Err(reason) => return FastLineageOutcome::Unparsed(reason),
         };
     let sql: String = placeholder_defaults(&normalised, placeholders);
-    let mut references: Vec<(String, String, String)> = Vec::new();
-    for resource in physical_resources(query_sql) {
-        if !references
-            .iter()
-            .any(|(name, _, _)| *name == resource.resource_name)
-        {
-            references.push((
-                resource.resource_name.clone(),
-                resource.resource_type.as_str().to_owned(),
-                resource.resource_name,
-            ));
-        }
-    }
     let relations: SessionSchema = names_schema(schema);
     let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
         sql: &sql,
         schema: &relations,
-        references: &references,
+        references,
         extension_functions: &[],
     });
     match analysed {

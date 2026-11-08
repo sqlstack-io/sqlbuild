@@ -99,10 +99,7 @@ fn binding_request(
     (sql.to_owned(), references, overrides)
 }
 
-/// Python's `_reported_diagnostic`: drop open-relation lookups, make parser rejections P001.
-///
-/// On a native route the analysis gate reads model hooks with the dialect's parser and gives one
-/// it cannot read P026, so Polyglot's rejection of hook SQL is never a P001 there.
+/// `_reported_diagnostic`: drop open-relation lookups; parser rejections are P001, natively P026's.
 fn reported(resource: &ResourceSql, finding: &Finding, native_hooks: bool) -> Option<Finding> {
     if finding.code != UNKNOWN_TABLE_CODE {
         return Some(finding.clone());
