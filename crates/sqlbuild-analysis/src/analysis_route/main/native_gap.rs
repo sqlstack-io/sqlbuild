@@ -22,7 +22,7 @@ pub fn native_gap(
 }
 
 /// The gap with the line and column of its offset; an offset past the end is the end.
-fn located(sql: &str, gap: ParserGap) -> LocatedGap {
+pub(crate) fn located(sql: &str, gap: ParserGap) -> LocatedGap {
     let before: &str = sql.get(..gap.offset).unwrap_or(sql);
     let position: TextPosition = text_position(sql, before.chars().count());
     LocatedGap {

@@ -45,6 +45,7 @@ pub(crate) fn deep_union_outcome_lines(
                 FastLineageModel::Parse {
                     query_sql: sql,
                     inferred_columns: Vec::new(),
+                    placeholders: Vec::new(),
                 },
             )
         })

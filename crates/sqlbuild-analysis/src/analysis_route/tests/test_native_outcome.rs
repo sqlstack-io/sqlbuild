@@ -1,8 +1,12 @@
-use crate::analysis_route::tests::test_types::{CataloguedDialect, NativeOutcomeTestCase};
+use crate::analysis_route::tests::test_types::{
+    CataloguedDialect, NativeLineageTestCase, NativeOutcomeTestCase, PivotlessDialect,
+};
 use crate::assembly::analysis_session::_helpers::mappings::ShapeTable;
 use crate::assembly::analysis_session::_helpers::native_outcome::native_outcome;
 use crate::assembly::analysis_session::models::{ModelOutcome, ModelRequest};
 use crate::assembly::analysis_session::types::Shapes;
+use crate::lineage::_helpers::native_lineage::native_model_lineage;
+use crate::lineage::models::{FastLineageOutcome, LineageResourceType, LineageSchemaResource};
 
 #[test]
 fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_follow_them() {
@@ -78,5 +82,95 @@ fn given_session_shapes_when_a_native_route_analyses_a_model_then_its_facts_foll
             "{}",
             test_case.description
         );
+    }
+}
+
+#[test]
+fn given_a_model_without_facts_when_fast_lineage_reads_it_natively_then_it_has_lineage_or_a_reason()
+{
+    let schema: Vec<LineageSchemaResource> = vec![
+        LineageSchemaResource {
+            resource_type: LineageResourceType::Model,
+            name: "orders".to_owned(),
+            columns: vec!["order_id".to_owned(), "amount".to_owned()],
+        },
+        LineageSchemaResource {
+            resource_type: LineageResourceType::Source,
+            name: "raw_payments".to_owned(),
+            columns: vec!["payment_id".to_owned()],
+        },
+    ];
+    let test_cases = [
+        NativeLineageTestCase {
+            description: "a referenced model's columns are the upstreams of direct and computed outputs",
+            sql: r#"SELECT o.order_id, o.amount * 2 AS doubled FROM __ref("orders") AS o"#,
+            placeholders: &[],
+            expected: &[
+                "order_id direct high [model:orders.order_id]",
+                "doubled expression high [model:orders.amount]",
+                "star=false",
+            ],
+        },
+        NativeLineageTestCase {
+            description: "a placeholder takes its default before the parse, and a source is a source",
+            sql: r#"SELECT payment_id FROM __source("raw_payments") WHERE payment_id > @@@min_id"#,
+            placeholders: &[("min_id", "0")],
+            expected: &[
+                "payment_id direct high [source:raw_payments.payment_id]",
+                "star=false",
+            ],
+        },
+        NativeLineageTestCase {
+            description: "a star over a relation of unknown columns is a star without outputs",
+            sql: r#"SELECT * FROM __ref("unknown_model")"#,
+            placeholders: &[],
+            expected: &["star=true"],
+        },
+        NativeLineageTestCase {
+            description: "SQL the parser cannot read gives P026's reason, located",
+            sql: "SELECT 1\nFROM t PIVOT (sum(x) FOR y IN (1))",
+            placeholders: &[],
+            expected: &["unparsed: the postgres parser cannot read PIVOT at line 2, column 8"],
+        },
+    ];
+
+    for test_case in test_cases {
+        let placeholders: Vec<(String, String)> = test_case
+            .placeholders
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect();
+        let outcome: FastLineageOutcome =
+            native_model_lineage(&PivotlessDialect, test_case.sql, &placeholders, &schema);
+        let lines: Vec<String> = match outcome {
+            FastLineageOutcome::Built { columns, has_star } => columns
+                .iter()
+                .map(|column| {
+                    let sources: Vec<String> = column
+                        .upstream_columns
+                        .iter()
+                        .map(|source| {
+                            format!(
+                                "{}:{}.{}",
+                                source.resource_type.as_str(),
+                                source.resource_name,
+                                source.column_name
+                            )
+                        })
+                        .collect();
+                    format!(
+                        "{} {} {} [{}]",
+                        column.output_column,
+                        column.transform_kind.as_str(),
+                        column.confidence.as_str(),
+                        sources.join(", ")
+                    )
+                })
+                .chain([format!("star={has_star}")])
+                .collect(),
+            FastLineageOutcome::Unparsed(reason) => vec![format!("unparsed: {reason}")],
+            other => vec![format!("{other:?}")],
+        };
+        assert_eq!(lines, test_case.expected, "{}", test_case.description);
     }
 }

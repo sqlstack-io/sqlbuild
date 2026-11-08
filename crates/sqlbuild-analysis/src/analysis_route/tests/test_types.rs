@@ -190,3 +190,10 @@ pub(super) struct NativeOutcomeTestCase {
     /// Each output column as `name type nullability`, then `succeeded star=<has>/<resolved>`.
     pub(super) expected: &'static [&'static str],
 }
+
+pub(super) struct NativeLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected: &'static [&'static str],
+}

@@ -30,6 +30,7 @@ use crate::bindings::_helpers::lineage::lineage_objects::{LineageClasses, log_li
 use crate::bindings::_helpers::lineage::project_schema::{
     fast_schema, inferred_names, rich_schema,
 };
+use crate::bindings::_helpers::project_assembly::syntax_checks::model_placeholders;
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::ErrorId;
@@ -154,8 +155,6 @@ struct FastModel<'py> {
 /// A model's lineage facts: none, Python facts, or a compiled model's native facts and edge count.
 enum FastFacts<'py> {
     Missing,
-    /// No facts, on a native route, where Polyglot never parses the model: no lineage.
-    Skipped,
     Python(Bound<'py, PyAny>),
     Native(Bound<'py, PyAny>, usize),
 }
@@ -191,19 +190,15 @@ fn fast_lineage<'py>(
             continue;
         }
         let facts: Bound<'py, PyAny> = native_field(model, "fast_lineage_columns")?;
-        if facts.is_none() && native {
-            work.push(FastModel {
-                name: native_field(model, "name")?.extract()?,
-                facts: FastFacts::Skipped,
-                has_star,
-                expands_star,
-            });
-            continue;
-        }
         if facts.is_none() {
             requests.push(FastLineageModel::Parse {
                 query_sql: native_field(model, "query_sql")?.extract()?,
                 inferred_columns: inferred_names(model)?,
+                placeholders: if native {
+                    placeholder_pairs(model)?
+                } else {
+                    Vec::new()
+                },
             });
         } else if expands_star {
             requests.push(FastLineageModel::StarExpansion {
@@ -266,7 +261,6 @@ fn fast_lineage<'py>(
                 }
                 CompactColumns::Facts(columns.unbind())
             }
-            FastFacts::Skipped => continue,
             FastFacts::Missing => {
                 match outcomes.next() {
                     Some(FastLineageOutcome::Built { columns, has_star }) => {
@@ -282,7 +276,11 @@ fn fast_lineage<'py>(
                     }
                     Some(FastLineageOutcome::Unparsed(detail)) => log_lineage_event(
                         py,
-                        "fast column lineage parse failed; falling back",
+                        if native {
+                            "fast column lineage not built: the native parser cannot read the model"
+                        } else {
+                            "fast column lineage parse failed; falling back"
+                        },
                         &model.name,
                         Some(&detail),
                     )?,
@@ -308,6 +306,17 @@ fn fast_lineage<'py>(
         ProjectColumnLineage::compacted(classes, built.as_any(), compact, model_order)?,
     )
     .map(Bound::into_any)
+}
+
+/// The model's `@@@name` placeholder defaults, which a native parser reads in their place.
+fn placeholder_pairs(model: &Bound<'_, PyAny>) -> PyResult<Vec<(String, String)>> {
+    let Some(placeholders) = model_placeholders(model)? else {
+        return Ok(Vec::new());
+    };
+    placeholders
+        .iter()
+        .map(|(name, value)| Ok((name.extract()?, value.extract()?)))
+        .collect()
 }
 
 /// The output column names of compact facts or plain column facts.
