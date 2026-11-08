@@ -605,10 +605,6 @@ def test_given_a_changed_returns_form_when_compiling_warm_then_the_cache_is_not_
     assert test_case.expected_warm_fragment in output(warm), output(warm)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="SQL macros are unavailable on these adapters until their native parser arms land",
-)
 @pytest.mark.parametrize(
     "test_case",
     [

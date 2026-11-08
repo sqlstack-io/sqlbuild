@@ -348,10 +348,7 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
         )
         == []
     )
-    assert all(
-        payload in (None, session)
-        for payload, session in zip(payload_views, session_views, strict=True)
-    )
+    assert payload_views == [None] * len(captured)
     assert (
         session_models,
         model_count - session_models,

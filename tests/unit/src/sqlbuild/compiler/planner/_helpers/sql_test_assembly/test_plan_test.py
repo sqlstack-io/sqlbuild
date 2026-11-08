@@ -1511,9 +1511,6 @@ def test_given_adapter_function_when_resolving_with_analysis_then_keeps_authored
     ],
     ids=lambda case: case.description,
 )
-@pytest.mark.xfail(
-    strict=True, reason="SQL tests are unavailable on SQL Server until its native parser arm lands"
-)
 def test_given_tsql_shared_cte_name_when_planning_then_helper_and_model_cte_stay_distinct(
     test_case: PlanTestChainTestCase,
 ) -> None:
@@ -1557,9 +1554,6 @@ def test_given_tsql_shared_cte_name_when_planning_then_helper_and_model_cte_stay
         ),
     ],
     ids=lambda case: case.description,
-)
-@pytest.mark.xfail(
-    strict=True, reason="SQL tests are unavailable on SQL Server until its native parser arm lands"
 )
 def test_given_unflattened_with_when_building_assertion_ctes_then_raises_clear_error(
     test_case: AssertionChainCteErrorTestCase,
