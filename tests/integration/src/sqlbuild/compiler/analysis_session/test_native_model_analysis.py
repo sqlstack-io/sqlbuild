@@ -15,11 +15,19 @@ from sqlbuild._native import (
     assemble_project,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
+from sqlbuild.adapters.bigquery.classes.bigquery_adapter import BigQueryAdapter
+from sqlbuild.adapters.clickhouse.classes.clickhouse_adapter import ClickHouseAdapter
+from sqlbuild.adapters.databricks.classes.databricks_adapter import DatabricksAdapter
 from sqlbuild.adapters.duckdb.classes.duckdb_adapter import DuckDbAdapter
+from sqlbuild.adapters.motherduck.classes.motherduck_adapter import MotherDuckAdapter
+from sqlbuild.adapters.postgres.classes.postgres_adapter import PostgresAdapter
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
+from sqlbuild.adapters.sqlite.classes.sqlite_adapter import SqliteAdapter
+from sqlbuild.adapters.sqlserver.classes.sqlserver_adapter import SqlServerAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.analysis_session._test_types import (
     AdapterRuleCallbackTestCase,
+    AdapterWaveTestCase,
     CyclicAnalysisTestCase,
     CyclicCompileTestCase,
     GeneratedAnalysisTestCase,
@@ -256,6 +264,80 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     assert runs.proven_pivots >= test_case.expected_minimum_proven_pivots
     assert runs.native_enrichments >= test_case.expected_minimum_native_enrichments
     assert runs.native_column_values > 0
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AdapterWaveTestCase(
+            description="BigQueryAdapter",
+            profile=BigQueryAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="ClickHouseAdapter",
+            profile=ClickHouseAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="DatabricksAdapter",
+            profile=DatabricksAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="DuckDbAdapter",
+            profile=DuckDbAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="MotherDuckAdapter",
+            profile=MotherDuckAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="PostgresAdapter",
+            profile=PostgresAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SnowflakeAdapter",
+            profile=SnowflakeAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SqliteAdapter",
+            profile=SqliteAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+        AdapterWaveTestCase(
+            description="SqlServerAdapter",
+            profile=SqlServerAdapter().expression_inference_profile(),
+            expected_shared=0,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_shipped_adapter_when_analysing_equal_queries_then_its_session_wave_is_native(
+    test_case: AdapterWaveTestCase, tmp_path: Path
+) -> None:
+    runs: NativeAnalysisRuns = NativeAnalysisRuns()
+    analyse_natively(
+        inputs=compile_inputs(
+            project_dir=tmp_path / "project",
+            files=shared_analysis_files(regions=("east", "west"), inexact_regions=()),
+            dialect=test_case.profile.sql_analysis_dialect,
+        ),
+        inference_profile=test_case.profile,
+        lineage_mode=ColumnLineageMode.FAST,
+        runs=runs,
+        cache_root=tmp_path / "cache",
+    )
+
+    assert runs.analysed_models > 0
+    assert (
+        sum(session.sharing[0] for session in runs.sessions),
+        runs.native_enrichments,
+    ) == (test_case.expected_shared, 0)
 
 
 @pytest.mark.parametrize(

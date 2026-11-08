@@ -51,6 +51,15 @@ class SourceTypesTestCase:
 
 
 @dataclass(frozen=True)
+class AdapterWaveTestCase:
+    """A shipped adapter's own profile, whose session must analyse each model natively."""
+
+    description: str
+    profile: ExpressionInferenceProfile
+    expected_shared: int
+
+
+@dataclass(frozen=True)
 class CyclicCompileTestCase:
     """A project whose models `ref` each other, compiled through the CLI."""
 
