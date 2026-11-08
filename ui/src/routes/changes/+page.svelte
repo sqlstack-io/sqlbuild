@@ -111,10 +111,12 @@
 				{#if c.roles.length}
 					<section>
 						<h3>Roles <span>{c.roles.length}</span></h3>
-						{#each c.roles as r (r.role)}
+						{#each c.roles as r, i (`${i}:${r.role}`)}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[r.op]}>{changeOpLabel[r.op]}</span>
-								<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
+								{#if !r.role}<span class="faint" title="Only people who can give roles see which role changed">a role</span>
+								{:else if app.client.supports('getRole')}<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
+								{:else}<code>{r.role}</code>{/if}
 								<span class="detail">
 									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
 								</span>
