@@ -4,7 +4,6 @@ use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDiale
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
-// Validation only: the arms' own pull requests bring these modules.
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (DUCKDB_DIALECT, &DuckDbDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),

@@ -39,8 +39,7 @@ impl NativeDialect for SnowflakeDialect {
     }
 }
 
-/// Every statement the shared parser reads from `sql` in `dialect`, or its first refusal; it
-/// cannot tell invalid syntax from an unsupported construct, so no refusal is marked syntax.
+/// Every statement the shared parser reads from `sql` in `dialect`, or its first refusal, never marked syntax.
 pub(crate) fn shared_parsed(sql: &str, dialect: Dialect) -> Result<Parsed, ParserGap> {
     let statements: Vec<Expression> = parse_strict(sql, dialect, &ParseOptions::default())
         .map_err(|failure| match failure {
