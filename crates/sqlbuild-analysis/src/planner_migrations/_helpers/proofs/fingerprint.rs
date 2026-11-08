@@ -1,11 +1,14 @@
 //! Normalize migration metadata and SQL without changing the persisted format.
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::planner_changes::main::version_identity_payload::version_identity_payload;
 use crate::planner_changes::models::IdentityPayload;
 use crate::planner_migrations::_helpers::proofs::ast::strip_formatting;
+use crate::planner_migrations::_helpers::proofs::encoding::encode;
 use crate::planner_migrations::_helpers::proofs::local_names::{local_names, rewrite, unambiguous};
 use crate::planner_migrations::_helpers::proofs::parse::parse;
-use crate::planner_migrations::constants::{EXCLUDED_CONFIG, REF_MARKER};
+use crate::planner_migrations::constants::{EXCLUDED_CONFIG, NATIVE_TREE_PREFIX, REF_MARKER};
 use polyglot_sql::{Expression, dialects::Dialect};
 use regex::Regex;
 use serde_json::Value;
@@ -74,6 +77,9 @@ pub(crate) fn normalized(
         }
     }
     rewrite(&mut parsed, &names, &ctes);
+    if let AnalysisRoute::Native(_) = analysis_route(Some(dialect)) {
+        return encode(&parsed).map(|tree| Some(format!("{NATIVE_TREE_PREFIX}{tree}")));
+    }
     let expression: Expression =
         serde_json::from_value(parsed).map_err(|error| error.to_string())?;
     Dialect::get_by_name(dialect)

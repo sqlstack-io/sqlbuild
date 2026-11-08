@@ -84,7 +84,7 @@ impl CappedWatermarkInput {
     }
 }
 
-/// A warehouse type Polyglot could not parse, which classifies as no cursor type.
+/// A warehouse type the parser could not read, which classifies as no cursor type.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TypeParseFailure {
     pub normalized_type: String,

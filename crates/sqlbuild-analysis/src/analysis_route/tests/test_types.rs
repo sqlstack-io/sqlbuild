@@ -1,5 +1,7 @@
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
+use sqlquack_syntax::expressions::names::models::Null;
+use sqlquack_syntax::{Expression, Parsed};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -31,7 +33,7 @@ impl NativeDialect for PivotlessDialect {
         "postgres"
     }
 
-    fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
         let refused = ["PIVOT", "@@@", "__sqlbuild_udf_", "__cursor_", "@'"]
             .iter()
             .filter_map(|word| sql.find(word).map(|offset| (offset, *word)))
@@ -41,7 +43,10 @@ impl NativeDialect for PivotlessDialect {
                 construct: word.to_owned(),
                 offset,
             }),
-            None => Ok(()),
+            None => Ok(Parsed {
+                statements: vec![Expression::Null(Null)],
+                gaps: Vec::new(),
+            }),
         }
     }
 
