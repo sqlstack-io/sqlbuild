@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 import sqlbuild._native as native_module
 from sqlbuild._native import (
     CompilerDiagnostic,
+    NativeCompilerError,
     project_with,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
@@ -268,7 +269,7 @@ def payload_completion_view(inputs: SemanticInputs) -> tuple[object, ...] | None
 
     try:
         completed: CompiledProjectView = completed_natively(without_session(inputs))
-    except ValueError as error:
+    except NativeCompilerError as error:
         assert _NATIVE_SESSION_REQUIRED in str(error)
         return None
     return completion_view(completed)
