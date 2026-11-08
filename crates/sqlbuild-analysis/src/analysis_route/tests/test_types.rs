@@ -1,6 +1,6 @@
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
-use crate::type_system::models::TypeFamily;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct ArmGapTestCase {
     pub(super) dialect: &'static dyn NativeDialect,
@@ -70,7 +70,7 @@ pub(super) struct TypeMatchTestCase {
 pub(super) struct TypeSpellingTestCase {
     pub(super) description: &'static str,
     pub(super) dialect: &'static str,
-    pub(super) normalize: fn(&str) -> Option<String>,
+    pub(super) normalize: fn(&str) -> Option<NormalizedType>,
     pub(super) spelling: &'static str,
     pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }

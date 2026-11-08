@@ -1,12 +1,9 @@
 use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDialect};
 use crate::analysis_route::tests::test_types::TypeSpellingTestCase;
-use crate::type_system::_helpers::dialects::coerce_type_dialect;
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
 use crate::type_system::models::{NormalizedType, TypeFamily};
 
 #[test]
-fn given_a_type_spelling_when_a_dialect_normalises_it_then_the_fallback_gives_polyglots_type_or_none()
- {
+fn given_a_type_spelling_when_a_dialect_normalises_it_then_it_is_polyglots_type_or_none() {
     let test_cases = [
         TypeSpellingTestCase {
             description: "a DuckDB integer keeps Polyglot's INT",
@@ -248,12 +245,8 @@ fn given_a_type_spelling_when_a_dialect_normalises_it_then_the_fallback_gives_po
         },
     ];
     for test_case in test_cases {
-        let found: Option<(String, TypeFamily)> =
-            (test_case.normalize)(test_case.spelling).map(|respelt| {
-                let normalized: NormalizedType =
-                    normalize_with_fallback(&respelt, coerce_type_dialect(test_case.dialect));
-                (normalized.normalized_name, normalized.family)
-            });
+        let found: Option<(String, TypeFamily)> = (test_case.normalize)(test_case.spelling)
+            .map(|normalized: NormalizedType| (normalized.normalized_name, normalized.family));
         assert_eq!(
             found,
             test_case
