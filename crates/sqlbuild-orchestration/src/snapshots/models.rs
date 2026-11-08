@@ -139,7 +139,7 @@ pub struct PublishedSnapshot {
     pub changes: Vec<PublishedChange>,
 }
 
-/// A changed subject, such as `model:orders` or `role:analyst`, without its content hashes.
+/// A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PublishedChange {
     pub change_kind: String,

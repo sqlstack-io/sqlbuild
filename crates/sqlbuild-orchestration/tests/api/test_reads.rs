@@ -1,6 +1,8 @@
 //! Real HTTP reads keep both location and target scope, including guessed nested resource IDs.
 
+use crate::authorization::main::assign_builtin_role::assign_builtin_role;
 use crate::authorization::main::bootstrap_user::bootstrap_user;
+use crate::credentials::main::identities::create_principal::create_principal;
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
 use crate::snapshots::main::list_person_snapshots::list_person_snapshots;
 use std::collections::BTreeMap;
@@ -8,7 +10,9 @@ use std::time::Duration;
 
 use crate::credentials::main::tokens::issue_token::issue_token;
 use crate::credentials::main::tokens::revoke_token::revoke_token;
-use crate::credentials::models::{AuditContext, CredentialScope, DefaultRole};
+use crate::credentials::models::{
+    AuditContext, BuiltinRole, CredentialScope, DefaultRole, RoleAssignmentRequest,
+};
 use crate::declarations::main::change_trigger::change_trigger;
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
@@ -332,6 +336,11 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             extra.generation += 1;
             extra.nodes.remove("products");
             extra.git_dirty = !input.git_dirty;
+            extra.documents.insert(
+                "roles".into(),
+                json!({"order_support": {"description": "Answer order questions", "grants": [{"nodes": ["tag:orders"],
+                    "permissions": ["view"], "resolved_nodes": {"tag:orders": ["orders"]}}]}}),
+            );
             publish_snapshot(store, &extra)
                 .await
                 .expect("second publication");
@@ -351,8 +360,41 @@ fn given_published_locations_and_scheduled_work_when_read_through_http_then_reso
             );
             assert_eq!(
                 json!(history[0].changes),
-                json!([{"change_kind": "removed", "subject_key": "products"}]),
-                "only the subjects that changed"
+                json!([{"change_kind": "removed", "subject_key": "products"},
+                    {"change_kind": "added", "subject_key": "role:order_support"}]),
+                "only the subjects that changed; a role assigner sees the role's name"
+            );
+            let viewer = create_principal(store, &audit, "orders-viewer")
+                .await
+                .expect("viewer");
+            assign_builtin_role(
+                store,
+                (&audit, administrator),
+                &RoleAssignmentRequest {
+                    principal_id: viewer,
+                    role: BuiltinRole::Viewer.into(),
+                    location_id: Some(location_id),
+                    target: Some("development".into()),
+                    revoke: false,
+                },
+            )
+            .await
+            .expect("viewer role");
+            assert_eq!(
+                json!(
+                    list_person_snapshots(
+                        store,
+                        (&audit, viewer),
+                        ((location_id, "development"), 1),
+                        DefaultRole::None,
+                    )
+                    .await
+                    .expect("viewer snapshots")[0]
+                        .changes
+                ),
+                json!([{"change_kind": "removed", "subject_key": "products"},
+                    {"change_kind": "added", "subject_key": "role:"}]),
+                "a viewer sees that a role changed, not which"
             );
             assert!(!history[1].changes.is_empty());
             assert_eq!(

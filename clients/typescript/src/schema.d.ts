@@ -1640,7 +1640,7 @@ export interface components {
              */
             scheduler_lease_expires_at?: string | null;
         };
-        /** @description A changed subject, such as `model:orders` or `role:analyst`, without its content hashes. */
+        /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
             subject_key: string;

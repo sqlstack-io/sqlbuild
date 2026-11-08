@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
+use crate::authorization::main::person_assigns_roles::person_assigns_roles;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::snapshots::models::{PublishedChange, PublishedSnapshot};
 use crate::store::errors::ControlError;
@@ -13,7 +14,7 @@ use crate::store::main::{begin::begin, commit::commit, decode_row::decode_row, q
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
 use crate::store::types::Row;
 
-/// Newest first, at most `limit` (capped at 100) publications with their changes.
+/// Newest first, at most 100 publications; changed roles are named only for people who assign roles.
 pub async fn list_person_snapshots(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
@@ -41,14 +42,16 @@ pub async fn list_person_snapshots(
          WHERE c.snapshot_id IN (SELECT s.snapshot_id FROM sqb_snapshots s WHERE s.location_id=$1 AND s.target=$2 \
            ORDER BY s.generation DESC LIMIT $3) ORDER BY c.snapshot_id, c.change_seq",
         scope).await?;
+    let (transaction, names_roles) = person_assigns_roles(transaction, credentials).await?;
     commit(transaction).await?;
     let mut changes: BTreeMap<Uuid, Vec<PublishedChange>> = BTreeMap::new();
     for row in changed {
         let snapshot_id = id_of(&row)?;
-        changes
-            .entry(snapshot_id)
-            .or_default()
-            .push(decode_row(row)?);
+        let mut change: PublishedChange = decode_row(row)?;
+        if !names_roles && change.subject_key.starts_with("role:") {
+            change.subject_key = "role:".into();
+        }
+        changes.entry(snapshot_id).or_default().push(change);
     }
     published
         .into_iter()
