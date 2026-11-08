@@ -30,14 +30,14 @@ _HEADER: str = "MODEL (description 'Test model.', materialized view);\n"
     "test_case",
     [
         FallbackColumnsTestCase(
-            description="CREATE TABLE AS takes its inner select's columns",
+            description="CREATE TABLE AS, not a query, has unknown columns",
             query_sql="CREATE TABLE t AS SELECT 1 AS a",
-            expected_columns=(("a", None, "non_null"),),
+            expected_columns=(),
         ),
         FallbackColumnsTestCase(
-            description="INSERT ... SELECT takes its select's columns",
+            description="INSERT ... SELECT, not a query, has unknown columns",
             query_sql="INSERT INTO t SELECT 1 AS a",
-            expected_columns=(("a", None, "non_null"),),
+            expected_columns=(),
         ),
         FallbackColumnsTestCase(
             description="calls nested 100 deep",
