@@ -10,6 +10,7 @@ use reqwest::StatusCode;
 use uuid::Uuid;
 
 use crate::api::constants::BODY_BYTES;
+use crate::api::errors::ClientError;
 use crate::api::tests::helpers::{
     gzip_bomb, gzipped_empty_object, large_snapshot, not_gzip, oversized_json, start_api, stop_api,
 };
@@ -123,6 +124,15 @@ fn given_encoded_snapshot_bodies_when_publishing_then_gzip_is_bounded_after_auth
             .await
             .expect("publish a 10k-node snapshot");
         assert_eq!(published.generation, 1);
+        let invalid = SnapshotInput {
+            generation: 0,
+            ..input
+        };
+        let refused = publish_remote_snapshot(&api.url, &token.bearer, &invalid).await;
+        assert!(
+            matches!(refused, Err(ClientError::Rejected(StatusCode::BAD_REQUEST))),
+            "a snapshot too large to resend plain reports the server's own 400, got {refused:?}"
+        );
         let current: serde_json::Value = client
             .get(&path)
             .bearer_auth(&token.bearer)
