@@ -154,6 +154,7 @@ const R_COMPILE_ADAPTER_CONTEXT: RecordSpec = RecordSpec {
         FieldSpec::required("collection_rendering"),
         FieldSpec::required("python_functions_inherit_default_namespace"),
         FieldSpec::required("sql_lexical_syntax"),
+        FieldSpec::new("sql_analysis_dialect", FieldDefault::None),
     ],
 };
 const R_INVALID_SQL_REFERENCE_CALL: RecordSpec = RecordSpec {
@@ -1346,6 +1347,7 @@ const R_MODEL_INPUT_BUILD_CONTEXT: RecordSpec = RecordSpec {
         FieldSpec::new("public_constants", FieldDefault::EmptyDict),
         FieldSpec::new("public_model_schemas", FieldDefault::EmptyDict),
         FieldSpec::new("declaration_resolver", FieldDefault::None),
+        FieldSpec::new("sql_analysis_dialect", FieldDefault::None),
     ],
 };
 const R_COMPILE_SQL_REFERENCE: RecordSpec = RecordSpec {

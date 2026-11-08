@@ -919,6 +919,8 @@ pub struct ModelRow {
     pub constant_declarations: Vec<Declaration>,
     /// Each expression SQL macro call in `query_sql`, by byte range.
     pub typed_calls: Vec<TypedCall>,
+    /// Whether analysis was skipped because the dialect's native parser cannot read the model.
+    pub sql_analysis_skipped: bool,
 }
 
 /// A model's declared schema entry.

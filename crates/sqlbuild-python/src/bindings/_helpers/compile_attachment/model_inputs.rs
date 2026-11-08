@@ -282,6 +282,7 @@ pub(crate) fn build_model_inputs<'py>(
                         .extract()?,
                 },
                 project_config_path.str()?.extract()?,
+                native_field(context, "sql_analysis_dialect")?.extract()?,
             ),
         )
         .and_then(|value| pyo3::Bound::new(py, value))

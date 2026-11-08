@@ -168,7 +168,7 @@ def is_normalized(outcome: TypeOutcome) -> bool:
 
 
 def logged_parse_error(outcome: TypeOutcome) -> bool:
-    """Return whether a Polyglot parse failure was logged for this type."""
+    """Return whether a type parse failure was logged for this type."""
 
     return bool(outcome.logged_errors)
 

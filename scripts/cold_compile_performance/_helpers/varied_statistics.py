@@ -8,8 +8,7 @@ from scripts.cold_compile_performance.constants import (
     VARIED_WINDOW_NODE_FRAGMENT,
 )
 from scripts.cold_compile_performance.models import VariedProjectStatistics
-from sqlbuild._native import CompiledResourceType
-from sqlbuild.compiler.sql_analysis.main.import_polyglot_sql import import_polyglot_sql
+from sqlbuild._native import CompiledResourceType, SqlDocument
 
 _UDF_REFERENCE: re.Pattern[str] = re.compile(r'__udf\("([a-zA-Z0-9_]+)"\)')
 
@@ -30,8 +29,8 @@ def varied_project_statistics(payload: dict[str, object]) -> VariedProjectStatis
     window_models: int = 0
     for model in models:
         query_sql: str = _UDF_REFERENCE.sub(r"\1", model["query_sql"])
-        expression: Any = import_polyglot_sql().parse_one(query_sql, dialect="snowflake")
-        shape: tuple[str, ...] = tuple(str(node.key) for node in expression.walk())
+        document: SqlDocument = SqlDocument(source=query_sql, dialect="snowflake")
+        shape: tuple[str, ...] = tuple(node.kind for node in document.ast().walk())
         shapes.add(shape)
         array_models += int(any(key in VARIED_ARRAY_NODE_KEYS for key in shape))
         window_models += int(any(VARIED_WINDOW_NODE_FRAGMENT in key for key in shape))

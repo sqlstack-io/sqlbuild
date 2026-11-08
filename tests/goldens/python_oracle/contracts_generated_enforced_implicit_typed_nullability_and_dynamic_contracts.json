@@ -426,7 +426,7 @@
 "bigquery": "0fb1be349cccda275d77113d",
 "databricks": "0fb1be349cccda275d77113d",
 "duckdb": "0fb1be349cccda275d77113d",
-"postgres": "0fb1be349cccda275d77113d",
+"postgres": "a281bca2dfa9d33402e687f3",
 "snowflake": "0fb1be349cccda275d77113d",
 "tsql": "0fb1be349cccda275d77113d"
 }
@@ -594,7 +594,7 @@
 "bigquery": "6e5f3057275c88687658bb88",
 "databricks": "6e5f3057275c88687658bb88",
 "duckdb": "6e5f3057275c88687658bb88",
-"postgres": "6e5f3057275c88687658bb88",
+"postgres": "2a42e291118d5fa419ada6b8",
 "snowflake": "6e5f3057275c88687658bb88",
 "tsql": "6e5f3057275c88687658bb88"
 }

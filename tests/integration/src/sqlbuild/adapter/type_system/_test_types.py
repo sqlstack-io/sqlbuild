@@ -33,7 +33,7 @@ class TypeNormalizationTestCase:
 
 @dataclass(frozen=True)
 class UnknownDialectTypeTestCase:
-    """A dialect Polyglot does not know, and the error Python's wheel raised for it."""
+    """A dialect SQLBuild has no type rules for, and the error normalization raises for it."""
 
     description: str
     dialect: str

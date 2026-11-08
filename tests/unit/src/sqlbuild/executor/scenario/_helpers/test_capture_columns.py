@@ -3,9 +3,11 @@ from __future__ import annotations
 import duckdb
 import pytest
 
+from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.scenario._helpers.capture.columns import local_type_for_warehouse_type
 from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
     ScenarioSnapshotLocalTypeMappingTestCase,
+    ScenarioSnapshotLocalTypeRefusalTestCase,
 )
 
 
@@ -157,10 +159,10 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             expected_local_type="JSON",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="snowflake variant remains variant",
+            description="snowflake variant is held as json as sqlquack converts it",
             sql_analysis_dialect="snowflake",
             warehouse_type="VARIANT",
-            expected_local_type="VARIANT",
+            expected_local_type="JSON",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="snowflake geography falls back to varchar",
@@ -187,10 +189,10 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             expected_local_type="BIGINT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="bigquery integer maps to int",
+            description="bigquery integer is int64 and maps to bigint",
             sql_analysis_dialect="bigquery",
             warehouse_type="INTEGER",
-            expected_local_type="INT",
+            expected_local_type="BIGINT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="bigquery boolean maps to boolean",
@@ -502,7 +504,7 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             description="databricks map maps to duckdb map type",
             sql_analysis_dialect="databricks",
             warehouse_type="MAP<STRING, INT>",
-            expected_local_type="MAP(TEXT, INT)",
+            expected_local_type="MAP(VARCHAR, INT)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks tinyint maps to tinyint",
@@ -514,19 +516,19 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             description="databricks decimal precision and scale are preserved",
             sql_analysis_dialect="databricks",
             warehouse_type="DECIMAL(10,2)",
-            expected_local_type="DECIMAL(10, 2)",
+            expected_local_type="DECIMAL(10,2)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="databricks string maps to text",
+            description="databricks string maps to varchar",
             sql_analysis_dialect="databricks",
             warehouse_type="STRING",
-            expected_local_type="TEXT",
+            expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="databricks varchar length maps to text length",
+            description="databricks varchar length maps to varchar",
             sql_analysis_dialect="databricks",
             warehouse_type="VARCHAR(20)",
-            expected_local_type="TEXT(20)",
+            expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks timestamp maps to timestamptz",
@@ -568,7 +570,73 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             description="databricks nested map of arrays maps to duckdb map",
             sql_analysis_dialect="databricks",
             warehouse_type="MAP<STRING, ARRAY<INT>>",
-            expected_local_type="MAP(TEXT, INT[])",
+            expected_local_type="MAP(VARCHAR, INT[])",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="databricks struct nests lists, maps and quoted field names",
+            sql_analysis_dialect="databricks",
+            warehouse_type="STRUCT<a: ARRAY<MAP<STRING, BIGINT>>, `b c`: TINYINT>",
+            expected_local_type='STRUCT(a MAP(VARCHAR, BIGINT)[], "b c" TINYINT)',
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server datetime2 is a timestamp",
+            sql_analysis_dialect="tsql",
+            warehouse_type="datetime2",
+            expected_local_type="TIMESTAMP",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server smalldatetime is a timestamp",
+            sql_analysis_dialect="tsql",
+            warehouse_type="smalldatetime",
+            expected_local_type="TIMESTAMP",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server datetimeoffset is a timestamp with time zone",
+            sql_analysis_dialect="tsql",
+            warehouse_type="datetimeoffset",
+            expected_local_type="TIMESTAMPTZ",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server uniqueidentifier is a uuid",
+            sql_analysis_dialect="tsql",
+            warehouse_type="uniqueidentifier",
+            expected_local_type="UUID",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server bit is a boolean",
+            sql_analysis_dialect="tsql",
+            warehouse_type="bit",
+            expected_local_type="BOOLEAN",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server float is eight bytes",
+            sql_analysis_dialect="tsql",
+            warehouse_type="float",
+            expected_local_type="DOUBLE",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server real is four bytes",
+            sql_analysis_dialect="tsql",
+            warehouse_type="real",
+            expected_local_type="FLOAT",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server money is an exact four-place decimal",
+            sql_analysis_dialect="tsql",
+            warehouse_type="money",
+            expected_local_type="DECIMAL(19,4)",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="databricks float keeps four bytes, nested too",
+            sql_analysis_dialect="databricks",
+            warehouse_type="ARRAY<FLOAT>",
+            expected_local_type="FLOAT[]",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="generic float keeps four bytes",
+            sql_analysis_dialect="generic",
+            warehouse_type="FLOAT",
+            expected_local_type="FLOAT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks interval year is preserved",
@@ -619,16 +687,16 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb struct is preserved with normalized inner type",
+            description="duckdb struct passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="STRUCT(a INTEGER)",
-            expected_local_type="STRUCT(a INT)",
+            expected_local_type="STRUCT(a INTEGER)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb union is preserved with normalized inner types",
+            description="duckdb union passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="UNION(num INTEGER, str VARCHAR)",
-            expected_local_type="UNION(num INT, str TEXT)",
+            expected_local_type="UNION(num INTEGER, str VARCHAR)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="duckdb list angle syntax maps to bracket list syntax",
@@ -643,10 +711,10 @@ from tests.unit.src.sqlbuild.executor.scenario._helpers._test_types import (
             expected_local_type="ENUM('a', 'b')",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb time with timezone maps to timetz",
+            description="duckdb time with time zone passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="TIME WITH TIME ZONE",
-            expected_local_type="TIMETZ",
+            expected_local_type="TIME WITH TIME ZONE",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="unknown type falls back to varchar",
@@ -855,10 +923,10 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             expected_local_type="JSON",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="snowflake variant remains variant",
+            description="snowflake variant is held as json as sqlquack converts it",
             sql_analysis_dialect="snowflake",
             warehouse_type="VARIANT",
-            expected_local_type="VARIANT",
+            expected_local_type="JSON",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="snowflake geography falls back to varchar",
@@ -885,10 +953,10 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             expected_local_type="BIGINT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="bigquery integer maps to int",
+            description="bigquery integer is int64 and maps to bigint",
             sql_analysis_dialect="bigquery",
             warehouse_type="INTEGER",
-            expected_local_type="INT",
+            expected_local_type="BIGINT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="bigquery boolean maps to boolean",
@@ -1200,7 +1268,7 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             description="databricks map maps to duckdb map type",
             sql_analysis_dialect="databricks",
             warehouse_type="MAP<STRING, INT>",
-            expected_local_type="MAP(TEXT, INT)",
+            expected_local_type="MAP(VARCHAR, INT)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks tinyint maps to tinyint",
@@ -1212,19 +1280,19 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             description="databricks decimal precision and scale are preserved",
             sql_analysis_dialect="databricks",
             warehouse_type="DECIMAL(10,2)",
-            expected_local_type="DECIMAL(10, 2)",
+            expected_local_type="DECIMAL(10,2)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="databricks string maps to text",
+            description="databricks string maps to varchar",
             sql_analysis_dialect="databricks",
             warehouse_type="STRING",
-            expected_local_type="TEXT",
+            expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="databricks varchar length maps to text length",
+            description="databricks varchar length maps to varchar",
             sql_analysis_dialect="databricks",
             warehouse_type="VARCHAR(20)",
-            expected_local_type="TEXT(20)",
+            expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks timestamp maps to timestamptz",
@@ -1266,7 +1334,73 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             description="databricks nested map of arrays maps to duckdb map",
             sql_analysis_dialect="databricks",
             warehouse_type="MAP<STRING, ARRAY<INT>>",
-            expected_local_type="MAP(TEXT, INT[])",
+            expected_local_type="MAP(VARCHAR, INT[])",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="databricks struct nests lists, maps and quoted field names",
+            sql_analysis_dialect="databricks",
+            warehouse_type="STRUCT<a: ARRAY<MAP<STRING, BIGINT>>, `b c`: TINYINT>",
+            expected_local_type='STRUCT(a MAP(VARCHAR, BIGINT)[], "b c" TINYINT)',
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server datetime2 is a timestamp",
+            sql_analysis_dialect="tsql",
+            warehouse_type="datetime2",
+            expected_local_type="TIMESTAMP",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server smalldatetime is a timestamp",
+            sql_analysis_dialect="tsql",
+            warehouse_type="smalldatetime",
+            expected_local_type="TIMESTAMP",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server datetimeoffset is a timestamp with time zone",
+            sql_analysis_dialect="tsql",
+            warehouse_type="datetimeoffset",
+            expected_local_type="TIMESTAMPTZ",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server uniqueidentifier is a uuid",
+            sql_analysis_dialect="tsql",
+            warehouse_type="uniqueidentifier",
+            expected_local_type="UUID",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server bit is a boolean",
+            sql_analysis_dialect="tsql",
+            warehouse_type="bit",
+            expected_local_type="BOOLEAN",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server float is eight bytes",
+            sql_analysis_dialect="tsql",
+            warehouse_type="float",
+            expected_local_type="DOUBLE",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server real is four bytes",
+            sql_analysis_dialect="tsql",
+            warehouse_type="real",
+            expected_local_type="FLOAT",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="sql server money is an exact four-place decimal",
+            sql_analysis_dialect="tsql",
+            warehouse_type="money",
+            expected_local_type="DECIMAL(19,4)",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="databricks float keeps four bytes, nested too",
+            sql_analysis_dialect="databricks",
+            warehouse_type="ARRAY<FLOAT>",
+            expected_local_type="FLOAT[]",
+        ),
+        ScenarioSnapshotLocalTypeMappingTestCase(
+            description="generic float keeps four bytes",
+            sql_analysis_dialect="generic",
+            warehouse_type="FLOAT",
+            expected_local_type="FLOAT",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="databricks interval year is preserved",
@@ -1317,16 +1451,16 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             expected_local_type="VARCHAR",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb struct is preserved with normalized inner type",
+            description="duckdb struct passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="STRUCT(a INTEGER)",
-            expected_local_type="STRUCT(a INT)",
+            expected_local_type="STRUCT(a INTEGER)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb union is preserved with normalized inner types",
+            description="duckdb union passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="UNION(num INTEGER, str VARCHAR)",
-            expected_local_type="UNION(num INT, str TEXT)",
+            expected_local_type="UNION(num INTEGER, str VARCHAR)",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="duckdb list angle syntax maps to bracket list syntax",
@@ -1341,10 +1475,10 @@ def test_given_warehouse_type_when_mapping_to_local_type_then_returns_expected_d
             expected_local_type="ENUM('a', 'b')",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
-            description="duckdb time with timezone maps to timetz",
+            description="duckdb time with time zone passes through unchanged",
             sql_analysis_dialect="duckdb",
             warehouse_type="TIME WITH TIME ZONE",
-            expected_local_type="TIMETZ",
+            expected_local_type="TIME WITH TIME ZONE",
         ),
         ScenarioSnapshotLocalTypeMappingTestCase(
             description="unknown type falls back to varchar",
@@ -1405,3 +1539,33 @@ def test_given_mapped_local_type_when_creating_duckdb_table_then_type_is_accepte
 
     assert local_type == test_case.expected_local_type
     connection.execute(f'CREATE TABLE local_type_probe ("value" {local_type})')
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ScenarioSnapshotLocalTypeRefusalTestCase(
+            description="databricks array of an unmapped element type is refused",
+            sql_analysis_dialect="databricks",
+            warehouse_type="ARRAY<GEOGRAPHY>",
+            expected_message="SQLBuild cannot map 'GEOGRAPHY' inside it",
+        ),
+        ScenarioSnapshotLocalTypeRefusalTestCase(
+            description="databricks map missing its value type is refused",
+            sql_analysis_dialect="databricks",
+            warehouse_type="MAP<STRING>",
+            expected_message="SQLBuild cannot map 'MAP<STRING>' inside it",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_unmapped_nested_type_when_mapping_to_local_type_then_it_is_refused(
+    test_case: ScenarioSnapshotLocalTypeRefusalTestCase,
+) -> None:
+    with pytest.raises(ExecutorInputError) as raised:
+        local_type_for_warehouse_type(
+            warehouse_type=test_case.warehouse_type,
+            sql_analysis_dialect=test_case.sql_analysis_dialect,
+        )
+
+    assert test_case.expected_message in raised.value.message

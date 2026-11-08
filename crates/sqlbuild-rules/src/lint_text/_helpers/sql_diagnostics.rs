@@ -1,6 +1,7 @@
 //! Native SQL lint responses mapped back onto authored source through expansion passes.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -10,7 +11,8 @@ use crate::lint_text::_helpers::sites::backtick_identifiers;
 use crate::lint_text::_helpers::sites::{byte_offset, compiled, lint_policy, site_end};
 use crate::lint_text::constants::{
     GENERATED_FIX, GENERATED_SQL_SUFFIX, HARNESS_CTE_PREFIXES, INVALID_DIAGNOSTIC,
-    INVALID_FIX_EDIT, INVALID_FIX_OBJECT, INVALID_FIX_REASON, LINT_API_VERSION, LONG_LITERAL_CODE,
+    INVALID_FIX_EDIT, INVALID_FIX_OBJECT, INVALID_FIX_REASON, INVALID_UNAVAILABLE,
+    LINT_API_VERSION, LINT_UNAVAILABLE_CODE, LINT_UNAVAILABLE_REMEDIATION, LONG_LITERAL_CODE,
     MACRO_MIXED_QUALIFICATION_REMEDIATION, MISSING_DIAGNOSTICS, MIXED_QUALIFICATION_CODE,
     NATIVE_LINT_ERROR_CODE, NON_CONTIGUOUS_FIX, NON_OBJECT_RESPONSE, NOT_AN_OBJECT,
     PARSE_ERROR_POSITION_PATTERN, PARSE_FAILURE_PREFIX, PARSE_FAILURE_REMEDIATION,
@@ -109,8 +111,15 @@ pub(crate) fn map_offset(offset: i64, passes: &[Vec<ExpansionSpan>]) -> (i64, bo
     (current, generated)
 }
 
-/// The diagnostics list of one engine response, or the error it reports.
-pub(crate) fn response_diagnostics(response: &Value) -> Result<Vec<Value>, String> {
+/// The diagnostics list of one engine response, or why its dialect could not be linted.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum LintResult {
+    Diagnostics(Vec<Value>),
+    Unavailable(String),
+}
+
+/// The result of one engine response, or the error it reports.
+pub(crate) fn response_diagnostics(response: &Value) -> Result<LintResult, String> {
     let Some(payload) = response.as_object() else {
         return Err(NON_OBJECT_RESPONSE.to_string());
     };
@@ -123,9 +132,67 @@ pub(crate) fn response_diagnostics(response: &Value) -> Result<Vec<Value>, Strin
     if integer(result.get("version")) != Some(LINT_API_VERSION) {
         return Err(UNSUPPORTED_VERSION.to_string());
     }
-    match result.get("diagnostics") {
-        Some(Value::Array(diagnostics)) => Ok(diagnostics.clone()),
-        _ => Err(MISSING_DIAGNOSTICS.to_string()),
+    match (result.get("unavailable"), result.get("diagnostics")) {
+        (Some(Value::String(reason)), _) => Ok(LintResult::Unavailable(reason.clone())),
+        (Some(_), _) => Err(INVALID_UNAVAILABLE.to_string()),
+        (None, Some(Value::Array(diagnostics))) => Ok(LintResult::Diagnostics(diagnostics.clone())),
+        (None, _) => Err(MISSING_DIAGNOSTICS.to_string()),
+    }
+}
+
+/// One body's authored diagnostics from its engine response, or the warning that it was not linted.
+pub(crate) fn body_diagnostics(
+    response: &Result<LintResult, String>,
+    (body, omitted): (&LintSqlBody, Option<usize>),
+    file: &AuthoredFile<'_>,
+) -> Vec<AuthoredDiagnostic> {
+    let raw: Vec<Value> = match response {
+        Ok(LintResult::Diagnostics(raw)) => raw.clone(),
+        Ok(LintResult::Unavailable(reason)) => {
+            return vec![unavailable_warning(reason, body, file)];
+        }
+        Err(message) => return vec![parse_failure(message, body, file)],
+    };
+    without_generated_frame(raw, body, omitted)
+        .iter()
+        .filter_map(|item| match authored_diagnostic(item, body, file) {
+            Ok(diagnostic) => diagnostic,
+            Err(message) => Some(parse_failure(&message, body, file)),
+        })
+        .collect()
+}
+
+/// The diagnostics with only each file's first lint-unavailable warning.
+pub(crate) fn unavailable_once_per_file(
+    diagnostics: Vec<AuthoredDiagnostic>,
+) -> Vec<AuthoredDiagnostic> {
+    let mut warned: HashSet<usize> = HashSet::new();
+    diagnostics
+        .into_iter()
+        .filter(|diagnostic| {
+            diagnostic.code != LINT_UNAVAILABLE_CODE || warned.insert(diagnostic.file)
+        })
+        .collect()
+}
+
+/// The warning that a body's SQL was not linted because the engine cannot parse its dialect.
+fn unavailable_warning(
+    reason: &str,
+    body: &LintSqlBody,
+    file: &AuthoredFile<'_>,
+) -> AuthoredDiagnostic {
+    let (line, column): (i64, i64) = file.position(body.body_start);
+    AuthoredDiagnostic {
+        file: body.file,
+        line,
+        column,
+        code: LINT_UNAVAILABLE_CODE.to_string(),
+        message: reason.to_string(),
+        fault: false,
+        end: None,
+        remediation: LINT_UNAVAILABLE_REMEDIATION.to_string(),
+        fix: None,
+        fix_unavailable_reason: None,
     }
 }
 

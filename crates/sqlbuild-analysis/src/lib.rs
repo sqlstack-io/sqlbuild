@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod analysis_route;
 pub mod assembly;
 pub mod auditing;
 pub mod binding_locations;
@@ -36,6 +37,7 @@ pub mod python_plan;
 pub mod python_selection;
 pub mod python_values;
 pub mod query_analysis;
+pub mod relation_markers;
 pub mod relation_names;
 pub mod required_columns;
 pub mod resource_diagnostics;
@@ -47,5 +49,8 @@ pub mod snowflake_cost;
 pub mod sql_macros;
 pub mod sql_test_attachment;
 pub mod sql_tokens;
+pub mod sql_tree;
 pub mod target_paths;
 pub mod type_system;
+pub mod warehouse_types;
+pub mod worker_stack;
