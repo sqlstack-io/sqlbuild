@@ -1504,7 +1504,7 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
-        /** @description A changed subject, such as `model:orders` or `role:analyst`, without its content hashes. */
+        /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
         PublishedChange: {
             change_kind: string;
             subject_key: string;
