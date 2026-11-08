@@ -1,7 +1,7 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT,
+    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT,
     TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
@@ -95,6 +95,7 @@ pub(crate) fn query_facts(sql: &str, dialect_name: &str) -> Result<QueryFacts, S
     let builder = Builder {
         selects: tokens.selects(),
         tokens,
+        dialect,
         spans: RefCell::default(),
         cursor: Cell::default(),
         claimed: RefCell::default(),
@@ -118,6 +119,7 @@ fn is_query(expression: &Expression) -> bool {
 struct Builder<'a> {
     tokens: QueryTokens<'a>,
     selects: Vec<SelectTokens>,
+    dialect: Dialect,
     spans: RefCell<HashMap<*const Expression, Option<ComparisonSpan>>>,
     cursor: Cell<usize>,
     claimed: RefCell<HashSet<usize>>,
@@ -316,9 +318,14 @@ impl Builder<'_> {
         let range = item.map(|item| self.tokens.expression_range(item, alias.is_some()));
         let unwrapped = unwrap_paren(value);
         let cast_type = match unwrapped {
-            Expression::Cast(_) | Expression::TryCast(_) | Expression::SafeCast(_) => range
+            Expression::Cast(cast) | Expression::TryCast(cast) | Expression::SafeCast(cast) => range
                 .as_ref()
-                .and_then(|range| self.tokens.cast_type(range)),
+                .and_then(|range| self.tokens.cast_type(range))
+                .or_else(|| {
+                    let span = cast.span.0?;
+                    self.tokens
+                        .cast_type(&self.tokens.covering(span.start, span.end))
+                }),
             _ => None,
         };
         ItemFacts::Expression(ExpressionItem {
@@ -425,6 +432,7 @@ impl Builder<'_> {
         let mut string_tokens: Vec<(usize, usize, &str)> = span.map_or_else(Vec::new, |span| {
             self.tokens.string_tokens(span.start, span.end)
         });
+        let units = date_part_arguments(node, self.dialect);
         for value in node.dfs() {
             match value {
                 Expression::Column(column) => {
@@ -433,7 +441,7 @@ impl Builder<'_> {
                 Expression::Identifier(identifier) => {
                     fact.columns.insert(identifier.name.clone());
                 }
-                Expression::Literal(literal) => {
+                Expression::Literal(literal) if !units.contains(&std::ptr::from_ref(value)) => {
                     if let Some(generated) = string_literal(literal) {
                         let position = string_tokens
                             .iter()
@@ -458,15 +466,38 @@ impl Builder<'_> {
                     .extend(operand.dfs().filter_map(direct_column));
             }
             if direct_string_literal(operand).is_none()
-                && operand
-                    .dfs()
-                    .any(|value| direct_string_literal(value).is_some())
+                && operand.dfs().any(|value| {
+                    !units.contains(&std::ptr::from_ref(value))
+                        && direct_string_literal(value).is_some()
+                })
             {
                 fact.modified_string_literal = true;
             }
         }
         fact
     }
+}
+
+/// The quoted first arguments of Snowflake's three-argument `DATEDIFF` calls, which are date parts.
+fn date_part_arguments(root: &Expression, dialect: Dialect) -> HashSet<*const Expression> {
+    if dialect != Dialect::Snowflake {
+        return HashSet::new();
+    }
+    root.dfs()
+        .filter_map(|node| match node {
+            Expression::Function(function)
+                if function.args.len() == DATE_DIFF_ARGUMENTS
+                    && DATE_DIFF_CALLS.contains(&function.name.to_ascii_uppercase().as_str()) =>
+            {
+                function
+                    .args
+                    .first()
+                    .filter(|argument| direct_string_literal(argument).is_some())
+                    .map(std::ptr::from_ref)
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn comparison_parts(node: &Expression) -> Option<ComparisonParts<'_>> {

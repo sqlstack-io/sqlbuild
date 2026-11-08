@@ -374,6 +374,13 @@ impl<'a> QueryTokens<'a> {
         parameterized && (cast || conversion)
     }
 
+    /// The tokens within characters `start` to `end`, as a token range.
+    pub(crate) fn covering(&self, start: usize, end: usize) -> Range<usize> {
+        let first = self.tokens.partition_point(|token| token.start < start);
+        let last = self.tokens.partition_point(|token| token.end <= end);
+        first..last.max(first)
+    }
+
     /// The string-literal tokens within a normalized range, as character range and source text.
     pub(crate) fn string_tokens(&self, start: usize, end: usize) -> Vec<(usize, usize, &str)> {
         self.tokens
