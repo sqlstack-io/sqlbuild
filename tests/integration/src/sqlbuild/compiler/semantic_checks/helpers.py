@@ -199,6 +199,25 @@ def captured_semantic_inputs(
     return SemanticInputs(**stage)
 
 
+def captured_under_dialect(
+    *,
+    project_dir: Path,
+    files: dict[str, str],
+    dialect: str,
+) -> SemanticInputs:
+    """Compile under `dialect`, with DuckDB's function rules, and keep the stage's inputs."""
+
+    stage: dict[str, Any] | None = native_module.assembly_stage_inputs(
+        "semantic_completion",
+        inputs=compile_inputs(project_dir=project_dir, files=files),
+        inference_profile=replace(
+            DuckDbAdapter().expression_inference_profile(), sql_analysis_dialect=dialect
+        ),
+    )
+    assert stage is not None
+    return SemanticInputs(**stage)
+
+
 def with_dialect(inputs: SemanticInputs, dialect: str | None) -> SemanticInputs:
     """The same stage inputs read under another SQL dialect."""
 
