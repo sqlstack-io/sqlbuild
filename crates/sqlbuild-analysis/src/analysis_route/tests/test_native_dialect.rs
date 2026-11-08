@@ -1,5 +1,7 @@
 use crate::analysis_route::main::unavailable_analysis::unavailable_analysis;
-use crate::analysis_route::models::{NativeAnalysis, TypeMatch};
+use crate::analysis_route::models::{
+    DuckDbDialect, NativeAnalysis, SnowflakeDialect, SqliteDialect, TypeMatch,
+};
 use crate::analysis_route::tests::helpers::{analysed, resource_columns};
 use crate::analysis_route::tests::test_types::{
     CataloguedDialect, ColumnTestCase, FindingTestCase, LineageTestCase, MacroBodyTestCase,
@@ -181,6 +183,34 @@ fn given_findings_when_analysing_then_they_take_sqlbuild_codes_and_positions() {
             sql: "SELECT CURRENT_TIMESTAMP() AS created_at FROM orders",
             extension_functions: &["md_user_info"],
             expected_findings: &[("B101", None)],
+        },
+        FindingTestCase {
+            description: "Snowflake's arm reports an unknown column at its line and column",
+            dialect: &SnowflakeDialect,
+            sql: "SELECT id,\n  nope\nFROM orders",
+            extension_functions: &[],
+            expected_findings: &[("B002", Some((2, 3)))],
+        },
+        FindingTestCase {
+            description: "DuckDB's arm reports an unknown column at its line and column",
+            dialect: &DuckDbDialect,
+            sql: "SELECT id,\n  nope\nFROM orders",
+            extension_functions: &[],
+            expected_findings: &[("B002", Some((2, 3)))],
+        },
+        FindingTestCase {
+            description: "SQLite's arm reports an unknown column at its line and column",
+            dialect: &SqliteDialect,
+            sql: "SELECT id,\n  nope\nFROM orders",
+            extension_functions: &[],
+            expected_findings: &[("B002", Some((2, 3)))],
+        },
+        FindingTestCase {
+            description: "DuckDB's arm reports a misspelt function as B101",
+            dialect: &DuckDbDialect,
+            sql: "SELECT lenght(status) AS n FROM orders",
+            extension_functions: &[],
+            expected_findings: &[("B101", Some((1, 8)))],
         },
     ];
     for test_case in test_cases {
