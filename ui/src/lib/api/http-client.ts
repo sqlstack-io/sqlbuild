@@ -2,7 +2,7 @@ import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { toLocationSummary, warehouseSyncOf } from './http-locations';
@@ -14,7 +14,7 @@ import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTab
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
@@ -49,6 +49,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckEvidence',
 	'listCatalogNodes',
 	'getCatalogNode',
+	'getColumnLineage',
 	'listSnapshotChanges',
 	'listAuditEntries',
 	'listAccounts',
@@ -411,6 +412,18 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
 			return toRoleAssignments(data, await people().catch(() => []));
+		},
+		async getColumnLineage(scope: Scope, ref: string): Promise<ColumnLineage | null> {
+			const nodes = await implemented.listCatalogNodes(scope);
+			const node = findNode(nodes, ref);
+			if (!node) return null;
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/column-lineage', {
+				params: { path: { location_id: locationId, target }, query: { node_key: node.key } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toColumnLineage(data, nodes);
 		},
 		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
 			const nodes = await implemented.listCatalogNodes(scope);

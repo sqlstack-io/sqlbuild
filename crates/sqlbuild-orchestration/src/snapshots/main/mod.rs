@@ -11,5 +11,6 @@ pub mod publish_snapshot;
 pub(crate) mod read_current_record;
 pub mod read_person_node_sql;
 pub(crate) mod read_snapshot_documents;
+pub(crate) mod read_snapshot_keys;
 pub(crate) mod read_snapshot_nodes;
 pub mod verify_execution;

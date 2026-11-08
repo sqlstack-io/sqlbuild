@@ -4,9 +4,10 @@ use std::collections::BTreeSet;
 
 use uuid::Uuid;
 
-use crate::authorization::_helpers::person_grants::{allowed, person_role_rows, snapshot_nodes};
+use crate::authorization::_helpers::person_grants::{allowed, person_role_rows};
 use crate::authorization::models::{LocationAccess, PersonAccess};
 use crate::credentials::models::{Action, DefaultRole};
+use crate::snapshots::main::read_snapshot_keys::read_snapshot_keys;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -51,7 +52,7 @@ pub(crate) async fn read_person_access(
         let location_id: Uuid = serde_json::from_value(current["location_id"].clone())
             .map_err(|error| ControlError::Invalid(error.to_string()))?;
         let target = current["target"].as_str().unwrap_or_default().to_owned();
-        let (next, nodes) = snapshot_nodes(
+        let (next, nodes) = read_snapshot_keys(
             transaction,
             serde_json::from_value(current["snapshot_id"].clone())
                 .map_err(|error| ControlError::Invalid(error.to_string()))?,
