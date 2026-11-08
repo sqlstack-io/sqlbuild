@@ -375,13 +375,10 @@ fn given_enrichment_dialect_when_running_then_answers_natively_or_fails_internal
             expected_error: None,
         },
         SessionFailureTestCase {
-            description: "an adapter alias compile maps before analysis never reaches the session",
+            description: "the postgres analysis dialect answers natively",
             dialect: "postgres",
             models: &[UNTYPED_ORDERS],
-            expected_error: Some(
-                "NativeCompilerError: native model analysis of model 'orders_untyped' enrichment: \
-                 query analysis options: unknown variant `postgres`",
-            ),
+            expected_error: None,
         },
     ];
     for test_case in test_cases {

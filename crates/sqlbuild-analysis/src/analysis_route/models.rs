@@ -145,3 +145,7 @@ impl LineageSchema for StandInSchema {
             .then_some(self.columns.as_slice())
     }
 }
+
+/// PostgreSQL, whose SQL SQLQuack's PostgreSQL 18 parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct PostgresDialect;

@@ -1,9 +1,17 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
+use crate::analysis_route::models::PostgresDialect;
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
-pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[];
+pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] =
+    &[(POSTGRES_DIALECT, &PostgresDialect)];
+/// PostgreSQL's analysis dialect name.
+pub(crate) const POSTGRES_DIALECT: &str = "postgres";
+/// The stub prefix PostgreSQL reads as one unquoted name.
+pub(crate) const POSTGRES_STUB_PREFIX: &str = "__sqlbuild_";
+/// The construct of a byte the scanner reads as no token, blank or comment.
+pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
 /// The dialect a project with no analysis dialect is named by.
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 /// The gap of SQL that holds more than one statement.
