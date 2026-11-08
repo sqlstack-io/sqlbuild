@@ -219,11 +219,19 @@ def test_given_one_model_under_its_dialect_when_completing_natively_then_has_exp
 
 
 @pytest.mark.xfail(
-    strict=True, reason="SQLQuack's Snowflake profile does not yet check or type these"
+    strict=True,
+    reason="SQLQuack's Snowflake and PostgreSQL profiles do not yet check or type these",
 )
 @pytest.mark.parametrize(
     "test_case",
     [
+        DialectFindingTestCase(
+            description="PostgreSQL refuses a text literal compared with a number",
+            dialect="postgres",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INT"),),
+        ),
         DialectFindingTestCase(
             description="Snowflake refuses a text literal compared with a number",
             dialect="snowflake",
@@ -241,7 +249,7 @@ def test_given_one_model_under_its_dialect_when_completing_natively_then_has_exp
     ],
     ids=lambda case: case.description,
 )
-def test_given_pending_snowflake_semantics_when_completing_natively_then_has_expected_findings(
+def test_given_pending_dialect_semantics_when_completing_natively_then_has_expected_findings(
     test_case: DialectFindingTestCase,
     tmp_path: Path,
 ) -> None:
