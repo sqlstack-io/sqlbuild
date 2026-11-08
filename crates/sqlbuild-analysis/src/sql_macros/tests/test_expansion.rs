@@ -117,6 +117,14 @@ const SPACED_DECLARATIONS: (&str, &str) = (
     "spaced",
     "MACRO (description \"Spaced\", arguments (status VARCHAR, places INT), returns BOOLEAN);\n\n@status <> @enum (\"order_status\").CLOSED AND @places = @const (\"price_places\")\n",
 );
+const ENUM_DECLARATION: (&str, &str) = (
+    "with_closed",
+    "MACRO (description \"With closed\", arguments (status VARCHAR));\n\nCONCAT(@status, @enum (\"order_status\").CLOSED)\n",
+);
+const CONST_DECLARATION: (&str, &str) = (
+    "plus_places",
+    "MACRO (description \"Plus places\", arguments (places INT));\n\n@places + @const (\"price_places\")\n",
+);
 const ORDER_KEY: (&str, &str) = (
     "order_key",
     "MACRO (description \"Order key\", arguments (store_code VARCHAR, order_number ANY), returns VARCHAR);\n\n@store_code || '::' || CAST(@order_number AS VARCHAR)\n",
@@ -438,6 +446,20 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             macros: &[SPACED_DECLARATIONS],
             sql: "SELECT @sql.spaced(o.status, o.places) AS s FROM orders AS o",
             expected_sql: "SELECT o.status <> @enum (\"order_status\").CLOSED AND o.places = @const (\"price_places\") AS s FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a spaced enum declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[ENUM_DECLARATION],
+            sql: "SELECT @sql.with_closed(o.status) AS s FROM orders AS o",
+            expected_sql: "SELECT CONCAT(o.status, @enum (\"order_status\").CLOSED) AS s FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a spaced constant declaration reaches a parser that reads @ as a variable",
+            adapter: "tsql",
+            macros: &[CONST_DECLARATION],
+            sql: "SELECT @sql.plus_places(o.places) AS s FROM orders AS o",
+            expected_sql: "SELECT o.places + @const (\"price_places\") AS s FROM orders AS o",
         },
         ExpansionTestCase {
             description: "generic SQL checks no adapter types",
