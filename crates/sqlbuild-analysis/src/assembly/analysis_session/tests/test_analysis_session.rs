@@ -539,6 +539,16 @@ fn given_dynamic_pivots_when_proving_then_matches_python_or_defers() {
             ),
         },
         PivotTestCase {
+            description: "a passthrough from a call that names no dependency",
+            dialect: "duckdb",
+            sql: "SELECT * FROM __dbt_ref(\"shop\", \"status_amounts\")",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: failed(
+                "output must be a wildcard projection from one supported dynamic pivot or a \
+                 proven dynamic-family passthrough",
+            ),
+        },
+        PivotTestCase {
             description: "no declared families",
             dialect: "duckdb",
             sql: "SELECT 1",
