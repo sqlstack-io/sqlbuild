@@ -68,7 +68,7 @@ pub(crate) async fn authorize_execution(
         )
         .await?;
     }
-    if request.priority > 0 {
+    if matches!(action, Action::JobRun | Action::RunRerun) && request.priority > 0 {
         scope.action = Action::RunPrioritise;
         (transaction, context) = authorize_person(
             transaction,

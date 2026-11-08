@@ -209,11 +209,12 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             &JobRunRequest {
                                 run_id: source_id,
                                 job_key: job_key.into(),
+                                priority: 1,
                                 ..request.clone()
                             },
                         )
                         .await
-                        .expect("owner creates source with frozen settings");
+                        .expect("owner creates urgent source with frozen settings");
                         let cancellation = CancelRunRequest {
                             run_id: source_id,
                             event_id: Uuid::now_v7(),
@@ -226,7 +227,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                                     .await
                                     .ok(),
                                 can_cancel.then_some(expected),
-                                "cancellation permits stopping even sensitive work"
+                                "cancellation permits stopping even sensitive or prioritised work"
                             );
                         }
                         let source_id = Uuid::now_v7();
