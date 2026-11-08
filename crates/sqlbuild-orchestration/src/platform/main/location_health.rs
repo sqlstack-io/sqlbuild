@@ -12,8 +12,12 @@ pub async fn location_health(
     store: &ControlStore,
     location_id: Uuid,
 ) -> Result<Vec<LocationHealthObservation>, ControlError> {
-    let (transaction, observations) =
-        recent_health(begin(store, TransactionMode::Read).await?, location_id).await?;
+    let (transaction, observations) = recent_health(
+        begin(store, TransactionMode::Read).await?,
+        location_id,
+        None,
+    )
+    .await?;
     commit(transaction).await?;
     Ok(observations)
 }

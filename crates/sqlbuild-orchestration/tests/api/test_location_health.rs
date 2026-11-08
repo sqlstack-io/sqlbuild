@@ -222,6 +222,44 @@ fn given_scoped_location_observations_when_retried_or_read_then_history_and_auth
                     .all(|observation| observation.received_at >= before
                         && observation.received_at <= Utc::now())
             );
+            let mut busy = snapshot(location_id);
+            busy.target = "another target".into();
+            publish_snapshot(store, &busy)
+                .await
+                .expect("busy target generation");
+            let busy_heartbeat = LocationHealthReport {
+                event_id: Uuid::now_v7(),
+                session_id: Uuid::now_v7(),
+                target: busy.target.clone(),
+                health: LocationHealth::Heartbeat {},
+            };
+            report_remote_location_health((&api.url, &token.bearer), location_id, &busy_heartbeat)
+                .await
+                .expect("busy target instance");
+            for _ in 0..101 {
+                let busy_connection = LocationHealthReport {
+                    event_id: Uuid::now_v7(),
+                    health: LocationHealth::Connection {
+                        generation: 1,
+                        healthy: true,
+                    },
+                    ..busy_heartbeat.clone()
+                };
+                report_remote_location_health(
+                    (&api.url, &token.bearer),
+                    location_id,
+                    &busy_connection,
+                )
+                .await
+                .expect("busy target observation");
+            }
+            assert_eq!(
+                person_read("preview #1")
+                    .await
+                    .expect("quiet target health"),
+                observations,
+                "a busier target's newer observations do not push out this target's"
+            );
             stop_api(api).await;
             close_test_store(fixture).await;
         });

@@ -24,10 +24,7 @@ pub async fn read_person_location_health(
         default_role,
     )
     .await?;
-    let (transaction, observations) = recent_health(transaction, location_id).await?;
+    let (transaction, observations) = recent_health(transaction, location_id, Some(target)).await?;
     commit(transaction).await?;
-    Ok(observations
-        .into_iter()
-        .filter(|observation| observation.report.target == target)
-        .collect())
+    Ok(observations)
 }
