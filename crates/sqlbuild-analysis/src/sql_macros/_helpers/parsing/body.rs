@@ -30,6 +30,7 @@ use crate::sql_macros::models::{
 };
 
 const EXPRESSION_PREFIX: &str = "SELECT ";
+const TYPE_PREFIX: &str = "SELECT CAST(NULL AS ";
 const CTE_SUFFIX: &str = "\nSELECT 1";
 
 /// The body parsed as SQL.
@@ -50,23 +51,30 @@ pub(crate) fn macro_parser(dialect: Option<&str>) -> Result<&'static dyn NativeD
     }
 }
 
-/// The body parsed as SQL by the project's parser, or why that parser cannot read it.
+/// The body parsed by the project's parser, an expression body reading as a type taken as a cast's.
 pub(crate) fn parsed(
     parser: &dyn NativeDialect,
     form: SqlMacroForm,
     body: &str,
 ) -> Result<ParsedBody, String> {
-    let text: String = match form {
-        SqlMacroForm::Expression => format!("{EXPRESSION_PREFIX}{body}"),
-        SqlMacroForm::CteList => format!("{body}{CTE_SUFFIX}"),
-        SqlMacroForm::ColumnList => body.to_owned(),
-    };
+    match form {
+        SqlMacroForm::Expression => parsed_text(parser, &format!("{EXPRESSION_PREFIX}{body}"))
+            .or_else(|reason| {
+                parsed_text(parser, &format!("{TYPE_PREFIX}{body})")).map_err(|_| reason)
+            }),
+        SqlMacroForm::CteList => parsed_text(parser, &format!("{body}{CTE_SUFFIX}")),
+        SqlMacroForm::ColumnList => parsed_text(parser, body),
+    }
+}
+
+/// The single SELECT `text` holds, parsed by the project's parser, or why that parser cannot read it.
+fn parsed_text(parser: &dyn NativeDialect, text: &str) -> Result<ParsedBody, String> {
     let Parsed {
         mut statements,
         gaps,
     } = parser
         .parse(&in_lists_parenthesised(&using_reads_joined(
-            &declarations_masked(&text),
+            &declarations_masked(text),
         )))
         .map_err(|gap| gap.message)?;
     if let Some(gap) = gaps.first() {

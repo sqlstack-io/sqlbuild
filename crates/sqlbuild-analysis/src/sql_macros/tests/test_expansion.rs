@@ -61,6 +61,10 @@ const PLUS_ONE: (&str, &str) = (
     "plus_one",
     "MACRO (description \"Plus one\", arguments (v BIGINT), returns BIGINT);\n\n@v + 1\n",
 );
+const MONEY_TYPE: (&str, &str) = (
+    "money_type",
+    "MACRO (description \"Money type\", returns VARCHAR);\n\nDECIMAL(18, 2)\n",
+);
 const ROUND_TO: (&str, &str) = (
     "round_to",
     "MACRO (description \"Rounded\", arguments (v DECIMAL(18, 4), places INT), returns DECIMAL(18, 2));\n\nROUND(@v, @places)\n",
@@ -194,6 +198,13 @@ fn given_calls_of_each_form_when_expanding_then_the_ticket_examples_compile() {
             macros: &[NET_AMOUNT, CENTS_TO_DOLLARS],
             sql: "SELECT 'it\\'s @sql.x(' AS note, @sql.net_amount(o.a, o.b) AS net FROM orders AS o",
             expected_sql: "SELECT 'it\\'s @sql.x(' AS note, CAST(ROUND((o.a - COALESCE(o.b, 0)) / 100, 2) AS DECIMAL(18, 2)) AS net FROM orders AS o",
+        },
+        ExpansionTestCase {
+            description: "a body that only reads as a type fills a cast's type",
+            adapter: "duckdb",
+            macros: &[MONEY_TYPE],
+            sql: "SELECT CAST(o.v AS @sql.money_type()) AS m FROM orders AS o",
+            expected_sql: "SELECT CAST(o.v AS DECIMAL(18, 2)) AS m FROM orders AS o",
         },
         ExpansionTestCase {
             description: "an expression call before AT TIME ZONE is parenthesised",
