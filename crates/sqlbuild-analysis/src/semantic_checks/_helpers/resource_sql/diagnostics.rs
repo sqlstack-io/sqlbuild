@@ -266,8 +266,7 @@ pub(crate) fn missing_column_diagnostic(
     })
 }
 
-/// Every audit, SQL test and SQL hook finding, in Python's first-seen order; where no native
-/// parser reads the dialect, only the audits of declared columns, as no SQL is read.
+/// Audit, SQL test and hook findings in first-seen order; only column audits where no parser reads SQL.
 pub(crate) fn resource_sql_findings(
     request: &ResourceSqlRequest,
     catalog: &ProjectCatalog,
