@@ -568,11 +568,6 @@ rule = 3
 note = "Reads the declaration attached to a project audit factory."
 
 [[stays]]
-path = "compiler/sql_analysis/main/import_polyglot.py"
-rule = 4
-note = "Imports the Polyglot Python package for the Python API."
-
-[[stays]]
 path = "compiler/sql_analysis/main/import_polyglot_sql.py"
 rule = 4
 note = "Imports the Polyglot SQL Python package for the Python API."

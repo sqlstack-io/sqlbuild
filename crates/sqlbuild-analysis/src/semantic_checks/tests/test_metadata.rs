@@ -17,8 +17,8 @@ fn given_project_metadata_when_checking_then_reports_python_errors() {
             expected_outcome: Ok(expected_checked_outcome()),
         },
         MetadataTestCase {
-            description: "a dialect the all-dialects parser build added",
-            dialect: "mysql",
+            description: "a shipped dialect without a native type parser",
+            dialect: "tsql",
             mart_shape: MART_SHAPE,
             expected_outcome: Ok(expected_checked_outcome()),
         },

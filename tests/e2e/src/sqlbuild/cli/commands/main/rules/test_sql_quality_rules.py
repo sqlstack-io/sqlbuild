@@ -9,13 +9,16 @@ from typing import Any
 
 import pytest
 
+from sqlbuild._native import rules_bulk_cache_path
 from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     ConstantLiteralCase,
     DuplicateLiteralCase,
     FixableReportingCase,
     RankingKeyProofCase,
     RankingSortDefaultCase,
+    ReplayedFindingExitCase,
     SqlQualityRuleCase,
+    UnparsedDialectRulesCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
     diagnostic_codes,
@@ -557,5 +560,125 @@ def test_given_repeated_long_literal_when_running_rules_then_help_names_the_shar
     ), result.stdout
 
 
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        ReplayedFindingExitCase(
+            description="a SQL rule finding fails every command",
+            code="SQLCLEAN043",
+            expected_exit=1,
+        ),
+        ReplayedFindingExitCase(
+            description="a lint-unavailable warning fails no command",
+            code="L007",
+            expected_exit=0,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_cached_sql_finding_when_running_commands_then_only_rule_findings_fail(
+    test_case: ReplayedFindingExitCase, tmp_path: Path
+) -> None:
+    write_quality_project(
+        project_dir=tmp_path,
+        toml=(
+            'name = "orders"\nadapter = "duckdb"\ndefault_target = "dev"\n\n'
+            '[connection]\ndatabase = "plan.duckdb"\n\n[targets.dev]\nschema = "analytics"\n\n'
+            '[rules]\nselect = ["SQLCLEAN043"]\n'
+        ),
+        upstream=_RAW_HEADER + _UPSTREAM_SQL,
+        summary=(
+            _SUMMARY_HEADER + "SELECT o.order_id, ROW_NUMBER() OVER (ORDER BY o.amount,"
+            " o.status, o.note, o.customer_id, o.amount + 1, o.order_id) AS rn\n"
+            'FROM __ref("raw_orders") AS o\n'
+        ),
+    )
+    seeded: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "compile", "--json"
+    )
+    assert diagnostic_codes(seeded) == ("SQLCLEAN043",), seeded.stdout + seeded.stderr
+    # Replay the cached finding under the case's code: the engine cannot emit L007 yet.
+    cache: Path = rules_bulk_cache_path(project_dir=tmp_path, file_name="sql.json")
+    stored: dict[str, Any] = json.loads(cache.read_text(encoding="utf-8"))
+    for entry in stored["entries"].values():
+        for finding in entry["findings"]:
+            finding["code"] = test_case.code
+    _ = cache.write_text(json.dumps(stored), encoding="utf-8")
+
+    compiled: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "compile", "--json"
+    )
+    exits: tuple[int, ...] = (
+        compiled.returncode,
+        run_unevaluated_rules_cli(tmp_path, "rules", "run", "SQLCLEAN043").returncode,
+        run_unevaluated_rules_cli(tmp_path, "plan").returncode,
+        run_unevaluated_rules_cli(tmp_path, "build").returncode,
+    )
+
+    assert (diagnostic_codes(compiled), exits) == (
+        (test_case.code,),
+        (test_case.expected_exit,) * len(exits),
+    ), compiled.stdout + compiled.stderr
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    (
+        UnparsedDialectRulesCase(
+            description="a parsed dialect reports the built-in rule finding",
+            adapter_toml='adapter = "duckdb"\n',
+            expected_codes=("SQBRMODEL102",),
+            expected_message="SELECT * is allowed only",
+            expected_exit=1,
+        ),
+        UnparsedDialectRulesCase(
+            description="an unparsed dialect warns once per model and fails nothing",
+            adapter_toml=(
+                'adapter = "bigquery"\ndefault_target = "dev"\n\n'
+                '[targets.dev]\ndatabase = "warehouse"\nschema = "analytics"\n'
+            ),
+            expected_codes=("L007", "L007"),
+            expected_message=(
+                "SQLBuild cannot parse bigquery SQL for built-in rules yet,"
+                " so these rules were not evaluated: SQBRMODEL102"
+            ),
+            expected_exit=0,
+        ),
+    ),
+    ids=lambda case: case.description,
+)
+def test_given_project_dialect_when_running_built_in_rules_then_unparsed_dialects_only_warn(
+    test_case: UnparsedDialectRulesCase, tmp_path: Path
+) -> None:
+    write_quality_project(
+        project_dir=tmp_path,
+        toml=(
+            'name = "orders"\n' + test_case.adapter_toml + '\n[rules]\nselect = ["SQBRMODEL102"]\n'
+        ),
+        upstream=_RAW_HEADER + _UPSTREAM_SQL,
+        summary=_SUMMARY_HEADER + 'SELECT * FROM __ref("raw_orders")\n',
+    )
+
+    compiled: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "compile", "--json"
+    )
+    ran: subprocess.CompletedProcess[str] = run_unevaluated_rules_cli(
+        tmp_path, "rules", "run", "SQBRMODEL102"
+    )
+
+    messages: list[str] = [
+        str(item["message"]) for item in json.loads(compiled.stdout)["diagnostics"]
+    ]
+    assert (
+        diagnostic_codes(compiled),
+        all(test_case.expected_message in message for message in messages),
+        (compiled.returncode, ran.returncode),
+    ) == (
+        test_case.expected_codes,
+        True,
+        (test_case.expected_exit, test_case.expected_exit),
+    ), compiled.stdout + compiled.stderr + ran.stdout + ran.stderr

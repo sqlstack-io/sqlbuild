@@ -7,9 +7,9 @@ use crate::planner_strategy::_helpers::type_names::{argument, named_type};
 use crate::planner_strategy::constants::{GENERIC_DIALECT, POLYGLOT_CUSTOM_TYPE_NAME};
 use crate::planner_strategy::errors::TypeParseFailure;
 use crate::planner_strategy::models::CursorType;
-use crate::type_system::main::polyglot_type_args::polyglot_type_args;
+use crate::type_system::main::type_args::type_args;
 
-/// Timestamp or integer for supported cross-adapter types; `Err` when Polyglot cannot parse an unknown type.
+/// Timestamp or integer for supported cross-adapter types; `Err` when an unknown type does not parse.
 pub fn classify_cursor_sql_type(sql_type: &str) -> Result<Option<CursorType>, TypeParseFailure> {
     let normalized: String = sql_type
         .to_uppercase()
@@ -29,7 +29,7 @@ pub fn classify_cursor_sql_type(sql_type: &str) -> Result<Option<CursorType>, Ty
         return Ok(Some(cursor_type));
     }
     let args: Map<String, Value> =
-        polyglot_type_args(&normalized, GENERIC_DIALECT).map_err(|message| TypeParseFailure {
+        type_args(&normalized, GENERIC_DIALECT).map_err(|message| TypeParseFailure {
             normalized_type: normalized.clone(),
             message,
         })?;

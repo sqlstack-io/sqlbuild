@@ -9,7 +9,14 @@ pub(crate) const FLOAT_TYPE_NAMES: &[&str] = &["DOUBLE", "FLOAT", "FLOAT64", "RE
 pub(crate) const INTEGER_TYPE_NAMES: &[&str] = &[
     "BIGINT", "INT", "INT64", "INTEGER", "LONG", "SMALLINT", "TINYINT",
 ];
-pub(crate) const POLYGLOT_CUSTOM_TYPE_NAME: &str = "CUSTOM";
+/// The deepest type nesting SQLBuild reads: SQLQuack's syntax tree depth.
+pub(crate) const MAX_TYPE_NESTING: usize = 512;
+/// The type nesting read on the caller's stack; deeper types get their own.
+pub(crate) const SHALLOW_TYPE_NESTING: usize = 32;
+/// The stack a more deeply nested type is read and normalized on.
+pub(crate) const DEEP_TYPE_STACK_BYTES: usize = 32 * 1024 * 1024;
+/// The tag of a type name no dialect gives its own shape.
+pub(crate) const CUSTOM_TYPE_TAG: &str = "CUSTOM";
 pub(crate) const STRING_TYPE_NAMES: &[&str] = &["CHAR", "CHARACTER", "STRING", "TEXT", "VARCHAR"];
 pub(crate) const TIMESTAMP_TYPE_NAMES: &[&str] =
     &["TIMESTAMP", "TIMESTAMPLTZ", "TIMESTAMPNTZ", "TIMESTAMPTZ"];
@@ -31,16 +38,14 @@ pub(crate) const SIZED_TEXT_TYPE_NAMES: &[&str] = &["STRING", "TEXT"];
 pub(crate) const VARCHAR_TYPE_NAME: &str = "VARCHAR";
 /// BigQuery's one spelling of every variable-length text type.
 pub(crate) const BIGQUERY_STRING_TYPE_NAME: &str = "STRING";
-/// Polyglot `data_type` tags whose Python spelling drops the word separator.
-pub(crate) const POLYGLOT_TYPE_NAME_ALIASES: &[(&str, &str)] = &[
+/// Type tags whose type name drops the word separator.
+pub(crate) const TYPE_TAG_ALIASES: &[(&str, &str)] = &[
     ("BIG_INT", "BIGINT"),
     ("SMALL_INT", "SMALLINT"),
     ("TEXT_WITH_LENGTH", "TEXT"),
     ("TINY_INT", "TINYINT"),
     ("VAR_CHAR", "VARCHAR"),
 ];
-/// The function call depth limit SQLBuild passes to every Polyglot parse.
-pub(crate) const MAX_FUNCTION_CALL_DEPTH: usize = 512;
 /// Python's `str(0)`, the only integer text Python treats as false.
 pub(crate) const ZERO_TEXT: &str = "0";
 /// Snowflake time and timestamp types, word separators removed, whose precision metadata omits.

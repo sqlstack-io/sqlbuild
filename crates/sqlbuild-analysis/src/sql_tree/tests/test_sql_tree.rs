@@ -6,6 +6,8 @@ use crate::sql_tree::tests::test_types::{TreeFailureTestCase, TreeShapeTestCase}
 const CTE_AND_JOIN_SQL: &str =
     "WITH x AS (SELECT 1 AS id)\nSELECT *\n  FROM x JOIN (SELECT 2 AS id) s ON x.id = s.id";
 
+const SNOWFLAKE_MARKER_SQL: &str = "WITH o AS (SELECT * FROM __ref(\"orders\"))\nSELECT o.*, c.name\nFROM o JOIN __ref(\"customers\") c ON o.id = c.id JOIN (SELECT 2 AS id) s ON s.id = o.id\nWHERE o.id IN (SELECT id FROM __source(\"raw_returns\"))";
+
 #[test]
 fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_source_positions() {
     let test_cases = [
@@ -46,6 +48,60 @@ fn given_sql_when_building_a_rule_tree_then_clauses_own_their_queries_at_their_s
                 ("star", 1, 8, Some("select")),
                 ("select", 2, 3, Some("subquery")),
                 ("subquery", 2, 3, Some("alias")),
+            ],
+        },
+        TreeShapeTestCase {
+            description: "Snowflake reads relation markers as tables; nodes after them keep their columns",
+            dialect: "snowflake",
+            sql: SNOWFLAKE_MARKER_SQL,
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("cte", 1, 6, Some("select")),
+                ("select", 1, 12, Some("cte")),
+                ("star", 1, 12, Some("select")),
+                ("star", 2, 8, Some("select")),
+                ("join", 3, 8, Some("select")),
+                ("join", 3, 49, Some("select")),
+                ("select", 3, 54, Some("subquery")),
+                ("subquery", 3, 54, Some("join")),
+                ("select", 4, 7, Some("in")),
+            ],
+        },
+        TreeShapeTestCase {
+            description: "a Snowflake table function marker reads as SQLBuild renders it, inside TABLE( ), at its columns",
+            dialect: "snowflake",
+            sql: "SELECT l.*\nFROM __table_fn(\"lines_for\")('B-1', __ref(\"orders\").k) AS l JOIN (SELECT 1 AS k) s ON s.k = l.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("star", 1, 8, Some("select")),
+                ("join", 2, 61, Some("select")),
+                ("select", 2, 66, Some("subquery")),
+                ("subquery", 2, 66, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
+            description: "a Snowflake table function marker closing a subquery keeps the columns after it",
+            dialect: "snowflake",
+            sql: "SELECT 1\nFROM (SELECT * FROM __table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("select", 2, 6, Some("subquery")),
+                ("star", 2, 6, Some("select")),
+                ("subquery", 2, 6, Some("select")),
+                ("join", 2, 43, Some("select")),
+                ("select", 2, 48, Some("subquery")),
+                ("subquery", 2, 48, Some("join")),
+            ],
+        },
+        TreeShapeTestCase {
+            description: "a Snowflake table function marker already inside TABLE( ) is not wrapped twice",
+            dialect: "snowflake",
+            sql: "SELECT 1\nFROM TABLE(__table_fn(\"f\")(1)) t JOIN (SELECT 2 AS k) s ON s.k = t.k",
+            expected_nodes: vec![
+                ("select", 1, 1, None),
+                ("join", 2, 34, Some("select")),
+                ("select", 2, 39, Some("subquery")),
+                ("subquery", 2, 39, Some("join")),
             ],
         },
         TreeShapeTestCase {

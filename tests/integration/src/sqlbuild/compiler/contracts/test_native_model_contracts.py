@@ -128,9 +128,9 @@ def test_given_generated_contracts_when_validating_then_every_contract_family_is
             ),
         ),
         FormerlyDeferredContractTestCase(
-            description="a dialect outside the old native build",
+            description="a shipped dialect without a native type parser",
             declared_type="INTEGER",
-            dialect="mysql",
+            dialect="tsql",
             expected_diagnostics=(
                 (
                     "K002",
@@ -184,9 +184,9 @@ def test_given_input_python_once_answered_when_validating_then_native_diagnostic
     "test_case",
     [
         UnknownDialectContractTestCase(
-            description="a dialect Polyglot does not know raises the wheel's error",
-            dialect="motherduck",
-            expected_error="Unknown dialect: motherduck",
+            description="a dialect no adapter ships raises the wheel's error",
+            dialect="mysql",
+            expected_error="Unknown dialect: mysql",
         ),
     ],
     ids=lambda case: case.description,

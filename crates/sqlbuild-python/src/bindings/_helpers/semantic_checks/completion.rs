@@ -66,7 +66,7 @@ pub(crate) fn completed_diagnostics<'py>(
     let (completed, model_bindings, order) = py
         .compiler_detach(|| Ok(complete_semantic_diagnostics(&request, shared.catalog)))
         .map_err(compiler_error)?
-        .map_err(|failure| semantic_error(py, &failure))?
+        .map_err(|failure| semantic_error(&failure))?
         .into_parts();
     let mut rebuilt: Vec<Bound<'py, PyAny>> = Vec::with_capacity(completed.len());
     for row in completed {
