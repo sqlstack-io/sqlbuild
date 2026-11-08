@@ -28,6 +28,7 @@ from tests.integration.src.sqlbuild.compiler.helpers import (
 from tests.integration.src.sqlbuild.compiler.lineage._test_types import (
     FormerlyDeferredLineageTestCase,
     GeneratedLineageParityTestCase,
+    RootStarLineageTestCase,
     TruncatedSqlLineageTestCase,
     UnparsedLineageTestCase,
 )
@@ -54,7 +55,6 @@ _MODEL_COUNT: int = 16
             dialects=(None, "duckdb", "postgres", "snowflake"),
             expected_minimum_native=400,
             expected_minimum_parsed=250,
-            expected_minimum_star_expansions=20,
         )
     ],
     ids=lambda case: case.description,
@@ -112,7 +112,50 @@ def test_given_generated_projects_when_building_fast_lineage_then_restored_proje
     assert differences == []
     assert sum(work.values()) >= test_case.expected_minimum_native
     assert work["parse"] >= test_case.expected_minimum_parsed
-    assert work["star"] >= test_case.expected_minimum_star_expansions
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        RootStarLineageTestCase(
+            description=f"a root star over a model without SQL analysis, {dialect} dialect",
+            dialect=dialect,
+            expected_star_expansions=1,
+        )
+        for dialect in (None, "duckdb", "postgres", "snowflake")
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_root_star_over_opted_out_model_when_building_fast_lineage_then_restored_project_agrees(
+    test_case: RootStarLineageTestCase,
+    tmp_path: Path,
+) -> None:
+    project: CompiledProjectView = compiled_project(
+        project_dir=tmp_path / "project",
+        files={
+            **generated_lineage_files(rng=random.Random(5), model_count=_MODEL_COUNT),
+            "models/orders_staged.sql": (
+                'MODEL (description "Staged orders", sql_analysis false);\n\n'
+                'SELECT customer_id, order_id FROM __source("raw_orders")\n'
+            ),
+            "models/orders_all.sql": (
+                'MODEL (description "All orders");\n\nSELECT * FROM __ref("orders_staged")\n'
+            ),
+        },
+    )
+
+    names, with_catalog = lineage_views(
+        project=project, dialect=test_case.dialect, model_names=None
+    )
+    _, restored = lineage_views(
+        project=project_with(project=project, binding_catalog=None),
+        dialect=test_case.dialect,
+        model_names=None,
+    )
+    work: Counter[str] = fast_lineage_work(project=project, model_names=frozenset({"orders_all"}))
+
+    assert work["star"] == test_case.expected_star_expansions
+    assert mismatches(inputs=names, expected=with_catalog, actual=restored) == []
 
 
 @pytest.mark.parametrize(

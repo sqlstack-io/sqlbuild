@@ -7,7 +7,7 @@ use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 use crate::analysis_route::models::{AnalysisRoute, GapSite, LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -243,6 +243,22 @@ pub(super) struct StarTestCase {
     pub(super) sql: &'static str,
     /// Whether it projects a star, whether every star column is known, and the column count.
     pub(super) expected_star: (bool, bool, usize),
+}
+
+pub(super) struct ArmGapTestCase {
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) placeholders: &'static [(&'static str, &'static str)],
+    pub(super) expected_gap: Option<LocatedGap>,
+}
+
+pub(super) struct TypeSpellingTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static str,
+    pub(super) normalize: fn(&str) -> Option<NormalizedType>,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }
 
 pub(super) struct NativeOutcomeTestCase {

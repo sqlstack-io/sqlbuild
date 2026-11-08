@@ -314,7 +314,11 @@ class AnalysisFeatureWriter:
             name=f"unanalysed_{base.name}",
             description=f"Copy of {base.name} that SQL analysis cannot parse",
             header="  sql_analysis false,\n",
-            body=f'SELECT id, amount\nFROM __ref("{base.name}")\nWHERE id = ANY [1, 2]\n',
+            body=(
+                "SELECT a.id, a.amount\n"
+                f'FROM __ref("{base.name}") AS a\n'
+                f'JOIN __ref("{base.name}") AS b NEAREST 1 BY DISTANCE abs(a.amount - b.amount)\n'
+            ),
         )
         self.settings_lines.append("require_sql_analysis = true")
 

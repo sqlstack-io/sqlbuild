@@ -170,9 +170,9 @@
    ""
   ],
   "models/analysis/unanalysed_stg_support_1.sql": [
-   "SELECT id, amount",
-   "FROM __ref(\"stg_support_1\")",
-   "WHERE id = ANY [1, 2]",
+   "SELECT a.id, a.amount",
+   "FROM __ref(\"stg_support_1\") AS a",
+   "JOIN __ref(\"stg_support_1\") AS b NEAREST 1 BY DISTANCE abs(a.amount - b.amount)",
    ""
   ],
   "models/billing/marts/billing_summary_0.sql": [

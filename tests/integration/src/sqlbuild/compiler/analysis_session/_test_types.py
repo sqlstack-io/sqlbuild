@@ -40,6 +40,16 @@ class CyclicAnalysisTestCase:
 
 
 @dataclass(frozen=True)
+class SourceTypesTestCase:
+    """A model reading a source with declared types, with or without the source's expression."""
+
+    description: str
+    files: dict[str, str]
+    lineage_mode: ColumnLineageMode
+    expected_types: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
 class CyclicCompileTestCase:
     """A project whose models `ref` each other, compiled through the CLI."""
 
@@ -62,7 +72,7 @@ class StandalonePivotProofTestCase:
 
 @dataclass(frozen=True)
 class SharedAnalysisTestCase:
-    """Models whose equal queries share one analysis, some inexact and so re-analysed alone."""
+    """Models with equal queries, some inexact, and how many analyses the session shares."""
 
     description: str
     regions: tuple[str, ...]

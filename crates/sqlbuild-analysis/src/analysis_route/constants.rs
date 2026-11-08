@@ -1,9 +1,28 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
+use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDialect, TypeSpelling};
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
-pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[];
+pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
+    (DUCKDB_DIALECT, &DuckDbDialect),
+    (SNOWFLAKE_DIALECT, &SnowflakeDialect),
+    (SQLITE_DIALECT, &SqliteDialect),
+];
+/// DuckDB's (and MotherDuck's) analysis dialect name.
+pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
+/// Snowflake's analysis dialect name.
+pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
+/// SQLite's analysis dialect name.
+pub(crate) const SQLITE_DIALECT: &str = "sqlite";
+/// The stub prefix Snowflake and SQLite read as one unquoted name.
+pub(crate) const UNQUOTED_STUB_PREFIX: &str = "__sqlbuild_";
+/// The word that makes SQLBuild's type fallback call a type it cannot split into name and flat parameters a timestamp.
+pub(crate) const FALLBACK_TIMESTAMP_WORD: &str = "TIMESTAMP";
+/// The most words a type name spans, as in `TIMESTAMP WITH LOCAL TIME ZONE`.
+pub(crate) const MAX_TYPE_NAME_WORDS: usize = 5;
+/// The construct of a byte the scanner reads as no token, blank or comment.
+pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
 /// The dialect a project with no analysis dialect is named by.
 pub(crate) const GENERIC_DIALECT: &str = "generic";
 /// The gap of SQL that holds more than one statement.
@@ -28,3 +47,145 @@ pub(crate) const ERROR_SEVERITY: &str = "error";
 pub(crate) const MACRO_BODY_PREFIX: &str = "SELECT ";
 /// The gap of a macro body that is not one expression.
 pub(crate) const NOT_ONE_EXPRESSION: &str = "not one expression";
+/// DuckDB's type names as SQLBuild compares them.
+pub(crate) const DUCKDB_TYPE_SPELLING: TypeSpelling = TypeSpelling {
+    aliases: &[
+        ("BINARY", "BLOB"),
+        ("BLOB", "VARBINARY"),
+        ("BOOL", "BOOLEAN"),
+        ("BYTEA", "BLOB"),
+        ("CHAR", "TEXT"),
+        ("CHAR VARYING", "TEXT"),
+        ("CHARACTER", "TEXT"),
+        ("CHARACTER VARYING", "TEXT"),
+        ("DOUBLE PRECISION", "DOUBLE"),
+        ("HUGEINT", "INT128"),
+        ("INT64", "BIGINT"),
+        ("INTEGER", "INT"),
+        ("NCHAR VARYING", "TEXT"),
+        ("NTEXT", "TEXT"),
+        ("NUMERIC", "DECIMAL"),
+        ("ROW", "STRUCT"),
+        ("STRING", "TEXT"),
+        ("TIME WITH TIME ZONE", "TIMETZ"),
+        ("TIME WITHOUT TIME ZONE", "TIME"),
+        ("TIMESTAMP WITH LOCAL TIME ZONE", "TIMESTAMPLTZ"),
+        ("TIMESTAMP WITH TIME ZONE", "TIMESTAMPTZ"),
+        ("TIMESTAMP WITHOUT TIME ZONE", "TIMESTAMP"),
+        ("TIMESTAMP_LTZ", "TIMESTAMPLTZ"),
+        ("TIMESTAMP_NTZ", "TIMESTAMPNTZ"),
+        ("TIMESTAMP_TZ", "TIMESTAMPTZ"),
+        ("UHUGEINT", "UINT128"),
+        ("UINT16", "USMALLINT"),
+        ("UINT32", "UINTEGER"),
+        ("UINT64", "UBIGINT"),
+        ("UINT8", "UTINYINT"),
+        ("VARBINARY", "BLOB"),
+        ("VARCHAR", "TEXT"),
+    ],
+    nested_aliases: &[("DATETIME", "TIMESTAMP"), ("NVARCHAR", "TEXT")],
+    sizeless: &["CHAR", "CHARACTER"],
+    sizeless_whole: &["CHAR", "CHARACTER", "TIMESTAMP"],
+    bare_kept: &["ROW"],
+    fielded: &["STRUCT", "UNION"],
+    verbatim: &["LIST"],
+    arrays: true,
+};
+/// Snowflake's type names as SQLBuild compares them.
+pub(crate) const SNOWFLAKE_TYPE_SPELLING: TypeSpelling = TypeSpelling {
+    aliases: &[
+        ("BINARY VARYING", "VARBINARY"),
+        ("BOOL", "BOOLEAN"),
+        ("BYTEA", "VARBINARY"),
+        ("CHAR VARYING", "VARCHAR"),
+        ("CHARACTER", "CHAR"),
+        ("CHARACTER VARYING", "VARCHAR"),
+        ("DOUBLE PRECISION", "DOUBLE"),
+        ("HUGEINT", "INT128"),
+        ("INTEGER", "INT"),
+        ("JSON", "VARIANT"),
+        ("NCHAR VARYING", "VARCHAR"),
+        ("NTEXT", "VARCHAR"),
+        ("NUMERIC", "DECIMAL"),
+        ("REAL", "FLOAT"),
+        ("TEXT", "VARCHAR"),
+        ("TIME WITH TIME ZONE", "TIMEWITHTIMEZONE"),
+        ("TIME WITHOUT TIME ZONE", "TIME"),
+        ("TIMESTAMP WITH LOCAL TIME ZONE", "TIMESTAMPLTZ"),
+        ("TIMESTAMP WITH TIME ZONE", "TIMESTAMPTZ"),
+        ("TIMESTAMP WITHOUT TIME ZONE", "TIMESTAMPNTZ"),
+        ("TIMESTAMP_LTZ", "TIMESTAMPLTZ"),
+        ("TIMESTAMP_NTZ", "TIMESTAMPNTZ"),
+        ("TIMESTAMP_TZ", "TIMESTAMPTZ"),
+        ("TIMETZ", "TIMEWITHTIMEZONE"),
+        ("UHUGEINT", "UINT128"),
+        ("UINT16", "USMALLINT"),
+        ("UINT32", "UINTEGER"),
+        ("UINT64", "UBIGINT"),
+        ("UINT8", "UTINYINT"),
+    ],
+    nested_aliases: &[],
+    sizeless: &[],
+    sizeless_whole: &["TIMESTAMP", "TIMESTAMP_TZ", "TIMESTAMPTZ"],
+    bare_kept: &[],
+    fielded: &["OBJECT"],
+    verbatim: &[],
+    arrays: false,
+};
+/// SQLite's type names as SQLBuild compares them.
+pub(crate) const SQLITE_TYPE_SPELLING: TypeSpelling = TypeSpelling {
+    aliases: &[
+        ("BINARY", "BLOB"),
+        ("BOOL", "BOOLEAN"),
+        ("BYTEA", "BLOB"),
+        ("CHAR", "TEXT"),
+        ("CHAR VARYING", "TEXT"),
+        ("CHARACTER", "TEXT"),
+        ("CHARACTER VARYING", "TEXT"),
+        ("DOUBLE", "REAL"),
+        ("DOUBLE PRECISION", "REAL"),
+        ("HUGEINT", "INT128"),
+        ("INT", "INTEGER"),
+        ("INT64", "BIGINT"),
+        ("NCHAR VARYING", "TEXT"),
+        ("NTEXT", "TEXT"),
+        ("NUMERIC", "DECIMAL"),
+        ("SMALLINT", "INTEGER"),
+        ("TIME WITH TIME ZONE", "TIMEWITHTIMEZONE"),
+        ("TIME WITHOUT TIME ZONE", "TIME"),
+        ("TIMESTAMP WITH LOCAL TIME ZONE", "TIMESTAMPLTZ"),
+        ("TIMESTAMP WITH TIME ZONE", "TIMESTAMPTZ"),
+        ("TIMESTAMP WITHOUT TIME ZONE", "TIMESTAMP"),
+        ("TIMESTAMP_LTZ", "TIMESTAMPLTZ"),
+        ("TIMESTAMP_NTZ", "TIMESTAMPNTZ"),
+        ("TIMESTAMP_TZ", "TIMESTAMPTZ"),
+        ("TIMETZ", "TIMEWITHTIMEZONE"),
+        ("UHUGEINT", "UINT128"),
+        ("UINT16", "USMALLINT"),
+        ("UINT32", "UINTEGER"),
+        ("UINT64", "UBIGINT"),
+        ("UINT8", "UTINYINT"),
+        ("VARBINARY", "BLOB"),
+        ("VARCHAR", "TEXT"),
+    ],
+    nested_aliases: &[],
+    sizeless: &["CHAR", "CHARACTER"],
+    sizeless_whole: &[
+        "BIGINT",
+        "CHAR",
+        "CHARACTER",
+        "DOUBLE",
+        "DOUBLE PRECISION",
+        "FLOAT",
+        "INT",
+        "INTEGER",
+        "MEDIUMINT",
+        "REAL",
+        "SMALLINT",
+        "TINYINT",
+    ],
+    bare_kept: &[],
+    fielded: &[],
+    verbatim: &[],
+    arrays: false,
+};

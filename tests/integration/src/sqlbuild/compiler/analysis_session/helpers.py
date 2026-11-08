@@ -656,6 +656,26 @@ def _record_analyses(
     runs.sessions.append(session)
 
 
+def first_model_types(
+    *, files: dict[str, str], lineage_mode: ColumnLineageMode, tmp_path: Path
+) -> tuple[tuple[str, str | None], ...]:
+    """The first analysed model's output names and types, analysed natively as DuckDB."""
+
+    inputs: CompileInputsView = compile_inputs(project_dir=tmp_path / "project", files=files)
+    runs: NativeAnalysisRuns = NativeAnalysisRuns()
+    analyse_natively(
+        inputs=inputs,
+        inference_profile=ExpressionInferenceProfile(sql_analysis_dialect="duckdb"),
+        lineage_mode=lineage_mode,
+        runs=runs,
+        cache_root=tmp_path / "cache",
+    )
+    analysis: ModelSqlAnalysis = session_outcome_analysis(
+        session=runs.sessions[0], position=0, placeholders=None
+    )
+    return tuple((column.name, column.type) for column in analysis.polyglot_analysis.columns or ())
+
+
 def custom_nullability_rule(arguments: tuple[InferredNullability, ...]) -> InferredNullability:
     """An adapter rule SQLBuild does not ship, so native analysis calls it back."""
 

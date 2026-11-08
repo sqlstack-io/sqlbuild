@@ -31,6 +31,17 @@ class FormerlyDeferredSemanticTestCase:
 
 
 @dataclass(frozen=True)
+class DialectFindingTestCase:
+    """One model compiled under one dialect: the findings and output types it must have."""
+
+    description: str
+    dialect: str
+    sql: str
+    expected_codes: tuple[str, ...]
+    expected_types: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
 class MissingCatalogTestCase:
     """A project without the analysis catalog every compile builds."""
 

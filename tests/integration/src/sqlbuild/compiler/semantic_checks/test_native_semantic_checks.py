@@ -22,6 +22,7 @@ from tests.integration.src.sqlbuild.compiler.helpers import (
     read_golden,
 )
 from tests.integration.src.sqlbuild.compiler.semantic_checks._test_types import (
+    DialectFindingTestCase,
     FormerlyDeferredSemanticTestCase,
     GeneratedSemanticParityTestCase,
     MissingCatalogTestCase,
@@ -30,6 +31,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks._test_types import 
 from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     SemanticInputs,
     captured_semantic_inputs,
+    captured_under_dialect,
     completed_natively,
     completion_view,
     files_with_non_ascii,
@@ -37,6 +39,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     has_blocking_binding,
     native_completion,
     note_kinds,
+    one_model_completion,
     outcome_label,
     payload_completion_view,
     proven_output_count,
@@ -84,15 +87,15 @@ def test_given_generated_failing_projects_when_completing_natively_then_matches_
     golden: list[GoldenEntry] = []
     for index in range(test_case.count):
         project_dir: Path = tmp_path / f"project_{index}"
-        captured: SemanticInputs = captured_semantic_inputs(
-            project_dir=project_dir,
-            files=generated_semantic_files(
-                rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
-            ),
+        files: dict[str, str] = generated_semantic_files(
+            rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
         )
         views: dict[str, object] = {}
         for dialect in test_case.dialects:
-            native: CompiledProjectView = completed_natively(with_dialect(captured, dialect))
+            captured: SemanticInputs = captured_under_dialect(
+                project_dir=project_dir, files=files, dialect=dialect
+            )
+            native: CompiledProjectView = completed_natively(captured)
             statuses["completion_native"] += 1
             statuses["diagnostics_native"] += len(native.diagnostics)
             statuses["type_recovery_planned"] += has_blocking_binding(captured.project)
@@ -189,6 +192,67 @@ def test_given_formerly_deferred_projects_when_completing_natively_then_matches_
 @pytest.mark.parametrize(
     "test_case",
     [
+        DialectFindingTestCase(
+            description="DuckDB refuses a text literal compared with a number",
+            dialect="duckdb",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="DuckDB types a date plus whole days as a date",
+            dialect="duckdb",
+            sql='SELECT order_date + order_id AS due FROM __source("raw_orders")',
+            expected_codes=(),
+            expected_types=(("due", "DATE"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_one_model_under_its_dialect_when_completing_natively_then_has_expected_findings(
+    test_case: DialectFindingTestCase,
+    tmp_path: Path,
+) -> None:
+    assert one_model_completion(
+        project_dir=tmp_path / "project", dialect=test_case.dialect, sql=test_case.sql
+    ) == (test_case.expected_codes, test_case.expected_types)
+
+
+@pytest.mark.xfail(
+    strict=True, reason="SQLQuack's Snowflake profile does not yet check or type these"
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DialectFindingTestCase(
+            description="Snowflake refuses a text literal compared with a number",
+            dialect="snowflake",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
+            description="Snowflake types a date plus whole days as a date",
+            dialect="snowflake",
+            sql='SELECT order_date + order_id AS due FROM __source("raw_orders")',
+            expected_codes=(),
+            expected_types=(("due", "DATE"),),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_snowflake_semantics_when_completing_natively_then_has_expected_findings(
+    test_case: DialectFindingTestCase,
+    tmp_path: Path,
+) -> None:
+    assert one_model_completion(
+        project_dir=tmp_path / "project", dialect=test_case.dialect, sql=test_case.sql
+    ) == (test_case.expected_codes, test_case.expected_types)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
         MissingCatalogTestCase(
             description="a project without an analysis catalog is an internal failure",
             expected_message=(
@@ -236,8 +300,8 @@ def test_given_project_without_catalog_when_completing_then_raises_native_compil
             seed=20261011,
             count=4,
             model_count=16,
-            expected_session_models=78,
-            expected_payload_models=18,
+            expected_session_models=83,
+            expected_payload_models=13,
             expected_proven_outputs=10,
             expected_minimum_codes={"B002": 1},
         ),

@@ -2935,10 +2935,5 @@ reason = "Only SensorContext lives here: invocation-local ctx.cursor assignment 
 
 [[targets.rust.rule_exceptions]]
 rule = "FPRSL105"
-path = "crates/sqlbuild-analysis/src/type_system/main/normalize_text_type.rs"
-reason = "Native dialect modules in analysis_route type their spellings through this entry; each dialect's module lands in its own change."
-
-[[targets.rust.rule_exceptions]]
-rule = "FPRSL105"
 path = "crates/sqlbuild-analysis/src/analysis_route/main/clickhouse_type_match.rs"
 reason = "The ClickHouse native dialect module's type_match calls this entry; that module lands in its own change."

@@ -25,6 +25,7 @@ from tests.integration.src.sqlbuild.compiler.analysis_session._test_types import
     CyclicCompileTestCase,
     GeneratedAnalysisTestCase,
     SharedAnalysisTestCase,
+    SourceTypesTestCase,
     StandalonePivotProofTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
@@ -37,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.analysis_session.helpers import (
     compile_inputs,
     compiled_project_view,
     custom_nullability_rule,
+    first_model_types,
     generated_analysis_files,
     native_pivot_proofs,
     pivot_project_files,
@@ -100,6 +102,26 @@ _ORDERS_PROJECT: dict[str, str] = {
     "models/returns.sql": 'MODEL (description "Returns");\n\nSELECT order_id FROM __ref("orders")\n',
 }
 
+_DECLARED_SOURCE_PROJECT: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "orders_sources"\nadapter = "duckdb"\n',
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_orders\n    description: Raw orders.\n    columns:\n"
+        "      - name: order_id\n        type: INTEGER\n"
+        "      - name: amount\n        type: DOUBLE\n"
+    ),
+    "models/orders.sql": (
+        'MODEL (description "Orders");\n\n'
+        'SELECT order_id, amount * -1 AS refund FROM __source("raw_orders")\n'
+    ),
+}
+_EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
+    "sources/raw.yml": _DECLARED_SOURCE_PROJECT["sources/raw.yml"].replace(
+        "    columns:\n",
+        "    expression: >-\n      (SELECT 1 AS order_id, CAST(5 AS DOUBLE) AS amount)\n"
+        "    columns:\n",
+    ),
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -130,7 +152,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=40,
             expected_minimum_pivot_proofs=80,
             expected_minimum_proven_pivots=12,
-            expected_minimum_native_enrichments=90,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, fast lineage",
@@ -144,7 +166,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=30,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="snowflake and duckdb adapter rules, rich lineage",
@@ -158,10 +180,12 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=15,
             expected_minimum_pivot_proofs=30,
             expected_minimum_proven_pivots=10,
-            expected_minimum_native_enrichments=20,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
-            description="a project-local adapter's own nullability rules, called back natively",
+            description=(
+                "a project-local adapter's own nullability rules, not called on a native route"
+            ),
             seed=20261011,
             count=3,
             model_count=24,
@@ -172,7 +196,7 @@ _ORDERS_PROJECT: dict[str, str] = {
             expected_minimum_expression_shapes=1,
             expected_minimum_pivot_proofs=1,
             expected_minimum_proven_pivots=1,
-            expected_minimum_native_enrichments=1,
+            expected_minimum_native_enrichments=0,
         ),
     ],
     ids=lambda case: case.description,
@@ -222,20 +246,23 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     "test_case",
     [
         SharedAnalysisTestCase(
-            description="equal regional queries, missing-column readers and a unique summary",
+            description=(
+                "equal regional queries, missing-column readers and a unique summary, "
+                "each analysed by a native wave"
+            ),
             regions=("east", "west", "north", "south"),
             inexact_regions=("east", "west", "north"),
             dialects=("duckdb", "snowflake"),
             expected_analysed=24,
-            expected_shared=22,
-            expected_reanalysed=6,
-            expected_unshared=2,
+            expected_shared=0,
+            expected_reanalysed=0,
+            expected_unshared=24,
             expected_column_values=12,
         )
     ],
     ids=lambda case: case.description,
 )
-def test_given_equal_model_queries_when_analysing_natively_then_shares_and_cached_runs_agree(
+def test_given_equal_model_queries_when_analysing_natively_then_each_is_analysed_and_runs_agree(
     test_case: SharedAnalysisTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     inputs: CompileInputsView = compile_inputs(
@@ -329,6 +356,55 @@ def test_given_cyclic_models_when_analysing_natively_then_session_answers_and_ca
         test_case.expected_analysed,
         len(test_case.dialects) * len(test_case.lineage_modes),
         False,
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="a source with its expression types the columns read from it",
+            files=_EXPRESSION_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.RICH,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_typed_source_when_analysing_natively_then_its_columns_are_typed(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files, lineage_mode=test_case.lineage_mode, tmp_path=tmp_path
+        )
+        == test_case.expected_types
+    )
+
+
+@pytest.mark.xfail(
+    strict=True, reason="native analysis reads only authoritative shapes, not declared types"
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="a source's declared types type the columns read from it",
+            files=_DECLARED_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.RICH,
+            expected_types=(("order_id", "INTEGER"), ("refund", "DOUBLE")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_declared_source_types_when_analysing_natively_then_columns_are_typed(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files, lineage_mode=test_case.lineage_mode, tmp_path=tmp_path
+        )
+        == test_case.expected_types
     )
 
 

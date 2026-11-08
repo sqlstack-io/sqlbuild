@@ -23,7 +23,7 @@
      },
      "help": "supply argument types supported by this function or conditional expression",
      "notes": [
-      "status is TEXT"
+      "status is VARCHAR"
      ]
     }
    ]
