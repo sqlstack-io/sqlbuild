@@ -30,6 +30,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks._test_types import 
 from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     SemanticInputs,
     captured_semantic_inputs,
+    captured_under_dialect,
     completed_natively,
     completion_view,
     files_with_non_ascii,
@@ -84,15 +85,15 @@ def test_given_generated_failing_projects_when_completing_natively_then_matches_
     golden: list[GoldenEntry] = []
     for index in range(test_case.count):
         project_dir: Path = tmp_path / f"project_{index}"
-        captured: SemanticInputs = captured_semantic_inputs(
-            project_dir=project_dir,
-            files=generated_semantic_files(
-                rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
-            ),
+        files: dict[str, str] = generated_semantic_files(
+            rng=rng, model_count=test_case.model_count, require_analysis=index % 2 == 0
         )
         views: dict[str, object] = {}
         for dialect in test_case.dialects:
-            native: CompiledProjectView = completed_natively(with_dialect(captured, dialect))
+            captured: SemanticInputs = captured_under_dialect(
+                project_dir=project_dir, files=files, dialect=dialect
+            )
+            native: CompiledProjectView = completed_natively(captured)
             statuses["completion_native"] += 1
             statuses["diagnostics_native"] += len(native.diagnostics)
             statuses["type_recovery_planned"] += has_blocking_binding(captured.project)
