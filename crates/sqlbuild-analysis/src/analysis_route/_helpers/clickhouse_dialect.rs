@@ -61,9 +61,7 @@ impl ClickHouseDialect {
         clickhouse_spelling(spelling)
     }
 
-    /// A declared and an inferred type compared as ClickHouse's `toTypeName` spells them, wrappers
-    /// apart: Polyglot's spellings wrap SQL aliases such as `INTEGER` in `Nullable`, the engine's
-    /// don't. `None`, not compared, when either side is no type ClickHouse accepts.
+    /// Two types compared as `toTypeName` spells them, wrappers apart; `None` if either is refused.
     #[must_use]
     pub fn type_match(
         &self,

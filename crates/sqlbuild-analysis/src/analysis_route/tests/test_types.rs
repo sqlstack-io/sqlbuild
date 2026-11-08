@@ -57,3 +57,17 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
 }
+
+pub(super) struct ArmTypeMatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) declared: &'static str,
+    pub(super) inferred: &'static str,
+    pub(super) inferred_nullable: bool,
+    pub(super) expected_match: Option<TypeMatch>,
+}
+
+pub(super) struct TypeSpellingsTestCase {
+    pub(super) description: &'static str,
+    pub(super) spellings: &'static [&'static str],
+    pub(super) expected_mismatches: &'static [&'static str],
+}
