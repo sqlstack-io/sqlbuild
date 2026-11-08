@@ -225,7 +225,6 @@ TYPE_ARGUMENT_CLOSE_TOKENS: frozenset[str] = frozenset({")", ">"})
 TYPE_ARGUMENT_SEPARATOR: str = ","
 TYPE_PATTERN_WILDCARD: str = "*"
 JSONL_BLANK_LINE: str = ""
-LOCAL_SCENARIO_DIALECT: str = "duckdb"
 LOCAL_SCENARIO_DUCKDB_DIALECTS: frozenset[str] = frozenset({"duckdb", "motherduck"})
 LOCAL_SCENARIO_CONVERTED_DIALECT: str = "snowflake"
 

@@ -68,6 +68,7 @@ from sqlbuild.executor.scenario.models import (
     ScenarioLocalSnapshotLoadedRelation,
     ScenarioLocalSnapshotLoadResult,
     ScenarioRunResult,
+    ScenarioSnapshotRelation,
     ScenarioSnapshotStateResult,
 )
 from sqlbuild.executor.scenario.types import (
@@ -475,13 +476,15 @@ def _execute_local_functions(
 
 
 def _snapshot_schema(load_result: ScenarioLocalSnapshotLoadResult) -> dict[str, LocalSqlColumns]:
-    columns: dict[tuple[ScenarioArtifactKind, str], LocalSqlColumns] = {
-        (relation.kind, relation.logical_name): tuple(
+    """Snowflake columns of each loaded relation, keyed by the name Snowflake resolves it to."""
+
+    columns: dict[tuple[ScenarioArtifactKind, str], LocalSqlColumns] = {}
+    relation: ScenarioSnapshotRelation
+    for relation in load_result.manifest.relations:
+        columns[(relation.kind, relation.logical_name)] = tuple(
             (_snowflake_stored_name(column.name), column.warehouse_type)
             for column in relation.columns
         )
-        for relation in load_result.manifest.relations
-    }
     return {
         _snowflake_stored_name(loaded.table_name): columns[(loaded.kind, loaded.logical_name)]
         for loaded in load_result.relations

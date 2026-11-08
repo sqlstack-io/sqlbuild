@@ -35,7 +35,6 @@ WAREHOUSE_AND_INTEGRATION_MODULES: tuple[str, ...] = (
 )
 COMPILE_ONLY_MODULES: tuple[str, ...] = (
     "filelock",
-    "polyglot_sql",
     "pydantic",
     "yaml",
     "sqlbuild.adapter.contract.classes.base_adapter",
@@ -57,7 +56,6 @@ COMPILE_FORBIDDEN: tuple[str, ...] = (
     *PRESENTATION_AND_PROVIDER_MODULES,
 )
 FULL_COMPILE_MODULES: tuple[str, ...] = (
-    "polyglot_sql",
     "pydantic",
     "sqlbuild.adapter.contract.classes.base_adapter",
     "sqlbuild.compiler.pipeline",
@@ -65,7 +63,6 @@ FULL_COMPILE_MODULES: tuple[str, ...] = (
 INSPECTION_FORBIDDEN: tuple[str, ...] = (
     *WAREHOUSE_AND_INTEGRATION_MODULES,
     "filelock",
-    "polyglot_sql",
     "pydantic",
     "yaml",
     "sqlbuild.lint",

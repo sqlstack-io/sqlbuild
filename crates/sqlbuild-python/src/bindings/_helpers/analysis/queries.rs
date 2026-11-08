@@ -33,24 +33,16 @@ fn convert_local_scenario_sql(
     sql: &str,
     schema_json: &str,
     name: &str,
-) -> PyResult<(Option<String>, Vec<(String, String)>, String)> {
-    let converted = py
-        .compiler_detach(|| {
-            sqlbuild_analysis::local_sql::main::convert_local_sql::convert_local_sql(
-                sql,
-                schema_json,
-                name,
-            )
-        })
-        .map_err(value_error)?;
-    Ok(match converted {
-        sqlbuild_analysis::local_sql::models::LocalSql::Converted { sql, columns } => {
-            (Some(sql), columns, String::new())
-        }
-        sqlbuild_analysis::local_sql::models::LocalSql::Refused(reason) => {
-            (None, Vec::new(), reason)
-        }
+) -> PyResult<sqlbuild_analysis::local_sql::models::LocalSqlParts> {
+    py.compiler_detach(|| {
+        sqlbuild_analysis::local_sql::main::convert_local_sql::convert_local_sql(
+            sql,
+            schema_json,
+            name,
+        )
     })
+    .map(sqlbuild_analysis::local_sql::models::LocalSql::into_parts)
+    .map_err(value_error)
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

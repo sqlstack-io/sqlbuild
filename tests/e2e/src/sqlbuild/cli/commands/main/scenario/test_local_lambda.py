@@ -1,4 +1,4 @@
-"""E2E coverage of local replay of captured-dialect lambdas, which DuckDB 2.0 needs as lambda x:."""
+"""E2E coverage of local replay of a Snowflake lambda, which SQLQuack's default policy refuses."""
 
 from __future__ import annotations
 
@@ -21,14 +21,14 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_pr
     "test_case",
     [
         CapturedLambdaScenarioTestCase(
-            description="a Snowflake FILTER with an arrow lambda replays locally",
+            description="a Snowflake FILTER over a constructed array is refused as a JSON divergence",
             scenario_name="order_quantities__lambda",
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
+            expected_stdout_fragment="fn:ARRAY_CONSTRUCT needs known divergence `json_fidelity`",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_snowflake_arrow_lambda_when_replaying_locally_then_the_scenario_passes(
+def test_given_snowflake_arrow_lambda_when_replaying_locally_then_sqlquack_refuses_it(
     test_case: CapturedLambdaScenarioTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(
@@ -45,7 +45,8 @@ def test_given_snowflake_arrow_lambda_when_replaying_locally_then_the_scenario_p
         project_dir=project_dir,
     )
 
-    assert replayed.returncode == 0, replayed.stdout + replayed.stderr
+    assert replayed.returncode == 1, replayed.stdout + replayed.stderr
+    assert "error[X607]" in replayed.stdout, replayed.stdout
     assert test_case.expected_stdout_fragment in replayed.stdout, replayed.stdout
 
 

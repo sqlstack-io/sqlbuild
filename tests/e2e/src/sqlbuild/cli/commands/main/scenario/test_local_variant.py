@@ -112,30 +112,16 @@ def test_given_captured_variant_fixture_when_replaying_locally_then_the_scenario
     "test_case",
     [
         CapturedVariantTextScenarioTestCase(
-            description="pretty-printed JSON text in another key order equals the expected value",
+            description="a PARSE_JSON expected value is refused as a JSON divergence",
             captured_payload_text='{\n  "note": "x",\n  "qty": 2\n}',
             expected_payload_json='{"qty": 2, "note": "x"}',
-            expected_returncode=0,
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
-        ),
-        CapturedVariantTextScenarioTestCase(
-            description="nested objects in another key order equal the expected value",
-            captured_payload_text='{\n  "a": [\n    1,\n    {\n      "d": 2,\n      "c": 3\n    }\n  ],\n  "b": null\n}',
-            expected_payload_json='{"b": null, "a": [1, {"c": 3, "d": 2}]}',
-            expected_returncode=0,
-            expected_stdout_fragment="PASS=1  FAIL=0  ERROR=0  SKIP=0  TOTAL=1",
-        ),
-        CapturedVariantTextScenarioTestCase(
-            description="a different value still fails the comparison",
-            captured_payload_text='{\n  "note": "x",\n  "qty": 3\n}',
-            expected_payload_json='{"qty": 2, "note": "x"}',
             expected_returncode=1,
-            expected_stdout_fragment="mismatched=1 missing=1",
+            expected_stdout_fragment="fn:PARSE_JSON needs known divergence `json_fidelity`",
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_snowflake_variant_text_snapshot_when_replaying_locally_then_json_values_compare_semantically(
+def test_given_snowflake_variant_text_snapshot_when_replaying_locally_then_parse_json_is_refused(
     test_case: CapturedVariantTextScenarioTestCase, tmp_path: Path
 ) -> None:
     project_dir: Path = prepare_inline_project(

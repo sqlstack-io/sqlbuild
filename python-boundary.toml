@@ -568,16 +568,6 @@ rule = 3
 note = "Reads the declaration attached to a project audit factory."
 
 [[stays]]
-path = "compiler/sql_analysis/main/import_polyglot_sql.py"
-rule = 4
-note = "Imports the Polyglot SQL Python package for the Python API."
-
-[[stays]]
-path = "compiler/sql_analysis/_helpers/polyglot.py"
-rule = 4
-note = "Wraps the Polyglot Python package with complexity guards."
-
-[[stays]]
 path = "_native_host.py"
 rule = 1
 note = "The one module native code imports by path: a lazy name table of the executor, adapter, user-code, third-party and facade entry points the native host table (crates/sqlbuild-python native_host) reaches."
@@ -796,11 +786,6 @@ note = "Shape rule: custom-rule host and fact-name constants (CUSTOM_HOST_MAX_TR
 path = "compiler/compile/exceptions.py"
 rule = 2
 note = "Shape rule: data exceptions only (MacroDeclarationLookupError, a CompileInputError that is also a KeyError, which a native error class with one parent cannot express), no logic; consumed by compiler/compile/_helpers/render/user_macros.py."
-
-[[stays]]
-path = "compiler/sql_analysis/constants.py"
-rule = 4
-note = "Rule 4: polyglot_sql glue only; the entry point, call-shape and option names (POLYGLOT_ANALYZE_QUERY_ENTRY_POINT, POLYGLOT_COMPLEXITY_GUARD_OPTION, POLYGLOT_MAX_FUNCTION_CALL_DEPTH, ...) that compiler/sql_analysis/_helpers/polyglot.py uses to wrap the polyglot_sql Python package."
 
 [[stays]]
 path = "compiler/compile/models.py"

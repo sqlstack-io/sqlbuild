@@ -15,7 +15,6 @@ dependencies = [
   "duckdb>=2.0.0",
   "filelock>=3.20.3",
   "orjson>=3.11.7",
-  "polyglot-sql-chio==0.13.10",
   "pydantic-settings>=2,<3",
   "PyYAML>=6.0.2",
   "sqlbuild-cli==0.200.0",  # x-release-please-version

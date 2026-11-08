@@ -22,9 +22,9 @@ DEPENDENCY_SPECIFIER_PATTERN: re.Pattern[str] = re.compile(r"[\[<>=!~]")
             expected_optional_extra_absent=True,
         ),
         ProjectDependencyTestCase(
-            description="maintained polyglot fork is a core dependency",
+            description="the maintained polyglot fork is no longer a dependency",
             dependency_name="polyglot-sql-chio",
-            expected_in_core_dependencies=True,
+            expected_in_core_dependencies=False,
             expected_optional_extra_absent=True,
         ),
     ],

@@ -24,12 +24,7 @@ def convert_sql_for_local_duckdb(
     resource_kind: str,
     resource_name: str,
 ) -> tuple[str, LocalSqlColumns]:
-    """Return captured SQL as DuckDB SQL and its result columns; DuckDB SQL runs as authored.
-
-    Snowflake SQL is converted by SQLQuack under its built-in default policy against `schema`, the
-    Snowflake columns of each local relation keyed as Snowflake resolves its unquoted name. A
-    statement SQLQuack refuses is refused here with SQLQuack's diagnostics.
-    """
+    """Return DuckDB SQL and result columns: Snowflake converted by SQLQuack, DuckDB as authored."""
 
     if source_dialect in LOCAL_SCENARIO_DUCKDB_DIALECTS:
         return sql, ()
@@ -43,7 +38,7 @@ def convert_sql_for_local_duckdb(
     try:
         converted_sql, columns, refusal = convert_local_scenario_sql(
             sql,
-            json.dumps({name: [list(column) for column in columns] for name, columns in schema.items()}),
+            json.dumps(schema),
             f"{resource_kind} '{resource_name}'",
         )
     except ValueError as exc:
@@ -71,7 +66,7 @@ def function_sql_for_local_duckdb(
     resource_kind: str,
     resource_name: str,
 ) -> str:
-    """Return a SQL function body for local DuckDB; only DuckDB captures run SQL functions locally."""
+    """Return a SQL function body for local DuckDB; only DuckDB captures run SQL functions."""
 
     if source_dialect not in LOCAL_SCENARIO_DUCKDB_DIALECTS:
         _raise_conversion_error(

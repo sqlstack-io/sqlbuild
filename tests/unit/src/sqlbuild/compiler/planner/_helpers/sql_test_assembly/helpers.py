@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
 
 from sqlbuild._native import (
     CompiledFunction,
@@ -32,6 +31,7 @@ from sqlbuild._native import (
     plan_compiled_sql_test_artifacts,
     plan_sql_tests,
     plan_sql_tests_natively,
+    query_fingerprint,
     render_sql_test_comparison_sql,
     sql_test_plan_error_messages,
 )
@@ -44,7 +44,6 @@ from sqlbuild.compiler.compile.types import (
     CompiledModelView,
     CompiledProjectView,
 )
-from sqlbuild.compiler.sql_analysis.main.import_polyglot_sql import import_polyglot_sql
 from tests.unit.src.sqlbuild.compiler.planner._helpers.sql_test_assembly._test_types import (
     PlanTestChainTestCase,
 )
@@ -148,16 +147,8 @@ def assert_native_artifact_matches_runtime_plan(
         sql_analysis_enabled=sql_analysis_enabled,
     )
 
-    polyglot_sql: Any = import_polyglot_sql()
-    native_expression: Any = polyglot_sql.parse_one(
-        artifact.sql, dialect=adapter.sql_analysis_dialect()
-    )
-    expected_expression: Any = polyglot_sql.parse_one(
-        expected_sql, dialect=adapter.sql_analysis_dialect()
-    )
-    assert native_expression.sql(dialect=adapter.sql_analysis_dialect()) == expected_expression.sql(
-        dialect=adapter.sql_analysis_dialect()
-    )
+    dialect: str = adapter.sql_analysis_dialect()
+    assert query_fingerprint(artifact.sql, dialect) == query_fingerprint(expected_sql, dialect)
     assert artifact.model_names == tuple(step.model_name for step in entry.chain)
     assert artifact.error_messages == sql_test_plan_error_messages(warnings=warnings)
     return True
