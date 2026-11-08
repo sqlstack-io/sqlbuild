@@ -199,7 +199,16 @@ class LocalScenarioSqlTestCase:
     description: str
     source_dialect: str | None
     sql: str
-    expected_sql: str
+    expected_sql_fragments: tuple[str, ...]
+    expected_columns: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class LocalScenarioSqlRefusalTestCase:
+    description: str
+    source_dialect: str | None
+    sql: str
+    expected_message_fragments: tuple[str, ...]
 
 
 @dataclass(frozen=True)

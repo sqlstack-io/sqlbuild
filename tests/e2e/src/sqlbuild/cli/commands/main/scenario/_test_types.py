@@ -365,6 +365,18 @@ class EscapedQuoteScenarioTestCase:
 
 
 @dataclass(frozen=True)
+class SnowflakeLocalConversionTestCase:
+    """A Snowflake-captured scenario whose models SQLQuack converts for DuckDB, or refuses."""
+
+    description: str
+    scenario_name: str
+    model_files: tuple[tuple[str, str], ...]
+    expected_sql: str
+    expected_exit_code: int
+    expected_stdout_fragments: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class CapturedLambdaScenarioTestCase:
     """A Snowflake-captured scenario whose model uses an arrow lambda, replayed in DuckDB."""
 
