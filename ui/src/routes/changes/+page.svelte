@@ -12,7 +12,7 @@
 	import { runStatusLabel, runStatusTone } from '$lib/status';
 	import { changeOpLabel, changeOpTone, formatCredits } from '$lib/build-area/labels';
 	import { summarizeChange } from '$lib/build-area/changes';
-	import { orchestrationHref, percentChange } from './utils';
+	import { nodeHref, orchestrationHref, percentChange } from './utils';
 
 	type Area = 'all' | 'nodes' | 'orchestration' | 'roles' | 'environment';
 
@@ -32,7 +32,7 @@
 			if (!hasArea(c, area)) return false;
 			const q = query.trim().toLowerCase();
 			if (!q) return true;
-			return [c.gitRevision, c.gitAuthor, String(c.generation), ...c.nodes.map((n) => n.key), ...c.nodes.map((n) => n.formerKey ?? ''), ...c.orchestration.map((o) => o.key), ...c.roles.map((r) => r.role)].some((s) => s.toLowerCase().includes(q));
+			return [c.gitRevision ?? '', c.gitAuthor ?? '', String(c.generation), ...c.nodes.map((n) => n.key), ...c.nodes.map((n) => n.formerKey ?? ''), ...c.orchestration.map((o) => o.key), ...c.roles.map((r) => r.role)].some((s) => s.toLowerCase().includes(q));
 		})
 	);
 	const areaOptions: { value: Area; label: string }[] = [
@@ -62,12 +62,12 @@
 				<span class="icon"><GitCommitIcon size={15} /></span>
 				<div class="title">
 					<strong title="Snapshot {c.snapshotId}, generation {c.generation}">Version {c.generation}</strong>
-					<code title="Commit">{c.gitRevision}{c.gitDirty ? ' · with uncommitted changes' : ''}</code>
+					{#if c.gitRevision}<code title="Commit">{c.gitRevision}{c.gitDirty ? ' · with uncommitted changes' : ''}</code>{/if}
 					<span class="faint">{summarizeChange(c)}</span>
 				</div>
 				<div class="who">
-					<span>{c.gitAuthor}</span>
-					<span class="faint">deployed by {c.publishedBy.displayName} · <span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
+					{#if c.gitAuthor}<span>{c.gitAuthor}</span>{/if}
+					<span class="faint">{c.publishedBy ? `deployed by ${c.publishedBy.displayName} · ` : 'published '}<span title={formatStamp(c.publishedAt)}>{formatAgo(c.publishedAt, app.now)}</span></span>
 				</div>
 			</header>
 
@@ -76,9 +76,10 @@
 					<section>
 						<h3>Nodes <span>{c.nodes.length}</span></h3>
 						{#each c.nodes as n (n.key + n.op)}
+							{@const href = nodeHref(n, app.client.supports('getCatalogNode'))}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[n.op]}>{changeOpLabel[n.op]}</span>
-								{#if n.op === 'removed'}<code class="gone">{n.key}</code>{:else}<a class="key" href="/catalog/{n.key}{n.op === 'changed' ? '?tab=drift' : ''}">{n.key}</a>{/if}
+								{#if href}<a class="key" {href}>{n.key}</a>{:else}<code class:gone={n.op === 'removed'}>{n.key}</code>{/if}
 								<span class="detail">{n.detail}{#if n.compiledOnly}<span class="tag">compiled only</span>{/if}</span>
 							</div>
 							{#each n.columns as col (col.name)}
@@ -110,10 +111,12 @@
 				{#if c.roles.length}
 					<section>
 						<h3>Roles <span>{c.roles.length}</span></h3>
-						{#each c.roles as r (r.role)}
+						{#each c.roles as r, i (`${i}:${r.role}`)}
 							<div class="row">
 								<span class="op" style:--tone={changeOpTone[r.op]}>{changeOpLabel[r.op]}</span>
-								<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
+								{#if !r.role}<span class="faint" title="Only people who can give roles see which role changed">a role</span>
+								{:else if app.client.supports('getRole')}<a class="key" href="/admin/roles/{encodeURIComponent(r.role)}">{r.role}</a>
+								{:else}<code>{r.role}</code>{/if}
 								<span class="detail">
 									{#if r.coverage}<b>now covers {r.coverage.after} {r.coverage.after === 1 ? 'node' : 'nodes'}</b>{`${r.coverage.before !== r.coverage.after ? ` (was ${r.coverage.before})` : ''} · `}{/if}{r.detail}
 								</span>

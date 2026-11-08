@@ -70,7 +70,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
       - name: Validate inputs

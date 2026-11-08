@@ -122,3 +122,26 @@ impl Default for SnapshotRetention {
         }
     }
 }
+
+/// One publication as people browse it: its commit, environment and changed definitions.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct PublishedSnapshot {
+    pub snapshot_id: Uuid,
+    pub generation: i64,
+    pub git_revision: Option<String>,
+    pub git_dirty: bool,
+    pub git_author: Option<String>,
+    /// Digest of the lock file, Python and `sqb` versions; a change means dependencies changed.
+    pub environment_hash: String,
+    pub sqb_version: String,
+    pub published_at: DateTime<Utc>,
+    /// Added, changed and removed nodes and roles, in publication order.
+    pub changes: Vec<PublishedChange>,
+}
+
+/// A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PublishedChange {
+    pub change_kind: String,
+    pub subject_key: String,
+}

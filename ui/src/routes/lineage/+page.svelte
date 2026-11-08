@@ -243,11 +243,14 @@
 	const primary = $derived(selectedNodes[0] ?? nodes.find((n) => n.id === scaleStartId));
 	const primarySlug = $derived(primary?.data.name ?? '');
 	// Inspector detail for the primary selection; the scale-test graph is synthetic, so it has none.
+	// Without a detail read the inspector shows what the catalog listing reports.
+	const detailSupported = app.client.supports('getCatalogNode');
 	const detail = createResource(
-		(client, scope) => (scaleMode || !primarySlug ? Promise.resolve(null) : client.getCatalogNode(scope, String(primarySlug))),
+		(client, scope) => (scaleMode || !primarySlug || !detailSupported ? Promise.resolve(null) : client.getCatalogNode(scope, String(primarySlug))),
 		['runs', 'checks', 'snapshot', 'node_status']
 	);
 	const d = $derived(detail.data && detail.data.key === primarySlug ? detail.data : null);
+	const listed = $derived(detailSupported ? null : (catalogByKey.get(String(primarySlug)) ?? null));
 	const isSource = $derived(d?.kind === 'source');
 	const hasSql = $derived(!!d?.sql);
 
@@ -455,7 +458,7 @@
 
 <AppTopbar title="Lineage">
 	<Button variant="outline" size="sm" onclick={() => catalog.refresh()}>↻ Refresh</Button>
-	<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Execute{runSelection.length ? ` ${runSelection.length}` : ''}</GatedButton>{/if}
 </AppTopbar>
 
 <RunPanel bind:open={runOpen} selection={runSelection} />
@@ -632,6 +635,16 @@
 				<InspectorSection title="Scale test">
 					<p class="insp-description">A synthetic graph for layout and rendering at scale; nodes have no catalog detail.</p>
 				</InspectorSection>
+			{:else if listed}
+				<InspectorSection title="Details">
+					<dl class="kv">
+						<div><dt>Kind</dt><dd>{kindLine(listed)}</dd></div>
+						{#if listed.relation}<div><dt>Relation</dt><dd class="mono">{relationName(listed.relation)}</dd></div>{/if}
+						{#if listed.kind !== 'source'}<div><dt>Last built</dt><dd>{#if listed.lastBuild}<BuildSource build={listed.lastBuild} />{:else}No build recorded{/if}</dd></div>{/if}
+						{#if listed.tags.length}<div><dt>Tags</dt><dd>{listed.tags.join(', ')}</dd></div>{/if}
+						{#if listed.path}<div><dt>File</dt><dd class="mono">{listed.path}</dd></div>{/if}
+					</dl>
+				</InspectorSection>
 			{:else if !d}
 				<InspectorSection title="Details"><p class="insp-description">{detail.error ?? 'Loading…'}</p></InspectorSection>
 			{:else if isSource}
@@ -675,9 +688,9 @@
 				</InspectorSection>
 			{/if}
 
-			{#if d?.description}
+			{#if (d ?? listed)?.description}
 				<InspectorSection title="Description">
-					<p class="insp-description">{d.description}</p>
+					<p class="insp-description">{(d ?? listed)?.description}</p>
 				</InspectorSection>
 			{/if}
 
