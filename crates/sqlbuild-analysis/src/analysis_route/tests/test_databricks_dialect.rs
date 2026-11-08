@@ -1,9 +1,8 @@
 use crate::analysis_route::models::{DatabricksDialect, ParserGap};
 use crate::analysis_route::tests::test_types::{NormalizeTypeTestCase, ReadWholeTestCase};
 use crate::analysis_route::types::NativeDialect;
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
 use crate::type_system::main::normalize_type::normalize_type;
-use crate::type_system::models::{NormalizedType, TypeDialect};
+use crate::type_system::models::NormalizedType;
 
 const DATABRICKS: &str = "databricks";
 
@@ -110,9 +109,7 @@ fn given_databricks_type_spellings_when_normalized_then_the_fallback_gives_polyg
         let polyglot: NormalizedType = normalize_type(test_case.spelling, DATABRICKS)
             .expect("Polyglot normalizes every Databricks spelling")
             .normalized;
-        let native: Option<NormalizedType> = DatabricksDialect
-            .normalize_type(test_case.spelling)
-            .map(|spelling| normalize_with_fallback(&spelling, Some(TypeDialect::Databricks)));
+        let native: Option<NormalizedType> = DatabricksDialect.normalize_type(test_case.spelling);
         assert_eq!(native, Some(polyglot), "{}", test_case.description);
     }
 }

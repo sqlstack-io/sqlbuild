@@ -5,6 +5,7 @@ use sqlquack_syntax::{Expression, Parsed};
 
 use crate::analysis_route::constants::{STATEMENTS_CONSTRUCT, UNPARSED_CONSTRUCT};
 use crate::analysis_route::models::ParserGap;
+use crate::type_system::models::NormalizedType;
 
 /// A dialect whose SQL SQLQuack parses and analyses in place of Polyglot.
 pub trait NativeDialect: Sync {
@@ -20,8 +21,8 @@ pub trait NativeDialect: Sync {
     /// The dialect's sqlquack-semantics profile: name resolution, typing and scope rules.
     fn profile(&self) -> &'static dyn DialectProfile;
 
-    /// A type as written in this dialect, spelt as SQLBuild compares types; `None` when unknown.
-    fn normalize_type(&self, spelling: &str) -> Option<String>;
+    /// A type as written in this dialect, as SQLBuild compares types; `None` when unknown.
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType>;
 
     /// One statement, no gaps, every byte covered, and not a lone `Command` (text a parser kept
     /// unparsed): `parse`, then those rules.

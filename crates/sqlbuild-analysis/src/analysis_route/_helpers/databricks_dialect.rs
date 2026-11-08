@@ -9,6 +9,8 @@ use crate::analysis_route::constants::{
 };
 use crate::analysis_route::models::{DatabricksDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::_helpers::fallback::normalize_with_fallback;
+use crate::type_system::models::{NormalizedType, TypeDialect};
 
 impl NativeDialect for DatabricksDialect {
     fn name(&self) -> &'static str {
@@ -40,7 +42,7 @@ impl NativeDialect for DatabricksDialect {
         &DATABRICKS
     }
 
-    fn normalize_type(&self, spelling: &str) -> Option<String> {
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         let upper: String = spelling
             .split_whitespace()
             .collect::<Vec<&str>>()
@@ -49,11 +51,13 @@ impl NativeDialect for DatabricksDialect {
         if upper.is_empty() {
             return None;
         }
-        Some(
-            DATABRICKS_TYPE_ALIASES
-                .iter()
-                .fold(upper, |text, (alias, name)| aliased(&text, alias, name)),
-        )
+        let spelt: String = DATABRICKS_TYPE_ALIASES
+            .iter()
+            .fold(upper, |text, (alias, name)| aliased(&text, alias, name));
+        Some(normalize_with_fallback(
+            &spelt,
+            Some(TypeDialect::Databricks),
+        ))
     }
 }
 
