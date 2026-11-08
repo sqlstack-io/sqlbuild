@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::api::main::serve_api::serve_api;
 use crate::api::models::ApiAuthentication;
 use crate::api::tests::test_types::TestApi;
+use crate::runs::tests::test_types::ExactKeyPlanner;
 use crate::store::models::ControlStore;
 
 pub(crate) async fn start_api(store: &ControlStore) -> TestApi {
@@ -22,7 +23,11 @@ pub(crate) async fn start_api_with_authentication(
     let task = tokio::spawn(serve_api(
         store,
         listener,
-        (authentication, Vec::new(), Default::default()),
+        (
+            authentication,
+            (Vec::new(), std::sync::Arc::new(ExactKeyPlanner)),
+            Default::default(),
+        ),
         (|| {}, async {
             let _ = signal.await;
         }),

@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
-import type { Principal } from './types';
-import type { NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
+import type { Capability, Principal } from './types';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -9,6 +9,19 @@ type Wire = components['schemas'];
 export const RUN_WINDOW = 1000;
 
 const PERSON = 'principal:';
+
+/** The server's dry run of an ad-hoc command. */
+export function toAdhocCheck(wire: Wire['AdhocCheck']): AdhocRunCheck {
+	return {
+		verb: (wire.verb ?? null) as LaunchVerb | null,
+		selection: wire.selection,
+		writeSet: wire.write_set,
+		settings: wire.settings,
+		permissions: wire.permissions.map((p) => ({ action: p.action as Capability, allowed: p.allowed, reason: p.reason ?? null })),
+		error: wire.error ?? null,
+		launchable: wire.launchable
+	};
+}
 
 /** Who requested a run: a person by display name and principal ID, otherwise the trigger or system actor. */
 export function requesterOf(wire: Wire['RunRecord']): Principal {

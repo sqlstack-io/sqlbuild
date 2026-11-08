@@ -1,17 +1,18 @@
 <script lang="ts">
 	// Run panel: one editable command line is the interface. Verbs and flags come
-	// from the CLI's command table; selectors autocomplete from the snapshot. The
-	// server checks the request before launch: what it resolves to, what it
-	// writes, and whether the caller may write all of it.
+	// from the CLI's ad-hoc allowlist; selectors autocomplete from the snapshot.
+	// The server's dry run decides everything else: what the command resolves
+	// to, what it writes, and each permission the launch needs.
 	import { goto } from '$app/navigation';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import XIcon from '@lucide/svelte/icons/x';
-	import type { AdhocRunCheck, LaunchVerb } from '$lib/api';
+	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb } from '$lib/api';
+	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { VERBS, verbSpec } from './command-table';
-	import { applySuggestion, parseCommand, suggest, withVerb, type Suggestion } from './command';
+	import { applySuggestion, commandTokens, parseCommand, selectorOf, suggest, withVerb, type Suggestion } from './command';
 
 	let {
 		open = $bindable(false),
@@ -24,14 +25,15 @@
 		verb?: LaunchVerb;
 	} = $props();
 
-	const snapshotNodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
+	// Autocomplete reads the snapshot's nodes only while the panel is open.
+	const snapshotNodes = createResource((client, scope) => (open ? client.listSnapshotNodes(scope) : Promise.resolve([])), ['snapshot']);
 
 	let cmd = $state('sqb build ');
 	let cmdEl = $state<HTMLInputElement>();
 	let wasOpen = false;
 	$effect(() => {
 		if (open && !wasOpen) {
-			cmd = `sqb ${initialVerb} ${selection.length ? `--select ${selection.join(' ')} ` : ''}`;
+			cmd = `sqb ${initialVerb} ${selection.length ? `--select ${selection.map(selectorOf).join(' ')} ` : ''}`;
 			check = null;
 			launchError = null;
 			queueMicrotask(() => cmdEl?.focus());
@@ -39,28 +41,30 @@
 		wasOpen = open;
 	});
 
-	const parsed = $derived(parseCommand(cmd));
-	const verb = $derived(parsed.request.verb);
+	const parts = $derived(parseCommand(cmd));
+	const verb = $derived(parts.verb);
 	const spec = $derived(verbSpec(verb));
-	const requestKey = $derived(JSON.stringify(parsed.request));
+	const request = $derived<AdhocRunRequest>({ command: commandTokens(cmd), priority: 0 });
+	const requestKey = $derived(JSON.stringify(request));
+	const mayRun = $derived(app.can('run.adhoc'));
 
-	// ---- server check (debounced) ----
+	// ---- server dry run (debounced; nothing is queued or recorded) ----
 	let check = $state<AdhocRunCheck | null>(null);
 	let checkedKey = $state('');
 	let checking = $state(false);
 	let checkError = $state<string | null>(null);
 	let seq = 0;
 	$effect(() => {
-		if (!open) return;
+		if (!open || !mayRun) return;
 		const key = requestKey;
-		const request = parsed.request;
+		const body = request;
 		const scope = app.scope;
 		if (!scope) return;
 		const mine = ++seq;
 		checking = true;
 		const timer = setTimeout(async () => {
 			try {
-				const result = await app.client.checkAdhocRun(scope, request);
+				const result = await app.client.checkAdhocRun(scope, body);
 				if (mine !== seq) return;
 				check = result;
 				checkedKey = key;
@@ -135,10 +139,13 @@
 	// ---- launch ----
 	let launching = $state(false);
 	let launchError = $state<string | null>(null);
-	const canLaunch = $derived(fresh && !!check?.ok && parsed.errors.length === 0);
+	const canLaunch = $derived(fresh && !!check?.launchable);
 	const blockedReason = $derived(
-		parsed.errors[0] ??
-			(!fresh ? 'Checking with the server…' : check && !check.adhoc.allowed ? 'You need permission to build every node this run would update (run.adhoc)' : check?.rewriteHistory.required && !check.rewriteHistory.allowed ? "You don't have permission to rebuild history (run.rewrite_history)" : check?.problems[0]?.message)
+		!mayRun
+			? "You don't have permission to start runs by hand in this target (run.adhoc)"
+			: !fresh
+				? 'Checking with the server…'
+				: (check?.error ?? check?.permissions.find((p) => !p.allowed)?.reason ?? undefined)
 	);
 
 	async function launch() {
@@ -147,7 +154,7 @@
 		launching = true;
 		launchError = null;
 		try {
-			const run = await app.client.launchAdhocRun(scope, parsed.request);
+			const run = await app.client.launchAdhocRun(scope, request);
 			open = false;
 			await goto(`/runs/${run.id}`);
 		} catch (e) {
@@ -190,48 +197,39 @@
 					Server check
 					{#if checking}<span class="faint">checking…</span>{:else if checkError}<span class="bad-text">{checkError}</span>{/if}
 				</div>
-				{#if parsed.errors.length}
-					{#each parsed.errors as e (e)}<p class="problem">{e}</p>{/each}
-				{/if}
-				{#if check}
-					<div class="block" class:stale={!fresh}>
-						<h5>Picks <span>{check.resolvedNodes.length} node{check.resolvedNodes.length === 1 ? '' : 's'}{parsed.request.select.length ? '' : ' · whole project'}</span></h5>
-						{@render chips(check.resolvedNodes)}
-					</div>
-					<div class="block" class:stale={!fresh}>
-						<h5 title="The write set: nodes this run updates and reserves while it runs">Updates <span>{check.writeSet.length ? `${check.writeSet.length} node${check.writeSet.length === 1 ? '' : 's'}` : 'nothing'}</span></h5>
-						{#if check.writeSet.length}{@render chips(check.writeSet)}{:else}<p class="faint">sqb {verb} only reads, so it doesn't wait for other runs.</p>{/if}
-					</div>
-					<div class="block" class:stale={!fresh}>
-						<h5 title="run.adhoc">
-							Permission
-							{#if check.adhoc.allowed}<span class="ok-text">you can update all of these</span>{:else}<span class="bad-text">the whole run would be refused</span>{/if}
-						</h5>
-						{#if !check.adhoc.allowed}
-							<p class="faint">
-								{app.can('run.adhoc') ? `You can't update ${check.adhoc.outOfScope.length} of the nodes this run would update. Narrow the selection, or ask for a role that covers them (run.adhoc).` : "You don't have permission to start runs by hand in this target (run.adhoc)."}
-							</p>
-							{@render chips(check.adhoc.outOfScope, 'bad')}
-						{/if}
-					</div>
-					{#if check.rewriteHistory.required}
+				{#if !mayRun}
+					<p class="faint">You don't have permission to start runs by hand in this target (run.adhoc).</p>
+				{:else if check}
+					{#if check.error}<p class="problem" data-testid="adhoc-error">{check.error}</p>{/if}
+					{#if check.verb}
 						<div class="block" class:stale={!fresh}>
-							<h5 title="run.rewrite_history">
-								Rebuilds history
-								{#if check.rewriteHistory.allowed}<span class="ok-text">you're allowed to</span>{:else}<span class="bad-text">you need permission</span>{/if}
-							</h5>
-							<p class="faint">These options replace data that was already built: {check.rewriteHistory.reasons.join(', ')}</p>
+							<h5>Picks <span>{check.selection.length} node{check.selection.length === 1 ? '' : 's'}{parts.select.length ? '' : ' · whole project'}</span></h5>
+							{@render chips(check.selection)}
 						</div>
-					{/if}
-					{#if check.claimConflicts.length}
 						<div class="block" class:stale={!fresh}>
-							<h5 title="Write claims are held by other runs">Will wait <span>other runs are updating the same data</span></h5>
-							{#each check.claimConflicts.slice(0, 6) as c (c.runId + c.nodeKey)}
-								<p class="faint">Run <a href="/runs/{c.runId}" onclick={() => (open = false)}>{c.runId.replace(/^run-/, '')}</a> is updating <code>{c.nodeKey}</code></p>
+							<h5 title="The write set: nodes this run updates and reserves while it runs">Updates <span>{check.writeSet.length ? `${check.writeSet.length} node${check.writeSet.length === 1 ? '' : 's'}` : 'nothing'}</span></h5>
+							{#if check.writeSet.length}{@render chips(check.writeSet)}{:else}<p class="faint">sqb {check.verb} only reads, so it doesn't wait for other runs.</p>{/if}
+						</div>
+						<div class="block" class:stale={!fresh}>
+							<h5>Permissions <span>checked on every node it picks</span></h5>
+							{#each check.permissions as p (p.action)}
+								<p class="decision" data-testid="adhoc-permission">
+									<span class={p.allowed ? 'ok-text' : 'bad-text'}>{p.allowed ? '✓' : '✕'}</span>
+									<span title={p.action}>{PERMISSIONS[p.action].label}</span>
+									<code class="faint">{p.action}</code>
+									{#if p.reason}<span class="bad-text">{p.reason}</span>{/if}
+								</p>
 							{/each}
 						</div>
+						{#if Object.keys(check.settings).length}
+							<div class="block" class:stale={!fresh}>
+								<h5 title="The options the worker receives">Options</h5>
+								<div class="chips">
+									{#each Object.entries(check.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
+								</div>
+							</div>
+						{/if}
 					{/if}
-					{#each check.problems as p (p.code + p.message)}<p class="problem">{p.message}</p>{/each}
 				{:else if !checkError}
 					<p class="faint">Checking the request…</p>
 				{/if}
@@ -241,12 +239,12 @@
 				<div class="section-title">Options · sqb {verb}</div>
 				{#each spec.flags.filter((f) => f.flag !== '--select' && f.flag !== '--exclude') as f (f.flag)}
 					<button onclick={() => insertFlag(f.flag)} title={f.description}>
-						<code class:rewrite={f.rewritesHistory}>{f.flag}</code>
+						<code class:rewrite={f.requires !== null} title={f.requires ? `Needs ${f.requires}` : undefined}>{f.flag}</code>
 						<span>{f.description}</span>
 					</button>
 				{/each}
 				<p class="faint note">
-					The same options as the command line. Type <code>--</code> for options, or a node name, <code>tag:</code>, <code>group:</code>, <code>kind:</code> or <code>path:</code> after <code>--select</code>; <code>+</code> before or after adds upstream or downstream nodes.
+					The command line's options, less those a server run can't honour. Type <code>--</code> for options, or a node name, <code>seed:</code>, <code>source:</code>, <code>tag:</code> or <code>path:</code> after <code>--select</code>; <code>+</code> before or after adds upstream or downstream nodes. Amber options need an extra permission.
 				</p>
 			</div>
 		</div>
@@ -276,10 +274,10 @@
 				/>
 				<span class="locked" title="Set by the location you're in"><LockIcon size={11} /> --target {app.target?.name}</span>
 				<span title={canLaunch ? undefined : blockedReason}>
-					<GatedButton requires="run.adhoc" variant="default" disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+					<GatedButton requires="run.adhoc" variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
 				</span>
 			</div>
-			{#if launchError}<p class="problem">{launchError}</p>{:else if !canLaunch && blockedReason && fresh}<p class="faint hint">{blockedReason}</p>{/if}
+			{#if launchError}<p class="problem">{launchError}</p>{:else if !canLaunch && blockedReason && (fresh || !mayRun)}<p class="faint hint">{blockedReason}</p>{/if}
 		</div>
 	</div>
 {/if}
@@ -408,8 +406,12 @@
 		color: var(--sb-error);
 		font-size: 12px;
 	}
-	.check a {
-		color: var(--primary);
+	.decision {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		margin: 3px 0;
+		font-size: 12px;
 	}
 	.flags button {
 		display: flex;

@@ -83,6 +83,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             post(crate::api::_helpers::resources::person_operations::request_job),
         )
         .route(
+            "/api/control/runs/adhoc",
+            post(crate::api::_helpers::resources::person_operations::request_adhoc),
+        )
+        .route(
+            "/api/control/runs/adhoc/check",
+            post(crate::api::_helpers::resources::person_operations::check_adhoc),
+        )
+        .route(
             "/api/control/runs/cancel",
             post(crate::api::_helpers::resources::person_operations::cancel_run),
         )

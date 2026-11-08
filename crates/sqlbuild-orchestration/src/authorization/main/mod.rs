@@ -5,6 +5,7 @@ pub(crate) mod begin_authorized;
 pub mod bootstrap_user;
 pub mod change_administrator;
 pub mod compile_roles;
+pub(crate) mod decide_person_scopes;
 pub(crate) mod deny_authorization;
 pub mod grant_admin;
 pub mod list_role_definitions;
