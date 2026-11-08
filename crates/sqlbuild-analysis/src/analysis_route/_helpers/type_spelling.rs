@@ -86,19 +86,11 @@ impl Reader<'_> {
         while words.len() < MAX_TYPE_NAME_WORDS {
             self.blank_if(!words.is_empty());
             let word_start: usize = self.position;
-            while self
-                .peek()
-                .is_some_and(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-            {
-                self.position += 1;
-            }
+            self.position = self.word_end();
             if self.position == word_start {
                 break;
             }
-            let word: String = self
-                .source
-                .get(word_start..self.position)?
-                .to_ascii_uppercase();
+            let word: String = self.source.get(word_start..self.position)?.to_uppercase();
             words.push((word, self.position));
         }
         let (first, first_end) = words.first().cloned()?;
@@ -158,7 +150,7 @@ impl Reader<'_> {
         }
     }
 
-    /// A field name, quoted or bare, as written.
+    /// A field name as written; a bare one outside ASCII is quoted, as Polyglot quotes it.
     fn field(&mut self) -> Option<String> {
         let start: usize = self.position;
         if self.peek() == Some(b'"') {
@@ -168,17 +160,14 @@ impl Reader<'_> {
             }
             self.position += 1;
         } else {
-            while self
-                .peek()
-                .is_some_and(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-            {
-                self.position += 1;
-            }
+            self.position = self.word_end();
         }
-        (self.position > start)
-            .then(|| self.source.get(start..self.position))
-            .flatten()
-            .map(str::to_owned)
+        let field: &str = self.source.get(start..self.position)?;
+        match (field.is_empty(), field.starts_with('"') || field.is_ascii()) {
+            (true, _) => None,
+            (false, true) => Some(field.to_owned()),
+            (false, false) => Some(format!("\"{field}\"")),
+        }
     }
 
     /// A number or a quoted string, as written.
@@ -214,6 +203,15 @@ impl Reader<'_> {
             }
         }
         self.source.get(start..self.position).map(str::to_owned)
+    }
+
+    /// Where the word at the position ends: letters and digits in any script, and underscores.
+    fn word_end(&self) -> usize {
+        let rest: &str = self.source.get(self.position..).unwrap_or_default();
+        self.position
+            + rest
+                .find(|character: char| !(character.is_alphanumeric() || character == '_'))
+                .unwrap_or(rest.len())
     }
 
     fn peek(&self) -> Option<u8> {

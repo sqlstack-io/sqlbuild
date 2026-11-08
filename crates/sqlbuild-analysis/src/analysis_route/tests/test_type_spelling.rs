@@ -237,6 +237,20 @@ fn given_a_type_spelling_when_a_dialect_normalises_it_then_it_is_polyglots_type_
             expected_type: None,
         },
         TypeSpellingTestCase {
+            description: "a type name outside ASCII is one word, upper-cased as Python does",
+            dialect: "duckdb",
+            normalize: |spelling| DuckDbDialect.normalize_type(spelling),
+            spelling: "téxt",
+            expected_type: Some(("T\u{c9}XT", TypeFamily::Other)),
+        },
+        TypeSpellingTestCase {
+            description: "a bare struct field outside ASCII is quoted, as Polyglot quotes it",
+            dialect: "duckdb",
+            normalize: |spelling| DuckDbDialect.normalize_type(spelling),
+            spelling: "STRUCT(größe INTEGER)",
+            expected_type: Some(("STRUCT(\"GRÖSSE\"INT)", TypeFamily::Other)),
+        },
+        TypeSpellingTestCase {
             description: "NUMERIC is DECIMAL",
             dialect: "sqlite",
             normalize: |spelling| SqliteDialect.normalize_type(spelling),
