@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
       - uses: dtolnay/rust-toolchain@master
@@ -58,7 +58,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
       - uses: dtolnay/rust-toolchain@master
@@ -97,7 +97,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
       - uses: dtolnay/rust-toolchain@master

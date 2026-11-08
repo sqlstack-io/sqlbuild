@@ -74,7 +74,7 @@ jobs:
           ref: ${{ steps.release_branch.outputs.name }}
           token: ${{ steps.delivery-token.outputs.token }}
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         if: steps.release.outputs.prs_created == 'true'
         with:
           version: "0.12.3"

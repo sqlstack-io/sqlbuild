@@ -261,7 +261,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
       - uses: dtolnay/rust-toolchain@master
@@ -282,7 +282,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -338,7 +338,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -388,7 +388,7 @@ jobs:
       PYTEST_XDIST_AUTO_NUM_WORKERS: "4"
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -447,7 +447,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -494,7 +494,7 @@ jobs:
       UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -531,7 +531,7 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -637,7 +637,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -672,7 +672,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -705,7 +705,7 @@ jobs:
         models: [3000, 5000, 10000]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -757,7 +757,7 @@ jobs:
         models: [1000, 3000, 5000, 10000]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -826,7 +826,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'main' }}
           path: base
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -903,7 +903,7 @@ jobs:
         models: [3000, 5000, 10000]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -974,7 +974,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -1024,7 +1024,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -1061,7 +1061,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
@@ -1110,7 +1110,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: ./.github/actions/setup-uv
         with:
           version: "0.12.3"
           enable-cache: true
