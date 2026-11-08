@@ -1205,11 +1205,10 @@ jobs:
     # release checks in release-please.yml post on the branch's current head, after the lockfile
     # refresh and every dispatched check. This job reports under another name there, so its quick
     # metadata-only pass can never satisfy Verify first; a skipped job would count as passing, so
-    # the job runs unless the run is cancelled, and only its name changes. Until those checks post
-    # Verify on the head, the pull request waits for an expected check, and every new push to the
-    # branch waits again. The same holds for a fast-core run that leaves out suites its change
-    # needs, and for a run started by an unrelated label: neither reports as Verify. A cancelled
-    # run cancels this job instead of queueing it for a runner, and a cancelled Verify blocks.
+    # the job always runs and only its name changes. Until those checks post Verify on the head,
+    # the pull request waits for an expected check, and every new push to the branch waits again.
+    # The same holds for a fast-core run that leaves out suites its change needs, and for a run
+    # started by an unrelated label: neither reports as Verify.
     name: >-
       ${{ (github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
@@ -1218,7 +1217,7 @@ jobs:
       || ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-verify') && 'Label change (nothing verified)'
       || needs.changes.outputs.partial == 'true' && 'Fast core (label full-verify for Verify)'
       || 'Verify' }}
-    if: ${{ !cancelled() }}
+    if: always()
     needs:
       [
         changes,
