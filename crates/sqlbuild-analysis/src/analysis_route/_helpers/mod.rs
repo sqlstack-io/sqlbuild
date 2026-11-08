@@ -1,3 +1,4 @@
+pub(crate) mod clickhouse_dialect;
 pub(crate) mod clickhouse_types;
 pub(crate) mod duckdb_dialect;
 pub(crate) mod located_gap;

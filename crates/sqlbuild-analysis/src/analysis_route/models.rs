@@ -148,6 +148,10 @@ impl LineageSchema for StandInSchema {
     }
 }
 
+/// ClickHouse, whose SQL SQLQuack's ClickHouse parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct ClickHouseDialect;
+
 /// DuckDB and MotherDuck, whose type spellings the native route compares as Polyglot did.
 #[derive(Clone, Copy, Debug)]
 pub struct DuckDbDialect;

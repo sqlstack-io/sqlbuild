@@ -1,17 +1,21 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
 use crate::analysis_route::models::{
-    DuckDbDialect, PostgresDialect, SnowflakeDialect, SqliteDialect, TypeSpelling,
+    ClickHouseDialect, DuckDbDialect, PostgresDialect, SnowflakeDialect, SqliteDialect, TypeSpelling,
 };
 use crate::analysis_route::types::NativeDialect;
+use crate::type_system::models::TypeFamily;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
+    (CLICKHOUSE_DIALECT, &ClickHouseDialect),
     (DUCKDB_DIALECT, &DuckDbDialect),
     (POSTGRES_DIALECT, &PostgresDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
     (SQLITE_DIALECT, &SqliteDialect),
 ];
+/// ClickHouse's analysis dialect name.
+pub(crate) const CLICKHOUSE_DIALECT: &str = "clickhouse";
 /// DuckDB's (and MotherDuck's) analysis dialect name.
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
 /// PostgreSQL's analysis dialect name.
@@ -20,7 +24,7 @@ pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// SQLite's analysis dialect name.
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
-/// The stub prefix PostgreSQL, Snowflake and SQLite read as one unquoted name.
+/// The stub prefix ClickHouse, PostgreSQL, Snowflake and SQLite read as one unquoted name.
 pub(crate) const UNQUOTED_STUB_PREFIX: &str = "__sqlbuild_";
 /// The word that makes SQLBuild's type fallback call a type it cannot split into name and flat parameters a timestamp.
 pub(crate) const FALLBACK_TIMESTAMP_WORD: &str = "TIMESTAMP";
@@ -208,3 +212,28 @@ pub(crate) const SQLITE_TYPE_SPELLING: TypeSpelling = TypeSpelling {
     verbatim: &[],
     arrays: false,
 };
+/// Polyglot's ClickHouse respelling of each SQL type alias (`{}` keeps the arguments) and family.
+pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str, Option<TypeFamily>)] = &[
+    ("BOOLEAN", "Bool", None),
+    ("CHAR", "String", None),
+    ("TEXT", "String", None),
+    ("VARCHAR", "String", None),
+    ("NUMERIC", "Decimal{}", None),
+    ("BINARY", "Nullable(BINARY{})", None),
+    ("TINYINT", "Nullable(Int8)", Some(TypeFamily::Integer)),
+    ("SMALLINT", "Nullable(Int16)", Some(TypeFamily::Integer)),
+    ("INT", "Nullable(Int32)", Some(TypeFamily::Integer)),
+    ("INTEGER", "Nullable(Int32)", Some(TypeFamily::Integer)),
+    ("BIGINT", "Nullable(Int64)", Some(TypeFamily::Integer)),
+    ("REAL", "Nullable(Float32){}", Some(TypeFamily::Float)),
+    ("FLOAT", "Nullable(Float32){}", Some(TypeFamily::Float)),
+    ("DOUBLE", "Nullable(Float64){}", Some(TypeFamily::Float)),
+    (
+        "DOUBLE PRECISION",
+        "Nullable(Float64){}",
+        Some(TypeFamily::Float),
+    ),
+    ("TIMESTAMP", "DateTime{}", Some(TypeFamily::Timestamp)),
+];
+/// The ClickHouse types whose arguments Polyglot keeps as written, aliases unrenamed.
+pub(crate) const CLICKHOUSE_VERBATIM_TYPES: &[&str] = &["LowCardinality", "Tuple"];
