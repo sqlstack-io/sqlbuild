@@ -23,7 +23,7 @@
      },
      "help": "use operands supported by this arithmetic operator, or convert them explicitly",
      "notes": [
-      "status is TEXT, 1 is INTEGER"
+      "status is VARCHAR, 1 is INTEGER"
      ]
     }
    ]
