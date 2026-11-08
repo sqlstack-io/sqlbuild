@@ -282,11 +282,11 @@ fn given_models_sharing_types_when_evaluating_together_then_each_matches_its_own
 }
 
 #[test]
-fn given_a_dialect_polyglot_does_not_know_when_comparing_types_then_python_error_is_returned() {
+fn given_a_dialect_no_adapter_ships_when_comparing_types_then_python_error_is_returned() {
     let test_cases = [UnknownDialectTestCase {
         description: "an enforced contract compared under an unknown dialect",
-        dialect: "motherduck",
-        expected_error: "Unknown dialect: motherduck",
+        dialect: "mysql",
+        expected_error: "Unknown dialect: mysql",
     }];
     for test_case in test_cases {
         let request = ContractRequest {

@@ -70,7 +70,7 @@ pub(crate) fn metadata_diagnostics<'py>(
     let outcome = py
         .compiler_detach(|| Ok(check_semantic_metadata(&request, catalog)))
         .map_err(compiler_error)?
-        .map_err(|failure| semantic_error(py, &failure))?;
+        .map_err(|failure| semantic_error(&failure))?;
     let dialect: Bound<'py, PyAny> = native_field(profile, "sql_analysis_dialect")?;
     for type_sql in &outcome.fallback_types {
         let _ = classes.call(

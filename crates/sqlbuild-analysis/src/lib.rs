@@ -52,4 +52,5 @@ pub mod sql_tokens;
 pub mod sql_tree;
 pub mod target_paths;
 pub mod type_system;
+pub mod warehouse_types;
 pub mod worker_stack;

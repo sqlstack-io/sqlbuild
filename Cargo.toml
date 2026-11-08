@@ -176,9 +176,10 @@ sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
 sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656d247277a30bc81ef39b6dee420e721221" }
-# The lossless SQL tokenizer behind query fingerprints.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "4d0c6bc56da0e44eb164601a2af673ae7998257d" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "4d0c6bc56da0e44eb164601a2af673ae7998257d" }
+# SQLQuack's lossless tokenizer behind query fingerprints and its parsers for warehouse types.
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "98eefae657b57566a091e39f7cde992bee45eb6f" }
+sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "98eefae657b57566a091e39f7cde992bee45eb6f" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "98eefae657b57566a091e39f7cde992bee45eb6f" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"

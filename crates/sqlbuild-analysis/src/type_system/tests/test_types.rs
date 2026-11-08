@@ -30,3 +30,10 @@ pub(super) struct SameTypeTestCase {
     pub(super) types: (&'static str, &'static str),
     pub(super) expected_same: bool,
 }
+
+pub(super) struct AliasGroupsTestCase {
+    pub(super) description: &'static str,
+    /// JSON: each dialect's groups of spellings of one type.
+    pub(super) groups: &'static str,
+    pub(super) expected_same: bool,
+}
