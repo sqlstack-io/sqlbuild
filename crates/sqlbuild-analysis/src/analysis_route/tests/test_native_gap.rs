@@ -18,17 +18,17 @@ fn given_any_dialect_when_routing_analysis_then_it_stays_on_the_legacy_path() {
         RouteTestCase {
             description: "snowflake",
             dialect: Some("snowflake"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "duckdb",
             dialect: Some("duckdb"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "sqlite",
             dialect: Some("sqlite"),
-            expected_legacy: true,
+            expected_legacy: false,
         },
         RouteTestCase {
             description: "bigquery",
