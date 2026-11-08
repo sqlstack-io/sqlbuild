@@ -1,11 +1,16 @@
-//! `rejected_sql_analysis_opt_out`: `sql_analysis false` on SQL that parses, when it is required.
+//! Rejected `sql_analysis false` opt-outs, and native-route analysis skipped on a parser gap.
 
 use std::path::Path;
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
+use sqlbuild_analysis::analysis_route::main::native_gap::native_gap;
+use sqlbuild_analysis::analysis_route::main::skipped_analysis::skipped_analysis;
+use sqlbuild_analysis::analysis_route::models::{AnalysisRoute, LocatedGap};
+use sqlbuild_analysis::analysis_route::types::NativeDialect;
 use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxMode};
 use sqlbuild_analysis::compiled_project::main::opt_out_position::opt_out_position;
+use sqlbuild_analysis::compiled_project::models::ModelLoopSettings;
 use sqlbuild_analysis::compiled_project::models::TextPosition;
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
 
@@ -14,7 +19,9 @@ use crate::bindings::_helpers::input_loops::model_loop::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_inputs::{HOOK_KEYS, present};
 use crate::bindings::_helpers::project_assembly::resources::{syntax_error_message, syntax_valid};
+use crate::bindings::_helpers::records::construct::{new_helped_error, new_record_with};
 use crate::bindings::_helpers::records::fields::field as native_field;
+use crate::bindings::_helpers::records::ids::{ErrorId, RecordId};
 
 const OPT_OUT_KEYS: [&str; 2] = ["sql_analysis", "sql_validation"];
 const CURSOR_TYPE_KEY: &str = "cursor_type";
@@ -33,6 +40,7 @@ const PATH_FIELD: &str = "path";
 const LINE_FIELD: &str = "line";
 const COLUMN_FIELD: &str = "column";
 const HELP_ARGUMENT: &str = "help";
+const MODEL_RESOURCE: &str = "model";
 
 /// Where the opt-out was authored, or a check the attachment still answers.
 pub(crate) enum OptOut<'py> {
@@ -65,6 +73,75 @@ pub(crate) fn rejected_opt_out<'py>(
     {
         return Ok(OptOut::Accepted);
     }
+    let checks: Vec<SyntaxCheck> = model_checks(context, model)?;
+    let readable: bool = match model_loop.route {
+        AnalysisRoute::Legacy => syntax_valid(model.config.py(), GENERIC_DIALECT, &checks)?,
+        AnalysisRoute::Native(dialect) => first_gap(dialect, context, &checks)?.is_none(),
+    };
+    if readable {
+        Ok(OptOut::Rejected(location(model_loop, context, model)?))
+    } else {
+        Ok(OptOut::Accepted)
+    }
+}
+
+/// Whether a native route analyses the model: P026 warns, or raises, when its parser cannot read it.
+pub(crate) fn skip_unreadable(
+    settings: ModelLoopSettings,
+    dialect: &dyn NativeDialect,
+    context: &LoopContext<'_, '_>,
+    model: &OptOutModel<'_, '_>,
+) -> PyResult<bool> {
+    let checks: Vec<SyntaxCheck> = model_checks(context, model)?;
+    let Some(gap) = first_gap(dialect, context, &checks)? else {
+        return Ok(true);
+    };
+    let (code, message) = skipped_analysis(model.name, dialect.name(), &gap);
+    let py: Python<'_> = model.config.py();
+    let help: &str = &context.classes.syntax_help;
+    if settings.require_sql_analysis {
+        return Err(new_helped_error(
+            py,
+            ErrorId::CompileInput,
+            (message, code),
+            Some(help),
+        ));
+    }
+    let diagnostic: Bound<'_, PyAny> = new_record_with(
+        py,
+        RecordId::CompilerDiagnostic,
+        &[
+            ("phase", PyString::new(py, "compile").into_any()),
+            ("severity", PyString::new(py, "warning").into_any()),
+            ("code", PyString::new(py, code).into_any()),
+            ("message", PyString::new(py, &message).into_any()),
+            (
+                "resource_type",
+                PyString::new(py, MODEL_RESOURCE).into_any(),
+            ),
+            ("resource_name", PyString::new(py, model.name).into_any()),
+            (
+                "path",
+                context.classes.path_class.call1((model.relative_path,))?,
+            ),
+            ("help", PyString::new(py, help).into_any()),
+        ],
+    )?;
+    let arguments: Bound<'_, PyDict> = PyDict::new(py);
+    arguments.set_item("key", PyTuple::new(py, [code, model.name])?)?;
+    arguments.set_item("diagnostic", diagnostic)?;
+    context
+        .classes
+        .report_diagnostic
+        .call((), Some(&arguments))?;
+    Ok(false)
+}
+
+/// The model's analysis SQL and each hook statement, as filled to run, with its placeholders.
+fn model_checks(
+    context: &LoopContext<'_, '_>,
+    model: &OptOutModel<'_, '_>,
+) -> PyResult<Vec<SyntaxCheck>> {
     let mut statements: Vec<String> = vec![analysis_sql(context, model)?];
     for key in HOOK_KEYS {
         if let Some(hooks) = model.values.get_item(key)? {
@@ -72,18 +149,29 @@ pub(crate) fn rejected_opt_out<'py>(
         }
     }
     let placeholders: Vec<(String, String)> = placeholders(model.values)?;
-    let checks: Vec<SyntaxCheck> = statements
+    Ok(statements
         .into_iter()
         .map(|sql| SyntaxCheck {
             sql,
             placeholders: placeholders.clone(),
         })
-        .collect();
-    if syntax_valid(model.config.py(), GENERIC_DIALECT, &checks)? {
-        Ok(OptOut::Rejected(location(model_loop, context, model)?))
-    } else {
-        Ok(OptOut::Accepted)
+        .collect())
+}
+
+/// The native parser's first gap across `checks`; none when it reads each one whole.
+fn first_gap(
+    dialect: &dyn NativeDialect,
+    context: &LoopContext<'_, '_>,
+    checks: &[SyntaxCheck],
+) -> PyResult<Option<LocatedGap>> {
+    for check in checks {
+        if let Some(gap) = native_gap(dialect, check)
+            .map_err(|message| compile_error(context.classes, &message, None))?
+        {
+            return Ok(Some(gap));
+        }
     }
+    Ok(None)
 }
 
 /// `validate_sql_syntax`: raise the model's SQL syntax error before its references are scanned.

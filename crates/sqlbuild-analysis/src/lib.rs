@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod analysis_route;
 pub mod assembly;
 pub mod auditing;
 pub mod binding_locations;

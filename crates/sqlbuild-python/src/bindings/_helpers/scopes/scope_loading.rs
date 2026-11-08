@@ -14,13 +14,13 @@ use sqlbuild_host::entries::models::{AdapterHost, UserCodeHost};
 use crate::bindings::_helpers::boundary::python_calls::call_with;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::inputs::{InputsRequest, attached_inputs};
+use crate::bindings::_helpers::compile_driver::project::compile_adapter_context;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
-use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_collection_rendering;
 use crate::bindings::_helpers::discovery::scope_snapshot::discover_scope_snapshot;
 use crate::bindings::_helpers::frontier::cache_directory::cache_directory;
 use crate::bindings::_helpers::frontier::compile_frontier::{FrontierStage, bridged, produced};
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::records::construct::{new_record, new_record_with};
+use crate::bindings::_helpers::records::construct::new_record;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::ids::RecordId;
 use crate::bindings::_helpers::scopes::scope_cache::{
@@ -78,23 +78,7 @@ fn compiled_index<'py>(
     syntax: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = discovered.py();
-    let project_config: Bound<'py, PyAny> = native_field(&discovered, "project_config")?;
-    let collection_rendering: Bound<'py, PyAny> =
-        resolve_effective_collection_rendering(&project_config, &py.None().into_bound(py))
-            .and_then(|value| value.into_bound_py_any(py))?;
-    let adapter_context: Bound<'py, PyAny> = new_record_with(
-        py,
-        RecordId::CompileAdapterContext,
-        &[
-            ("value_renderer", adapter.clone()),
-            ("collection_rendering", collection_rendering),
-            (
-                "python_functions_inherit_default_namespace",
-                adapter.call_method0("python_functions_inherit_default_namespace")?,
-            ),
-            ("sql_lexical_syntax", syntax.clone()),
-        ],
-    )?;
+    let adapter_context: Bound<'py, PyAny> = compile_adapter_context(&discovered, adapter, syntax)?;
     let inputs: InputsRequest = InputsRequest {
         discovered_inputs: discovered.unbind(),
         adapter_context: adapter_context.unbind(),
