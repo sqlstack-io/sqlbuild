@@ -2,10 +2,11 @@
 
 use sqlquack_semantics::dialects::constants::POSTGRES;
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_syntax_postgres::{Parsed, StrictFailure, parse_strict, parse_type};
+use sqlquack_syntax_postgres::{Parsed, StrictFailure, format_type, parse_strict, parse_type};
 
 use crate::analysis_route::constants::{
-    POSTGRES_DIALECT, POSTGRES_STUB_PREFIX, UNSCANNED_CONSTRUCT,
+    POSTGRES_DIALECT, POSTGRES_STUB_PREFIX, POSTGRES_TEMPORAL_SPELLINGS, POSTGRES_TYPE_SPELLINGS,
+    UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{ParserGap, PostgresDialect};
 use crate::analysis_route::types::NativeDialect;
@@ -42,10 +43,34 @@ impl NativeDialect for PostgresDialect {
         &POSTGRES
     }
 
-    /// The type's comparison shape under PostgreSQL; `None` (unknown) when PostgreSQL cannot name it.
+    /// The comparison shape of the type PostgreSQL names; `None` (unknown) when it cannot name it.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        parse_type(spelling)
-            .is_ok()
-            .then(|| normalize_text_type(spelling, Some(TypeDialect::Postgres)))
+        let canonical: String = format_type(&parse_type(spelling).ok()?)?;
+        Some(normalize_text_type(
+            &fallback_spelling(&canonical),
+            Some(TypeDialect::Postgres),
+        ))
     }
+}
+
+/// PostgreSQL's `format_type` name with its multi-word names in the words SQLBuild's fallback reads.
+fn fallback_spelling(canonical: &str) -> String {
+    for (name, zone, respelt) in POSTGRES_TEMPORAL_SPELLINGS {
+        if let Some(precision) = canonical
+            .strip_prefix(name)
+            .and_then(|rest| rest.strip_suffix(zone))
+            .filter(|precision| precision.is_empty() || precision.starts_with('('))
+        {
+            return format!("{respelt}{precision}");
+        }
+    }
+    for (name, respelt) in POSTGRES_TYPE_SPELLINGS {
+        if let Some(rest) = canonical
+            .strip_prefix(name)
+            .filter(|rest| rest.is_empty() || rest.starts_with(['(', '[']))
+        {
+            return format!("{respelt}{rest}");
+        }
+    }
+    canonical.to_owned()
 }
