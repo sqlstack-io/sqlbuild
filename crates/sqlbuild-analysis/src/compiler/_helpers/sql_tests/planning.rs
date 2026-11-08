@@ -35,9 +35,7 @@ use crate::compiler::_helpers::sql_tests::reader_references::{
 use crate::compiler::_helpers::sql_tests::real_model_limit::{
     RealModelChain, real_model_limit_message,
 };
-use crate::compiler::_helpers::sql_tests::relation_markers::{
-    markers_as_names, named_marker_calls,
-};
+use crate::compiler::_helpers::sql_tests::relation_markers::named_marker_calls;
 use crate::compiler::_helpers::sql_tests::rendering::{
     RenderRequest, render_comparison_sql, rendered_chain_steps, sql_test_parser,
 };
@@ -50,6 +48,7 @@ use crate::constants::{
     SQL_TEST_ACTUAL_CTE, SQL_TEST_ACTUAL_CTE_PREFIX, SQL_TEST_EXPECTED_CTE,
     TABLE_FUNCTION_TEST_MODE, UDF_TEST_MODE,
 };
+use crate::relation_markers::main::markers_as_names::markers_as_names;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 const MAX_WORKERS: usize = 4;
@@ -114,8 +113,6 @@ pub(crate) struct SqlTestPatterns {
     table_function: Regex,
     pub(crate) dbt_reference: Regex,
     pub(crate) test_reference: Regex,
-    /// Any relation marker call: `__name("x")`, or `__name("a", "b")` as `__dbt_ref` writes it.
-    pub(crate) relation_marker: Regex,
     pub(crate) lexical: LexicalSyntax,
     pub(crate) identifier: Regex,
 }
@@ -132,9 +129,6 @@ impl SqlTestPatterns {
                 r#"(?i)__dbt_ref\(\s*\"([^\"]+)\"\s*(?:,\s*\"([^\"]+)\"\s*)?\)"#,
             )?,
             test_reference: compile_pattern(r#"(?i)__(?:ref|source|seed|dbt_ref|table_fn)\("#)?,
-            relation_marker: compile_pattern(
-                r#"(?i)\b(__[a-z_]+)\(\s*"([^"]+)"\s*(?:,\s*"([^"]+)"\s*)?\)"#,
-            )?,
             lexical,
             identifier: compile_pattern(r"[A-Za-z_][A-Za-z0-9_$]*")?,
         })
@@ -1519,7 +1513,9 @@ pub(crate) fn parsed_analysis_template(
     query_sql: &str,
     (parser, patterns): (&dyn NativeDialect, &SqlTestPatterns),
 ) -> Option<AnalysisTemplate> {
-    let (named_sql, named) = markers_as_names(query_sql, patterns);
+    let Ok((named_sql, named)) = markers_as_names(query_sql, &patterns.lexical) else {
+        return None;
+    };
     let mut statements = match parser.parse(&named_sql) {
         Ok(Parsed { statements, gaps }) if gaps.is_empty() => statements,
         _ => return None,
