@@ -62,13 +62,13 @@ fn evaluated_project(evaluation: ProjectEvaluationRequest<'_>) -> Result<Vec<Fau
             .filter(|test| reads_fixtures(test))
             .map(|test| test.source_path.as_str())
             .collect();
-        faults.extend(paths.into_iter().map(|path| {
-            rules_unavailable(
-                path,
-                fixture_rules.iter().map(|rule| rule.code.as_str()),
-                dialect,
-            )
-        }));
+        let codes: Vec<&str> = fixture_rules
+            .iter()
+            .map(|rule| rule.code.as_str())
+            .collect();
+        for path in paths {
+            faults.push(rules_unavailable(path, codes.iter().copied(), dialect));
+        }
     }
     for rule in fixture_rules.iter().filter(|_| facts_available(dialect)) {
         for test in &tests {

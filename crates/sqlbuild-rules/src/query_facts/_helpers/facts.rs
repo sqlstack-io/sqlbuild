@@ -520,22 +520,24 @@ fn date_part_arguments(root: &Expression, dialect: Dialect) -> HashSet<*const Ex
     if dialect != Dialect::Snowflake {
         return HashSet::new();
     }
-    root.dfs()
-        .filter_map(|node| match node {
-            Expression::Function(function) => {
-                let name = function.name.to_ascii_uppercase();
-                let (_, _, index) = SNOWFLAKE_DATE_PART_ARGUMENTS
-                    .iter()
-                    .find(|(call, count, _)| *call == name && *count == function.args.len())?;
-                function
-                    .args
-                    .get(*index)
-                    .filter(|argument| direct_string_literal(argument).is_some())
-                    .map(std::ptr::from_ref)
-            }
-            _ => None,
-        })
-        .collect()
+    root.dfs().filter_map(date_part_argument).collect()
+}
+
+/// The quoted date-part argument of `node` when it is a Snowflake date-part call.
+fn date_part_argument(node: &Expression) -> Option<*const Expression> {
+    let Expression::Function(function) = node else {
+        return None;
+    };
+    let name = function.name.to_ascii_uppercase();
+    for (call, count, index) in SNOWFLAKE_DATE_PART_ARGUMENTS {
+        if call == name && count == function.args.len() {
+            let argument = function.args.get(index)?;
+            return direct_string_literal(argument)
+                .is_some()
+                .then(|| std::ptr::from_ref(argument));
+        }
+    }
+    None
 }
 
 fn comparison_parts(node: &Expression) -> Option<ComparisonParts<'_>> {

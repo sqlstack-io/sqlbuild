@@ -164,7 +164,7 @@ impl<'a> QueryTokens<'a> {
         let mut bytes: Vec<usize> = sql.char_indices().map(|(byte, _)| byte).collect();
         bytes.push(sql.len());
         let character = |byte: usize| bytes.partition_point(|offset| *offset < byte);
-        let tokens = tokens
+        let tokens: Vec<CodeToken<'a>> = tokens
             .into_iter()
             .filter_map(|token| match token.kind {
                 TokenKind::Significant(token_type) => Some(CodeToken {
