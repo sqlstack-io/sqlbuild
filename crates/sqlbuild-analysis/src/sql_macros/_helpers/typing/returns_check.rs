@@ -19,7 +19,7 @@ use crate::sql_macros::models::{
     ArgumentShape, BodyType, ExpandedText, ParameterKind, RenderedArgument, SqlMacroDefinition,
     SqlMacroForm, SqlMacroLocation, TypeFamily, TypedCall,
 };
-use crate::sql_macros::types::RelationShapes;
+use crate::sql_macros::types::{BodyProbe, RelationShapes};
 use crate::type_system::main::normalize_type::normalize_type;
 use crate::type_system::models::TypeNormalization;
 
@@ -63,7 +63,7 @@ fn body_probe(
     (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     body: &ExpandedText,
     families: bool,
-) -> Option<(String, Vec<(String, Vec<(String, String)>)>)> {
+) -> Option<BodyProbe> {
     let mut arguments: Vec<RenderedArgument> = Vec::with_capacity(definition.parameters.len());
     let mut columns: Vec<(String, String)> = Vec::with_capacity(definition.parameters.len());
     for (index, parameter) in definition.parameters.iter().enumerate() {

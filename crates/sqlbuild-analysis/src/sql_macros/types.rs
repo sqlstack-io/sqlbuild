@@ -77,5 +77,7 @@ pub(crate) type Walk<'a> = (Vec<&'a str>, Vec<&'a str>);
 pub type ProbeColumns = Option<Vec<(String, Option<String>)>>;
 /// Each bound relation's name and `(column, type)` list.
 pub type RelationShapes = [(String, Vec<(String, String)>)];
+/// A body's probe SQL and the stand-in relation it reads.
+pub type BodyProbe = (String, Vec<(String, Vec<(String, String)>)>);
 /// One model's analysed SQL, its bound relations and its SQL macro calls' checks.
 pub type ArgumentCheckInput<'a> = (&'a str, &'a RelationShapes, &'a [SqlMacroCheck]);

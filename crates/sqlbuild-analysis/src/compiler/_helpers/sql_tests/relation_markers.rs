@@ -11,11 +11,6 @@ pub(crate) type MarkerCall = (String, String);
 /// The name a relation marker call stands as while the planning template is parsed.
 const MARKER_NAME_PREFIX: &str = "__sqlbuild_relation_";
 
-/// Return marker calls in node order, where children follow declared field order.
-pub(crate) fn relation_marker_calls(expression: &Expression) -> Vec<MarkerCall> {
-    named_marker_calls(expression, &[])
-}
-
 /// Marker calls in node order, the relations `named` by `markers_as_names` read back as their calls.
 pub(crate) fn named_marker_calls(expression: &Expression, named: &[MarkerCall]) -> Vec<MarkerCall> {
     expression.dfs().fold(Vec::new(), |calls, node| {

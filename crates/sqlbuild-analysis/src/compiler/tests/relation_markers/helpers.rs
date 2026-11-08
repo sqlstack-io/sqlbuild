@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use crate::compiler::_helpers::sql_tests::relation_markers::relation_marker_calls;
+use crate::compiler::_helpers::sql_tests::relation_markers::named_marker_calls;
 use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 
 type MarkerCalls = Option<Vec<(String, String)>>;
@@ -87,7 +87,7 @@ pub(crate) fn relation_markers_and_json_oracle(
     assert_eq!(statements.len(), 1, "{sql}");
     let expression = statements.remove(0);
     (
-        Some(relation_marker_calls(&expression)),
+        Some(named_marker_calls(&expression, &[])),
         serde_json::to_value(&expression)
             .ok()
             .map(|value| json_relation_marker_calls(&value)),
@@ -135,7 +135,7 @@ pub(crate) fn relation_marker_oracle_mismatches(dialect: &str) -> Vec<String> {
                 .unwrap_or_default()
                 .iter()
                 .any(|expression| {
-                    Some(relation_marker_calls(expression))
+                    Some(named_marker_calls(expression, &[]))
                         != serde_json::to_value(expression)
                             .ok()
                             .map(|value| json_relation_marker_calls(&value))
