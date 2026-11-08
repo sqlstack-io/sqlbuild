@@ -89,6 +89,8 @@ pub enum Action {
     RunRerun,
     #[serde(rename = "run.rewrite_history")]
     RunRewriteHistory,
+    #[serde(rename = "run.prioritise")]
+    RunPrioritise,
     #[serde(rename = "trigger.toggle")]
     TriggerToggle,
     #[serde(rename = "sensor.reset_cursor")]

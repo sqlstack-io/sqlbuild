@@ -16,5 +16,7 @@ pub(crate) struct SessionRoleCase {
     pub(crate) expected_metadata: u16,
     pub(crate) expected_connection: u16,
     pub(crate) expected_job: u16,
+    /// A job run above priority 0 needs `run.prioritise`, which only Admin grants.
+    pub(crate) expected_prioritised: u16,
     pub(crate) expected_sql: u16,
 }

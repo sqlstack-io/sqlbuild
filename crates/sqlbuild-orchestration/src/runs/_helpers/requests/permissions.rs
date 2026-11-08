@@ -68,5 +68,15 @@ pub(crate) async fn authorize_execution(
         )
         .await?;
     }
+    if matches!(action, Action::JobRun | Action::RunRerun) && request.priority > 0 {
+        scope.action = Action::RunPrioritise;
+        (transaction, context) = authorize_person(
+            transaction,
+            (&context, credentials),
+            &scope,
+            DefaultRole::None,
+        )
+        .await?;
+    }
     Ok((transaction, context))
 }

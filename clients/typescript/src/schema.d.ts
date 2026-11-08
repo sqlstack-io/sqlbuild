@@ -954,7 +954,7 @@ export interface components {
          * @description Closed permission vocabulary; unknown actions fail deserialization.
          * @enum {string}
          */
-        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
+        Action: "view" | "view.sql" | "view.evidence" | "job.run" | "run.cancel" | "run.rerun" | "run.rewrite_history" | "run.prioritise" | "trigger.toggle" | "sensor.reset_cursor" | "run.adhoc" | "connection.test" | "user.manage" | "role.assign" | "audit.view";
         /**
          * @description Administrator membership and person eligibility share the final-admin invariant.
          * @enum {string}

@@ -164,7 +164,7 @@ permissions = ["view.evidence"]
 | Selectors | Same grammar as a job's `select`; an unknown tag or name fails publication |
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
-| Runs | `job.run`, `run.adhoc`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes |
+| Runs | `job.run`, `run.adhoc`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; a priority above 0 also needs `run.prioritise`, which only Admin grants among built-in roles |
 | Triggers | `trigger.toggle` and `sensor.reset_cursor` need the permission on every node the trigger's job writes |
 | Listings | The catalog, statistics and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |
