@@ -125,12 +125,12 @@ pub(crate) fn pivot_outcome(
 
 /// The one statement of `sql` as SQLQuack's tagged JSON tree, marker relations as their names.
 fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
-    let (named, calls) = markers_as_names(sql, &dialect_lexical_syntax(dialect))?;
-    let dialect: Dialect = if dialect == SNOWFLAKE_DIALECT {
-        Dialect::Snowflake
+    let (lexical_dialect, dialect): (&str, Dialect) = if dialect == SNOWFLAKE_DIALECT {
+        (SNOWFLAKE_DIALECT, Dialect::Snowflake)
     } else {
-        Dialect::DuckDB
+        (DUCKDB_DIALECT, Dialect::DuckDB)
     };
+    let (named, calls) = markers_as_names(sql, &dialect_lexical_syntax(lexical_dialect))?;
     let parsed = sqlquack_syntax::parse_statements_with(
         &named,
         dialect,
