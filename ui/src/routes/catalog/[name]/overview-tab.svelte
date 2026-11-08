@@ -8,7 +8,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeLabel, checkOutcomeTone, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseLabel } from '$lib/build-area/labels';
+	import { formatCredits, formatMs, formatNumber, kindLine, relationName, runScopePhaseLabel, shortName } from '$lib/build-area/labels';
 	import { driftLabel, driftOf, type Tab } from './utils';
 
 	let { node, onTab, onSql }: { node: CatalogNodeDetail; onTab: (tab: Tab) => void; onSql: (mode: 'raw' | 'compiled' | 'drift') => void } = $props();
@@ -75,7 +75,7 @@
 
 		{#if node.sql}
 			<section class="section">
-				<CodePreview file="{node.key}.sql" code={node.sql.raw} compiled={node.sql.compiled} bind:mode={sqlMode} maxLines={16} onOpen={() => onSql(sqlMode)} />
+				<CodePreview file="{shortName(node.key)}.sql" code={node.sql.raw} compiled={node.sql.compiled} bind:mode={sqlMode} maxLines={16} onOpen={() => onSql(sqlMode)} />
 			</section>
 		{:else if node.code}
 			<section class="section">

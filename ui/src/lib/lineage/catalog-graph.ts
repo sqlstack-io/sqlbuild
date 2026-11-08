@@ -2,8 +2,7 @@
 
 import type { Edge, Node } from '@xyflow/svelte';
 import type { CatalogNode, StaleReason } from '$lib/api';
-import { shortName } from '$lib/api/http-catalog';
-import { kindLine, nodeIconKey } from '$lib/build-area/labels';
+import { kindLine, nodeIconKey, shortName } from '$lib/build-area/labels';
 
 export type CardStatus = 'ok' | 'fail' | 'warn' | 'src' | 'none';
 export type CardStale = 'changed' | 'compiled' | 'upstream' | 'behind';

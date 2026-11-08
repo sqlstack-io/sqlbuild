@@ -1,4 +1,5 @@
 import type { components } from '$control/schema.d.ts';
+import { shortName } from '$lib/build-area/labels';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, StaleReason } from './types/build';
 import type { NodeKind } from './types/operate';
 
@@ -66,8 +67,6 @@ function staleOf(status: Wire['NodeStatus'] | null): StaleReason[] {
 	return [{ reason: 'changed', change: 'definition', detail: 'The definition changed since it was last built here.', since: status.build.observed_at }];
 }
 
-/** A node key without its kind, e.g. `customer_summary` for `model:customer_summary`. */
-export const shortName = (key: string) => key.slice(key.indexOf(':') + 1);
 
 /** The listed node a key or bare name refers to, preferring a model; migrations name models without their kind. */
 export function findNode(nodes: CatalogNode[], ref: string): CatalogNode | null {

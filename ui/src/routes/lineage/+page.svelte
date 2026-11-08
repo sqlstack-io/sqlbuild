@@ -38,7 +38,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { checkOutcomeTone, nodeOutcomeLabel, nodeOutcomeTone, staleReasonDetail, staleReasonLabel } from '$lib/status';
-	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortRunId, sqlVersions } from '$lib/build-area/labels';
+	import { NODE_KINDS, formatCredits, formatMs, formatNumber, kindLine, nodeKindPlural, relationName, runScopePhaseLabel, shortName, shortRunId, sqlVersions } from '$lib/build-area/labels';
 	import { catalogGraph, cardData } from '$lib/lineage/catalog-graph';
 
 	let runOpen = $state(false);
@@ -594,7 +594,7 @@
 
 	{#if sqlOpen && d?.sql}
 		<div class="sql-drawer">
-			<SqlViewer name={d.key} raw={d.sql.raw} compiled={d.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamDriftNote} onRef={selectByName} onClose={() => (sqlOpen = false)} />
+			<SqlViewer name={shortName(d.key)} raw={d.sql.raw} compiled={d.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamDriftNote} onRef={selectByName} onClose={() => (sqlOpen = false)} />
 		</div>
 	{/if}
 
@@ -702,7 +702,7 @@
 			{#if d?.sql}
 				<InspectorSection title="SQL">
 					{#snippet meta()}<span>{sqlRaw.split('\n').length} lines</span><button class="section-link" onclick={() => openSql()}>Open →</button>{/snippet}
-					<CodePreview file="{primarySlug}.sql" code={d.sql.raw} compiled={d.sql.compiled} bind:mode={sqlMode} maxLines={14} onOpen={() => openSql()} />
+					<CodePreview file="{shortName(d.key)}.sql" code={d.sql.raw} compiled={d.sql.compiled} bind:mode={sqlMode} maxLines={14} onOpen={() => openSql()} />
 				</InspectorSection>
 			{:else if d?.code}
 				<InspectorSection title="Code">

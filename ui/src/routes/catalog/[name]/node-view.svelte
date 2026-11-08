@@ -15,7 +15,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { kindLine, nodeIcon, nodeIconKey, nodeKindPlural, sqlVersions } from '$lib/build-area/labels';
+	import { kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, sqlVersions } from '$lib/build-area/labels';
 	import { cardData } from '$lib/lineage/catalog-graph';
 	import OverviewTab from './overview-tab.svelte';
 	import DriftTab from './drift-tab.svelte';
@@ -148,13 +148,13 @@
 				</table>
 			{:else if tab === 'sql'}
 				{#if n.sql}
-					<SqlViewer {name} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=sql`)} />
+					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={viewerMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=sql`)} />
 				{:else if n.code}
 					<div class="p-5"><CodePreview file={n.code.file} code={n.code.source} language="text" maxLines={200} /></div>
 				{/if}
 			{:else if tab === 'drift' && n.sql}
 				<DriftTab node={n}>
-					<SqlViewer {name} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={driftMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=drift`)} />
+					<SqlViewer name={shortName(n.key)} raw={n.sql.raw} compiled={n.sql.compiled} bind:mode={driftMode} {versions} upstreamNote={upstreamNote(n)} onRef={(m) => goto(`/catalog/${m}?tab=drift`)} />
 				</DriftTab>
 			{:else if tab === 'lineage'}
 				{#if graph.nodes.length}
