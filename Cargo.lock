@@ -4501,7 +4501,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-core"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "serde",
  "serde_json",
@@ -4511,7 +4511,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-semantics"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "serde",
  "serde_json",
@@ -4523,7 +4523,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-snowflake"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "serde",
  "sqlquack-core",
@@ -4532,7 +4532,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "serde",
  "serde_json",
@@ -4545,7 +4545,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-bigquery"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "sqlquack-syntax",
  "stacker",
@@ -4554,7 +4554,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-derive"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4564,7 +4564,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-postgres"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=698316c250ca6b141d5eee73f407ade200867c88#698316c250ca6b141d5eee73f407ade200867c88"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=9baef37e0dbb75c30c71d37ee6964bcbcb0fff71#9baef37e0dbb75c30c71d37ee6964bcbcb0fff71"
 dependencies = [
  "sqlquack-syntax",
 ]

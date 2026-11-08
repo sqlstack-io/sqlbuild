@@ -228,114 +228,184 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_and_the_
     }
 }
 
-/// Each expectation is the type a BigQuery dry run of `SELECT CAST(NULL AS <spelling>)` gave,
-/// or its refusal, in SQLBuild's comparison spelling.
+/// Validity follows a BigQuery dry run of `SELECT CAST(NULL AS <spelling>)`; names stay Polyglot's.
 #[test]
-fn given_a_bigquery_type_spelling_when_normalising_then_it_names_the_type_bigquery_gives_it() {
+fn given_a_bigquery_type_spelling_when_normalising_then_a_valid_one_keeps_polyglot_s_name() {
     let test_cases = [
         NormalizeTypeTestCase {
+            description: "lower-case INT64",
             spelling: "int64",
-            expected: Some("INT64"),
+            expected_name: Some("INT64"),
         },
         NormalizeTypeTestCase {
+            description: "BYTEINT keeps Polyglot's spelling",
             spelling: "BYTEINT",
-            expected: Some("INT64"),
+            expected_name: Some("BYTEINT"),
         },
         NormalizeTypeTestCase {
+            description: "TINYINT keeps Polyglot's spelling",
             spelling: "TINYINT",
-            expected: Some("INT64"),
+            expected_name: Some("TINYINT"),
         },
         NormalizeTypeTestCase {
+            description: "SMALLINT is INT64",
+            spelling: "SMALLINT",
+            expected_name: Some("INT64"),
+        },
+        NormalizeTypeTestCase {
+            description: "DECIMAL with parameters is NUMERIC",
             spelling: "DECIMAL(38, 9)",
-            expected: Some("NUMERIC(38,9)"),
+            expected_name: Some("NUMERIC(38,9)"),
         },
         NormalizeTypeTestCase {
+            description: "the widest NUMERIC precision",
             spelling: "NUMERIC(29)",
-            expected: Some("NUMERIC(29)"),
+            expected_name: Some("NUMERIC(29)"),
         },
         NormalizeTypeTestCase {
+            description: "NUMERIC precision past 29 is refused",
             spelling: "NUMERIC(30)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "NUMERIC scale past 9 is refused",
             spelling: "NUMERIC(10,10)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "a whole BIGDECIMAL is Polyglot's NUMERIC",
             spelling: "BIGDECIMAL",
-            expected: Some("BIGNUMERIC"),
+            expected_name: Some("NUMERIC"),
         },
         NormalizeTypeTestCase {
+            description: "BIGNUMERIC precision past 38 without a scale is refused",
             spelling: "BIGNUMERIC(40)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "the widest BIGNUMERIC",
             spelling: "BIGNUMERIC(76, 38)",
-            expected: Some("BIGNUMERIC(76,38)"),
+            expected_name: Some("BIGNUMERIC(76,38)"),
         },
         NormalizeTypeTestCase {
+            description: "BIGNUMERIC precision past 76 is refused",
             spelling: "BIGNUMERIC(77,38)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "BOOL is BOOLEAN",
             spelling: "BOOL",
-            expected: Some("BOOLEAN"),
+            expected_name: Some("BOOLEAN"),
         },
         NormalizeTypeTestCase {
+            description: "a whole TIMESTAMP is Polyglot's DATETIME",
             spelling: "TIMESTAMP",
-            expected: Some("TIMESTAMP"),
+            expected_name: Some("DATETIME"),
         },
         NormalizeTypeTestCase {
+            description: "DATETIME",
             spelling: "DATETIME",
-            expected: Some("DATETIME"),
+            expected_name: Some("DATETIME"),
         },
         NormalizeTypeTestCase {
+            description: "a padded STRING length",
             spelling: "STRING( 10 )",
-            expected: Some("STRING(10)"),
+            expected_name: Some("STRING(10)"),
         },
         NormalizeTypeTestCase {
+            description: "a zero STRING length is refused",
             spelling: "STRING(0)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "nested field names are upper case",
             spelling: "array<struct<x int64, y string>>",
-            expected: Some("ARRAY<STRUCT<XINT64,YSTRING>>"),
+            expected_name: Some("ARRAY<STRUCT<XINT64,YSTRING>>"),
         },
         NormalizeTypeTestCase {
-            spelling: "STRUCT<INT64, STRING>",
-            expected: Some("STRUCT<INT64,STRING>"),
+            description: "BIGINT keeps its spelling inside ARRAY",
+            spelling: "ARRAY<BIGINT>",
+            expected_name: Some("ARRAY<BIGINT>"),
         },
         NormalizeTypeTestCase {
+            description: "TIMESTAMP inside ARRAY is DATETIME",
+            spelling: "ARRAY<TIMESTAMP>",
+            expected_name: Some("ARRAY<DATETIME>"),
+        },
+        NormalizeTypeTestCase {
+            description: "STRUCT renames INTEGER but keeps BIGDECIMAL",
+            spelling: "STRUCT<int INTEGER, `a b` BIGDECIMAL>",
+            expected_name: Some("STRUCT<INTINT64,`AB`BIGDECIMAL>"),
+        },
+        NormalizeTypeTestCase {
+            description: "an unnamed field with parameters keeps its spelling",
+            spelling: "STRUCT<DECIMAL(38,9), DECIMAL>",
+            expected_name: Some("STRUCT<DECIMAL(38,9),NUMERIC>"),
+        },
+        NormalizeTypeTestCase {
+            description: "a whole STRING drops MAX",
+            spelling: "STRING(MAX)",
+            expected_name: Some("STRING"),
+        },
+        NormalizeTypeTestCase {
+            description: "a whole BIGDECIMAL drops MAX and keeps its scale",
+            spelling: "BIGDECIMAL(MAX, 2)",
+            expected_name: Some("NUMERIC(2)"),
+        },
+        NormalizeTypeTestCase {
+            description: "BYTES keeps MAX",
+            spelling: "BYTES(MAX)",
+            expected_name: Some("BYTES(MAX)"),
+        },
+        NormalizeTypeTestCase {
+            description: "a nested STRING keeps MAX",
+            spelling: "ARRAY<STRING(MAX)>",
+            expected_name: Some("ARRAY<STRING(MAX)>"),
+        },
+        NormalizeTypeTestCase {
+            description: "NUMERIC takes no MAX",
+            spelling: "NUMERIC(MAX)",
+            expected_name: None,
+        },
+        NormalizeTypeTestCase {
+            description: "a RANGE of DATE",
             spelling: "range<date>",
-            expected: Some("RANGE<DATE>"),
+            expected_name: Some("RANGE<DATE>"),
         },
         NormalizeTypeTestCase {
+            description: "a RANGE of INT64 is refused",
             spelling: "RANGE<INT64>",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "TIMESTAMP takes no precision",
             spelling: "TIMESTAMP(6)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "FLOAT is no BigQuery type",
             spelling: "FLOAT",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "VARCHAR is no BigQuery type",
             spelling: "VARCHAR(10)",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "a collated STRING is no cast target",
             spelling: "STRING COLLATE 'und:ci'",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "a spelling that closes the cast early",
             spelling: "INT64) FROM t WHERE (1",
-            expected: None,
+            expected_name: None,
         },
         NormalizeTypeTestCase {
+            description: "a spelling that comments out the rest",
             spelling: "INT64) -- ",
-            expected: None,
+            expected_name: None,
         },
     ];
     for test_case in test_cases {
@@ -343,9 +413,9 @@ fn given_a_bigquery_type_spelling_when_normalising_then_it_names_the_type_bigque
             BigQueryDialect
                 .normalize_type(test_case.spelling)
                 .as_deref(),
-            test_case.expected,
+            test_case.expected_name,
             "{}",
-            test_case.spelling
+            test_case.description
         );
     }
 }
@@ -371,12 +441,10 @@ fn given_sql_bigquery_refuses_when_parsing_then_the_gap_says_whether_it_is_a_syn
             .parse(&test_case.sql)
             .expect_err(test_case.description);
         assert_eq!(
-            gap.syntax, test_case.expected_syntax,
+            (gap.syntax, test_case.expected_offset.map(|_| gap.offset)),
+            (test_case.expected_syntax, test_case.expected_offset),
             "{}",
             test_case.description
         );
-        if let Some(offset) = test_case.expected_offset {
-            assert_eq!(gap.offset, offset, "{}", test_case.description);
-        }
     }
 }

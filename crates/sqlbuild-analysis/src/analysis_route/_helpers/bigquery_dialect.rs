@@ -6,8 +6,9 @@ use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 
 use crate::analysis_route::constants::{
-    BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, BIGQUERY_STUB_PREFIX, CAST_TYPE_PREFIX, NUMERIC_DIGITS,
-    RANGE_ELEMENT_TYPES, STATEMENTS_CONSTRUCT, UNSCANNED_CONSTRUCT,
+    BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, BIGQUERY_STUB_PREFIX, CAST_TYPE_PREFIX, DECIMAL_RADIX,
+    NUMERIC_DIGITS, POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES,
+    POLYGLOT_TOP_LEVEL_TYPE_NAMES, RANGE_ELEMENT_TYPES, STATEMENTS_CONSTRUCT, UNSCANNED_CONSTRUCT,
 };
 use crate::analysis_route::models::{BigQueryDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
@@ -40,7 +41,10 @@ impl NativeDialect for BigQueryDialect {
 
     fn normalize_type(&self, spelling: &str) -> Option<String> {
         let sql: String = format!("{CAST_TYPE_PREFIX}{spelling})");
-        let parsed: Parsed = parse_strict(&sql).ok()?;
+        let parsed: Parsed = match parse_strict(&sql) {
+            Ok(parsed) => parsed,
+            Err(StrictFailure::Parse(_) | StrictFailure::Uncovered { .. }) => return None,
+        };
         let ([Expression::Select(select)], []) =
             (parsed.statements.as_slice(), parsed.gaps.as_slice())
         else {
@@ -49,12 +53,12 @@ impl NativeDialect for BigQueryDialect {
         let [Expression::Cast(cast)] = select.expressions.as_slice() else {
             return None;
         };
-        // A spelling that closes the cast early leaves text after it, so it names no one type.
-        let whole: bool = cast
+        let ends_the_query: bool = cast
             .span
             .0
             .is_some_and(|span| span.end == sql.chars().count());
-        whole.then(|| compared_type(&cast.to)).flatten()
+        (ends_the_query && native_type(&cast.to).is_some())
+            .then(|| polyglot_name(spelling, &cast.to, true))
     }
 
     fn read_whole(&self, sql: &str) -> Result<(), ParserGap> {
@@ -81,10 +85,8 @@ impl NativeDialect for BigQueryDialect {
     }
 }
 
-/// A BigQuery type in SQLBuild's comparison spelling: upper case, no spaces, parameters kept.
-/// The parser has already folded the aliases (INT, BIGINT, BYTEINT, DECIMAL, BIGDECIMAL, BOOLEAN);
-/// a name or parameter BigQuery refuses, or a collated string, is `None`.
-fn compared_type(data_type: &DataType) -> Option<String> {
+/// A type BigQuery's dry run accepts, as BigQuery names it; `None` for one it refuses.
+fn native_type(data_type: &DataType) -> Option<String> {
     Some(match data_type {
         DataType::BigInt { length: None } => "INT64".to_owned(),
         DataType::Decimal { precision, scale } => {
@@ -123,7 +125,7 @@ fn compared_type(data_type: &DataType) -> Option<String> {
         DataType::Array {
             element_type,
             dimension: None,
-        } => format!("ARRAY<{}>", compared_type(element_type)?),
+        } => format!("ARRAY<{}>", native_type(element_type)?),
         DataType::Struct {
             fields,
             nested: true,
@@ -131,7 +133,7 @@ fn compared_type(data_type: &DataType) -> Option<String> {
             let fields: Vec<String> = fields
                 .iter()
                 .map(|field| {
-                    let spelt: String = compared_type(&field.data_type)?;
+                    let spelt: String = native_type(&field.data_type)?;
                     Some(format!("{}{spelt}", field.name.to_ascii_uppercase()))
                 })
                 .collect::<Option<_>>()?;
@@ -142,7 +144,7 @@ fn compared_type(data_type: &DataType) -> Option<String> {
     })
 }
 
-/// BIGNUMERIC and RANGE, which the parser keeps by name.
+/// BIGNUMERIC, RANGE and the MAX-parameterised types, which the parser keeps by name.
 fn custom_type(compact: &str) -> Option<String> {
     if let Some(element) = compact
         .strip_prefix("RANGE<")
@@ -152,21 +154,25 @@ fn custom_type(compact: &str) -> Option<String> {
             .contains(&element)
             .then(|| compact.to_owned());
     }
-    if compact == "BIGNUMERIC" {
+    if ["BIGNUMERIC", "BIGNUMERIC(MAX)", "STRING(MAX)", "BYTES(MAX)"].contains(&compact) {
         return Some(compact.to_owned());
+    }
+    if let Some(scale) = compact
+        .strip_prefix("BIGNUMERIC(MAX,")
+        .and_then(|rest| rest.strip_suffix(')'))
+    {
+        return parameter(scale)
+            .filter(|scale| *scale <= BIGNUMERIC_DIGITS.0)
+            .map(|_| compact.to_owned());
     }
     let inner: &str = compact
         .strip_prefix("BIGNUMERIC(")
         .and_then(|rest| rest.strip_suffix(')'))?;
-    let given: Vec<u32> = inner
-        .split(',')
-        .map(|digits| digits.parse::<u32>().ok())
-        .collect::<Option<_>>()?;
+    let given: Vec<u32> = inner.split(',').map(parameter).collect::<Option<_>>()?;
     decimal("BIGNUMERIC", &given, BIGNUMERIC_DIGITS)
 }
 
-/// A decimal type with BigQuery's bounds: scale at most `max_scale`, precision from the scale
-/// (at least 1) to `max_integer_digits` more than it.
+/// A decimal type within BigQuery's scale and integer-digit bounds.
 fn decimal(
     base: &str,
     given: &[u32],
@@ -184,6 +190,17 @@ fn decimal(
     valid.then(|| format!("{base}({})", shown.join(",")))
 }
 
+/// A type parameter written in digits.
+fn parameter(text: &str) -> Option<u32> {
+    if text.is_empty() {
+        return None;
+    }
+    text.chars().try_fold(0_u32, |value, character| {
+        let digit: u32 = character.to_digit(DECIMAL_RADIX)?;
+        value.checked_mul(DECIMAL_RADIX)?.checked_add(digit)
+    })
+}
+
 /// A STRING or BYTES type, whose length when given is at least 1.
 fn sized(base: &str, length: Option<u32>) -> Option<String> {
     match length {
@@ -191,4 +208,101 @@ fn sized(base: &str, length: Option<u32>) -> Option<String> {
         Some(0) => None,
         Some(length) => Some(format!("{base}({length})")),
     }
+}
+
+/// The name Polyglot gives `spelling`, a type BigQuery accepts parsed as `data_type`.
+fn polyglot_name(spelling: &str, data_type: &DataType, top: bool) -> String {
+    let text: &str = spelling.trim();
+    let inner = || {
+        let open: usize = text.find('<').map_or(text.len(), |at| at + 1);
+        let close: usize = text.rfind('>').unwrap_or(text.len()).max(open);
+        &text[open..close]
+    };
+    match data_type {
+        DataType::Array { element_type, .. } => {
+            format!("ARRAY<{}>", polyglot_name(inner(), element_type, false))
+        }
+        DataType::Struct { fields, .. } => {
+            let named: Vec<String> = top_level_fields(inner())
+                .into_iter()
+                .zip(fields)
+                .map(|(field_text, field)| {
+                    if field.name.is_empty() && field_text.contains('(') {
+                        return compact(field_text);
+                    }
+                    if field.name.is_empty() {
+                        return polyglot_name(field_text, &field.data_type, false);
+                    }
+                    let (name, rest) = split_field_name(field_text.trim_start());
+                    format!(
+                        "{}{}",
+                        compact(name),
+                        polyglot_name(rest, &field.data_type, false)
+                    )
+                })
+                .collect();
+            format!("STRUCT<{}>", named.join(","))
+        }
+        _ => {
+            let spelt: String = compact(text);
+            let base_end: usize = spelt.find(['(', '<']).unwrap_or(spelt.len());
+            let (base, parameters) = spelt.split_at(base_end);
+            let names: &[(&str, &str)] = if top {
+                POLYGLOT_TOP_LEVEL_TYPE_NAMES
+            } else {
+                POLYGLOT_NESTED_TYPE_NAMES
+            };
+            let parameters: String = match parameters.strip_prefix("(MAX") {
+                Some(rest) if top && POLYGLOT_MAX_DROPPED.contains(&base) => rest
+                    .strip_prefix(',')
+                    .map_or(String::new(), |scale| format!("({scale}")),
+                _ => parameters.to_owned(),
+            };
+            match names.iter().find(|(alias, _)| *alias == base) {
+                Some((_, name)) => format!("{name}{parameters}"),
+                None => format!("{base}{parameters}"),
+            }
+        }
+    }
+}
+
+/// Upper case without whitespace, as Polyglot's generated type text compares.
+fn compact(text: &str) -> String {
+    text.chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>()
+        .to_ascii_uppercase()
+}
+
+/// A STRUCT's field texts: its commas outside brackets, parentheses and quoted names.
+fn top_level_fields(text: &str) -> Vec<&str> {
+    let mut fields: Vec<&str> = Vec::new();
+    let (mut depth, mut quote, mut start): (usize, Option<char>, usize) = (0, None, 0);
+    for (at, character) in text.char_indices() {
+        match (quote, character) {
+            (Some(open), _) if character == open => quote = None,
+            (Some(_), _) => {}
+            (None, '`' | '\'' | '"') => quote = Some(character),
+            (None, '<' | '(') => depth += 1,
+            (None, '>' | ')') => depth = depth.saturating_sub(1),
+            (None, ',') if depth == 0 => {
+                fields.push(&text[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
+    }
+    fields.push(&text[start..]);
+    fields
+}
+
+/// A named field's name, backquoted or a word, and its type text.
+fn split_field_name(text: &str) -> (&str, &str) {
+    let end: usize = match text.strip_prefix('`') {
+        Some(rest) => rest.find('`').map_or(text.len(), |at| at + 2),
+        None => text
+            .find(|character: char| !(character.is_ascii_alphanumeric() || character == '_'))
+            .unwrap_or(text.len()),
+    };
+    text.split_at(end)
 }

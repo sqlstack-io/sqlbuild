@@ -80,8 +80,9 @@ pub(super) struct TypeMatchTestCase {
 }
 
 pub(super) struct NormalizeTypeTestCase {
+    pub(super) description: &'static str,
     pub(super) spelling: &'static str,
-    pub(super) expected: Option<&'static str>,
+    pub(super) expected_name: Option<&'static str>,
 }
 
 pub(super) struct ParseFailureTestCase {
