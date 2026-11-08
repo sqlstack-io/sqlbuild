@@ -717,8 +717,10 @@ impl NativeModelLoop {
             relative_path,
             contents,
         };
-        let (analysed, rejected_opt_out, analysis_skipped) =
-            self.analysis(context, &opt_out_model)?;
+        let legacy_gate = match self.route {
+            AnalysisRoute::Legacy => Some(self.analysis(context, &opt_out_model, true)?),
+            AnalysisRoute::Native(_) | AnalysisRoute::Unavailable => None,
+        };
         let scanned = match extract_sql_references(&query_sql, &self.syntax) {
             ReferenceExtraction::Extracted(scanned) => scanned,
             ReferenceExtraction::Failed(failure) => {
@@ -751,6 +753,10 @@ impl NativeModelLoop {
                 contents,
             },
         )?;
+        let (analysed, rejected_opt_out, analysis_skipped) = match legacy_gate {
+            Some(gate) => gate,
+            None => self.analysis(context, &opt_out_model, scanned.invalid_calls.is_empty())?,
+        };
         let analysis: (bool, Option<Bound<'py, PyAny>>) = (
             analysed && scanned.invalid_calls.is_empty(),
             rejected_opt_out,
@@ -818,11 +824,12 @@ impl NativeModelLoop {
         })
     }
 
-    /// Whether the model's SQL is analysed, its rejected opt-out, and whether its parser skipped it.
+    /// Analysed, rejected opt-out, skipped; a native route reads no SQL whose calls P012 failed.
     fn analysis<'py>(
         &self,
         context: &LoopContext<'_, 'py>,
         model: &OptOutModel<'_, 'py>,
+        calls_valid: bool,
     ) -> PyResult<(bool, Option<Bound<'py, PyAny>>, bool)> {
         let mut skipped: bool = false;
         let (analysed, rejected) =
@@ -836,6 +843,9 @@ impl NativeModelLoop {
                 }
                 AnalysisGate::Enabled => match self.route {
                     AnalysisRoute::Legacy => (true, None),
+                    AnalysisRoute::Native(_) | AnalysisRoute::Unavailable if !calls_valid => {
+                        (false, None)
+                    }
                     AnalysisRoute::Native(dialect) => {
                         let read: bool = skip_unreadable(self.settings, dialect, context, model)?;
                         skipped = !read;
