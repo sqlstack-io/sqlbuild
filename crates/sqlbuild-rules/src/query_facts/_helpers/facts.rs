@@ -1,8 +1,9 @@
 use crate::query_facts::_helpers::shape::stub_call;
 use crate::query_facts::_helpers::tokens::{ComparisonOperator, QueryTokens, SelectTokens};
 use crate::query_facts::constants::{
-    DATE_DIFF_ARGUMENTS, DATE_DIFF_CALLS, DUCKDB_DIALECTS, MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH,
-    POSTGRES_DIALECTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT, TABLE_FUNCTION_STUB, TRIPLE_QUOTE_LENGTH,
+    DUCKDB_DIALECTS, MAX_AST_DEPTH, MAX_FUNCTION_CALL_DEPTH, POSTGRES_DIALECTS,
+    SNOWFLAKE_DATE_PART_ARGUMENTS, SNOWFLAKE_DIALECT, SQLITE_DIALECT, TABLE_FUNCTION_STUB,
+    TRIPLE_QUOTE_LENGTH,
 };
 use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
@@ -395,7 +396,13 @@ impl Builder<'_> {
             return *span;
         }
         let anchors = match anchors(parts) {
-            (None, None) => (node.source_span().map(|span| span.start), None),
+            (None, None) => (
+                parts.operands[0]
+                    .source_span()
+                    .map(|span| span.end)
+                    .or_else(|| node.source_span().map(|span| span.start)),
+                None,
+            ),
             anchors => anchors,
         };
         let span = self
@@ -463,7 +470,15 @@ impl Builder<'_> {
                 Expression::Identifier(identifier) => {
                     fact.columns.insert(identifier.name.clone());
                 }
-                Expression::Literal(literal) if !units.contains(&std::ptr::from_ref(value)) => {
+                Expression::Literal(literal) if units.contains(&std::ptr::from_ref(value)) => {
+                    if let Some(unit) = string_literal(literal)
+                        && let Some(index) =
+                            string_tokens.iter().position(|(_, _, text)| *text == unit)
+                    {
+                        string_tokens.remove(index);
+                    }
+                }
+                Expression::Literal(literal) => {
                     if let Some(generated) = string_literal(literal) {
                         let position = string_tokens
                             .iter()
@@ -500,20 +515,21 @@ impl Builder<'_> {
     }
 }
 
-/// The quoted first arguments of Snowflake's three-argument `DATEDIFF` calls, which are date parts.
+/// The quoted date-part arguments of Snowflake calls such as `DATEDIFF('day', a, b)`.
 fn date_part_arguments(root: &Expression, dialect: Dialect) -> HashSet<*const Expression> {
     if dialect != Dialect::Snowflake {
         return HashSet::new();
     }
     root.dfs()
         .filter_map(|node| match node {
-            Expression::Function(function)
-                if function.args.len() == DATE_DIFF_ARGUMENTS
-                    && DATE_DIFF_CALLS.contains(&function.name.to_ascii_uppercase().as_str()) =>
-            {
+            Expression::Function(function) => {
+                let name = function.name.to_ascii_uppercase();
+                let (_, _, index) = SNOWFLAKE_DATE_PART_ARGUMENTS
+                    .iter()
+                    .find(|(call, count, _)| *call == name && *count == function.args.len())?;
                 function
                     .args
-                    .first()
+                    .get(*index)
                     .filter(|argument| direct_string_literal(argument).is_some())
                     .map(std::ptr::from_ref)
             }
