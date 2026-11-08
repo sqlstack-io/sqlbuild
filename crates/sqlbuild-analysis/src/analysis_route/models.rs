@@ -122,3 +122,7 @@ impl LineageSchema for StandInSchema {
             .then_some(self.columns.as_slice())
     }
 }
+
+/// SQL Server, whose SQL SQLQuack's T-SQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct TsqlDialect;
