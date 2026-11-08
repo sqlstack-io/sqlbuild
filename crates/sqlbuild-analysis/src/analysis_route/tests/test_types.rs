@@ -7,7 +7,7 @@ use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::NormalizedType;
+use crate::type_system::models::{NormalizedType, TypeFamily};
 
 pub(super) struct NativeGapTestCase {
     pub(super) description: &'static str,
@@ -247,4 +247,17 @@ pub(super) struct NativeLineageTestCase {
     pub(super) sql: &'static str,
     pub(super) placeholders: &'static [(&'static str, &'static str)],
     pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct TsqlParseTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `Ok((statements, gaps))` when the parser reads the SQL, `Err((syntax, offset))` when it refuses it.
+    pub(super) expected_parse: Result<(usize, usize), (bool, usize)>,
+}
+
+pub(super) struct TsqlTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
 }
