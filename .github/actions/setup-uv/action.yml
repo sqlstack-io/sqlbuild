@@ -1,0 +1,58 @@
+name: Set up uv
+description: >-
+  Install a pinned uv from PyPI and optionally cache its package cache. Installing from PyPI
+  keeps setup working when GitHub release downloads fail.
+inputs:
+  version:
+    description: Exact uv version to install
+    required: true
+  enable-cache:
+    description: Restore and save the uv cache, keyed on the dependency files
+    required: false
+    default: "false"
+  cache-dependency-glob:
+    description: Files whose contents key the cache, one path per line
+    required: false
+    default: uv.lock
+runs:
+  using: composite
+  steps:
+    # The runner's cached Python, left off PATH so jobs keep the Python they set up themselves.
+    - id: python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        update-environment: false
+    - name: Install uv from PyPI
+      shell: bash
+      env:
+        PYTHON: ${{ steps.python.outputs.python-path }}
+        UV_VERSION: ${{ inputs.version }}
+      run: |
+        package="${RUNNER_TEMP}/uv-package"
+        "${PYTHON}" -m pip install --disable-pip-version-check --no-warn-script-location \
+          --target "${package}" "uv==${UV_VERSION}"
+        mkdir -p "${RUNNER_TEMP}/uv-bin"
+        for executable in "${package}"/bin/uv* "${package}"/Scripts/uv*; do
+          if [[ -f "${executable}" ]]; then cp "${executable}" "${RUNNER_TEMP}/uv-bin/"; fi
+        done
+        echo "${RUNNER_TEMP}/uv-bin" >> "${GITHUB_PATH}"
+        "${RUNNER_TEMP}/uv-bin/uv" --version
+    - id: cache-key
+      if: inputs.enable-cache == 'true'
+      name: Key the uv cache on the dependency files
+      shell: bash
+      env:
+        FILES: ${{ inputs.cache-dependency-glob }}
+        UV_VERSION: ${{ inputs.version }}
+      run: |
+        echo "UV_CACHE_DIR=${RUNNER_TEMP}/setup-uv-cache" >> "${GITHUB_ENV}"
+        digest=$(while IFS= read -r file; do
+          if [[ -n "${file// /}" ]]; then sha256sum "${file// /}"; fi
+        done <<< "${FILES}" | sha256sum | cut -c1-64)
+        echo "key=uv-pypi-${RUNNER_OS}-${RUNNER_ARCH}-${UV_VERSION}-${digest}" >> "${GITHUB_OUTPUT}"
+    - if: inputs.enable-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/setup-uv-cache
+        key: ${{ steps.cache-key.outputs.key }}

@@ -141,8 +141,13 @@ jobs:
         run: |
           npm ci
           npm run build
-      - uses: PyO3/maturin-action@v1
+      # maturin-action downloads maturin from GitHub releases, which can fail on its own. Each
+      # build retries once; macOS and Windows then fall back to the same maturin from PyPI. Linux
+      # builds need the action's manylinux container, so they have no fallback.
+      - id: extension
+        uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
+        continue-on-error: true
         with:
           command: build
           # One platform records a cargo build timing report for build time work.
@@ -151,8 +156,33 @@ jobs:
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
-      - uses: PyO3/maturin-action@v1
+      - id: extension-retry
+        name: Retry the extension build
+        uses: PyO3/maturin-action@v1
+        if: inputs.prebuilt-run-id == '' && steps.extension.outcome == 'failure'
+        continue-on-error: ${{ runner.os != 'Linux' }}
+        with:
+          command: build
+          # One platform records a cargo build timing report for build time work.
+          args: >-
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+            ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
+      - name: Build the extension with maturin from PyPI
+        if: >-
+          inputs.prebuilt-run-id == '' && runner.os != 'Linux'
+          && steps.extension.outcome == 'failure' && steps.extension-retry.outcome == 'failure'
+        shell: bash
+        env:
+          MATURIN_ARGS: >-
+            --profile ${{ inputs.cargo-profile }} --out dist --features extension-module
+          TARGET: ${{ matrix.platform.target }}
+        run: scripts/maturin_from_pypi.sh build ${MATURIN_ARGS}
+      - id: cli
+        uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
+        continue-on-error: true
         # On macOS maturin links the extension with these flags for every crate, which changes
         # their build hash. Passing the same flags here lets sqb reuse the crates the extension
         # build just compiled instead of compiling them again; sqb has no undefined symbols, and
@@ -169,6 +199,37 @@ jobs:
             ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
           target: ${{ matrix.platform.target }}
           manylinux: auto
+      - id: cli-retry
+        name: Retry the sqb build
+        uses: PyO3/maturin-action@v1
+        if: inputs.prebuilt-run-id == '' && steps.cli.outcome == 'failure'
+        continue-on-error: ${{ runner.os != 'Linux' }}
+        env:
+          RUSTFLAGS: >-
+            ${{ runner.os == 'macOS' && '-C link-arg=-undefined -C link-arg=dynamic_lookup' || '' }}
+          # A wheel must never ship a sqb server without its UI.
+          SQLBUILD_UI_REQUIRED: "1"
+        with:
+          command: build
+          args: >-
+            --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
+            ${{ matrix.platform.name == 'linux-x86_64' && '--timings' || '' }}
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
+      - name: Build sqb with maturin from PyPI
+        if: >-
+          inputs.prebuilt-run-id == '' && runner.os != 'Linux'
+          && steps.cli.outcome == 'failure' && steps.cli-retry.outcome == 'failure'
+        shell: bash
+        env:
+          RUSTFLAGS: >-
+            ${{ runner.os == 'macOS' && '-C link-arg=-undefined -C link-arg=dynamic_lookup' || '' }}
+          # A wheel must never ship a sqb server without its UI.
+          SQLBUILD_UI_REQUIRED: "1"
+          MATURIN_ARGS: >-
+            --profile ${{ inputs.cargo-profile }} --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml --features ui
+          TARGET: ${{ matrix.platform.target }}
+        run: scripts/maturin_from_pypi.sh build ${MATURIN_ARGS}
       - name: Upload the cargo build timing reports
         if: inputs.prebuilt-run-id == '' && matrix.platform.name == 'linux-x86_64'
         uses: actions/upload-artifact@v4
@@ -286,16 +347,46 @@ jobs:
         if: inputs.prebuilt-run-id == ''
         with:
           toolchain: stable
-      - uses: PyO3/maturin-action@v1
+      - id: sdist
+        uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
+        continue-on-error: true
         with:
           command: sdist
           args: --out dist
-      - uses: PyO3/maturin-action@v1
+      - id: sdist-retry
+        name: Retry the source distribution
+        uses: PyO3/maturin-action@v1
+        if: inputs.prebuilt-run-id == '' && steps.sdist.outcome == 'failure'
+        continue-on-error: true
+        with:
+          command: sdist
+          args: --out dist
+      - name: Build the source distribution with maturin from PyPI
+        if: >-
+          inputs.prebuilt-run-id == '' && steps.sdist.outcome == 'failure'
+          && steps.sdist-retry.outcome == 'failure'
+        run: scripts/maturin_from_pypi.sh sdist --out dist
+      - id: sdist-cli
+        uses: PyO3/maturin-action@v1
         if: inputs.prebuilt-run-id == ''
+        continue-on-error: true
         with:
           command: sdist
           args: --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml
+      - id: sdist-cli-retry
+        name: Retry the sqb source distribution
+        uses: PyO3/maturin-action@v1
+        if: inputs.prebuilt-run-id == '' && steps.sdist-cli.outcome == 'failure'
+        continue-on-error: true
+        with:
+          command: sdist
+          args: --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml
+      - name: Build the sqb source distribution with maturin from PyPI
+        if: >-
+          inputs.prebuilt-run-id == '' && steps.sdist-cli.outcome == 'failure'
+          && steps.sdist-cli-retry.outcome == 'failure'
+        run: scripts/maturin_from_pypi.sh sdist --out dist --manifest-path crates/sqlbuild-cli/Cargo.toml
       - name: Download prebuilt source distributions
         if: inputs.prebuilt-run-id != ''
         uses: actions/download-artifact@v4
