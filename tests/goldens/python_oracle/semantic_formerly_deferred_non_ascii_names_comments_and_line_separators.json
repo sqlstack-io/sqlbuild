@@ -12,7 +12,7 @@
 "completion",
 {
 "duckdb": "c10085934861ac2acdf66683",
-"postgres": "c10085934861ac2acdf66683",
+"postgres": "8dfa54b86c900f9b548d3a0d",
 "snowflake": "c10085934861ac2acdf66683",
 "bigquery": "ee8f0e9b7ecf29cbf883f458"
 }
@@ -21,7 +21,7 @@
 "completion",
 {
 "duckdb": "d94e71acae817a60f01b0955",
-"postgres": "d94e71acae817a60f01b0955",
+"postgres": "17cebe026f75d716827cfa80",
 "snowflake": "d94e71acae817a60f01b0955",
 "bigquery": "d94e71acae817a60f01b0955"
 }

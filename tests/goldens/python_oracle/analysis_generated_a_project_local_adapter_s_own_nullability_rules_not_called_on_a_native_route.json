@@ -40,7 +40,6 @@
 "payment_totals": "09523c9ed08b78a006a96743",
 "payments_by_customer": "9e1265b9f4134636cb508259",
 "pivot_0": "70e69b1adee7eb5488b1f3a6",
-"pivot_1": "780cccafd942913ef74a86dc",
 "pivot_2": "695625b156dd7898eb94a3ce",
 "pivot_3": "982ab4ce4de6bc53624132e2",
 "status_amounts": "9b4977bb6f213498c985226b",
@@ -250,7 +249,6 @@
 "pivot_0": "695625b156dd7898eb94a3ce",
 "pivot_1": "37b64f1acff2d02dfd7b0d76",
 "pivot_2": "f557338abf3ddad3a6cb4336",
-"pivot_3": "111edafe3adf02dec49c33d9",
 "status_amounts": "9b4977bb6f213498c985226b",
 "status_passthrough": "cd8b6c8470557dc1d97cf1b4"
 }

@@ -47,6 +47,7 @@ class SourceTypesTestCase:
     files: dict[str, str]
     lineage_mode: ColumnLineageMode
     expected_types: tuple[tuple[str, str | None], ...]
+    dialect: str = "duckdb"
 
 
 @dataclass(frozen=True)

@@ -42,6 +42,16 @@ class DialectFindingTestCase:
 
 
 @dataclass(frozen=True)
+class ModelFindingsTestCase:
+    """Models compiled together under one dialect: each finding's model and code."""
+
+    description: str
+    dialect: str
+    models: dict[str, str]
+    expected_findings: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
 class MissingCatalogTestCase:
     """A project without the analysis catalog every compile builds."""
 

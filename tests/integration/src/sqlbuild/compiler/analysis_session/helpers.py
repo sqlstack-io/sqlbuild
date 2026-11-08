@@ -470,7 +470,7 @@ def shared_analysis_files(
 def compile_inputs(
     *, project_dir: Path, files: dict[str, str], dialect: str | None = "duckdb"
 ) -> CompileInputsView:
-    """Write a project and attach its compile inputs with DuckDB's compile context under `dialect`."""
+    """Write a project and attach its compile inputs, compiled under `dialect`."""
 
     for relative_path, contents in files.items():
         path: Path = project_dir / relative_path
@@ -659,15 +659,21 @@ def _record_analyses(
 
 
 def first_model_types(
-    *, files: dict[str, str], lineage_mode: ColumnLineageMode, tmp_path: Path
+    *,
+    files: dict[str, str],
+    lineage_mode: ColumnLineageMode,
+    tmp_path: Path,
+    dialect: str = "duckdb",
 ) -> tuple[tuple[str, str | None], ...]:
-    """The first analysed model's output names and types, analysed natively as DuckDB."""
+    """The first analysed model's output names and types, analysed natively under `dialect`."""
 
-    inputs: CompileInputsView = compile_inputs(project_dir=tmp_path / "project", files=files)
+    inputs: CompileInputsView = compile_inputs(
+        project_dir=tmp_path / "project", files=files, dialect=dialect
+    )
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
     analyse_natively(
         inputs=inputs,
-        inference_profile=ExpressionInferenceProfile(sql_analysis_dialect="duckdb"),
+        inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=dialect),
         lineage_mode=lineage_mode,
         runs=runs,
         cache_root=tmp_path / "cache",

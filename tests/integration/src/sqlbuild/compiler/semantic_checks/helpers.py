@@ -236,6 +236,22 @@ def one_model_completion(
     )
 
 
+def model_findings(
+    *, project_dir: Path, dialect: str, models: dict[str, str]
+) -> tuple[tuple[str, str], ...]:
+    """`models` over the generated sources under `dialect`: each finding's model and code."""
+
+    files: dict[str, str] = generated_semantic_files(
+        rng=random.Random(0), model_count=0, require_analysis=True
+    )
+    for name, sql in models.items():
+        files[f"models/{name}.sql"] = f'MODEL (description "{name}");\n\n{sql}\n'
+    native: CompiledProjectView = completed_natively(
+        captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
+    )
+    return tuple(sorted((str(item.resource_name), item.code) for item in native.diagnostics))
+
+
 def with_dialect(inputs: SemanticInputs, dialect: str | None) -> SemanticInputs:
     """The same stage inputs read under another SQL dialect."""
 

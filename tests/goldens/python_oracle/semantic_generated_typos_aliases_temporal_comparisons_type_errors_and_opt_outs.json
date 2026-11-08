@@ -3,72 +3,72 @@
 "completion",
 {
 "duckdb": "ff77b0f7c0cca5db3021485f",
-"postgres": "f6cd382284a88cb40ee7119a",
+"postgres": "0de896ddd8f99c8c157c0d6a",
 "snowflake": "45200ddc74b94812a0aca571",
-"bigquery": "f6ed5f097058d1635d709bd1"
+"bigquery": "fd5541de4ab52c998f7e13c5"
 }
 ],
 [
 "completion",
 {
 "duckdb": "a88cbfc47aa1a11a62c671bb",
-"postgres": "6b2a976a568aea0841340272",
+"postgres": "a88cbfc47aa1a11a62c671bb",
 "snowflake": "2c23a32e69460308d4893f41",
-"bigquery": "b6fcb7fdea037d60e2702021"
+"bigquery": "a88cbfc47aa1a11a62c671bb"
 }
 ],
 [
 "completion",
 {
 "duckdb": "559b4f8d9d535a8c20a43a68",
-"postgres": "61b4f248f3abd2ba9cd652a5",
+"postgres": "62353b9339584a3bc2715173",
 "snowflake": "a7a5c49a1a12ea6a55928d58",
-"bigquery": "dac3d8e7001cb578e97d6ce4"
+"bigquery": "391905a2f2b3241b9f017c1d"
 }
 ],
 [
 "completion",
 {
 "duckdb": "43a694212f8a1c90b7c5c429",
-"postgres": "50a5615b0792ed59adf9f1d2",
+"postgres": "43a694212f8a1c90b7c5c429",
 "snowflake": "43a694212f8a1c90b7c5c429",
-"bigquery": "6e65889a512f0a3e8dbdbcf6"
+"bigquery": "1af1a3ae03db4c1e15297421"
 }
 ],
 [
 "completion",
 {
 "duckdb": "7a4e919059d5f2d759a79a0e",
-"postgres": "7d6b71a9970d341846a8f745",
+"postgres": "9b49648e2fb4be6d8afbea9c",
 "snowflake": "2e5d4d0063e8d8db7563cc53",
-"bigquery": "a04f42301146206387e9cab3"
+"bigquery": "0bffda198dbb4f007269080c"
 }
 ],
 [
 "completion",
 {
 "duckdb": "dabfee6327264ab0daad3f28",
-"postgres": "6ed1cf041b8be10e061db0f7",
+"postgres": "dabfee6327264ab0daad3f28",
 "snowflake": "77d73ac56b19811a2e044eb4",
-"bigquery": "582b2ca361eca23875f37828"
+"bigquery": "6ace0baa2efb70168eb18aad"
 }
 ],
 [
 "completion",
 {
 "duckdb": "4d6653aafceb276d132e3d5a",
-"postgres": "5fa95a999d889ee53aa44970",
+"postgres": "303eca4e9e93684168a02cfd",
 "snowflake": "49f8133ce7dc3332de1928b8",
-"bigquery": "63abe5e3df41cdc10962f43c"
+"bigquery": "f7432c7f32261cd8ed0b5055"
 }
 ],
 [
 "completion",
 {
 "duckdb": "5a5c63115bf816432297ed36",
-"postgres": "15298f247b3b7ab16eac060c",
+"postgres": "9b6637d1334d254103ed3484",
 "snowflake": "5a5c63115bf816432297ed36",
-"bigquery": "fa3def6e43f007f87ecb1870"
+"bigquery": "15a3513a31fb5749f5951af1"
 }
 ]
 ]

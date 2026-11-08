@@ -26,6 +26,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks._test_types import 
     FormerlyDeferredSemanticTestCase,
     GeneratedSemanticParityTestCase,
     MissingCatalogTestCase,
+    ModelFindingsTestCase,
     SessionCompletionTestCase,
 )
 from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
@@ -37,6 +38,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
     files_with_non_ascii,
     generated_semantic_files,
     has_blocking_binding,
+    model_findings,
     native_completion,
     note_kinds,
     one_model_completion,
@@ -50,6 +52,14 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
 )
 
 _NOTE_KINDS: tuple[str, ...] = ("downstream output uses", "downstream uses of", " has: ")
+
+_FAILED_UPSTREAM_MODELS: dict[str, str] = {
+    "upstream": 'SELECT orde_rid, sattus FROM __source("raw_orders")',
+    "downstream": (
+        'WITH base AS (\n  SELECT order_id, sattus FROM __ref("upstream")\n)\n'
+        "SELECT order_id, MAX(status) AS status\nFROM base\nGROUP BY 1"
+    ),
+}
 
 
 @pytest.mark.parametrize(
@@ -220,17 +230,24 @@ def test_given_one_model_under_its_dialect_when_completing_natively_then_has_exp
 
 @pytest.mark.xfail(
     strict=True,
-    reason="SQLQuack's Snowflake and PostgreSQL profiles do not yet check or type these",
+    reason="SQLQuack's Snowflake, PostgreSQL and BigQuery profiles do not yet check or type these",
 )
 @pytest.mark.parametrize(
     "test_case",
     [
         DialectFindingTestCase(
+            description="BigQuery refuses a text literal compared with a timestamp",
+            dialect="bigquery",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.ordered_at > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
             description="PostgreSQL refuses a text literal compared with a number",
             dialect="postgres",
             sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
             expected_codes=("B218",),
-            expected_types=(("order_id", "INT"),),
+            expected_types=(("order_id", "INTEGER"),),
         ),
         DialectFindingTestCase(
             description="Snowflake refuses a text literal compared with a number",
@@ -256,6 +273,61 @@ def test_given_pending_dialect_semantics_when_completing_natively_then_has_expec
     assert one_model_completion(
         project_dir=tmp_path / "project", dialect=test_case.dialect, sql=test_case.sql
     ) == (test_case.expected_codes, test_case.expected_types)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ModelFindingsTestCase(
+            description="DuckDB reports a column its CTE lacks over a failed upstream model",
+            dialect="duckdb",
+            models=_FAILED_UPSTREAM_MODELS,
+            expected_findings=(("downstream", "B002"), ("upstream", "B002"), ("upstream", "B002")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_cte_over_failed_upstream_when_completing_natively_then_model_keeps_a_finding(
+    test_case: ModelFindingsTestCase,
+    tmp_path: Path,
+) -> None:
+    assert (
+        model_findings(
+            project_dir=tmp_path / "project", dialect=test_case.dialect, models=test_case.models
+        )
+        == test_case.expected_findings
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SQLQuack drops PostgreSQL's follow-on finding of a CTE whose own finding type "
+        "recovery then drops as poisoned, so the model is left with none"
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        ModelFindingsTestCase(
+            description="PostgreSQL reports a column its CTE lacks over a failed upstream model",
+            dialect="postgres",
+            models=_FAILED_UPSTREAM_MODELS,
+            expected_findings=(("downstream", "B002"), ("upstream", "B002"), ("upstream", "B002")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_postgres_cte_over_failed_upstream_when_completing_then_keeps_a_finding(
+    test_case: ModelFindingsTestCase,
+    tmp_path: Path,
+) -> None:
+    assert (
+        model_findings(
+            project_dir=tmp_path / "project", dialect=test_case.dialect, models=test_case.models
+        )
+        == test_case.expected_findings
+    )
 
 
 @pytest.mark.parametrize(
@@ -356,7 +428,11 @@ def test_given_compiles_when_completing_from_the_session_then_matches_payload_an
         )
         == []
     )
-    assert payload_views == [None] * len(captured)
+    assert {payload is None for payload in payload_views} == {True, False}
+    assert all(
+        payload in (None, session)
+        for payload, session in zip(payload_views, session_views, strict=True)
+    )
     assert (
         session_models,
         model_count - session_models,

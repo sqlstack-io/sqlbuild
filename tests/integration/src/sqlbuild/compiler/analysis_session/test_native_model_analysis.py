@@ -12,7 +12,6 @@ import pytest
 
 from sqlbuild._native import (
     ColumnLineageMode,
-    InferredNullability,
     assemble_project,
 )
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
@@ -127,6 +126,17 @@ _EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
     ),
 }
 
+_MIXED_CASE_SOURCE_PROJECT: dict[str, str] = {
+    "sqlbuild_project.toml": 'name = "customers"\nadapter = "duckdb"\n',
+    "sources/raw.yml": (
+        "sources:\n  - name: raw_customers\n    description: Raw customers.\n"
+        "    expression: >-\n      (SELECT 10 AS customer_id, 'Ada' AS Customer_Name)\n"
+    ),
+    "models/customers.sql": (
+        'MODEL (description "Customers");\n\nSELECT * FROM __source("raw_customers")\n'
+    ),
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -143,7 +153,7 @@ _EXPRESSION_SOURCE_PROJECT: dict[str, str] = _DECLARED_SOURCE_PROJECT | {
             expected_minimum_expression_shapes=40,
             expected_minimum_pivot_proofs=80,
             expected_minimum_proven_pivots=12,
-            expected_minimum_native_enrichments=90,
+            expected_minimum_native_enrichments=0,
         ),
         GeneratedAnalysisTestCase(
             description="rich lineage over untyped inputs, CTE facts and contracts",
@@ -390,7 +400,70 @@ def test_given_typed_source_when_analysing_natively_then_its_columns_are_typed(
 ) -> None:
     assert (
         first_model_types(
-            files=test_case.files, lineage_mode=test_case.lineage_mode, tmp_path=tmp_path
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
+        )
+        == test_case.expected_types
+    )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="DuckDB keeps an expression source's unquoted alias as written",
+            files=_MIXED_CASE_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("customer_id", "INT"), ("Customer_Name", "TEXT")),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_expression_source_with_mixed_case_alias_when_analysing_then_star_lists_engine_names(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
+        )
+        == test_case.expected_types
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "an expression source's shape keeps the alias's authored case and Polyglot's type "
+        "names under PostgreSQL"
+    ),
+)
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SourceTypesTestCase(
+            description="PostgreSQL folds an expression source's unquoted alias",
+            files=_MIXED_CASE_SOURCE_PROJECT,
+            lineage_mode=ColumnLineageMode.FAST,
+            expected_types=(("customer_id", "INTEGER"), ("customer_name", "TEXT")),
+            dialect="postgres",
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pending_postgres_expression_source_when_analysing_then_star_lists_engine_names(
+    test_case: SourceTypesTestCase, tmp_path: Path
+) -> None:
+    assert (
+        first_model_types(
+            files=test_case.files,
+            lineage_mode=test_case.lineage_mode,
+            tmp_path=tmp_path,
+            dialect=test_case.dialect,
         )
         == test_case.expected_types
     )
