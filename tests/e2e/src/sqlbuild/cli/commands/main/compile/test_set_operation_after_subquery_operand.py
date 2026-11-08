@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -67,6 +68,22 @@ _FROM_QUERY_MODELS: tuple[SetOperationModel, ...] = (
         ),
     ),
 )
+
+
+def _from_query_models(adapter: str) -> tuple[SetOperationModel, ...]:
+    """The FROM-query models; BigQuery requires DISTINCT or ALL after EXCEPT and INTERSECT."""
+
+    if adapter != "bigquery":
+        return _FROM_QUERY_MODELS
+    return tuple(
+        replace(
+            model,
+            query_sql=model.query_sql.replace("\nEXCEPT\n", "\nEXCEPT DISTINCT\n").replace(
+                "\nINTERSECT\n", "\nINTERSECT DISTINCT\n"
+            ),
+        )
+        for model in _FROM_QUERY_MODELS
+    )
 
 
 @pytest.mark.parametrize(
@@ -233,7 +250,7 @@ def test_given_set_operation_after_subquery_operand_when_compiling_building_and_
         FromQuerySetOperationTestCase(
             description=f"{adapter} FROM query before a set operation",
             adapter=adapter,
-            models=_FROM_QUERY_MODELS,
+            models=_from_query_models(adapter),
             expected_column_counts=(
                 ("union_all_orders", 2),
                 ("except_orders", 2),

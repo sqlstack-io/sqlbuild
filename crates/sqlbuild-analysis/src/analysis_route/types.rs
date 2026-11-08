@@ -29,6 +29,11 @@ pub trait NativeDialect: Sync {
     /// A type as written in this dialect, as SQLBuild compares it; `None` when unknown or refused.
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType>;
 
+    /// A session column type, spelled as SQLBuild keeps it, as this dialect's parser reads it.
+    fn session_type(&self, spelling: &str) -> String {
+        spelling.to_owned()
+    }
+
     /// The one statement of `sql` when the parser reads it whole: no gap, and not raw text.
     fn read_whole(&self, sql: &str) -> Result<Expression, ParserGap> {
         let parsed: Parsed = self.parse(sql)?;
