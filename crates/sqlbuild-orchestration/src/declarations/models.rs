@@ -119,6 +119,14 @@ pub struct TriggerRecord {
     pub next_due_at: Option<DateTime<Utc>>,
 }
 
+/// A trigger as people list it, with its newest tick so a list needs no read per trigger.
+#[derive(Clone, Debug, PartialEq, Serialize, utoipa::ToSchema)]
+pub struct PersonTriggerRecord {
+    #[serde(flatten)]
+    pub trigger: TriggerRecord,
+    pub latest_tick: Option<crate::scheduler::models::TickRecord>,
+}
+
 /// Operator changes are immutable facts; clearing an override restores the published code default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]

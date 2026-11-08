@@ -10,7 +10,7 @@ use crate::api::models::ReadQuery;
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
-use crate::declarations::models::{JobRecord, TriggerRecord};
+use crate::declarations::models::{JobRecord, PersonTriggerRecord};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::RunNodeRecord;
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
@@ -87,14 +87,14 @@ pub(crate) async fn jobs(
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/triggers", operation_id = "listPersonTriggers",
     params(("location_id" = Uuid, Path), ("target" = String, Path)),
-    responses((status = 200, body = Vec<TriggerRecord>), (status = 401, description = "Session rejected"),
+    responses((status = 200, body = Vec<PersonTriggerRecord>, description = "Published triggers with their newest tick"), (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn triggers(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
     Path((location_id, target)): Path<(Uuid, String)>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<Vec<TriggerRecord>>, ApiError> {
+) -> Result<Json<Vec<PersonTriggerRecord>>, ApiError> {
     Ok(Json(
         list_person_triggers(
             &store,
