@@ -72,6 +72,8 @@ mod test_person_location_work;
 mod test_person_sessions;
 #[path = "test_proxy.rs"]
 mod test_proxy;
+#[path = "test_publish_encoding.rs"]
+mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
 #[path = "test_statistics_recovery.rs"]

@@ -1,12 +1,15 @@
 //! A location credential publishes and reads only its own location's snapshots.
 
+use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::_helpers::authentication::bearer::require_location;
 use crate::api::_helpers::resources::docker_image;
+use crate::api::_helpers::resources::request_json::request_json;
+use crate::api::constants::DECOMPRESSED_BODY_BYTES;
 use crate::api::errors::ApiError;
 use crate::api::models::{DevelopmentScope, DockerImageSource};
 use crate::credentials::models::TokenIdentity;
@@ -22,20 +25,30 @@ use crate::store::models::ControlStore;
     request_body = SnapshotInput,
     responses((status = 200, body = SnapshotRecord), (status = 400, body = crate::api::models::ApiErrorBody),
         (status = 401, description = "Invalid credential"), (status = 403, description = "Location not authorized"),
-        (status = 409, description = "Stale generation")), security(("bearer" = [])))]
+        (status = 409, description = "Stale generation"), (status = 413, description = "Body over its wire or decompressed bound"),
+        (status = 415, description = "Content encoding other than gzip")), security(("bearer" = [])))]
 pub(crate) async fn publish(
     State(store): State<ControlStore>,
     (Extension(identity), Extension(images)): (
         Extension<TokenIdentity>,
         Extension<std::sync::Arc<Vec<DockerImageSource>>>,
     ),
-    (Path((location_id, target)), development): (
+    (Path((location_id, target)), development, headers): (
         Path<(Uuid, String)>,
         Option<Extension<DevelopmentScope>>,
+        HeaderMap,
     ),
-    Json(input): Json<SnapshotInput>,
+    body: Bytes,
 ) -> Result<Json<SnapshotRecord>, ApiError> {
     require_location(&identity, location_id)?;
+    let input: SnapshotInput =
+        tokio::task::spawn_blocking(move || request_json(&headers, &body, DECOMPRESSED_BODY_BYTES))
+            .await
+            .map_err(|_| ApiError {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                message: "snapshot decoding stopped".into(),
+                decision_id: None,
+            })??;
     if input.location_id != location_id || input.target != target {
         return Err(ApiError {
             status: StatusCode::BAD_REQUEST,

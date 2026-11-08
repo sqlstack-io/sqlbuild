@@ -1,6 +1,11 @@
 //! Shared HTTP transport bounds for the server and native clients.
 
 pub const BODY_BYTES: usize = 64 * 1024 * 1024;
+/// A gzip request body may decompress to at most this many bytes before it is refused.
+pub(crate) const DECOMPRESSED_BODY_BYTES: usize = 512 * 1024 * 1024;
+pub(crate) const GZIP_ENCODING: &str = "gzip";
+pub(crate) const IDENTITY_ENCODING: &str = "identity";
+pub(crate) const JSON_MEDIA_TYPE: &str = "application/json";
 /// Two 1024-byte passwords can each expand sixfold through JSON escaping.
 pub(crate) const PASSWORD_BODY_BYTES: usize = 16 * 1024;
 pub(crate) const PASSWORD_COOKIE: &str = "__Host-sqb-session";
