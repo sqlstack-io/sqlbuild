@@ -49,7 +49,7 @@ pub(crate) fn revised(
             .map(|(relation, columns)| {
                 (
                     relation.clone(),
-                    schema_columns(relation, columns, poisoned),
+                    schema_columns(dialect, relation, columns, poisoned),
                 )
             })
             .collect::<HashMap<String, Vec<SchemaColumn>>>(),
@@ -80,8 +80,9 @@ pub(crate) fn unrevised(model: &RecoveryModel) -> Vec<RevisedBinding> {
         .collect()
 }
 
-/// `relation`'s columns as the session bound them, each poisoned or unknown one untyped.
+/// `relation`'s columns as the session bound them and `dialect` reads them, poisoned ones untyped.
 fn schema_columns(
+    dialect: &dyn NativeDialect,
     relation: &str,
     columns: &Pairs,
     poisoned: &[(String, String)],
@@ -96,7 +97,7 @@ fn schema_columns(
         schema.push(SchemaColumn {
             name: name.clone(),
             quoted: false,
-            data_type: (!untyped).then(|| data_type.clone()),
+            data_type: (!untyped).then(|| dialect.session_type(data_type)),
             nullability: Nullability::Unknown,
         });
     }

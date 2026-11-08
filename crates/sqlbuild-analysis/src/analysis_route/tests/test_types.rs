@@ -4,7 +4,7 @@ use sqlquack_semantics::lineage::models::Nullability;
 use sqlquack_syntax::expressions::statements::models::Command;
 use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 
-use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
+use crate::analysis_route::models::{GapSite, LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeFamily};
@@ -27,6 +27,7 @@ pub(super) struct SkippedAnalysisTestCase {
     pub(super) model: &'static str,
     pub(super) dialect: &'static str,
     pub(super) gap: LocatedGap,
+    pub(super) site: GapSite<'static>,
     pub(super) expected_code: &'static str,
     pub(super) expected_message: &'static str,
 }

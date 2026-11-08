@@ -64,7 +64,8 @@ fn parse_error(context: &SyntaxContext<'_, '_>, sql: &str) -> PyResult<Option<St
     syntax_error_message(context.py, &check, context.dialect, SyntaxMode::Validate)
 }
 
-fn sql_entry_label(prefix: &str, entry: &Bound<'_, PyAny>) -> PyResult<String> {
+/// How errors name a SQL hook entry: `{prefix} sql("name")`, or `{prefix} inline_sql("...")`.
+pub(crate) fn sql_entry_label(prefix: &str, entry: &Bound<'_, PyAny>) -> PyResult<String> {
     let name: Bound<'_, PyAny> = native_field(entry, "name")?;
     Ok(if name.is_none() {
         format!("{prefix} inline_sql(\"...\")")
