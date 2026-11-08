@@ -25,6 +25,7 @@ use crate::api::_helpers::resources::{
     person_reads::jobs,
     person_reads::triggers,
     person_reads::ticks,
+    person_reads::snapshots,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,

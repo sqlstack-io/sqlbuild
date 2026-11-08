@@ -482,6 +482,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/statistics": {
         parameters: {
             query?: never;
@@ -1492,6 +1508,28 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        /** @description A changed subject, such as `model:orders`, or `role:analyst` (`role:` for those who can't assign roles). */
+        PublishedChange: {
+            change_kind: string;
+            subject_key: string;
+        };
+        /** @description One publication as people browse it: its commit, environment and changed definitions. */
+        PublishedSnapshot: {
+            /** @description Added, changed and removed nodes and roles, in publication order. */
+            changes: components["schemas"]["PublishedChange"][];
+            /** @description Digest of the lock file, Python and `sqb` versions; a change means dependencies changed. */
+            environment_hash: string;
+            /** Format: int64 */
+            generation: number;
+            git_author?: string | null;
+            git_dirty: boolean;
+            git_revision?: string | null;
+            /** Format: date-time */
+            published_at: string;
+            /** Format: uuid */
+            snapshot_id: string;
+            sqb_version: string;
+        };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
             invocation_id: string;
@@ -3287,6 +3325,47 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listPersonSnapshots: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent publications; defaults to 20, capped at 100 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Publications newest first, each with its changed nodes and roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishedSnapshot"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

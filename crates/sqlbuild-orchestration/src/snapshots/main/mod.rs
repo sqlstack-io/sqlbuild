@@ -2,6 +2,7 @@ pub(super) mod _publish_snapshot;
 pub mod current_snapshot;
 pub mod current_snapshot_record;
 pub(crate) mod job_write_set;
+pub mod list_person_snapshots;
 pub mod next_remote_generation;
 pub(crate) mod prune_snapshots;
 pub(crate) mod publish_development_snapshot;
