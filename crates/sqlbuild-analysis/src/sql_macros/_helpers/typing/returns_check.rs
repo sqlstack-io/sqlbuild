@@ -3,24 +3,23 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use serde_json::{Value, json};
-
 use crate::analysis_route::types::NativeDialect;
 use crate::sql_macros::_helpers::parsing::body::expand_body;
 use crate::sql_macros::_helpers::rendering::arguments::type_family;
-use crate::sql_macros::_helpers::typing::probes::{probe_outputs, probe_type_errors};
+use crate::sql_macros::_helpers::typing::probes::{ProbeSchema, probe_outputs, probe_type_errors};
 use crate::sql_macros::_helpers::typing::typed_calls::{
     markable_calls, shifted, typed_sql, without_marker_calls,
 };
 use crate::sql_macros::constants::{
-    BODY_TYPE_CODE, INFERRED_TEXT_TYPE, RETURNS_MISMATCH_CODE, STAND_IN_RELATION, TYPE_ERROR_CODES,
-    TYPE_WARNING_CODES, UNKNOWN_TYPE_HINT, VARCHAR_TYPE,
+    BODY_TYPE_CODE, INFERRED_TEXT_TYPE, RETURNS_MISMATCH_CODE, STAND_IN_RELATION, TYPE_CODE_PREFIX,
+    TYPE_CODES, UNKNOWN_TYPE_HINT, VARCHAR_TYPE,
 };
 use crate::sql_macros::errors::SqlMacroError;
 use crate::sql_macros::models::{
     ArgumentShape, BodyType, ExpandedText, ParameterKind, RenderedArgument, SqlMacroDefinition,
     SqlMacroForm, SqlMacroLocation, TypeFamily, TypedCall,
 };
+use crate::sql_macros::types::RelationShapes;
 use crate::type_system::main::normalize_type::normalize_type;
 use crate::type_system::models::TypeNormalization;
 
@@ -64,9 +63,9 @@ fn body_probe(
     (parser, definition): (&dyn NativeDialect, &SqlMacroDefinition),
     body: &ExpandedText,
     families: bool,
-) -> Option<(String, Value)> {
+) -> Option<(String, Vec<(String, Vec<(String, String)>)>)> {
     let mut arguments: Vec<RenderedArgument> = Vec::with_capacity(definition.parameters.len());
-    let mut columns: Vec<Value> = Vec::with_capacity(definition.parameters.len());
+    let mut columns: Vec<(String, String)> = Vec::with_capacity(definition.parameters.len());
     for (index, parameter) in definition.parameters.iter().enumerate() {
         if matches!(parameter.kind, ParameterKind::Relation { .. }) {
             return None;
@@ -76,10 +75,12 @@ fn body_probe(
             ParameterKind::Collection { .. } => format!("({STAND_IN_RELATION}.{column})"),
             _ => format!("{STAND_IN_RELATION}.{column}"),
         };
-        columns.push(json!({
-            "name": column,
-            "type": stand_in_type(&parameter.kind, families).unwrap_or(UNKNOWN_TYPE_HINT),
-        }));
+        columns.push((
+            column.clone(),
+            stand_in_type(&parameter.kind, families)
+                .unwrap_or(UNKNOWN_TYPE_HINT)
+                .to_owned(),
+        ));
         arguments.push(RenderedArgument {
             parameter: index,
             sql,
@@ -96,13 +97,12 @@ fn body_probe(
     let unmarked: String = format!("{prefix}{}) AS b FROM {STAND_IN_RELATION}", expansion.sql);
     let calls: Vec<TypedCall> = shifted(expansion.calls, prefix.len()).collect();
     let (probe, _) = typed_sql(&unmarked, &markable_calls(&unmarked, &calls, parser.name()));
-    let table: Value = json!({"name": STAND_IN_RELATION, "columns": columns});
-    Some((probe, table))
+    Some((probe, vec![(STAND_IN_RELATION.to_owned(), columns)]))
 }
 
 /// What inference knows of the body's type.
-fn inferred_body_type(parser: &dyn NativeDialect, probe: &str, table: Value) -> BodyType {
-    let Some(outputs) = probe_outputs(parser, probe, &[table]) else {
+fn inferred_body_type(parser: &dyn NativeDialect, probe: &str, table: &RelationShapes) -> BodyType {
+    let Some(outputs) = probe_outputs(parser, probe, &ProbeSchema::new(table)) else {
         return BodyType::Unknown;
     };
     match outputs.into_iter().next() {
@@ -174,9 +174,9 @@ pub(crate) fn check_body_returns(
     let Some((probe, table)) = body_probe((parser, definition), body, false) else {
         return Ok(());
     };
-    let key: String = format!("returns\n{}\n{table}\n{probe}", parser.name());
+    let key: String = format!("returns\n{}\n{table:?}\n{probe}", parser.name());
     let body_type: BodyType = remembered(&BODY_TYPES, key, || {
-        inferred_body_type(parser, &probe, table)
+        inferred_body_type(parser, &probe, &table)
     });
     let (shown, wrong): (String, bool) = match body_type {
         BodyType::Unknown => return Ok(()),
@@ -206,8 +206,12 @@ pub(crate) fn check_body_returns(
 }
 
 /// The first type error the body's probe shows.
-fn body_type_error(parser: &dyn NativeDialect, probe: &str, table: Value) -> Option<String> {
-    probe_type_errors(parser, probe, &[table])
+fn body_type_error(
+    parser: &dyn NativeDialect,
+    probe: &str,
+    table: &RelationShapes,
+) -> Option<String> {
+    probe_type_errors(parser, probe, &ProbeSchema::new(table))
         .into_iter()
         .find(|(code, _)| is_type_code(code))
         .map(|(_, message)| without_marker_calls(&message).into_owned())
@@ -219,9 +223,7 @@ fn is_type_code(code: &str) -> bool {
         Some(Ok(number)) => number,
         _ => return false,
     };
-    (code.starts_with('E') && (TYPE_ERROR_CODES.0..=TYPE_ERROR_CODES.1).contains(&number))
-        || (code.starts_with('W')
-            && (TYPE_WARNING_CODES.0..=TYPE_WARNING_CODES.1).contains(&number))
+    code.starts_with(TYPE_CODE_PREFIX) && (TYPE_CODES.0..=TYPE_CODES.1).contains(&number)
 }
 
 /// Rejects a body that misuses an `ANY` family argument, typed as the family's widest member.
@@ -246,9 +248,10 @@ pub(crate) fn check_body_types(
     let Some((probe, table)) = body_probe((parser, definition), body, true) else {
         return Ok(());
     };
-    let key: String = format!("types\n{}\n{table}\n{probe}", parser.name());
-    let found: Option<String> =
-        remembered(&TYPE_ERRORS, key, || body_type_error(parser, &probe, table));
+    let key: String = format!("types\n{}\n{table:?}\n{probe}", parser.name());
+    let found: Option<String> = remembered(&TYPE_ERRORS, key, || {
+        body_type_error(parser, &probe, &table)
+    });
     let Some(found) = found else {
         return Ok(());
     };

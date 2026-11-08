@@ -2,7 +2,9 @@
 
 use sqlbuild_render::macro_calls::main::opens_bare_call::opens_bare_call;
 
-use crate::sql_macros::_helpers::parsing::lexing::{DECLARATION_WORDS, Token, TokenKind, tokens};
+use crate::sql_macros::_helpers::parsing::lexing::{
+    DECLARATION_WORDS, Token, TokenKind, closing_token, tokens,
+};
 
 const PLACEHOLDER_PREFIX: &str = "__sqlbuild_parameter__";
 /// Words that may follow a table reference without being its alias.
@@ -157,6 +159,37 @@ pub(crate) fn declarations_masked(sql: &str) -> String {
         index = last + 1;
     }
     masked
+}
+
+/// `sql` with each placeholder slot read in a `USING` list as one word of the same length, since
+/// `USING` names bare columns: `__sqlbuild_parameter__r.keys` reads as `__sqlbuild_parameter__r_keys`.
+pub(crate) fn using_reads_joined(sql: &str) -> String {
+    let Ok(scanned) = tokens(sql) else {
+        return sql.to_owned();
+    };
+    let mut joined: String = sql.to_owned();
+    let mut index: usize = 0;
+    while index + 1 < scanned.len() {
+        if !(scanned[index].is_word(sql, "USING") && scanned[index + 1].is(sql, "(")) {
+            index += 1;
+            continue;
+        }
+        let close: usize = closing_token(sql, &scanned, index + 1).unwrap_or(scanned.len());
+        for read in scanned[index + 2..close].windows(3) {
+            let (relation, dot, slot) = (&read[0], &read[1], &read[2]);
+            if relation.kind == TokenKind::Word
+                && placeholder_parameter(relation.text(sql)).is_some()
+                && dot.is(sql, ".")
+                && dot.start == relation.end
+                && slot.kind == TokenKind::Word
+                && slot.start == dot.end
+            {
+                joined.replace_range(dot.start..dot.end, "_");
+            }
+        }
+        index = close;
+    }
+    joined
 }
 
 /// Whether the table reference whose last token is `index` is followed by an alias.

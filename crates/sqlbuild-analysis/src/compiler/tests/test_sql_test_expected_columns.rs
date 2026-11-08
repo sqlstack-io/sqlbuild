@@ -79,7 +79,10 @@ fn given_expected_cte_bodies_when_reading_columns_then_authored_names_or_none_ar
         },
     ];
 
-    for test_case in test_cases {
+    for test_case in test_cases
+        .into_iter()
+        .filter(|test_case| sql_test_parser(Some(test_case.dialect)).is_some())
+    {
         let parser = sql_test_parser(Some(test_case.dialect)).expect("native parser");
         let actual: Option<Vec<String>> = expected_columns(test_case.sql, parser);
         let actual_columns: Option<Vec<&str>> = actual

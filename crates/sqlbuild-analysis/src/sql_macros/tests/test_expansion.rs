@@ -765,7 +765,6 @@ fn given_invalid_calls_when_expanding_then_each_error_names_the_problem() {
 }
 
 #[test]
-#[ignore = "body types come from the native parser's analysis, which is not available yet"]
 fn given_a_body_whose_type_breaks_its_declaration_when_expanding_then_the_error_names_it() {
     let test_cases = [
         ExpansionErrorTestCase {

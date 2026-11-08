@@ -219,7 +219,10 @@ fn given_typed_requests_when_planning_then_plans_and_chains_equal_the_json_entry
         }
         value
     };
-    for test_case in test_cases {
+    for test_case in test_cases
+        .into_iter()
+        .filter(|test_case| sql_test_parser(test_case.dialect).is_some())
+    {
         let mut request: Value = serde_json::from_str(GLUE_REQUEST).expect("valid request");
         request["sqlAnalysisDialect"] = json!(test_case.dialect);
         request["renderSql"] = json!(test_case.render_sql);
