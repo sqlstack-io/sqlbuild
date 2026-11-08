@@ -106,21 +106,36 @@ def test_given_unconvertible_sql_when_preparing_local_scenario_sql_then_refuses_
         assert fragment in str(raised.value)
 
 
-def test_given_snowflake_sql_function_when_preparing_local_scenario_then_refuses_with_x607() -> (
-    None
-):
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        LocalScenarioSqlRefusalTestCase(
+            description="a Snowflake SQL function has no local execution yet",
+            source_dialect="snowflake",
+            sql="create function order_margin(total number) returns number as 'total * 0.1'",
+            expected_message_fragments=(
+                "function 'order_margin'",
+                "local execution of snowflake SQL functions is unavailable",
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_sql_function_when_preparing_local_scenario_then_refuses_with_x607(
+    test_case: LocalScenarioSqlRefusalTestCase,
+) -> None:
     with pytest.raises(ExecutorInputError) as raised:
         function_sql_for_local_duckdb(
-            sql="create function order_margin(total number) returns number as 'total * 0.1'",
-            source_dialect="snowflake",
+            sql=test_case.sql,
+            source_dialect=test_case.source_dialect,
             scenario_name="order_totals",
             resource_kind="function",
             resource_name="order_margin",
         )
 
     assert raised.value.code == SCENARIO_LOCAL_SQL_TRANSPILE_FAILED
-    assert "function 'order_margin'" in str(raised.value)
-    assert "local execution of snowflake SQL functions is unavailable" in str(raised.value)
+    for fragment in test_case.expected_message_fragments:
+        assert fragment in str(raised.value)
 
 
 if __name__ == "__main__":
