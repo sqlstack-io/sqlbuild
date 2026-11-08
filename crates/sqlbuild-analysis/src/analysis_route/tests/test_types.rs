@@ -321,3 +321,16 @@ pub(super) struct SessionTypeTestCase {
     pub(super) spelling: &'static str,
     pub(super) expected_type: &'static str,
 }
+
+pub(super) struct TsqlParseTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    /// `Ok((statements, gaps))` when the parser reads the SQL, `Err((syntax, offset))` when it refuses it.
+    pub(super) expected_parse: Result<(usize, usize), (bool, usize)>,
+}
+
+pub(super) struct TsqlTypeTestCase {
+    pub(super) description: &'static str,
+    pub(super) spelling: &'static str,
+    pub(super) expected_type: Option<(&'static str, TypeFamily)>,
+}

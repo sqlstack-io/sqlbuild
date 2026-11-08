@@ -9,5 +9,6 @@ pub(crate) mod postgres_dialect;
 pub(crate) mod revalidation;
 pub(crate) mod snowflake_dialect;
 pub(crate) mod sqlite_dialect;
+pub(crate) mod tsql_dialect;
 pub(crate) mod type_spelling;
 pub(crate) mod whole_gap;

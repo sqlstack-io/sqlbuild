@@ -197,3 +197,7 @@ pub struct TypeSpelling {
     /// Whether `[]` array suffixes are part of the dialect's type syntax.
     pub arrays: bool,
 }
+
+/// SQL Server, whose SQL SQLQuack's T-SQL parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct TsqlDialect;

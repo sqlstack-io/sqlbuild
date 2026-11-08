@@ -185,6 +185,7 @@ sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.gi
 sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
+sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "c2e78ffb575764e798328358f4bedaf28e997307" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"
