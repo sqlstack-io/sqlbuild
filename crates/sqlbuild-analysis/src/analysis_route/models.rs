@@ -33,3 +33,7 @@ pub struct TypeMatch {
     /// The inferred column may be null, but its declared type does not allow it.
     pub nullable_into_non_null: bool,
 }
+
+/// ClickHouse, whose SQL SQLQuack's ClickHouse parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct ClickHouseDialect;

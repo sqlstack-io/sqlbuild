@@ -86,6 +86,9 @@ proc-macro2 = { version = "1", features = ["span-locations"] }
 pyo3 = { version = "0.26", features = ["abi3-py312"] }
 rpassword = "7.5.4"
 rcgen = "0.14"
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f48808e9b3ea7c3f928a758459a2b55fff7301a3" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f48808e9b3ea7c3f928a758459a2b55fff7301a3" }
+sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f48808e9b3ea7c3f928a758459a2b55fff7301a3" }
 polyglot-sql = { git = "https://github.com/sqlstack-io/polyglot.git", rev = "8767d688c5b504ad609645e27ab77a260d91c5a1", default-features = false, features = [
     "ast-tools",
     "builder",

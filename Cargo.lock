@@ -4142,6 +4142,9 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlquack-semantics",
+ "sqlquack-syntax",
+ "sqlquack-syntax-clickhouse",
 ]
 
 [[package]]
@@ -4492,6 +4495,69 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "sqlquack-core"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-semantics"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-core",
+ "sqlquack-snowflake",
+ "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-snowflake"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "serde",
+ "sqlquack-core",
+]
+
+[[package]]
+name = "sqlquack-syntax"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sqlquack-syntax-derive",
+ "stacker",
+ "thiserror 1.0.69",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "sqlquack-syntax-clickhouse"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
+name = "sqlquack-syntax-derive"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=f48808e9b3ea7c3f928a758459a2b55fff7301a3#f48808e9b3ea7c3f928a758459a2b55fff7301a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
