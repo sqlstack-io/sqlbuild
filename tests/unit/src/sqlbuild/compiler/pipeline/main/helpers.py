@@ -109,8 +109,8 @@ class SlowConnectionDuckDbAdapter(DuckDbAdapter):
     """An in-memory DuckDB adapter whose connections, compile profile and rules dialect take
     `connection_seconds`, `compile_seconds` and `rules_seconds` on a manual clock.
 
-    The compile profile takes its time on its first call; the dialect on its second, which the
-    rules gate makes after the compile's own dialect read."""
+    The compile profile takes its time on its first call; the dialect on its third, which the
+    rules gate makes after the compile's two dialect reads (its adapter context and its profile)."""
 
     def __init__(
         self,
@@ -124,7 +124,7 @@ class SlowConnectionDuckDbAdapter(DuckDbAdapter):
         self._clock: ManualClock = clock
         self._connection_seconds: float = connection_seconds
         self._compile_seconds: float = compile_seconds
-        self._dialect_seconds: list[float] = [0.0, rules_seconds]
+        self._dialect_seconds: list[float] = [0.0, 0.0, rules_seconds]
 
     def expression_inference_profile(self) -> ExpressionInferenceProfile:
         self._clock.advance(self._compile_seconds)

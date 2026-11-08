@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import pytest
 
 from sqlbuild._native import QueryFingerprintError, compute_query_hash, normalize_query_sql
@@ -8,7 +10,10 @@ from tests.unit.src.sqlbuild.compiler.fingerprints.main._test_types import (
     ComputeQueryHashTestCase,
     NormalizeQuerySqlTestCase,
     QueryFingerprintFailureTestCase,
+    QueryFingerprintTimeLimitTestCase,
 )
+
+_NESTING: int = 32_000
 
 
 @pytest.mark.parametrize(
@@ -78,6 +83,12 @@ def test_given_raw_query_when_normalizing_then_returns_expected_text(
             "SELECT o.id, payload:customer.name::STRING AS customer FROM orders AS o "
             "QUALIFY ROW_NUMBER() OVER (PARTITION BY o.id ORDER BY o.id) = 1",
             "c75f7b5931a18e1a074ffa7ab113c256fc838285af75a3f9feb62d61cc76d94d",
+        ),
+        ComputeQueryHashTestCase(
+            "DuckDB lower-case keywords and SQLBuild placeholder",
+            "duckdb",
+            'select o.id from __ref("orders") as o where o.id > 0',
+            "fda88b9b0f26486bdd25b8e3bab5a982fbb387901ab229091b17772d044aebd0",
         ),
         ComputeQueryHashTestCase(
             "BigQuery raw string and backtick path",
@@ -161,10 +172,80 @@ def test_given_dialect_query_when_computing_hash_then_golden_fingerprint_is_stab
             False,
         ),
         ComputeQueryHashStabilityTestCase(
-            "user-defined function case is significant",
+            "unquoted call name case is ignored",
             "duckdb",
             "SELECT MyFunc(id) FROM orders",
             "SELECT myfunc(id) FROM orders",
+            True,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "quoted call name case is significant",
+            "snowflake",
+            'SELECT "MyFunc"(id) FROM orders',
+            'SELECT "myfunc"(id) FROM orders',
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "PostgreSQL multi-character operator is one token",
+            "postgres",
+            "SELECT a |>> b FROM orders",
+            "SELECT a |> > b FROM orders",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "CTE column-list name case is significant",
+            "duckdb",
+            "WITH Tree(id) AS (SELECT 1) SELECT id FROM orders",
+            "WITH tree(id) AS (SELECT 1) SELECT id FROM orders",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "SQLBuild placeholder case is significant",
+            "duckdb",
+            'SELECT id FROM __ref("orders")',
+            'SELECT id FROM __REF("orders")',
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "PostgreSQL comments, layout and keyword case are ignored",
+            "postgres",
+            "SELECT o.id -- key\nFROM orders AS o WHERE o.id > 0",
+            "select o.id from orders as o /* all */ where o.id > 0",
+            True,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "PostgreSQL dollar-quoted body is significant",
+            "postgres",
+            "SELECT $tag$it's$tag$ AS note",
+            "SELECT $tag$it s$tag$ AS note",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "SQLite comments and keyword case are ignored",
+            "sqlite",
+            "SELECT id FROM orders -- trailing",
+            "select id\nfrom orders",
+            True,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "SQLite identifier case is significant",
+            "sqlite",
+            "SELECT Id FROM orders",
+            "SELECT id FROM orders",
+            False,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "Snowflake double-slash comments are ignored",
+            "snowflake",
+            "SELECT id // order key\nFROM orders",
+            "SELECT id FROM orders",
+            True,
+        ),
+        ComputeQueryHashStabilityTestCase(
+            "generic keyword case is ignored and identifier case is not",
+            None,
+            "select Id from orders",
+            "SELECT id FROM orders",
             False,
         ),
         ComputeQueryHashStabilityTestCase(
@@ -231,3 +312,36 @@ def test_given_untokenizable_sql_when_computing_hash_then_raises_fingerprint_err
 ) -> None:
     with pytest.raises(QueryFingerprintError, match=test_case.expected_message):
         _ = compute_query_hash(query_sql=test_case.query_sql, dialect=test_case.dialect)
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        QueryFingerprintTimeLimitTestCase(
+            "deeply nested parentheses",
+            "duckdb",
+            "SELECT 1 + " + "(" * _NESTING + "1" + ")" * _NESTING,
+            0.25,
+        ),
+        QueryFingerprintTimeLimitTestCase(
+            "deeply nested calls",
+            "postgres",
+            "SELECT " + "f(" * _NESTING + "1" + ")" * _NESTING,
+            0.25,
+        ),
+        QueryFingerprintTimeLimitTestCase(
+            "unclosed calls",
+            "snowflake",
+            "SELECT " + "f(" * _NESTING,
+            0.25,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_pathological_nesting_when_computing_hash_then_time_stays_linear(
+    test_case: QueryFingerprintTimeLimitTestCase,
+) -> None:
+    started: float = time.perf_counter()
+    _ = compute_query_hash(query_sql=test_case.query_sql, dialect=test_case.dialect)
+
+    assert time.perf_counter() - started < test_case.expected_max_seconds

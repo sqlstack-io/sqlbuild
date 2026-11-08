@@ -104,3 +104,11 @@ class QueryFingerprintFailureTestCase:
     dialect: str
     query_sql: str
     expected_message: str
+
+
+@dataclass(frozen=True)
+class QueryFingerprintTimeLimitTestCase:
+    description: str
+    dialect: str
+    query_sql: str
+    expected_max_seconds: float
