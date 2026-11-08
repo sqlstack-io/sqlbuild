@@ -105,8 +105,10 @@ fn given_model_sql_when_probing_the_native_parser_then_its_gap_is_located_after_
             placeholders: &[],
             expected_gap: Some(LocatedGap {
                 construct: "PIVOT".to_owned(),
+                message: "PIVOT".to_owned(),
                 line: 3,
                 column: 3,
+                syntax: false,
             }),
         },
     ];
@@ -136,8 +138,10 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_and_the_
         dialect: "postgres",
         gap: LocatedGap {
             construct: "PIVOT".to_owned(),
+            message: "PIVOT".to_owned(),
             line: 3,
             column: 3,
+            syntax: false,
         },
         expected_code: "P026",
         expected_message: "SQL analysis skipped for model 'orders_pivot': the postgres parser \

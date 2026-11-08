@@ -170,9 +170,9 @@ fn fast_lineage<'py>(
     let mut work: Vec<FastModel<'py>> = Vec::with_capacity(models.len());
     let mut requests: Vec<FastLineageModel> = Vec::new();
     let dialect_name: Option<String> = dialect.map(|name| name.extract()).transpose()?;
-    let native: bool = matches!(
+    let native: bool = !matches!(
         analysis_route(dialect_name.as_deref()),
-        AnalysisRoute::Native(_)
+        AnalysisRoute::Legacy
     );
     for model in models {
         let (has_star, star_resolved): (bool, bool) = star_flags(model)?;

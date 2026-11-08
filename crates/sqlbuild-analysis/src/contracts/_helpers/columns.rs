@@ -310,7 +310,7 @@ fn column_type(
             },
         }));
     };
-    if check.types.types_equal(declared_type, inferred_type)? == TypeComparison::Equal {
+    if check.types.types_equal(declared_type, inferred_type)? != TypeComparison::Different {
         return Ok(None);
     }
     Ok(Some(ContractDiagnostic {

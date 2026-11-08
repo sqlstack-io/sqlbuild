@@ -42,7 +42,5 @@ pub(crate) const PROMOTION_REMOVE_CONTRACT_HELP: &str = "or remove the model's e
 
 pub(crate) const SETTING_SNIPPET_INDENT: &str = "            ";
 pub(crate) const ADDITIONAL_HELP_SEPARATOR: &str = "\n  = help: ";
-/// The analysis dialect name whose native route compares ClickHouse types without wrappers.
-pub(crate) const CLICKHOUSE_DIALECT: &str = "clickhouse";
 /// The dialect that folds unquoted identifiers to upper case.
 pub(crate) const UPPER_FOLDING_DIALECT: &str = "snowflake";

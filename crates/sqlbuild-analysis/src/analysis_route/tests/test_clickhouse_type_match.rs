@@ -11,7 +11,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "Nullable(String)",
             inferred: "String",
             inferred_nullable: true,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: false,
             },
@@ -21,7 +21,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "LowCardinality(String)",
             inferred: "String",
             inferred_nullable: false,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: false,
             },
@@ -31,7 +31,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "LowCardinality(Nullable(String))",
             inferred: "Nullable(String)",
             inferred_nullable: false,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: false,
             },
@@ -41,7 +41,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "String",
             inferred: "String",
             inferred_nullable: true,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: true,
             },
@@ -51,7 +51,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "Nullable(Int64)",
             inferred: "Int64",
             inferred_nullable: false,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: true,
                 nullable_into_non_null: false,
             },
@@ -61,7 +61,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "Nullable(Int32)",
             inferred: "Int64",
             inferred_nullable: true,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: false,
                 nullable_into_non_null: false,
             },
@@ -71,7 +71,7 @@ fn given_clickhouse_column_types_when_matching_then_wrappers_are_stripped_and_nu
             declared: "Array(Nullable(String))",
             inferred: "Array(String)",
             inferred_nullable: false,
-            expected_match: TypeMatch {
+            expected_match: TypeMatch::Compared {
                 same_type: false,
                 nullable_into_non_null: false,
             },

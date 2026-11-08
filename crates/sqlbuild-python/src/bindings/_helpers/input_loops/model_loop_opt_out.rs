@@ -5,7 +5,9 @@ use std::path::Path;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
 use sqlbuild_analysis::analysis_route::main::native_gap::native_gap;
-use sqlbuild_analysis::analysis_route::main::skipped_analysis::skipped_analysis;
+use sqlbuild_analysis::analysis_route::main::skipped_analysis::{
+    skipped_analysis, unavailable_analysis,
+};
 use sqlbuild_analysis::analysis_route::models::{AnalysisRoute, LocatedGap};
 use sqlbuild_analysis::analysis_route::types::NativeDialect;
 use sqlbuild_analysis::assembly::project::models::{SyntaxCheck, SyntaxMode};
@@ -77,6 +79,7 @@ pub(crate) fn rejected_opt_out<'py>(
     let readable: bool = match model_loop.route {
         AnalysisRoute::Legacy => syntax_valid(model.config.py(), GENERIC_DIALECT, &checks)?,
         AnalysisRoute::Native(dialect) => first_gap(dialect, context, &checks)?.is_none(),
+        AnalysisRoute::Unavailable => false,
     };
     if readable {
         Ok(OptOut::Rejected(location(model_loop, context, model)?))
@@ -97,6 +100,29 @@ pub(crate) fn skip_unreadable(
         return Ok(true);
     };
     let (code, message) = skipped_analysis(model.name, dialect.name(), &gap);
+    report_skip(settings, context, model, code, message)?;
+    Ok(false)
+}
+
+/// P026 for a model whose dialect no native parser reads; it warns, or raises, and is not analysed.
+pub(crate) fn skip_unavailable(
+    settings: ModelLoopSettings,
+    dialect: Option<&str>,
+    context: &LoopContext<'_, '_>,
+    model: &OptOutModel<'_, '_>,
+) -> PyResult<()> {
+    let (code, message) = unavailable_analysis(model.name, dialect);
+    report_skip(settings, context, model, code, message)
+}
+
+/// Reports P026 as a warning, or raises it under `require_sql_analysis`.
+fn report_skip(
+    settings: ModelLoopSettings,
+    context: &LoopContext<'_, '_>,
+    model: &OptOutModel<'_, '_>,
+    code: &str,
+    message: String,
+) -> PyResult<()> {
     let py: Python<'_> = model.config.py();
     let help: &str = &context.classes.syntax_help;
     if settings.require_sql_analysis {
@@ -134,7 +160,7 @@ pub(crate) fn skip_unreadable(
         .classes
         .report_diagnostic
         .call((), Some(&arguments))?;
-    Ok(false)
+    Ok(())
 }
 
 /// The model's analysis SQL and each hook statement, as filled to run, with its placeholders.
