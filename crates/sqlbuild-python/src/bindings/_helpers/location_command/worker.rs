@@ -16,6 +16,10 @@ use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_w
 use crate::bindings::_helpers::build_command::command::run_build;
 use crate::bindings::_helpers::cli::argv::parse_cli_invocation;
 use crate::bindings::_helpers::cli::dispatch::{Invocation, command_facts, warehouse_scope};
+use crate::bindings::_helpers::command_runtime::warehouses::{
+    WarehouseInputs, configured_warehouses,
+};
+use crate::bindings::_helpers::compile_attachment::effective_config::build_effective_connection_config;
 use crate::bindings::_helpers::compiled_project::snapshot::NativeOrchestrationSnapshot;
 use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
 use crate::bindings::_helpers::compiled_project::snapshot_worker::NativeOrchestrationWorker;
@@ -89,6 +93,34 @@ fn build_request<'py>(
     ))
 }
 
+/// Why a run's `--warehouse` is refused: it must be one the target configures here. Reads configuration only.
+fn unconfigured_warehouse(
+    discovered: &Bound<'_, PyAny>,
+    target: &str,
+    settings: &std::collections::BTreeMap<String, serde_json::Value>,
+) -> PyResult<Option<String>> {
+    let Some(warehouse) = settings.get("warehouse") else {
+        return Ok(None);
+    };
+    let warehouse: &str = warehouse
+        .as_str()
+        .ok_or_else(|| PyValueError::new_err("frozen run warehouse must be text"))?;
+    let selected_target: Bound<'_, PyAny> = PyString::new(discovered.py(), target).into_any();
+    let connection: Bound<'_, PyAny> =
+        build_effective_connection_config(discovered, Some(selected_target.clone()), None, false)?;
+    let inputs = WarehouseInputs {
+        discovered_inputs: discovered,
+        selected_target: &selected_target,
+    };
+    if configured_warehouses(inputs, &connection)?.contains(warehouse) {
+        return Ok(None);
+    }
+    Ok(Some(format!(
+        "warehouse {warehouse} is not configured for target {target} on this location; \
+         no warehouse statement ran"
+    )))
+}
+
 /// The heartbeat is native; only driver cancellation crosses the executor host boundary.
 fn run_cancellable(
     py: Python<'_>,
@@ -152,6 +184,13 @@ pub(super) fn execute_worker<'py>(
                 "Run inputs verified. All selected nodes are blocked by upstream failures.\n",
             )?;
             return Ok(0);
+        }
+        let frozen = owner.get().execution(py)?.claim.request;
+        if let Some(reason) = unconfigured_warehouse(&discovered, &frozen.target, &frozen.settings)?
+        {
+            worker.refuse(&reason)?;
+            write_stderr(py, &format!("Run refused: {reason}\n"))?;
+            return Err(PyValueError::new_err(reason));
         }
         let (request, scope) = build_request(py, discovered, arguments, &owner)?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
