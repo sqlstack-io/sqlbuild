@@ -4,14 +4,14 @@ use crate::planner_migrations::_helpers::proofs::ast::{canonical, strip_formatti
 use crate::planner_migrations::_helpers::proofs::clauses::{clause_references, positional};
 use crate::planner_migrations::_helpers::proofs::encoding::encode;
 use crate::planner_migrations::_helpers::proofs::inputs::select_inputs;
-use crate::planner_migrations::_helpers::proofs::parse::parse;
+use crate::planner_migrations::_helpers::proofs::parse::proof_tree;
 use crate::planner_migrations::_helpers::proofs::projection::named_projections;
 use crate::planner_migrations::models::QueryShape;
 use serde_json::json;
 
 /// Named projections of exactly one plain SELECT, or None when unknowable.
 pub fn query_shape(sql: &str, dialect: &str) -> Result<Option<QueryShape>, String> {
-    let Some(mut root) = parse(sql, dialect)? else {
+    let Some(mut root) = proof_tree(sql, dialect)? else {
         return Ok(None);
     };
     strip_formatting(&mut root);

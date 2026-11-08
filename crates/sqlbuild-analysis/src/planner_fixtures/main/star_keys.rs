@@ -7,12 +7,10 @@ use polyglot_sql::{
     AnalyzeQueryOptions, DialectType, SchemaColumn, SchemaTable, ValidationSchema, analyze_query,
 };
 use sqlbuild_core::text::main::python_casefold::python_casefold;
-use sqlquack_syntax::Expression as NativeExpression;
-use sqlquack_syntax::traversal::types::ExpressionWalk as NativeWalk;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::models::AnalysisRoute;
-use crate::analysis_route::types::NativeDialect;
+use crate::planner_fixtures::_helpers::native_star_keys::native_star_keys;
 use crate::planner_fixtures::_helpers::stub_markers::stub_markers;
 use crate::planner_fixtures::models::FixtureStarRelation;
 
@@ -130,67 +128,4 @@ fn column_type(sql_type: Option<&str>) -> String {
         .filter(|name| !name.is_empty())
         .unwrap_or("UNKNOWN")
         .to_owned()
-}
-
-/// Star dependencies from SQLQuack's tree, a superset of what each star reads: a bare star selects
-/// every relation in the query, and a star whose qualifier the tree does not settle, or SQL the
-/// parser cannot read whole, selects every relation given.
-fn native_star_keys(
-    native: &dyn NativeDialect,
-    sql: &str,
-    relations: &[FixtureStarRelation],
-) -> Vec<(String, String)> {
-    let every = || {
-        relations
-            .iter()
-            .map(|relation| relation.key.clone())
-            .collect()
-    };
-    let Ok(sql) = stub_markers(sql) else {
-        return every();
-    };
-    let Ok(root) = native.read_whole(&sql) else {
-        return every();
-    };
-    let mut aliases: HashMap<String, String> = HashMap::new();
-    let mut stars: Vec<Option<String>> = Vec::new();
-    for node in NativeWalk::dfs(&root) {
-        match node {
-            NativeExpression::Table(table) => {
-                let name: String = python_casefold(&table.name.name);
-                aliases.insert(name.clone(), name.clone());
-                if let Some(alias) = &table.alias {
-                    aliases.insert(python_casefold(&alias.name), name);
-                }
-            }
-            NativeExpression::Select(select) => {
-                stars.extend(select.expressions.iter().filter_map(|projection| {
-                    match projection {
-                        NativeExpression::Star(star) => Some(
-                            star.table
-                                .as_ref()
-                                .map(|table| python_casefold(&table.name)),
-                        ),
-                        _ => None,
-                    }
-                }));
-            }
-            _ => {}
-        }
-    }
-    let mut names: HashSet<String> = HashSet::new();
-    for star in &stars {
-        match star.as_ref().map(|qualifier| aliases.get(qualifier)) {
-            Some(Some(name)) => {
-                names.insert(name.clone());
-            }
-            None => names.extend(aliases.values().cloned()),
-            Some(None) => return every(),
-        }
-    }
-    relations
-        .iter()
-        .filter(|relation| names.contains(&python_casefold(&relation.key.1)))
-        .map(|relation| relation.key.clone())
-        .collect()
 }

@@ -20,8 +20,7 @@ pub(crate) fn python_space(character: char) -> bool {
     character.is_whitespace() || ('\u{1c}'..='\u{1f}').contains(&character)
 }
 
-/// Whether a CREATE statement's text parses as a definition that needs no warehouse; false, the
-/// warehouse-billed reading, when the parser cannot read it whole.
+/// Whether a CREATE needs no warehouse; false, warehouse-billed, when not read whole.
 pub(crate) fn metadata_only_create(query_text: &str) -> bool {
     if let AnalysisRoute::Native(native) = analysis_route(Some(SNOWFLAKE_DIALECT)) {
         return native

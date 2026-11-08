@@ -19,3 +19,4 @@ class RuntimeRelationGuardTestCase:
     owner_label: str = "task 'export_orders'"
     owner_kind: HardCodedRelationOwnerKind = HardCodedRelationOwnerKind.NODE
     upstream_loader_by_source: dict[str, str] = field(default_factory=dict)
+    dialect: str = "duckdb"
