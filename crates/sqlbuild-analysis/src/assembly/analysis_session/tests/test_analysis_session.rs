@@ -803,8 +803,17 @@ fn given_deeply_nested_pivot_input_when_proving_then_the_proof_fails_without_abo
         let in_session =
             prove_finished_dynamic_contracts(&session, &request.models).expect("the proofs run");
 
-        let expected = vec![test_case.expected_outcome, PivotOutcome::Absent];
-        assert_eq!(standalone, expected, "{}", test_case.description);
-        assert_eq!(in_session, expected, "{}", test_case.description);
+        assert_eq!(
+            standalone,
+            vec![test_case.expected_outcome.clone(), PivotOutcome::Absent],
+            "{}",
+            test_case.description
+        );
+        assert_eq!(
+            in_session,
+            vec![test_case.expected_outcome, PivotOutcome::Absent],
+            "{}",
+            test_case.description
+        );
     }
 }

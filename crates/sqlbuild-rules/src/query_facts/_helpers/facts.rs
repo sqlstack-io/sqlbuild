@@ -8,6 +8,7 @@ use crate::query_facts::models::{
     CallKind, ColumnFact, ComparisonFacts, ComparisonSpan, CteFacts, ExpressionItem, ItemFacts,
     ModelShape, ParsedFixture, QueryFacts, RelationFacts, SelectFacts, SetFacts, SourceText,
 };
+use sqlbuild_analysis::sql_tree::main::deeper_than::deeper_than;
 use sqlbuild_analysis::sql_tree::main::shared_dialect::shared_dialect;
 use sqlquack_syntax::expressions::names::models::{Identifier, Literal, TableRef};
 use sqlquack_syntax::expressions::queries::models::{Select, With};
@@ -44,18 +45,6 @@ fn parse_query(sql: &str, dialect_name: &str) -> Result<(Expression, Dialect), S
         return Err("expected a query".to_owned());
     }
     Ok((statement, dialect))
-}
-
-/// Whether `statement` nests deeper than `limit` levels, measured without recursion.
-fn deeper_than(statement: &Expression, limit: usize) -> bool {
-    let mut stack: Vec<(&Expression, usize)> = vec![(statement, 1)];
-    while let Some((node, depth)) = stack.pop() {
-        if depth > limit {
-            return true;
-        }
-        stack.extend(node.children().into_iter().map(|child| (child, depth + 1)));
-    }
-    false
 }
 
 fn code_tokens(sql: &str, dialect: Dialect) -> Result<QueryTokens<'_>, String> {
