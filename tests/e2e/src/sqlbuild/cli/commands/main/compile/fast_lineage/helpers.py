@@ -29,31 +29,28 @@ def lineage_run(
     files: dict[str, str],
     targets: tuple[str, ...],
     mode: str = "fast",
-    warm: str | None = None,
+    cache_args: tuple[str, ...] = ("--no-cache",),
+    environment: tuple[tuple[str, str], ...] = ((REUSE_DISABLE_ENV_VAR, "1"),),
+    cold_compiles: int = 0,
 ) -> LineageRun:
     """Write the project, then compile and trace every target both ways in one lineage mode.
 
-    `warm` names the store a cold compile fills first, so the measured compile and the traces
-    restore from it: `analysis cache` for the analysis store alone, `compile reuse` for both.
+    `cold_compiles` compiles run first, so the measured compile and traces read what they stored.
     """
 
     for relative_path, contents in files.items():
         path: Path = project_dir / "project" / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
         _ = path.write_text(contents, encoding="utf-8")
-    environment: dict[str, str] = {REUSE_DISABLE_ENV_VAR: "0" if warm == "compile reuse" else "1"}
-    compile_args: tuple[str, ...] = (
-        ("compile", "--json", "--no-cache", "--lineage-mode", mode)
-        if warm is None
-        else ("compile", "--json", "--lineage-mode", mode)
-    )
-    if warm is not None:
+    env: dict[str, str] = dict(environment)
+    compile_args: tuple[str, ...] = ("compile", "--json", *cache_args, "--lineage-mode", mode)
+    for _ in range(cold_compiles):
         cold: subprocess.CompletedProcess[str] = run_installed_sqb(
-            project_dir=project_dir / "project", args=compile_args, env=environment
+            project_dir=project_dir / "project", args=compile_args, env=env
         )
         assert cold.returncode == 0, cold.stdout + cold.stderr
     compiled: subprocess.CompletedProcess[str] = run_installed_sqb(
-        project_dir=project_dir / "project", args=compile_args, env=environment
+        project_dir=project_dir / "project", args=compile_args, env=env
     )
     report: dict[str, object] = json.loads(compiled.stdout.replace(str(project_dir), "<project>"))
     timings: dict[str, int] = cast(dict[str, int], report.pop("compile_timings", {}))
@@ -62,7 +59,7 @@ def lineage_run(
         result: subprocess.CompletedProcess[str] = run_installed_sqb(
             project_dir=project_dir / "project",
             args=("lineage", target, "--mode", mode, "--direction", direction, "--json"),
-            env=environment,
+            env=env,
         )
         stdout: str = result.stdout.replace(str(project_dir), "<project>")
         traces.append((result.returncode, stdout, _TIMING.sub("", result.stderr)))

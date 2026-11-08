@@ -163,6 +163,18 @@ fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names
             expected_sql: r"SELECT 'it\'s __cursor_end()', __sqlbuild.cursor_end() FROM t",
         },
         NativeStubTestCase {
+            dialect: "tsql",
+            description: "a T-SQL bracket name's apostrophe opens no string, so the stub after it is code",
+            sql: "SELECT [customer's name] AS n FROM t WHERE ts >= __cursor_start()",
+            expected_sql: "SELECT [customer's name] AS n FROM t WHERE ts >= __sqlbuild.cursor_start()",
+        },
+        NativeStubTestCase {
+            dialect: "clickhouse",
+            description: "a ClickHouse backslash-quoted quote in an identifier keeps the stub after it in code",
+            sql: r#"SELECT 1 AS "a\"b", __cursor_end() FROM t"#,
+            expected_sql: r#"SELECT 1 AS "a\"b", __sqlbuild.cursor_end() FROM t"#,
+        },
+        NativeStubTestCase {
             dialect: "snowflake",
             description: "a cursor stub's text inside a Snowflake // comment is left as written",
             sql: "SELECT 1 FROM t // __cursor_end()\n",

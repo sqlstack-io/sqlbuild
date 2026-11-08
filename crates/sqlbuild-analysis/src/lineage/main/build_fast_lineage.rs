@@ -9,8 +9,8 @@ use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::main::fast_lineage::fast_lineage;
 use crate::analysis_route::models::AnalysisRoute;
-use crate::lineage::_helpers::native_lineage::native_model_lineage;
 use crate::lineage::_helpers::parsed_lineage::{
     ParsedModel, parsed_model_lineage, proxy_parse_options,
 };
@@ -80,10 +80,9 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
                 },
                 AnalysisRoute::Native(module),
             ) => catch_compiler_panic(|| {
-                Ok(native_model_lineage(
+                Ok(fast_lineage(
                     module,
-                    query_sql,
-                    placeholders,
+                    (query_sql, placeholders),
                     &request.schema,
                 ))
             }),

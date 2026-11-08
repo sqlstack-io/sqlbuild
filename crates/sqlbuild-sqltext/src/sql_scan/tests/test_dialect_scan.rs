@@ -1,3 +1,4 @@
+use crate::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use crate::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use crate::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use crate::sql_scan::models::{LexicalSyntax, Unclosed};
@@ -150,6 +151,48 @@ fn given_dialect_lexical_syntax_when_scanning_non_code_then_dialect_decides_boun
             sql: "/* a /* b */ c */ x",
             syntax: generic(),
             expected_first_range: Some((0, 12)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a T-SQL bracket identifier hides the apostrophe inside it",
+            sql: "[customer's name] x",
+            syntax: dialect_lexical_syntax("tsql"),
+            expected_first_range: Some((0, 17)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a doubled closing bracket stays inside the identifier",
+            sql: "[a]]'b] x",
+            syntax: dialect_lexical_syntax("tsql"),
+            expected_first_range: Some((0, 7)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a comment prefix inside a bracket identifier opens no comment",
+            sql: "[a--b] x",
+            syntax: dialect_lexical_syntax("tsql"),
+            expected_first_range: Some((0, 6)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "outside T-SQL a bracket is code, so the apostrophe opens a quote",
+            sql: "[customer's name] x",
+            syntax: generic(),
+            expected_first_range: Some((9, 19)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "ClickHouse backslash escapes hold in double-quoted identifiers",
+            sql: r#""a\"b" x"#,
+            syntax: dialect_lexical_syntax("clickhouse"),
+            expected_first_range: Some((0, 6)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a ClickHouse hash before a word is code, not a comment",
+            sql: "#x 'a'",
+            syntax: dialect_lexical_syntax("clickhouse"),
+            expected_first_range: Some((3, 6)),
+        },
+        DialectFirstNonCodeRangeTestCase {
+            description: "a ClickHouse hash before a space opens a comment",
+            sql: "# it's\nx",
+            syntax: dialect_lexical_syntax("clickhouse"),
+            expected_first_range: Some((0, 7)),
         },
         DialectFirstNonCodeRangeTestCase {
             description: "an unclosed backslash-escaped quote extends to the end",

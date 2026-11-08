@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 
 use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::analysis_route::main::native_gap::located;
-use crate::analysis_route::main::skipped_analysis::unreadable_reason;
+use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
+use crate::analysis_route::_helpers::marker_names::{distinct_calls, first_call_names};
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::constants::{
@@ -14,40 +15,60 @@ use crate::assembly::analysis_session::constants::{
     TRANSFORM_DIRECT, TRANSFORM_STAR,
 };
 use crate::assembly::analysis_session::models::{LineageRow, SessionSchema};
-use crate::lineage::_helpers::references::physical_resources;
 use crate::lineage::models::{
     FastLineageOutcome, LineageColumn, LineageConfidence, LineageResourceType,
     LineageSchemaResource, LineageSource, LineageTransformKind,
 };
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
+use crate::relation_markers::main::markers_as_names::markers_as_names;
+use crate::relation_markers::types::MarkerCall;
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 
-/// The model's lineage over `schema`'s column names, or why the dialect's parser cannot read it.
-pub(crate) fn native_model_lineage(
+/// Lineage over `schema` of `query_sql`, its relation markers read as names, or why it is unreadable.
+pub fn fast_lineage(
     dialect: &dyn NativeDialect,
-    query_sql: &str,
-    placeholders: &[(String, String)],
+    (query_sql, placeholders): (&str, &[(String, String)]),
     schema: &[LineageSchemaResource],
 ) -> FastLineageOutcome {
-    let normalised: String =
-        match normalize_native_sql(query_sql, dialect.name(), dialect.stub_prefix()) {
-            Ok(normalised) => normalised,
+    let (named, calls): (String, Vec<MarkerCall>) =
+        match markers_as_names(query_sql, &dialect_lexical_syntax(dialect.name())) {
+            Ok(named) => named,
             Err(reason) => return FastLineageOutcome::Unparsed(reason),
         };
+    let normalised: Result<String, String> = first_call_names(&named, &calls)
+        .and_then(|named| normalize_native_sql(&named, dialect.name(), dialect.stub_prefix()));
+    let normalised: String = match normalised {
+        Ok(normalised) => normalised,
+        Err(reason) => return FastLineageOutcome::Unparsed(reason),
+    };
     let sql: String = placeholder_defaults(&normalised, placeholders);
-    let mut references: Vec<(String, String, String)> = Vec::new();
-    for resource in physical_resources(query_sql) {
-        if !references
-            .iter()
-            .any(|(name, _, _)| *name == resource.resource_name)
-        {
-            references.push((
-                resource.resource_name.clone(),
-                resource.resource_type.as_str().to_owned(),
-                resource.resource_name,
-            ));
-        }
-    }
-    let relations: SessionSchema = names_schema(schema);
+    let referenced: Vec<(String, LineageResourceType, String)> = distinct_calls(&calls)
+        .into_iter()
+        .filter_map(|(index, (function, name))| {
+            let resource_type: LineageResourceType = match function.as_str() {
+                "__ref" => LineageResourceType::Model,
+                "__source" => LineageResourceType::Source,
+                "__seed" => LineageResourceType::Seed,
+                _ => return None,
+            };
+            Some((
+                format!("{MARKER_NAME_PREFIX}{index}"),
+                resource_type,
+                name.clone(),
+            ))
+        })
+        .collect();
+    let references: Vec<(String, String, String)> = referenced
+        .iter()
+        .map(|(marker, resource_type, name)| {
+            (
+                marker.clone(),
+                resource_type.as_str().to_owned(),
+                name.clone(),
+            )
+        })
+        .collect();
+    let relations: SessionSchema = markers_schema(&referenced, schema);
     let analysed: Result<NativeAnalysis, ParserGap> = dialect.analyse(&AnalysisInput {
         sql: &sql,
         schema: &relations,
@@ -65,25 +86,33 @@ pub(crate) fn native_model_lineage(
     }
 }
 
-/// Each resource with known columns, untyped and of unknown nullability; the first of a name wins.
-fn names_schema(schema: &[LineageSchemaResource]) -> SessionSchema {
+/// Each marker name's resource columns, untyped and of unknown nullability, when the schema knows them.
+fn markers_schema(
+    referenced: &[(String, LineageResourceType, String)],
+    schema: &[LineageSchemaResource],
+) -> SessionSchema {
     let mut relations: HashMap<String, Vec<SchemaColumn>> = HashMap::new();
-    for resource in schema
-        .iter()
-        .filter(|resource| !resource.columns.is_empty())
-    {
-        let _ = relations.entry(resource.name.clone()).or_insert_with(|| {
+    for (marker, resource_type, name) in referenced {
+        let Some(resource) = schema.iter().find(|resource| {
+            resource.resource_type == *resource_type
+                && resource.name == *name
+                && !resource.columns.is_empty()
+        }) else {
+            continue;
+        };
+        let _ = relations.insert(
+            marker.clone(),
             resource
                 .columns
                 .iter()
-                .map(|name| SchemaColumn {
-                    name: name.clone(),
+                .map(|column| SchemaColumn {
+                    name: column.clone(),
                     quoted: false,
                     data_type: None,
                     nullability: Nullability::Unknown,
                 })
-                .collect()
-        });
+                .collect(),
+        );
     }
     SessionSchema { relations }
 }

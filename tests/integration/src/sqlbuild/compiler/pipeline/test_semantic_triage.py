@@ -18,6 +18,7 @@ from sqlbuild.adapter.contract.models import ColumnInfo, ExpressionInferenceProf
 from sqlbuild.adapters.snowflake.classes.snowflake_adapter import SnowflakeAdapter
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.pipeline._test_types import (
+    AdapterRecoveryCase,
     FunctionArgumentTypeCase,
     SemanticTriageCase,
 )
@@ -237,6 +238,47 @@ def test_given_cached_validation_when_warm_or_schema_changed_then_reuses_only_ma
     assert main(args) == 1
     result: dict[str, Any] = json.loads(capsys.readouterr().out)
     assert tuple(item["code"] for item in result["diagnostics"]) == test_case.expected_codes
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        AdapterRecoveryCase("bigquery", adapter="bigquery"),
+        AdapterRecoveryCase("duckdb", adapter="duckdb"),
+        AdapterRecoveryCase("postgres", adapter="postgres"),
+        AdapterRecoveryCase("snowflake", adapter="snowflake"),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_a_type_error_upstream_of_a_model_with_its_own_error_when_compiling_then_both_are_reported(
+    test_case: AdapterRecoveryCase, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "sqlbuild_project.toml").write_text(
+        f'name = "orders"\nadapter = "{test_case.adapter}"\n[rules]\nselect = []\n'
+    )
+    (tmp_path / "models").mkdir()
+    header: str = (
+        "MODEL (description 'Test model.', materialized view, database warehouse, schema analytics"
+    )
+    files: dict[str, str] = {
+        "orders": f"{header});\n"
+        "SELECT CAST(1 AS INTEGER) AS quantity, CAST('2026-04-01' AS TIMESTAMP) AS ordered_at",
+        "upstream": f'{header});\nSELECT quantity, ordered_at, quantity + ordered_at AS bad FROM __ref("orders")',
+        "downstream": f'{header});\nSELECT bad > ordered_at AS compared, missing FROM __ref("upstream")',
+    }
+    for name, sql in files.items():
+        (tmp_path / "models" / f"{name}.sql").write_text(sql)
+    assert main(["--project-dir", str(tmp_path), "compile", "--json", "--no-cache"]) == 1
+    result: dict[str, Any] = json.loads(capsys.readouterr().out)
+    found: dict[tuple[str, str], list[str]] = {
+        (item["code"], item["resource_name"]): item.get("notes", [])
+        for item in result["diagnostics"]
+    }
+    assert tuple(sorted(found)) == test_case.expected_findings, result["diagnostics"]
+    assert (
+        "1 downstream output uses were not type-checked because of this error"
+        in found[("B212", "upstream")]
+    )
 
 
 @pytest.mark.parametrize(

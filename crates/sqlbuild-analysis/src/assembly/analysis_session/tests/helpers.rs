@@ -400,6 +400,8 @@ pub(crate) fn finished_session(tables: PivotTables) -> FinishedSession {
         models: HashMap::new(),
         dynamic_proofs: HashMap::new(),
         relations: None,
+        model_names: Vec::new(),
+        declared_functions: Vec::new(),
     }
 }
 

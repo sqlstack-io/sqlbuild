@@ -1,5 +1,6 @@
-use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES};
+use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES, SNOWFLAKE};
 use sqlquack_semantics::dialects::types::DialectProfile;
+use sqlquack_semantics::lineage::models::Nullability;
 use sqlquack_syntax::expressions::statements::models::Command;
 use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 
@@ -115,6 +116,54 @@ impl NativeDialect for CataloguedDialect {
     }
 }
 
+/// Snowflake's shared parser under the Snowflake profile, which folds unquoted names to upper case.
+pub(super) struct FoldingDialect;
+
+impl NativeDialect for FoldingDialect {
+    fn name(&self) -> &'static str {
+        "snowflake"
+    }
+
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild_"
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        parse_strict(sql, Dialect::Snowflake, &ParseOptions::default())
+            .map(|statements| Parsed {
+                statements,
+                gaps: Vec::new(),
+            })
+            .map_err(|failure| ParserGap {
+                construct: failure.to_string(),
+                message: failure.to_string(),
+                offset: 0,
+                syntax: false,
+            })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &SNOWFLAKE
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        PivotlessDialect.normalize_type(spelling)
+    }
+}
+
+pub(super) struct MarkerLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) expected_lines: &'static [&'static str],
+}
+
+pub(super) struct RevalidationTestCase {
+    pub(super) description: &'static str,
+    pub(super) sql: &'static str,
+    pub(super) poisoned: &'static [(&'static str, &'static str)],
+    pub(super) expected_rows: &'static [(&'static str, Option<i64>, Option<i64>)],
+}
+
 pub(super) struct ReadWholeTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
@@ -185,17 +234,19 @@ pub(super) struct StarTestCase {
 pub(super) struct NativeOutcomeTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
-    /// `raw_orders`' shape as the session knows it; empty when it does not.
-    pub(super) shape: &'static [(&'static str, &'static str)],
-    /// Each output column as `name type nullability`, then `succeeded star=<has>/<resolved>`.
-    pub(super) expected: &'static [&'static str],
+    /// `raw_orders`' columns, types and nullability as the session knows them; empty when unknown.
+    pub(super) shape: &'static [(&'static str, &'static str, Nullability)],
+    /// The adapter's declared functions as `(name, return type)`.
+    pub(super) declared_functions: &'static [(&'static str, &'static str)],
+    /// Each output column as `name type nullability`, then success, star flags and finding codes.
+    pub(super) expected_lines: &'static [&'static str],
 }
 
 pub(super) struct NativeLineageTestCase {
     pub(super) description: &'static str,
     pub(super) sql: &'static str,
     pub(super) placeholders: &'static [(&'static str, &'static str)],
-    pub(super) expected: &'static [&'static str],
+    pub(super) expected_lines: &'static [&'static str],
 }
 
 pub(super) struct PolyglotTypeTestCase {

@@ -9,8 +9,10 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::main::model_outcome::model_outcome;
 use crate::analysis_route::models::AnalysisRoute;
 use crate::analysis_route::types::NativeDialect;
 use crate::assembly::analysis_session::_helpers::analysis_cache::{
@@ -29,20 +31,18 @@ use crate::assembly::analysis_session::_helpers::enrichment::{
     Enrichment, EnrichmentInput, enrichment,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{
-    ShapeTable, dict_from_pairs, same_keys, same_relations,
+    ShapeTable, dict_from_pairs, same_keys, same_relations, session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::_helpers::native_outcome::{
-    native_cleaned_sql, native_outcome,
-};
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
     AnalysisSession, ColumnFact, ContractProof, DeferredCleaning, FinishedSession, LineageFacts,
     LineageRow, ModelAnalysis, ModelOutcome, ModelRequest, Phase, PivotOutcome, PivotTables,
-    RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionStep,
+    RelationTables, SessionModelFacts, SessionOutcome, SessionRequest, SessionSchema, SessionStep,
 };
 use crate::assembly::analysis_session::types::{Pairs, Shapes};
+use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 use crate::semantic_validation::models::DiagnosticRow;
 use crate::semantic_validation::models::ProjectCatalog;
 use crate::sql_macros::main::check_sql_macro_arguments::check_sql_macro_arguments;
@@ -171,6 +171,16 @@ impl AnalysisSession {
                 dynamic_proofs.insert(model.name.clone(), proof.clone());
             }
         }
+        let model_names: Vec<String> = request
+            .models
+            .iter()
+            .map(|model| model.name.clone())
+            .collect();
+        let declared_functions: Vec<String> = request
+            .function_return_types
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
         let finished = FinishedSession {
             tables: PivotTables {
                 dialect: request.dialect,
@@ -183,6 +193,8 @@ impl AnalysisSession {
             models: model_facts,
             dynamic_proofs,
             relations,
+            model_names,
+            declared_functions,
         };
         let outcome = SessionOutcome {
             models,
@@ -314,12 +326,19 @@ impl AnalysisSession {
         let pool = self.catalog.native.analysis_pool()?;
         let request: &SessionRequest = &self.request;
         let nullability: &ShapeTable = &self.available_nullability;
+        let declared: Vec<String> = request
+            .function_return_types
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
         let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
             misses
                 .par_iter()
                 .map(|position| {
                     let model: &ModelRequest = &request.models[models[*position]];
-                    native_outcome(dialect, model, (schemas[*position].clone(), nullability))
+                    let schema: Shapes = schemas[*position].clone();
+                    let relations: SessionSchema = session_schema(&schema, nullability);
+                    model_outcome(dialect, model, (schema, &relations), &declared)
                 })
                 .collect()
         });
@@ -669,7 +688,7 @@ impl AnalysisSession {
         }
     }
 
-        /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
+    /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
     fn ensure_cleaned(&mut self, models: &[usize]) -> Result<(), String> {
         let pending: Vec<usize> = models
             .iter()
@@ -681,8 +700,11 @@ impl AnalysisSession {
         }
         if let AnalysisRoute::Native(dialect) = self.route() {
             for model in pending {
+                let request: &ModelRequest = &self.request.models[model];
                 let sql: String =
-                    native_cleaned_sql(dialect, &self.request.models[model]).unwrap_or_default();
+                    normalize_native_sql(&request.query_sql, dialect.name(), dialect.stub_prefix())
+                        .map(|normalised| placeholder_defaults(&normalised, &request.placeholders))
+                        .unwrap_or_default();
                 self.outcome_mut(model)?.cleaned_sql = sql;
                 self.pending_cleaned[model] = false;
             }

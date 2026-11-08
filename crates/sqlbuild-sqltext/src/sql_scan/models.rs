@@ -81,6 +81,9 @@ pub struct LexicalSyntax {
     pub nested_block_comments: bool,
     /// Prefixes that start a line comment, such as `--`, `#` or `//`.
     pub line_comment_prefixes: Vec<String>,
+    /// `[...]` quotes an identifier, `]]` standing for one `]`, as in T-SQL.
+    #[serde(default)]
+    pub bracket_identifiers: bool,
 }
 
 impl LexicalSyntax {

@@ -1,6 +1,15 @@
+use std::collections::HashMap;
+
+use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
+
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, StandInSchema};
 use crate::analysis_route::types::NativeDialect;
-use crate::assembly::analysis_session::models::LineageRow;
+use crate::assembly::analysis_session::models::{
+    LineageFacts, LineageRow, ModelAnalysis, ModelOutcome, SessionSchema,
+};
+use crate::assembly::analysis_session::types::Shapes;
+use crate::lineage::models::{LineageColumn, LineageSource};
+use crate::semantic_checks::types::RevisedBinding;
 
 /// `orders` with a non-null INTEGER id and a nullable VARCHAR status.
 pub(super) fn orders() -> StandInSchema {
@@ -50,4 +59,88 @@ pub(super) fn resource_columns(row: &LineageRow) -> Vec<&str> {
             column.as_str()
         })
         .collect()
+}
+
+/// `output transform confidence [type:resource.column, ...]`.
+pub(super) fn column_line(column: &LineageColumn) -> String {
+    let sources: Vec<String> = column.upstream_columns.iter().map(source_text).collect();
+    format!(
+        "{} {} {} [{}]",
+        column.output_column,
+        column.transform_kind.as_str(),
+        column.confidence.as_str(),
+        sources.join(", ")
+    )
+}
+
+fn source_text(source: &LineageSource) -> String {
+    format!(
+        "{}:{}.{}",
+        source.resource_type.as_str(),
+        source.resource_name,
+        source.column_name
+    )
+}
+
+/// `raw_orders` with `shape` as the session's input shapes and its typed schema; none when empty.
+pub(super) fn session_relations(shape: &[(&str, &str, Nullability)]) -> (Shapes, SessionSchema) {
+    let pairs: Vec<(String, String)> = shape
+        .iter()
+        .map(|(name, data_type, _)| ((*name).to_owned(), (*data_type).to_owned()))
+        .collect();
+    let columns: Vec<SchemaColumn> = shape.iter().map(schema_column).collect();
+    let relations: HashMap<String, Vec<SchemaColumn>> = std::iter::once(("raw_orders", columns))
+        .filter(|(_, columns)| !columns.is_empty())
+        .map(|(name, columns)| (name.to_owned(), columns))
+        .collect();
+    (
+        vec![("raw_orders".to_owned(), pairs)],
+        SessionSchema { relations },
+    )
+}
+
+fn schema_column(&(name, data_type, nullability): &(&str, &str, Nullability)) -> SchemaColumn {
+    SchemaColumn {
+        name: name.to_owned(),
+        quoted: false,
+        data_type: Some(data_type.to_owned()),
+        nullability,
+    }
+}
+
+/// A finished outcome of `sql` over `orders`, as the session bound it.
+pub(super) fn outcome(sql: &str) -> ModelOutcome {
+    ModelOutcome {
+        analysis: ModelAnalysis {
+            analysis_succeeded: true,
+            columns: None,
+            lineage: LineageFacts::Native(Vec::new()),
+            has_star: false,
+            star_resolved: false,
+            binding_diagnostics: Vec::new(),
+            binding_validated: true,
+        },
+        cleaned_sql: sql.to_owned(),
+        deferred_cleaning: None,
+        validated_schema: vec![(
+            "orders".to_owned(),
+            vec![
+                ("id".to_owned(), "INTEGER".to_owned()),
+                ("status".to_owned(), "VARCHAR".to_owned()),
+            ],
+        )],
+        fused_binding_validated: true,
+        sql_macro_findings: Vec::new(),
+    }
+}
+
+/// Each revised finding of every model as `(code, start, end)`, in order.
+pub(super) fn finding_rows(
+    models: &[Vec<RevisedBinding>],
+) -> Vec<(&str, Option<i64>, Option<i64>)> {
+    let mut rows: Vec<(&str, Option<i64>, Option<i64>)> = Vec::new();
+    for (code, start, end) in models.iter().flatten() {
+        rows.push((code.as_str(), *start, *end));
+    }
+    rows
 }

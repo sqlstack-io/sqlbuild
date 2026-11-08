@@ -114,6 +114,10 @@ pub struct FinishedSession {
     pub(crate) dynamic_proofs: HashMap<String, ContractProof>,
     /// The relation facts the session ended with, when the request asked to keep them.
     pub(crate) relations: Option<RelationTables>,
+    /// Each requested model's name, in request order, as the session's outcomes are.
+    pub(crate) model_names: Vec<String>,
+    /// The adapter's declared functions, which the native analysis knew.
+    pub(crate) declared_functions: Vec<String>,
 }
 
 /// The session's typed result for one compiled model, borrowed from the finished session.

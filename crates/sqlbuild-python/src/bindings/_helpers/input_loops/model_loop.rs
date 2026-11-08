@@ -753,14 +753,6 @@ impl NativeModelLoop {
                 contents,
             },
         )?;
-        let (analysed, rejected_opt_out, analysis_skipped) = match legacy_gate {
-            Some(gate) => gate,
-            None => self.analysis(context, &opt_out_model, scanned.invalid_calls.is_empty())?,
-        };
-        let analysis: (bool, Option<Bound<'py, PyAny>>) = (
-            analysed && scanned.invalid_calls.is_empty(),
-            rejected_opt_out,
-        );
         let references: Vec<ReferenceRow> = merge_call_site_references(
             scanned.references.iter().map(reference_row).collect(),
             argument_references,
@@ -794,6 +786,25 @@ impl NativeModelLoop {
         } else {
             (values, Vec::new())
         };
+        let (analysed, rejected_opt_out, analysis_skipped) = match legacy_gate {
+            Some(gate) => gate,
+            None => {
+                let expanded_model: OptOutModel<'_, 'py> = OptOutModel {
+                    name,
+                    file_path,
+                    config: &config,
+                    values: &values,
+                    query_sql: &query_sql,
+                    relative_path,
+                    contents,
+                };
+                self.analysis(context, &expanded_model, scanned.invalid_calls.is_empty())?
+            }
+        };
+        let analysis: (bool, Option<Bound<'py, PyAny>>) = (
+            analysed && scanned.invalid_calls.is_empty(),
+            rejected_opt_out,
+        );
         let source: HeaderSource<'_, 'py> = HeaderSource {
             name,
             values: &values,
