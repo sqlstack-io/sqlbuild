@@ -83,7 +83,6 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
                 Ok(fast_lineage(
                     module,
                     (query_sql, placeholders),
-                    &lineage_references(query_sql),
                     &request.schema,
                 ))
             }),
@@ -109,22 +108,4 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
             }
         })
         .collect()
-}
-
-/// `(name, resource type, name)` of each resource `query_sql` references, first spelling once.
-fn lineage_references(query_sql: &str) -> Vec<(String, String, String)> {
-    let mut references: Vec<(String, String, String)> = Vec::new();
-    for resource in physical_resources(query_sql) {
-        if !references
-            .iter()
-            .any(|(name, _, _)| *name == resource.resource_name)
-        {
-            references.push((
-                resource.resource_name.clone(),
-                resource.resource_type.as_str().to_owned(),
-                resource.resource_name,
-            ));
-        }
-    }
-    references
 }

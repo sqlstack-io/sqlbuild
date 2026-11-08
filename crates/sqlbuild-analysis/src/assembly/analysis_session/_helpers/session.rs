@@ -171,6 +171,16 @@ impl AnalysisSession {
                 dynamic_proofs.insert(model.name.clone(), proof.clone());
             }
         }
+        let model_names: Vec<String> = request
+            .models
+            .iter()
+            .map(|model| model.name.clone())
+            .collect();
+        let declared_functions: Vec<String> = request
+            .function_return_types
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
         let finished = FinishedSession {
             tables: PivotTables {
                 dialect: request.dialect,
@@ -183,6 +193,8 @@ impl AnalysisSession {
             models: model_facts,
             dynamic_proofs,
             relations,
+            model_names,
+            declared_functions,
         };
         let outcome = SessionOutcome {
             models,

@@ -4,8 +4,8 @@ use crate::analysis_route::models::{
 };
 use crate::analysis_route::tests::helpers::{analysed, resource_columns};
 use crate::analysis_route::tests::test_types::{
-    CataloguedDialect, ColumnTestCase, FindingTestCase, LineageTestCase, MacroBodyTestCase,
-    NativeTypeMatchTestCase, PivotlessDialect, ReadWholeTestCase, StarTestCase,
+    CataloguedDialect, ColumnTestCase, FindingTestCase, FoldingDialect, LineageTestCase,
+    MacroBodyTestCase, NativeTypeMatchTestCase, PivotlessDialect, ReadWholeTestCase, StarTestCase,
     UnavailableAnalysisTestCase,
 };
 use crate::analysis_route::types::NativeDialect;
@@ -162,6 +162,13 @@ fn given_findings_when_analysing_then_they_take_sqlbuild_codes_and_positions() {
             sql: "SELECT id,\n  nope\nFROM orders",
             extension_functions: &[],
             expected_findings: &[("B002", Some((2, 3)))],
+        },
+        FindingTestCase {
+            description: "a truth-value test the warehouse rejects is SQLBuild's own B103, after the parse's findings",
+            dialect: &FoldingDialect,
+            sql: "SELECT id, nope FROM orders WHERE (id > 1) IS NOT TRUE",
+            extension_functions: &[],
+            expected_findings: &[("B002", Some((1, 12))), ("B103", Some((1, 44)))],
         },
         FindingTestCase {
             description: "a function the catalogue does not know is B101",

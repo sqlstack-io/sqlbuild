@@ -1,5 +1,6 @@
 //! The provided native analysis: sqlquack-semantics lineage and findings as SQLBuild's facts.
 
+use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{
     LineageContext, NameFinding, Nullability, OutputLineage, QueryLineage, SourceColumn,
     TransformKind,
@@ -17,6 +18,7 @@ use crate::assembly::analysis_session::constants::{
 };
 use crate::assembly::analysis_session::models::{ColumnFact, LineageRow};
 use crate::semantic_validation::main::sqlbuild_code::sqlbuild_code;
+use crate::semantic_validation::main::text_findings::text_findings;
 use crate::semantic_validation::models::DiagnosticRow;
 
 /// The analysis of `statement`, the one statement of `input.sql`, under `dialect`'s profile.
@@ -40,7 +42,7 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
         lineage: lineage
             .outputs
             .iter()
-            .map(|output| lineage_row(output, input.references))
+            .map(|output| lineage_row(dialect.profile(), output, input.references))
             .collect(),
         row_sources: lineage
             .row_sources
@@ -52,19 +54,20 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
         diagnostics: statement_name_findings(statement, context)
             .into_iter()
             .filter_map(|finding| diagnostic_row(input, finding))
+            .chain(text_findings(input.sql, dialect.name()))
             .collect(),
     }
 }
 
-/// An output column typed through the dialect, so both routes spell its type alike.
+/// An output column in the analysis's own type spelling, kept when the dialect can compare it.
 fn column_fact<D: NativeDialect + ?Sized>(dialect: &D, output: &OutputLineage) -> ColumnFact {
     ColumnFact {
         name: output.name.clone(),
         data_type: output
             .data_type
             .as_deref()
-            .and_then(|spelling| dialect.normalize_type(spelling))
-            .map(|normalized| normalized.normalized_name),
+            .filter(|spelling| dialect.normalize_type(spelling).is_some())
+            .map(str::to_owned),
         nullability: match output.nullability {
             Nullability::Unknown => UNKNOWN_NULLABILITY,
             Nullability::Nullable => NULLABLE_NULLABILITY,
@@ -75,7 +78,11 @@ fn column_fact<D: NativeDialect + ?Sized>(dialect: &D, output: &OutputLineage) -
 }
 
 /// An output column's lineage over the model's referenced resources, as the legacy rows give it.
-fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) -> LineageRow {
+fn lineage_row(
+    profile: &dyn DialectProfile,
+    output: &OutputLineage,
+    references: &[(String, String, String)],
+) -> LineageRow {
     let transform_code: u8 = match output.kind {
         TransformKind::Constant => TRANSFORM_CONSTANT,
         TransformKind::Direct => TRANSFORM_DIRECT,
@@ -83,11 +90,16 @@ fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) 
         TransformKind::Expression => TRANSFORM_EXPRESSION,
         TransformKind::Aggregation => TRANSFORM_AGGREGATION,
     };
-    let sources: Vec<(String, String, String)> = output
+    let mut sources: Vec<(String, String, String)> = Vec::new();
+    for source in output
         .sources
         .iter()
-        .filter_map(|source| referenced_source(source, references))
-        .collect();
+        .filter_map(|source| referenced_source(profile, source, references))
+    {
+        if !sources.contains(&source) {
+            sources.push(source);
+        }
+    }
     let confidence_code: u8 = if sources.is_empty() && transform_code != TRANSFORM_CONSTANT {
         CONFIDENCE_UNKNOWN
     } else if output.resolved {
@@ -103,14 +115,19 @@ fn lineage_row(output: &OutputLineage, references: &[(String, String, String)]) 
     }
 }
 
-/// `(resource type, resource name, column)` of a source column the model references.
+/// `(resource type, resource name, column)` of a source column, each name resolved as the profile does.
 fn referenced_source(
+    profile: &dyn DialectProfile,
     source: &SourceColumn,
     references: &[(String, String, String)],
 ) -> Option<(String, String, String)> {
-    let (_, resource_type, resource_name) = references
-        .iter()
-        .find(|(analysis_name, _, _)| *analysis_name == source.relation)?;
+    let (_, resource_type, resource_name) = references.iter().find(|(analysis_name, _, _)| {
+        *analysis_name == source.relation
+            || profile.same_identifier(
+                &profile.resolved_identifier(analysis_name, false),
+                &source.relation,
+            )
+    })?;
     Some((
         resource_type.clone(),
         resource_name.clone(),

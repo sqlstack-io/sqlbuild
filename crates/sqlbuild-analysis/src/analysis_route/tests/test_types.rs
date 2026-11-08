@@ -1,4 +1,4 @@
-use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES};
+use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES, SNOWFLAKE};
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::Nullability;
 use sqlquack_syntax::expressions::statements::models::Command;
@@ -114,6 +114,47 @@ impl NativeDialect for CataloguedDialect {
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         PivotlessDialect.normalize_type(spelling)
     }
+}
+
+/// Snowflake's shared parser under the Snowflake profile, which folds unquoted names to upper case.
+pub(super) struct FoldingDialect;
+
+impl NativeDialect for FoldingDialect {
+    fn name(&self) -> &'static str {
+        "snowflake"
+    }
+
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild_"
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        parse_strict(sql, Dialect::Snowflake, &ParseOptions::default())
+            .map(|statements| Parsed {
+                statements,
+                gaps: Vec::new(),
+            })
+            .map_err(|failure| ParserGap {
+                construct: failure.to_string(),
+                message: failure.to_string(),
+                offset: 0,
+                syntax: false,
+            })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &SNOWFLAKE
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        PivotlessDialect.normalize_type(spelling)
+    }
+}
+
+pub(super) struct MarkerLineageTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) expected_lines: &'static [&'static str],
 }
 
 pub(super) struct ReadWholeTestCase {
