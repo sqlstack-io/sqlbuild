@@ -9,7 +9,7 @@ use crate::analysis_route::constants::{
 };
 use crate::analysis_route::models::{DatabricksDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect};
 
 impl NativeDialect for DatabricksDialect {
@@ -54,10 +54,7 @@ impl NativeDialect for DatabricksDialect {
         let spelt: String = DATABRICKS_TYPE_ALIASES
             .iter()
             .fold(upper, |text, (alias, name)| aliased(&text, alias, name));
-        Some(normalize_with_fallback(
-            &spelt,
-            Some(TypeDialect::Databricks),
-        ))
+        Some(normalize_text_type(&spelt, Some(TypeDialect::Databricks)))
     }
 }
 

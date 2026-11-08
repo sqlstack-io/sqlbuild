@@ -5,7 +5,7 @@ use sqlquack_syntax::{Expression, Parsed};
 
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
-use crate::type_system::_helpers::fallback::normalize_with_fallback;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::NormalizedType;
 
 pub(super) struct NativeGapTestCase {
@@ -66,7 +66,7 @@ impl NativeDialect for PivotlessDialect {
     }
 
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
-        Some(normalize_with_fallback(spelling, None))
+        Some(normalize_text_type(spelling, None))
     }
 }
 
