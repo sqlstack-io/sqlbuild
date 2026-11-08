@@ -4145,6 +4145,7 @@ dependencies = [
  "sqlquack-syntax",
  "sqlquack-syntax-bigquery",
  "sqlquack-syntax-postgres",
+ "stacker",
 ]
 
 [[package]]

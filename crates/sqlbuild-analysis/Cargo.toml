@@ -29,6 +29,7 @@ sqlclean.workspace = true
 sqlquack-syntax.workspace = true
 sqlquack-syntax-bigquery.workspace = true
 sqlquack-syntax-postgres.workspace = true
+stacker.workspace = true
 
 [lints]
 workspace = true

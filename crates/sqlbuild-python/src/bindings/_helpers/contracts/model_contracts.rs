@@ -51,7 +51,7 @@ pub(crate) fn evaluate_project_model_contracts(
         .compiler_detach(|| Ok(evaluate_model_contracts(&request)))
         .map_err(compiler_error)?;
     let outcomes: Vec<Vec<ContractDiagnostic>> =
-        outcomes.map_err(|error| normalization_error(py, &error))?;
+        outcomes.map_err(|error| normalization_error(&error))?;
     Ok(models
         .iter()
         .zip(outcomes)

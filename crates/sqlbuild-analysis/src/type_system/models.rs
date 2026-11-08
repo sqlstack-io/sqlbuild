@@ -101,7 +101,7 @@ pub struct NormalizedType {
     pub length: Option<PythonInteger>,
 }
 
-/// A normalized type and the Polyglot parse error Python logs before its text fallback.
+/// A normalized type and the parse error logged before its text fallback.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeNormalization {
     pub normalized: NormalizedType,

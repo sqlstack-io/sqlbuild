@@ -244,7 +244,7 @@ def test_given_type_when_normalizing_then_python_shape_is_returned(
     "test_case",
     [
         UnknownDialectTypeTestCase(
-            description="a dialect name Polyglot does not know",
+            description="a dialect name SQLBuild does not know",
             dialect="motherduck",
             expected_error="ValueError: Unknown dialect: motherduck",
         ),

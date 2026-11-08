@@ -83,17 +83,17 @@ fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
             type_sql: "order status",
             dialect: "generic",
             expected_normalization: Ok(
-                "ORDERSTATUS | other | - | - | - | Parse error at line 1, column 13: Unexpected token after data type: status",
+                "ORDERSTATUS | other | - | - | - | unexpected 'status' after the type",
             ),
         },
         NormalizeTypeTestCase {
-            description: "every Polyglot dialect is normalized natively",
+            description: "another SQL analysis dialect reads types as generic SQL",
             type_sql: "INT",
             dialect: "mysql",
             expected_normalization: Ok("INT | integer | - | - | - | -"),
         },
         NormalizeTypeTestCase {
-            description: "a dialect Polyglot does not know raises Python's error",
+            description: "a dialect name SQLBuild does not know raises Python's error",
             type_sql: "INT",
             dialect: "motherduck",
             expected_normalization: Err("Unknown dialect: motherduck"),
@@ -110,7 +110,8 @@ fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
             dialect: "duckdb",
             expected_normalization: Ok(
                 "DECIMAL(99999999999999999999,2) | decimal | 99999999999999999999 | 2 | - | \
-                 Parse error at line 1, column 30: Invalid number: 99999999999999999999",
+                 Parse(Parse { message: \"Invalid number: 99999999999999999999\", line: 1, \
+                 column: 50, start: 48, end: 49 })",
             ),
         },
         NormalizeTypeTestCase {
@@ -118,7 +119,8 @@ fn given_type_strings_when_normalizing_then_python_normalization_is_returned() {
             type_sql: "VARCHAR(\u{663})",
             dialect: "snowflake",
             expected_normalization: Ok(
-                "VARCHAR(3) | string | - | - | 3 | Parse error at line 1, column 10: Expected number",
+                "VARCHAR(3) | string | - | - | 3 | Parse(Parse { message: \"Expected number\", \
+                 line: 1, column: 30, start: 28, end: 29 })",
             ),
         },
     ];
