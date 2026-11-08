@@ -6,8 +6,8 @@ use sqlbuild_sqltext::compiler::main::placeholder_defaults::placeholder_defaults
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlquack_semantics::lineage::models::{Nullability, SchemaColumn};
 
-use crate::analysis_route::_helpers::located_gap::{located, unreadable_reason};
-use crate::analysis_route::_helpers::marker_names::{distinct_calls, first_call_names};
+use crate::analysis_route::_helpers::analysis::located_gap::{located, unreadable_reason};
+use crate::analysis_route::_helpers::analysis::marker_names::{distinct_calls, first_call_names};
 use crate::analysis_route::main::schema_column::schema_column;
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap};
 use crate::analysis_route::types::NativeDialect;
@@ -25,11 +25,12 @@ use crate::relation_markers::main::markers_as_names::markers_as_names;
 use crate::relation_markers::types::MarkerCall;
 use crate::semantic_validation::main::normalize_native::normalize_native_sql;
 
-/// Lineage over `schema` of `query_sql`, its relation markers read as names, or why it is unreadable.
+/// `query_sql`'s lineage over `schema`, unnamed outputs named from `inferred_names`, or its gap.
 pub fn fast_lineage(
     dialect: &dyn NativeDialect,
     (query_sql, placeholders): (&str, &[(String, String)]),
     schema: &[LineageSchemaResource],
+    inferred_names: &[String],
 ) -> FastLineageOutcome {
     let (named, calls): (String, Vec<MarkerCall>) =
         match markers_as_names(query_sql, &dialect_lexical_syntax(dialect.name())) {
@@ -79,7 +80,20 @@ pub fn fast_lineage(
     });
     match analysed {
         Ok(native) => FastLineageOutcome::Built {
-            columns: native.lineage.iter().map(lineage_column).collect(),
+            columns: native
+                .lineage
+                .iter()
+                .enumerate()
+                .map(|(index, row)| {
+                    let mut column: LineageColumn = lineage_column(row);
+                    if let (true, Some(name)) =
+                        (column.output_column.is_empty(), inferred_names.get(index))
+                    {
+                        column.output_column.clone_from(name);
+                    }
+                    column
+                })
+                .collect(),
             has_star: native.has_star,
         },
         Err(gap) => FastLineageOutcome::Unparsed(unreadable_reason(

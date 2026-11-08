@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import itertools
+import logging
 import random
 from itertools import product
 from pathlib import Path
@@ -71,6 +71,11 @@ _CUSTOM_RULE_PROFILES: tuple[ExpressionInferenceProfile, ...] = (
             "COALESCE": custom_nullability_rule,
         },
     ),
+)
+_COMPILE_LOGGER: str = "sqlbuild.compile"
+_UNAPPLIED_RULES_WARNING: str = (
+    "Adapter 'duckdb' defines its own nullability rule for IFF, UPPER; native SQL analysis "
+    "does not apply it, so these calls take the dialect's own nullability"
 )
 _CYCLIC_PROJECT: dict[str, str] = {
     "sqlbuild_project.toml": 'name = "orders_cycle"\nadapter = "duckdb"\n',
@@ -493,54 +498,36 @@ def test_given_unanalysed_pivot_model_when_assembling_then_native_proves_it_with
     "test_case",
     [
         AdapterRuleCallbackTestCase(
-            description="the adapter's own rule answers natively analysed CTE nullability",
+            description="an adapter's own rule is not called on a native route, and compile says so",
             seed=20261012,
             model_count=6,
             raised=None,
-            expected_minimum_calls=1,
+            expected_warning=_UNAPPLIED_RULES_WARNING,
         ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_adapter_nullability_rule_when_analysing_natively_then_rule_is_called_back(
-    test_case: AdapterRuleCallbackTestCase, tmp_path: Path
-) -> None:
-    rule: RecordingNullabilityRule = RecordingNullabilityRule(raised=test_case.raised)
-    inputs, profile = adapter_rule_project(test_case=test_case, rule=rule, tmp_path=tmp_path)
-
-    project: CompiledProjectView = assemble_project(inputs=inputs, inference_profile=profile)
-
-    assert any(model.inferred_columns for model in project.models)
-    assert len(rule.calls) >= test_case.expected_minimum_calls, test_case.description
-    assert all(
-        isinstance(value, InferredNullability)
-        for value in itertools.chain.from_iterable(rule.calls)
-    )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
         AdapterRuleCallbackTestCase(
-            description="the adapter rule's exception reaches the caller unchanged",
+            description="a failing adapter rule is never reached on a native route",
             seed=20261012,
             model_count=6,
             raised=LookupError,
-            expected_minimum_calls=1,
+            expected_warning=_UNAPPLIED_RULES_WARNING,
         ),
     ],
     ids=lambda case: case.description,
 )
-def test_given_failing_adapter_nullability_rule_when_analysing_natively_then_its_error_raises(
-    test_case: AdapterRuleCallbackTestCase, tmp_path: Path
+def test_given_adapter_nullability_rule_when_analysing_natively_then_compile_warns_it_is_unapplied(
+    test_case: AdapterRuleCallbackTestCase,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     rule: RecordingNullabilityRule = RecordingNullabilityRule(raised=test_case.raised)
     inputs, profile = adapter_rule_project(test_case=test_case, rule=rule, tmp_path=tmp_path)
 
-    with pytest.raises(LookupError, match="adapter rule failed"):
-        _ = assemble_project(inputs=inputs, inference_profile=profile)
+    with caplog.at_level(logging.WARNING, logger=_COMPILE_LOGGER):
+        project: CompiledProjectView = assemble_project(inputs=inputs, inference_profile=profile)
 
-    assert len(rule.calls) >= test_case.expected_minimum_calls, test_case.description
+    assert any(model.inferred_columns for model in project.models)
+    assert rule.calls == []
+    assert caplog.messages == [test_case.expected_warning]
 
 
 if __name__ == "__main__":

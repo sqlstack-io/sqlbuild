@@ -181,7 +181,7 @@ fn given_an_edit_when_rerunning_then_only_changed_analyses_miss_and_match_uncach
             expected_hits: &[false, false, false, true],
         },
         CacheEditTestCase {
-            description: "a legacy analysis misses when any relation it could read changes",
+            description: "an analysis hits when only a model it does not read changes",
             models: &[EVENTS, STG_ORDERS, EVENTS_MART],
             edited: &[
                 EVENTS,
@@ -193,7 +193,7 @@ fn given_an_edit_when_rerunning_then_only_changed_analyses_miss_and_match_uncach
                 ),
                 EVENTS_MART,
             ],
-            expected_hits: &[true, false, false],
+            expected_hits: &[true, false, true],
         },
         CacheEditTestCase {
             description: "an edit misses only the edited model beside legacy and failed analyses",

@@ -341,8 +341,13 @@ fn given_a_model_without_facts_when_fast_lineage_reads_it_natively_then_it_has_l
             .iter()
             .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
             .collect();
-        let parts: LineageOutcomeParts<LineageColumn> =
-            fast_lineage(&PivotlessDialect, (test_case.sql, &placeholders), &schema).into_parts();
+        let parts: LineageOutcomeParts<LineageColumn> = fast_lineage(
+            &PivotlessDialect,
+            (test_case.sql, &placeholders),
+            &schema,
+            &[],
+        )
+        .into_parts();
         let mut lines: Vec<String> = parts.columns.iter().map(column_line).collect();
         lines.push(format!("{} star={}", parts.status, parts.has_star));
         lines.extend(parts.detail);
@@ -392,7 +397,7 @@ FROM __ref("orders") AS o JOIN __source("orders") AS s ON o.order_id = s.order_i
 
     for test_case in test_cases {
         let parts: LineageOutcomeParts<LineageColumn> =
-            fast_lineage(test_case.dialect, (sql, &[]), &schema).into_parts();
+            fast_lineage(test_case.dialect, (sql, &[]), &schema, &[]).into_parts();
         let mut lines: Vec<String> = parts.columns.iter().map(column_line).collect();
         lines.push(format!("{} star={}", parts.status, parts.has_star));
         lines.extend(parts.detail);

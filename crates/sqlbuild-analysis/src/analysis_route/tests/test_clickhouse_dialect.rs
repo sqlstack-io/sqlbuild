@@ -160,6 +160,7 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
                 line: 3,
                 column: 11,
                 syntax: false,
+                source_offset: Some(44),
             }),
         },
         NativeGapTestCase {
@@ -172,6 +173,7 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
                 line: 1,
                 column: 18,
                 syntax: true,
+                source_offset: Some(17),
             }),
         },
         NativeGapTestCase {
@@ -184,6 +186,7 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
     ];

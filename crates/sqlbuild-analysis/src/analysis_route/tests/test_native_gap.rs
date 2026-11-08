@@ -12,58 +12,69 @@ use crate::compiled_project::models::TextPosition;
 use crate::type_system::models::TypeFamily;
 
 #[test]
-fn given_a_dialect_when_routing_analysis_then_only_native_dialects_leave_the_legacy_path() {
+fn given_a_dialect_when_routing_analysis_then_a_native_module_or_nothing_analyses_it() {
     let test_cases = [
         RouteTestCase {
             description: "postgres",
             dialect: Some("postgres"),
-            expected_legacy: false,
+            expected_module: Some("postgres"),
         },
         RouteTestCase {
             description: "snowflake",
             dialect: Some("snowflake"),
-            expected_legacy: false,
+            expected_module: Some("snowflake"),
         },
         RouteTestCase {
             description: "duckdb",
             dialect: Some("duckdb"),
-            expected_legacy: false,
+            expected_module: Some("duckdb"),
         },
         RouteTestCase {
             description: "sqlite",
             dialect: Some("sqlite"),
-            expected_legacy: false,
+            expected_module: Some("sqlite"),
         },
         RouteTestCase {
             description: "bigquery",
             dialect: Some("bigquery"),
-            expected_legacy: false,
+            expected_module: Some("bigquery"),
         },
         RouteTestCase {
             description: "databricks, read by SQLQuack's Databricks SQL parser",
             dialect: Some("databricks"),
-            expected_legacy: false,
+            expected_module: Some("databricks"),
         },
         RouteTestCase {
             description: "clickhouse",
             dialect: Some("clickhouse"),
-            expected_legacy: false,
+            expected_module: Some("clickhouse"),
         },
         RouteTestCase {
             description: "tsql",
             dialect: Some("tsql"),
-            expected_legacy: false,
+            expected_module: Some("tsql"),
+        },
+        RouteTestCase {
+            description: "a dialect no native module reads, such as a custom adapter's",
+            dialect: Some("trino"),
+            expected_module: None,
         },
         RouteTestCase {
             description: "no analysis dialect",
             dialect: None,
-            expected_legacy: true,
+            expected_module: None,
         },
     ];
     for test_case in test_cases {
-        assert_eq!(
-            matches!(analysis_route(test_case.dialect), AnalysisRoute::Legacy),
-            test_case.expected_legacy,
+        let route: AnalysisRoute = analysis_route(test_case.dialect);
+        assert!(
+            matches!(
+                (route, test_case.expected_module),
+                (AnalysisRoute::Native(module), Some(name)) if module.name() == name
+            ) || matches!(
+                (route, test_case.expected_module),
+                (AnalysisRoute::Unavailable, None)
+            ),
             "{}",
             test_case.description
         );
@@ -311,6 +322,7 @@ fn given_tsql_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has
                 line: 2,
                 column: 9,
                 syntax: true,
+                source_offset: Some(19),
             }),
         },
         NativeGapTestCase {
@@ -323,6 +335,7 @@ fn given_tsql_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has
                 line: 1,
                 column: 24,
                 syntax: true,
+                source_offset: Some(23),
             }),
         },
         NativeGapTestCase {
@@ -335,6 +348,7 @@ fn given_tsql_model_sql_when_probing_its_parser_then_only_sql_it_reads_whole_has
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
     ];

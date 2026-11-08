@@ -76,7 +76,7 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
                 FastLineageModel::Parse {
                     query_sql,
                     placeholders,
-                    ..
+                    inferred_columns,
                 },
                 AnalysisRoute::Native(module),
             ) => catch_compiler_panic(|| {
@@ -84,6 +84,7 @@ fn model_outcomes(request: &FastLineageRequest) -> Vec<Result<FastLineageOutcome
                     module,
                     (query_sql, placeholders),
                     &request.schema,
+                    inferred_columns,
                 ))
             }),
             (FastLineageModel::Parse { .. }, AnalysisRoute::Unavailable) => {

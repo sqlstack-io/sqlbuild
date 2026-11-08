@@ -25,7 +25,8 @@ pub(crate) struct PromotionTestCase {
 pub(crate) struct UnknownDialectTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static str,
-    pub(crate) expected_error: &'static str,
+    /// Whether the declared and inferred types are compared, so their mismatch is reported.
+    pub(crate) expected_compared: bool,
 }
 
 pub(crate) struct EnumLiteralTestCase {

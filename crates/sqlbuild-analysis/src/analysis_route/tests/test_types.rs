@@ -19,7 +19,8 @@ pub(super) struct NativeGapTestCase {
 pub(super) struct RouteTestCase {
     pub(super) description: &'static str,
     pub(super) dialect: Option<&'static str>,
-    pub(super) expected_legacy: bool,
+    /// The name of the native module that analyses the dialect, or `None` when none does.
+    pub(super) expected_module: Option<&'static str>,
 }
 
 pub(super) struct SkippedAnalysisTestCase {

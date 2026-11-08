@@ -98,13 +98,13 @@ class CteFactRecoveryParityTestCase:
 
 @dataclass(frozen=True)
 class AdapterRuleCallbackTestCase:
-    """A project-local adapter rule the Polyglot route calls back into, and what it raises."""
+    """An adapter's own nullability rule, what it raises if called, and the native warning."""
 
     description: str
     seed: int
     model_count: int
     raised: type[Exception] | None
-    expected_minimum_calls: int
+    expected_warning: str
 
 
 @dataclass(frozen=True)

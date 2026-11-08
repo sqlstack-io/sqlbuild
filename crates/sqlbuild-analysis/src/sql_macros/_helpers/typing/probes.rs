@@ -605,6 +605,7 @@ fn probe_analysis(
         schema,
         references: &[],
         extension_functions: &[],
+        quoted_ignore_case: false,
     };
     let Ok(analysis) = parser.analyse(&input) else {
         return None;

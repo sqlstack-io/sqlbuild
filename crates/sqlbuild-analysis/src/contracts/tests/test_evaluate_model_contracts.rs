@@ -282,12 +282,19 @@ fn given_models_sharing_types_when_evaluating_together_then_each_matches_its_own
 }
 
 #[test]
-fn given_a_dialect_polyglot_does_not_know_when_comparing_types_then_python_error_is_returned() {
-    let test_cases = [UnknownDialectTestCase {
-        description: "an enforced contract compared under an unknown dialect",
-        dialect: "motherduck",
-        expected_error: "Unknown dialect: motherduck",
-    }];
+fn given_a_dialect_no_native_module_reads_when_comparing_types_then_types_are_not_compared() {
+    let test_cases = [
+        UnknownDialectTestCase {
+            description: "an enforced contract under a dialect no native module reads",
+            dialect: "motherduck",
+            expected_compared: false,
+        },
+        UnknownDialectTestCase {
+            description: "the same contract under DuckDB reports its mismatch",
+            dialect: "duckdb",
+            expected_compared: true,
+        },
+    ];
     for test_case in test_cases {
         let request = ContractRequest {
             dialect: test_case.dialect.to_owned(),
@@ -295,15 +302,19 @@ fn given_a_dialect_polyglot_does_not_know_when_comparing_types_then_python_error
             models: vec![with_inferred(
                 model(
                     Some("enforced"),
-                    Some(schema(vec![declared("amount", Some("INT"), false)], false)),
+                    Some(schema(
+                        vec![declared("amount", Some("VARCHAR"), false)],
+                        false,
+                    )),
                 ),
                 vec![inferred("amount", Some("INTEGER"), false)],
             )],
         };
 
+        let findings = evaluate_model_contracts(&request).map_err(|error| error.message());
         assert_eq!(
-            evaluate_model_contracts(&request).map_err(|error| error.message()),
-            Err(test_case.expected_error.to_owned()),
+            findings.map(|models| models.iter().any(|model| !model.is_empty())),
+            Ok(test_case.expected_compared),
             "{}",
             test_case.description
         );

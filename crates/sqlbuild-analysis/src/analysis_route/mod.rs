@@ -1,4 +1,4 @@
-//! Which engine analyses a dialect's SQL: the Polyglot path, or a native module over SQLQuack.
+//! Which native module analyses a dialect's SQL over SQLQuack, if any does.
 
 pub(crate) mod _helpers;
 pub(crate) mod constants;
