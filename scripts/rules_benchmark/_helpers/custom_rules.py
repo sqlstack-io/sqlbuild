@@ -64,8 +64,8 @@ def check_001(*, project: Project, ctx: RuleContext) -> list[Finding]:
 def _model_local_rule(*, index: int) -> str:
     check: str = {
         2: (
-            "(sum(1 for node in ctx.sql.for_model(model).expanded.polyglot_ast().walk() "
-            'if str(getattr(node, "key", "")).lower() == "select") '
+            "(sum(1 for node in ctx.sql.for_model(model).expanded.ast().walk() "
+            'if node.kind == "select") '
             '>= 1 if model.name == "model_00000" else True)'
         ),
         3: "len(ctx.graph.dependencies(model)) >= 0",
