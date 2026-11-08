@@ -2,18 +2,20 @@ use crate::models::{
     DeclarationKind, EvaluateRequest, Fault, Model, ResourceKind, RuleMetadata, RulesConfig,
     ScopeResource, SqlScenarioFact, SqlTestCteFact, SqlTestFact, SqlTestMode,
 };
+use crate::query_facts::main::facts_available::facts_available;
 use crate::query_facts::main::model_shape::model_shape;
 use crate::query_facts::main::parse_fixture::parse_fixture;
 use crate::query_facts::main::stub_call::stub_call;
 use crate::query_facts::models::{CallKind, ParsedFixture};
-use crate::rules::_helpers::evaluation::path_fault;
+use crate::rules::_helpers::evaluation::{path_fault, rules_unavailable};
 use crate::rules::models::ProjectEvaluationRequest;
-use polyglot_sql::Expression;
-use polyglot_sql::expressions::{Literal, Select};
 use serde::{Deserialize, Serialize};
 use sqlbuild_analysis::compiler::main::sql_test_fixture_facts::fixture_facts;
+use sqlquack_syntax::Expression;
+use sqlquack_syntax::expressions::names::models::Literal;
+use sqlquack_syntax::expressions::queries::models::Select;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -42,17 +44,35 @@ fn evaluated_project(evaluation: ProjectEvaluationRequest<'_>) -> Result<Vec<Fau
     scenarios.sort_by(|left, right| left.source_path.cmp(&right.source_path));
     let mut fixture_eligibility: HashMap<&str, Result<(), String>> = HashMap::new();
 
-    for rule in evaluation.selected.values().filter(|rule| {
-        matches!(
-            rule.code.as_str(),
-            "SQBRTEST201" | "SQBRTEST202" | EMPTY_INPUT_RULE_CODE
-        )
-    }) {
+    let fixture_rules: Vec<&RuleMetadata> = evaluation
+        .selected
+        .values()
+        .copied()
+        .filter(|rule| {
+            matches!(
+                rule.code.as_str(),
+                "SQBRTEST201" | "SQBRTEST202" | EMPTY_INPUT_RULE_CODE
+            )
+        })
+        .collect();
+    let dialect: &str = &evaluation.request.dialect;
+    if !fixture_rules.is_empty() && !facts_available(dialect) {
+        let paths: BTreeSet<&str> = tests
+            .iter()
+            .filter(|test| reads_fixtures(test))
+            .map(|test| test.source_path.as_str())
+            .collect();
+        let codes: Vec<&str> = fixture_rules
+            .iter()
+            .map(|rule| rule.code.as_str())
+            .collect();
+        for path in paths {
+            faults.push(rules_unavailable(path, codes.iter().copied(), dialect));
+        }
+    }
+    for rule in fixture_rules.iter().filter(|_| facts_available(dialect)) {
         for test in &tests {
-            if !matches!(test.mode, SqlTestMode::Model)
-                || test.has_macro_mocks
-                || test.has_model_query_overrides
-            {
+            if !reads_fixtures(test) {
                 continue;
             }
             for cte in test
@@ -112,6 +132,13 @@ fn evaluated_project(evaluation: ProjectEvaluationRequest<'_>) -> Result<Vec<Fau
         ));
     }
     Ok(faults)
+}
+
+/// Whether the fixture rules read `test`'s fixture SQL: a model test without macro mocks or query overrides.
+fn reads_fixtures(test: &SqlTestFact) -> bool {
+    matches!(test.mode, SqlTestMode::Model)
+        && !test.has_macro_mocks
+        && !test.has_model_query_overrides
 }
 
 fn canonical_roots(

@@ -12,6 +12,7 @@ Online: https://sqlbuild.com/docs/concepts/rules/
 - How Rules work
 - SQL Rules
 - Built-in and custom Rules
+- Dialect support
 - One definition of project validity
 - Rules compared with tests, audits, and contracts
 - Findings and intentional exceptions
@@ -177,6 +178,26 @@ select = [
 
   Define typed model or project checks over compiler-owned facts with `@rule`, `RuleContext`, and
   `Finding`.
+
+## Dialect support
+
+SQL Rules, and the built-in Rules that read SQL, such as `SQBRMODEL102` and the SQL-test Rules
+`SQBRTEST201` to `SQBRTEST203`, run only where SQLBuild parses the project's dialect. Built-in Rules
+that read SQL support these adapters:
+
+| Adapter | Built-in Rules that read SQL |
+|---|---|
+| DuckDB, MotherDuck | Supported |
+| PostgreSQL | Supported |
+| Snowflake | Supported |
+| SQLite | Supported |
+| BigQuery, ClickHouse, Databricks, SQL Server | Not yet |
+
+Where SQLBuild does not parse the dialect yet, `sqb compile` and `sqb rules run` show `L007`
+warnings that name it: one per file for SQL Rules, and one per model or SQL test listing the
+built-in Rules that did not run. `L007` never changes an exit code, including for `sqb plan` and
+`sqb build`: it reports a gap in SQLBuild's dialect support, not a problem in your SQL. A syntax
+error in a supported dialect still fails the Rules that read it.
 
 ## One definition of project validity
 
