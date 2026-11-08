@@ -40,6 +40,16 @@ class CyclicAnalysisTestCase:
 
 
 @dataclass(frozen=True)
+class SourceTypesTestCase:
+    """A model reading a source with declared types, with or without the source's expression."""
+
+    description: str
+    files: dict[str, str]
+    lineage_mode: ColumnLineageMode
+    expected_types: tuple[tuple[str, str | None], ...]
+
+
+@dataclass(frozen=True)
 class CyclicCompileTestCase:
     """A project whose models `ref` each other, compiled through the CLI."""
 

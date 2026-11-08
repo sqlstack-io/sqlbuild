@@ -218,6 +218,24 @@ def captured_under_dialect(
     return SemanticInputs(**stage)
 
 
+def one_model_completion(
+    *, project_dir: Path, dialect: str, sql: str
+) -> tuple[tuple[str, ...], tuple[tuple[str, str | None], ...]]:
+    """One model over the generated sources, completed under `dialect`: codes and output types."""
+
+    files: dict[str, str] = generated_semantic_files(
+        rng=random.Random(0), model_count=0, require_analysis=True
+    )
+    files["models/probe.sql"] = f'MODEL (description "Probe");\n\n{sql}\n'
+    native: CompiledProjectView = completed_natively(
+        captured_under_dialect(project_dir=project_dir, files=files, dialect=dialect)
+    )
+    return (
+        tuple(diagnostic.code for diagnostic in native.diagnostics),
+        tuple((column.name, column.type) for column in native.models[0].inferred_columns or ()),
+    )
+
+
 def with_dialect(inputs: SemanticInputs, dialect: str | None) -> SemanticInputs:
     """The same stage inputs read under another SQL dialect."""
 
