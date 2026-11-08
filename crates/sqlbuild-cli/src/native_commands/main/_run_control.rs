@@ -1,6 +1,8 @@
 //! Supervise native API/scheduler roles together; a failed role stops its siblings.
 
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
+
+use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use sqlbuild_orchestration::scheduler::main::run_scheduler::run_scheduler;
 use sqlbuild_orchestration::scheduler::models::SchedulerState;
 use sqlbuild_orchestration::store::errors::ControlError;
@@ -42,7 +44,7 @@ pub(crate) async fn run_control(
         tasks.spawn(serve_api(
             store.clone(),
             listener,
-            (authentication, images, statistics),
+            (authentication, (images, adhoc_planner()), statistics),
             (
                 move || {
                     drop(write_output(&[(

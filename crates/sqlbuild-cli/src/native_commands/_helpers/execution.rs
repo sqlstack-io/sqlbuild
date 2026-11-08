@@ -11,6 +11,8 @@ use serde_json::json;
 use sqlbuild_orchestration::api::constants::BODY_BYTES;
 use sqlbuild_orchestration::api::errors::ClientError;
 use sqlbuild_orchestration::api::main::serve_api::serve_api;
+
+use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use sqlbuild_orchestration::api::models::{
     ApiAuthentication, DevelopmentScope, DockerImageSource, HumanLogin,
 };
@@ -111,7 +113,7 @@ pub(crate) async fn run_development_roles(
         (ApiAuthentication {
             login: HumanLogin::Development(scope),
             ..ApiAuthentication::default()
-        }, Vec::new(), Default::default()),
+        }, (Vec::new(), adhoc_planner()), Default::default()),
         (move || {
             drop(write_output(&[(Stream::Stderr, &format!(
                 "Development API ready: {address}\nDevelopment location: {location_id}\nAuthentication disabled on loopback; triggers {}\n",

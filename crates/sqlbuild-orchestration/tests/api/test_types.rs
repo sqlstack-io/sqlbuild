@@ -156,3 +156,40 @@ pub(crate) struct UiPathTestCase {
     pub(crate) expected_status: u16,
     pub(crate) expected_body: &'static str,
 }
+
+/// Stands in for the CLI's planner, which this crate cannot depend on: `build`, exact node keys,
+/// `--full-refresh` and `--warehouse NAME`; anything else is refused.
+pub(crate) struct ExactKeyPlanner;
+
+impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
+    fn plan(
+        &self,
+        command: &[String],
+        resources: &[crate::runs::models::PlannerResource],
+    ) -> Result<crate::runs::models::CommandPlan, String> {
+        let mut plan = crate::runs::models::CommandPlan {
+            verb: command.first().cloned().unwrap_or_default(),
+            selection: Default::default(),
+            settings: Default::default(),
+        };
+        let mut tokens = command.iter().skip(1);
+        while let Some(token) = tokens.next() {
+            match token.as_str() {
+                "--full-refresh" => {
+                    plan.settings
+                        .insert("full_refresh".into(), serde_json::json!(true));
+                }
+                "--warehouse" => {
+                    let name = tokens.next().ok_or("--warehouse needs a name")?;
+                    plan.settings
+                        .insert("warehouse".into(), serde_json::json!(name));
+                }
+                key if resources.iter().any(|resource| resource.key == key) => {
+                    plan.selection.insert(key.to_owned());
+                }
+                other => return Err(format!("{other} is not available for ad-hoc runs")),
+            }
+        }
+        Ok(plan)
+    }
+}

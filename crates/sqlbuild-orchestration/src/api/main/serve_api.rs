@@ -11,6 +11,7 @@ use crate::api::models::{
     ApiAuthentication, ChangeFeed, DevelopmentScope, DockerImageSource, GroupRole,
 };
 use crate::authorization::main::publish_group_roles::publish_group_roles;
+use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
@@ -20,9 +21,9 @@ use crate::warehouse_metadata::models::StatisticsRetention;
 pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
-    (authentication, images, retention): (
+    (authentication, (images, planner), retention): (
         ApiAuthentication,
-        Vec<DockerImageSource>,
+        (Vec<DockerImageSource>, std::sync::Arc<dyn CommandPlanner>),
         StatisticsRetention,
     ),
     (ready, shutdown): (
@@ -43,6 +44,7 @@ pub async fn serve_api(
     let application = router(&store, feed.clone())
         .merge(authentication_routes.layer(Extension(feed)))
         .layer(Extension(std::sync::Arc::new(images)))
+        .layer(Extension(planner))
         .layer(Extension(retention))
         .route(
             "/api/openapi.json",

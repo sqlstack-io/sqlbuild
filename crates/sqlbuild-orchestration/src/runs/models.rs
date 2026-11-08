@@ -6,6 +6,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::credentials::models::Action;
+use crate::runs::types::CommandPlanner;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum RunKind {
@@ -450,4 +453,72 @@ pub struct RunObservation {
     pub claimed_at: Option<DateTime<Utc>>,
     pub last_heartbeat_at: Option<DateTime<Utc>>,
     pub observed_at: DateTime<Utc>,
+}
+
+/// A person's command as argument tokens after `sqb`, never shell text; selectors resolve on the server.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AdhocRunRequest {
+    pub run_id: Uuid,
+    pub location_id: Uuid,
+    pub target: String,
+    pub command: Vec<String>,
+    pub reason: String,
+    pub priority: i64,
+}
+
+/// A dry run of a command; nothing is queued or audited.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AdhocCheckRequest {
+    pub location_id: Uuid,
+    pub target: String,
+    pub command: Vec<String>,
+    pub priority: i64,
+}
+
+/// One graph resource selectors resolve over: its `kind:name` key, upstream keys, tags and model folder.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlannerResource {
+    pub key: String,
+    pub deps: Vec<String>,
+    pub tags: Vec<String>,
+    pub folder: Option<String>,
+}
+
+/// A parsed command: its verb, the exact node keys it selects and the flags it sets, by parser destination.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CommandPlan {
+    pub verb: String,
+    pub selection: BTreeSet<String>,
+    pub settings: BTreeMap<String, serde_json::Value>,
+}
+
+/// One permission the run needs and whether the person holds it on every resolved node.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AdhocPermission {
+    pub action: Action,
+    pub allowed: bool,
+    /// Why it is refused, as the launch would report it.
+    pub reason: Option<String>,
+}
+
+/// What launching the command would run and whether this person may launch it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct AdhocCheck {
+    pub snapshot_id: Option<Uuid>,
+    pub verb: Option<String>,
+    pub selection: Vec<String>,
+    pub write_set: Vec<String>,
+    pub settings: BTreeMap<String, serde_json::Value>,
+    pub permissions: Vec<AdhocPermission>,
+    /// Why the command cannot run regardless of permissions, such as a refused flag or an unknown selector.
+    pub error: Option<String>,
+    pub launchable: bool,
+}
+
+/// What a person asks to run: a published job, or a command the planner resolves on the server.
+pub enum PersonRunRequest<'a> {
+    Job(&'a JobRunRequest),
+    Adhoc(&'a dyn CommandPlanner, &'a AdhocRunRequest),
 }

@@ -16,6 +16,8 @@ use crate::api::_helpers::resources::{
     administrators::assign,
     audit::read,
     person_operations::request_job,
+    person_operations::request_adhoc,
+    person_operations::check_adhoc,
     person_operations::cancel_run,
     person_operations::rerun,
     person_operations::change_trigger,
