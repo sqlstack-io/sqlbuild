@@ -1,26 +1,45 @@
 //! The native dialects and the diagnostic a model the native parser cannot read takes.
 
-use crate::analysis_route::models::{DuckDbDialect, SnowflakeDialect, SqliteDialect, TypeSpelling};
+use crate::analysis_route::models::{
+    DuckDbDialect, PostgresDialect, SnowflakeDialect, SqliteDialect, TypeSpelling,
+};
 use crate::analysis_route::types::NativeDialect;
 
 /// Each dialect, by its adapter's analysis dialect name, whose SQL a native module analyses.
 pub(crate) const NATIVE_DIALECTS: &[(&str, &dyn NativeDialect)] = &[
     (DUCKDB_DIALECT, &DuckDbDialect),
+    (POSTGRES_DIALECT, &PostgresDialect),
     (SNOWFLAKE_DIALECT, &SnowflakeDialect),
     (SQLITE_DIALECT, &SqliteDialect),
 ];
 /// DuckDB's (and MotherDuck's) analysis dialect name.
 pub(crate) const DUCKDB_DIALECT: &str = "duckdb";
+/// PostgreSQL's analysis dialect name.
+pub(crate) const POSTGRES_DIALECT: &str = "postgres";
 /// Snowflake's analysis dialect name.
 pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 /// SQLite's analysis dialect name.
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
-/// The stub prefix Snowflake and SQLite read as one unquoted name.
+/// The stub prefix PostgreSQL, Snowflake and SQLite read as one unquoted name.
 pub(crate) const UNQUOTED_STUB_PREFIX: &str = "__sqlbuild_";
 /// The word that makes SQLBuild's type fallback call a type it cannot split into name and flat parameters a timestamp.
 pub(crate) const FALLBACK_TIMESTAMP_WORD: &str = "TIMESTAMP";
 /// The most words a type name spans, as in `TIMESTAMP WITH LOCAL TIME ZONE`.
 pub(crate) const MAX_TYPE_NAME_WORDS: usize = 5;
+/// `format_type`'s time and timestamp names, `(name, zone words, respelt)`, around any precision.
+pub(crate) const POSTGRES_TEMPORAL_SPELLINGS: &[(&str, &str, &str)] = &[
+    ("timestamp", " without time zone", "TIMESTAMP"),
+    ("timestamp", " with time zone", "TIMESTAMPTZ"),
+    ("time", " without time zone", "TIME"),
+    ("time", " with time zone", "TIMETZ"),
+];
+/// `format_type`'s other multi-word names, as SQLBuild's type fallback spells them.
+pub(crate) const POSTGRES_TYPE_SPELLINGS: &[(&str, &str)] = &[
+    ("character varying", "VARCHAR"),
+    ("character", "CHAR"),
+    ("double precision", "DOUBLE"),
+    ("bit varying", "VARBIT"),
+];
 /// The construct of a byte the scanner reads as no token, blank or comment.
 pub(crate) const UNSCANNED_CONSTRUCT: &str = "unscanned text";
 /// The dialect a project with no analysis dialect is named by.

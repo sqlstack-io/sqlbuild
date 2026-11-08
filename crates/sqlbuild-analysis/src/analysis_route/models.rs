@@ -152,6 +152,10 @@ impl LineageSchema for StandInSchema {
 #[derive(Clone, Copy, Debug)]
 pub struct DuckDbDialect;
 
+/// PostgreSQL, whose SQL SQLQuack's PostgreSQL 18 parser reads.
+#[derive(Clone, Copy, Debug)]
+pub struct PostgresDialect;
+
 /// Snowflake, whose SQL SQLQuack's Snowflake parser reads.
 #[derive(Clone, Copy, Debug)]
 pub struct SnowflakeDialect;

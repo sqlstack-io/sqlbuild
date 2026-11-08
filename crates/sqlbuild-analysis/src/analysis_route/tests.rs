@@ -12,6 +12,8 @@ mod test_native_gap;
 mod test_native_outcome;
 #[path = "tests/test_native_revalidation.rs"]
 mod test_native_revalidation;
+#[path = "tests/test_postgres_dialect.rs"]
+mod test_postgres_dialect;
 #[path = "tests/test_type_spelling.rs"]
 mod test_type_spelling;
 #[path = "tests/test_types.rs"]
