@@ -19,7 +19,6 @@ use crate::bindings::_helpers::compiled_project::snapshot_models::model_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_resources::resource_nodes;
 use crate::bindings::_helpers::compiled_project::snapshot_roles::compile_project_roles;
 use crate::bindings::_helpers::compiled_views::project_view::NativeProjectView;
-use crate::bindings::_helpers::location_command::snapshot_lineage::column_lineage_document;
 use crate::bindings::_helpers::native_host::orchestration_declarations::collect_declarations;
 use crate::bindings::_helpers::native_host::orchestration_environment::environment_hash;
 use crate::bindings::_helpers::planner_identity::identities::direct_model_version_identities;
@@ -80,11 +79,7 @@ pub(crate) fn build_orchestration_snapshot(
         )?;
     }
     input = compile_project_roles(py, input, (&project_dir, graph.bind(py).get().graph()))?;
-    let project = project.into_pyobject(py)?;
-    if let Some(lineage) = column_lineage_document(project.as_any())? {
-        input.documents.insert("lineage".into(), lineage);
-    }
-    input.nodes = identity_nodes(project.as_any(), input.nodes)?;
+    input.nodes = identity_nodes(project.into_pyobject(py)?.as_any(), input.nodes)?;
     Ok(NativeOrchestrationSnapshot { input })
 }
 

@@ -30,7 +30,6 @@ use crate::api::_helpers::resources::{
     person_operations::statistics,
     person_operations::fingerprint,
     person_operations::node_status,
-    person_operations::column_lineage,
     person_checks::list,
     person_checks::history,
     person_checks::sql,

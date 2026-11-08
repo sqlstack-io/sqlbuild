@@ -35,7 +35,6 @@ from tests.integration.src.sqlbuild.compiler.compiled_project._test_types import
     SnapshotDiscoveryTestCase,
     SnapshotEnvironmentTestCase,
     SnapshotIdentityTestCase,
-    SnapshotLineageTestCase,
     SnapshotRejectionTestCase,
     SnapshotScheduleTestCase,
 )
@@ -325,59 +324,6 @@ def test_given_invalid_compilation_or_forged_nodes_when_publishing_then_no_snaps
             json.dumps(METADATA | {"nodes": test_case.nodes}),
             tmp_path,
         )
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        SnapshotLineageTestCase(
-            description="published column lineage follows passthroughs, casts and aggregations",
-            files={
-                "sqlbuild_project.toml": 'name = "orders"\nadapter = "duckdb"\n',
-                "models/stg_orders.sql": (
-                    "MODEL (description 'Staged orders.');\n\n"
-                    "SELECT 1 AS order_id, 'eu' AS region, '5.00' AS amount_text\n"
-                ),
-                "models/orders.sql": (
-                    "MODEL (description 'Typed orders.');\n\n"
-                    "SELECT order_id, region, CAST(amount_text AS DECIMAL(10, 2)) AS amount\n"
-                    'FROM __ref("stg_orders")\n'
-                ),
-                "models/region_revenue.sql": (
-                    "MODEL (description 'Revenue by region.');\n\n"
-                    "SELECT region, SUM(amount) AS revenue\n"
-                    'FROM __ref("orders")\nGROUP BY region\n'
-                ),
-            },
-            expected_edges=[
-                ["model:orders", "amount", "model:region_revenue", "revenue", "aggregation"],
-                ["model:orders", "region", "model:region_revenue", "region", "direct"],
-                ["model:stg_orders", "amount_text", "model:orders", "amount", "cast"],
-                ["model:stg_orders", "order_id", "model:orders", "order_id", "direct"],
-                ["model:stg_orders", "region", "model:orders", "region", "direct"],
-            ],
-        ),
-    ],
-    ids=lambda case: case.description,
-)
-def test_given_a_compiled_project_when_publishing_then_its_column_lineage_is_a_snapshot_document(
-    test_case: SnapshotLineageTestCase,
-    tmp_path: Path,
-) -> None:
-    write_files(project_dir=tmp_path, files=test_case.files)
-    project: CompiledProjectView = build_compiled_project(
-        discovered_inputs=discover_project_inputs(project_dir=tmp_path),
-        adapter=DuckDbAdapter(),
-        resolved_connection={"database": "warehouse", "schema": "main"},
-    )
-    publication: dict[str, Any] = json.loads(
-        build_orchestration_snapshot(project, json.dumps(METADATA), tmp_path).to_json()
-    )
-    edges: list[list[str]] = publication["documents"]["lineage"]["edges"]
-    assert sorted(edges) == test_case.expected_edges
-    sources: set[str] = {edge[0] for edge in edges}
-    targets: set[str] = {edge[2] for edge in edges}
-    assert sources | targets <= set(publication["nodes"])
 
 
 @pytest.mark.parametrize(

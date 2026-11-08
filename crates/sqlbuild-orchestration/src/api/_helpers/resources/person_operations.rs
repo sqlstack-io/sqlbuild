@@ -17,13 +17,12 @@ use crate::runs::main::request_rerun::request_rerun;
 use crate::runs::models::{CancelRunRequest, JobRunRequest, RerunRequest, RunRecord};
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
-use crate::warehouse_metadata::main::read_person_column_lineage::read_person_column_lineage;
 use crate::warehouse_metadata::main::read_person_fingerprint::read_person_fingerprint;
 use crate::warehouse_metadata::main::read_person_node_status::read_person_node_status;
 use crate::warehouse_metadata::main::read_person_statistics::read_person_statistics;
 use crate::warehouse_metadata::models::{
-    CatalogPage, CatalogQuery, ColumnLineageRead, FingerprintObservation, FingerprintQuery,
-    NodeStatus, NodeStatusQuery, StatisticsPage, StatisticsQuery, StatisticsRetention,
+    CatalogPage, CatalogQuery, FingerprintObservation, FingerprintQuery, NodeStatus,
+    NodeStatusQuery, StatisticsPage, StatisticsQuery, StatisticsRetention,
 };
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/statistics", operation_id = "readPersonStatistics",
@@ -179,28 +178,6 @@ pub(crate) async fn fingerprint(
             &store,
             (&context, principal),
             (location_id, &target, &options),
-            default_role,
-        )
-        .await?,
-    ))
-}
-
-#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/column-lineage", operation_id = "readPersonColumnLineage",
-    params(("location_id" = Uuid, Path), ("target" = String, Path),
-        ("node_key" = String, Query, description = "The node whose upstream and downstream column lineage to return")),
-    responses((status = 200, body = ColumnLineageRead), (status = 401, description = "Session rejected"),
-        (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
-pub(crate) async fn column_lineage(
-    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(default_role): Extension<DefaultRole>,
-    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<NodeStatusQuery>),
-    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<ColumnLineageRead>, ApiError> {
-    Ok(Json(
-        read_person_column_lineage(
-            &store,
-            (&context, principal),
-            (location_id, &target, &options.node_key),
             default_role,
         )
         .await?,

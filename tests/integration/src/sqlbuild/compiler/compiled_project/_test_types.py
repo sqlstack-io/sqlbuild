@@ -234,13 +234,6 @@ class SnapshotEnvironmentTestCase:
 
 
 @dataclass(frozen=True)
-class SnapshotLineageTestCase:
-    description: str
-    files: dict[str, str]
-    expected_edges: list[list[str]]
-
-
-@dataclass(frozen=True)
 class SnapshotScheduleTestCase:
     description: str
     schedule: Schedule

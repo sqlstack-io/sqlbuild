@@ -645,35 +645,3 @@ pub struct CatalogNodeBuild {
     pub run_id: String,
     pub version_hash: String,
 }
-
-/// A node's columns as its compiled definition infers them; `data_type` is absent when inference could not tell.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct LineageNodeColumns {
-    pub node_key: String,
-    pub kind: String,
-    pub columns: Vec<LineageColumn>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct LineageColumn {
-    pub name: String,
-    pub data_type: Option<String>,
-}
-
-/// One published column lineage edge; `transform` is the compiler's transform kind, such as `direct` or `cast`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ColumnLineageEdge {
-    pub source_key: String,
-    pub source_column: String,
-    pub target_key: String,
-    pub target_column: String,
-    pub transform: String,
-}
-
-/// The column lineage reaching or leaving one node, from the current snapshot; empty before one publishes lineage.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct ColumnLineageRead {
-    pub snapshot_id: Option<Uuid>,
-    pub nodes: Vec<LineageNodeColumns>,
-    pub edges: Vec<ColumnLineageEdge>,
-}
