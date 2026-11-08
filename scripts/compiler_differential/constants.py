@@ -691,10 +691,7 @@ ANALYSIS_INDIRECT_KINDS: dict[str, str] = {
         "the capture does not record the write-schema check itself"
     ),
 }
-ANALYSIS_CODE_SCAN_ROOTS: tuple[str, ...] = (
-    "compile/_helpers/diagnostics",
-    "sql_analysis",
-)
+ANALYSIS_CODE_SCAN_ROOTS: tuple[str, ...] = ("compile/_helpers/diagnostics",)
 ANALYSIS_NATIVE_CODE_SCAN_ROOTS: tuple[str, ...] = (
     "crates/sqlbuild-analysis/src/semantic_checks/constants.rs",
     "crates/sqlbuild-analysis/src/semantic_checks/_helpers/resource_sql/diagnostics.rs",
