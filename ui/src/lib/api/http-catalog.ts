@@ -1,6 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { shortName } from '$lib/build-area/labels';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, StaleReason } from './types/build';
+import { cardStatus } from '$lib/lineage/catalog-graph';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, ColumnLens, ColumnLineage, StaleReason } from './types/build';
 import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
@@ -102,5 +103,30 @@ export function nodeDetailOf(nodes: CatalogNode[], node: CatalogNode, status: Wi
 		warehouse: null,
 		microbatch: null,
 		history: null
+	};
+}
+
+/** A kept name through `direct` or `star` is a passthrough, a new name a rename; every other transform changes the value. */
+function lensOf(edge: Wire['ColumnLineageEdge']): ColumnLens {
+	if (edge.transform !== 'direct' && edge.transform !== 'star') return 'transform';
+	return edge.source_column === edge.target_column ? 'passthrough' : 'rename';
+}
+
+/**
+ * Column lineage around one node, named and coloured from the catalog listing. The read carries no
+ * SQL or expressions, so those stay empty; null before a snapshot publishes lineage for the node.
+ */
+export function toColumnLineage(read: Wire['ColumnLineageRead'], nodes: CatalogNode[]): ColumnLineage | null {
+	if (!read.edges.length) return null;
+	const listed = new Map(nodes.map((n) => [n.key, n]));
+	return {
+		models: read.nodes.flatMap((n) => {
+			const node = listed.get(n.node_key);
+			const columns = n.columns.map((c) => ({ name: c.name, type: c.data_type ?? '' }));
+			return node ? [{ id: n.node_key, name: shortName(n.node_key), kind: node.kind, status: cardStatus(node), columns }] : [];
+		}),
+		edges: read.edges.map((e) => [`${e.source_key}.${e.source_column}`, `${e.target_key}.${e.target_column}`, lensOf(e)]),
+		sql: {},
+		expressions: {}
 	};
 }

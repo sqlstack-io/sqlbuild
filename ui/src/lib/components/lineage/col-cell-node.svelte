@@ -7,7 +7,7 @@
 		model: string;
 		column: string;
 		kind: string;
-		status: 'ok' | 'fail' | 'warn' | 'stale' | 'src';
+		status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none';
 		lens?: Lens;
 		lensLabel?: Record<Lens, string>;
 		focal?: boolean;
@@ -22,7 +22,8 @@
 		fail: 'var(--sb-error)',
 		warn: 'var(--sb-warning)',
 		stale: 'var(--sb-stale)',
-		src: 'var(--sb-text-faint)'
+		src: 'var(--sb-text-faint)',
+		none: 'var(--border)'
 	};
 	const KindIcon = $derived(d.kind === 'view' ? Eye : d.kind.startsWith('source') ? Database : d.kind.startsWith('incremental') ? Layers : Table2);
 	const kindColor = $derived(d.kind === 'view' ? '#5aa9e6' : d.kind === 'table' ? '#2e90ff' : d.kind.startsWith('incremental') ? '#3fb6c9' : '#7c8aa5');

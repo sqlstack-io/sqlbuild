@@ -12,7 +12,7 @@
 	import { highlightSqlbuild } from '$lib/sql/highlight';
 	import { tick } from 'svelte';
 
-	type ColModel = { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src'; columns: { name: string; type: string }[] };
+	type ColModel = { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none'; columns: { name: string; type: string }[] };
 	type Lens = 'raw' | 'passthrough' | 'rename' | 'transform';
 
 	let {
@@ -394,7 +394,7 @@
 				{#if sqlParts && pinnedNode}
 					<div class="dv-sub">SQL · {sqlParts.model}.sql</div>
 					<pre class="dv-sql">{@html sqlParts.before}{#if sqlParts.match}<mark bind:this={markEl}>{@html sqlParts.match}</mark>{/if}{@html sqlParts.after}</pre>
-				{:else}
+				{:else if modelSql && Object.keys(modelSql).length}
 					<p class="dv-hint">Select a step to see it in the model's SQL.</p>
 				{/if}
 			</aside>

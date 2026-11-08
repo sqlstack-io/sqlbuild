@@ -306,6 +306,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/column-lineage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonColumnLineage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/connection-tests": {
         parameters: {
             query?: never;
@@ -1106,6 +1122,21 @@ export interface components {
         CliLoginStartRequest: {
             client_hash: string;
         };
+        /** @description One published column lineage edge; `transform` is the compiler's transform kind, such as `direct` or `cast`. */
+        ColumnLineageEdge: {
+            source_column: string;
+            source_key: string;
+            target_column: string;
+            target_key: string;
+            transform: string;
+        };
+        /** @description The column lineage reaching or leaving one node, from the current snapshot; empty before one publishes lineage. */
+        ColumnLineageRead: {
+            edges: components["schemas"]["ColumnLineageEdge"][];
+            nodes: components["schemas"]["LineageNodeColumns"][];
+            /** Format: uuid */
+            snapshot_id?: string | null;
+        };
         /** @description A row whose key was already stored with different content; the first row is kept. */
         ConflictEvidence: {
             existing_sha256: string;
@@ -1235,6 +1266,16 @@ export interface components {
             run_id: string;
             target: string;
             window?: null | components["schemas"]["RunWindow"];
+        };
+        LineageColumn: {
+            data_type?: string | null;
+            name: string;
+        };
+        /** @description A node's columns as its compiled definition infers them; `data_type` is absent when inference could not tell. */
+        LineageNodeColumns: {
+            columns: components["schemas"]["LineageColumn"][];
+            kind: string;
+            node_key: string;
         };
         /** @description One location target the person can view, with the actions allowed on at least one of its nodes. */
         LocationAccess: {
@@ -2835,6 +2876,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["CheckSql"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPersonColumnLineage: {
+        parameters: {
+            query: {
+                /** @description The node whose upstream and downstream column lineage to return */
+                node_key: string;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnLineageRead"];
                 };
             };
             /** @description Session rejected */

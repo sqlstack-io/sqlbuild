@@ -97,7 +97,7 @@
 		<nav class="crumbs"><a href="/catalog">Catalog</a><span>/</span>{#if n}<a href="/catalog?kind={n.kind}">{nodeKindPlural[n.kind]}</a>{/if}</nav>
 		<div class="title-row">
 			<Glyph size={18} strokeWidth={1.75} />
-			<h2>{name}</h2>
+			<h2 title={name}>{shortName(n?.key ?? name)}</h2>
 			{#if n}
 				{#if n.kind === 'source'}
 					<StatusLabel tone="var(--sb-text-faint)" label="External source" muted />

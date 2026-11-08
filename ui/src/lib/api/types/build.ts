@@ -193,7 +193,7 @@ export type CatalogNodeDetail = Omit<CatalogNode, 'stale' | 'checks'> & {
 export type ColumnLens = 'raw' | 'passthrough' | 'rename' | 'transform';
 
 export type ColumnLineage = {
-	models: { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src'; columns: { name: string; type: string }[] }[];
+	models: { id: string; name: string; kind: string; status: 'ok' | 'fail' | 'warn' | 'stale' | 'src' | 'none'; columns: { name: string; type: string }[] }[];
 	/** `model.column` pairs from upstream to downstream. */
 	edges: [string, string, ColumnLens][];
 	sql: Record<string, string>;
