@@ -197,10 +197,11 @@ its reason:
 | `--target`, `--project-dir` and the `--dbt-*` paths | Workers run the published project for the request's target |
 | `--json`, `--json-output`, `--event-output`, `--manifest`, `--no-color` | Workers own the run's output |
 
-The worker checks `--warehouse` against the warehouses the location configures for the target
-before any statement runs. An unconfigured warehouse fails the run with the reason
-`warehouse WH_L is not configured for target development on this location; no warehouse
-statement ran`, which the run page shows.
+For an ad-hoc run, the worker checks `--warehouse` against the warehouses the location
+configures for the target before any statement runs. An unconfigured warehouse fails the run with
+the reason `the requested warehouse is not configured for this target on this location; no
+warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
+checked this way.
 
 ## Define project roles
 

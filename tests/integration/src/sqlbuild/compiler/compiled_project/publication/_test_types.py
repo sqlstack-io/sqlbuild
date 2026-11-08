@@ -354,3 +354,6 @@ class AdhocRunTestCase:
     expected_reason: str
     expected_statements: bool
     expected_customers_tables: int
+    job_settings: str = ""
+    expected_scheduled_status: str = "success"
+    expected_worker_log: str = ""

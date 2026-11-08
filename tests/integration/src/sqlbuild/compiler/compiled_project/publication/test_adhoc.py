@@ -26,7 +26,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.publication.person
 )
 
 WAREHOUSE_REFUSAL: str = (
-    "warehouse ANALYST_XS is not configured for target development on this location; "
+    "the requested warehouse is not configured for this target on this location; "
     "no warehouse statement ran"
 )
 
@@ -45,7 +45,8 @@ WAREHOUSE_REFUSAL: str = (
             expected_customers_tables=1,
         ),
         AdhocRunTestCase(
-            description="an unconfigured warehouse is refused before any statement, with its reason",
+            description="an unconfigured warehouse is refused before any statement, "
+            "while a published job keeps its authored warehouse",
             person="admin",
             command=["build", "--select", "customers", "--warehouse", "ANALYST_XS"],
             expected_permissions=[["run.adhoc", True], ["run.warehouse", True]],
@@ -53,6 +54,11 @@ WAREHOUSE_REFUSAL: str = (
             expected_reason=WAREHOUSE_REFUSAL,
             expected_statements=False,
             expected_customers_tables=0,
+            # DuckDB has no session warehouse, so the CLI refuses the job's warehouse: the
+            # published job reached the CLI instead of being refused by the worker.
+            job_settings="settings={'warehouse': 'ANALYST_XS'}, ",
+            expected_scheduled_status="failed",
+            expected_worker_log="error[C260]: --warehouse ANALYST_XS was given",
         ),
     ],
     ids=lambda case: case.description,
@@ -70,6 +76,15 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
             "models/customers.sql": (
                 "MODEL (description 'Customers.', materialized table);\nSELECT 1 AS id\n"
             )
+        }
+        | {
+            "orchestration/orders.py": (
+                "from sqlbuild.orchestration import job, schedule\n"
+                'annual_orders = job("annual_orders", select="orders", '
+                f'description="Build orders.", {test_case.job_settings}'
+                'schedule=schedule(cron="0 0 * * *", timezone="UTC", '
+                'starts_at="2000-01-01T00:00:00Z"))\n'
+            )
         },
     )
     with scheduled_worker(
@@ -81,7 +96,9 @@ def test_given_an_ad_hoc_command_when_checked_and_launched_then_the_worker_runs_
         scheduled: dict[str, Any] = wait_for_run(
             worker.api, worker.process, worker.log, job_key="annual_orders"
         )
-        assert scheduled["status"] == "success", worker.log.read_text()
+        assert scheduled["status"] == test_case.expected_scheduled_status, worker.log.read_text()
+        assert scheduled["status_reason"] != WAREHOUSE_REFUSAL, "published jobs are not refused"
+        assert test_case.expected_worker_log in worker.log.read_text()
         admin: dict[str, Any] = provision_person(
             tmp_path / "control", "create-user", "orders-admin"
         )
