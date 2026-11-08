@@ -6,12 +6,11 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_documents::read_snapshot_documents;
-use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 use crate::warehouse_metadata::_helpers::catalog_nodes::{
-    neighbourhood, node_columns, published_edges,
+    neighbourhood, node_columns, published_edges, snapshot_keys, touched_definitions, touched_nodes,
 };
 use crate::warehouse_metadata::models::ColumnLineageRead;
 
@@ -38,14 +37,23 @@ pub async fn read_person_column_lineage(
             edges: Vec::new(),
         });
     };
-    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
+    let (transaction, current) = snapshot_keys(transaction, snapshot.snapshot_id).await?;
     let (transaction, documents) =
         read_snapshot_documents(transaction, snapshot.snapshot_id, Some(&["lineage"])).await?;
+    let edges = neighbourhood(
+        &published_edges(documents.get("lineage"), &current),
+        node_key,
+    );
+    let (transaction, nodes) = touched_definitions(
+        transaction,
+        snapshot.snapshot_id,
+        &touched_nodes(node_key, &edges),
+    )
+    .await?;
     commit(transaction).await?;
-    let edges = neighbourhood(&published_edges(documents.get("lineage"), &nodes), node_key);
     Ok(ColumnLineageRead {
         snapshot_id: Some(snapshot.snapshot_id),
-        nodes: node_columns(&nodes, node_key, &edges),
+        nodes: node_columns(&nodes),
         edges,
     })
 }

@@ -6,7 +6,12 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::sensors::constants::SOURCE_NODE_KIND;
+use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::snapshots::models::SnapshotNode;
+use crate::store::errors::ControlError;
+use crate::store::main::query::query;
+use crate::store::models::{ControlTransaction, Parameter};
+use crate::warehouse_metadata::constants::LINEAGE_DEFINITION_BATCH;
 use crate::warehouse_metadata::models::{
     CatalogNodeBuild, CatalogNodeRecord, CatalogRelation, ColumnLineageEdge, LineageColumn,
     LineageNodeColumns,
@@ -87,7 +92,7 @@ pub(crate) fn catalog_node(
 /// Published edge rows whose both ends are current nodes, so the graph never points at a hidden node.
 pub(crate) fn published_edges(
     document: Option<&Value>,
-    nodes: &BTreeMap<String, SnapshotNode>,
+    nodes: &BTreeSet<String>,
 ) -> Vec<ColumnLineageEdge> {
     let rows = document
         .and_then(|document| document.get("edges"))
@@ -95,7 +100,7 @@ pub(crate) fn published_edges(
     rows.into_iter()
         .flatten()
         .filter_map(edge_row)
-        .filter(|edge| nodes.contains_key(&edge.source_key) && nodes.contains_key(&edge.target_key))
+        .filter(|edge| nodes.contains(&edge.source_key) && nodes.contains(&edge.target_key))
         .collect()
 }
 
@@ -164,18 +169,19 @@ fn end(edge: &ColumnLineageEdge, source: bool) -> (&str, &str) {
     }
 }
 
-/// The inferred columns of the focal node and of every node an edge touches, in node key order.
-pub(crate) fn node_columns(
-    nodes: &BTreeMap<String, SnapshotNode>,
-    node_key: &str,
-    edges: &[ColumnLineageEdge],
-) -> Vec<LineageNodeColumns> {
-    let mut keys: BTreeSet<&str> = BTreeSet::from([node_key]);
+/// The focal node and every node an edge touches, whose definitions the read loads.
+pub(crate) fn touched_nodes(node_key: &str, edges: &[ColumnLineageEdge]) -> BTreeSet<String> {
+    let mut keys: BTreeSet<String> = BTreeSet::from([node_key.to_owned()]);
     for edge in edges {
-        keys.extend([edge.source_key.as_str(), edge.target_key.as_str()]);
+        keys.extend([edge.source_key.clone(), edge.target_key.clone()]);
     }
-    keys.into_iter()
-        .filter_map(|key| nodes.get_key_value(key))
+    keys
+}
+
+/// The inferred columns of each loaded node, in node key order.
+pub(crate) fn node_columns(nodes: &BTreeMap<String, SnapshotNode>) -> Vec<LineageNodeColumns> {
+    nodes
+        .iter()
         .map(|(key, node)| LineageNodeColumns {
             node_key: key.clone(),
             kind: node.kind.clone(),
@@ -199,4 +205,39 @@ fn definition_columns(definition: &Value) -> Vec<LineageColumn> {
             })
         })
         .collect()
+}
+
+/// The snapshot's node keys, without loading any definition.
+pub(crate) async fn snapshot_keys(
+    transaction: ControlTransaction,
+    snapshot_id: Uuid,
+) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
+    let (transaction, rows) = query(
+        transaction,
+        "SELECT node_key FROM sqb_snapshot_nodes WHERE snapshot_id=$1",
+        vec![Parameter::Id(snapshot_id)],
+    )
+    .await?;
+    let keys: BTreeSet<String> = rows
+        .iter()
+        .filter_map(|row| row["node_key"].as_str().map(str::to_owned))
+        .collect();
+    Ok((transaction, keys))
+}
+
+/// The definitions of `keys`, read in bounded batches because a large snapshot's definitions dominate the read.
+pub(crate) async fn touched_definitions(
+    mut transaction: ControlTransaction,
+    snapshot_id: Uuid,
+    keys: &BTreeSet<String>,
+) -> Result<(ControlTransaction, BTreeMap<String, SnapshotNode>), ControlError> {
+    let keys: Vec<&String> = keys.iter().collect();
+    let mut nodes: BTreeMap<String, SnapshotNode> = BTreeMap::new();
+    for batch in keys.chunks(LINEAGE_DEFINITION_BATCH) {
+        let batch: BTreeSet<String> = batch.iter().map(|key| (*key).clone()).collect();
+        let (next, loaded) = read_snapshot_nodes(transaction, snapshot_id, Some(&batch)).await?;
+        transaction = next;
+        nodes.extend(loaded);
+    }
+    Ok((transaction, nodes))
 }

@@ -26,8 +26,10 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
             expected_orders_edges: vec![
                 ("model:raw_orders", "model:orders"),
                 ("model:orders", "model:order_totals"),
+                ("source:shop.raw_orders", "model:raw_orders"),
+                ("seed:currencies", "model:orders"),
             ],
-            expected_leaf_edges: 2,
+            expected_leaf_edges: 4,
         },
         ColumnLineageTestCase {
             description: "PostgreSQL column lineage",
@@ -35,8 +37,10 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
             expected_orders_edges: vec![
                 ("model:raw_orders", "model:orders"),
                 ("model:orders", "model:order_totals"),
+                ("source:shop.raw_orders", "model:raw_orders"),
+                ("seed:currencies", "model:orders"),
             ],
-            expected_leaf_edges: 2,
+            expected_leaf_edges: 4,
         },
     ];
     for test_case in test_cases {
@@ -55,15 +59,24 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
             let location_id = create_location(store, "orders", "test-admin")
                 .await
                 .expect("location");
-            let model = |columns: serde_json::Value| SnapshotNode {
-                kind: "model".into(),
+            let node = |kind: &str, columns: serde_json::Value| SnapshotNode {
+                kind: kind.into(),
                 definition: json!({"materialization": "table", "columns": columns}),
                 raw_sql: Some("select 1 as id".into()),
                 compiled_sql: Some("select 1 as id".into()),
                 python_source: None,
             };
+            let model = |columns: serde_json::Value| node("model", columns);
             let mut input = snapshot(location_id);
             input.nodes = [
+                (
+                    "source:shop.raw_orders",
+                    node("source", json!([{"name": "amount", "type": "VARCHAR"}])),
+                ),
+                (
+                    "seed:currencies",
+                    node("seed", json!([{"name": "code", "type": "VARCHAR"}])),
+                ),
                 (
                     "model:raw_orders",
                     model(json!([{"name": "amount", "type": "VARCHAR"}])),
@@ -88,15 +101,60 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
             .into_iter()
             .map(|(key, node)| (key.to_owned(), node))
             .collect();
-            input.documents.insert(
-                "lineage".into(),
-                json!({"edges": [
-                    ["model:raw_orders", "amount", "model:orders", "amount", "cast"],
-                    ["model:orders", "amount", "model:order_totals", "total", "aggregate"],
-                    ["model:inventory", "quantity", "model:inventory_report", "quantity", "direct"],
-                    ["model:retired_orders", "amount", "model:orders", "amount", "direct"],
-                ]}),
+            // A chain longer than one definition batch, so the read loads definitions in several queries.
+            let chain: Vec<String> = (0..1200).map(|i| format!("model:chain_{i:04}")).collect();
+            for key in &chain {
+                input.nodes.insert(
+                    key.clone(),
+                    model(json!([{"name": "id", "type": "INTEGER"}])),
+                );
+            }
+            let mut edges: Vec<serde_json::Value> = vec![
+                json!([
+                    "model:raw_orders",
+                    "amount",
+                    "model:orders",
+                    "amount",
+                    "cast"
+                ]),
+                json!([
+                    "model:orders",
+                    "amount",
+                    "model:order_totals",
+                    "total",
+                    "aggregate"
+                ]),
+                json!([
+                    "model:inventory",
+                    "quantity",
+                    "model:inventory_report",
+                    "quantity",
+                    "direct"
+                ]),
+                json!([
+                    "model:retired_orders",
+                    "amount",
+                    "model:orders",
+                    "amount",
+                    "direct"
+                ]),
+                json!([
+                    "source:shop.raw_orders",
+                    "amount",
+                    "model:raw_orders",
+                    "amount",
+                    "direct"
+                ]),
+                json!(["seed:currencies", "code", "model:orders", "amount", "join"]),
+            ];
+            edges.extend(
+                chain
+                    .windows(2)
+                    .map(|pair| json!([pair[0], "id", pair[1], "id", "direct"])),
             );
+            input
+                .documents
+                .insert("lineage".into(), json!({ "edges": edges }));
             publish_snapshot(store, &input).await.expect("publish");
             let admin = bootstrap_user(store, &audit, "orders-admin")
                 .await
@@ -126,6 +184,8 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
                     {"node_key": "model:order_totals", "kind": "model", "columns": [{"name": "total", "data_type": null}]},
                     {"node_key": "model:orders", "kind": "model", "columns": [{"name": "amount", "data_type": "DECIMAL(10,2)"}]},
                     {"node_key": "model:raw_orders", "kind": "model", "columns": [{"name": "amount", "data_type": "VARCHAR"}]},
+                    {"node_key": "seed:currencies", "kind": "seed", "columns": [{"name": "code", "data_type": "VARCHAR"}]},
+                    {"node_key": "source:shop.raw_orders", "kind": "source", "columns": [{"name": "amount", "data_type": "VARCHAR"}]},
                 ]),
                 "{}",
                 test_case.description
@@ -137,6 +197,22 @@ fn given_published_column_lineage_when_people_read_a_node_then_only_its_reachabl
                 leaf.edges.len(),
                 test_case.expected_leaf_edges,
                 "{}: upstream is followed transitively",
+                test_case.description
+            );
+            let middle = read("model:chain_0600", admin)
+                .await
+                .expect("chain lineage");
+            assert_eq!(
+                (
+                    middle.edges.len(),
+                    middle
+                        .nodes
+                        .iter()
+                        .filter(|node| node.columns.len() == 1)
+                        .count()
+                ),
+                (1199, 1200),
+                "{}: every touched node's columns load across definition batches",
                 test_case.description
             );
             let stranger = create_principal(store, &audit, "orders-stranger")
