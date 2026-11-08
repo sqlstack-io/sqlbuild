@@ -29,6 +29,7 @@ use crate::api::_helpers::resources::{
     person_reads::ticks,
     person_reads::snapshots,
     person_reads::health,
+    person_reads::problems,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,

@@ -578,6 +578,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/platform/problems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonPlatformProblems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/runs": {
         parameters: {
             query?: never;
@@ -1010,6 +1026,14 @@ export interface components {
          * @enum {string}
          */
         BatchState: "complete" | "gap" | "replay_required";
+        /** @description Every instance of this location target has missed two check-ins. */
+        BrokenLocation: {
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: uuid */
+            location_id: string;
+            target: string;
+        };
         /** @enum {string} */
         BuiltinRole: "viewer" | "operator" | "developer" | "admin";
         /** @description Browser cancellation cannot supply an actor, claim or lifecycle transition. */
@@ -1512,6 +1536,17 @@ export interface components {
          * @enum {string}
          */
         OutputStream: "stdout" | "stderr";
+        /** @description A running schedule whose next tick is more than 30 seconds late. */
+        OverdueTick: {
+            /** Format: uuid */
+            location_id: string;
+            name: string;
+            /** Format: date-time */
+            scheduled_for: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
         PasswordChangeRequest: {
             current_password: string;
             new_password: string;
@@ -1576,6 +1611,12 @@ export interface components {
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
+        /** @description Problems derived from live state when read; nothing here is stored. */
+        PlatformProblems: {
+            broken_locations: components["schemas"]["BrokenLocation"][];
+            overdue_ticks: components["schemas"]["OverdueTick"][];
+            scheduler_leader: boolean;
+        };
         /** @description A changed subject, such as `model:orders` or `role:analyst`, without its content hashes. */
         PublishedChange: {
             change_kind: string;
@@ -3682,6 +3723,33 @@ export interface operations {
             };
             /** @description Trigger not found for a person who may view the whole target */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonPlatformProblems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live scheduler state, and broken locations and late ticks of targets the person lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformProblems"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

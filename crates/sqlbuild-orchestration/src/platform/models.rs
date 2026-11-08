@@ -250,3 +250,35 @@ pub struct PlatformEventEnvelope {
 pub struct PlatformEventPayload {
     pub platform: PlatformEvent,
 }
+
+/// Problems derived from live state when read; nothing here is stored.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PlatformProblems {
+    pub scheduler_leader: bool,
+    pub broken_locations: Vec<BrokenLocation>,
+    pub overdue_ticks: Vec<OverdueTick>,
+}
+
+/// Every instance of this location target has missed two check-ins.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct BrokenLocation {
+    pub location_id: Uuid,
+    pub target: String,
+    pub last_seen_at: DateTime<Utc>,
+}
+
+/// A running schedule whose next tick is more than 30 seconds late.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct OverdueTick {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub target: String,
+    pub scheduled_for: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct LateTarget {
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
+}

@@ -2,6 +2,8 @@
 
 #[path = "helpers.rs"]
 mod helpers;
+#[path = "test_problems.rs"]
+mod test_problems;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_watchdog.rs"]

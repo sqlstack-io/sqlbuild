@@ -12,7 +12,8 @@ use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::declarations::models::{JobRecord, TriggerRecord};
 use crate::platform::main::read_person_location_health::read_person_location_health;
-use crate::platform::models::LocationHealthObservation;
+use crate::platform::main::read_person_problems::read_person_problems;
+use crate::platform::models::{LocationHealthObservation, PlatformProblems};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::RunNodeRecord;
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
@@ -182,6 +183,19 @@ pub(crate) async fn health(
             default_role,
         )
         .await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/platform/problems", operation_id = "readPersonPlatformProblems",
+    responses((status = 200, body = PlatformProblems, description = "Live scheduler state, and broken locations and late ticks of targets the person lists"),
+        (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn problems(
+    State(store): State<ControlStore>,
+    Extension(default_role): Extension<DefaultRole>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<PlatformProblems>, ApiError> {
+    Ok(Json(
+        read_person_problems(&store, principal, default_role).await?,
     ))
 }
 

@@ -51,3 +51,9 @@ pub(crate) struct WebhookState {
     pub(crate) status: u16,
     pub(crate) requests: Vec<PlatformEventEnvelope>,
 }
+
+pub(crate) struct ProblemsTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) leaders: usize,
+}
