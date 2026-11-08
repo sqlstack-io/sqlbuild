@@ -1,5 +1,7 @@
+use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES};
+use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::expressions::statements::models::Command;
-use sqlquack_syntax::{Expression, Parsed};
+use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
 
 use crate::analysis_route::models::{LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
@@ -70,8 +72,48 @@ impl NativeDialect for PivotlessDialect {
         })
     }
 
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &POSTGRES
+    }
+
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         (!spelling.eq_ignore_ascii_case("NOT_A_TYPE")).then(|| normalize_text_type(spelling, None))
+    }
+}
+
+/// DuckDB's shared parser under the DuckDB profile, which knows DuckDB's keyword-only functions, as
+/// MotherDuck projects are analysed.
+pub(super) struct CataloguedDialect;
+
+impl NativeDialect for CataloguedDialect {
+    fn name(&self) -> &'static str {
+        "duckdb"
+    }
+
+    fn stub_prefix(&self) -> &'static str {
+        "__sqlbuild_"
+    }
+
+    fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {
+        parse_strict(sql, Dialect::DuckDB, &ParseOptions::default())
+            .map(|statements| Parsed {
+                statements,
+                gaps: Vec::new(),
+            })
+            .map_err(|failure| ParserGap {
+                construct: failure.to_string(),
+                message: failure.to_string(),
+                offset: 0,
+                syntax: false,
+            })
+    }
+
+    fn profile(&self) -> &'static dyn DialectProfile {
+        &DUCKDB
+    }
+
+    fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
+        PivotlessDialect.normalize_type(spelling)
     }
 }
 
@@ -94,4 +136,20 @@ pub(super) struct TypeMatchTestCase {
     pub(super) inferred: &'static str,
     pub(super) inferred_nullable: bool,
     pub(super) expected_match: TypeMatch,
+}
+
+pub(super) struct FindingTestCase {
+    pub(super) description: &'static str,
+    pub(super) dialect: &'static dyn NativeDialect,
+    pub(super) sql: &'static str,
+    pub(super) extension_functions: &'static [&'static str],
+    /// The code of each finding in order, with its line and column when the parse placed it.
+    pub(super) expected_findings: &'static [(&'static str, Option<(usize, usize)>)],
+}
+
+pub(super) struct MacroBodyTestCase {
+    pub(super) description: &'static str,
+    pub(super) body: &'static str,
+    /// `(construct, offset in the body)` of the gap, when the body is not read.
+    pub(super) expected_gap: Option<(&'static str, usize)>,
 }

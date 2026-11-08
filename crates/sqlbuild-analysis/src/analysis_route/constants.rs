@@ -18,3 +18,11 @@ pub(crate) const SKIPPED_ANALYSIS_CODE: &str = "P026";
 pub(crate) const NULLABLE_WRAPPER: &str = "Nullable";
 /// ClickHouse's top-level dictionary-encoding wrapper, which leaves the column's type as it is.
 pub(crate) const LOW_CARDINALITY_WRAPPER: &str = "LowCardinality";
+/// The finding of a function the dialect's catalogue does not know.
+pub(crate) const UNKNOWN_FUNCTION_CODE: &str = "E202";
+/// The severity of every finding the native analysis reports, as the Polyglot path blocks them.
+pub(crate) const ERROR_SEVERITY: &str = "error";
+/// What `macro_body` puts before a body to read it as the one projection of a query.
+pub(crate) const MACRO_BODY_PREFIX: &str = "SELECT ";
+/// The gap of a macro body that is not one expression.
+pub(crate) const NOT_ONE_EXPRESSION: &str = "not one expression";

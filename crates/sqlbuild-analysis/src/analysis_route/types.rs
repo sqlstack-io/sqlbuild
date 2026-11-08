@@ -1,9 +1,14 @@
 //! What a dialect's native analysis module provides.
 
+use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{Expression, Parsed};
 
-use crate::analysis_route::constants::{MORE_THAN_ONE_STATEMENT, NO_STATEMENT, UNPARSED_STATEMENT};
-use crate::analysis_route::models::{ParserGap, TypeMatch};
+use crate::analysis_route::_helpers::native_analysis::native_analysis;
+use crate::analysis_route::constants::{
+    MACRO_BODY_PREFIX, MORE_THAN_ONE_STATEMENT, NO_STATEMENT, NOT_ONE_EXPRESSION,
+    UNPARSED_STATEMENT,
+};
+use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap, TypeMatch};
 use crate::type_system::models::NormalizedType;
 
 /// A dialect whose SQL SQLQuack analyses in place of Polyglot.
@@ -16,6 +21,9 @@ pub trait NativeDialect: Sync {
 
     /// Every statement of `sql` with the parser's named gaps, or the first error that stops it.
     fn parse(&self, sql: &str) -> Result<Parsed, ParserGap>;
+
+    /// The dialect's sqlquack-semantics profile: how its names resolve, compare and type.
+    fn profile(&self) -> &'static dyn DialectProfile;
 
     /// A type as written in this dialect, as SQLBuild compares types; `None` when the dialect
     /// cannot spell it or its engine refuses it, and nothing is compared against it.
@@ -33,17 +41,39 @@ pub trait NativeDialect: Sync {
             });
         }
         let mut statements = parsed.statements.into_iter();
-        let (Some(statement), None) = (statements.next(), statements.next()) else {
-            let construct: &str = if sql.trim().is_empty() {
-                NO_STATEMENT
-            } else {
-                MORE_THAN_ONE_STATEMENT
-            };
-            return Err(whole_gap(construct, 0));
+        match (statements.next(), statements.next()) {
+            (None, _) => Err(whole_gap(NO_STATEMENT, 0)),
+            (Some(_), Some(_)) => Err(whole_gap(MORE_THAN_ONE_STATEMENT, 0)),
+            (Some(Expression::Command(_)), None) => Err(whole_gap(UNPARSED_STATEMENT, 0)),
+            (Some(statement), None) => Ok(statement),
+        }
+    }
+
+    /// The outputs, lineage and findings of the query `input.sql`, read whole, against
+    /// `input.schema`; findings are in SQLBuild's codes, as the Polyglot path reports them.
+    fn analyse(&self, input: &AnalysisInput<'_>) -> Result<NativeAnalysis, ParserGap> {
+        let statement: Expression = self.read_whole(input.sql)?;
+        Ok(native_analysis(self, &statement, input))
+    }
+
+    /// A macro body's one expression, read as the projection of `SELECT <body>`; a gap's offset
+    /// is in `body`.
+    fn macro_body(&self, body: &str) -> Result<Expression, ParserGap> {
+        let statement: Expression = self
+            .read_whole(&format!("{MACRO_BODY_PREFIX}{body}"))
+            .map_err(|gap| ParserGap {
+                offset: gap.offset.saturating_sub(MACRO_BODY_PREFIX.len()),
+                ..gap
+            })?;
+        let Expression::Select(select) = statement else {
+            return Err(whole_gap(NOT_ONE_EXPRESSION, 0));
         };
-        match statement {
-            Expression::Command(_) => Err(whole_gap(UNPARSED_STATEMENT, 0)),
-            statement => Ok(statement),
+        if select.from.is_some() {
+            return Err(whole_gap(NOT_ONE_EXPRESSION, 0));
+        }
+        match <[Expression; 1]>::try_from(select.expressions) {
+            Ok([expression]) => Ok(expression),
+            Err(_) => Err(whole_gap(NOT_ONE_EXPRESSION, 0)),
         }
     }
 
