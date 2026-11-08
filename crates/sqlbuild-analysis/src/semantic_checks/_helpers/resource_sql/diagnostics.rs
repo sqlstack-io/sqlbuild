@@ -6,6 +6,8 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
+use crate::analysis_route::main::analysis_route::analysis_route;
+use crate::analysis_route::models::AnalysisRoute;
 use crate::semantic_checks::_helpers::explanation::opt_outs::unneeded_opt_out;
 use crate::semantic_checks::_helpers::metadata_checks::positions::{text_position, word_start};
 use crate::semantic_checks::_helpers::resource_sql::help::{HelpContext, resource_sql_help};
@@ -98,11 +100,16 @@ fn binding_request(
 }
 
 /// Python's `_reported_diagnostic`: drop open-relation lookups, make parser rejections P001.
-fn reported(resource: &ResourceSql, finding: &Finding) -> Option<Finding> {
+///
+/// On a native route the analysis gate reads model hooks with the dialect's parser and gives one
+/// it cannot read P026, so Polyglot's rejection of hook SQL is never a P001 there.
+fn reported(resource: &ResourceSql, finding: &Finding, native_hooks: bool) -> Option<Finding> {
     if finding.code != UNKNOWN_TABLE_CODE {
         return Some(finding.clone());
     }
-    if finding.message.starts_with(UNKNOWN_TABLE_PREFIX) {
+    if finding.message.starts_with(UNKNOWN_TABLE_PREFIX)
+        || (native_hooks && resource.kind == ResourceSqlKind::Model)
+    {
         return None;
     }
     Some(Finding {
@@ -134,8 +141,12 @@ fn resource_diagnostics(
     checking: &Checking<'_>,
 ) -> Result<Vec<(Key, ResourceSqlDiagnostic)>, ResourceSqlFailure> {
     let mut found: Vec<(Key, ResourceSqlDiagnostic)> = Vec::new();
+    let native_hooks: bool = matches!(
+        analysis_route(checking.request.dialect.as_deref()),
+        AnalysisRoute::Native(_)
+    );
     for (index, native) in findings.iter().enumerate() {
-        let Some(finding) = reported(resource, native) else {
+        let Some(finding) = reported(resource, native, native_hooks) else {
             continue;
         };
         let span = location(resource, checking.cleaned_sql, &finding)?;
