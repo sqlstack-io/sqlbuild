@@ -4229,6 +4229,20 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Body over its wire or decompressed bound */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Content encoding other than gzip */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     metadata: {
