@@ -69,21 +69,16 @@ _FROM_QUERY_MODELS: tuple[SetOperationModel, ...] = (
     ),
 )
 
-
-def _from_query_models(adapter: str) -> tuple[SetOperationModel, ...]:
-    """The FROM-query models; BigQuery requires DISTINCT or ALL after EXCEPT and INTERSECT."""
-
-    if adapter != "bigquery":
-        return _FROM_QUERY_MODELS
-    return tuple(
-        replace(
-            model,
-            query_sql=model.query_sql.replace("\nEXCEPT\n", "\nEXCEPT DISTINCT\n").replace(
-                "\nINTERSECT\n", "\nINTERSECT DISTINCT\n"
-            ),
-        )
-        for model in _FROM_QUERY_MODELS
+# BigQuery requires DISTINCT or ALL after EXCEPT and INTERSECT.
+_BIGQUERY_FROM_QUERY_MODELS: tuple[SetOperationModel, ...] = tuple(
+    replace(
+        model,
+        query_sql=model.query_sql.replace("\nEXCEPT\n", "\nEXCEPT DISTINCT\n").replace(
+            "\nINTERSECT\n", "\nINTERSECT DISTINCT\n"
+        ),
     )
+    for model in _FROM_QUERY_MODELS
+)
 
 
 @pytest.mark.parametrize(
@@ -250,7 +245,7 @@ def test_given_set_operation_after_subquery_operand_when_compiling_building_and_
         FromQuerySetOperationTestCase(
             description=f"{adapter} FROM query before a set operation",
             adapter=adapter,
-            models=_from_query_models(adapter),
+            models=_BIGQUERY_FROM_QUERY_MODELS if adapter == "bigquery" else _FROM_QUERY_MODELS,
             expected_column_counts=(
                 ("union_all_orders", 2),
                 ("except_orders", 2),
