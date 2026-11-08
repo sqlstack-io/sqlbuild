@@ -150,7 +150,7 @@ def test_given_semantic_scope_when_compiling_then_closed_shapes_are_checked(
             "SELECT 1 AS id",
             'SELECT id FROM __ref("upstream") WHERE SUM(id) > 0',
             "B231",
-            expected_column=44,
+            expected_column=40,
         ),
         SemanticCompileCase(
             "count star after macro",
