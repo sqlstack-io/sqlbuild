@@ -189,12 +189,13 @@ pub(crate) fn normalize_native_sql(
     sql: &str,
     dialect: &str,
     stub_prefix: &str,
+    line_comment_prefixes: &[&str],
 ) -> Result<String, String> {
     let none: HashMap<String, String> = HashMap::new();
     let udf_prefix: String = format!("{stub_prefix}udf_");
     let normalized: String = normalize(sql, dialect, (&none, &none), &udf_prefix)?.sql;
     let stubs: &Regex = NATIVE_STUBS.as_ref()?;
-    let non_code: Vec<(usize, usize)> = non_code_ranges(&normalized)?;
+    let non_code: Vec<(usize, usize)> = non_code_ranges(&normalized, line_comment_prefixes)?;
     let mut native: String = String::with_capacity(normalized.len());
     let mut copied_until: usize = 0;
     for captures in stubs.captures_iter(&normalized) {
@@ -227,11 +228,26 @@ pub(crate) fn normalize_native_sql(
 }
 
 /// The byte ranges of `sql`'s strings, quoted identifiers and comments, in order.
-fn non_code_ranges(sql: &str) -> Result<Vec<(usize, usize)>, String> {
+fn non_code_ranges(
+    sql: &str,
+    line_comment_prefixes: &[&str],
+) -> Result<Vec<(usize, usize)>, String> {
     let mut ranges: Vec<(usize, usize)> = Vec::new();
     let mut index: usize = 0;
     while index < sql.len() {
-        if let Some(end) = skip_non_code(sql, index)? {
+        let non_code_end: Option<usize> = if line_comment_prefixes
+            .iter()
+            .any(|prefix| sql[index..].starts_with(prefix))
+        {
+            Some(
+                sql[index..]
+                    .find('\n')
+                    .map_or(sql.len(), |offset| index + offset + 1),
+            )
+        } else {
+            skip_non_code(sql, index)?
+        };
+        if let Some(end) = non_code_end {
             ranges.push((index, end));
             index = end;
             continue;

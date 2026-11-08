@@ -136,7 +136,8 @@ fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names
     ];
     for test_case in test_cases {
         assert_eq!(
-            normalize_native_sql(test_case.sql, "postgres", "__sqlbuild.").as_deref(),
+            normalize_native_sql(test_case.sql, "postgres", "__sqlbuild.", &["--", "//"])
+                .as_deref(),
             Ok(test_case.expected_sql),
             "{}",
             test_case.description

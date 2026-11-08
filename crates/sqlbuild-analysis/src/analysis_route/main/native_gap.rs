@@ -12,8 +12,12 @@ pub fn native_gap(
     dialect: &dyn NativeDialect,
     check: &SyntaxCheck,
 ) -> Result<Option<LocatedGap>, String> {
-    let normalised: String =
-        normalize_native_sql(&check.sql, dialect.name(), dialect.stub_prefix())?;
+    let normalised: String = normalize_native_sql(
+        &check.sql,
+        dialect.name(),
+        dialect.stub_prefix(),
+        dialect.line_comment_prefixes(),
+    )?;
     let analysed: String = placeholder_defaults(&normalised, &check.placeholders);
     Ok(dialect
         .read_whole(&analysed)

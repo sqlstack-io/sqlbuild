@@ -29,10 +29,14 @@ pub(crate) const ERROR_SEVERITY: &str = "error";
 pub(crate) const MACRO_BODY_PREFIX: &str = "SELECT ";
 /// The gap of a macro body that is not one expression.
 pub(crate) const NOT_ONE_EXPRESSION: &str = "not one expression";
+/// The prefixes that start a line comment in a native dialect that names no others.
+pub(crate) const LINE_COMMENT_PREFIXES: &[&str] = &["--", "//"];
 /// ClickHouse's analysis dialect name.
 pub(crate) const CLICKHOUSE_DIALECT: &str = "clickhouse";
 /// The stub prefix ClickHouse reads as one unquoted name.
 pub(crate) const CLICKHOUSE_STUB_PREFIX: &str = "__sqlbuild_";
+/// ClickHouse's line comment prefixes: `#` opens one only before a space or `!`.
+pub(crate) const CLICKHOUSE_LINE_COMMENT_PREFIXES: &[&str] = &["--", "# ", "#!", "//"];
 /// Polyglot's ClickHouse respelling of each SQL type alias (`{}` keeps the arguments) and family.
 pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str, Option<TypeFamily>)] = &[
     ("BOOLEAN", "Bool", None),

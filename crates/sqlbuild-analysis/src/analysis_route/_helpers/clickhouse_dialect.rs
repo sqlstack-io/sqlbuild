@@ -9,7 +9,9 @@ use sqlquack_syntax_clickhouse::parse_strict;
 use crate::analysis_route::_helpers::clickhouse_types::{
     clickhouse_spelling, clickhouse_type_match,
 };
-use crate::analysis_route::constants::{CLICKHOUSE_DIALECT, CLICKHOUSE_STUB_PREFIX};
+use crate::analysis_route::constants::{
+    CLICKHOUSE_DIALECT, CLICKHOUSE_LINE_COMMENT_PREFIXES, CLICKHOUSE_STUB_PREFIX,
+};
 use crate::analysis_route::models::{ClickHouseDialect, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::models::NormalizedType;
@@ -21,6 +23,10 @@ impl NativeDialect for ClickHouseDialect {
 
     fn stub_prefix(&self) -> &'static str {
         CLICKHOUSE_STUB_PREFIX
+    }
+
+    fn line_comment_prefixes(&self) -> &'static [&'static str] {
+        CLICKHOUSE_LINE_COMMENT_PREFIXES
     }
 
     fn parse(&self, sql: &str) -> Result<Parsed, ParserGap> {

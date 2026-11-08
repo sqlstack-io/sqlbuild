@@ -6,8 +6,8 @@ use sqlquack_syntax::{Expression, Parsed};
 use crate::analysis_route::_helpers::native_analysis::native_analysis;
 use crate::analysis_route::_helpers::whole_gap::whole_gap;
 use crate::analysis_route::constants::{
-    MACRO_BODY_PREFIX, MORE_THAN_ONE_STATEMENT, NO_STATEMENT, NOT_ONE_EXPRESSION,
-    UNPARSED_STATEMENT,
+    LINE_COMMENT_PREFIXES, MACRO_BODY_PREFIX, MORE_THAN_ONE_STATEMENT, NO_STATEMENT,
+    NOT_ONE_EXPRESSION, UNPARSED_STATEMENT,
 };
 use crate::analysis_route::models::{AnalysisInput, NativeAnalysis, ParserGap, TypeMatch};
 use crate::type_system::models::NormalizedType;
@@ -19,6 +19,11 @@ pub trait NativeDialect: Sync {
 
     /// The engine-accepted prefix of UDF and cursor stubs: `__sqlbuild_`, or `__sqlbuild.` for T-SQL.
     fn stub_prefix(&self) -> &'static str;
+
+    /// The prefixes that start a line comment, whose text the gap gate does not read as code.
+    fn line_comment_prefixes(&self) -> &'static [&'static str] {
+        LINE_COMMENT_PREFIXES
+    }
 
     /// Every statement of `sql` with the parser's named gaps, or the first error that stops it.
     fn parse(&self, sql: &str) -> Result<Parsed, ParserGap>;

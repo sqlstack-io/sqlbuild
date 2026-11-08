@@ -133,6 +133,18 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
             expected_gap: None,
         },
         NativeGapTestCase {
+            description: "an apostrophe in a hash comment opens no string",
+            sql: "WITH o AS (SELECT 1 AS id)\n# don't keep the star\nSELECT * FROM o",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
+            description: "an apostrophe in a shebang comment opens no string",
+            sql: "SELECT * FROM t #!it's\n",
+            placeholders: &[],
+            expected_gap: None,
+        },
+        NativeGapTestCase {
             description: "a FROM after FROM is a table name, as ClickHouse reads it",
             sql: "SELECT 1 FROM FROM",
             placeholders: &[],
