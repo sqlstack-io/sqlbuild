@@ -7,20 +7,28 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde_json::{Map, Value};
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 use sqlbuild_core::panics::main::native_failure::native_failure;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
+use sqlquack_syntax::{CallMode, Dialect, Expression, ParseOptions};
 
 use crate::assembly::analysis_session::_helpers::dict_walk::{
     casefold, column_name, dict_list, identifier_name, is_single_wildcard, nested, node_key,
-    parse_one_or_error, payload, relation_name, render_type, to_dict, truthy, upper,
+    payload, relation_name, render_type, truthy, upper,
 };
 use crate::assembly::analysis_session::constants::{
-    ALIAS_AST_KIND, CAST_AST_KIND, DUCKDB_DIALECT, DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT,
-    PIVOT_AST_KIND, QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS,
-    SUPPORTED_PIVOT_DIALECTS, TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY, UNKNOWN_TYPE,
+    ALIAS_AST_KIND, CAST_AST_KIND, COLUMN_AST_KIND, DEPENDENCY_FUNCTION_NAMES, DUCKDB_DIALECT,
+    DYNAMIC_VALUE_SOURCE_KINDS, MOTHERDUCK_DIALECT, PIVOT_AST_KIND, PIVOT_MAX_AST_DEPTH,
+    QUERY_AST_KINDS, SELECT_AST_KIND, SIMPLIFIED_PIVOT_DIALECTS, SNOWFLAKE_DIALECT,
+    SUPPORTED_PIVOT_DIALECTS, TABLE_AST_KIND, TYPE_PRESERVING_AGGREGATES, UNKNOWN_NULLABILITY,
+    UNKNOWN_TYPE,
 };
 use crate::assembly::analysis_session::models::{
     ColumnFact, ContractProof, DynamicFamily, PivotModel, PivotOutcome, PivotTables,
 };
 use crate::assembly::analysis_session::types::Shapes;
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
+use crate::relation_markers::main::markers_as_names::markers_as_names;
+use crate::relation_markers::types::MarkerCall;
+use crate::sql_tree::main::deeper_than::deeper_than;
 use sqlbuild_core::constants::CTE_AST_KIND;
 
 /// What an internal native failure of a pivot proof names.
@@ -115,11 +123,81 @@ pub(crate) fn pivot_outcome(
     .map_err(|reason| native_failure(PIVOT_CONTEXT, &reason))
 }
 
-/// Python's `parse_one(...).to_dict()`, or the parse error Python reports.
+/// The one statement of `sql` as SQLQuack's tagged JSON tree, marker relations as their names.
 fn parsed(sql: &str, dialect: &str) -> Result<Result<Value, String>, String> {
-    parse_one_or_error(sql, dialect)?
-        .map(|expression| to_dict(&expression))
-        .map_or_else(|error| Ok(Err(error)), |value| value.map(Ok))
+    let (lexical_dialect, dialect): (&str, Dialect) = if dialect == SNOWFLAKE_DIALECT {
+        (SNOWFLAKE_DIALECT, Dialect::Snowflake)
+    } else {
+        (DUCKDB_DIALECT, Dialect::DuckDB)
+    };
+    let (named, calls) = markers_as_names(sql, &dialect_lexical_syntax(lexical_dialect))?;
+    let parsed = sqlquack_syntax::parse_statements_with(
+        &named,
+        dialect,
+        &ParseOptions::default(),
+        CallMode::Faithful,
+    );
+    let mut statements: Vec<Expression> = match parsed {
+        Ok(statements) => statements,
+        Err(error) => return Ok(Err(error.to_string())),
+    };
+    if statements.len() != 1 {
+        return Ok(Err(format!(
+            "Expected 1 statement, found {}",
+            statements.len()
+        )));
+    }
+    let statement: Expression = statements.pop().ok_or_else(|| "no statement".to_owned())?;
+    if deeper_than(&statement, PIVOT_MAX_AST_DEPTH) {
+        return Ok(Err(format!(
+            "E_GUARD_AST_DEPTH_EXCEEDED: value {} exceeds configured limit {PIVOT_MAX_AST_DEPTH}",
+            PIVOT_MAX_AST_DEPTH + 1
+        )));
+    }
+    let mut root: Value = serde_json::to_value(statement).map_err(|error| error.to_string())?;
+    name_marker_tables(&mut root, &calls);
+    Ok(Ok(root))
+}
+
+/// Each `__ref`, `__source` or `__seed` marker, a table or column node, renamed to the relation its call names.
+fn name_marker_tables(root: &mut Value, calls: &[MarkerCall]) {
+    let mut stack: Vec<&mut Value> = vec![root];
+    while let Some(node) = stack.pop() {
+        match node {
+            Value::Object(object) => {
+                for kind in [TABLE_AST_KIND, COLUMN_AST_KIND] {
+                    if let Some(Value::Object(relation)) = object.get_mut(kind) {
+                        rename_marker(relation.get_mut("name"), calls);
+                    }
+                }
+                stack.extend(object.values_mut());
+            }
+            Value::Array(items) => stack.extend(items.iter_mut()),
+            _ => {}
+        }
+    }
+}
+
+/// The marker name in `name`, a plain string or an identifier object, replaced by its call's relation.
+fn rename_marker(name: Option<&mut Value>, calls: &[MarkerCall]) {
+    let text: Option<&mut Value> = match name {
+        Some(Value::Object(identifier)) => identifier.get_mut("name"),
+        other => other,
+    };
+    let Some(Value::String(text)) = text else {
+        return;
+    };
+    let Some(Ok(index)) = text
+        .strip_prefix(MARKER_NAME_PREFIX)
+        .map(str::parse::<usize>)
+    else {
+        return;
+    };
+    if let Some((function, relation)) = calls.get(index)
+        && DEPENDENCY_FUNCTION_NAMES.contains(&function.as_str())
+    {
+        *text = relation.clone();
+    }
 }
 
 fn proof(
@@ -362,6 +440,18 @@ fn has_dynamic_values(field: &Value) -> bool {
         .any(|value| DYNAMIC_VALUE_SOURCE_KINDS.contains(&node_key(Some(value))))
 }
 
+/// The one argument of a call SQLQuack keeps by name, such as Snowflake's `SUM(amount)`.
+fn sole_argument(payload: &Map<String, Value>) -> Option<&Value> {
+    match payload
+        .get("args")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+    {
+        Some([argument]) => Some(argument),
+        _ => None,
+    }
+}
+
 /// Python's `_aggregate_fact`: aggregate name, value column and type-preserving inferred type.
 fn aggregate_fact<'a>(
     aggregate: &'a Value,
@@ -380,7 +470,7 @@ fn aggregate_fact<'a>(
         name = upper(authored);
     }
     let preserving: bool = TYPE_PRESERVING_AGGREGATES.contains(&name.as_str());
-    let value: Option<&Value> = payload.get("this");
+    let value: Option<&Value> = payload.get("this").or_else(|| sole_argument(payload));
     let mut value_name: Option<&str> = column_name(value);
     let mut inferred: Option<String> = None;
     let cast: Option<&Map<String, Value>> = value
