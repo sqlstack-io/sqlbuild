@@ -13,7 +13,15 @@ class GeneratedLineageParityTestCase:
     dialects: tuple[str | None, ...]
     expected_minimum_native: int
     expected_minimum_parsed: int
-    expected_minimum_star_expansions: int
+
+
+@dataclass(frozen=True)
+class RootStarLineageTestCase:
+    """A root star over a model without SQL analysis, whose facts leave the star to fast lineage."""
+
+    description: str
+    dialect: str | None
+    expected_star_expansions: int
 
 
 @dataclass(frozen=True)

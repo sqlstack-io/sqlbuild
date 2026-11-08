@@ -38,6 +38,7 @@ fn given_model_sql_when_probing_a_dialects_parser_then_only_sql_it_reads_whole_h
                 line: 1,
                 column: 15,
                 syntax: true,
+                source_offset: Some(14),
             }),
         },
         ArmGapTestCase {
@@ -51,6 +52,7 @@ fn given_model_sql_when_probing_a_dialects_parser_then_only_sql_it_reads_whole_h
                 line: 3,
                 column: 9,
                 syntax: true,
+                source_offset: Some(24),
             }),
         },
         ArmGapTestCase {
@@ -64,6 +66,7 @@ fn given_model_sql_when_probing_a_dialects_parser_then_only_sql_it_reads_whole_h
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
         ArmGapTestCase {
@@ -98,6 +101,7 @@ fn given_model_sql_when_probing_a_dialects_parser_then_only_sql_it_reads_whole_h
                 line: 1,
                 column: 15,
                 syntax: false,
+                source_offset: Some(14),
             }),
         },
         ArmGapTestCase {
@@ -111,6 +115,7 @@ fn given_model_sql_when_probing_a_dialects_parser_then_only_sql_it_reads_whole_h
                 line: 1,
                 column: 1,
                 syntax: false,
+                source_offset: Some(0),
             }),
         },
     ];
