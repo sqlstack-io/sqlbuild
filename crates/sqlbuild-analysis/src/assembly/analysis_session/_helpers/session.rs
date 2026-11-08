@@ -4,9 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use rayon::ThreadPool;
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
@@ -34,7 +32,9 @@ use crate::assembly::analysis_session::_helpers::mappings::{
     ShapeTable, dict_from_pairs, same_keys, same_relations,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
-use crate::assembly::analysis_session::_helpers::native_outcome::native_outcome;
+use crate::assembly::analysis_session::_helpers::native_outcome::{
+    native_cleaned_sql, native_outcome,
+};
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
 use crate::assembly::analysis_session::main::resolved_cleaned_sql::resolved_cleaned_sql;
 use crate::assembly::analysis_session::models::{
@@ -232,14 +232,14 @@ impl AnalysisSession {
 
     /// Python's `_analyze_model_sql_requests` for one wave, less the models the cache answers.
     fn analyze_wave(&mut self, models: &[usize]) -> Result<(), String> {
-        if let AnalysisRoute::Native(dialect) = self.route() {
-            return self.analyze_native_wave(dialect, models);
-        }
         let schemas: Vec<Shapes> = models
             .iter()
             .map(|model| self.binding_schema(&self.request.models[*model]))
             .collect();
         let misses: Vec<usize> = self.read_cache(models, &schemas)?;
+        if let AnalysisRoute::Native(dialect) = self.route() {
+            return self.analyze_native_wave(dialect, models, &misses, &schemas);
+        }
         let batch = Batch {
             dialect: &self.request.dialect,
             function_return_types: &self.request.function_return_types,
@@ -303,30 +303,29 @@ impl AnalysisSession {
         self.check_sql_macros(models)
     }
 
-    /// Each model of the wave analysed by its dialect's native module, in parallel.
+    /// Each model of the wave the cache did not answer, analysed by its dialect's native module.
     fn analyze_native_wave(
         &mut self,
         dialect: &'static dyn NativeDialect,
         models: &[usize],
+        misses: &[usize],
+        schemas: &[Shapes],
     ) -> Result<(), String> {
-        let inputs: Vec<(usize, Shapes)> = models
-            .iter()
-            .map(|model| (*model, self.binding_schema(&self.request.models[*model])))
-            .collect();
         let pool = self.catalog.native.analysis_pool()?;
         let request: &SessionRequest = &self.request;
         let nullability: &ShapeTable = &self.available_nullability;
         let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
-            inputs
-                .into_par_iter()
-                .map(|(model, schema)| {
-                    native_outcome(dialect, &request.models[model], (schema, nullability))
+            misses
+                .par_iter()
+                .map(|position| {
+                    let model: &ModelRequest = &request.models[models[*position]];
+                    native_outcome(dialect, model, (schemas[*position].clone(), nullability))
                 })
                 .collect()
         });
-        for (model, (outcome, failure)) in models.iter().zip(outcomes) {
+        for (position, (outcome, failure)) in misses.iter().zip(outcomes) {
             self.failures.extend(failure);
-            self.outcomes[*model] = Some(outcome);
+            self.outcomes[models[*position]] = Some(outcome);
         }
         self.check_sql_macros(models)
     }
@@ -584,22 +583,8 @@ impl AnalysisSession {
         let Some(mut cache) = self.cache.take() else {
             return Ok((0..models.len()).collect());
         };
-        let mut required: Vec<String> = Vec::new();
-        let mut seen: HashSet<&str> = HashSet::new();
-        for model in models {
-            for reference in &self.request.models[*model].references {
-                if seen.insert(reference.analysis_name.as_str()) {
-                    required.push(reference.analysis_name.clone());
-                }
-            }
-        }
-        self.catalog.prepare_analysis(
-            &required,
-            &self.available_types,
-            &self.available_nullability,
-        );
-        for schema in schemas {
-            let _ = self.catalog.prepare(&[("", schema)]);
+        if matches!(self.route(), AnalysisRoute::Legacy) {
+            self.prepare_catalog(models, schemas);
         }
         let pool: Arc<ThreadPool> = self.catalog.native.analysis_pool()?;
         let session_digest: ContentDigest = cache.session_digest;
@@ -663,7 +648,28 @@ impl AnalysisSession {
         Ok(misses)
     }
 
-    /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
+    /// Load the relations and schemas a Polyglot analysis of `models` reads into its catalog.
+    fn prepare_catalog(&mut self, models: &[usize], schemas: &[Shapes]) {
+        let mut required: Vec<String> = Vec::new();
+        let mut seen: HashSet<&str> = HashSet::new();
+        for model in models {
+            for reference in &self.request.models[*model].references {
+                if seen.insert(reference.analysis_name.as_str()) {
+                    required.push(reference.analysis_name.clone());
+                }
+            }
+        }
+        self.catalog.prepare_analysis(
+            &required,
+            &self.available_types,
+            &self.available_nullability,
+        );
+        for schema in schemas {
+            let _ = self.catalog.prepare(&[("", schema)]);
+        }
+    }
+
+        /// Normalize the cleaned SQL of the cache hits among `models` that still lack it.
     fn ensure_cleaned(&mut self, models: &[usize]) -> Result<(), String> {
         let pending: Vec<usize> = models
             .iter()
@@ -671,6 +677,15 @@ impl AnalysisSession {
             .filter(|model| self.pending_cleaned[*model])
             .collect();
         if pending.is_empty() {
+            return Ok(());
+        }
+        if let AnalysisRoute::Native(dialect) = self.route() {
+            for model in pending {
+                let sql: String =
+                    native_cleaned_sql(dialect, &self.request.models[model]).unwrap_or_default();
+                self.outcome_mut(model)?.cleaned_sql = sql;
+                self.pending_cleaned[model] = false;
+            }
             return Ok(());
         }
         let schemas: Vec<Shapes> = pending

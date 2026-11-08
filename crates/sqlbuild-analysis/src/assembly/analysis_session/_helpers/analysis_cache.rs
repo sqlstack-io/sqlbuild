@@ -7,7 +7,6 @@ use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::errors::StoreDecodeError;
 use sqlbuild_cache::store::models::NativeStore;
 
-use crate::analysis_route::models::AnalysisRoute;
 use crate::assembly::analysis_session::constants::{
     ANALYSIS_CACHE_FORMAT, VARINT_CONTINUATION, VARINT_MAX_BYTES, VARINT_PAYLOAD_BITS,
     VARINT_PAYLOAD_MASK,
@@ -28,9 +27,6 @@ pub(crate) type CachedOutcome = (ModelOutcome, Option<ContentDigest>);
 impl AnalysisSession {
     /// Read and fill `store`; its environment already names the build and Python's settings.
     pub(crate) fn attach_cache(&mut self, store: NativeStore) {
-        if matches!(self.route(), AnalysisRoute::Native(_)) {
-            return;
-        }
         let models: usize = self.request.models.len();
         self.cache = Some(AnalysisCache {
             store,

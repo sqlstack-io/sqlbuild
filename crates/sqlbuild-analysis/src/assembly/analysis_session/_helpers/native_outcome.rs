@@ -21,24 +21,22 @@ pub(crate) fn native_outcome(
     model: &ModelRequest,
     (schema, nullability): (Shapes, &ShapeTable),
 ) -> (ModelOutcome, Option<String>) {
-    let normalised: Result<String, String> =
-        normalize_native_sql(&model.query_sql, dialect.name(), dialect.stub_prefix());
-    let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) = match normalised {
-        Ok(normalised) => {
-            let sql: String = placeholder_defaults(&normalised, &model.placeholders);
-            let relations: SessionSchema = session_schema(&schema, nullability);
-            let analysed = dialect
-                .analyse(&AnalysisInput {
-                    sql: &sql,
-                    schema: &relations,
-                    references: &model.lineage_references,
-                    extension_functions: &[],
-                })
-                .map_err(|gap: ParserGap| gap.message);
-            (sql, analysed)
-        }
-        Err(reason) => (String::new(), Err(reason)),
-    };
+    let (cleaned_sql, analysed): (String, Result<NativeAnalysis, String>) =
+        match native_cleaned_sql(dialect, model) {
+            Ok(sql) => {
+                let relations: SessionSchema = session_schema(&schema, nullability);
+                let analysed = dialect
+                    .analyse(&AnalysisInput {
+                        sql: &sql,
+                        schema: &relations,
+                        references: &model.lineage_references,
+                        extension_functions: &[],
+                    })
+                    .map_err(|gap: ParserGap| gap.message);
+                (sql, analysed)
+            }
+            Err(reason) => (String::new(), Err(reason)),
+        };
     let failure: Option<String> = analysed
         .as_ref()
         .err()
@@ -72,6 +70,15 @@ pub(crate) fn native_outcome(
         sql_macro_findings: Vec::new(),
     };
     (outcome, failure)
+}
+
+/// The model's SQL as its dialect's parser reads it: stubs respelt and placeholders filled.
+pub(crate) fn native_cleaned_sql(
+    dialect: &dyn NativeDialect,
+    model: &ModelRequest,
+) -> Result<String, String> {
+    normalize_native_sql(&model.query_sql, dialect.name(), dialect.stub_prefix())
+        .map(|normalised| placeholder_defaults(&normalised, &model.placeholders))
 }
 
 /// Each relation with a known shape, its columns typed and with the nullability the session knows.
