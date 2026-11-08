@@ -459,6 +459,18 @@ fn given_dynamic_pivots_when_proving_then_matches_python_or_defers() {
             ),
         },
         PivotTestCase {
+            description: "a Snowflake passthrough reads its relation marker as the relation",
+            dialect: "snowflake",
+            sql: "SELECT * FROM __ref(\"status_amounts\")",
+            family: Some(("status", "amount", "MAX")),
+            expected_outcome: proven(
+                &[("customer_id", "INTEGER", "unknown")],
+                Some("DOUBLE"),
+                "status_amounts",
+                false,
+            ),
+        },
+        PivotTestCase {
             description: "a passthrough redeclaring the upstream families",
             dialect: "duckdb",
             sql: "SELECT * FROM __ref(\"status_amounts\")",
