@@ -24,6 +24,7 @@ _ADAPTER_CONTEXT: CompileAdapterContext = CompileAdapterContext(
     collection_rendering=CollectionRendering.VALUE_LIST,
     python_functions_inherit_default_namespace=True,
     sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+    sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
 )
 _PROJECT: str = (
     'name = "orders_project"\nadapter = "duckdb"\n\n'

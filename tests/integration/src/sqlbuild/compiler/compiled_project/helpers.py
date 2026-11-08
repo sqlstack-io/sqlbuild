@@ -337,6 +337,7 @@ def build_inputs_with_native_loop(
             collection_rendering=CollectionRendering.VALUE_LIST,
             python_functions_inherit_default_namespace=True,
             sql_lexical_syntax=DuckDbAdapter.sql_lexical_syntax,
+            sql_analysis_dialect=DuckDbAdapter.sql_analysis_dialect_name,
         ),
         defer_model_sql_validation=defer_validation,
         no_cache=True,
