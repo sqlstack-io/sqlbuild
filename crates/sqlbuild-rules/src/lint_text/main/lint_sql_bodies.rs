@@ -5,12 +5,12 @@ use std::collections::HashMap;
 use serde_json::Value;
 
 use crate::lint_text::_helpers::sql_diagnostics::{
-    AuthoredFile, authored_diagnostic, parse_failure, response_diagnostics, without_generated_frame,
+    AuthoredFile, LintResult, body_diagnostics, response_diagnostics, unavailable_once_per_file,
 };
 use crate::lint_text::_helpers::sql_requests::{lint_payload, omitted_select, run_batch};
 use crate::lint_text::models::{AuthoredDiagnostic, LintSqlBody, LintSqlOptions};
 
-/// Lint every body once per distinct request and map each diagnostic onto its authored file.
+/// Lint each distinct request once and map its diagnostics, or one unavailable warning per file, onto source.
 pub fn lint_sql_bodies(
     bodies: &[LintSqlBody],
     files: &[&str],
@@ -30,31 +30,20 @@ pub fn lint_sql_bodies(
         }
         request_of_body.push(index);
     }
-    let responses: Vec<Result<Vec<Value>, String>> = run_batch(&payloads)
+    let responses: Vec<Result<LintResult, String>> = run_batch(&payloads)
         .map(|responses| responses.iter().map(response_diagnostics).collect())
         .unwrap_or_else(|error| vec![Err(error); payloads.len()]);
     let authored: Vec<AuthoredFile<'_>> = files
         .iter()
         .map(|text| AuthoredFile::new(text, &options.dialect))
         .collect();
-    let mut diagnostics: Vec<AuthoredDiagnostic> = Vec::new();
-    for ((body, offset), request) in bodies.iter().zip(omitted).zip(request_of_body) {
-        let file: &AuthoredFile<'_> = &authored[body.file];
-        let raw: Vec<Value> = match &responses[request] {
-            Ok(raw) => raw.clone(),
-            Err(message) => {
-                diagnostics.push(parse_failure(message, body, file));
-                continue;
-            }
-        };
-        let raw: Vec<Value> = without_generated_frame(raw, body, offset);
-        for item in &raw {
-            match authored_diagnostic(item, body, file) {
-                Ok(Some(diagnostic)) => diagnostics.push(diagnostic),
-                Ok(None) => {}
-                Err(message) => diagnostics.push(parse_failure(&message, body, file)),
-            }
-        }
-    }
-    diagnostics
+    let diagnostics: Vec<AuthoredDiagnostic> = bodies
+        .iter()
+        .zip(omitted)
+        .zip(request_of_body)
+        .flat_map(|((body, offset), request)| {
+            body_diagnostics(&responses[request], (body, offset), &authored[body.file])
+        })
+        .collect();
+    unavailable_once_per_file(diagnostics)
 }

@@ -180,6 +180,13 @@ class RankingSortDefaultCase:
 
 
 @dataclass(frozen=True)
+class ReplayedFindingExitCase:
+    description: str
+    code: str
+    expected_exit: int
+
+
+@dataclass(frozen=True)
 class FixableReportingCase:
     description: str
     summary_sql: str
