@@ -5,6 +5,7 @@ use crate::query_facts::constants::{
 use crate::query_facts::models::{CallKind, ModelCall, ModelShape};
 use crate::rules::main::compact_sql::compact_sql;
 use sqlbuild_analysis::semantic_validation::main::normalize_mapped::normalize_mapped;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
 use sqlbuild_sqltext::sql_scan::main::quote_policy::quote_policy;
@@ -15,7 +16,7 @@ pub(crate) fn model_shape(sql: &str, dialect: &str) -> Result<ModelShape, String
         dollar_quotes: true,
         ..quote_policy(dialect)
     };
-    let (stubbed, stub_offsets, calls) = stub_calls(sql, policy, &lexical_syntax(dialect));
+    let (stubbed, stub_offsets, calls) = stub_calls(sql, policy, &dialect_lexical_syntax(dialect));
     let normalized = normalize_mapped(&stubbed, dialect)?;
     let end = stub_offsets.last().copied().unwrap_or_default();
     let offsets: Vec<usize> = normalized
@@ -75,46 +76,6 @@ fn stub_prefix(kind: CallKind) -> &'static str {
 
 fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'$'
-}
-
-/// The comment and quoted-text syntax the rules parser tokenized for `dialect`.
-fn lexical_syntax(dialect: &str) -> LexicalSyntax {
-    let strings = |quotes: &[&str]| quotes.iter().map(|quote| (*quote).to_owned()).collect();
-    let lines = |prefixes: &[&str]| prefixes.iter().map(|prefix| (*prefix).to_owned()).collect();
-    match dialect.to_ascii_lowercase().as_str() {
-        "bigquery" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'", "\""]),
-            raw_string_prefix: true,
-            triple_quoted_strings: true,
-            line_comment_prefixes: lines(&["--", "#"]),
-            ..LexicalSyntax::default()
-        },
-        "snowflake" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'"]),
-            line_comment_prefixes: lines(&["--", "//"]),
-            ..LexicalSyntax::default()
-        },
-        "clickhouse" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'"]),
-            line_comment_prefixes: lines(&["--", "#", "//"]),
-            ..LexicalSyntax::default()
-        },
-        "databricks" | "duckdb" => LexicalSyntax {
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-        "mssql" | "sqlserver" | "tsql" => LexicalSyntax {
-            nested_block_comments: true,
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-        _ => LexicalSyntax {
-            escape_string_prefix: true,
-            nested_block_comments: true,
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-    }
 }
 
 fn is_quote_start(byte: u8) -> bool {
