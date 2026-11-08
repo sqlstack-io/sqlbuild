@@ -276,7 +276,55 @@ describe('listing requests', () => {
 		await client.setTriggerStates(ORDERS, ['t-orders'], 'paused');
 		expect([calls[0], ...calls.slice(1).sort()]).toEqual(['POST /api/control/triggers', 'GET /runs', 'GET /triggers']);
 	});
+
+	it('finds an ad-hoc run it launched while an older runs listing was still in flight', async () => {
+		let launched: string | null = null;
+		let releaseOlderListing = () => {};
+		const olderListingHeld = new Promise<void>((release) => (releaseOlderListing = release));
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				if (request.method === 'POST') {
+					launched = (await request.json()).run_id;
+					releaseOlderListing();
+					return Response.json({ run_id: launched }, { status: 201 });
+				}
+				// The listing answers with the runs queued when it was asked; the first is held until the launch is queued.
+				const runs = launched ? [queuedAdhocRun(launched)] : [];
+				if (!launched) await olderListingHeld;
+				return Response.json(new URL(request.url).pathname.endsWith('/runs') ? runs : []);
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		const olderListing = client.listRuns(ORDERS);
+		const run = await client.launchAdhocRun(ORDERS, { command: ['build', '--select', 'orders'], priority: 0 });
+		expect(run.id).toBe(launched);
+		expect(await olderListing).toEqual([]);
+	});
 });
+
+function queuedAdhocRun(id: string) {
+	return {
+		run_id: id,
+		root_run_id: id,
+		kind: 'adhoc',
+		origin: 'manual',
+		status: 'queued',
+		job_key: null,
+		last_event_storage_id: 1,
+		location_id: '0191f0aa-orders',
+		node_counts_json: {},
+		priority: 0,
+		queued_at: '2026-11-08T10:00:00Z',
+		requested_by: 'principal:p',
+		requester_name: 'Ada Admin',
+		rewrite_history: false,
+		selection_json: ['model.orders'],
+		snapshot_id: '0191f0dd-0000-7000-8000-000000000000',
+		target: 'development'
+	};
+}
 
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */

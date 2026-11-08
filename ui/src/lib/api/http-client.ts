@@ -337,6 +337,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/adhoc', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
