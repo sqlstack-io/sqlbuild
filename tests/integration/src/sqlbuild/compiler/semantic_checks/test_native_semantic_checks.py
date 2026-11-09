@@ -210,6 +210,13 @@ def test_given_formerly_deferred_projects_when_completing_natively_then_matches_
             expected_types=(("order_id", "INTEGER"),),
         ),
         DialectFindingTestCase(
+            description="PostgreSQL refuses a text literal compared with a number",
+            dialect="postgres",
+            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
+            expected_codes=("B218",),
+            expected_types=(("order_id", "INTEGER"),),
+        ),
+        DialectFindingTestCase(
             description="DuckDB types a date plus whole days as a date",
             dialect="duckdb",
             sql='SELECT order_date + order_id AS due FROM __source("raw_orders")',
@@ -230,7 +237,7 @@ def test_given_one_model_under_its_dialect_when_completing_natively_then_has_exp
 
 @pytest.mark.xfail(
     strict=True,
-    reason="SQLQuack's Snowflake, PostgreSQL and BigQuery profiles do not yet check or type these",
+    reason="SQLQuack's Snowflake and BigQuery profiles do not yet check or type these",
 )
 @pytest.mark.parametrize(
     "test_case",
@@ -239,13 +246,6 @@ def test_given_one_model_under_its_dialect_when_completing_natively_then_has_exp
             description="BigQuery refuses a text literal compared with a timestamp",
             dialect="bigquery",
             sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.ordered_at > 'placed'",
-            expected_codes=("B218",),
-            expected_types=(("order_id", "INTEGER"),),
-        ),
-        DialectFindingTestCase(
-            description="PostgreSQL refuses a text literal compared with a number",
-            dialect="postgres",
-            sql="SELECT o.order_id FROM __source(\"raw_orders\") AS o WHERE o.amount > 'placed'",
             expected_codes=("B218",),
             expected_types=(("order_id", "INTEGER"),),
         ),
