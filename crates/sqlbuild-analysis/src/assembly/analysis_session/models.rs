@@ -116,7 +116,7 @@ pub struct FinishedSession {
     pub(crate) relations: Option<RelationTables>,
     /// Each requested model's name, in request order, as the session's outcomes are.
     pub(crate) model_names: Vec<String>,
-    /// The adapter's declared functions, which the native analysis knew.
+    /// The adapter's and the project's declared functions, which the native analysis knew.
     pub(crate) declared_functions: Vec<String>,
     /// The adapter's function return types and nullability rules the native analysis read.
     pub(crate) functions: SessionFunctions,
@@ -183,6 +183,8 @@ pub struct SessionRequest {
     /// Whether quoted identifiers compare without case, as Snowflake's session parameter sets.
     pub quoted_ignore_case: bool,
     pub function_return_types: Pairs,
+    /// The project's declared function names and their stub spellings, never unknown functions.
+    pub known_functions: Vec<String>,
     /// Adapter nullability rules as `(function name, rule id)`.
     pub nullability_rules: Option<Pairs>,
     /// Runs the adapter's own rules, those with the `python` rule id.
@@ -369,27 +371,11 @@ pub(crate) struct SessionSchema {
 
 impl LineageSchema for SessionSchema {
     fn columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
-        self.relations
-            .get(relation)
-            .or_else(|| {
-                self.relations
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case(relation))
-                    .map(|(_, columns)| columns)
-            })
-            .map(Vec::as_slice)
+        relation_columns(&self.relations, relation)
     }
 
     fn open_columns(&self, relation: &str) -> Option<&[SchemaColumn]> {
-        self.open
-            .get(relation)
-            .or_else(|| {
-                self.open
-                    .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case(relation))
-                    .map(|(_, columns)| columns)
-            })
-            .map(Vec::as_slice)
+        relation_columns(&self.open, relation)
     }
 
     fn function_type(&self, name: &str) -> Option<&str> {
@@ -407,6 +393,22 @@ impl LineageSchema for SessionSchema {
             .find(|(function, _)| function.eq_ignore_ascii_case(name))
             .map(|(_, rule)| *rule)
     }
+}
+
+/// A relation's columns by exact name, else by the first name equal to it without case.
+fn relation_columns<'a>(
+    shapes: &'a HashMap<String, Vec<SchemaColumn>>,
+    relation: &str,
+) -> Option<&'a [SchemaColumn]> {
+    shapes
+        .get(relation)
+        .or_else(|| {
+            shapes
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(relation))
+                .map(|(_, columns)| columns)
+        })
+        .map(Vec::as_slice)
 }
 
 /// One compile's model analysis, advanced phase by phase.

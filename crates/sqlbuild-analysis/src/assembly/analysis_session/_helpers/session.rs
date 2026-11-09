@@ -31,7 +31,8 @@ use crate::assembly::analysis_session::_helpers::enrichment::{
     Enrichment, EnrichmentInput, enrichment,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{
-    ShapeTable, dict_from_pairs, same_keys, same_relations, session_functions, session_schema,
+    ShapeTable, declared_functions, dict_from_pairs, same_keys, same_relations, session_functions,
+    session_schema,
 };
 use crate::assembly::analysis_session::_helpers::mappings::{producers, waves};
 use crate::assembly::analysis_session::constants::{UNKNOWN_NULLABILITY, UNKNOWN_TYPE};
@@ -177,11 +178,7 @@ impl AnalysisSession {
             .iter()
             .map(|model| model.name.clone())
             .collect();
-        let declared_functions: Vec<String> = request
-            .function_return_types
-            .iter()
-            .map(|(name, _)| name.clone())
-            .collect();
+        let declared_functions: Vec<String> = declared_functions(&request);
         let functions: SessionFunctions = session_functions(&request);
         let quoted_ignore_case: bool = request.quoted_ignore_case;
         let finished = FinishedSession {
@@ -332,11 +329,7 @@ impl AnalysisSession {
         let request: &SessionRequest = &self.request;
         let tables: (&ShapeTable, &ShapeTable) =
             (&self.available_types, &self.available_nullability);
-        let declared: Vec<String> = request
-            .function_return_types
-            .iter()
-            .map(|(name, _)| name.clone())
-            .collect();
+        let declared: Vec<String> = declared_functions(request);
         let functions: SessionFunctions = session_functions(request);
         let outcomes: Vec<(ModelOutcome, Option<String>)> = pool.install(|| {
             misses

@@ -123,6 +123,7 @@ pub(crate) fn orders_request(models: Vec<ModelRequest>) -> SessionRequest {
         case_sensitive_shapes: false,
         quoted_ignore_case: false,
         function_return_types: Vec::new(),
+        known_functions: Vec::new(),
         nullability_rules: Some(Vec::new()),
         nullability_callback: None,
         rich_type_inference: true,

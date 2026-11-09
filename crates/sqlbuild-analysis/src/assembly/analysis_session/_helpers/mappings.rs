@@ -246,6 +246,16 @@ pub(crate) fn waves(producers: &[Vec<usize>]) -> Option<Vec<Vec<usize>>> {
     (scheduled == producers.len()).then_some(waves)
 }
 
+/// The adapter's typed functions and the project's declared functions, which are not unknown names.
+pub(crate) fn declared_functions(request: &SessionRequest) -> Vec<String> {
+    request
+        .function_return_types
+        .iter()
+        .map(|(name, _)| name.clone())
+        .chain(request.known_functions.iter().cloned())
+        .collect()
+}
+
 /// The request's function return types, and its built-in nullability rules; adapter callbacks are not.
 pub(crate) fn session_functions(request: &SessionRequest) -> SessionFunctions {
     SessionFunctions {

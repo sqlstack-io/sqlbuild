@@ -131,6 +131,7 @@ fn session_request<'py>(
         )?,
         quoted_ignore_case: native_field(profile, "quoted_identifiers_ignore_case")?.is_truthy()?,
         function_return_types: return_types(profile)?,
+        known_functions: native_field(profile, "semantic_known_functions")?.extract()?,
         nullability_rules: Some(rules),
         rich_type_inference: request.rich_type_inference,
         column_types: shapes.types,
