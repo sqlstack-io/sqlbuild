@@ -78,5 +78,8 @@
 	.app-topbar {
 		background: color-mix(in srgb, var(--background) 94%, transparent);
 		backdrop-filter: blur(12px);
+		/* The blur makes the bar its own layer; this keeps it and its popovers, such as Run now, above the page. */
+		position: relative;
+		z-index: 20;
 	}
 </style>
