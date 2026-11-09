@@ -11,13 +11,13 @@ import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
-import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
+import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -321,9 +321,11 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const wire = jobs.find((job) => job.job_key === key);
 			return wire ? jobDetailOf(toJob(wire, triggers, runs), wire) : null;
 		},
-		async launchJob(scope: Scope, key: string): Promise<Run> {
+		/** A window makes it a backfill, which the server also checks against `run.rewrite_history`. */
+		async launchJob(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
-			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: 'Started from the web UI' };
+			const window = options?.window ? runWindowOf(options.window) : undefined;
+			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: window ? 'Backfill started from the web UI' : 'Started from the web UI', window };
 			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
 			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
@@ -778,7 +780,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}) as unknown as ApiClient;
 }
 
+/** The server's message: a JSON error body's text, or a plain-text body such as a request the route couldn't read. */
 function errorText(error: unknown, response: Response): string {
+	if (typeof error === 'string' && error.trim()) return error.trim();
 	const message = (error as { message?: unknown; error?: unknown } | undefined)?.message ?? (error as { error?: unknown } | undefined)?.error;
 	return typeof message === 'string' ? message : `${response.status} ${response.statusText}`;
 }

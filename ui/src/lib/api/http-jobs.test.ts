@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { cadenceOf, jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf, triggerKindOf } from './http-jobs';
+import { cadenceOf, jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf, triggerKindOf } from './http-jobs';
 import type { Run } from './types/operate';
 
 type W = components['schemas'];
@@ -67,5 +67,22 @@ describe('job mapping', () => {
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
 		expect([detail.settings, detail.concurrency, detail.memberOf, detail.cursorType]).toEqual([null, null, null, null]);
 		expect(toJob({ ...wire, job_key: 'nightly', kind: 'group' }, triggers, []).kind).toBe('group');
+	});
+});
+
+describe('runWindowOf', () => {
+	const typed = (start: string, end: string) => runWindowOf({ type: 'timestamp', start, end });
+
+	it('sends whole numbers on both ends as an integer window, negatives included', () => {
+		expect(typed(' -3 ', '11')).toEqual({ kind: 'integer', start: -3, end: 11 });
+	});
+
+	it('sends anything else as typed for the server to validate, without reading zones or order', () => {
+		expect(typed('2026-10-31T00:00:00+02:00', '2026-10-01')).toEqual({ kind: 'timestamp', start: '2026-10-31T00:00:00+02:00', end: '2026-10-01' });
+		expect(typed('1200', 'yesterday')).toEqual({ kind: 'timestamp', start: '1200', end: 'yesterday' });
+	});
+
+	it('refuses a whole number JSON would round instead of sending another value', () => {
+		expect(() => typed('9007199254740993', '9007199254740995')).toThrow('exactly');
 	});
 });
