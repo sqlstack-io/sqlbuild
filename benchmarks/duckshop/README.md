@@ -125,7 +125,7 @@ project and does not change it:
   (`models/intermediate/edge_cases/_sqlbuild/_hooks/sql/`) and SQLBuild does not declare.
 
 It has 161 models (13 staging, 134 intermediate, 14 marts), 5 Python functions, a SQL table
-function, a hook-created JavaScript function, 185 unit tests and 4 scenarios, in nine groups:
+function, a hook-created JavaScript function, 186 unit tests and 4 scenarios, in nine groups:
 
 | Group | Covers |
 |-------|--------|
