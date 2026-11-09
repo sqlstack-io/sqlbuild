@@ -238,6 +238,94 @@ describe('feedAllowed', () => {
 	});
 });
 
+describe('listing requests', () => {
+	const tick = { tick_id: 'k-2', trigger_id: 't-orders', scheduled_for: '2026-11-07T06:00:00Z', evaluated_at: '2026-11-07T06:00:02Z', epoch: 1, outcome: 'requested', run_id: null, covered_by_run_id: null };
+	const declaration = { description: 'Daily orders', job_key: 'orders', schedule: { kind: 'cron', expression: '0 6 * * *', timezone: 'UTC' } };
+	const triggers = [
+		{ trigger_id: 't-orders', name: 'orders_daily', job_key: 'orders', definition_json: declaration, status: 'running', last_tick_for: null, next_due_at: null, latest_tick: tick },
+		{ trigger_id: 't-stock', name: 'stock_daily', job_key: 'stock', definition_json: declaration, status: 'running', last_tick_for: null, next_due_at: null, latest_tick: null }
+	];
+
+	function server() {
+		const calls: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname.replace('/api/control/locations/0191f0aa-orders/targets/development', '');
+				calls.push(`${request.method} ${path}`);
+				const body = request.method === 'POST' ? { applied: true } : path === '/triggers' ? triggers : [];
+				return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+			})
+		);
+		return { calls, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('lists triggers with their newest tick in one request, never one per trigger', async () => {
+		const { calls, client } = server();
+		const listed = await client.listTriggers(ORDERS);
+		expect(listed.map((t) => t.lastTick?.id ?? null)).toEqual(['k-2', null]);
+		expect(calls.sort()).toEqual(['GET /runs', 'GET /triggers']);
+	});
+
+	it('shares listings between pages that refresh together, and reads again after a write', async () => {
+		const { calls, client } = server();
+		await Promise.all([client.listJobs(ORDERS), client.listTriggers(ORDERS)]);
+		expect(calls.sort()).toEqual(['GET /jobs', 'GET /runs', 'GET /triggers']);
+		calls.length = 0;
+		await client.setTriggerStates(ORDERS, ['t-orders'], 'paused');
+		expect([calls[0], ...calls.slice(1).sort()]).toEqual(['POST /api/control/triggers', 'GET /runs', 'GET /triggers']);
+	});
+
+	it('finds an ad-hoc run it launched while an older runs listing was still in flight', async () => {
+		let launched: string | null = null;
+		let releaseOlderListing = () => {};
+		const olderListingHeld = new Promise<void>((release) => (releaseOlderListing = release));
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				if (request.method === 'POST') {
+					launched = (await request.json()).run_id;
+					releaseOlderListing();
+					return Response.json({ run_id: launched }, { status: 201 });
+				}
+				// The listing answers with the runs queued when it was asked; the first is held until the launch is queued.
+				const runs = launched ? [queuedAdhocRun(launched)] : [];
+				if (!launched) await olderListingHeld;
+				return Response.json(new URL(request.url).pathname.endsWith('/runs') ? runs : []);
+			})
+		);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		const olderListing = client.listRuns(ORDERS);
+		const run = await client.launchAdhocRun(ORDERS, { command: ['build', '--select', 'orders'], priority: 0 });
+		expect(run.id).toBe(launched);
+		expect(await olderListing).toEqual([]);
+	});
+});
+
+function queuedAdhocRun(id: string) {
+	return {
+		run_id: id,
+		root_run_id: id,
+		kind: 'adhoc',
+		origin: 'manual',
+		status: 'queued',
+		job_key: null,
+		last_event_storage_id: 1,
+		location_id: '0191f0aa-orders',
+		node_counts_json: {},
+		priority: 0,
+		queued_at: '2026-11-08T10:00:00Z',
+		requested_by: 'principal:p',
+		requester_name: 'Ada Admin',
+		rewrite_history: false,
+		selection_json: ['model.orders'],
+		snapshot_id: '0191f0dd-0000-7000-8000-000000000000',
+		target: 'development'
+	};
+}
+
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
 	function serve(actions: string[], sqlStatus = 200) {

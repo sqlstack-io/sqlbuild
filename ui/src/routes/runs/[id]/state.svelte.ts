@@ -15,7 +15,7 @@ export function createRunDetailState(runId: string) {
 	const topics = [`run:${runId}`, 'runs'];
 	const detailRes = createResource((client, scope) => client.getRunDetail(scope, runId), topics);
 	const eventsRes = createResource((client, scope) => (client.supports('listRunEvents') ? client.listRunEvents(scope, runId, { limit: 5000 }) : Promise.resolve({ events: [], nextCursor: null })), topics);
-	const outputRes = createResource((client, scope) => (client.supports('listRunOutput') ? client.listRunOutput(scope, runId) : Promise.resolve([])), topics);
+	const outputRes = createResource((client, scope) => (client.supports('listRunOutput') && app.can('view.evidence') ? client.listRunOutput(scope, runId) : Promise.resolve([])), topics);
 	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? client.listRunStatements(scope, runId) : Promise.resolve([])), topics);
 
 	const detail = $derived(detailRes.data ?? null);

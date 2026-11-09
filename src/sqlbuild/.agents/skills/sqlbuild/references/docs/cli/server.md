@@ -11,6 +11,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Set retention
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
+- Run ad-hoc commands
 - Define project roles
 
 Run the control API and scheduler without loading project Python:
@@ -141,6 +142,76 @@ data. Every successful inspection records an audit entry without copying SQL int
 audit cannot be saved, the request fails without returning SQL. Revocation takes effect on the
 next request, including sessions created by [`sqb login`](login.md).
 
+## Run ad-hoc commands
+
+People with `run.adhoc` can run a `sqb` command on the current publication without declaring a
+job. Use the web UI's Run panel, or send the command as argument tokens after `sqb`:
+
+```json
+{
+  "location_id": "0191f0aa-0000-7000-8000-000000000001",
+  "target": "development",
+  "command": ["build", "--select", "+orders", "--full-refresh"],
+  "priority": 0
+}
+```
+
+`POST /api/control/runs/adhoc/check` with this body is a dry run. It returns the exact nodes the
+command selects (`selection`), the nodes it writes (`write_set`), the options the worker receives
+(`settings`), and each permission it needs with your decision (`permissions`). `error` explains a
+command that can't run whatever your permissions, and `launchable` is `true` when the launch
+would be accepted. A dry run queues nothing and records no audit entry.
+
+To launch, `POST /api/control/runs/adhoc` with the same fields plus a new `run_id` and a
+`reason`. The response is `{"applied": true}`; sending the same `run_id` again returns
+`{"applied": false}` and starts nothing. The server resolves selectors against the current
+publication, and the worker runs exactly the resolved nodes. The target is always the one in the
+request.
+
+| Verb | Ad-hoc runs |
+| --- | --- |
+| `build` | Dry run and launch |
+| `test`, `seed`, `audit`, `freshness` | Dry run only; workers can't run them yet |
+| Any other verb | Refused |
+
+Selectors use the CLI grammar: names, `seed:`, `source:`, `tag:`, `path:` and `test:`, with `+`
+for upstream or downstream nodes. Positional selectors work as on the command line.
+
+| Flags | Verbs | Needs |
+| --- | --- | --- |
+| `--select`, `-s`, `--exclude` | All | `run.adhoc` on every selected node |
+| `--full-refresh`, `--start-cursor`, `--end-cursor`, `--start-cursor-ts`, `--end-cursor-ts`, `--start-cursor-int`, `--end-cursor-int` | `build` | `run.rewrite_history` |
+| `--allow-snapshot-full-refresh`, `--allow-snapshot-schema-change`, `--allow-table-type-downgrade`, `--allow-retention-decrease` | `build` | `run.rewrite_history` |
+| `--warehouse` | All | `run.warehouse`, and the warehouse configured for the target on the location |
+| `--max-microbatches`, `--no-load`, `--no-tests`, `--no-audits`, `--no-python`, `--fail-fast`, `--selection-diagnostics`, `--verbose` | `build` | `run.adhoc` |
+| `--concurrency` | `build`, `test`, `seed`, `audit` | `run.adhoc` |
+| `--test-timeout` | `build`, `test` | `run.adhoc` |
+| `--case`, `--inspect` | `test` | `run.adhoc` |
+| `--state`, `--fail-on-error`, `--fail-on-stale` | `freshness` | `run.adhoc` |
+
+A priority above 0 also needs `run.prioritise`. Among built-in roles only Admin grants
+`run.rewrite_history`, `run.warehouse` and `run.prioritise`. Every other flag is refused with
+its reason:
+
+| Refused flags | Reason |
+| --- | --- |
+| `--vars` | Variables change the published SQL |
+| `--defer-to`, `--defer-sources-to`, `--defer-clone-from` | They read another target |
+| `--load`, `--reload` | Source loads are not part of ad-hoc runs |
+| `--allow-missing-migration-origin` | It can lose data |
+| `--no-sql-analysis`, `--no-cache` | Workers verify the published SQL and manage their own cache |
+| `--debug` | It prints executed SQL |
+| `--since`, `--explain` | They need the worker's Git checkout |
+| `--select-file` | It reads a file on the worker |
+| `--target`, `--project-dir` and the `--dbt-*` paths | Workers run the published project for the request's target |
+| `--json`, `--json-output`, `--event-output`, `--manifest`, `--no-color` | Workers own the run's output |
+
+For an ad-hoc run, the worker checks `--warehouse` against the warehouses the location
+configures for the target before any statement runs. An unconfigured warehouse fails the run with
+the reason `the requested warehouse is not configured for this target on this location; no
+warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
+checked this way.
+
 ## Define project roles
 
 Put project roles in `roles.toml` at the project root. `sqb location publish` resolves each
@@ -164,7 +235,7 @@ permissions = ["view.evidence"]
 | Selectors | Same grammar as a job's `select`; an unknown tag or name fails publication |
 | No matching nodes | Publication succeeds with a warning; the grant gives nothing |
 | Permissions | Any non-administrative action; `user.manage`, `role.assign` and `audit.view` are rejected |
-| Runs | `job.run`, `run.adhoc`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes |
+| Runs | `job.run`, `run.rerun` and `run.rewrite_history` need the permission on every node the run writes; an [ad-hoc command](#run-ad-hoc-commands) needs `run.adhoc` and its flags' permissions on every node it selects; a priority above 0 also needs `run.prioritise` |
 | Triggers | `trigger.toggle` and `sensor.reset_cursor` need the permission on every node the trigger's job writes |
 | Listings | The catalog, statistics and run list need `view` on every node of the current publication; partial coverage is denied, not filtered |
 | Several roles | Grants add up across a person's roles |

@@ -23,14 +23,14 @@ _PROJECT_TOML: str = (
     "test_case",
     [
         ClickHouseCommentE2ETestCase(
-            description="a hash comment with an apostrophe is skipped",
+            description="a hash comment with an apostrophe is skipped, reported unavailable until SQLBuild parses the dialect",
             comment="# don't keep the star",
-            expected_location="models/orders.sql:4:8 [SQBRMODEL102]",
+            expected_location="models/orders.sql:1:1 [L007]",
         ),
         ClickHouseCommentE2ETestCase(
-            description="a double-slash comment with an apostrophe is skipped",
+            description="a double-slash comment with an apostrophe is skipped, reported unavailable until SQLBuild parses the dialect",
             comment="// don't keep the star",
-            expected_location="models/orders.sql:4:8 [SQBRMODEL102]",
+            expected_location="models/orders.sql:1:1 [L007]",
         ),
     ],
     ids=lambda case: case.description,

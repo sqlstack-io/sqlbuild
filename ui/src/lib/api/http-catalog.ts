@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import { shortName } from '$lib/build-area/labels';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, StaleReason } from './types/build';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckCounts, NodeJob, NodeOutcome, NodeRunEntry, StaleReason } from './types/build';
 import type { NodeKind } from './types/operate';
 
 type Wire = components['schemas'];
@@ -73,12 +73,49 @@ export function findNode(nodes: CatalogNode[], ref: string): CatalogNode | null 
 	return nodes.find((n) => n.key === ref) ?? nodes.find((n) => n.key === `model:${ref}`) ?? nodes.find((n) => shortName(n.key) === ref) ?? null;
 }
 
+/** Jobs and groups whose resolved selection includes the node, with the triggers that start each. */
+export function nodeJobsOf(nodeKey: string, jobs: Wire['JobRecord'][], triggers: Wire['TriggerRecord'][]): NodeJob[] {
+	return jobs
+		.filter((job) => job.selection.includes(nodeKey))
+		.map((job) => ({ key: job.job_key, kind: job.kind === 'group' ? 'group' : 'job', triggerIds: triggers.filter((t) => t.job_key === job.job_key).map((t) => t.trigger_id) }));
+}
+
+const FINISHED: readonly NodeOutcome[] = ['success', 'warn', 'failed', 'skipped'];
+
+/** Finished builds of the node by scheduler runs, newest first; queued, running and cancelled attempts are left out. */
+export function toNodeRuns(wire: Wire['NodeRunRecord'][]): NodeRunEntry[] {
+	return wire.flatMap((r) => {
+		const outcome = FINISHED.find((o) => o === r.status);
+		if (!outcome) return [];
+		const started = r.started_at ?? r.queued_at;
+		return [
+			{
+				runId: r.run_id,
+				fingerprintRunId: null,
+				jobKey: r.job_key ?? null,
+				outcome,
+				startedAt: started,
+				durationMs: r.started_at && r.ended_at ? Date.parse(r.ended_at) - Date.parse(r.started_at) : null,
+				rows: r.rows_affected ?? null,
+				message: r.skipped_because_of ? `Skipped because ${shortName(r.skipped_because_of)} did not succeed` : (r.error_code ?? null)
+			}
+		];
+	});
+}
+
 /**
- * A listed node with its status and SQL reads and its checks. The server keeps no
- * per-node run history, row counts, cost, jobs or migrations, so those stay empty or null and the
- * pages hide them. `sql` is null when the person may not see SQL.
+ * A listed node with its status, SQL, run history, jobs and checks. The server keeps no row
+ * counts, cost or migrations per node, so those stay empty or null and the pages hide them. `sql`
+ * is null when the person may not see SQL; `runs` and `jobs` are null when their reads failed.
  */
-export function nodeDetailOf(nodes: CatalogNode[], node: CatalogNode, status: Wire['NodeStatus'] | null, sql: Wire['NodeSql'] | null, checks: Check[]): CatalogNodeDetail {
+export function nodeDetailOf(
+	nodes: CatalogNode[],
+	node: CatalogNode,
+	status: Wire['NodeStatus'] | null,
+	sql: Wire['NodeSql'] | null,
+	checks: Check[],
+	{ runs, jobs }: { runs: NodeRunEntry[] | null; jobs: NodeJob[] | null } = { runs: null, jobs: null }
+): CatalogNodeDetail {
 	// Checks name their node without its kind, so the attachment tells a source from a model of the same name.
 	const own = checks.filter((c) => c.node === node.key || `${c.attachment}:${c.node}` === node.key);
 	const physical = status?.physical.status === 'observed' ? status.physical.observation.record : null;
@@ -87,17 +124,17 @@ export function nodeDetailOf(nodes: CatalogNode[], node: CatalogNode, status: Wi
 		stale: staleOf(status),
 		checks: checkCountsOf(own),
 		downstream: nodes.filter((n) => n.upstream.includes(node.key)).map((n) => n.key),
-		recentOutcomes: [],
+		recentOutcomes: (runs ?? []).slice(0, 40).map((r) => r.outcome).reverse(),
 		lastRows: null,
 		rowsDelta: null,
-		lastDurationMs: null,
+		lastDurationMs: runs?.find((r) => r.durationMs !== null)?.durationMs ?? null,
 		cost: null,
 		columns: (physical?.columns ?? []).map((c) => ({ name: c.name, type: c.data_type, description: '', audits: [] })),
 		sql: sql?.raw_sql ? { raw: sql.raw_sql, compiled: sql.compiled_sql ?? sql.raw_sql } : null,
 		code: null,
 		builds: [],
-		jobs: null,
-		runs: null,
+		jobs,
+		runs,
 		checkResults: own,
 		warehouse: null,
 		microbatch: null,

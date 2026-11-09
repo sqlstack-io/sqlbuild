@@ -35,7 +35,7 @@ pub(crate) struct DeclarationScopeTestCase {
 pub(crate) struct DialectEvaluationTestCase {
     pub(crate) description: &'static str,
     pub(crate) dialect: &'static str,
-    pub(crate) query_sql: &'static str,
+    pub(crate) query_sql: String,
     pub(crate) expected_code: &'static str,
 }
 

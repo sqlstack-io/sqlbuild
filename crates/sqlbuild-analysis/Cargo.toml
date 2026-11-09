@@ -10,7 +10,6 @@ rust-version.workspace = true
 [dependencies]
 memchr.workspace = true
 polyglot-sql.workspace = true
-polyglot-sql-function-catalogs.workspace = true
 rayon.workspace = true
 regex.workspace = true
 rustc-hash.workspace = true
@@ -27,7 +26,9 @@ sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlclean.workspace = true
 sqlquack-syntax.workspace = true
+sqlquack-syntax-bigquery.workspace = true
 sqlquack-syntax-postgres.workspace = true
+stacker.workspace = true
 
 [lints]
 workspace = true

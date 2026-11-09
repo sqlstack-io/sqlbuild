@@ -163,7 +163,11 @@ export type LocationDetail = {
 	connectionTest: ConnectionTest | null;
 };
 
-export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'health' | 'brokenDeployPolicy' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+export type LocationSummary = Pick<LocationDetail, 'id' | 'name' | 'failedDeploy' | 'target' | 'snapshot' | 'connectionTest'> & {
+	/** Null when the server can't report it to this person. */
+	health: LocationHealth | null;
+	/** Null when the server doesn't report the policy. */
+	brokenDeployPolicy: BrokenDeployPolicy | null;
 	/** Unresolved platform events of this location. */
 	activeProblems: number;
 	liveInstances: number;
@@ -296,7 +300,8 @@ export type AccountSource = 'oidc' | 'trusted_proxy' | 'password';
 export type Account = Principal & {
 	kind: 'user';
 	email: string | null;
-	source: AccountSource;
+	/** Null when the server can't tell, such as a person with no password who hasn't used SSO. */
+	source: AccountSource | null;
 	ssoGroups: string[];
 	createdAt: Iso;
 	lastSeenAt: Iso | null;
@@ -327,8 +332,8 @@ export type RoleDefinition = {
 	grants: RoleGrant[];
 	/** People holding the role somewhere. */
 	holders: number;
-	/** Nodes the role's selectors started matching in the last 7 days. */
-	recentlyMatched: number;
+	/** Nodes the role's selectors started matching in the last 7 days; null when unknown. */
+	recentlyMatched: number | null;
 };
 
 /** What one selector of a role matches in the current snapshot. */
@@ -344,8 +349,8 @@ export type RoleDetail = RoleDefinition & {
 	baseGrants: RoleGrant[];
 	selectors: SelectorMatch[];
 	assignments: RoleAssignment[];
-	/** The role's definition as written, read-only. */
-	definition: string;
+	/** The role's definition as published, read-only; null for built-in roles. */
+	definition: string | null;
 };
 
 /** `locationId: null` applies everywhere. */
@@ -369,7 +374,7 @@ export type RoleAssignment = {
 	/** For policy and built-in assignments: where they are set, `path:line`. */
 	definedIn: string | null;
 	assignedBy: Principal | null;
-	assignedAt: Iso;
+	assignedAt: Iso | null;
 	/** The role no longer exists in code; the assignment shows but grants nothing. */
 	stale: boolean;
 };
@@ -395,7 +400,8 @@ export type AuditEntry = {
 	id: string;
 	at: Iso;
 	actor: Principal;
-	action: Capability | 'session.login';
+	/** A capability, or a recorded event such as `token.issued`; a denial carries the refused capability. */
+	action: string;
 	outcome: AuditOutcome;
 	scope: AssignmentScope & { subject: string | null };
 	/** Role that granted the action, or for denials null. */

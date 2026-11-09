@@ -2142,10 +2142,16 @@ FROM final
 
 @pytest.mark.parametrize(
     "test_case",
-    [RulesIntegrationTestCase("quoted comment marker preserves real call", 1, "SQBRMODEL101")],
+    [
+        RulesIntegrationTestCase(
+            "quoted comment marker" + ", reported unavailable until SQLBuild parses the dialect",
+            0,
+            "SQBRMODEL101",
+        )
+    ],
     ids=lambda case: case.description,
 )
-def test_given_bigquery_quoted_comment_marker_when_running_import_rule_then_real_call_is_detected(
+def test_given_bigquery_quoted_comment_marker_when_running_import_rule_then_reports_dialect_unavailable(
     test_case: RulesIntegrationTestCase,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -2194,8 +2200,9 @@ FROM final
     payload: dict[str, object] = json.loads(capsys.readouterr().out)
     findings: list[dict[str, object]] = cast(list[dict[str, object]], payload["findings"])
     assert [finding["message"] for finding in findings] == [
-        'import CTE "imported_orders" contains transformation logic'
-    ]
+        "SQLBuild cannot parse bigquery SQL for built-in rules yet,"
+        " so these rules were not evaluated: SQBRMODEL101"
+    ] * 2
 
 
 @pytest.mark.parametrize(

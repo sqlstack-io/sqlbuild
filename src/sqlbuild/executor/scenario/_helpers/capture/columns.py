@@ -2,50 +2,63 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
+from sqlbuild._native import parse_warehouse_type
 from sqlbuild.adapter.contract.classes.base_adapter import BaseAdapter
 from sqlbuild.adapter.contract.models import ColumnInfo
 from sqlbuild.adapter.contract.types import TypeDialect
-from sqlbuild.compiler.sql_analysis.main.import_polyglot import import_polyglot
 from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 from sqlbuild.errors.contracts.exceptions import ExecutorInputError
 from sqlbuild.executor.scenario.constants import (
     BIGQUERY_BIGNUMERIC_TYPE,
-    BIGQUERY_BYTES_TYPE,
     BIGQUERY_TIMESTAMP_TYPE,
     BIGQUERY_VARCHAR_TYPES,
     BIGQUERY_WIDEN_TO_DOUBLE_TYPES,
+    DATABRICKS_ARRAY_TYPE,
+    DATABRICKS_INTERVAL_PREFIX,
+    DATABRICKS_MAP_ARGUMENT_COUNT,
+    DATABRICKS_MAP_TYPE,
+    DATABRICKS_NESTED_TYPES,
+    DATABRICKS_STRUCT_FIELD_PATTERN,
+    DATABRICKS_STRUCT_TYPE,
     DATABRICKS_TIMESTAMP_NTZ_TYPE,
     DATABRICKS_TIMESTAMP_TYPE,
+    DATABRICKS_VARIANT_TYPE,
     DATABRICKS_VOID_TYPE,
     DUCKDB_BLOB_TYPE,
     DUCKDB_HUGEINT_TYPE,
     DUCKDB_INTEGER_TYPE,
     DUCKDB_LIST_TYPE,
+    DUCKDB_SPATIAL_TYPES,
     DUCKDB_UHUGEINT_TYPE,
     FALLBACK_BINARY_TYPES,
     FALLBACK_BOOLEAN_TYPES,
     FALLBACK_DATE_TYPE,
     FALLBACK_DECIMAL_TYPES,
+    FALLBACK_DOUBLE_TYPES,
     FALLBACK_FLOAT_TYPES,
     FALLBACK_JSON_TYPES,
-    FALLBACK_POLYGLOT_BASE_TYPES,
-    FALLBACK_SIGNED_INTEGER_TYPES,
+    FALLBACK_SIGNED_INTEGER_LOCAL_TYPES,
     FALLBACK_STRUCTURED_TYPES,
     FALLBACK_TIME_TYPES,
     FALLBACK_TIMESTAMP_TOKEN,
     FALLBACK_TIMESTAMP_TYPES,
     FALLBACK_UNSIGNED_INTEGER_TYPES,
     FALLBACK_VARCHAR_TYPES,
+    GENERIC_LOCAL_BASE_TYPES,
     GENERIC_WIDEN_TO_DOUBLE_TYPES,
     LOCAL_TYPE_BIGINT,
     LOCAL_TYPE_BOOLEAN,
     LOCAL_TYPE_DATE,
     LOCAL_TYPE_DECIMAL,
+    LOCAL_TYPE_DIALECTS,
     LOCAL_TYPE_DOUBLE,
+    LOCAL_TYPE_FLOAT,
     LOCAL_TYPE_INT,
     LOCAL_TYPE_INT128,
     LOCAL_TYPE_JSON,
@@ -55,16 +68,10 @@ from sqlbuild.executor.scenario.constants import (
     LOCAL_TYPE_TIME,
     LOCAL_TYPE_TIMESTAMP,
     LOCAL_TYPE_TIMESTAMPTZ,
+    LOCAL_TYPE_TIMETZ,
     LOCAL_TYPE_UINT128,
     LOCAL_TYPE_VARCHAR,
-    MALFORMED_RENDERED_TYPE_TOKEN,
-    POLYGLOT_ARRAY_TYPE,
-    POLYGLOT_COLLECTION_TYPES,
-    POLYGLOT_CUSTOM_TYPE,
-    POLYGLOT_DECIMAL_TYPES,
-    POLYGLOT_OBJECT_TYPE,
-    POLYGLOT_SPATIAL_AND_MONEY_TYPES,
-    POLYGLOT_VARCHAR_TYPES,
+    LOCAL_TYPE_VARIANT,
     POSTGRES_BIGSERIAL_TYPE,
     POSTGRES_PARAMETERIZED_DECIMAL_TYPES,
     POSTGRES_PARAMETERIZED_TEXT_TYPES,
@@ -79,6 +86,8 @@ from sqlbuild.executor.scenario.constants import (
     SNOWFLAKE_TIMEZONE_TIMESTAMP_TYPES,
     SNOWFLAKE_VECTOR_TYPE,
     SNOWFLAKE_WIDEN_TO_DOUBLE_TYPES,
+    STRUCT_FIELD_NAME_PATTERN,
+    TSQL_LOCAL_TYPES,
     TYPE_ARGUMENT_CLOSE_ANGLE,
     TYPE_ARGUMENT_CLOSE_PAREN,
     TYPE_ARGUMENT_CLOSE_TOKENS,
@@ -86,7 +95,16 @@ from sqlbuild.executor.scenario.constants import (
     TYPE_ARGUMENT_OPEN_TOKENS,
     TYPE_ARGUMENT_SEPARATOR,
     TYPE_PATTERN_WILDCARD,
-    UNTYPED_ARRAY_TYPE,
+    TYPE_TREE_COLLECTIONS,
+    TYPE_TREE_DECIMAL,
+    TYPE_TREE_FLOAT,
+    TYPE_TREE_KIND,
+    TYPE_TREE_LOCAL_TYPES,
+    TYPE_TREE_MAP,
+    TYPE_TREE_STRUCT,
+    TYPE_TREE_TEXT_KINDS,
+    TYPE_TREE_TIME,
+    TYPE_TREE_TIMESTAMP,
 )
 from sqlbuild.executor.scenario.models import ScenarioSnapshotColumn
 
@@ -194,12 +212,12 @@ def local_type_for_warehouse_type(
     if dialect_type is not None:
         return dialect_type
 
-    polyglot_local_type: str | None = _local_type_with_polyglot(
+    parsed_local_type: str | None = _local_type_with_sqlquack(
         warehouse_type=warehouse_type,
         sql_analysis_dialect=sql_analysis_dialect,
     )
-    if polyglot_local_type is not None:
-        return polyglot_local_type
+    if parsed_local_type is not None:
+        return parsed_local_type
 
     return _fallback_local_type_for_warehouse_type(warehouse_type)
 
@@ -277,10 +295,12 @@ def _dialect_pre_local_type(*, warehouse_type: str, sql_analysis_dialect: str | 
     if dialect == TypeDialect.BIGQUERY:
         return _bigquery_pre_local_type(base=base, args=args)
     if dialect == TypeDialect.DATABRICKS:
-        return _databricks_pre_local_type(base=base, args=args)
-    if dialect == TypeDialect.DUCKDB:
+        return _databricks_local_type(warehouse_type)
+    if dialect in LOCAL_TYPE_DIALECTS:
         return _duckdb_pre_local_type(base=base, args=args)
-    if dialect is None and base not in FALLBACK_POLYGLOT_BASE_TYPES:
+    if dialect == TypeDialect.TSQL:
+        return TSQL_LOCAL_TYPES.get(base)
+    if dialect is None and base not in GENERIC_LOCAL_BASE_TYPES:
         return LOCAL_TYPE_VARCHAR
     return None
 
@@ -317,14 +337,64 @@ def _bigquery_pre_local_type(*, base: str, args: tuple[str, ...]) -> str | None:
     return None
 
 
-def _databricks_pre_local_type(*, base: str, args: tuple[str, ...]) -> str | None:
+def _databricks_local_type(type_text: str) -> str | None:
+    """Map a Databricks type, nesting included; None leaves a scalar to the fallback."""
+
+    pattern: _TypePattern = _split_type_text(type_text.strip())
+    base: str = pattern.base.upper()
+    if base in DATABRICKS_NESTED_TYPES:
+        return _databricks_nested_local_type(type_text=type_text.strip(), pattern=pattern)
     if base == DATABRICKS_TIMESTAMP_TYPE:
         return LOCAL_TYPE_TIMESTAMPTZ
     if base == DATABRICKS_TIMESTAMP_NTZ_TYPE:
         return LOCAL_TYPE_TIMESTAMP
     if base == DATABRICKS_VOID_TYPE:
         return LOCAL_TYPE_VARCHAR
+    if base.startswith(DATABRICKS_INTERVAL_PREFIX):
+        return " ".join(base.split())
+    if base == DATABRICKS_VARIANT_TYPE:
+        return LOCAL_TYPE_VARIANT
     return None
+
+
+def _databricks_nested_local_type(*, type_text: str, pattern: _TypePattern) -> str:
+    base: str = pattern.base.upper()
+    args: tuple[str, ...] = pattern.args
+    if base == DATABRICKS_ARRAY_TYPE and len(args) == 1:
+        return _databricks_element_local_type(element=args[0], type_text=type_text) + "[]"
+    if base == DATABRICKS_MAP_TYPE and len(args) == DATABRICKS_MAP_ARGUMENT_COUNT:
+        key: str = _databricks_element_local_type(element=args[0], type_text=type_text)
+        value: str = _databricks_element_local_type(element=args[1], type_text=type_text)
+        return f"MAP({key}, {value})"
+    if base == DATABRICKS_STRUCT_TYPE and args:
+        fields: list[str] = []
+        for field in args:
+            match: re.Match[str] | None = DATABRICKS_STRUCT_FIELD_PATTERN.fullmatch(field)
+            if match is None:
+                raise _unmapped_databricks_type(element=field, type_text=type_text)
+            name: str = match.group("name").strip("`")
+            field_type: str = _databricks_element_local_type(
+                element=match.group("type"), type_text=type_text
+            )
+            fields.append(f"{_struct_field_name(name)} {field_type}")
+        return f"STRUCT({', '.join(fields)})"
+    raise _unmapped_databricks_type(element=type_text, type_text=type_text)
+
+
+def _databricks_element_local_type(*, element: str, type_text: str) -> str:
+    local_type: str | None = _databricks_local_type(element) or _known_local_type(element)
+    if local_type is None:
+        raise _unmapped_databricks_type(element=element, type_text=type_text)
+    return local_type
+
+
+def _unmapped_databricks_type(*, element: str, type_text: str) -> ExecutorInputError:
+    return ExecutorInputError(
+        f"Databricks type '{type_text}' has no local DuckDB type: SQLBuild cannot map "
+        f"'{element.strip()}' inside it",
+        code=SCENARIO_LOCAL_TYPE_INVALID,
+        help="Add a scenario local type override for this warehouse type.",
+    )
 
 
 def _duckdb_pre_local_type(*, base: str, args: tuple[str, ...]) -> str | None:
@@ -332,7 +402,7 @@ def _duckdb_pre_local_type(*, base: str, args: tuple[str, ...]) -> str | None:
         return LOCAL_TYPE_INT128
     if base == DUCKDB_UHUGEINT_TYPE:
         return LOCAL_TYPE_UINT128
-    if base == DUCKDB_BLOB_TYPE:
+    if base == DUCKDB_BLOB_TYPE or base in DUCKDB_SPATIAL_TYPES:
         return LOCAL_TYPE_VARCHAR
     if base == DUCKDB_LIST_TYPE and args:
         inner_type: str = _fallback_local_type_for_warehouse_type(args[0])
@@ -342,68 +412,37 @@ def _duckdb_pre_local_type(*, base: str, args: tuple[str, ...]) -> str | None:
     return None
 
 
-def _local_type_with_polyglot(
+def _local_type_with_sqlquack(
     *, warehouse_type: str, sql_analysis_dialect: str | None
 ) -> str | None:
-    polyglot_module: Any = import_polyglot()
+    """Map a type through SQLQuack's parser for its dialect; DuckDB spellings are already local."""
 
+    dialect: TypeDialect | None = _coerce_type_dialect(sql_analysis_dialect)
+    if dialect in LOCAL_TYPE_DIALECTS:
+        return warehouse_type.strip()
     try:
-        data_type: Any = polyglot_module.parse_data_type(
-            warehouse_type,
-            dialect=sql_analysis_dialect or "generic",
-        )
-    except polyglot_module.PolyglotError as error:
+        tree_json: str | None = parse_warehouse_type(warehouse_type, sql_analysis_dialect or "")
+    except ValueError as error:
         log_debug_event(
             logger=_DEBUG_LOGGER,
-            message="scenario snapshot type polyglot conversion failed; falling back",
+            message="scenario snapshot type parse failed; falling back",
             warehouse_type=warehouse_type,
             sql_analysis_dialect=sql_analysis_dialect,
             sqlbuild_error=str(error),
         )
         return None
-
-    type_name: str = _polyglot_type_name(data_type)
+    if tree_json is None:
+        return None
     base_type: str = _parse_type_pattern(warehouse_type).base
-    if type_name in POLYGLOT_DECIMAL_TYPES:
-        rendered_bigdecimal_type: str = data_type.sql(dialect="duckdb").strip()
-        if MALFORMED_RENDERED_TYPE_TOKEN not in rendered_bigdecimal_type:
-            return rendered_bigdecimal_type
-        return _decimal_local_type_from_polyglot(data_type) or LOCAL_TYPE_VARCHAR
-    if type_name in POLYGLOT_VARCHAR_TYPES:
-        return LOCAL_TYPE_VARCHAR
-    if type_name == POLYGLOT_OBJECT_TYPE:
-        return LOCAL_TYPE_JSON
-    if type_name == POLYGLOT_ARRAY_TYPE and not _polyglot_element_type(data_type):
-        return LOCAL_TYPE_JSON
-    if type_name in POLYGLOT_COLLECTION_TYPES and _polyglot_element_type(data_type):
-        return data_type.sql(dialect="duckdb").strip()
-    if type_name in POLYGLOT_SPATIAL_AND_MONEY_TYPES:
-        return LOCAL_TYPE_VARCHAR
-    dialect: TypeDialect | None = _coerce_type_dialect(sql_analysis_dialect)
     if dialect == TypeDialect.POSTGRES and base_type in POSTGRES_VARCHAR_TYPES:
         return LOCAL_TYPE_VARCHAR
     if dialect == TypeDialect.POSTGRES and base_type in POSTGRES_SERIAL_TYPES:
         return _postgres_serial_local_type(base_type)
-    if (
-        dialect == TypeDialect.BIGQUERY
-        and base_type == BIGQUERY_BYTES_TYPE
-        and data_type.expressions
-    ):
-        return LOCAL_TYPE_VARCHAR
     if dialect == TypeDialect.SNOWFLAKE and base_type == SNOWFLAKE_VECTOR_TYPE:
         return LOCAL_TYPE_JSON
-
-    local_type: str = data_type.sql(dialect="duckdb").strip()
-    if (
-        not local_type
-        or local_type == UNTYPED_ARRAY_TYPE
-        or MALFORMED_RENDERED_TYPE_TOKEN in local_type
-    ):
+    local_type: str | None = _local_type_from_tree(json.loads(tree_json))
+    if local_type is None:
         return _fallback_local_type_for_warehouse_type(warehouse_type)
-    if local_type.startswith("BLOB"):
-        return "VARCHAR"
-    if local_type.startswith("TIMESTAMPTZ("):
-        return "TIMESTAMPTZ"
     if local_type == LOCAL_TYPE_REAL and _should_widen_real_to_double(
         warehouse_type=warehouse_type,
         sql_analysis_dialect=sql_analysis_dialect,
@@ -412,18 +451,70 @@ def _local_type_with_polyglot(
     return local_type
 
 
+def _local_type_from_tree(tree: dict[str, Any]) -> str | None:
+    """The DuckDB type of a SQLQuack type tree, or None when it has no fixed local type."""
+
+    kind: str = str(tree.get(TYPE_TREE_KIND, ""))
+    if kind in TYPE_TREE_LOCAL_TYPES:
+        return TYPE_TREE_LOCAL_TYPES[kind]
+    if kind in TYPE_TREE_TEXT_KINDS:
+        length: Any = tree.get("length")
+        return LOCAL_TYPE_TEXT if length is None else f"{LOCAL_TYPE_TEXT}({length})"
+    if kind == TYPE_TREE_FLOAT:
+        return LOCAL_TYPE_REAL if tree.get("real_spelling") else LOCAL_TYPE_FLOAT
+    if kind == TYPE_TREE_DECIMAL:
+        arguments: list[str] = [
+            str(value) for value in (tree.get("precision"), tree.get("scale")) if value is not None
+        ]
+        return LOCAL_TYPE_DECIMAL + (f"({', '.join(arguments)})" if arguments else "")
+    if kind == TYPE_TREE_TIME:
+        return LOCAL_TYPE_TIMETZ if tree.get("timezone") else LOCAL_TYPE_TIME
+    if kind == TYPE_TREE_TIMESTAMP:
+        return LOCAL_TYPE_TIMESTAMPTZ if tree.get("timezone") else LOCAL_TYPE_TIMESTAMP
+    if kind in TYPE_TREE_COLLECTIONS:
+        element: str | None = _local_type_from_tree(tree.get("element_type") or {})
+        return None if element is None else f"{element}[]"
+    if kind == TYPE_TREE_STRUCT:
+        fields: list[str] = []
+        for field in tree.get("fields") or []:
+            field_type: str | None = _local_type_from_tree(field.get("data_type") or {})
+            if field_type is None:
+                return None
+            fields.append(f"{_struct_field_name(str(field.get('name', '')))} {field_type}")
+        return f"STRUCT({', '.join(fields)})" if fields else None
+    if kind == TYPE_TREE_MAP:
+        key: str | None = _local_type_from_tree(tree.get("key_type") or {})
+        value: str | None = _local_type_from_tree(tree.get("value_type") or {})
+        return None if key is None or value is None else f"MAP({key}, {value})"
+    return None
+
+
+def _struct_field_name(name: str) -> str:
+    if STRUCT_FIELD_NAME_PATTERN.fullmatch(name):
+        return name
+    return '"' + name.replace('"', '""') + '"'
+
+
 def _fallback_local_type_for_warehouse_type(warehouse_type: str) -> str:
     """Return a conservative local type when SQL analysis cannot classify a type."""
 
+    return _known_local_type(warehouse_type) or LOCAL_TYPE_VARCHAR
+
+
+def _known_local_type(warehouse_type: str) -> str | None:
+    """The local type of a type name SQLBuild knows by its base name alone, else None."""
+
     normalized_type: str = warehouse_type.strip().upper()
-    base_type: str = normalized_type.split("(", 1)[0].strip()
+    base_type: str = _parse_type_pattern(normalized_type).base
     if base_type in FALLBACK_BOOLEAN_TYPES:
         return LOCAL_TYPE_BOOLEAN
-    if base_type in FALLBACK_SIGNED_INTEGER_TYPES:
-        return LOCAL_TYPE_BIGINT
+    if base_type in FALLBACK_SIGNED_INTEGER_LOCAL_TYPES:
+        return FALLBACK_SIGNED_INTEGER_LOCAL_TYPES[base_type]
     if base_type in FALLBACK_UNSIGNED_INTEGER_TYPES:
         return LOCAL_TYPE_BIGINT
     if base_type in FALLBACK_FLOAT_TYPES:
+        return LOCAL_TYPE_FLOAT
+    if base_type in FALLBACK_DOUBLE_TYPES:
         return LOCAL_TYPE_DOUBLE
     if base_type in FALLBACK_DECIMAL_TYPES:
         return _decimal_local_type(normalized_type)
@@ -441,7 +532,7 @@ def _fallback_local_type_for_warehouse_type(warehouse_type: str) -> str:
         return LOCAL_TYPE_VARCHAR
     if base_type in FALLBACK_STRUCTURED_TYPES:
         return LOCAL_TYPE_JSON
-    return LOCAL_TYPE_VARCHAR
+    return None
 
 
 def _postgres_serial_local_type(base_type: str) -> str:
@@ -453,7 +544,10 @@ def _postgres_serial_local_type(base_type: str) -> str:
 
 
 def _parse_type_pattern(type_text: str) -> _TypePattern:
-    normalized_type: str = type_text.strip().upper()
+    return _split_type_text(type_text.strip().upper())
+
+
+def _split_type_text(normalized_type: str) -> _TypePattern:
     if not normalized_type:
         return _TypePattern(base="")
     open_index: int = _first_type_arg_open_index(normalized_type)
@@ -536,37 +630,6 @@ def _decimal_local_type(normalized_type: str) -> str:
     if not precision_scale:
         return LOCAL_TYPE_DECIMAL
     return f"DECIMAL({precision_scale})"
-
-
-def _decimal_local_type_from_polyglot(data_type: Any) -> str | None:
-    precision_scale: str | None = _polyglot_precision_scale(data_type)
-    if precision_scale is None:
-        return LOCAL_TYPE_DECIMAL
-    return f"DECIMAL({precision_scale})"
-
-
-def _polyglot_precision_scale(data_type: Any) -> str | None:
-    args: dict[str, Any] = dict(getattr(data_type, "args", {}) or {})
-    values: list[str] = [
-        str(value) for value in (args.get("precision"), args.get("scale")) if value is not None
-    ]
-    if not values:
-        return None
-    return ", ".join(values)
-
-
-def _polyglot_type_name(data_type: Any) -> str:
-    args: dict[str, Any] = dict(getattr(data_type, "args", {}) or {})
-    data_type_name: str = str(args.get("data_type", "")).upper()
-    if data_type_name == POLYGLOT_CUSTOM_TYPE:
-        return str(args.get("name", "")).upper().replace(" ", "")
-    return data_type_name
-
-
-def _polyglot_element_type(data_type: Any) -> dict[str, Any] | None:
-    args: dict[str, Any] = dict(getattr(data_type, "args", {}) or {})
-    element_type: Any = args.get("element_type")
-    return element_type if isinstance(element_type, dict) else None
 
 
 def _should_widen_real_to_double(*, warehouse_type: str, sql_analysis_dialect: str | None) -> bool:

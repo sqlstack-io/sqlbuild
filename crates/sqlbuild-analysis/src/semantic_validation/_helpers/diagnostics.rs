@@ -6,7 +6,6 @@ use crate::semantic_validation::_helpers::sqlite_temporal_casts;
 use crate::semantic_validation::_helpers::truth_tests;
 use crate::semantic_validation::_helpers::type_locations::locate_type_findings;
 use crate::semantic_validation::models::DiagnosticRow;
-use crate::semantic_validation::models::FunctionProbes;
 use polyglot_sql::expressions::Select;
 use polyglot_sql::{
     Dialect, DialectType, Expression, ExpressionWalk, ValidationError, ValidationResult,
@@ -149,7 +148,6 @@ pub(crate) fn map_diagnostics(
     sql: &str,
     dialect: DialectType,
     result: ValidationResult,
-    probes: &FunctionProbes,
 ) -> Result<ValidationResult, String> {
     let mut context = DiagnosticContext {
         sql,
@@ -164,9 +162,7 @@ pub(crate) fn map_diagnostics(
             errors.push(error);
         }
     }
-    errors.extend(function_names::unsupported_function_errors(
-        sql, dialect, probes,
-    ));
+    errors.extend(function_names::unsupported_function_errors(sql, dialect));
     errors.extend(truth_tests::unsupported_truth_test_errors(sql, dialect));
     errors.extend(sqlite_temporal_casts::sqlite_temporal_cast_warnings(
         sql, dialect,
@@ -418,7 +414,6 @@ pub(crate) fn binding_diagnostics(
             valid: false,
             errors,
         },
-        &FunctionProbes::default(),
     )?;
     Ok(result.errors.into_iter().map(diagnostic_row).collect())
 }

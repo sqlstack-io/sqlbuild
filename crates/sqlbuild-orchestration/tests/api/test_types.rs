@@ -8,6 +8,20 @@ pub(crate) struct ApiContractTestCase {
     pub(crate) expected_status: RunStatus,
 }
 
+pub(crate) struct PublishEncodingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) forged_bearer: Option<&'static str>,
+    pub(crate) encoding: &'static str,
+    pub(crate) body: fn() -> Vec<u8>,
+    pub(crate) expected_status: reqwest::StatusCode,
+}
+
+pub(crate) struct OlderServerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) refusal: reqwest::StatusCode,
+    pub(crate) expected_requests: usize,
+}
+
 pub(crate) struct DevelopmentTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

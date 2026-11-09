@@ -19,14 +19,17 @@
 	let query = $state('');
 	const all = $derived(locations.data ?? []);
 	const filtered = $derived(all.filter((l) => !query.trim() || l.name.toLowerCase().includes(query.trim().toLowerCase())));
-	const unhealthy = $derived(all.filter((l) => l.health !== 'healthy' || l.activeProblems > 0).length);
+	const unhealthy = $derived(all.filter((l) => (l.health && l.health !== 'healthy') || l.activeProblems > 0).length);
+	const opensDetail = $derived(app.client.supports('getLocation'));
+	const showsServer = $derived(app.client.supports('platformHealth'));
+	const knowsPolicy = $derived(all.some((l) => l.brokenDeployPolicy));
 </script>
 
 <AppTopbar title="Locations">
 	<Button variant="outline" size="sm" onclick={() => (locations.refresh(), status?.refresh())}>↻ Refresh</Button>
 </AppTopbar>
 
-<ServerStatus bind:this={status} />
+{#if showsServer}<ServerStatus bind:this={status} />{/if}
 
 <ListToolbar
 	bind:query
@@ -44,23 +47,27 @@
 				<th>Deployed version</th>
 				<th>Warehouse</th>
 				<th>Location processes</th>
-				<th title="What happens when a deploy fails to load">If a deploy fails</th>
+				{#if knowsPolicy}<th title="What happens when a deploy fails to load">If a deploy fails</th>{/if}
 			</tr>
 		</thead>
 		<tbody>
 			{#each filtered as l (l.id)}
-				<tr onclick={() => goto(`/locations/${l.id}`)}>
+				<tr class:static={!opensDetail} onclick={() => opensDetail && goto(`/locations/${l.id}`)}>
 					<td>
 						<div class="cell-name">
 							<MapPinIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								<a href="/locations/{l.id}" onclick={(e) => e.stopPropagation()}>{l.name}</a>
+								{#if opensDetail}<a href="/locations/{l.id}" onclick={(e) => e.stopPropagation()}>{l.name}</a>{:else}{l.name}{/if}
 								<div class="cell-desc" title={l.target.connectionSummary}>{targetWords(l.target)}</div>
 							</div>
 						</div>
 					</td>
 					<td>
-						<StatusLabel tone={l.failedDeploy || l.activeProblems ? healthTone[l.health === 'healthy' ? 'degraded' : l.health] : healthTone[l.health]} label={healthWords(l)} />
+						{#if l.health}
+							<StatusLabel tone={l.failedDeploy || l.activeProblems ? healthTone[l.health === 'healthy' ? 'degraded' : l.health] : healthTone[l.health]} label={healthWords(l)} />
+						{:else}
+							<span title="You need view on every node of this location to see its health"><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
+						{/if}
 						{#if l.activeProblems}
 							<div class="cell-desc"><a class="link" href="/locations/{l.id}#problems" onclick={(e) => e.stopPropagation()}>{l.activeProblems} open problem{l.activeProblems === 1 ? '' : 's'}</a></div>
 						{/if}
@@ -85,13 +92,19 @@
 					</td>
 					<td>
 						<div>{l.liveInstances === 1 ? 'Running' : l.liveInstances === 0 ? 'Not running' : `${l.liveInstances} running`}</div>
-						<RelativeTime value="last check-in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} />
+						{#if l.lastSeenAt}<RelativeTime value="last check-in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} />{/if}
 					</td>
-					<td class="muted">{l.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : 'Hold scheduled runs until a deploy works'}</td>
+					{#if knowsPolicy}<td class="muted">{l.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : l.brokenDeployPolicy ? 'Hold scheduled runs until a deploy works' : '—'}</td>{/if}
 				</tr>
 			{:else}
-				<LoadRow colspan={6} resource={locations} empty={all.length ? 'No locations match the search.' : 'No code locations yet. Register one with the server using a location token.'} />
+				<LoadRow colspan={knowsPolicy ? 6 : 5} resource={locations} empty={all.length ? 'No locations match the search.' : 'No code locations yet. Register one with the server using a location token.'} />
 			{/each}
 		</tbody>
 	</table>
 </div>
+
+<style>
+	tr.static {
+		cursor: default;
+	}
+</style>

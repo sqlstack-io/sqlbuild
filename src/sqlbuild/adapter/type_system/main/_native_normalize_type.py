@@ -15,7 +15,7 @@ from sqlbuild.diagnostics.main.log_debug_event import log_debug_event
 
 
 def normalize_native_type(*, type_sql: str, dialect: TypeDialect | str | None) -> NormalizedType:
-    """Return the native normalization of one type, raising as Polyglot does."""
+    """Return the native normalization of one type, raising ValueError for an unknown dialect."""
 
     (normalized_name, family, precision, scale, length), parse_error = _native.normalize_type(
         type_sql, str(dialect or "generic")

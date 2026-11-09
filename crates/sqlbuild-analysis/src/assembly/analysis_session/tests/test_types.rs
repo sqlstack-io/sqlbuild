@@ -230,3 +230,11 @@ pub(crate) struct TypedMarkerCacheTestCase {
     pub(crate) sql: &'static str,
     pub(crate) expected_hits: &'static [bool],
 }
+
+/// A pivot over a CTE whose projection is a left-nested sum of `terms` ones.
+pub(crate) struct DeepPivotTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) terms: usize,
+    pub(crate) expected_outcome: PivotOutcome,
+}

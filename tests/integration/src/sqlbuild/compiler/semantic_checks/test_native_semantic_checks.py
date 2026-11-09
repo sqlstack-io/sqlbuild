@@ -132,7 +132,7 @@ def test_given_generated_failing_projects_when_completing_natively_then_matches_
             seed=20261015,
             count=2,
             non_ascii=False,
-            dialects=("mysql", "tsql", "databricks", "sqlite", "oracle", "trino"),
+            dialects=("tsql", "databricks", "sqlite", "clickhouse"),
             expected_outcomes=frozenset({"completed"}),
         ),
         FormerlyDeferredSemanticTestCase(

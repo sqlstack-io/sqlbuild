@@ -24,9 +24,11 @@ export const PERMISSIONS: Record<Capability, PermissionInfo> = {
 		description: 'Rebuild tables from scratch or reprocess earlier periods, replacing data already built.',
 		risk: 'changes_data'
 	},
+	'run.prioritise': { label: 'Put runs ahead of the queue', description: 'Start or rerun a run with a priority above 0, so it is claimed before waiting runs.', risk: 'operate' },
+	'run.warehouse': { label: 'Choose a run’s warehouse', description: 'Start an ad-hoc run on another warehouse configured for the target, which can change cost and speed.', risk: 'operate' },
 	'trigger.toggle': { label: 'Pause and resume schedules and sensors', description: 'Stop or restart automatic runs.', risk: 'operate' },
 	'sensor.reset_cursor': { label: 'Reset where a sensor is up to', description: 'Move a sensor’s position so it looks at events again.', risk: 'operate' },
-	'run.adhoc': { label: 'Build any selection of nodes', description: 'Start an ad-hoc run of nodes outside a declared job, writing to the warehouse.', risk: 'changes_data' },
+	'run.adhoc': { label: 'Run ad-hoc commands', description: 'Run sqb build and other commands on any selection of nodes outside a declared job, writing to the warehouse.', risk: 'changes_data' },
 	'connection.test': { label: 'Test warehouse connections', description: 'Run the connection check from a location.', risk: 'operate' },
 	'plan.preview': { label: 'Preview build plans', description: 'See what a run would build without running it.', risk: 'read' },
 	'location.manage': { label: 'Manage locations and their tokens', description: 'Register locations and create, rotate or revoke their tokens.', risk: 'administer' },
@@ -72,13 +74,32 @@ export function requiresText(action: Capability): string {
 	return `Requires “${PERMISSIONS[action].label}” (${action})`;
 }
 
-const AUDIT_ONLY: Record<Exclude<AuditEntry['action'], Capability>, string> = {
-	'session.login': 'Signed in'
+const AUDIT_ONLY: Record<string, string> = {
+	'session.login': 'Signed in',
+	'admin.granted': 'Changed administrators',
+	'authorization.denied': 'Denied',
+	'cli.login.started': 'Started CLI sign-in',
+	'cli.login.decided': 'Decided CLI sign-in',
+	'cli.login.exchanged': 'Completed CLI sign-in',
+	'evidence.read': 'Read sample rows',
+	'job.run_requested': 'Requested a job run',
+	'location.created': 'Created location',
+	'oidc.flow.created': 'Started SSO sign-in',
+	'oidc.authenticated': 'Signed in with SSO',
+	'password.changed': 'Changed password',
+	'principal.created': 'Added person',
+	'role.assigned': 'Changed role',
+	'run.cancel_requested': 'Requested cancel',
+	'run.rerun_requested': 'Requested rerun',
+	'session.created': 'Signed in',
+	'session.revoked': 'Signed out',
+	'sql.read': 'Read SQL',
+	'token.issued': 'Issued token',
+	'token.revoked': 'Revoked token',
+	'trigger.changed': 'Changed trigger'
 };
 
 /** Plain name of an audited action, including the audit-only ones. */
-export function auditActionLabel(action: AuditEntry['action']): string {
-	return action in PERMISSIONS ? PERMISSIONS[action as Capability].label : AUDIT_ONLY[action as keyof typeof AUDIT_ONLY];
+export function auditActionLabel(action: string): string {
+	return action in PERMISSIONS ? PERMISSIONS[action as Capability].label : (AUDIT_ONLY[action] ?? action);
 }
-
-export const AUDIT_ACTIONS: AuditEntry['action'][] = [...CAPABILITIES, 'session.login'];

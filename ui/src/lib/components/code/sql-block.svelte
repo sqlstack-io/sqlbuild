@@ -73,5 +73,8 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		line-height: 1.65;
+		/* Wrap long lines: inside table cells a scrolling block widens its column instead. */
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
 	}
 </style>

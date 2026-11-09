@@ -53,10 +53,15 @@ def verify_check_name(*, job: dict[str, Any], event: WorkflowEvent) -> str:
         "github": {
             "event_name": event.event_name,
             "repository": event.repository,
-            "event": {"pull_request": pull_request}
+            "event": {
+                "pull_request": pull_request,
+                "action": event.action,
+                "label": {"name": event.label},
+            }
             if event.event_name == PULL_REQUEST_EVENT
             else {},
-        }
+        },
+        "needs": {"changes": {"outputs": {"partial": event.partial}}},
     }
     return evaluate_template(template=str(job.get("name", VERIFY_JOB)), contexts=contexts).strip()
 

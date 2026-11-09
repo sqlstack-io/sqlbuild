@@ -69,7 +69,7 @@
 						{:else}
 							<Panel title="Base role">
 								{#snippet actions()}
-									<label class="toggle"><input type="checkbox" class="sb-check" bind:checked={compare} /> Compare with base</label>
+									{#if r.extends}<label class="toggle"><input type="checkbox" class="sb-check" bind:checked={compare} /> Compare with base</label>{/if}
 								{/snippet}
 								{#if r.extends}
 									<p>
@@ -77,7 +77,7 @@
 										inherit further than one built-in role.
 									</p>
 								{:else}
-									<p class="muted">Starts from nothing; only the additions below apply.</p>
+									<p class="muted">Starts from nothing; only the additions below apply, on top of any built-in role a person also holds.</p>
 								{/if}
 								{#if compare}
 									<table class="compare">
@@ -160,9 +160,11 @@
 							{/if}
 						{/if}
 
-						<Panel title="Definition" note="Read-only; change it in code">
-							<CodePreview file={r.definedIn ?? 'built in'} code={r.definition} language="text" maxLines={24} />
-						</Panel>
+						{#if r.definition}
+							<Panel title="Definition" note="As the location published it; change it in the project's roles file">
+								<CodePreview file={r.definedIn ?? 'published roles document'} code={r.definition} language="text" maxLines={24} />
+							</Panel>
+						{/if}
 					</div>
 
 					<div class="min-w-0">

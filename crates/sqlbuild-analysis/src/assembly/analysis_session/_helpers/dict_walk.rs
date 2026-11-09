@@ -6,6 +6,7 @@ use polyglot_sql::{ComplexityGuardOptions, DataType, Dialect, Expression, ParseO
 use serde_json::{Map, Value, json};
 
 use crate::assembly::analysis_session::models::ProjectionFacts;
+use crate::relation_markers::constants::MARKER_NAME_PREFIX;
 
 use crate::assembly::analysis_session::constants::{
     ALIAS_AST_KIND, ANNOTATED_AST_KIND, ARRAY_FIXTURE_TYPE, ARRAY_PAYLOAD_KIND, CATALOG_TABLE_ARG,
@@ -95,7 +96,8 @@ pub(crate) fn relation_name(node: Option<&Value>) -> Option<&str> {
     let key: &str = node_key(node);
     let payload: &Map<String, Value> = payload(node)?;
     if key == TABLE_AST_KIND || key == COLUMN_AST_KIND {
-        return identifier_name(payload.get("name"));
+        return identifier_name(payload.get("name"))
+            .filter(|name| !name.starts_with(MARKER_NAME_PREFIX));
     }
     let called: &str = payload
         .get("name")

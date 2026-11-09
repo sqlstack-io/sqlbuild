@@ -6,7 +6,7 @@ import { createResource } from '$lib/state/resource.svelte';
 export function createRolesState() {
 	const can = () => app.can('role.assign');
 	const roles = createResource((client, scope) => (can() ? client.listRoles(scope.locationId) : Promise.resolve([] as RoleDefinition[])));
-	const sso = createResource((client) => (can() ? client.listSsoMappings() : Promise.resolve([] as SsoMapping[])));
+	const sso = createResource((client) => (can() && client.supports('listSsoMappings') ? client.listSsoMappings() : Promise.resolve([] as SsoMapping[])));
 
 	return {
 		roles,

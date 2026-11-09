@@ -24,7 +24,11 @@ RELEASE_AWARE_NAME: str = (
     "${{ (github.event_name == 'pull_request'"
     " && github.event.pull_request.head.repo.full_name == github.repository"
     " && startsWith(github.event.pull_request.head.ref, 'release-please--branches--'))"
-    " && 'Release pull request suites' || 'Verify' }}"
+    " && 'Release pull request suites'"
+    " || ((github.event.action == 'labeled' || github.event.action == 'unlabeled')"
+    " && github.event.label.name != 'full-verify') && 'Label change (nothing verified)'"
+    " || needs.changes.outputs.partial == 'true' && 'Fast core (label full-verify for Verify)'"
+    " || 'Verify' }}"
 )
 
 
@@ -69,6 +73,42 @@ def test_given_repository_workflows_when_checking_release_gate_then_returns_no_e
             expected_name="Verify",
         ),
         VerifyCheckNameTestCase(
+            description="fast-core pull request reports under another name",
+            event_name="pull_request",
+            head_ref="feature/inventory-sync",
+            head_repository=REPOSITORY,
+            expected_name="Fast core (label full-verify for Verify)",
+            action="synchronize",
+            partial="true",
+        ),
+        VerifyCheckNameTestCase(
+            description="unrelated label reports under another name",
+            event_name="pull_request",
+            head_ref="feature/inventory-sync",
+            head_repository=REPOSITORY,
+            expected_name="Label change (nothing verified)",
+            action="labeled",
+            label="documentation",
+        ),
+        VerifyCheckNameTestCase(
+            description="full-verify label reports Verify",
+            event_name="pull_request",
+            head_ref="feature/inventory-sync",
+            head_repository=REPOSITORY,
+            expected_name="Verify",
+            action="labeled",
+            label="full-verify",
+            partial="false",
+        ),
+        VerifyCheckNameTestCase(
+            description="unclassified pull request reports Verify, which then fails",
+            event_name="pull_request",
+            head_ref="feature/inventory-sync",
+            head_repository=REPOSITORY,
+            expected_name="Verify",
+            action="synchronize",
+        ),
+        VerifyCheckNameTestCase(
             description="merge group reports Verify",
             event_name="merge_group",
             head_ref=None,
@@ -93,6 +133,9 @@ def test_given_event_when_naming_repository_verify_job_then_reports_expected_nam
         repository=REPOSITORY,
         head_ref=test_case.head_ref,
         head_repository=test_case.head_repository,
+        action=test_case.action,
+        label=test_case.label,
+        partial=test_case.partial,
     )
 
     assert verify_check_name(job=read_verify_job(), event=event) == test_case.expected_name
@@ -109,6 +152,10 @@ def test_given_event_when_naming_repository_verify_job_then_reports_expected_nam
                 "under .github/workflows/verify.yml.",
                 "A release pull request pushed to after its trusted release checks passed can "
                 "merge under .github/workflows/verify.yml.",
+                "A feature pull request whose fast core passed without the full matrix it needs "
+                "can merge under .github/workflows/verify.yml.",
+                "A feature pull request whose only run followed an unrelated label can merge "
+                "under .github/workflows/verify.yml.",
             ),
         ),
         GateViolationTestCase(
@@ -187,6 +234,79 @@ def test_given_workflows_when_checking_release_gate_then_reports_violations(
         VerificationSuitesTestCase(
             "docs-only skips terminate successfully", "false", "skipped", "skipped", 0
         ),
+        VerificationSuitesTestCase(
+            "full run whose selected suites passed",
+            "true",
+            "success",
+            "success",
+            0,
+            (
+                ("PARTIAL", "false"),
+                ("LABEL_ONLY", "false"),
+                ("DUCKDB_SELECTED", "true"),
+                ("RECOVERY_SELECTED", "true"),
+            ),
+        ),
+        VerificationSuitesTestCase(
+            "full run with a selected suite skipped fails closed",
+            "true",
+            "success",
+            "success",
+            1,
+            (
+                ("PARTIAL", "false"),
+                ("LABEL_ONLY", "false"),
+                ("RECOVERY_SELECTED", "true"),
+                ("SCHEDULER_RECOVERY_RESULT", "skipped"),
+            ),
+        ),
+        VerificationSuitesTestCase(
+            "full run with selected wheels skipped fails closed",
+            "true",
+            "success",
+            "success",
+            1,
+            (
+                ("PARTIAL", "false"),
+                ("LABEL_ONLY", "false"),
+                ("WHEELS_SELECTED", "true"),
+                ("WHEELS_RESULT", "skipped"),
+                ("COMPOSE_RESULT", "skipped"),
+            ),
+        ),
+        VerificationSuitesTestCase(
+            "fast core passes while the full matrix waits for its label",
+            "true",
+            "success",
+            "success",
+            0,
+            (
+                ("PARTIAL", "true"),
+                ("LABEL_ONLY", "false"),
+                ("DUCKDB_SELECTED", "true"),
+                ("E2E_SHARDS_RESULT", "skipped"),
+            ),
+        ),
+        VerificationSuitesTestCase(
+            "fast core cannot mask a static failure",
+            "true",
+            "failure",
+            "success",
+            1,
+            (("PARTIAL", "true"), ("LABEL_ONLY", "false")),
+        ),
+        VerificationSuitesTestCase(
+            "unrelated label run verifies nothing",
+            "true",
+            "skipped",
+            "skipped",
+            0,
+            (
+                ("LABEL_ONLY", "true"),
+                ("CHANGES_RESULT", "skipped"),
+                ("LOCKFILE_RESULT", "skipped"),
+            ),
+        ),
     ],
     ids=lambda case: case.description,
 )
@@ -202,6 +322,7 @@ def test_given_selected_suites_when_aggregating_then_failures_and_skips_resolve(
         CHECKS_RESULT=test_case.checks,
         NATIVE_CHECKS_RESULT=test_case.native_checks,
     )
+    environment.update(dict(test_case.environment))
     result: subprocess.CompletedProcess[str] = subprocess.run(
         ["bash", "-e", "-c", step["run"]],
         env=os.environ | environment,

@@ -12,7 +12,7 @@ use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 use crate::store::types::Row;
 
-const ACTIONS: [Action; 14] = [
+const ACTIONS: [Action; 16] = [
     Action::View,
     Action::ViewSql,
     Action::ViewEvidence,
@@ -20,6 +20,8 @@ const ACTIONS: [Action; 14] = [
     Action::RunCancel,
     Action::RunRerun,
     Action::RunRewriteHistory,
+    Action::RunPrioritise,
+    Action::RunWarehouse,
     Action::TriggerToggle,
     Action::SensorResetCursor,
     Action::RunAdhoc,
@@ -56,6 +58,14 @@ fn role_allows(role: BuiltinRole, action: Action) -> bool {
                 | ConnectionTest
         ),
     }
+}
+
+/// A built-in role's actions on every node, in vocabulary order.
+pub(crate) fn builtin_actions(role: BuiltinRole) -> Vec<Action> {
+    ACTIONS
+        .into_iter()
+        .filter(|action| role_allows(role, *action))
+        .collect()
 }
 
 /// The assigned and group roles of an active person for `target`; `None` when the person is disabled or unknown.

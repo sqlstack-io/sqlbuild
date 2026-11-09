@@ -1,6 +1,7 @@
 //! Real stored evidence never substitutes observation clocks for consumed inputs.
 
 use serde_json::{Value, json};
+use std::cell::Cell;
 use uuid::Uuid;
 
 use crate::credentials::models::{AuditContext, DefaultRole};
@@ -8,6 +9,7 @@ use crate::runs::tests::helpers::snapshot;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::snapshots::models::SnapshotInput;
 use crate::snapshots::models::SnapshotNode;
+use crate::store::_helpers::statement_count::STATEMENTS;
 use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit, query::query};
 use crate::store::models::{ControlStore, Parameter, TransactionMode};
@@ -18,6 +20,9 @@ use crate::warehouse_metadata::main::{
     read_person_node_status::read_person_node_status,
 };
 use crate::warehouse_metadata::models::{MetadataBatch, NodeStatusQuery};
+
+/// Statements a catalog listing issues besides one build read per 100 nodes: 7 fixed, 1 per extra namespace shape.
+const WIDE_LISTING_FIXED_STATEMENTS: usize = 8;
 
 pub(crate) async fn node_status_reads(
     store: &ControlStore,
@@ -243,7 +248,12 @@ pub(crate) async fn node_status_reads(
     );
     assert!(!json!(listed).to_string().contains("metadata_json"));
     listing_ignores_build_history(store, credentials, (location, &listed)).await;
-    listing_reads_wide_targets_in_batches(store, credentials, (location, input.clone())).await;
+    listing_wide_targets_is_batched_without_super_linear_growth(
+        store,
+        credentials,
+        (location, input.clone()),
+    )
+    .await;
     assert!(matches!(
         read_person_node_status(
             store,
@@ -358,8 +368,8 @@ async fn listing_ignores_build_history(
     );
 }
 
-/// Three thousand built nodes, half in a named database, keep their own builds, and listing them grows linearly.
-async fn listing_reads_wide_targets_in_batches(
+/// Three thousand nodes, half in a named database, keep their own builds, read 100 per statement without super-linear growth.
+async fn listing_wide_targets_is_batched_without_super_linear_growth(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (location, mut input): (Uuid, SnapshotInput),
@@ -367,33 +377,36 @@ async fn listing_reads_wide_targets_in_batches(
     let names: Vec<String> = (0..3_000).map(|index| format!("wide_{index:04}")).collect();
     let mut medians: Vec<std::time::Duration> = Vec::new();
     for (first, size) in [(0, 1_000), (1_000, names.len())] {
-        medians.push(
-            list_wide_target(
-                store,
-                credentials,
-                (location, &mut input),
-                (&names, first, size),
-            )
-            .await,
+        let (median, statements) = list_wide_target(
+            store,
+            credentials,
+            (location, &mut input),
+            (&names, first, size),
+        )
+        .await;
+        assert!(
+            statements <= size.div_ceil(100) + WIDE_LISTING_FIXED_STATEMENTS,
+            "listing {size} nodes issued {statements} store statements; builds must be read 100 or more nodes per statement"
         );
+        medians.push(median);
     }
     let ratio: f64 = medians[1].as_secs_f64() / medians[0].as_secs_f64();
     assert!(
         ratio < 6.0,
-        "listing {} nodes took {:?}, {ratio:.1} times the {:?} for 1,000; listing must stay linear",
+        "listing {} nodes took {:?}, {ratio:.1} times the {:?} for 1,000; listing must not grow super-linearly",
         names.len(),
         medians[1],
         medians[0]
     );
 }
 
-/// Add `names[first..size]` with one build each and return the median time to list the first `size`.
+/// Add `names[first..size]` with one build each; return the median listing time and one listing's statement count.
 async fn list_wide_target(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
     (location, input): (Uuid, &mut SnapshotInput),
     (names, first, size): (&[String], usize, usize),
-) -> std::time::Duration {
+) -> (std::time::Duration, usize) {
     let database = |index: usize| (index % 2 == 1).then(|| "analytics_db".to_owned());
     let built_at = |index: usize| {
         chrono::DateTime::parse_from_rfc3339("2026-02-01T00:00:00Z")
@@ -492,5 +505,18 @@ async fn list_wide_target(
         assert_eq!(built, size, "every wide node keeps its own build");
     }
     timings.sort();
-    timings[1]
+    let statements = STATEMENTS
+        .scope(Cell::new(0), async {
+            list_person_catalog_nodes(
+                store,
+                credentials,
+                (location, "development"),
+                DefaultRole::None,
+            )
+            .await
+            .expect("counted wide catalog");
+            STATEMENTS.with(Cell::get)
+        })
+        .await;
+    (timings[1], statements)
 }

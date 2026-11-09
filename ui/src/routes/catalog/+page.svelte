@@ -17,7 +17,7 @@
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { nodeOutcomeLabel, nodeOutcomeTone } from '$lib/status';
-	import { NODE_KINDS, kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortRunId } from '$lib/build-area/labels';
+	import { NODE_KINDS, kindLine, nodeIcon, nodeIconKey, nodeKindPlural, shortName, shortRunId } from '$lib/build-area/labels';
 
 	type StatusFilter = 'stale' | 'changed' | 'behind' | 'failed' | 'warn';
 
@@ -130,7 +130,7 @@
 						<div class="cell-name">
 							<Glyph size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								{#if linksNodes}<a href="/catalog/{n.key}" onclick={(e) => e.stopPropagation()}>{n.key}</a>{:else}<span class="mono">{n.key}</span>{/if}
+								{#if linksNodes}<a href="/catalog/{n.key}" title={n.key} onclick={(e) => e.stopPropagation()}>{shortName(n.key)}</a>{:else}<span class="mono" title={n.key}>{shortName(n.key)}</span>{/if}
 								<div class="cell-desc">{n.description}</div>
 							</div>
 						</div>

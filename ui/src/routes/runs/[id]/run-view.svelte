@@ -25,7 +25,7 @@
 	let topView = $state<'timeline' | 'graph'>('timeline');
 	/** The graph needs dependency edges and the bottom pane needs execution reads; servers without them show neither. */
 	const hasGraph = $derived((detail?.edges.length ?? 0) > 0);
-	const hasBottom = $derived(bottomTabs(app.client).length > 0);
+	const hasBottom = $derived(bottomTabs(app.client, (c) => app.can(c)).length > 0);
 
 	/** The axis starts at the first node start, not at queue time. */
 	const origin = $derived.by(() => {

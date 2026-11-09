@@ -126,7 +126,7 @@
 						<Panel title="Details">
 							<KeyValues
 								rows={[
-									{ label: 'Signs in with', value: accountSourceLabel[account.source] },
+									{ label: 'Signs in with', value: account.source ? accountSourceLabel[account.source] : '—' },
 									{ label: 'Email', value: account.email ?? '—' },
 									{ label: 'SSO groups', value: account.ssoGroups.join(', ') || '—' },
 									{ label: 'Last active', value: account.lastSeenAt ? formatAgo(account.lastSeenAt, app.now) : 'Never', title: formatStamp(account.lastSeenAt) },

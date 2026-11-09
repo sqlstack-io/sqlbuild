@@ -10,6 +10,8 @@ pub(crate) async fn query(
     sql: &str,
     parameters: Vec<Parameter>,
 ) -> Result<(ControlTransaction, Vec<Row>), ControlError> {
+    #[cfg(test)]
+    crate::store::_helpers::statement_count::count_statement();
     let connection = transaction
         .connection
         .take()

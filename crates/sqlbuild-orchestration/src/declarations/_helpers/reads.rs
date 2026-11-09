@@ -3,6 +3,7 @@
 use uuid::Uuid;
 
 use crate::declarations::models::{JobRecord, StoredJob, TriggerRecord};
+use crate::scheduler::models::TickRecord;
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -41,4 +42,17 @@ pub(crate) async fn jobs_in(
         })
         .collect();
     Ok((transaction, jobs))
+}
+
+/// The newest tick of every published trigger in the target, each found through the trigger-time index.
+pub(crate) async fn latest_ticks_in(
+    transaction: ControlTransaction,
+    (location_id, target): (Uuid, &str),
+) -> Result<(ControlTransaction, Vec<TickRecord>), ControlError> {
+    query_records(transaction,
+        "SELECT k.tick_id, k.trigger_id, k.scheduled_for, k.evaluated_at, k.epoch, k.outcome, k.run_id, k.covered_by_run_id \
+         FROM sqb_triggers t JOIN sqb_ticks k ON k.tick_id=(SELECT x.tick_id FROM sqb_ticks x WHERE x.trigger_id=t.trigger_id \
+         ORDER BY x.scheduled_for DESC LIMIT 1) \
+         WHERE t.location_id=$1 AND t.target=$2 AND t.removed_in_snapshot_id IS NULL",
+        vec![Parameter::Id(location_id), Parameter::Text(target.into())]).await
 }

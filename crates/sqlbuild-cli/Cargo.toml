@@ -27,6 +27,7 @@ reqwest.workspace = true
 rpassword.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, features = ["arbitrary_precision"] }
+sqlbuild-analysis.workspace = true
 sqlbuild-build-features.workspace = true
 sqlbuild-cache.workspace = true
 sqlbuild-config.workspace = true

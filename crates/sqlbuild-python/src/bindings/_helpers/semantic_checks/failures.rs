@@ -1,7 +1,7 @@
 //! The exception a failed native semantic completion step raises.
 
+use pyo3::PyErr;
 use pyo3::exceptions::{PyTypeError, PyValueError};
-use pyo3::{PyErr, Python};
 use sqlbuild_analysis::semantic_checks::models::SemanticFailure;
 use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::is_compiler_panic::is_compiler_panic;
@@ -15,13 +15,13 @@ const SEMANTIC_CONTEXT: &str = "native semantic completion";
 const NO_DIALECT_MESSAGE: &str = "argument 'dialect': 'None' is not an instance of 'str'";
 
 /// The error Python's semantic completion raised for the same input, or `NativeCompilerError`.
-pub(crate) fn semantic_error(python: Python<'_>, failure: &SemanticFailure) -> PyErr {
+pub(crate) fn semantic_error(failure: &SemanticFailure) -> PyErr {
     match failure {
         SemanticFailure::NoDialect => PyTypeError::new_err(NO_DIALECT_MESSAGE),
         SemanticFailure::UnknownDialect(name) => {
             PyValueError::new_err(format!("Unknown dialect: {name}"))
         }
-        SemanticFailure::TypeNormalization(error) => normalization_error(python, error),
+        SemanticFailure::TypeNormalization(error) => normalization_error(error),
         SemanticFailure::Internal(reason) => internal_error(reason),
     }
 }

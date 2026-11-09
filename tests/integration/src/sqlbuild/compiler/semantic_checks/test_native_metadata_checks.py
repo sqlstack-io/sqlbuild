@@ -56,7 +56,7 @@ from tests.integration.src.sqlbuild.compiler.semantic_checks.helpers import (
             seed=20261017,
             count=4,
             model_count=10,
-            dialects=("duckdb", "mysql", "tsql", None, "nonsense"),
+            dialects=("duckdb", "clickhouse", "tsql", None, "nonsense"),
             non_ascii=True,
             golden_prefix="metadata_formerly_deferred",
             expected_minimum_native=12,

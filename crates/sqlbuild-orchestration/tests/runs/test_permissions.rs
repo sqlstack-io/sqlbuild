@@ -17,12 +17,13 @@ use crate::credentials::models::{
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::main::{
-    advance_groups::advance_groups, cancel_person_run::cancel_person_run, change_run::change_run,
-    list_person_runs::list_person_runs, list_runs::list_runs, request_job_run::request_job_run,
-    request_person_job_run::request_person_job_run, request_rerun::request_rerun,
+    advance_groups::advance_groups, change_run::change_run, list_person_runs::list_person_runs,
+    list_runs::list_runs, request_job_run::request_job_run, request_person_run::request_person_run,
+    request_rerun::request_rerun,
 };
 use crate::runs::models::{
-    CancelRunRequest, JobRunRequest, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
+    CancelRunRequest, JobRunRequest, PersonRunRequest, RerunRequest, RunAuthority, RunChange,
+    RunChangeRequest,
 };
 use crate::runs::tests::helpers::{request_run, snapshot};
 use crate::runs::tests::test_types::PersonRunPermissionTestCase;
@@ -142,7 +143,12 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     };
                     assert!(
                         matches!(
-                            request_person_job_run(store, (&context, credentials), &request).await,
+                            request_person_run(
+                                store,
+                                (&context, credentials),
+                                PersonRunRequest::Job(&request)
+                            )
+                            .await,
                             Err(ControlError::Denied { .. })
                         ),
                         "no role is the default"
@@ -180,14 +186,14 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         .expect("leader");
                     let mut reruns = Vec::new();
                     for job_key in ["daily_orders", "orders_group"] {
-                        let result = request_person_job_run(
+                        let result = request_person_run(
                             store,
                             (&context, credentials),
-                            &JobRunRequest {
+                            PersonRunRequest::Job(&JobRunRequest {
                                 run_id: Uuid::now_v7(),
                                 job_key: job_key.into(),
                                 ..request.clone()
-                            },
+                            }),
                         )
                         .await;
                         assert_eq!(
@@ -209,11 +215,12 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             &JobRunRequest {
                                 run_id: source_id,
                                 job_key: job_key.into(),
+                                priority: 1,
                                 ..request.clone()
                             },
                         )
                         .await
-                        .expect("owner creates source with frozen settings");
+                        .expect("owner creates urgent source with frozen settings");
                         let cancellation = CancelRunRequest {
                             run_id: source_id,
                             event_id: Uuid::now_v7(),
@@ -222,11 +229,15 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         let can_cancel = test_case.role != BuiltinRole::Viewer;
                         for expected in [true, false] {
                             assert_eq!(
-                                cancel_person_run(store, (&context, credentials), &cancellation)
-                                    .await
-                                    .ok(),
+                                request_person_run(
+                                    store,
+                                    (&context, credentials),
+                                    PersonRunRequest::Cancel(&cancellation),
+                                )
+                                .await
+                                .ok(),
                                 can_cancel.then_some(expected),
-                                "cancellation permits stopping even sensitive work"
+                                "cancellation permits stopping even sensitive or prioritised work"
                             );
                         }
                         let source_id = Uuid::now_v7();
@@ -301,14 +312,14 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     request_run(store, &adhoc)
                         .await
                         .expect("owner requests ad-hoc execution");
-                    cancel_person_run(
+                    request_person_run(
                         store,
                         (&context, sessions[0].identity.principal_id),
-                        &CancelRunRequest {
+                        PersonRunRequest::Cancel(&CancelRunRequest {
                             run_id: adhoc.run_id,
                             event_id: Uuid::now_v7(),
                             reason: "Stop ad-hoc source".into(),
-                        },
+                        }),
                     )
                     .await
                     .expect("administrator stops ad-hoc execution");
@@ -375,13 +386,13 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                     );
                     assert!(
                         matches!(
-                            request_person_job_run(
+                            request_person_run(
                                 store,
                                 (&context, credentials),
-                                &JobRunRequest {
+                                PersonRunRequest::Job(&JobRunRequest {
                                     run_id: Uuid::now_v7(),
                                     ..request
-                                }
+                                })
                             )
                             .await,
                             Err(ControlError::Denied { .. })

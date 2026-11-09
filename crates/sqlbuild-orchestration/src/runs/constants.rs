@@ -14,3 +14,8 @@ pub(crate) const RECALL_INVOCATION_ID_BYTES: usize = 256;
 /// Manual requests derive their audit event ID from the run ID so retries find the original.
 pub(crate) const MANUAL_JOB_AUDIT_TAG: &[u8] = b"manual-job-request";
 pub(crate) const RERUN_AUDIT_TAG: &[u8] = b"rerun-request";
+/// Verbs a worker runs today; other verbs parse, resolve and authorise but are refused at launch.
+pub(crate) const LAUNCHABLE_VERBS: [&str; 1] = ["build"];
+
+/// Ad-hoc requests derive their audit event ID from the run ID so retries find the original.
+pub(crate) const ADHOC_AUDIT_TAG: &[u8] = b"adhoc-run-request";

@@ -1,12 +1,15 @@
 use crate::query_facts::constants::{
-    CALL_STUB, PLACEHOLDER_PREFIX, PLACEHOLDER_VALUE, REF_STUB, SOURCE_STUB, TABLE_FUNCTION_CALL,
-    TABLE_FUNCTION_STUB, UDF_CALL, UDF_STUB,
+    CALL_STUB, PLACEHOLDER_PREFIX, PLACEHOLDER_VALUE, REF_STUB, SNOWFLAKE_DIALECT, SOURCE_STUB,
+    TABLE_FUNCTION_CALL, TABLE_FUNCTION_STUB, UDF_CALL, UDF_STUB,
 };
 use crate::query_facts::models::{CallKind, ModelCall, ModelShape};
 use crate::rules::main::compact_sql::compact_sql;
 use sqlbuild_analysis::semantic_validation::main::normalize_mapped::normalize_mapped;
+use sqlbuild_sqltext::sql_scan::constants::TABLE_WRAPPER;
+use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_end::dialect_non_code_end;
+use sqlbuild_sqltext::sql_scan::main::follows_table_wrapper::follows_table_wrapper;
 use sqlbuild_sqltext::sql_scan::main::quote_policy::quote_policy;
 use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, QuotePolicy};
 
@@ -15,7 +18,12 @@ pub(crate) fn model_shape(sql: &str, dialect: &str) -> Result<ModelShape, String
         dollar_quotes: true,
         ..quote_policy(dialect)
     };
-    let (stubbed, stub_offsets, calls) = stub_calls(sql, policy, &lexical_syntax(dialect));
+    let (stubbed, stub_offsets, calls) = stub_calls(
+        sql,
+        policy,
+        &dialect_lexical_syntax(dialect),
+        dialect == SNOWFLAKE_DIALECT,
+    );
     let normalized = normalize_mapped(&stubbed, dialect)?;
     let end = stub_offsets.last().copied().unwrap_or_default();
     let offsets: Vec<usize> = normalized
@@ -77,46 +85,6 @@ fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'$'
 }
 
-/// The comment and quoted-text syntax the rules parser tokenized for `dialect`.
-fn lexical_syntax(dialect: &str) -> LexicalSyntax {
-    let strings = |quotes: &[&str]| quotes.iter().map(|quote| (*quote).to_owned()).collect();
-    let lines = |prefixes: &[&str]| prefixes.iter().map(|prefix| (*prefix).to_owned()).collect();
-    match dialect.to_ascii_lowercase().as_str() {
-        "bigquery" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'", "\""]),
-            raw_string_prefix: true,
-            triple_quoted_strings: true,
-            line_comment_prefixes: lines(&["--", "#"]),
-            ..LexicalSyntax::default()
-        },
-        "snowflake" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'"]),
-            line_comment_prefixes: lines(&["--", "//"]),
-            ..LexicalSyntax::default()
-        },
-        "clickhouse" => LexicalSyntax {
-            backslash_escape_quotes: strings(&["'"]),
-            line_comment_prefixes: lines(&["--", "#", "//"]),
-            ..LexicalSyntax::default()
-        },
-        "databricks" | "duckdb" => LexicalSyntax {
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-        "mssql" | "sqlserver" | "tsql" => LexicalSyntax {
-            nested_block_comments: true,
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-        _ => LexicalSyntax {
-            escape_string_prefix: true,
-            nested_block_comments: true,
-            line_comment_prefixes: lines(&["--"]),
-            ..LexicalSyntax::default()
-        },
-    }
-}
-
 fn is_quote_start(byte: u8) -> bool {
     matches!(byte, b'\'' | b'"' | b'`' | b'$')
 }
@@ -157,10 +125,12 @@ fn quoted_name(sql: &str, open: usize) -> Option<(String, usize)> {
     (valid && sql.as_bytes().get(close) == Some(&b')')).then(|| (name.to_owned(), close))
 }
 
+/// `sql` with calls and placeholders stubbed, table functions optionally wrapped in `TABLE( )`.
 fn stub_calls(
     sql: &str,
     policy: QuotePolicy,
     syntax: &LexicalSyntax,
+    wrap_table_functions: bool,
 ) -> (String, Vec<usize>, Vec<ModelCall>) {
     let bytes = sql.as_bytes();
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
@@ -217,7 +187,25 @@ fn stub_calls(
             } else {
                 TABLE_FUNCTION_STUB
             };
-            edits.push((start, open, format!("{stub}{name}")));
+            let mut wrap_close = None;
+            if word == TABLE_FUNCTION_CALL
+                && wrap_table_functions
+                && !follows_table_wrapper(&bytes[..start])
+            {
+                let Ok(close) = dialect_matching_paren(bytes, open, syntax) else {
+                    continue;
+                };
+                wrap_close = Some(close);
+            }
+            let wrapper = if wrap_close.is_some() {
+                TABLE_WRAPPER
+            } else {
+                ""
+            };
+            edits.push((start, open, format!("{wrapper}{stub}{name}")));
+            if let Some(close) = wrap_close {
+                edits.push((close + 1, close + 1, ")".to_owned()));
+            }
             index = open;
             continue;
         }
@@ -240,6 +228,7 @@ fn stub_calls(
         edits.push((start, close + 1, format!("{}{number}", stub_prefix(kind))));
         index = close + 1;
     }
+    edits.sort_by_key(|(start, end, _)| (*start, *end));
     let (stubbed, offsets) = apply_edits(sql, edits);
     (stubbed, offsets, calls)
 }

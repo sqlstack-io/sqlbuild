@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns } from './http-runs';
+import { runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
+type W = components['schemas'];
 
 const LOCATION = '0191f0aa-orders:development';
 const PERSON_ID = '0191f0cc-0000-7000-8000-000000000001';
@@ -122,3 +123,56 @@ describe('run detail', () => {
 		expect(nodes[2].skippedBecauseOf).toEqual({ nodeKey: 'model.n1', runId: 'run', jobKey: 'orders_daily' });
 	});
 });
+
+describe('run Recall reads', () => {
+	const inv = 'worker/c1/execution';
+	const event = (type: string, extra: Partial<W['RunEventRecord']> = {}): W['RunEventRecord'] => ({ storage_id: 1, event_id: `e-${type}`, invocation_id: inv, occurred_at: '2026-11-08T06:00:00Z', event_type: type, ...extra });
+
+	it('maps scheduler facts and sqb events, builds messages from metadata only and drops other kinds', () => {
+		const mapped = [
+			event('run_claimed', { invocation_id: 'scheduler/r1' }),
+			event('statement_completed', { duration_ms: 1500, affected_rows: 1, resource_id: `["${inv}","model:orders"]`, statement_id: 's1' }),
+			event('resource_attempt_failed', { severity: 'error', error_type: 'ExecutionFailed', error_code: 'R002', resource_id: `["${inv}","model:orders"]` }),
+			event('operation_started'),
+			event('location_health', { invocation_id: 'scheduler/r1' })
+		].flatMap((e) => toRunEvent(e, 'r1') ?? []);
+		expect(mapped.map((e) => [e.type, e.producer, e.level, e.nodeKey, e.statementId, e.message])).toEqual([
+			['claimed', 'scheduler', 'info', null, null, ''],
+			['statement_completed', 'sqb', 'info', 'model:orders', 's1', '1.5 s · 1 row'],
+			['resource_attempt_failed', 'sqb', 'error', 'model:orders', null, 'ExecutionFailed: R002']
+		]);
+	});
+
+	it('orders statements as sent and tells running from finished by the end time', () => {
+		const statement = (id: string, extra: Partial<W['RunStatementRecord']>): W['RunStatementRecord'] => ({ invocation_id: inv, statement_id: id, sql_available: true, ...extra });
+		const statements = toRunStatements(
+			[
+				statement('s1', { resource_id: `["${inv}","seed:countries"]`, statement_kind: 'CREATE', ended_at: '2026-11-08T06:00:01Z', affected_rows: 3 }),
+				statement('s2', { resource_name: 'orders', outcome: 'failed', error_type: 'CatalogException', sql_available: false }),
+				statement('s3', { purpose: 'model_build', started_at: '2026-11-08T06:00:02Z' })
+			],
+			'r1'
+		);
+		expect(statements.map((s) => [s.sequence, s.nodeKey, s.kind, s.status, s.rowsAffected, s.sqlRecorded, s.error])).toEqual([
+			[1, 'seed:countries', 'CREATE', 'completed', 3, true, null],
+			[2, 'orders', 'statement', 'failed', null, false, 'CatalogException'],
+			[3, '', 'model_build', 'running', null, true, null]
+		]);
+	});
+
+	it('merges error text into the output as stderr in time order', () => {
+		const output = toRunOutput({
+			lines: [
+				{ invocation_id: inv, sequence: 2, stream: 'stdout', occurred_at: '2026-11-08T06:00:03Z', text: 'done' },
+				{ invocation_id: inv, sequence: 1, stream: 'stderr', occurred_at: '2026-11-08T06:00:01Z', text: 'warning' }
+			],
+			errors: [{ invocation_id: inv, occurred_at: '2026-11-08T06:00:02Z', error_type: 'ValueError', message: 'RuntimeError: bad input' }]
+		});
+		expect(output.map((l) => [l.stream, l.text])).toEqual([
+			['stderr', 'warning'],
+			['stderr', 'RuntimeError: bad input'],
+			['stdout', 'done']
+		]);
+	});
+});
+

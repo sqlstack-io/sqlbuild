@@ -113,16 +113,39 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                     .expect("role assignment")
                 );
                 assert!(matches!(
-                    read_security_audit(&replica, (&context, ordinary_credentials), (0, 100)).await,
+                    read_security_audit(
+                        &replica,
+                        (&context, ordinary_credentials),
+                        ((0, None), 100)
+                    )
+                    .await,
                     Err(ControlError::Denied { .. })
                 ));
             }
-            let existing = read_security_audit(store, (&context, admin_credentials), (0, 100))
-                .await
-                .expect("existing security facts");
-            let upgraded = read_security_audit(&replica, (&context, admin_credentials), (0, 100))
-                .await
-                .expect("replica audit");
+            let existing =
+                read_security_audit(store, (&context, admin_credentials), ((0, None), 100))
+                    .await
+                    .expect("existing security facts");
+            assert_eq!(
+                existing
+                    .iter()
+                    .filter(|event| event.actor == format!("principal:{admin}"))
+                    .map(|event| event.actor_name.as_deref())
+                    .collect::<std::collections::BTreeSet<_>>(),
+                [Some("orders-admin")].into(),
+                "a principal actor is named"
+            );
+            assert!(
+                existing
+                    .iter()
+                    .filter(|event| !event.actor.starts_with("principal:"))
+                    .all(|event| event.actor_name.is_none()),
+                "other actors keep only their actor text"
+            );
+            let upgraded =
+                read_security_audit(&replica, (&context, admin_credentials), ((0, None), 100))
+                    .await
+                    .expect("replica audit");
             assert_eq!(
                 upgraded
                     .iter()
@@ -180,9 +203,10 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .expect("durable clock fact");
                 commit(transaction).await.expect("commit clock fact");
             }
-            let first = read_security_audit(&replica, (&context, admin_credentials), (cursor, 2))
-                .await
-                .expect("first bounded page");
+            let first =
+                read_security_audit(&replica, (&context, admin_credentials), ((cursor, None), 2))
+                    .await
+                    .expect("first bounded page");
             assert_eq!(
                 first.len(),
                 test_case.expected_page_length,
@@ -206,7 +230,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             let last = read_security_audit(
                 store,
                 (&context, admin_credentials),
-                (first[1].storage_id, 2),
+                ((first[1].storage_id, None), 2),
             )
             .await
             .expect("strict continuation");
@@ -214,14 +238,29 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 last.iter().map(|event| event.event_id).collect::<Vec<_>>(),
                 ids[2..]
             );
+            let newest = read_security_audit(
+                store,
+                (&context, admin_credentials),
+                ((cursor, Some(last[0].storage_id)), 100),
+            )
+            .await
+            .expect("newest-first window");
+            assert_eq!(
+                newest
+                    .iter()
+                    .map(|event| event.event_id)
+                    .collect::<Vec<_>>(),
+                [ids[1], ids[0]],
+                "both bounds are exclusive and the window reads newest first"
+            );
             let cursor = last[0].storage_id;
             assert!(
-                read_security_audit(store, (&context, admin_credentials), (cursor, 100))
+                read_security_audit(store, (&context, admin_credentials), ((cursor, None), 100))
                     .await
                     .expect("empty continuation")
                     .is_empty()
             );
-            for bounds in [(-1, 1), (0, 0), (0, 101)] {
+            for bounds in [((-1, None), 1), ((0, None), 0), ((0, None), 101)] {
                 assert!(matches!(
                     read_security_audit(store, (&context, admin_credentials), bounds).await,
                     Err(ControlError::Invalid(_))
@@ -243,17 +282,22 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
             );
             remove_fault(store, &fault).await;
             assert!(
-                read_security_audit(&replica, (&context, admin_credentials), (cursor, 100))
-                    .await
-                    .expect("failed audit did not publish")
-                    .is_empty()
+                read_security_audit(
+                    &replica,
+                    (&context, admin_credentials),
+                    ((cursor, None), 100)
+                )
+                .await
+                .expect("failed audit did not publish")
+                .is_empty()
             );
             create_principal(store, &context, "orders-rollback")
                 .await
                 .expect("failed principal did not persist");
-            let after = read_security_audit(store, (&context, admin_credentials), (cursor, 100))
-                .await
-                .expect("successful retry");
+            let after =
+                read_security_audit(store, (&context, admin_credentials), ((cursor, None), 100))
+                    .await
+                    .expect("successful retry");
             assert_eq!(after.len(), 1);
             assert_eq!(after[0].storage_id, cursor + 1);
             let cursor = after[0].storage_id;
@@ -266,7 +310,7 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 right.expect("second concurrent append")
             );
             let concurrent =
-                read_security_audit(store, (&context, admin_credentials), (cursor, 100))
+                read_security_audit(store, (&context, admin_credentials), ((cursor, None), 100))
                     .await
                     .expect("serialized writers");
             assert_eq!(
@@ -312,11 +356,12 @@ fn given_security_audit_pages_when_clock_and_authority_change_then_commit_order_
                 .expect("live role revocation")
             );
             assert!(matches!(
-                read_security_audit(&replica, (&context, admin_credentials), (0, 100)).await,
+                read_security_audit(&replica, (&context, admin_credentials), ((0, None), 100))
+                    .await,
                 Err(ControlError::Denied { .. })
             ));
             assert!(
-                !read_security_audit(&replica, (&context, ordinary_credentials), (0, 100))
+                !read_security_audit(&replica, (&context, ordinary_credentials), ((0, None), 100))
                     .await
                     .expect("replacement administrator reads audit")
                     .is_empty()

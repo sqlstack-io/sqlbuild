@@ -26,6 +26,10 @@ pub(crate) const RECALL_AMBIGUOUS_CODE: &str = "C973";
 pub(crate) const RECALL_QUERY_CODE: &str = "C974";
 pub(crate) const RECALL_SETTINGS_CODE: &str = "C975";
 pub(crate) const WAREHOUSE_BACKEND: &str = "warehouse";
+/// SQLBuild's state relations in the warehouse; a prefix comparison needs no `LIKE` escape, whose syntax differs by dialect.
+pub(crate) const WAREHOUSE_STATE_RELATIONS_SQL: &str = "SELECT table_schema, table_name, table_type \
+     FROM information_schema.tables WHERE SUBSTRING(table_name, 1, 10) = '_sqlbuild_' \
+     ORDER BY table_schema, table_name";
 /// Default cell width in text formats, in bytes.
 pub(crate) const DEFAULT_MAX_CELL_BYTES: usize = 4096;
 pub(crate) const JSON_FORMAT: &str = "json";

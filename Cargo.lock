@@ -4126,7 +4126,6 @@ version = "0.0.0"
 dependencies = [
  "memchr",
  "polyglot-sql",
- "polyglot-sql-function-catalogs",
  "rayon",
  "regex",
  "rustc-hash",
@@ -4143,7 +4142,9 @@ dependencies = [
  "sqlbuild-sqltext",
  "sqlclean",
  "sqlquack-syntax",
+ "sqlquack-syntax-bigquery",
  "sqlquack-syntax-postgres",
+ "stacker",
 ]
 
 [[package]]
@@ -4200,6 +4201,7 @@ dependencies = [
  "same-file",
  "serde",
  "serde_json",
+ "sqlbuild-analysis",
  "sqlbuild-build-features",
  "sqlbuild-cache",
  "sqlbuild-config",
@@ -4431,7 +4433,6 @@ dependencies = [
  "blake3",
  "fensu-policy",
  "globset",
- "polyglot-sql",
  "rayon",
  "regex",
  "rustc-hash",
@@ -4445,6 +4446,7 @@ dependencies = [
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
  "sqlclean",
+ "sqlquack-syntax",
  "stacker",
  "tempfile",
  "toml",
@@ -4499,7 +4501,7 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=4d0c6bc56da0e44eb164601a2af673ae7998257d#4d0c6bc56da0e44eb164601a2af673ae7998257d"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
 dependencies = [
  "serde",
  "serde_json",
@@ -4510,9 +4512,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlquack-syntax-bigquery"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
+dependencies = [
+ "sqlquack-syntax",
+ "stacker",
+]
+
+[[package]]
 name = "sqlquack-syntax-derive"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=4d0c6bc56da0e44eb164601a2af673ae7998257d#4d0c6bc56da0e44eb164601a2af673ae7998257d"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4522,9 +4533,10 @@ dependencies = [
 [[package]]
 name = "sqlquack-syntax-postgres"
 version = "0.2.0"
-source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=4d0c6bc56da0e44eb164601a2af673ae7998257d#4d0c6bc56da0e44eb164601a2af673ae7998257d"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=edfa30b26a0bab86661f96490b86a4f24b92db0a#edfa30b26a0bab86661f96490b86a4f24b92db0a"
 dependencies = [
  "sqlquack-syntax",
+ "stacker",
 ]
 
 [[package]]

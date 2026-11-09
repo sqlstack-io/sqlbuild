@@ -2,14 +2,20 @@ import createFetch from 'openapi-fetch';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns } from './http-catalog';
+import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
+import { toLocationSummary, warehouseSyncOf } from './http-locations';
+import { toAccount, toRoleAssignments } from './http-people';
+import { toPlatformEvents } from './http-problems';
+import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns } from './http-runs';
+import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, Scope } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
+import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange } from './types/build';
-import type { Job, JobDetail, RerunMode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -23,6 +29,10 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRuns',
 	'getRun',
 	'getRunDetail',
+	'listRunEvents',
+	'listRunStatements',
+	'getStatementSql',
+	'listRunOutput',
 	'cancelRun',
 	'rerunRun',
 	'listJobs',
@@ -39,8 +49,23 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getCheckEvidence',
 	'listCatalogNodes',
 	'getCatalogNode',
-	'listSnapshotChanges'
+	'listSnapshotChanges',
+	'listAuditEntries',
+	'listAccounts',
+	'listRoleAssignments',
+	'listLocations',
+	'listPlatformEvents',
+	'listRoles',
+	'getRole',
+	'getWarehouseSync',
+	'listSnapshotNodes',
+	'checkAdhocRun',
+	'launchAdhocRun'
 ]);
+
+/** The server's largest audit page, and how many the audit log reads before it stops looking. */
+const AUDIT_PAGE = 100;
+const AUDIT_PAGES = 10;
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -191,6 +216,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	// nodes there whose SQL was refused; each refused read is audited, so neither is asked again until reload.
 	let sqlLocations = new Set<string>();
 	const sqlRefused = new Set<string>();
+	// The same for run output, which needs view.evidence on every node the run selected.
+	let evidenceLocations = new Set<string>();
+	const outputRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -200,6 +228,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			const bootstrap = toBootstrap(data);
 			sqlLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.sql')).map((l) => l.id));
+			evidenceLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.evidence')).map((l) => l.id));
 			return bootstrap;
 		},
 		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> => runRowPage(await listedRuns(scope), scope.locationId, query),
@@ -213,9 +242,46 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const nodes = (await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))))).flat();
 			return runDetailOf(run, wire, listed, nodes);
 		},
+		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
+			const limit = query.limit ?? 1000;
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
+				params: { path: runPath(scope, runId), query: { after: query.after, limit } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { events: data.flatMap((e) => toRunEvent(e, runId) ?? []), nextCursor: data.length === limit ? (data.at(-1)?.storage_id ?? null) : null };
+		},
+		async listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements', { params: { path: runPath(scope, runId) } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toRunStatements(data, runId);
+		},
+		async getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!sqlLocations.has(scope.locationId) || sqlRefused.has(refusal)) throw new ApiError('You may not view the SQL of this run', 403);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/statements/sql', {
+				params: { path: runPath(scope, runId), query: { statement_id: statementId } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) sqlRefused.add(refusal);
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { statementId: data.statement_id, sql: data.sql ?? null };
+		},
+		async listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
+			const refusal = `${scope.locationId}|${runId}`;
+			if (!evidenceLocations.has(scope.locationId) || outputRefused.has(refusal)) return [];
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output', { params: { path: runPath(scope, runId) } });
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) outputRefused.add(refusal);
+			if (response.status === 403) return [];
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toRunOutput(data);
+		},
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, runId);
@@ -224,6 +290,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const source = await requireRun(scope, runId);
 			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -242,6 +309,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -253,6 +321,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toCatalogNodes(data);
 		},
+		async listSnapshotNodes(scope: Scope): Promise<SnapshotNode[]> {
+			const nodes = await implemented.listCatalogNodes(scope);
+			return nodes.map((n) => ({ key: n.key, kind: n.kind, group: n.group ?? '', tags: n.tags, path: n.path, cursor: null, upstream: n.upstream }));
+		},
+		async checkAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<AdhocRunCheck> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const body = { location_id: locationId, target, command: request.command, priority: request.priority };
+			const { data, error, response } = await http.POST('/api/control/runs/adhoc/check', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toAdhocCheck(data);
+		},
+		async launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
+			const { error, response } = await http.POST('/api/control/runs/adhoc', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			inFlight.clear();
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return requireRun(scope, body.run_id);
+		},
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const [snapshots, runs] = await Promise.all([
@@ -263,23 +352,87 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!snapshots.data) throw new ApiError(errorText(snapshots.error, snapshots.response), snapshots.response.status);
 			return toSnapshotChanges(snapshots.data, runs);
 		},
+		/** Newest first, reading at most `AUDIT_PAGES` server pages to find `limit` matching entries. */
+		async listAuditEntries(query: AuditQuery = {}): Promise<AuditEntry[]> {
+			const limit = query.limit ?? 100;
+			const found: AuditEntry[] = [];
+			let before = Number.MAX_SAFE_INTEGER;
+			for (let page = 0; page < AUDIT_PAGES && found.length < limit; page++) {
+				const { data, error, response } = await http.GET('/api/control/audit', { params: { query: { before, limit: AUDIT_PAGE } } });
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				found.push(...data.map(toAuditEntry).filter((entry) => auditMatches(entry, query)));
+				if (data.length < AUDIT_PAGE) break;
+				before = data[data.length - 1].storage_id;
+			}
+			return found.slice(0, limit);
+		},
+		async getWarehouseSync(scope: Scope): Promise<WarehouseSync | null> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return warehouseSyncOf(data);
+		},
+		async listPlatformEvents(): Promise<PlatformEvent[]> {
+			const { data, error, response } = await http.GET('/api/control/platform/problems');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toPlatformEvents(data, Date.now());
+		},
+		/** Each location the person sees, with health only where they may list the whole target. */
+		async listLocations(): Promise<LocationSummary[]> {
+			const { data, error, response } = await http.GET('/api/control/bootstrap');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return Promise.all(
+				toBootstrap(data).locations.map(async (location) => {
+					const { locationId, target } = parseLocationKey(location.id);
+					const path = { location_id: locationId, target };
+					const [health, snapshots] = await Promise.all([
+						http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path } }),
+						http.GET('/api/control/locations/{location_id}/targets/{target}/snapshots', { params: { path, query: { limit: 1 } } })
+					]);
+					if (health.response.status === 401 || snapshots.response.status === 401) onUnauthorized();
+					return toLocationSummary(location, health.data ?? null, snapshots.data?.[0] ?? null, Date.now());
+				})
+			);
+		},
+		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
+		listRoles: async (locationId: string): Promise<RoleDefinition[]> => (await roleOverviews(locationId)).map(toRoleDefinition),
+		async getRole(locationId: string, name: string): Promise<RoleDetail | null> {
+			const [roles, assignments] = await Promise.all([roleOverviews(locationId), implemented.listRoleAssignments()]);
+			const role = roles.find((r) => r.key === name);
+			return role ? roleDetailOf(role, assignments, locationId) : null;
+		},
+		async listRoleAssignments(): Promise<RoleAssignment[]> {
+			const { data, error, response } = await http.GET('/api/admin/roles');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			// Group members come from the people read; without it, SSO-derived roles stay unlisted.
+			return toRoleAssignments(data, await people().catch(() => []));
+		},
 		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
 			const nodes = await implemented.listCatalogNodes(scope);
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
-			const [status, sql, checks] = await Promise.all([
+			const [status, sql, checks, runs, jobs] = await Promise.all([
 				http.GET('/api/control/locations/{location_id}/targets/{target}/node-status', { params: { path, query: { node_key: node.key } } }),
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
 					: null,
-				checkResults(scope).catch(() => [])
+				checkResults(scope).catch(() => []),
+				node.kind === 'source'
+					? null
+					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
+				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null)
 			]);
-			if (status.response.status === 401 || sql?.response.status === 401) onUnauthorized();
+			if (status.response.status === 401 || sql?.response.status === 401 || runs?.response.status === 401) onUnauthorized();
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
-			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck));
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),
@@ -334,7 +487,27 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		}
 	};
 
-	async function listedJobs(scope: Scope) {
+	function runPath(scope: Scope, runId: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		return { location_id: locationId, target, run_id: runId };
+	}
+
+	/**
+	 * One request per listing at a time: pages that refresh together on a change notice share it
+	 * instead of each asking the server again. A write clears it, so reads after a write see it.
+	 */
+	const inFlight = new Map<string, Promise<unknown>>();
+	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
+		const pending = inFlight.get(key) as Promise<T> | undefined;
+		if (pending) return pending;
+		const started: Promise<T> = load().finally(() => inFlight.get(key) === started && inFlight.delete(key));
+		inFlight.set(key, started);
+		return started;
+	}
+
+	const listedJobs = (scope: Scope) => shared(`jobs ${scope.locationId}`, () => fetchJobs(scope));
+
+	async function fetchJobs(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/jobs', { params: { path: { location_id: locationId, target } } });
 		if (response.status === 401) onUnauthorized();
@@ -342,7 +515,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		return data;
 	}
 
-	async function listedTriggers(scope: Scope) {
+	const listedTriggers = (scope: Scope) => shared(`triggers ${scope.locationId}`, () => fetchTriggers(scope));
+
+	/** Published triggers, each with its newest tick. */
+	async function fetchTriggers(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers', { params: { path: { location_id: locationId, target } } });
 		if (response.status === 401) onUnauthorized();
@@ -355,6 +531,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
 		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function roleOverviews(locationKey: string) {
+		const { locationId, target } = parseLocationKey(locationKey);
+		const { data, error, response } = await http.GET('/api/admin/locations/{location_id}/targets/{target}/roles', { params: { path: { location_id: locationId, target } } });
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function people() {
+		const { data, error, response } = await http.GET('/api/admin/people');
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;
@@ -378,8 +569,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	/** Triggers with their latest tick and the newest listed run each started. */
 	async function triggersOf(scope: Scope): Promise<Trigger[]> {
 		const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
-		const latest = await Promise.all(wires.map(async (t) => (await ticksOf(scope, t.trigger_id, 1)).map(toTick)[0] ?? null));
-		return wires.map((t, i) => toTrigger(t, runs, latest[i]));
+		return wires.map((t) => toTrigger(t, runs, t.latest_tick ? toTick(t.latest_tick) : null));
 	}
 
 	async function requireTrigger(scope: Scope, id: string): Promise<Trigger> {
@@ -392,12 +582,15 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
 		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
 		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		inFlight.clear();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 	}
 
+	const listedRuns = (scope: Scope) => shared(`runs ${scope.locationId}`, () => fetchRuns(scope));
+
 	/** The newest runs of the location, up to the server's cap. */
-	async function listedRuns(scope: Scope) {
+	async function fetchRuns(scope: Scope) {
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
 			params: { path: { location_id: locationId, target }, query: { limit: RUN_WINDOW } }

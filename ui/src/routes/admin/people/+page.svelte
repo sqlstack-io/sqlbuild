@@ -25,6 +25,7 @@
 	const d = people.directory;
 	const allowed = $derived(app.can('user.manage') || app.can('role.assign'));
 	const locations = $derived(app.bootstrap?.locations ?? []);
+	const opensPeople = $derived(app.client.supports('effectiveAccess'));
 
 	const sources: AssignmentSource[] = ['manual', 'sso', 'policy', 'built_in'];
 
@@ -46,7 +47,7 @@
 	<div class="intro">
 		<p>
 			Everyone who has signed in, with what they can do in each location. People sign in with single sign-on, or <code>sqb login</code> on the command line.
-			Open someone to see their effective access and why.
+			{#if opensPeople}Open someone to see their effective access and why.{/if}
 		</p>
 	</div>
 	<ListToolbar bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
@@ -54,13 +55,13 @@
 			<ChoiceFilter label="Role" bind:value={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} all="Any role" />
 			<ChoiceFilter label="Location" bind:value={people.locationId} options={locations.map((l) => ({ value: l.id, label: l.name }))} all="All locations" />
 			<ChoiceFilter label="Source" bind:value={people.source} options={sources.map((s) => ({ value: s, label: assignmentSourceLabel[s] }))} all="Any source" />
-			<label class="check" title="Can change warehouse data or administer access somewhere">
+			{#if app.client.supports('listAccessOverview')}<label class="check" title="Can change warehouse data or administer access somewhere">
 				<input type="checkbox" class="sb-check" bind:checked={people.riskyOnly} />
 				Has risky actions
-			</label>
+			</label>{/if}
 		{/snippet}
 		{#snippet actions()}
-			<Button variant="outline" size="sm" href="/admin/check-access"><ShieldQuestionIcon size={14} /> Check access</Button>
+			{#if app.client.supports('explainAccess')}<Button variant="outline" size="sm" href="/admin/check-access"><ShieldQuestionIcon size={14} /> Check access</Button>{/if}
 		{/snippet}
 	</ListToolbar>
 	<div class="sb-list-wrap">
@@ -77,13 +78,13 @@
 			<tbody>
 				{#each people.shown as a (a.name)}
 					{@const risky = d.riskyOf(a.name)}
-					<tr class:sb-row-off={a.disabled} onclick={() => goto(personHref(a))}>
+					<tr class:sb-row-off={a.disabled} class:static={!opensPeople} onclick={() => opensPeople && goto(personHref(a))}>
 						<td>
 							<div class="cell-name">
 								<UserIcon size={15} strokeWidth={1.75} />
 								<div class="min-w-0">
-									<a href={personHref(a)} onclick={(e) => e.stopPropagation()}>{a.displayName}</a>
-									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : accountSourceLabel[a.source]}</div>
+									{#if opensPeople}<a href={personHref(a)} onclick={(e) => e.stopPropagation()}>{a.displayName}</a>{:else}{a.displayName}{/if}
+									<div class="cell-desc"><code>{a.name}</code> · {a.source === 'oidc' ? 'SSO' : a.source ? accountSourceLabel[a.source] : 'no password'}</div>
 								</div>
 							</div>
 						</td>
@@ -144,5 +145,8 @@
 		align-items: center;
 		gap: 4px;
 		color: var(--sb-warning) !important;
+	}
+	tr.static {
+		cursor: default;
 	}
 </style>

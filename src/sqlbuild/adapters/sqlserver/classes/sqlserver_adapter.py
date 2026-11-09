@@ -116,6 +116,7 @@ from sqlbuild.adapters.sqlserver.constants import (
     INFORMATION_SCHEMA_NULLABLE_VALUE,
     INTEGER_TYPE_TOKEN,
     ISO8601_CONVERT_STYLE,
+    TABLE_FUNCTION_RETURN_TYPE,
     USER_TABLE_OBJECT_TYPE,
 )
 from sqlbuild.compiler.compile.types import FunctionLanguage
@@ -319,9 +320,10 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
     def render_create_schema(self, *, database: str | None, schema: str) -> tuple[str, ...]:
         del database
         escaped_schema: str = schema.replace("'", "''")
+        escaped_identifier: str = self.render_identifier(schema).replace("'", "''")
         return (
             "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = "
-            f"'{escaped_schema}') EXEC('CREATE SCHEMA {self.render_identifier(schema)}')",
+            f"'{escaped_schema}') EXEC('CREATE SCHEMA {escaped_identifier}')",
         )
 
     def render_drop_schema(self, *, database: str | None, schema: str) -> tuple[str, ...]:
@@ -831,11 +833,17 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
                 message="Python functions require an engine-specific implementation"
             )
         arg_sql: str = ", ".join(f"@{arg.name} {arg.type}" for arg in arguments)
-        body_expression: str = body_sql.strip().removeprefix("SELECT").strip().rstrip(";")
+        body_query: str = body_sql.strip().rstrip(";")
         for arg in arguments:
-            body_expression = re.sub(
-                rf"\b{re.escape(str(arg.name))}\b", f"@{arg.name}", body_expression
+            body_query = re.sub(rf"\b{re.escape(str(arg.name))}\b", f"@{arg.name}", body_query)
+        if returns.upper() == TABLE_FUNCTION_RETURN_TYPE:
+            return (
+                f"CREATE OR ALTER FUNCTION {destination}({arg_sql})\n"
+                "RETURNS TABLE\n"
+                "AS\n"
+                f"RETURN (\n{body_query}\n)",
             )
+        body_expression: str = body_query.removeprefix("SELECT").strip()
         if returns.upper() == BOOLEAN_RETURN_TYPE and not body_expression.upper().startswith(
             ("CASE ", "CAST(")
         ):
@@ -2399,7 +2407,7 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         )
         if update_assignments:
             merge_sql += f"WHEN MATCHED THEN UPDATE SET {update_assignments} "
-        merge_sql += f"WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})"
+        merge_sql += f"WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values});"
         return (merge_sql,)
 
     def render_qualified_name(
@@ -2449,7 +2457,15 @@ class SqlServerAdapter(MicrobatchMixin, ConsumptionMixin, UnkeyedDiffMixin, Base
         if stripped_expression.startswith("("):
             return stripped_expression
         lowered: str = stripped_expression.lower()
-        if lowered.startswith(("select", "with", "values")):
+        if re.match(r"with\b", lowered):
+            raise AdapterUserError(
+                message="SQL Server cannot read a source expression that starts with WITH: "
+                "a common table expression cannot sit inside a derived table",
+                code="A715",
+                help="rewrite the source expression as one SELECT, using subqueries instead of "
+                "WITH, or define it as a view or model and read that",
+            )
+        if lowered.startswith(("select", "values")):
             return f"({stripped_expression})"
         return stripped_expression
 
