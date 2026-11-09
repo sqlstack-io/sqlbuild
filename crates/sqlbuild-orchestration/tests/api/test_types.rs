@@ -28,6 +28,12 @@ pub(crate) struct DevelopmentTestCase {
     pub(crate) expected_status: crate::declarations::models::TriggerStatus,
 }
 
+pub(crate) struct OlderServerReportTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) error_message: Option<&'static str>,
+    pub(crate) expected_upgrade_refusal: bool,
+}
+
 pub(crate) struct WorkerRedirectTestCase {
     pub(crate) description: &'static str,
     pub(crate) expected_status: reqwest::StatusCode,
