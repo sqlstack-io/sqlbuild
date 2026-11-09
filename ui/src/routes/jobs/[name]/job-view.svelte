@@ -92,7 +92,8 @@
 					{#if catalog.data && (def.kind !== 'group' || members.data)}
 						<JobGraph job={def} catalog={catalog.data} memberNodes={members.data?.nodes ?? new Map()} lastRuns={members.data?.lastRuns ?? new Map()} />
 					{:else}
-						<p class="faint">{catalog.error ?? members.error ?? 'Loading…'}</p>
+						<!-- Holds the graph's height, so nothing jumps when it arrives. -->
+						<p class="faint graph-wait" style:height="{def.kind === 'group' ? 420 : 340}px">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
 					{/if}
 					{#if def.criticalNodes.length}
 						<p class="critical">
@@ -122,7 +123,7 @@
 							</tbody>
 						</table>
 					{:else}
-						<p class="faint">{jobRuns.loading ? 'Loading…' : 'No runs yet. Use Run now, or turn on a schedule.'}</p>
+						<p class="faint">{jobRuns.loading ? (jobRuns.slow ? 'Loading…' : '') : 'No runs yet. Use Run now, or turn on a schedule.'}</p>
 					{/if}
 				</section>
 
@@ -277,6 +278,12 @@
 	}
 	.num {
 		text-align: right;
+	}
+	.graph-wait {
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--sb-inset);
+		padding: 14px;
 	}
 	.critical {
 		margin-top: 8px;
