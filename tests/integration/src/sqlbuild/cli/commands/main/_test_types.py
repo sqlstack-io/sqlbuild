@@ -1370,3 +1370,13 @@ class RuleFailureManifestTestCase:
     description: str
     compile_args: tuple[str, ...]
     expected_artifacts: dict[str, object]
+
+
+@dataclass(frozen=True)
+class JobSelectorBuildTestCase:
+    description: str
+    build_args: tuple[str, ...]
+    expected_exit_code: int
+    expected_tables: frozenset[str]
+    expected_jobs_imported: bool
+    expected_fragment: str = ""

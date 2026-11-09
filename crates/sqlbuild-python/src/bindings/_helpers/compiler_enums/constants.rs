@@ -186,6 +186,7 @@ const E_SELECTOR_KIND: EnumSpec = EnumSpec {
         ("TAG", "tag"),
         ("PATH", "path"),
         ("TEST", "test"),
+        ("JOB", "job"),
     ],
 };
 const E_PYTHON_RUN_PHASE: EnumSpec = EnumSpec {

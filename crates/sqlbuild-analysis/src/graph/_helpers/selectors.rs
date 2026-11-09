@@ -161,10 +161,41 @@ fn path(graph: &ProjectGraph, names: (&str, &str), expand: (bool, bool)) -> Reso
 }
 
 fn named(graph: &ProjectGraph, name: &str) -> Result<ObjectKey, SelectorError> {
-    graph
-        .key_named(name)
-        .cloned()
-        .ok_or_else(|| error(UNKNOWN_NAME_CODE, format!("unknown selector name '{name}'")))
+    if let Some(key) = graph.key_named(name) {
+        return Ok(key.clone());
+    }
+    let job: bool = name.starts_with(&format!("{JOB_KIND}{KIND_SEPARATOR}"))
+        || graph
+            .jobs
+            .as_ref()
+            .is_some_and(|jobs| jobs.contains_key(name));
+    Err(if job {
+        error(
+            PATH_SELECTOR_CODE,
+            format!("path selector endpoint '{name}' is a job; path selectors join two nodes"),
+        )
+    } else {
+        error(UNKNOWN_NAME_CODE, format!("unknown selector name '{name}'"))
+    })
+}
+
+/// Whether a `job:` part or an unknown bare name in `selectors` needs jobs; paths never do.
+pub(crate) fn needs_jobs(graph: &ProjectGraph, selectors: &[String], also_known: &[&str]) -> bool {
+    selectors
+        .iter()
+        .flat_map(|selector| selector.split(char::is_whitespace))
+        .flat_map(|token| token.split(INTERSECTION_SEPARATOR))
+        .filter(|part| !part.is_empty())
+        .any(|part| match parse(part) {
+            Ok(ParsedSelector::Kind { kind, value, .. }) => {
+                kind == JOB_KIND
+                    || (kind == NAME_KIND
+                        && !is_pattern(&value)
+                        && graph.key_named(&value).is_none()
+                        && !also_known.contains(&value.as_str()))
+            }
+            _ => false,
+        })
 }
 
 pub(crate) fn parse(raw: &str) -> Result<ParsedSelector, SelectorError> {
@@ -321,10 +352,11 @@ fn lookup(graph: &ProjectGraph, kind: &str, value: &str) -> Resolved {
     };
     let kind_matches = |key: &ObjectKey| resource.is_none_or(|resource| key.0 == resource);
     if !is_pattern(value) {
-        if resource.is_none() && graph.key_named(value).is_none() {
-            if let Some(Some(keys)) = graph.jobs.as_ref().map(|jobs| jobs.get(value)) {
-                return keys.clone();
-            }
+        if resource.is_none()
+            && graph.key_named(value).is_none()
+            && let Some(Some(keys)) = graph.jobs.as_ref().map(|jobs| jobs.get(value))
+        {
+            return keys.clone();
         }
         return Ok(graph
             .key_named(value)

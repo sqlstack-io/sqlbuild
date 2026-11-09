@@ -9,8 +9,8 @@ use sqlbuild_core::text::main::python_isspace::python_isspace;
 use sqlbuild_core::text::main::python_str_repr::python_str_repr;
 
 use crate::dag_artifact::constants::{
-    SELECTOR_KIND_CHECK, SELECTOR_KIND_NAME, SELECTOR_KIND_PATH, SELECTOR_KIND_SEPARATOR,
-    SELECTOR_KIND_TAG, SELECTOR_KIND_TEST, SELECTOR_MODELS_PREFIX,
+    SELECTOR_KIND_CHECK, SELECTOR_KIND_JOB, SELECTOR_KIND_NAME, SELECTOR_KIND_PATH,
+    SELECTOR_KIND_SEPARATOR, SELECTOR_KIND_TAG, SELECTOR_KIND_TEST, SELECTOR_MODELS_PREFIX,
 };
 use crate::dag_artifact::errors::DagSelectionError;
 use crate::dag_artifact::models::{DagSelectionIndex, DagSelectionNode};
@@ -144,6 +144,12 @@ fn match_kind(
         SELECTOR_KIND_TEST => {
             return Err(DagSelectionError::UnitTest(format!(
                 "{SELECTOR_KIND_TEST}{SELECTOR_KIND_SEPARATOR}{value}"
+            )));
+        }
+        SELECTOR_KIND_JOB => {
+            return Err(DagSelectionError::Input(format!(
+                "selector '{SELECTOR_KIND_JOB}{SELECTOR_KIND_SEPARATOR}{value}' selects a job; \
+                 select the job's assets by name, tag or path instead"
             )));
         }
         SELECTOR_KIND_TAG => ids(&|node| node.tags.iter().any(|tag| tag == value)),

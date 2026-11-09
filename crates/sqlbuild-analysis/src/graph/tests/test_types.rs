@@ -66,3 +66,10 @@ pub(super) struct JobSelectorErrorTestCase {
     pub(super) select: &'static [&'static str],
     pub(super) expected_error: SelectorFailure,
 }
+
+pub(super) struct NeedsJobsTestCase {
+    pub(super) description: &'static str,
+    pub(super) selectors: &'static [&'static str],
+    pub(super) also_known: &'static [&'static str],
+    pub(super) expected_needs_jobs: bool,
+}
