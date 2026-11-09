@@ -690,4 +690,9 @@ pub enum PersonRunRequest<'a> {
     Job(&'a dyn CommandPlanner, &'a JobRunRequest),
     Adhoc(&'a dyn CommandPlanner, &'a AdhocRunRequest),
     Cancel(&'a CancelRunRequest),
+    /// A build command planned on the location for `(location_id, target)`; it never becomes a run.
+    Plan(
+        &'a dyn CommandPlanner,
+        (Uuid, &'a str, &'a crate::platform::models::PlanRequest),
+    ),
 }

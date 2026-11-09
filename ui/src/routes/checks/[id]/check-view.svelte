@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import type { CheckEvidence, CheckSql } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
@@ -8,7 +9,7 @@
 	import Panel from '$lib/components/platform/panel.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import OutcomeStrip from '$lib/components/build-area/outcome-strip.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -61,16 +62,14 @@
 		}
 	}
 
-	let runOpen = $state(false);
 </script>
 
 <AppTopbar title="Checks">
 	{#if c && app.client.supports('launchAdhocRun')}
-		<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run check</GatedButton>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(c?.node ? [c.node] : [], 'audit'))}>▷ Run check</GatedButton>
 	{/if}
 </AppTopbar>
 
-{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={runOpen} verb="audit" selection={c?.node ? [c.node] : []} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">

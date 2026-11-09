@@ -456,7 +456,7 @@ export type SnapshotNode = {
 	upstream: string[];
 };
 
-// ---- ad-hoc runs (the run panel) ----
+// ---- ad-hoc runs (the plan page) ----
 
 export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness';
 
@@ -484,6 +484,40 @@ export type AdhocRunCheck = {
 	error: string | null;
 	launchable: boolean;
 };
+
+/** One model in `sqb plan --json`: what the build would do to it and why. */
+export type PlanModel = {
+	name: string;
+	materialization_type: string;
+	action: string;
+	reason: string;
+	incremental_strategy?: string;
+	cursor_column?: string;
+	cursor_bounds?: { start: string | null; end: string | null } | null;
+	backfill: { action: string; duration: string | null };
+	qualified_name?: string;
+	changed_functions?: string[];
+};
+
+export type PlanWarning = { severity: string; message: string; model_name?: string; code?: string };
+
+/** `sqb plan --json` as the location printed it; sections the page doesn't show are kept as they are. */
+export type PlanDocument = {
+	selected_count: number;
+	models: PlanModel[];
+	seeds: { name: string; reason: string; qualified_name?: string }[];
+	source_loads: { name: string; kind: string; write_strategy?: string; cursor_column?: string; is_reload: boolean }[];
+	functions: { name: string; language: string; reason?: string }[];
+	python_nodes: { name: string; kind: string; phase: string; identity_status: string }[];
+	warnings: PlanWarning[];
+	migrations: { model: string; origin_model?: string; decision: string; completed_at: string | null }[];
+	column_migrations: { model: string; origin_column: string; destination_column: string; decision: string }[];
+	table_type_conversions: { model: string; actual_type?: string; desired_type?: string }[];
+	retention: { model: string; action?: string }[];
+};
+
+/** The location's plan of a build command, or why it could not plan it. */
+export type PlanResult = { plan: PlanDocument; error: null } | { plan: null; error: string };
 
 /** Cursor window for a launch, typed from the selected nodes' cursor type. */
 export type CursorWindow = {

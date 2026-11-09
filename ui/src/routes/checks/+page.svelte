@@ -12,7 +12,7 @@
 	import StatusLabel from '$lib/components/list/status-label.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import LoadRow from '$lib/components/list/load-row.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatStamp } from '$lib/format/time';
@@ -62,17 +62,15 @@
 
 	// A check-only run (`sqb audit`) over the nodes the visible checks attach to.
 	const runSelection = $derived([...new Set(filtered.map((c) => c.node).filter((n): n is string => !!n))]);
-	let runOpen = $state(false);
 	const linksNodes = $derived(app.client.supports('getCatalogNode'));
 	const hasRecent = $derived(all.some((c) => c.recentOutcomes !== null));
 </script>
 
 <AppTopbar title="Checks">
 	<Button variant="outline" size="sm" onclick={() => checks.refresh()}>↻ Refresh</Button>
-	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run checks</GatedButton>{/if}
+	{#if app.client.supports('launchAdhocRun')}<GatedButton requires="run.adhoc" variant="default" onclick={() => goto(planHref(filtered.length === all.length ? [] : runSelection, 'audit'))}>▷ Run checks</GatedButton>{/if}
 </AppTopbar>
 
-{#if app.client.supports('launchAdhocRun')}<RunPanel bind:open={runOpen} verb="audit" selection={filtered.length === all.length ? [] : runSelection} />{/if}
 
 <ListToolbar
 	bind:query

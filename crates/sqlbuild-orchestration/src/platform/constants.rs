@@ -19,3 +19,18 @@ pub(crate) const SENSOR_EVALUATION_RETENTION_DAYS: i64 = 7;
 
 /// Bounded retention deletions per transaction.
 pub(crate) const HEARTBEAT_PAGE: usize = 1000;
+
+/// A plan document larger than this is refused by the server and replaced by an error on the location.
+pub const PLAN_DOCUMENT_BYTES: usize = 8 * 1024 * 1024;
+
+/// How long a location may hold a plan before another instance may claim it.
+pub(crate) const PLAN_LEASE_SECONDS: i64 = 300;
+
+/// A plan nobody claims or finishes by then is reported as expired.
+pub(crate) const PLAN_EXPIRY_SECONDS: i64 = 600;
+
+/// Unfinished plans one target accepts across everyone; each person may have one.
+pub(crate) const PLAN_QUEUE_LIMIT: i64 = 4;
+
+/// A location instance unseen for longer than this cannot take a plan; locations report every 30 seconds.
+pub(crate) const LOCATION_SILENCE_SECONDS: i64 = 90;

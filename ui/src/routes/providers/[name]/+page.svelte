@@ -99,7 +99,6 @@
 					]}
 				/>
 				<p class="text-muted-foreground mt-5 text-[12.5px] leading-relaxed">{provider.description}</p>
-				<p class="text-muted-foreground mt-3 text-[12px] leading-relaxed">Change settings in the project code and deploy; the new values apply to runs that start after the deploy.</p>
 			</aside>
 		</div>
 	{:else}

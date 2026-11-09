@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -10,6 +10,31 @@ type Wire = components['schemas'];
 export const RUN_WINDOW = 1000;
 
 const PERSON = 'principal:';
+
+/** The location's answer to a plan request: the plan, `sqb plan`'s own error, or a superseded plan. */
+export function planResultOf(outcome: Wire['LocationWorkOutcome']): PlanResult {
+	if (outcome.kind === 'superseded') return { plan: null, error: 'The project changed on the location while it was planning; plan again' };
+	if (outcome.kind !== 'plan') return { plan: null, error: 'The location answered with something other than a plan' };
+	const document = outcome.document as Partial<PlanDocument> & { error?: { code?: string; message?: string } };
+	if (document.error) return { plan: null, error: [document.error.code, document.error.message].filter(Boolean).join(': ') };
+	const list = <T>(value: T[] | undefined): T[] => value ?? [];
+	return {
+		plan: {
+			selected_count: document.selected_count ?? 0,
+			models: list(document.models),
+			seeds: list(document.seeds),
+			source_loads: list(document.source_loads),
+			functions: list(document.functions),
+			python_nodes: list(document.python_nodes),
+			warnings: list(document.warnings),
+			migrations: list(document.migrations),
+			column_migrations: list(document.column_migrations),
+			table_type_conversions: list(document.table_type_conversions),
+			retention: list(document.retention)
+		},
+		error: null
+	};
+}
 
 /** The server's dry run of an ad-hoc command. */
 export function toAdhocCheck(wire: Wire['AdhocCheck']): AdhocRunCheck {

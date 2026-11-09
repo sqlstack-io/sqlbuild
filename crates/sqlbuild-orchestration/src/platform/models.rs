@@ -73,6 +73,13 @@ pub enum LocationWork {
         #[schema(value_type = Object)]
         evaluation: Box<SensorEvaluationRequest>,
     },
+    /// `sqb plan --json` on exact node keys the server froze from a person's build command.
+    Plan {
+        command: Vec<String>,
+        selection: std::collections::BTreeSet<String>,
+        #[schema(value_type = Object)]
+        settings: std::collections::BTreeMap<String, serde_json::Value>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
@@ -83,6 +90,14 @@ pub struct LocationWorkRequest {
     pub target: String,
     pub reason: String,
     pub work: LocationWork,
+}
+
+/// A person's build command to plan on the location; the server freezes it like an ad-hoc run.
+#[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlanRequest {
+    pub request_id: Uuid,
+    pub command: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, utoipa::ToSchema)]
@@ -112,8 +127,17 @@ pub struct LocationWorkClaim {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LocationWorkOutcome {
-    Connection { healthy: bool },
-    SensorEvaluation { outcome: CustomSensorOutcome },
+    Connection {
+        healthy: bool,
+    },
+    SensorEvaluation {
+        outcome: CustomSensorOutcome,
+    },
+    /// The plan document `sqb plan --json` printed, or its `{"error": ...}` report.
+    Plan {
+        #[schema(value_type = Object)]
+        document: serde_json::Value,
+    },
     Superseded {},
 }
 

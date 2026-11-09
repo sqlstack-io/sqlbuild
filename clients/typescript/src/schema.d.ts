@@ -546,6 +546,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -698,6 +730,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonTriggers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonTriggerChanges"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1634,6 +1682,12 @@ export interface components {
             evaluation: Record<string, never>;
             /** @enum {string} */
             kind: "evaluate_sensor";
+        } | {
+            command: string[];
+            /** @enum {string} */
+            kind: "plan";
+            selection: string[];
+            settings: Record<string, never>;
         };
         LocationWorkClaim: {
             /** Format: uuid */
@@ -1654,6 +1708,10 @@ export interface components {
             /** @enum {string} */
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
+        } | {
+            document: Record<string, never>;
+            /** @enum {string} */
+            kind: "plan";
         } | {
             /** @enum {string} */
             kind: "superseded";
@@ -1924,6 +1982,28 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description One operator change of a trigger, as a person reads it: what changed, who changed it, when and why. */
+        PersonTriggerChange: {
+            /** @description The audited actor, such as `principal:<id>` for a person. */
+            actor: string;
+            /** @description The person's name when the actor is a person who still exists. */
+            actor_name?: string | null;
+            change: components["schemas"]["TriggerChange"];
+            /**
+             * Format: uuid
+             * @description The change's own ID, as recorded in the security audit.
+             */
+            event_id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** @description The operator's reason, with credential-shaped text redacted. */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description The publication that was current when the change was made.
+             */
+            snapshot_id: string;
+        };
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
             latest_tick?: null | components["schemas"]["TickRecord"];
@@ -1937,6 +2017,12 @@ export interface components {
             reason: string;
             /** @enum {string} */
             status: "unavailable";
+        };
+        /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
+        PlanRequest: {
+            command: string[];
+            /** Format: uuid */
+            request_id: string;
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
@@ -4056,6 +4142,95 @@ export interface operations {
             };
         };
     };
+    requestPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["LocationWorkRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     listPersonRuns: {
         parameters: {
             query?: {
@@ -4510,6 +4685,55 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    listPersonTriggerChanges: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent changes; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operator changes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonTriggerChange"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Trigger not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

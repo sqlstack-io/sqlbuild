@@ -700,7 +700,7 @@ pub(crate) async fn check_location_connection(
     )))
 }
 
-fn location_child(options: &LocationServe, script: &Path) -> Command {
+pub(crate) fn location_child(options: &LocationServe, script: &Path) -> Command {
     let mut command = Command::new(script);
     command.arg("--project-dir").arg(&options.project_dir);
     if terminal_columns().is_err() {

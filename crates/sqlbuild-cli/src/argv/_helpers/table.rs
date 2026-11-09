@@ -23,6 +23,17 @@ pub(crate) fn root_parser() -> &'static ParserSpec {
     })
 }
 
+/// One `sqb` subcommand's parser, such as `build` or `plan`.
+pub(crate) fn command_parser(command: &str) -> Result<&'static ParserSpec, String> {
+    root_parser()
+        .actions
+        .iter()
+        .flat_map(|action| &action.parsers)
+        .find(|(name, _)| name == command)
+        .map(|(_, parser)| parser)
+        .ok_or_else(|| format!("{command} command is unavailable"))
+}
+
 /// The `sqb dbt <command>` execution parser with the command named in its texts.
 pub(crate) fn dbt_execution_parser(command: &str) -> ParserSpec {
     let mut parser: ParserSpec = DBT_EXECUTION

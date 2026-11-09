@@ -111,6 +111,14 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_location_work::result),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans",
+            post(crate::api::_helpers::resources::person_plans::request),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}",
+            get(crate::api::_helpers::resources::person_plans::read),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/runs",
             get(crate::api::_helpers::resources::person_operations::recent_runs),
         )
@@ -137,6 +145,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks",
             get(crate::api::_helpers::resources::person_reads::ticks),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes",
+            get(crate::api::_helpers::resources::person_reads::trigger_changes),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/snapshots",

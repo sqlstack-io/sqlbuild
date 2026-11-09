@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::json;
+use uuid::Uuid;
 
 use crate::api::models::GroupRole;
 use crate::authorization::main::compile_roles::compile_roles;
@@ -11,9 +12,9 @@ use crate::authorization::main::publish_group_roles::publish_group_roles;
 use crate::credentials::main::identities::create_principal::create_principal;
 use crate::credentials::models::{Action, RoleAssignmentRequest, RoleKey};
 use crate::credentials::tests::role_helpers::{
-    SUPPORT_ROLE, assign, authorize_member, developer_grants, member_listings,
-    member_trigger_change, orders_grant, publish_customers_trigger, publish_support_role,
-    role_changes, role_fixture,
+    SUPPORT_ROLE, administrator_trigger_change, assign, authorize_member, developer_grants,
+    member_listings, member_trigger_change, member_trigger_changes, orders_grant,
+    publish_customers_trigger, publish_support_role, role_changes, role_fixture,
 };
 use crate::credentials::tests::test_types::{ProjectRoleTestCase, RolesFileTestCase};
 use crate::declarations::models::TriggerChange;
@@ -311,6 +312,112 @@ fn given_grant_outside_a_triggers_job_when_the_member_overrides_it_then_both_tri
                 member_trigger_change(store, &roles, TriggerChange::Pause).await,
                 Ok(true),
                 "{}: coverage of the job's write set allows the pause",
+                test_case.description
+            );
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_trigger_overrides_when_a_member_reads_their_history_then_only_full_view_sees_them_newest_first()
+ {
+    let test_cases = [
+        ProjectRoleTestCase {
+            description: "SQLite trigger history needs view on every node",
+            backend: Backend::Sqlite,
+            expected_before: Err("missing view permission for this target"),
+            expected_after: Ok("orders-admin"),
+        },
+        ProjectRoleTestCase {
+            description: "PostgreSQL trigger history needs view on every node",
+            backend: Backend::Postgres,
+            expected_before: Err("missing view permission for this target"),
+            expected_after: Ok("orders-admin"),
+        },
+    ];
+    for test_case in test_cases {
+        run(async {
+            let Some(fixture) = open_test_store(test_case.backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let view = |nodes: &[&str]| json!([orders_grant(json!(["view"]), nodes)]);
+            publish_customers_trigger(store, roles.location_id, (2, view(&["orders"]))).await;
+            let trigger_id = administrator_trigger_change(
+                store,
+                &roles,
+                (
+                    TriggerChange::Pause,
+                    "Hold while postgres://orders:orders-db-pass@warehouse.example.test/orders rotates",
+                ),
+            )
+            .await;
+            administrator_trigger_change(store, &roles, (TriggerChange::Enable, "Rotation done"))
+                .await;
+            assert_eq!(
+                member_trigger_changes(store, &roles, trigger_id)
+                    .await
+                    .map(|_| ()),
+                test_case.expected_before.map(|_| ()).map_err(str::to_owned),
+                "{}: part coverage is denied, not filtered",
+                test_case.description
+            );
+            assert_eq!(
+                member_trigger_changes(store, &roles, Uuid::now_v7())
+                    .await
+                    .map(|_| ()),
+                test_case.expected_before.map(|_| ()).map_err(str::to_owned),
+                "{}: an unknown trigger is refused alike",
+                test_case.description
+            );
+            publish_customers_trigger(
+                store,
+                roles.location_id,
+                (3, view(&["customers", "inventory", "orders", "products"])),
+            )
+            .await;
+            let changes = member_trigger_changes(store, &roles, trigger_id)
+                .await
+                .expect("full coverage reads the history")
+                .expect("published trigger");
+            assert_eq!(
+                changes
+                    .iter()
+                    .map(|change| (
+                        change.change.clone(),
+                        change.actor_name.as_deref(),
+                        change.reason.as_str()
+                    ))
+                    .collect::<Vec<_>>(),
+                [
+                    (
+                        TriggerChange::Enable,
+                        test_case.expected_after.ok(),
+                        "Rotation done"
+                    ),
+                    (
+                        TriggerChange::Pause,
+                        test_case.expected_after.ok(),
+                        "Hold while postgres://orders:[REDACTED]@warehouse.example.test/orders rotates"
+                    ),
+                ],
+                "{}: newest first, with the person's name and a redacted reason",
+                test_case.description
+            );
+            assert!(
+                changes
+                    .iter()
+                    .all(|change| change.actor.starts_with("principal:")),
+                "{}: the audited actor is kept",
+                test_case.description
+            );
+            assert_eq!(
+                member_trigger_changes(store, &roles, Uuid::now_v7()).await,
+                Ok(None),
+                "{}: an unknown trigger is not found once the listing is allowed",
                 test_case.description
             );
             close_test_store(fixture).await;

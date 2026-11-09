@@ -3,7 +3,7 @@
 	// enum / secret) from a provider's field schema (the Pydantic -> JSON-schema
 	// truth), with inline defaults, descriptions, required markers and live
 	// validation. Opt-in raw YAML escape hatch, two-way bound. Reused by the
-	// Providers page (durable config) and the Run panel (per-run overrides).
+	// Providers page (durable config) and the plan page (per-run overrides).
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import LockIcon from '@lucide/svelte/icons/lock';
 
@@ -23,7 +23,7 @@
 	let {
 		schema,
 		values = $bindable({}),
-		/** baseline to diff against → per-run override highlighting (Run panel) */
+		/** baseline to diff against → per-run override highlighting (plan page) */
 		baseline = undefined,
 		readOnly = false,
 		/** bindable: how many fields are invalid (parent gates Save/Run on this) */

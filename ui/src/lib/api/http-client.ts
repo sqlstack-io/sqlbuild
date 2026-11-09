@@ -11,13 +11,13 @@ import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
-import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, groupRunNodes, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
+import { RUN_WINDOW, groupRunNodes, planResultOf, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, PlanResult, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -74,12 +74,16 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'testConnection',
 	'listSnapshotNodes',
 	'checkAdhocRun',
-	'launchAdhocRun'
+	'launchAdhocRun',
+	'planBuild'
 ]);
 
 /** How often a connection test asks for the location's answer, and the longest it waits. */
 const CONNECTION_TEST_POLL_MS = 1000;
 const CONNECTION_TEST_WAIT_MS = 60_000;
+
+/** How often the plan page asks for the location's plan; the server expires a plan after ten minutes. */
+const PLAN_POLL_MS = 750;
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -376,6 +380,31 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
 		},
+		/** Queues the plan, then waits for the location's document; a plan the location could not make is a result, not a throw. */
+		async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = crypto.randomUUID();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/plans', {
+				body: { request_id: requestId, command },
+				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (asked.response.status === 400) return { plan: null, error: errorText(asked.error, asked.response) };
+			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			for (;;) {
+				await new Promise((resolve) => setTimeout(resolve, PLAN_POLL_MS));
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/plans/{request_id}', {
+					params: { path: { ...path, request_id: requestId } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+				if (!data) throw new ApiError('The plan request disappeared', 404);
+				const outcome = data.result_json?.outcome;
+				if (outcome) return planResultOf(outcome);
+				if (Date.parse(data.expires_at) <= Date.now()) return { plan: null, error: 'The location did not plan the command in time; check that sqb location serve is running' };
+			}
+		},
 		async listSnapshotChanges(scope: Scope, query: { limit?: number } = {}): Promise<SnapshotChange[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const [snapshots, runs] = await Promise.all([
@@ -569,8 +598,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const [wires, runs] = await Promise.all([listedTriggers(scope), recentRuns(scope)]);
 			const wire = wires.find((t) => t.trigger_id === id);
 			if (!wire) return null;
-			const ticks = (await ticksOf(scope, id, 100)).map(toTick);
-			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks);
+			const [ticks, changes] = await Promise.all([ticksOf(scope, id, 100).then((t) => t.map(toTick)), triggerChangesOf(scope, id)]);
+			return triggerDetailOf(toTrigger(wire, runs, ticks[0] ?? null), wire, ticks, changes.map(toTriggerStateEvent));
 		},
 		async setTriggerStates(scope: Scope, ids: string[], state: TriggerState, reason?: string | null): Promise<Trigger[]> {
 			for (const [done, id] of ids.entries()) {
@@ -638,6 +667,16 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks', {
 			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit } }
+		});
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function triggerChangesOf(scope: Scope, triggerId: string) {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes', {
+			params: { path: { location_id: locationId, target, trigger_id: triggerId }, query: { limit: 100 } }
 		});
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);

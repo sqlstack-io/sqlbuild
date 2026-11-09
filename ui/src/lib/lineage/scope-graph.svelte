@@ -1,16 +1,22 @@
 <script lang="ts">
 	import '@xyflow/svelte/dist/style.css';
 	import { Background, Controls, SvelteFlow, type Edge, type Node } from '@xyflow/svelte';
-	import { goto } from '$app/navigation';
 	import { tick, untrack } from 'svelte';
-	import type { CatalogNode, JobDetail, RunRef } from '$lib/api';
+	import type { CatalogNode, JobGroupMember } from '$lib/api';
 	import AssetNode from '$lib/components/lineage/asset-node.svelte';
 	import FlowController from '$lib/lineage/flow-controller.svelte';
 	import { jobGraph, layoutJobGraph, type JobBox } from '$lib/lineage/job-graph';
 	import JobBoxNode from './job-box-node.svelte';
 
-	// The job's nodes and the lineage between them; a group draws each member job as a box around its nodes.
-	let { job, catalog, memberNodes, lastRuns }: { job: JobDetail; catalog: CatalogNode[]; memberNodes: Map<string, string[]>; lastRuns: Map<string, RunRef | null> } = $props();
+	// Nodes and the lineage between them; each box, such as a group's member job, is drawn around its nodes.
+	// Clicking a node selects it; Shift, Ctrl or Cmd adds to the selection.
+	let {
+		keys,
+		catalog,
+		boxes = [],
+		members = [],
+		onselect
+	}: { keys: string[]; catalog: CatalogNode[]; boxes?: JobBox[]; members?: JobGroupMember[]; onselect: (keys: string[]) => void } = $props();
 
 	const nodeTypes = { asset: AssetNode, job: JobBoxNode };
 	let nodes = $state.raw<Node[]>([]);
@@ -19,9 +25,14 @@
 	let shape = '';
 	let laidOut = '';
 
+	/** Clears the selection, as clicking the empty canvas does. */
+	export function clear() {
+		nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+		onselect([]);
+	}
+
 	$effect(() => {
-		const boxes: JobBox[] = job.kind === 'group' ? [...(job.groupMembers ?? [])].sort((a, b) => a.stage - b.stage).map((m) => ({ jobKey: m.jobKey, nodes: memberNodes.get(m.jobKey) ?? [], lastRun: lastRuns.get(m.jobKey) })) : [];
-		const next = jobGraph(job.resolvedNodes, catalog, boxes, job.groupMembers ?? []);
+		const next = jobGraph(keys, catalog, boxes, members);
 		const sig = next.nodes.map((n) => `${n.id}@${n.parentId ?? ''}`).join(',');
 		if (sig === shape) {
 			// Same shape: keep positions and sizes, refresh build states.
@@ -45,8 +56,17 @@
 	});
 </script>
 
-<div class="graph sb-flow" style:height="{job.kind === 'group' ? 420 : 340}px">
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} nodesDraggable={false} elementsSelectable={false} minZoom={0.3} proOptions={{ hideAttribution: true }} onnodeclick={({ node }) => node.type === 'asset' && goto(`/catalog/${node.id}`)}>
+<div class="graph sb-flow">
+	<SvelteFlow
+		bind:nodes
+		bind:edges
+		{nodeTypes}
+		nodesDraggable={false}
+		multiSelectionKey={['Meta', 'Control', 'Shift']}
+		minZoom={0.3}
+		proOptions={{ hideAttribution: true }}
+		onselectionchange={({ nodes: picked }) => onselect(picked.filter((n) => n.type === 'asset').map((n) => n.id))}
+	>
 		<FlowController bind:fitView={fit} />
 		<Background gap={64} bgColor="var(--sb-inset)" patternColor="var(--sb-grid)" />
 		<Controls showLock={false} />
@@ -56,6 +76,7 @@
 <style>
 	.graph {
 		position: relative;
+		height: 100%;
 		overflow: hidden;
 		border: 1px solid var(--border);
 		border-radius: 2px;

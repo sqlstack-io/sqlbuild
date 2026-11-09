@@ -3,6 +3,7 @@ pub mod change_trigger;
 pub(crate) mod frozen_definitions;
 pub mod group_dependencies;
 pub mod list_person_jobs;
+pub mod list_person_trigger_changes;
 pub mod list_person_triggers;
 pub mod list_trigger_events;
 pub mod list_triggers;
