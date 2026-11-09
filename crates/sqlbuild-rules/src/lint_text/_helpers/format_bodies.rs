@@ -250,8 +250,9 @@ pub(crate) fn formatted_body(
 ) -> Result<Option<String>, String> {
     if !response.formatted {
         return Err(response
-            .reason
+            .unavailable
             .clone()
+            .or_else(|| response.reason.clone())
             .filter(|reason| !reason.is_empty())
             .unwrap_or_else(|| DECLINED_WITHOUT_REASON.to_string()));
     }
@@ -303,6 +304,7 @@ pub(crate) fn splice_file(
                     .count()
                     + 1,
                 reason,
+                unavailable: responses[body.request].unavailable.is_some(),
             }),
         }
     }

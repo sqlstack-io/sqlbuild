@@ -72,6 +72,8 @@ pub struct FormatFault {
     pub file: usize,
     pub line: usize,
     pub reason: String,
+    /// The dialect has no formatter yet: the file is left as written with a warning, not a fault.
+    pub unavailable: bool,
 }
 
 /// Formatted file texts by file index, and the bodies left unchanged.
