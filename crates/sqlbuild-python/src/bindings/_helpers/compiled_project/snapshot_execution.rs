@@ -410,7 +410,7 @@ impl WorkerBuild {
         Ok(())
     }
 
-    /// Never call missing selected nodes successful merely because the executor returned zero.
+    /// Never call unseen nodes successful unless the executor returned; a refused command proves only its failures.
     pub(crate) fn outcome(&self, py: Python<'_>, exit_code: i32) -> PyResult<RunOutcome> {
         let cancelled = self.worker.bind(py).get().refresh_cancellation(py)?;
         let checks_only = self.checks_only();
@@ -418,7 +418,6 @@ impl WorkerBuild {
             let checked = self.checked.lock().map_err(|_| poisoned())?.clone();
             let returned = self.returned.load(Ordering::SeqCst);
             for key in &self.execution.claim.request.selection {
-                // A refused or raising command proves only the failures it saw; the rest stay skipped.
                 let seen = checked.get(key).copied();
                 let outcome = if returned {
                     Some(seen.unwrap_or(NodeOutcome::Success))
