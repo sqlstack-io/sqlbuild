@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 use sqlbuild_core::redaction::main::redact_text::redact_text;
 
-use crate::declarations::constants::{VARS_SETTING, WITHHELD_SETTING};
+use crate::declarations::constants::{DEFER_SETTING_PREFIX, VARS_SETTING, WITHHELD_SETTING};
 use crate::declarations::models::{Definitions, GroupDefinition, JobMember};
 use crate::snapshots::models::SnapshotNode;
 
@@ -45,19 +45,32 @@ fn all_placed(waits: &BTreeSet<String>, placed: &BTreeSet<&str>) -> bool {
     waits.iter().all(|wait| placed.contains(wait.as_str()))
 }
 
-/// `vars` is free-form and can carry credentials, so only its presence shows.
+/// `vars` can carry credentials and a deferral can name a storage path, so only their presence shows.
 pub(crate) fn shown_settings(settings: &BTreeMap<String, Value>) -> BTreeMap<String, Value> {
     settings
         .iter()
         .map(|(name, value)| {
             let shown = match value {
-                _ if name == VARS_SETTING => Value::String(WITHHELD_SETTING.into()),
+                _ if withheld(name, value) => Value::String(WITHHELD_SETTING.into()),
                 Value::String(text) => Value::String(redact_text(text)),
                 other => other.clone(),
             };
             (name.clone(), shown)
         })
         .collect()
+}
+
+fn withheld(name: &str, value: &Value) -> bool {
+    name == VARS_SETTING
+        || (name.starts_with(DEFER_SETTING_PREFIX) && !value.as_str().is_some_and(target_name))
+}
+
+/// Target names are TOML bare keys in the project file: letters, digits, `_` and `-`.
+fn target_name(text: &str) -> bool {
+    !text.is_empty()
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }
 
 /// The groups of the snapshot that run `job_key`.

@@ -269,6 +269,16 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     execution.description
                 );
                 let runs = list_runs(store, scope, 20).await.expect("list reruns");
+                assert!(
+                    runs.iter()
+                        .filter(|run| {
+                            run.run_id == request.run_id
+                                || run.parent_run_id == Some(request.run_id)
+                        })
+                        .all(|run| run.rewrite_history),
+                    "{}: a backfill's rerun and its children record that they rewrite history",
+                    execution.description
+                );
                 assert_eq!(
                     runs.iter()
                         .find(|run| run.run_id == request.run_id)

@@ -1,4 +1,6 @@
-//! One job's declaration reads like the job list, and a full-refresh launch needs run.rewrite_history down to group children.
+//! One job's declaration reads like the job list; a full-refresh launch needs run.rewrite_history down to group children and records it.
+
+use std::collections::BTreeMap;
 
 use serde_json::json;
 use uuid::Uuid;
@@ -10,10 +12,13 @@ use crate::credentials::tests::role_helpers::{
 };
 use crate::declarations::main::read_person_job::read_person_job;
 use crate::runs::_helpers::requests::job::frozen_group_children;
-use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::models::{JobRunRequest, PersonRunRequest, RunRequest, RunWindow};
+use crate::runs::main::{
+    advance_groups::advance_groups, list_runs::list_runs, request_person_run::request_person_run,
+};
+use crate::runs::models::{JobRunRequest, PersonRunRequest, RunRecord, RunRequest, RunWindow};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::runs::tests::test_types::JobDetailTestCase;
+use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -55,7 +60,9 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
             input.documents.insert("jobs".into(), json!({
                 "daily_orders": {"description": "Build orders", "selection": ["orders"], "settings": {
                     "vars": "{\"api_key\": \"orders-key-123\"}",
-                    "defer_to": "postgres://orders:orders-db-pass@warehouse.example.test/orders",
+                    "defer_to": "/srv/orders/state",
+                    "defer_sources_to": "production",
+                    "warehouse": "postgres://orders:orders-db-pass@warehouse.example.test/orders",
                     "concurrency": 4}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
@@ -94,13 +101,14 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     job.members.len()
                 ),
                 (
-                    json!({"concurrency": 4, "vars": "[REDACTED]",
-                        "defer_to": "postgres://orders:[REDACTED]@warehouse.example.test/orders"}),
+                    json!({"concurrency": 4, "vars": "[REDACTED]", "defer_to": "[REDACTED]",
+                        "defer_sources_to": "production",
+                        "warehouse": "postgres://orders:[REDACTED]@warehouse.example.test/orders"}),
                     json!(["orders"]),
                     json!(["orders_group"]),
                     0
                 ),
-                "{}: free-form vars and URI passwords are withheld",
+                "{}: vars and a deferral path are withheld, a target name shows, URI passwords are redacted",
                 test_case.description
             );
             let group = read(administrator, "orders_group")
@@ -189,7 +197,8 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 test_case.description
             );
             let group_launch = launch("orders_group");
-            for request in [launch("daily_orders"), group_launch.clone()] {
+            let full_job = launch("daily_orders");
+            for request in [full_job.clone(), group_launch.clone()] {
                 assert!(
                     request_person_run(store, administrator, PersonRunRequest::Job(&request))
                         .await
@@ -210,6 +219,44 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     test_case.description
                 );
             }
+            let plain = JobRunRequest {
+                full_refresh: false,
+                ..launch("customers")
+            };
+            request_person_run(store, administrator, PersonRunRequest::Job(&plain))
+                .await
+                .expect("ordinary launch");
+            let lease = acquire_lease(store, Uuid::now_v7())
+                .await
+                .expect("elect")
+                .expect("leader");
+            let scope = (location, "development");
+            advance_groups(store, &lease, (&BTreeMap::new(), scope))
+                .await
+                .expect("start the group");
+            let runs = list_runs(store, scope, 50).await.expect("runs");
+            let rewrites = |matches: &dyn Fn(&RunRecord) -> bool| {
+                runs.iter()
+                    .filter(|run| matches(run))
+                    .map(|run| run.rewrite_history)
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
+                (
+                    rewrites(&|run| run.run_id == full_job.run_id),
+                    rewrites(&|run| run.run_id == group_launch.run_id),
+                    rewrites(&|run| run.run_id == plain.run_id),
+                ),
+                (vec![true], vec![true], vec![false]),
+                "{}: full refreshes record that they rewrite history, an ordinary run does not",
+                test_case.description
+            );
+            let children = rewrites(&|run| run.parent_run_id == Some(group_launch.run_id));
+            assert!(
+                !children.is_empty() && children.iter().all(|flag| *flag),
+                "{}: started group children record the full refresh: {children:?}",
+                test_case.description
+            );
             let stored = rows(
                 store,
                 "SELECT request_json FROM sqb_runs WHERE run_id=$1",

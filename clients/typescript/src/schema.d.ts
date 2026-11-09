@@ -1524,7 +1524,7 @@ export interface components {
             /** @description A group's member jobs in run order; empty for a job. */
             members: components["schemas"]["JobMember"][];
             selection: string[];
-            /** @description Command settings; `vars` shows as `[REDACTED]` and text values pass through secret redaction. */
+            /** @description Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction. */
             settings: {
                 [key: string]: unknown;
             };
