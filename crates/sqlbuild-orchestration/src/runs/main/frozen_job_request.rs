@@ -8,7 +8,9 @@ use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;
 use crate::runs::_helpers::requests::adhoc::publication_plan;
 use crate::runs::constants::FULL_REFRESH_SETTING;
-use crate::runs::models::{JobRunRequest, RunCommand, RunKind, RunOrigin, RunRequest};
+use crate::runs::models::{
+    JobRunRequest, RunCommand, RunKind, RunNarrowing, RunOrigin, RunRequest,
+};
 use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
@@ -45,7 +47,12 @@ pub(crate) async fn frozen_job_request(
             .insert(FULL_REFRESH_SETTING.into(), serde_json::Value::Bool(true));
     }
     let mut transaction = transaction;
-    if !request.select.is_empty() || !request.exclude.is_empty() {
+    let narrowing: Option<RunNarrowing> =
+        (!request.select.is_empty() || !request.exclude.is_empty()).then(|| RunNarrowing {
+            select: request.select.clone(),
+            exclude: request.exclude.clone(),
+        });
+    if narrowing.is_some() {
         (transaction, definition.selection) = narrowed(
             transaction,
             (planner, snapshot_id, kind),
@@ -87,6 +94,7 @@ pub(crate) async fn frozen_job_request(
             settings: definition.settings,
             window: request.window.clone(),
             concurrency_groups: definition.concurrency_groups,
+            narrowing,
         },
     ))
 }

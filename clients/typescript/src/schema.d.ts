@@ -2371,6 +2371,7 @@ export interface components {
             kind: components["schemas"]["RunKind"];
             /** Format: uuid */
             location_id: string;
+            narrowing?: null | components["schemas"]["RunNarrowing"];
             origin: components["schemas"]["RunOrigin"];
             /** Format: uuid */
             parent_run_id?: string | null;
