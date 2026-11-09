@@ -3,6 +3,7 @@ import { ApiError } from '../client';
 import { LocalChangeBus, type ConnectionState } from '../signals';
 import type {
 	AdhocRunCheck,
+	PlanResult,
 	AdhocRunRequest,
 	Bootstrap,
 	BuiltInRole,
@@ -264,6 +265,11 @@ export class MockApiClient implements ApiClient {
 	async launchAdhocRun(scope: Scope, request: AdhocRunRequest): Promise<Run> {
 		this.#location(scope);
 		return this.#operate.launchAdhocRun(scope, request);
+	}
+
+	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+		this.#location(scope);
+		return this.#operate.planBuild(scope, command);
 	}
 
 	async listJobs(scope: Scope): Promise<Job[]> {

@@ -1,11 +1,11 @@
 <script lang="ts">
-	// The plan: what a command picks, what each picked node's state is now, what it updates, the options
-	// it runs with and the permissions it needs, all from the server's dry run, before anything runs.
-	// Every Run button opens this page with its command; nothing is queued until Run is pressed here.
+	// Every Run button opens this page with its command. A build is planned by the location against the
+	// warehouse (`sqb plan`); other verbs show the server's dry run. Nothing is queued until Run is pressed.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import type { AdhocRunCheck, AdhocRunRequest, CatalogNode, LaunchVerb } from '$lib/api';
+	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
+	import type { AdhocRunCheck, AdhocRunRequest, LaunchVerb, PlanDocument, PlanModel } from '$lib/api';
 	import AppTopbar from '$lib/components/app-topbar.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import { kindLine } from '$lib/build-area/labels';
@@ -45,7 +45,6 @@
 	let checkError = $state<string | null>(null);
 	let seq = 0;
 	$effect(() => {
-		if (!mayRun) return;
 		const key = requestKey;
 		const body = request;
 		const scope = app.scope;
@@ -59,6 +58,7 @@
 				check = result;
 				checkedKey = key;
 				checkError = null;
+				if (result.verb && !result.error) shown = result;
 			} catch (e) {
 				if (mine === seq) checkError = e instanceof Error ? e.message : String(e);
 			} finally {
@@ -68,37 +68,102 @@
 		return () => clearTimeout(timer);
 	});
 	const fresh = $derived(!!check && checkedKey === requestKey && !checking);
+	/** The last command that checked out; it stays on screen, dimmed, while the command is wrong or changing. */
+	let shown = $state<AdhocRunCheck | null>(null);
 
-	// ---- each picked node's state now, from the catalog ----
-	// Where the server doesn't report staleness, a node is grouped by its last build instead.
-	type NodeState = 'failed' | 'never' | 'changed' | 'upstream' | 'behind' | 'current' | 'built' | 'source';
-	const STATES: { value: NodeState; label: string; tone: string }[] = [
-		{ value: 'failed', label: 'Failed last time', tone: 'var(--sb-error)' },
-		{ value: 'never', label: 'Never built', tone: 'var(--sb-warning)' },
-		{ value: 'changed', label: 'Changed', tone: 'var(--sb-warning)' },
-		{ value: 'upstream', label: 'Upstream changed', tone: 'var(--sb-warning)' },
-		{ value: 'behind', label: 'Behind', tone: 'var(--sb-warning)' },
-		{ value: 'current', label: 'Up to date', tone: 'var(--sb-success)' },
-		{ value: 'built', label: 'Built before', tone: 'var(--sb-success)' },
-		{ value: 'source', label: 'Sources', tone: 'var(--sb-text-faint)' }
-	];
-	const QUIET = new Set<NodeState>(['current', 'built', 'source']);
-	function stateOf(n: CatalogNode | undefined): NodeState {
-		if (n?.kind === 'source') return 'source';
-		if (n?.lastOutcome === 'failed') return 'failed';
-		if (!n?.lastBuild) return 'never';
-		if (n.stale === null) return 'built';
-		if (n.stale.some((r) => r.reason === 'changed')) return 'changed';
-		if (n.stale.some((r) => r.reason === 'changed_upstream')) return 'upstream';
-		if (n.stale.some((r) => r.reason === 'behind')) return 'behind';
-		return 'current';
+	// ---- the location's plan of a build (one at a time; the latest command wins) ----
+	let plan = $state<PlanDocument | null>(null);
+	let plannedKey = $state('');
+	let planning = $state(false);
+	let planError = $state<{ key: string; message: string } | null>(null);
+	const wantsPlan = $derived(fresh && check?.verb === 'build' && !check.error);
+	$effect(() => {
+		const key = requestKey;
+		const scope = app.scope;
+		if (!scope || !wantsPlan || planning || plannedKey === key || planError?.key === key) return;
+		const timer = setTimeout(async () => {
+			planning = true;
+			try {
+				const result = await app.client.planBuild(scope, commandTokens(cmd));
+				if (result.plan) {
+					plan = result.plan;
+					plannedKey = key;
+					planError = null;
+				} else planError = { key, message: result.error };
+			} catch (e) {
+				planError = { key, message: e instanceof Error ? e.message : String(e) };
+			} finally {
+				planning = false;
+			}
+		}, 400);
+		return () => clearTimeout(timer);
+	});
+	function replan() {
+		plannedKey = '';
+		planError = null;
 	}
-	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
-	const picked = $derived(check?.selection ?? []);
-	const writes = $derived(new Set(check?.writeSet ?? []));
-	const groups = $derived(
-		STATES.map((s) => ({ ...s, nodes: picked.filter((k) => stateOf(byKey.get(k)) === s.value).map((k) => ({ key: k, node: byKey.get(k) })) })).filter((g) => g.nodes.length)
+	const planCurrent = $derived(plannedKey === requestKey && !planning);
+
+	const REASONS: { value: string; label: string; tone: string }[] = [
+		{ value: 'source_freshness_error', label: 'Source freshness error', tone: 'var(--sb-error)' },
+		{ value: 'external_upstream_failed', label: 'Upstream failed', tone: 'var(--sb-error)' },
+		{ value: 'full_refresh', label: 'Full refresh', tone: 'var(--sb-warning)' },
+		{ value: 'query_changed', label: 'Query changed', tone: 'var(--sb-warning)' },
+		{ value: 'function_changed', label: 'Function changed', tone: 'var(--sb-warning)' },
+		{ value: 'config_changed', label: 'Config changed', tone: 'var(--sb-warning)' },
+		{ value: 'schema_changed', label: 'Schema changed', tone: 'var(--sb-warning)' },
+		{ value: 'first_run', label: 'First run', tone: 'var(--sb-warning)' },
+		{ value: 'renamed', label: 'Renamed', tone: 'var(--sb-warning)' },
+		{ value: 'normal_incremental', label: 'Incremental', tone: 'var(--primary)' },
+		{ value: 'no_change', label: 'Unchanged', tone: 'var(--sb-success)' },
+		{ value: 'disabled', label: 'Disabled', tone: 'var(--sb-text-faint)' }
+	];
+	const QUIET = new Set(['no_change', 'disabled']);
+	const ACTIONS: Record<string, string> = {
+		create_view: 'create view',
+		create_table: 'create table',
+		incremental_append: 'append',
+		incremental_delete_insert: 'delete + insert',
+		incremental_merge: 'merge',
+		load_seed: 'load seed'
+	};
+	const reasonGroups = $derived.by(() => {
+		const models = plan?.models ?? [];
+		const known = new Set(REASONS.map((r) => r.value));
+		const extra = [...new Set(models.map((m) => m.reason).filter((r) => !known.has(r)))].map((r) => ({ value: r, label: r.replaceAll('_', ' '), tone: 'var(--sb-text-faint)' }));
+		return [...REASONS, ...extra].map((r) => ({ ...r, models: models.filter((m) => m.reason === r.value) })).filter((g) => g.models.length);
+	});
+	const toBuild = $derived((plan?.models ?? []).filter((m) => !QUIET.has(m.reason)).length);
+	function detail(m: PlanModel): string {
+		const parts: string[] = [];
+		if (m.backfill.action === 'full') parts.push('full backfill');
+		if (m.backfill.action === 'bounded') parts.push(`backfill ${m.backfill.duration ?? ''}`.trim());
+		if (m.cursor_column) {
+			const b = m.cursor_bounds;
+			parts.push(b && (b.start || b.end) ? `${m.cursor_column} ${b.start ?? '…'} → ${b.end ?? '…'}` : `cursor ${m.cursor_column}`);
+		}
+		if (m.changed_functions?.length) parts.push(`uses ${m.changed_functions.join(', ')}`);
+		return parts.join(' · ');
+	}
+	const extras = $derived(
+		plan
+			? [
+					{ title: 'Sources to load', rows: plan.source_loads.map((r) => [r.name, [r.write_strategy, r.cursor_column && `cursor ${r.cursor_column}`, r.is_reload && 'reload'].filter(Boolean).join(' · ')]) },
+					{ title: 'Seeds', rows: plan.seeds.map((r) => [r.name, r.reason.replaceAll('_', ' ')]) },
+					{ title: 'Functions', rows: plan.functions.map((r) => [r.name, [r.language, r.reason?.replaceAll('_', ' ')].filter(Boolean).join(' · ')]) },
+					{ title: 'Python', rows: plan.python_nodes.map((r) => [r.name, `${r.kind} · ${r.identity_status}`]) },
+					{ title: 'Migrations', rows: plan.migrations.map((r) => [r.model, [r.origin_model && `from ${r.origin_model}`, r.decision, r.completed_at ? 'completed' : 'pending'].filter(Boolean).join(' · ')]) },
+					{ title: 'Column migrations', rows: plan.column_migrations.map((r) => [r.model, `${r.origin_column} → ${r.destination_column} · ${r.decision}`]) },
+					{ title: 'Table type changes', rows: plan.table_type_conversions.map((r) => [r.model, [r.actual_type, r.desired_type].filter(Boolean).join(' → ')]) },
+					{ title: 'Retention', rows: plan.retention.map((r) => [r.model, r.action ?? '']) }
+				].filter((x) => x.rows.length)
+			: []
 	);
+
+	// ---- what a non-build verb picks, from the catalog ----
+	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
+	const picked = $derived(shown?.selection ?? []);
+	const graphHeight = $derived(picked.length <= 3 ? 190 : picked.length <= 8 ? 270 : 360);
 
 	// ---- autocomplete ----
 	let caret = $state(0);
@@ -164,13 +229,15 @@
 	// ---- run ----
 	let launching = $state(false);
 	let launchError = $state<string | null>(null);
-	const canLaunch = $derived(fresh && !!check?.launchable);
+	const planned = $derived(check?.verb !== 'build' || planCurrent);
+	const canLaunch = $derived(fresh && !!check?.launchable && planned);
+	const problem = $derived(checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
 	const blockedReason = $derived(
 		!mayRun
 			? "You don't have permission to start runs by hand in this target (run.adhoc)"
 			: !fresh
 				? undefined
-				: (check?.error ?? check?.permissions.find((p) => !p.allowed)?.reason ?? undefined)
+				: (check?.error ?? check?.permissions.find((p) => !p.allowed)?.reason ?? (planned ? undefined : (planError?.message ?? 'Waiting for the plan')))
 	);
 
 	async function launch() {
@@ -226,60 +293,97 @@
 		</div>
 	</div>
 
+	{#if problem}<p class="problem-bar" data-testid="adhoc-error">{problem}</p>{/if}
+
 	<div class="body">
-		<div class="main sb-scroll" class:stale={check && !fresh}>
-			{#if !mayRun}
-				<p class="msg">You don't have permission to start runs by hand in this target (run.adhoc).</p>
-			{:else if checkError}
-				<p class="msg problem">{checkError}</p>
-			{:else if check}
-				{#if check.error}<p class="msg problem" data-testid="adhoc-error">{check.error}</p>{/if}
-				{#if check.verb && picked.length}
+		<div class="main sb-scroll" class:stale={!!shown && (!!problem || !fresh || (planning && !!plan))}>
+			{#if shown?.verb === 'build'}
+				{#if plan}
 					<div class="summary">
-						<b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{parts.select.length ? '' : ' · whole project'}
-						<span>·</span> updates <b>{check.writeSet.length}</b>
-						{#each groups.filter((g) => !QUIET.has(g.value)) as g (g.value)}
-							<span>·</span> <i style:background={g.tone}></i>{g.nodes.length} {g.label.toLowerCase()}
-						{/each}
+						<b>{plan.selected_count}</b> selected <span>·</span> <b>{toBuild}</b> to build
+						{#if plan.models.length - toBuild}<span>·</span> {plan.models.length - toBuild} unchanged{/if}
+						{#if plan.warnings.length}<span>·</span> <i style:background="var(--sb-warning)"></i>{plan.warnings.length} warning{plan.warnings.length === 1 ? '' : 's'}{/if}
+						<button class="replan" onclick={replan} disabled={planning}><RotateCwIcon size={11} class={planning ? 'animate-spin' : ''} /> {planning ? 'Planning…' : 'Plan again'}</button>
 					</div>
-					{#if catalog.data}
-						<div class="graph"><ScopeGraph keys={picked} catalog={catalog.data} onselect={() => {}} /></div>
+					{#if plan.warnings.length}
+						<ul class="warnings">
+							{#each plan.warnings as w, i (i)}
+								<li class:err={w.severity === 'error'}>{#if w.code}<code>{w.code}</code>{/if}{w.message}</li>
+							{/each}
+						</ul>
 					{/if}
-					<table class="nodes">
-						{#each groups as g (g.value)}
-							<tbody>
-								<tr class="group"><td colspan="4"><i style:background={g.tone}></i>{g.label} · {g.nodes.length}</td></tr>
-								{#each g.nodes as { key, node } (key)}
-									<tr>
-										<td><a href="/catalog/{key}" class="mono">{key}</a></td>
-										<td class="faint">{node ? kindLine(node) : ''}</td>
-										<td class="faint">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
-										<td class="faint right">{writes.has(key) ? 'updates' : 'reads'}</td>
-									</tr>
-								{/each}
-							</tbody>
-						{/each}
-					</table>
+				{:else if planning || (wantsPlan && !planError)}
+					<div class="planning" role="status" data-testid="plan-loading">
+						<RotateCwIcon size={13} class="animate-spin" />
+						<div>
+							<div>Planning on the location…</div>
+							<div class="faint">Reading the current warehouse state</div>
+						</div>
+					</div>
 				{/if}
-			{:else if checking}
+			{:else if shown?.verb}
+				<div class="summary"><b>{picked.length}</b> node{picked.length === 1 ? '' : 's'}{#if shown.writeSet.length}<span>·</span> updates <b>{shown.writeSet.length}</b>{/if}</div>
+			{:else if checking && !problem}
 				<p class="msg faint">Checking the command…</p>
+			{/if}
+			{#if shown?.verb === 'build' && plan}
+				<table class="nodes">
+					{#each reasonGroups as g (g.value)}
+						<tbody>
+							<tr class="group"><td colspan="5"><i style:background={g.tone}></i>{g.label} · {g.models.length}</td></tr>
+							{#each g.models as m (m.name)}
+								<tr>
+									<td><a href="/catalog/model:{m.name}" class="mono">{m.name}</a></td>
+									<td class="faint">{m.materialization_type}{m.incremental_strategy ? ` · ${m.incremental_strategy}` : ''}</td>
+									<td>{ACTIONS[m.action] ?? m.action.replaceAll('_', ' ')}</td>
+									<td class="faint wrap">{detail(m)}</td>
+									<td class="faint right mono">{m.qualified_name ?? ''}</td>
+								</tr>
+							{/each}
+						</tbody>
+					{/each}
+					{#each extras as x (x.title)}
+						<tbody>
+							<tr class="group"><td colspan="5">{x.title} · {x.rows.length}</td></tr>
+							{#each x.rows as [name, what], i (i)}
+								<tr><td class="mono">{name}</td><td class="faint" colspan="4">{what}</td></tr>
+							{/each}
+						</tbody>
+					{/each}
+				</table>
+			{:else if shown?.verb && shown.verb !== 'build'}
+				<table class="nodes">
+					<tbody>
+						{#each picked as key (key)}
+							{@const node = byKey.get(key)}
+							<tr>
+								<td><a href="/catalog/{key}" class="mono">{key.slice(key.indexOf(':') + 1)}</a></td>
+								<td class="faint">{node ? kindLine(node) : ''}</td>
+								<td class="faint right">{node?.lastBuild ? `built ${formatAgo(node.lastBuild.builtAt, app.now)}` : ''}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			{/if}
+			{#if shown?.verb && picked.length && catalog.data}
+				<div class="graph" class:below={!!plan || shown?.verb !== 'build'} style:height="{graphHeight}px"><ScopeGraph keys={picked} catalog={catalog.data} onselect={() => {}} /></div>
 			{/if}
 		</div>
 
-		{#if check?.verb}
-		<aside class="rail sb-scroll">
+		{#if shown?.verb}
+		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
 				<h3>Permissions</h3>
-				{#each check.permissions as p (p.action)}
+				{#each shown.permissions as p (p.action)}
 					<p class="decision" data-testid="adhoc-permission">
 						<span class={p.allowed ? 'ok-text' : 'bad-text'}>{p.allowed ? '✓' : '✕'}</span>
 						<span title={p.action}>{PERMISSIONS[p.action].label}</span>
 					</p>
 					{#if p.reason}<p class="bad-text reason">{p.reason}</p>{/if}
 				{/each}
-				{#if Object.keys(check.settings).length}
+				{#if Object.keys(shown.settings).length}
 					<h3>Options</h3>
 					<div class="chips">
-						{#each Object.entries(check.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
+						{#each Object.entries(shown.settings) as [name, value] (name)}<span class="sb-tag code">{value === true ? name : `${name}=${value}`}</span>{/each}
 					</div>
 				{/if}
 		</aside>
@@ -288,7 +392,7 @@
 
 	<div class="foot">
 		<div class="why">
-			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason}<span class="faint">{blockedReason}</span>{/if}
+			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
 		<GatedButton requires="run.adhoc" variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
 	</div>
@@ -401,11 +505,63 @@
 		padding: 14px 24px;
 		transition: opacity 0.15s;
 	}
-	.main.stale {
+	.main.stale,
+	.rail.stale {
 		opacity: 0.55;
 	}
 	.msg {
 		font-size: 13px;
+	}
+	.problem-bar {
+		margin: 0;
+		padding: 7px 24px;
+		border-bottom: 1px solid color-mix(in srgb, var(--sb-error) 35%, var(--border));
+		background: color-mix(in srgb, var(--sb-error) 7%, transparent);
+		color: var(--sb-error);
+		font-family: var(--font-mono);
+		font-size: 12px;
+	}
+	.planning {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 12px;
+		padding: 12px 14px;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--sb-inset);
+		font-size: 12.5px;
+	}
+	.replan {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		margin-left: auto;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
+	.replan:hover:not(:disabled) {
+		color: var(--foreground);
+	}
+	.warnings {
+		margin: 0 0 12px;
+		padding: 0;
+		list-style: none;
+		font-size: 12.5px;
+	}
+	.warnings li {
+		padding: 4px 0 4px 10px;
+		border-left: 2px solid var(--sb-warning);
+	}
+	.warnings li.err {
+		border-left-color: var(--sb-error);
+	}
+	.warnings code {
+		margin-right: 8px;
+		color: var(--sb-text-faint);
+	}
+	.wrap {
+		white-space: normal;
 	}
 	.summary {
 		display: flex;
@@ -434,8 +590,10 @@
 		margin-right: 0;
 	}
 	.graph {
-		height: 340px;
 		margin-bottom: 14px;
+	}
+	.graph.below {
+		margin-top: 16px;
 		border: 1px solid var(--border);
 		border-radius: 2px;
 	}

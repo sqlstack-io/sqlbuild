@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, planResultOf, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -187,5 +187,18 @@ describe('group run nodes', () => {
 			['model:report', 'g', 'pending'],
 			['model:raw', 's', 'failed']
 		]);
+	});
+});
+
+describe('planResultOf', () => {
+	it.each([
+		{ description: 'a plan keeps its models and fills missing sections', outcome: { kind: 'plan', document: { selected_count: 1, models: [{ name: 'orders', reason: 'first_run' }] } }, expected: { plan: 'orders', error: null } },
+		{ description: "sqb plan's own error is the result", outcome: { kind: 'plan', document: { error: { code: 'S007', message: "unknown selector name 'ordrs'" } } }, expected: { plan: null, error: "S007: unknown selector name 'ordrs'" } },
+		{ description: 'a superseded plan asks to plan again', outcome: { kind: 'superseded' }, expected: { plan: null, error: 'The project changed on the location while it was planning; plan again' } }
+	])('$description', ({ outcome, expected }) => {
+		const result = planResultOf(outcome as never);
+		expect(result.error).toBe(expected.error);
+		expect(result.plan?.models[0]?.name ?? null).toBe(expected.plan);
+		if (result.plan) expect(result.plan.warnings).toEqual([]);
 	});
 });

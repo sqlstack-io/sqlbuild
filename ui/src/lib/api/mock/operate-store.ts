@@ -9,6 +9,7 @@ import type { LocalChangeBus } from '../signals';
 import type {
 	AdhocPermission,
 	AdhocRunCheck,
+	PlanResult,
 	AdhocRunRequest,
 	BuiltInRole,
 	BulkRunResult,
@@ -520,6 +521,27 @@ export class MockOperate {
 		});
 		this.#ctx.changes.emit('runs');
 		return this.#ctx.reply(this.#view(rec, scope));
+	}
+
+	/** Every selected model is planned as unchanged unless the command asks for a full refresh. */
+	async planBuild(scope: Scope, command: string[]): Promise<PlanResult> {
+		const check = this.#check(scope, { command, priority: 0 });
+		await new Promise((resolve) => setTimeout(resolve, 1200));
+		if (check.error) return this.#ctx.reply({ plan: null, error: check.error });
+		if (check.verb !== 'build') return this.#ctx.reply({ plan: null, error: `sqb plan previews builds; sqb ${check.verb} cannot be planned` });
+		const reason = command.includes('--full-refresh') ? 'full_refresh' : 'no_change';
+		const models = check.selection.filter((key) => key.startsWith('model:')).map((key) => ({
+			name: key.slice('model:'.length),
+			materialization_type: 'table',
+			action: 'create_table',
+			reason,
+			backfill: { action: reason === 'full_refresh' ? 'full' : 'forward', duration: null },
+			qualified_name: `main.${key.slice('model:'.length)}`
+		}));
+		return this.#ctx.reply({
+			plan: { selected_count: check.selection.length, models, seeds: [], source_loads: [], functions: [], python_nodes: [], warnings: [], migrations: [], column_migrations: [], table_type_conversions: [], retention: [] },
+			error: null
+		});
 	}
 
 	// ---- jobs ----
