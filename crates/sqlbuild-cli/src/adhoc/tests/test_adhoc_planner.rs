@@ -1,6 +1,9 @@
 //! The planner parses with the CLI's own table, refuses every flag outside the allowlist and resolves exact keys.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde_json::json;
+use sqlbuild_orchestration::runs::types::PublishedJobs;
 
 use crate::adhoc::main::adhoc_planner::adhoc_planner;
 use crate::adhoc::tests::helpers::{owned_plan, resource};
@@ -26,7 +29,38 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
         resource("source:shop.raw_orders", &[], &[], None),
         resource("seed:currencies", &[], &[], None),
     ];
+    let jobs: PublishedJobs = BTreeMap::from([
+        (
+            "nightly".to_owned(),
+            BTreeSet::from(["model:orders".to_owned(), "model:order_totals".to_owned()]),
+        ),
+        (
+            "daily_group".to_owned(),
+            BTreeSet::from(["model:customers".to_owned(), "model:orders".to_owned()]),
+        ),
+    ]);
     let test_cases = [
+        AdhocPlanTestCase {
+            description: "a published job selects its published nodes",
+            command: &[
+                "build",
+                "--select",
+                "job:nightly",
+                "--exclude",
+                "order_totals",
+            ],
+            expected_plan: Ok((&["model:orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "a bare published group name needs no prefix",
+            command: &["build", "--select", "daily_group"],
+            expected_plan: Ok((&["model:customers", "model:orders"], json!({}))),
+        },
+        AdhocPlanTestCase {
+            description: "an unpublished job is refused",
+            command: &["build", "--select", "job:weekly"],
+            expected_plan: Err("unknown job name 'weekly'"),
+        },
         AdhocPlanTestCase {
             description: "upstream selector reaches the source and seed it reads",
             command: &["build", "--select", "+orders"],
@@ -217,7 +251,7 @@ fn given_ad_hoc_commands_when_planned_then_flags_follow_the_allowlist_and_select
             .map(|token| (*token).to_owned())
             .collect();
         let actual = planner
-            .plan(&command, &resources)
+            .plan(&command, (&resources, &jobs))
             .map(|plan| {
                 (
                     plan.selection.into_iter().collect::<Vec<String>>(),

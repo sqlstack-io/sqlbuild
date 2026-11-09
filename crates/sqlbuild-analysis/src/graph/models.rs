@@ -42,7 +42,7 @@ pub struct ProjectGraph {
     pub jobs: Option<BTreeMap<String, Result<BTreeSet<ObjectKey>, SelectorError>>>,
 }
 
-/// What one job or job group selects: a job's own selector tokens, or a group's member jobs.
+/// What one job or job group selects: its own selector tokens, its member jobs, or resolved keys.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JobSelection {
     Job {
@@ -51,6 +51,10 @@ pub enum JobSelection {
     },
     Group {
         members: Vec<String>,
+    },
+    /// A selection already resolved, such as a published job's.
+    Resolved {
+        keys: Vec<ObjectKey>,
     },
 }
 
