@@ -4494,8 +4494,8 @@ dependencies = [
 
 [[package]]
 name = "sqlclean"
-version = "0.6.3"
-source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=72feaf309bcae7caf24a0c4f35df9c3dc1f6dd4b#72feaf309bcae7caf24a0c4f35df9c3dc1f6dd4b"
+version = "0.6.4"
+source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=c111f9ebae03412e1165eefc2bdbc3038aa299ba#c111f9ebae03412e1165eefc2bdbc3038aa299ba"
 dependencies = [
  "rayon",
  "rustc-hash",
