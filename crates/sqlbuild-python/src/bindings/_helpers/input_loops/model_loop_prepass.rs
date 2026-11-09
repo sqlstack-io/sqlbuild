@@ -1,4 +1,5 @@
-//! Each model's native header facts, read before the ordered loop on a fixed pool off the GIL.
+//! The model loop's fixed compile pool off the GIL: header facts before the ordered loop, and work
+//! the loop hands off while it continues.
 
 use std::sync::{Arc, OnceLock};
 
@@ -29,17 +30,28 @@ pub(crate) fn pooled<T: Sync, R: Send>(
     items: &[T],
     each: impl Fn(&T) -> R + Sync + Send,
 ) -> Vec<R> {
-    let pool: &Result<ThreadPool, ThreadPoolBuildError> = POOL.get_or_init(|| {
+    match compile_pool() {
+        Ok(pool) => pool.install(|| items.par_iter().map(&each).collect()),
+        Err(_) => items.iter().map(each).collect(),
+    }
+}
+
+/// Run `job` on the compile pool while the caller continues, or now when the pool cannot start.
+pub(crate) fn spawned(job: impl FnOnce() + Send + 'static) {
+    match compile_pool() {
+        Ok(pool) => pool.spawn(job),
+        Err(_) => job(),
+    }
+}
+
+fn compile_pool() -> &'static Result<ThreadPool, ThreadPoolBuildError> {
+    POOL.get_or_init(|| {
         ThreadPoolBuilder::new()
             .num_threads(PREPASS_WORKERS)
             .stack_size(WORKER_STACK_BYTES)
             .thread_name(|index| format!("sqlbuild-model-prepass-{index}"))
             .build()
-    });
-    match pool {
-        Ok(pool) => pool.install(|| items.par_iter().map(&each).collect()),
-        Err(_) => items.iter().map(each).collect(),
-    }
+    })
 }
 
 fn facts_of(header: &Option<NativeHeader>) -> Option<HeaderFacts> {

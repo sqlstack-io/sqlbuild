@@ -1,6 +1,7 @@
 //! Rejected `sql_analysis false` opt-outs, and native-route analysis skipped on a parser gap.
 
 use std::path::Path;
+use std::sync::mpsc::{Receiver, Sender, channel};
 
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
 use pyo3::types::{PyBool, PyBoolMethods, PyDict, PyDictMethods, PyList, PyString, PyTuple};
@@ -17,6 +18,11 @@ use sqlbuild_analysis::compiled_project::main::text_position::text_position;
 use sqlbuild_analysis::compiled_project::models::ModelLoopSettings;
 use sqlbuild_analysis::compiled_project::models::{SplicedSpan, TextPosition};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
+use sqlbuild_core::constants::PANIC_MESSAGE;
+use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
+
+use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
+use crate::bindings::_helpers::input_loops::model_loop_prepass::spawned;
 
 use crate::bindings::_helpers::input_loops::model_loop::{
     LoopContext, NativeModelLoop, compile_error,
@@ -122,57 +128,192 @@ pub(crate) fn rejected_opt_out<'py>(
     }
 }
 
-/// Whether a native route analyses the model: P026 warns or raises when its parser cannot read it, and P001 raises when the parser reports invalid syntax.
-pub(crate) fn skip_unreadable(
-    settings: ModelLoopSettings,
-    dialect: &dyn NativeDialect,
+/// A model's native gap parse, run on the compile pool while the loop attaches later models.
+pub(crate) struct GapJob {
+    name: String,
+    relative_path: String,
+    dialect: &'static dyn NativeDialect,
+    checks: Vec<SiteCheck>,
+    query_sql: String,
+    contents: String,
+    /// The authored query, its macro expansion and the passes between them, when they map back.
+    authored: Option<(String, String, Vec<Vec<SplicedSpan>>)>,
+}
+
+/// A gap parse's finding: none, a gap with its syntax flag, code and message, or why it failed.
+type GapOutcome = Result<Option<(bool, &'static str, String)>, String>;
+
+impl GapJob {
+    /// The first gap in the model's query or hooks, as P001 or P026 names it.
+    fn outcome(&self) -> GapOutcome {
+        let Some((check, gap)) = first_native_gap(self.dialect, &self.checks)? else {
+            return Ok(None);
+        };
+        let authored: Option<AuthoredQuery<'_>> =
+            self.authored
+                .as_ref()
+                .map(|(query, macro_sql, passes)| AuthoredQuery {
+                    query,
+                    macro_sql,
+                    passes,
+                });
+        let texts: (&str, &str, Option<AuthoredQuery<'_>>) =
+            (&self.query_sql, &self.contents, authored);
+        let site: GapSite<'_> = GapSite {
+            label: check.label.as_deref(),
+            path: &check.path,
+            position: gap_position(texts, check, &gap),
+        };
+        let (code, message) = skipped_analysis(&self.name, self.dialect.name(), &gap, &site);
+        Ok(Some((gap.syntax, code, message)))
+    }
+}
+
+/// The model's statements for its native parser, with the texts a gap is placed by.
+pub(crate) fn gap_job(
+    dialect: &'static dyn NativeDialect,
     context: &LoopContext<'_, '_>,
     model: &OptOutModel<'_, '_>,
+) -> PyResult<GapJob> {
+    Ok(GapJob {
+        name: model.name.to_owned(),
+        relative_path: model.relative_path.to_owned(),
+        dialect,
+        checks: model_checks(context, model)?,
+        query_sql: model.query_sql.to_owned(),
+        contents: model.contents.to_owned(),
+        authored: model.authored.map(|authored| {
+            (
+                authored.query.to_owned(),
+                authored.macro_sql.to_owned(),
+                authored.passes.to_vec(),
+            )
+        }),
+    })
+}
+
+/// Each queued gap parse, settled in loop order before the model loop returns.
+pub(crate) struct GapQueue {
+    sender: Sender<(usize, GapOutcome)>,
+    receiver: Receiver<(usize, GapOutcome)>,
+    /// Each queued model's input record index, name and relative path, in loop order.
+    queued: Vec<(usize, String, String)>,
+    next_record: usize,
+}
+
+impl Default for GapQueue {
+    fn default() -> Self {
+        let (sender, receiver) = channel();
+        Self {
+            sender,
+            receiver,
+            queued: Vec::new(),
+            next_record: 0,
+        }
+    }
+}
+
+impl GapQueue {
+    /// The input record index the model being finished will be retained at.
+    pub(crate) fn expect_record(&mut self, index: usize) {
+        self.next_record = index;
+    }
+
+    /// Parse the model's statements on the compile pool.
+    pub(crate) fn queue(&mut self, job: GapJob) {
+        let slot: usize = self.queued.len();
+        self.queued.push((
+            self.next_record,
+            job.name.clone(),
+            job.relative_path.clone(),
+        ));
+        let sender: Sender<(usize, GapOutcome)> = self.sender.clone();
+        spawned(move || {
+            let outcome: GapOutcome = catch_compiler_panic(|| job.outcome());
+            let _ = sender.send((slot, outcome));
+        });
+    }
+
+    /// Raise the first queued model's P001, report each P026 and mark its model unanalysed.
+    pub(crate) fn settle(
+        self,
+        settings: ModelLoopSettings,
+        context: &LoopContext<'_, '_>,
+        project: &Bound<'_, NativeCompiledProject>,
+    ) -> PyResult<()> {
+        let Self {
+            sender,
+            receiver,
+            queued,
+            ..
+        } = self;
+        drop(sender);
+        let count: usize = queued.len();
+        let outcomes: Vec<Option<GapOutcome>> = project.py().detach(move || {
+            let mut outcomes: Vec<Option<GapOutcome>> = (0..count).map(|_| None).collect();
+            for (slot, outcome) in receiver.iter().take(count) {
+                outcomes[slot] = Some(outcome);
+            }
+            outcomes
+        });
+        for ((record, name, relative_path), outcome) in queued.into_iter().zip(outcomes) {
+            let outcome: GapOutcome = outcome.unwrap_or_else(|| Err(PANIC_MESSAGE.to_owned()));
+            let skipped: bool = settle_gap(settings, context, (&name, &relative_path), outcome)?;
+            if skipped && record < project.borrow().inputs().len() {
+                project.borrow_mut().mark_analysis_skipped(record)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Raise the gap's P001, or report its P026; whether the model's analysis is skipped.
+fn settle_gap(
+    settings: ModelLoopSettings,
+    context: &LoopContext<'_, '_>,
+    model: (&str, &str),
+    outcome: GapOutcome,
 ) -> PyResult<bool> {
-    let checks: Vec<SiteCheck> = model_checks(context, model)?;
-    let Some((check, gap)) = first_gap(dialect, context, &checks)? else {
-        return Ok(true);
-    };
-    let site: GapSite<'_> = GapSite {
-        label: check.label.as_deref(),
-        path: &check.path,
-        position: gap_position(model, check, &gap),
-    };
-    let (code, message) = skipped_analysis(model.name, dialect.name(), &gap, &site);
-    if gap.syntax {
-        return Err(new_helped_error(
-            model.config.py(),
+    match outcome.map_err(|message| compile_error(context.classes, &message, None))? {
+        None => Ok(false),
+        Some((true, code, message)) => Err(new_helped_error(
+            context.host.py(),
             ErrorId::CompileInput,
             (message, code),
             Some(&context.classes.syntax_help),
-        ));
+        )),
+        Some((false, code, message)) => {
+            report_skip(settings, context, model, (code, message))?;
+            Ok(true)
+        }
     }
-    report_skip(settings, context, model, (code, message))?;
-    Ok(false)
 }
 
 /// A hook's gap in its statement; the query's in the model file, when its text maps back there.
-fn gap_position(model: &OptOutModel<'_, '_>, check: &SiteCheck, gap: &LocatedGap) -> GapPosition {
+fn gap_position(
+    (query_sql, contents, authored): (&str, &str, Option<AuthoredQuery<'_>>),
+    check: &SiteCheck,
+    gap: &LocatedGap,
+) -> GapPosition {
     let Some(offset) = gap.source_offset else {
         return GapPosition::Analysed;
     };
     if check.label.is_some() {
         return GapPosition::Statement(text_position(&check.check.sql, offset));
     }
-    model
-        .authored
+    authored
         .and_then(|authored| {
-            let query: usize = aligned_offset(&check.check.sql, offset, model.query_sql)?;
-            let expanded: usize = aligned_offset(model.query_sql, query, authored.macro_sql)?;
+            let query: usize = aligned_offset(&check.check.sql, offset, query_sql)?;
+            let expanded: usize = aligned_offset(query_sql, query, authored.macro_sql)?;
             authored_model_offset(
-                model.contents,
+                contents,
                 authored.query,
                 (authored.macro_sql, expanded),
                 authored.passes,
             )
         })
         .map_or(GapPosition::Analysed, |file| {
-            GapPosition::File(text_position(model.contents, file))
+            GapPosition::File(text_position(contents, file))
         })
 }
 
@@ -186,7 +327,7 @@ pub(crate) fn skip_unavailable(
     report_skip(
         settings,
         context,
-        model,
+        (model.name, model.relative_path),
         unavailable_analysis(model.name, dialect),
     )
 }
@@ -195,10 +336,10 @@ pub(crate) fn skip_unavailable(
 fn report_skip(
     settings: ModelLoopSettings,
     context: &LoopContext<'_, '_>,
-    model: &OptOutModel<'_, '_>,
+    (name, relative_path): (&str, &str),
     (code, message): (&str, String),
 ) -> PyResult<()> {
-    let py: Python<'_> = model.config.py();
+    let py: Python<'_> = context.host.py();
     let help: &str = &context.classes.syntax_help;
     if settings.require_sql_analysis {
         return Err(new_helped_error(
@@ -220,16 +361,13 @@ fn report_skip(
                 "resource_type",
                 PyString::new(py, MODEL_RESOURCE).into_any(),
             ),
-            ("resource_name", PyString::new(py, model.name).into_any()),
-            (
-                "path",
-                context.classes.path_class.call1((model.relative_path,))?,
-            ),
+            ("resource_name", PyString::new(py, name).into_any()),
+            ("path", context.classes.path_class.call1((relative_path,))?),
             ("help", PyString::new(py, help).into_any()),
         ],
     )?;
     let arguments: Bound<'_, PyDict> = PyDict::new(py);
-    arguments.set_item("key", PyTuple::new(py, [code, model.name])?)?;
+    arguments.set_item("key", PyTuple::new(py, [code, name])?)?;
     arguments.set_item("diagnostic", diagnostic)?;
     context
         .classes
@@ -278,11 +416,18 @@ fn first_gap<'a>(
     context: &LoopContext<'_, '_>,
     checks: &'a [SiteCheck],
 ) -> PyResult<Option<(&'a SiteCheck, LocatedGap)>> {
+    first_native_gap(dialect, checks)
+        .map_err(|message| compile_error(context.classes, &message, None))
+}
+
+/// The first syntax gap across `checks`, else the first gap of any kind.
+fn first_native_gap<'a>(
+    dialect: &dyn NativeDialect,
+    checks: &'a [SiteCheck],
+) -> Result<Option<(&'a SiteCheck, LocatedGap)>, String> {
     let mut first: Option<(&'a SiteCheck, LocatedGap)> = None;
     for site in checks {
-        if let Some(gap) = native_gap(dialect, &site.check)
-            .map_err(|message| compile_error(context.classes, &message, None))?
-        {
+        if let Some(gap) = native_gap(dialect, &site.check)? {
             if gap.syntax {
                 return Ok(Some((site, gap)));
             }

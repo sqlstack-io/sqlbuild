@@ -73,8 +73,8 @@ use crate::bindings::_helpers::input_loops::model_loop_macros::{
 };
 use crate::bindings::_helpers::input_loops::model_loop_named::{SCHEMA_DECLARATION, named_usages};
 use crate::bindings::_helpers::input_loops::model_loop_opt_out::{
-    AuthoredQuery, OptOut, OptOutModel, reject_unparseable_query, rejected_opt_out,
-    skip_unavailable, skip_unreadable,
+    AuthoredQuery, GapQueue, OptOut, OptOutModel, gap_job, reject_unparseable_query,
+    rejected_opt_out, skip_unavailable,
 };
 use crate::bindings::_helpers::input_loops::model_loop_prepass::{
     NativeHeader, all_header_facts, native_header,
@@ -384,47 +384,59 @@ impl NativeModelLoop {
         let configs: ModelConfigs<'py> = ModelConfigs::default();
         let visibility: ModelVisibility<'py> = ModelVisibility::default();
         let signatures: HookSignatures = HookSignatures::default();
-        for row in models {
-            let ModelFileTexts {
-                name,
-                relative_path,
-                file_path,
-                ..
-            } = &row.paths;
-            let record: &NativeModelFile = row.model_file.get();
-            let (enums, constants) = record.declaration_tuples(py);
-            let visible: VisibleDeclarations<'py> = visibility.for_model(
-                &context,
-                &VisibilityModel {
+        let mut gaps: GapQueue = GapQueue::default();
+        let attached: PyResult<()> = (|| -> PyResult<()> {
+            for row in models {
+                let ModelFileTexts {
                     name,
+                    relative_path,
                     file_path,
-                    local: (enums.as_any(), constants.as_any()),
-                },
-            )?;
-            let config: Bound<'py, PyAny> =
-                configs.effective(&context, record, (name, relative_path), row.header.as_ref())?;
-            let model: LoopModel<'_, 'py> = LoopModel {
-                row: &row,
-                config,
-                visible: &visible,
-                signatures: &signatures,
-                visibility: &visibility,
-            };
-            let finished: FinishedModel<'py> = self.finish(py, &context, model)?;
-            let record_inputs: RecordInputs<'_, 'py> = RecordInputs {
-                classes: &classes.record,
-                visible: &visible.declarations,
-            };
-            let (record, facts) = finished_record(&record_inputs, row, finished)?;
-            let mut owner = project.borrow_mut();
-            owner.retain(facts);
-            let index: usize = owner.retain_input(record);
-            drop(owner);
-            inputs.push(Bound::new(
-                py,
-                NativeModelInput::new(project.clone().unbind(), index),
-            )?);
-        }
+                    ..
+                } = &row.paths;
+                let record: &NativeModelFile = row.model_file.get();
+                let (enums, constants) = record.declaration_tuples(py);
+                let visible: VisibleDeclarations<'py> = visibility.for_model(
+                    &context,
+                    &VisibilityModel {
+                        name,
+                        file_path,
+                        local: (enums.as_any(), constants.as_any()),
+                    },
+                )?;
+                let config: Bound<'py, PyAny> = configs.effective(
+                    &context,
+                    record,
+                    (name, relative_path),
+                    row.header.as_ref(),
+                )?;
+                let model: LoopModel<'_, 'py> = LoopModel {
+                    row: &row,
+                    config,
+                    visible: &visible,
+                    signatures: &signatures,
+                    visibility: &visibility,
+                };
+                gaps.expect_record(project.borrow().inputs().len());
+                let finished: FinishedModel<'py> = self.finish(py, &context, model, &mut gaps)?;
+                let record_inputs: RecordInputs<'_, 'py> = RecordInputs {
+                    classes: &classes.record,
+                    visible: &visible.declarations,
+                };
+                let (record, facts) = finished_record(&record_inputs, row, finished)?;
+                let mut owner = project.borrow_mut();
+                owner.retain(facts);
+                let index: usize = owner.retain_input(record);
+                drop(owner);
+                inputs.push(Bound::new(
+                    py,
+                    NativeModelInput::new(project.clone().unbind(), index),
+                )?);
+            }
+            Ok(())
+        })();
+        let settled: PyResult<()> = gaps.settle(self.settings, &context, &project);
+        settled?;
+        attached?;
         Ok(inputs)
     }
 }
@@ -591,6 +603,7 @@ impl NativeModelLoop {
         py: Python<'py>,
         context: &LoopContext<'_, 'py>,
         model: LoopModel<'_, 'py>,
+        gaps: &mut GapQueue,
     ) -> PyResult<FinishedModel<'py>> {
         let LoopModel {
             row,
@@ -729,7 +742,7 @@ impl NativeModelLoop {
             authored: authored_body,
         };
         let legacy_gate = match self.route {
-            AnalysisRoute::Legacy => Some(self.analysis(context, &opt_out_model, true)?),
+            AnalysisRoute::Legacy => Some(self.analysis(context, &opt_out_model, true, gaps)?),
             AnalysisRoute::Native(_) | AnalysisRoute::Unavailable => None,
         };
         let scanned = match extract_sql_references(&query_sql, &self.syntax) {
@@ -810,7 +823,8 @@ impl NativeModelLoop {
                     contents,
                     authored: authored_body,
                 };
-                self.analysis(context, &expanded_model, scanned.invalid_calls.is_empty())?
+                let calls_valid: bool = scanned.invalid_calls.is_empty();
+                self.analysis(context, &expanded_model, calls_valid, gaps)?
             }
         };
         let analysis: (bool, Option<Bound<'py, PyAny>>) = (
@@ -848,11 +862,13 @@ impl NativeModelLoop {
     }
 
     /// Analysed, rejected opt-out, skipped; a native route reads no SQL whose calls P012 failed.
+    /// A native parse is queued on `gaps`, which unmarks the model when it finds a gap.
     fn analysis<'py>(
         &self,
         context: &LoopContext<'_, 'py>,
         model: &OptOutModel<'_, 'py>,
         calls_valid: bool,
+        gaps: &mut GapQueue,
     ) -> PyResult<(bool, Option<Bound<'py, PyAny>>, bool)> {
         let mut skipped: bool = false;
         let (analysed, rejected) =
@@ -870,9 +886,8 @@ impl NativeModelLoop {
                         (false, None)
                     }
                     AnalysisRoute::Native(dialect) => {
-                        let read: bool = skip_unreadable(self.settings, dialect, context, model)?;
-                        skipped = !read;
-                        (read, None)
+                        gaps.queue(gap_job(dialect, context, model)?);
+                        (true, None)
                     }
                     AnalysisRoute::Unavailable => {
                         skip_unavailable(self.settings, self.dialect.as_deref(), context, model)?;
