@@ -40,7 +40,8 @@ pub(crate) fn table_wrapped(named: &str, calls: &[MarkerCall], syntax: &LexicalS
             .count();
         let after = close + 1;
         let replaced = usize::from(matches!(bytes.get(after), Some(b' ' | b'\t')));
-        let borrowed = spaces.min(TABLE_WRAPPER.len() + 1 - replaced);
+        let text_follows = !matches!(bytes.get(after), None | Some(b'\n' | b'\r'));
+        let borrowed = spaces.min(TABLE_WRAPPER.len() + usize::from(text_follows) - replaced);
         edits.push((start, name_end + borrowed, format!("{TABLE_WRAPPER}{name}")));
         edits.push((after, after + replaced, ")".to_owned()));
     }
