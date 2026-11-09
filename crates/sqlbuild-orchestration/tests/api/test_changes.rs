@@ -177,9 +177,11 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 priority: 0,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             assert!(
-                request_job_run(store, &audit, &request)
+                request_job_run(store, (&audit, None), &request)
                     .await
                     .expect("queue job")
             );
@@ -191,7 +193,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
             expect_topics(&mut a, &run_topics).await;
             expect_topics(&mut b, &run_topics).await;
             assert!(
-                !request_job_run(store, &audit, &request)
+                !request_job_run(store, (&audit, None), &request)
                     .await
                     .expect("idempotent retry")
             );

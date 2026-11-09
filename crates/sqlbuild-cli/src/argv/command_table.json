@@ -631,6 +631,24 @@
              "group": 1
             },
             {
+             "kind": "extend",
+             "options": ["--select", "-s"],
+             "dest": "admin_select",
+             "nargs": "+",
+             "default": [],
+             "help": "run only the job's nodes these selectors also select",
+             "group": 1
+            },
+            {
+             "kind": "extend",
+             "options": ["--exclude"],
+             "dest": "admin_exclude",
+             "nargs": "+",
+             "default": [],
+             "help": "leave the job's nodes these selectors select out of the run",
+             "group": 1
+            },
+            {
              "kind": "store",
              "options": ["--start-cursor-ts"],
              "dest": "admin_start_cursor_ts",

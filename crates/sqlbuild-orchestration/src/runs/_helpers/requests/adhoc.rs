@@ -16,8 +16,8 @@ use crate::runs::_helpers::requests::publication::{
 };
 use crate::runs::constants::ADHOC_AUDIT_TAG;
 use crate::runs::models::{
-    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunCommand, RunKind,
-    RunOrigin, RunRequest,
+    AdhocCheckRequest, AdhocPermission, AdhocRunRequest, CommandPlan, PlannerResource, RunCommand,
+    RunKind, RunOrigin, RunRequest,
 };
 use crate::runs::types::{CommandPlanner, PublishedJobs};
 use crate::snapshots::main::job_write_set::job_write_set;
@@ -45,20 +45,13 @@ pub(crate) async fn frozen_adhoc_request(
             Err("this target has no publication yet".into()),
         ));
     };
-    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
-    let (transaction, definitions) = frozen_definitions(transaction, snapshot.snapshot_id).await?;
-    let jobs: PublishedJobs = definitions
-        .jobs
-        .into_iter()
-        .map(|(name, job)| (name, job.selection))
-        .chain(
-            definitions
-                .groups
-                .into_iter()
-                .map(|(name, group)| (name, group.job.selection)),
-        )
-        .collect();
-    let plan = match planner.plan(&request.command, (&planner_resources(&nodes), &jobs)) {
+    let (transaction, plan) = publication_plan(
+        transaction,
+        (planner, snapshot.snapshot_id),
+        &request.command,
+    )
+    .await?;
+    let plan = match plan {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
@@ -114,6 +107,31 @@ pub(crate) async fn frozen_adhoc_request(
                 concurrency_groups: BTreeSet::new(),
             },
         )),
+    ))
+}
+
+/// `command` planned over one publication's nodes and its jobs, or why the planner refuses it.
+pub(crate) async fn publication_plan(
+    transaction: ControlTransaction,
+    (planner, snapshot_id): (&dyn CommandPlanner, Uuid),
+    command: &[String],
+) -> Result<(ControlTransaction, Result<CommandPlan, String>), ControlError> {
+    let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot_id, None).await?;
+    let (transaction, definitions) = frozen_definitions(transaction, snapshot_id).await?;
+    let jobs: PublishedJobs = definitions
+        .jobs
+        .into_iter()
+        .map(|(name, job)| (name, job.selection))
+        .chain(
+            definitions
+                .groups
+                .into_iter()
+                .map(|(name, group)| (name, group.job.selection)),
+        )
+        .collect();
+    Ok((
+        transaction,
+        planner.plan(command, (&planner_resources(&nodes), &jobs)),
     ))
 }
 

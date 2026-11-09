@@ -21,9 +21,14 @@ pub async fn request_person_run(
         PersonRunRequest::Cancel(request) => {
             cancel_person_run(store, (context, credentials), request).await
         }
-        PersonRunRequest::Job(request) => {
+        PersonRunRequest::Job(planner, request) => {
             write(store, |transaction| async move {
-                request_job_run_in(transaction, (context, Some(credentials)), request).await
+                request_job_run_in(
+                    transaction,
+                    (context, Some(credentials)),
+                    (Some(planner), request),
+                )
+                .await
             })
             .await
         }

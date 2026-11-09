@@ -73,6 +73,8 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                     end: "2026-07-04T01:17:23+05:30".parse().expect("end"),
                 }),
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             for invalid in [
                 JobRunRequest {
@@ -103,7 +105,11 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                     ..request.clone()
                 },
             ] {
-                assert!(request_job_run(store, &context, &invalid).await.is_err());
+                assert!(
+                    request_job_run(store, (&context, None), &invalid)
+                        .await
+                        .is_err()
+                );
             }
             let fault = TransactionFault {
                 description: "manual run audit failure",
@@ -114,7 +120,11 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 postgres_body: "RAISE EXCEPTION 'injected audit failure'",
             };
             install_fault(store, &fault).await;
-            assert!(request_job_run(store, &context, &request).await.is_err());
+            assert!(
+                request_job_run(store, (&context, None), &request)
+                    .await
+                    .is_err()
+            );
             remove_fault(store, &fault).await;
             assert!(
                 list_runs(store, (location_id, "development"), 10)
@@ -129,8 +139,8 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                     .is_empty()
             );
             let (first, retry) = tokio::join!(
-                request_job_run(store, &context, &request),
-                request_job_run(store, &context, &request)
+                request_job_run(store, (&context, None), &request),
+                request_job_run(store, (&context, None), &request)
             );
             assert_ne!(
                 first.expect("first request"),
@@ -148,22 +158,30 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 json!({"full_refresh": false});
             publish_snapshot(store, &input).await.expect("redeploy");
             assert!(
-                !request_job_run(store, &context, &request)
+                !request_job_run(store, (&context, None), &request)
                     .await
                     .expect("retry keeps original snapshot")
             );
             let mut changed = request.clone();
             changed.reason = "Different request".into();
-            assert!(request_job_run(store, &context, &changed).await.is_err());
+            assert!(
+                request_job_run(store, (&context, None), &changed)
+                    .await
+                    .is_err()
+            );
             changed = request.clone();
             changed.window = Some(RunWindow::Integer { start: 3, end: 11 });
-            assert!(request_job_run(store, &context, &changed).await.is_err());
+            assert!(
+                request_job_run(store, (&context, None), &changed)
+                    .await
+                    .is_err()
+            );
             let other_actor = AuditContext {
                 actor: "other-operator".into(),
                 ..context.clone()
             };
             assert!(
-                request_job_run(store, &other_actor, &request)
+                request_job_run(store, (&other_actor, None), &request)
                     .await
                     .is_err()
             );
@@ -220,7 +238,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                 ..request.clone()
             };
             assert!(
-                request_job_run(store, &context, &fresh)
+                request_job_run(store, (&context, None), &fresh)
                     .await
                     .expect("new request uses redeploy")
             );

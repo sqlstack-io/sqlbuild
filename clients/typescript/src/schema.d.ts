@@ -1549,6 +1549,8 @@ export interface components {
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
+            /** @description Leave nodes out of the job with `sqb build` selectors. */
+            exclude?: string[];
             /** @description Rebuild every selected model from scratch; it rewrites history, as a window does. */
             full_refresh?: boolean;
             job_key: string;
@@ -1559,6 +1561,8 @@ export interface components {
             reason: string;
             /** Format: uuid */
             run_id: string;
+            /** @description Narrow the job with `sqb build` selectors; only nodes already in the job can remain. */
+            select?: string[];
             target: string;
             window?: null | components["schemas"]["RunWindow"];
         };

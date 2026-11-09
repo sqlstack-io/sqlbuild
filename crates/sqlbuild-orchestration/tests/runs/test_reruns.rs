@@ -72,7 +72,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
             let source_id = Uuid::now_v7();
             request_job_run(
                 store,
-                &context,
+                (&context, None),
                 &JobRunRequest {
                     run_id: source_id,
                     location_id: location,
@@ -82,6 +82,8 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                     priority: 1,
                     window: Some(RunWindow::Integer { start: -3, end: 11 }),
                     full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
                 },
             )
             .await

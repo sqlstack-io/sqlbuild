@@ -48,8 +48,11 @@ pub(crate) async fn queue_sensor_run(
         priority: 0,
         window: None,
         full_refresh: false,
+        select: Vec::new(),
+        exclude: Vec::new(),
     };
-    let (transaction, mut frozen) = frozen_job_request(transaction, &context, &authored).await?;
+    let (transaction, mut frozen) =
+        frozen_job_request(transaction, (&context, None), &authored).await?;
     if frozen.snapshot_id != evaluation.snapshot_id {
         return Err(ControlError::Fenced);
     }
