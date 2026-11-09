@@ -354,6 +354,65 @@ describe('overview', () => {
 	});
 });
 
+describe('administration writes', () => {
+	const ada = { principal_id: 'p-ada', name: 'ada', created_at: '2026-11-01T00:00:00Z', disabled_at: null, has_password: true, groups: [], active_sessions: 2, last_signed_in_at: null };
+
+	function server(refuse = false) {
+		const posts: [string, unknown][] = [];
+		const state = { disabled: false, assignments: [{ assignment_id: 'a-1', principal_id: 'p-ada', name: 'ada', role_key: 'operator', location_id: 'loc-orders', target: 'development' }] };
+		vi.stubGlobal('document', { cookie: 'sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (request.method === 'POST') {
+					const body = await request.json();
+					posts.push([path, body]);
+					if (refuse) return Response.json({ error: 'cannot remove or disable the final installation administrator' }, { status: 403 });
+					if (body === 'disable') state.disabled = true;
+					if (body?.role && !body.revoke) state.assignments.push({ assignment_id: 'a-2', principal_id: body.principal_id, name: 'ada', role_key: body.role, location_id: body.location_id, target: body.target });
+					return Response.json({ applied: true });
+				}
+				if (path === '/api/admin/people') return Response.json([{ ...ada, disabled_at: state.disabled ? '2026-11-09T00:00:00Z' : null }]);
+				if (path === '/api/admin/roles') return Response.json({ assignments: state.assignments, group_roles: [] });
+				return Response.json([]);
+			})
+		);
+		return { posts, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('gives a role in one location target by person ID and returns the new assignment', async () => {
+		const { posts, client } = server();
+		const given = await client.createRoleAssignment({ principal: 'ada', role: 'developer', scope: { locationId: 'loc-orders:development' } });
+		expect(posts).toEqual([['/api/admin/roles', { principal_id: 'p-ada', role: 'developer', location_id: 'loc-orders', target: 'development', revoke: false }]]);
+		expect([given.id, given.scope.locationId]).toEqual(['a-2', 'loc-orders:development']);
+	});
+
+	it('gives a role everywhere with no location or target', async () => {
+		const { posts, client } = server();
+		await client.createRoleAssignment({ principal: 'ada', role: 'viewer', scope: { locationId: null } });
+		expect(posts[0][1]).toMatchObject({ location_id: null, target: null });
+	});
+
+	it('removes an assignment by revoking exactly its person, role and scope', async () => {
+		const { posts, client } = server();
+		await client.deleteRoleAssignment('a-1');
+		expect(posts).toEqual([['/api/admin/roles', { principal_id: 'p-ada', role: 'operator', location_id: 'loc-orders', target: 'development', revoke: true }]]);
+	});
+
+	it('disables a person by ID and returns them disabled', async () => {
+		const { posts, client } = server();
+		const account = await client.disableAccount('ada');
+		expect(posts).toEqual([['/api/admin/people/p-ada', 'disable']]);
+		expect(account.disabled).toBe(true);
+	});
+
+	it('reports a refusal from the server', async () => {
+		const { client } = server(true);
+		await expect(client.disableAccount('ada')).rejects.toMatchObject({ status: 403 });
+	});
+});
+
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
 	function serve(actions: string[], sqlStatus = 200) {

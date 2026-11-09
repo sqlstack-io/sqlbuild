@@ -30,14 +30,21 @@
 
 	let newLocation = $state('');
 	let newRole = $state('');
-	/** Roles defined in every location when giving one everywhere, else the location's roles. */
+	/**
+	 * Everywhere, only built-in roles, since a custom role belongs to the location that publishes it.
+	 * In one location, its roles except admin, which is only given for every location.
+	 */
 	const choices = $derived.by(() => {
-		if (newLocation) return rolesByLocation.get(newLocation) ?? [];
+		if (newLocation) return (rolesByLocation.get(newLocation) ?? []).filter((r) => r.name !== 'admin');
 		const lists = [...rolesByLocation.values()];
 		if (!lists.length) return [];
-		return lists[0].filter((r) => lists.every((l) => l.some((x) => x.name === r.name)));
+		return lists[0].filter((r) => r.source === 'built_in' && lists.every((l) => l.some((x) => x.name === r.name)));
 	});
 	const roleOf = (name: string) => allRoles.find((r) => r.name === name);
+	// A role picked for another place may not be on offer here.
+	$effect(() => {
+		if (newRole && !choices.some((r) => r.name === newRole)) newRole = '';
+	});
 
 	async function act(key: string, action: () => Promise<unknown>) {
 		busy = key;
@@ -124,7 +131,7 @@
 				{#each choices as r (r.name)}<option value={r.name}>{r.name} · {roleSummary(r)}</option>{/each}
 			</select>
 			<GatedButton requires="role.assign" variant="default" busy={busy === 'add'} disabled={!newRole} title="Pick a role" onclick={add}>Give role</GatedButton>
-			<span class="faint">You can only give roles you hold yourself in that location.</span>
+			<span class="faint">Admin is given for every location; custom roles for the location that defines them.</span>
 		</div>
 	{/if}
 	{#if error}<p class="err">{error}</p>{/if}
