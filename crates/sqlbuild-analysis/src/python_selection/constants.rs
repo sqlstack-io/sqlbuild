@@ -8,6 +8,7 @@ pub(crate) const NAME_KIND: &str = "name";
 pub(crate) const TAG_KIND: &str = "tag";
 pub(crate) const PATH_KIND: &str = "path";
 pub(crate) const TEST_KIND: &str = "test";
+pub(crate) const JOB_KIND: &str = "job";
 pub(crate) const SEED_KIND: &str = "seed";
 pub(crate) const SOURCE_KIND: &str = "source";
 pub(crate) const MODEL_RESOURCE: &str = "model";

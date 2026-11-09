@@ -5,6 +5,7 @@ use crate::graph::errors::SelectorError;
 use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::main::resolve_selectors::resolve_selectors;
+use crate::graph::main::selectors_need_jobs::selectors_need_jobs;
 use crate::graph::models::{GraphResource, JobSelection, ParsedSelector, ProjectGraph};
 use crate::graph::tests::test_types::SelectorFailure;
 
@@ -264,4 +265,10 @@ pub(super) fn job_selection(
     graph.jobs = graph.jobs.filter(|_| attached);
     resolved_in(&graph, select, exclude)
         .map(|keys| keys.into_iter().map(|(_, name)| name).collect())
+}
+
+/// Whether `selectors` need jobs on the orders project, `also_known` naming other node names.
+pub(super) fn needs_jobs(selectors: &[&str], also_known: &[&str]) -> bool {
+    let selectors: Vec<String> = selectors.iter().map(|value| (*value).to_owned()).collect();
+    selectors_need_jobs(&orders_graph(), &selectors, also_known)
 }

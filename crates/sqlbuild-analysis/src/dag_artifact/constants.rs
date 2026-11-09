@@ -32,6 +32,7 @@ pub(crate) const SELECTOR_KIND_TAG: &str = "tag";
 pub(crate) const SELECTOR_KIND_PATH: &str = "path";
 pub(crate) const SELECTOR_KIND_CHECK: &str = "check";
 pub(crate) const SELECTOR_KIND_TEST: &str = "test";
+pub(crate) const SELECTOR_KIND_JOB: &str = "job";
 pub(crate) const SELECTOR_KIND_SEPARATOR: &str = ":";
 pub(crate) const SELECTOR_MODELS_PREFIX: &str = "models/";
 /// The orchestrator kind every SQLBuild asset carries.

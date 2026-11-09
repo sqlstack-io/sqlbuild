@@ -27,7 +27,7 @@ use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
 };
 
-/// Dedicated declaration modules are imported only in the code-location interpreter.
+/// Dedicated declaration modules, imported by publication and by selectors that name a job.
 pub(crate) fn discover_declarations<'py>(
     py: Python<'py>,
     project_dir: &Path,

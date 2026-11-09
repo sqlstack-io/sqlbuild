@@ -17,6 +17,7 @@ use sqlbuild_analysis::python_selection::models::{
 };
 
 use crate::bindings::_helpers::boundary::panics::compiler_guard;
+use crate::bindings::_helpers::compiled_project::job_catalog::graph_with_jobs;
 use crate::bindings::_helpers::graph::project_graph::{CompiledProjectGraph, NativeProjectGraph};
 use crate::bindings::_helpers::records::construct::error_class;
 use crate::bindings::_helpers::records::fields::field as native_field;
@@ -180,10 +181,13 @@ pub(crate) fn resolve_python_sql_run_selection(
     let native: &Bound<'_, NativeProjectGraph> = project_graph.get().native(py);
     let sources: Vec<(String, Option<String>)> = project_sources(project_graph.get().project(py))?;
     let nodes: PythonSelectionGraph = selection_graph(python_graph)?;
+    let node_names: Vec<&str> = nodes.nodes.iter().map(|node| node.name.as_str()).collect();
+    let selectors: Vec<String> = select.iter().chain(&exclude).cloned().collect();
+    let graph = graph_with_jobs(py, native.get().graph(), &selectors, &node_names)?;
     let selection: RunSelection = compiler_guard(|| {
         Ok(run_selection(
             SqlSelectionGraph {
-                graph: native.get().graph(),
+                graph: &graph,
                 sources: &sources,
             },
             &nodes,
