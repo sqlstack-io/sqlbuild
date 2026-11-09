@@ -13,12 +13,12 @@ import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -33,6 +33,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRuns',
 	'getRun',
 	'getRunDetail',
+	'listQueue',
 	'listRunEvents',
 	'listRunStatements',
 	'getStatementSql',
@@ -281,8 +282,11 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { run, wire, listed } = found;
 			const owners = [run, ...listed.filter((r) => r.parentRunId === run.id)];
 			const [own, ...children] = await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))));
-			return runDetailOf(run, wire, listed, groupRunNodes(own, children.flat()));
+			const detail = runDetailOf(run, wire, listed, groupRunNodes(own, children.flat()));
+			if (run.status === 'queued') detail.waits = (await queueEntries(scope)).find((q) => q.run.id === run.id)?.waits ?? [];
+			return detail;
 		},
+		listQueue: (scope: Scope): Promise<QueueEntry[]> => queueEntries(scope),
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
@@ -866,6 +870,18 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		load.catch(() => olderWindows.delete(key));
 		return load;
 	}
+
+	/** Queued runs in claim order, with what each waits on. */
+	const queueEntries = (scope: Scope) =>
+		shared(`queue ${scope.locationId}`, async () => {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
+				params: { path: { location_id: locationId, target }, query: { queued: true, limit: RUN_WINDOW } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return queueEntriesOf(data, scope.locationId);
+		});
 
 	/** The newest runs of the location, up to the server's cap. */
 	async function fetchRuns(scope: Scope) {

@@ -17,8 +17,14 @@ pub trait CommandPlanner: Send + Sync {
     ) -> Result<CommandPlan, String>;
 }
 
-/// A page of runs, newest first: at most this many, after the queue time and ID of a previous page's last run.
-pub type RunsPage = (u32, Option<(chrono::DateTime<chrono::Utc>, uuid::Uuid)>);
+/// Which runs of one location and target to list.
+#[derive(Clone, Copy, Debug)]
+pub enum RunsListing {
+    /// Newest first: at most this many, after the queue time and ID of a previous page's last run.
+    Newest(u32, Option<(chrono::DateTime<chrono::Utc>, uuid::Uuid)>),
+    /// Queued runs in claim order, at most this many, each with its queue state.
+    Queue(u32),
+}
 
 /// What the API hands runs to workers with: their Docker images and the command planner.
 pub type RunHandoff = (

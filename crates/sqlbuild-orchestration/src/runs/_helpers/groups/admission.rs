@@ -92,11 +92,40 @@ pub(crate) fn earlier_waiter_blocks(
     limits: &BTreeSet<String>,
 ) -> bool {
     let position = rank(candidate);
-    waiters.iter().any(|waiter| {
-        waiter.run_id != candidate.request_json.run_id
-            && waiter.rank < position
-            && !waiter.limits.is_disjoint(limits)
-    })
+    waiters
+        .iter()
+        .any(|waiter| ahead_on(waiter, (candidate, position), limits).is_some())
+}
+
+/// Waiters ranked ahead of the candidate on a limit it takes, each with the first limit they share.
+pub(crate) fn earlier_waiters<'a>(
+    waiters: &'a [LimitWaiter],
+    candidate: &QueueCandidate,
+    limits: &'a BTreeSet<String>,
+) -> Vec<(&'a LimitWaiter, &'a String)> {
+    let position = rank(candidate);
+    let mut earlier: Vec<(&LimitWaiter, &String)> = Vec::new();
+    for waiter in waiters {
+        if let Some(limit) = ahead_on(waiter, (candidate, position), limits) {
+            earlier.push((waiter, limit));
+        }
+    }
+    earlier
+}
+
+/// The first of `limits` the waiter shares when it ranks ahead of the candidate.
+fn ahead_on<'a>(
+    waiter: &LimitWaiter,
+    (candidate, position): (
+        &QueueCandidate,
+        (Reverse<i64>, chrono::DateTime<chrono::Utc>, Uuid),
+    ),
+    limits: &'a BTreeSet<String>,
+) -> Option<&'a String> {
+    if waiter.run_id == candidate.request_json.run_id || waiter.rank >= position {
+        return None;
+    }
+    limits.iter().find(|limit| waiter.limits.contains(*limit))
 }
 
 fn rank(run: &QueueCandidate) -> (Reverse<i64>, chrono::DateTime<chrono::Utc>, Uuid) {

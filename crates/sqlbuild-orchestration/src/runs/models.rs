@@ -248,6 +248,44 @@ pub struct RunRecord {
         deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_narrowing"
     )]
     pub narrowing: Option<RunNarrowing>,
+    /// Set only when listing the queue: where the run stands and what it waits on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub queue: Option<RunQueueState>,
+}
+
+/// A queued run's place in claim order within its location and target, and what holds it back.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunQueueState {
+    /// 1-based, in the order the scheduler claims: priority, then queue time.
+    pub position: u32,
+    /// Empty when nothing holds the run back and it starts on a free worker.
+    pub waits: Vec<QueueWait>,
+}
+
+/// Why the scheduler cannot claim a queued run yet. Runs outside the listed location and target are counted, never named.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum QueueWait {
+    /// Its group run has not started yet, or is stopping.
+    GroupParent { run_id: Uuid },
+    /// A job this one runs after in the same group has not finished.
+    UpstreamJob { run_id: Uuid, job_key: String },
+    /// Another run of the same job is running.
+    JobRunning { run_id: Uuid },
+    /// Another run holds write claims on nodes this run writes.
+    WriteClaim {
+        run_id: Option<Uuid>,
+        node_key: String,
+        other_nodes: u32,
+    },
+    /// Running runs hold slots of a concurrency limit this run takes.
+    ConcurrencyLimit {
+        limit: String,
+        holders: Vec<Uuid>,
+        elsewhere: u32,
+    },
+    /// An earlier queued run takes the same concurrency limit, so it goes first.
+    EarlierRun { run_id: Option<Uuid>, limit: String },
 }
 
 /// The `sqb build` selectors one run of a job was narrowed with.
@@ -540,6 +578,22 @@ pub enum RunAuthority<'a> {
     Scheduler(&'a crate::scheduler::models::SchedulerLease),
     Worker { run_id: Uuid, claim_id: Uuid },
     Operator(&'a crate::credentials::models::AuditContext),
+}
+
+/// A running run's hold on a write-claimed node or a concurrency slot, with where the run is.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct QueueHolder {
+    pub(crate) held: String,
+    pub(crate) run_id: Uuid,
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
+}
+
+/// A run of a job that holds the job while it runs.
+#[derive(Clone, Debug, Deserialize)]
+pub(crate) struct RunningJob {
+    pub(crate) run_id: Uuid,
+    pub(crate) job_key: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -20,7 +20,7 @@ use crate::runs::models::{
     AdhocCheck, AdhocCheckRequest, AdhocRunRequest, CancelRunRequest, JobRunRequest,
     PersonRunRequest, RerunRequest, RunRecord,
 };
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, RunsListing};
 use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
@@ -175,8 +175,10 @@ pub(crate) async fn change_trigger(
     params(("location_id" = Uuid, Path), ("target" = String, Path),
         ("limit" = Option<u32>, Query, description = "Page size; defaults to 100, capped at 1000"),
         ("before_queued_at" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "With before_run_id: continue after this run of the previous page"),
-        ("before_run_id" = Option<Uuid>, Query)),
-    responses((status = 200, body = Vec<RunRecord>, description = "Runs newest first"), (status = 400, description = "Only one of the before_* pair was given"),
+        ("before_run_id" = Option<Uuid>, Query),
+        ("queued" = Option<bool>, Query, description = "List queued runs in claim order, each with its position and what it waits on")),
+    responses((status = 200, body = Vec<RunRecord>, description = "Runs newest first, or the queue in claim order"),
+        (status = 400, description = "Only one of the before_* pair was given, or a cursor with queued"),
         (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn recent_runs(
@@ -185,9 +187,20 @@ pub(crate) async fn recent_runs(
     (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<RunsQuery>),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<RunRecord>>, ApiError> {
-    let before = match (options.before_queued_at, options.before_run_id) {
-        (Some(queued_at), Some(run_id)) => Some((queued_at, run_id)),
-        (None, None) => None,
+    let limit = options.limit.unwrap_or(100);
+    let listing = match (
+        options.queued,
+        options.before_queued_at,
+        options.before_run_id,
+    ) {
+        (false, Some(queued_at), Some(run_id)) => {
+            RunsListing::Newest(limit, Some((queued_at, run_id)))
+        }
+        (false, None, None) => RunsListing::Newest(limit, None),
+        (true, None, None) => RunsListing::Queue(limit),
+        (true, ..) => {
+            return Err(ControlError::Invalid("the queue is not paged".into()).into());
+        }
         _ => {
             return Err(ControlError::Invalid(
                 "before_queued_at and before_run_id go together".into(),
@@ -199,7 +212,7 @@ pub(crate) async fn recent_runs(
         list_person_runs(
             &store,
             (&context, principal),
-            (location_id, &target, (options.limit.unwrap_or(100), before)),
+            (location_id, &target, listing),
             default_role,
         )
         .await?,

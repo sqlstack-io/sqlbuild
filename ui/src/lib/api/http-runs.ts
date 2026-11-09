@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { isActiveRun } from '$lib/status';
 import type { Capability, Principal } from './types';
-import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
+import type { AdhocRunCheck, LaunchVerb, NodeCounts, PlanDocument, PlanResult, QueueEntry, QueueWait, Run, RunDetail, RunListQuery, RunNode, RunNodeStatus, RunRow, RunRowPage, RunRowQuery, RunTabCounts, RunEvent, RunEventLevel, RunOutputLine, RunStatement } from './types/operate';
 import { RECALL_EVENT_TYPES, SCHEDULER_FACTS } from './types/operate';
 
 type Wire = components['schemas'];
@@ -109,6 +109,34 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 }
 
 /** Runs keyed by id, each with its number of child runs in the listing. */
+/** The queue in claim order; a run the read sent without queue state (it started meanwhile) is left out. */
+export function queueEntriesOf(wires: Wire['RunRecord'][], locationId: string): QueueEntry[] {
+	const runs = toRuns(wires, locationId);
+	return wires.flatMap((wire, i) => (wire.queue ? [{ run: runs[i], position: wire.queue.position, waits: shownWaits(wire.queue.waits.map(toQueueWait)), overlap: null }] : []));
+}
+
+/** A running run of the same job also holds the job's write claims; name it once. */
+function shownWaits(waits: QueueWait[]): QueueWait[] {
+	const sameJob = new Set(waits.flatMap((w) => (w.kind === 'job_running' ? [w.runId] : [])));
+	return waits.filter((w) => w.kind !== 'write_claim' || !w.runId || !sameJob.has(w.runId));
+}
+
+function toQueueWait(wait: Wire['QueueWait']): QueueWait {
+	switch (wait.kind) {
+		case 'write_claim':
+			return { kind: wait.kind, runId: wait.run_id ?? null, nodeKey: wait.node_key, otherNodes: wait.other_nodes };
+		case 'concurrency_limit':
+			return { kind: wait.kind, limit: wait.limit, holders: wait.holders, elsewhere: wait.elsewhere };
+		case 'earlier_run':
+			return { kind: wait.kind, runId: wait.run_id ?? null, limit: wait.limit };
+		case 'upstream_job':
+			return { kind: wait.kind, runId: wait.run_id, jobKey: wait.job_key };
+		case 'job_running':
+		case 'group_parent':
+			return { kind: wait.kind, runId: wait.run_id };
+	}
+}
+
 export function toRuns(wires: Wire['RunRecord'][], locationId: string): Run[] {
 	const children = new Map<string, number>();
 	for (const w of wires) if (w.parent_run_id) children.set(w.parent_run_id, (children.get(w.parent_run_id) ?? 0) + 1);

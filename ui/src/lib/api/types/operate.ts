@@ -389,13 +389,17 @@ export type RunDetail = {
 
 // ---- queue ----
 
+/** Why the scheduler can't claim a queued run yet; a run in another location or target is never named (`runId` null). */
 export type QueueWait =
-	| { kind: 'write_claim'; runId: string; jobKey: string | null; nodeKey: string; otherNodes: number }
-	| { kind: 'concurrency_group'; group: string; limit: number; holders: string[] }
-	| { kind: 'priority'; aheadRunIds: string[] }
+	| { kind: 'write_claim'; runId: string | null; nodeKey: string; otherNodes: number }
+	/** Running runs hold slots of a concurrency limit this run takes; `elsewhere` counts holders in other locations or targets. */
+	| { kind: 'concurrency_limit'; limit: string; holders: string[]; elsewhere: number }
+	/** An earlier queued run takes the same limit, so it goes first. */
+	| { kind: 'earlier_run'; runId: string | null; limit: string }
+	| { kind: 'job_running'; runId: string }
 	| { kind: 'upstream_job'; runId: string; jobKey: string }
-	/** A child run waits for its group run to be claimed. */
-	| { kind: 'group_parent'; runId: string; jobKey: string };
+	/** A child run waits for its group run to start. */
+	| { kind: 'group_parent'; runId: string };
 
 export type OverlapOutcome = {
 	policy: OverlapPolicy;

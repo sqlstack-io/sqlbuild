@@ -17,6 +17,12 @@ pub(crate) struct PersonRunPermissionTestCase {
     pub(crate) expected_allowed: bool,
 }
 
+pub(crate) struct QueueStateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_claim_order: [u128; 3],
+}
+
 pub(crate) struct ScopedClaimTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

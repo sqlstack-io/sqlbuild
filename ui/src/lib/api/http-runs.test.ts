@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, parseRunCursor, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, parseRunCursor, queueEntriesOf, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -102,6 +102,42 @@ describe('runs list', () => {
 		expect(runTabCountsOf(listing, LOCATION, { includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['ada admin'] }, includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['someone else'] } })).toEqual({ active: 0, queued: 0 });
+	});
+});
+
+describe('run queue', () => {
+	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
+		const entries = queueEntriesOf(
+			[
+				wire('urgent', { status: 'queued', queue: { position: 1, waits: [{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }] } }),
+				wire('started', { status: 'queued' }),
+				wire('blocked', {
+					status: 'queued',
+					queue: {
+						position: 2,
+						waits: [
+							{ kind: 'write_claim', run_id: null, node_key: 'model.orders', other_nodes: 3 },
+							{ kind: 'earlier_run', run_id: 'urgent', limit: 'warehouse' },
+							{ kind: 'upstream_job', run_id: 'stage', job_key: 'staging' },
+							{ kind: 'job_running', run_id: 'same' },
+							{ kind: 'write_claim', run_id: 'same', node_key: 'model.customers', other_nodes: 0 }
+						]
+					}
+				})
+			],
+			LOCATION
+		);
+		expect(entries.map((q) => [q.run.id, q.position])).toEqual([
+			['urgent', 1],
+			['blocked', 2]
+		]);
+		expect(entries[0].waits).toEqual([{ kind: 'concurrency_limit', limit: 'warehouse', holders: ['held'], elsewhere: 2 }]);
+		expect(entries[1].waits).toEqual([
+			{ kind: 'write_claim', runId: null, nodeKey: 'model.orders', otherNodes: 3 },
+			{ kind: 'earlier_run', runId: 'urgent', limit: 'warehouse' },
+			{ kind: 'upstream_job', runId: 'stage', jobKey: 'staging' },
+			{ kind: 'job_running', runId: 'same' }
+		]);
 	});
 });
 

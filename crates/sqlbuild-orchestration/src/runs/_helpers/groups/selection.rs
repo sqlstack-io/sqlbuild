@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::runs::_helpers::groups::context::load_group;
-use crate::runs::models::{RunRequest, RunStatus};
+use crate::runs::models::{QueueWait, RunRequest, RunStatus};
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -13,8 +13,17 @@ pub(crate) async fn child_ready(
     transaction: ControlTransaction,
     request: &RunRequest,
 ) -> Result<(ControlTransaction, bool), ControlError> {
+    let (transaction, waits) = child_waits(transaction, request).await?;
+    Ok((transaction, waits.is_empty()))
+}
+
+/// What holds a group child back: its group not running, or upstream jobs of the group not finished.
+pub(crate) async fn child_waits(
+    transaction: ControlTransaction,
+    request: &RunRequest,
+) -> Result<(ControlTransaction, Vec<QueueWait>), ControlError> {
     let Some(parent_id) = request.parent_run_id else {
-        return Ok((transaction, true));
+        return Ok((transaction, Vec::new()));
     };
     let (transaction, group) = load_group(transaction, parent_id).await?;
     let name = request
@@ -28,18 +37,29 @@ pub(crate) async fn child_ready(
         .as_ref()
         .ok_or_else(|| ControlError::Invalid("group has no declaration".into()))?;
     let dependencies = upstream_jobs(&group.definitions.groups[parent_name].jobs, name);
-    let ready = group.parent.state.status == RunStatus::Running
-        && group.parent.state.cancel_requested_at.is_none()
-        && !group.stopped()
-        && group.children.iter().all(|child| {
-            child
-                .request_json
-                .job_key
-                .as_ref()
-                .is_none_or(|name| !dependencies.contains(name.as_str()))
-                || child.state.status.is_terminal()
-        });
-    Ok((transaction, ready))
+    if group.parent.state.status != RunStatus::Running
+        || group.parent.state.cancel_requested_at.is_some()
+        || group.stopped()
+    {
+        return Ok((
+            transaction,
+            vec![QueueWait::GroupParent { run_id: parent_id }],
+        ));
+    }
+    let waits: Vec<QueueWait> = group
+        .children
+        .iter()
+        .filter_map(|child| {
+            let job_key = child.request_json.job_key.as_ref()?;
+            (dependencies.contains(job_key.as_str()) && !child.state.status.is_terminal()).then(
+                || QueueWait::UpstreamJob {
+                    run_id: child.request_json.run_id,
+                    job_key: job_key.clone(),
+                },
+            )
+        })
+        .collect();
+    Ok((transaction, waits))
 }
 
 pub(crate) async fn skipped_nodes(

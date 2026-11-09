@@ -1636,7 +1636,6 @@ allowed = [
     "sqb_password_credentials.changed_at=Audit history read through audit exports: when a password last changed.",
     "sqb_platform_sink_deliveries.delivered_at=Audit history read through audit exports: when an event reached the platform sink.",
     "sqb_security_audit_deliveries.delivered_at=Audit history read through audit exports: when an event reached a security audit sink.",
-    "sqb_write_claims=Read through its primary-key conflict: an insert that conflicts means another run already holds the node.",
     "sqb_warehouse_microbatches.execution_run_id=Reader comes with the UI epic (D132), which filters on it: the run that executed the batch.",
     "sqb_warehouse_microbatches.record_type=Reader comes with the UI epic (D132), which filters on it: the batch state.",
     "sqb_warehouse_migrations.decision=Reader comes with the UI epic (D132), which filters on it.",

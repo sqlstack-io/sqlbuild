@@ -2134,6 +2134,45 @@ export interface components {
             snapshot_id: string;
             sqb_version: string;
         };
+        /** @description Why the scheduler cannot claim a queued run yet. Runs outside the listed location and target are counted, never named. */
+        QueueWait: {
+            /** @enum {string} */
+            kind: "group_parent";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            job_key: string;
+            /** @enum {string} */
+            kind: "upstream_job";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "job_running";
+            /** Format: uuid */
+            run_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "write_claim";
+            node_key: string;
+            /** Format: int32 */
+            other_nodes: number;
+            /** Format: uuid */
+            run_id?: string | null;
+        } | {
+            /** Format: int32 */
+            elsewhere: number;
+            holders: string[];
+            /** @enum {string} */
+            kind: "concurrency_limit";
+            limit: string;
+        } | {
+            /** @enum {string} */
+            kind: "earlier_run";
+            limit: string;
+            /** Format: uuid */
+            run_id?: string | null;
+        };
         /** @description One invocation's records; the server owns its claim namespace, start time and version. */
         RecallBatch: {
             invocation_id: string;
@@ -2390,6 +2429,16 @@ export interface components {
             stream: string;
             text: string;
         };
+        /** @description A queued run's place in claim order within its location and target, and what holds it back. */
+        RunQueueState: {
+            /**
+             * Format: int32
+             * @description 1-based, in the order the scheduler claims: priority, then queue time.
+             */
+            position: number;
+            /** @description Empty when nothing holds the run back and it starts on a free worker. */
+            waits: components["schemas"]["QueueWait"][];
+        };
         RunRecord: {
             /** Format: date-time */
             cancel_requested_at?: string | null;
@@ -2412,6 +2461,7 @@ export interface components {
             parent_run_id?: string | null;
             /** Format: int64 */
             priority: number;
+            queue?: null | components["schemas"]["RunQueueState"];
             /** Format: date-time */
             queued_at: string;
             /** @description The stored actor: `principal:<id>` for a person, otherwise a system actor such as `system:scheduler`. */
@@ -4323,6 +4373,8 @@ export interface operations {
                 /** @description With before_run_id: continue after this run of the previous page */
                 before_queued_at?: string;
                 before_run_id?: string;
+                /** @description List queued runs in claim order, each with its position and what it waits on */
+                queued?: boolean;
             };
             header?: never;
             path: {
@@ -4333,7 +4385,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Runs newest first */
+            /** @description Runs newest first, or the queue in claim order */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4342,7 +4394,7 @@ export interface operations {
                     "application/json": components["schemas"]["RunRecord"][];
                 };
             };
-            /** @description Only one of the before_* pair was given */
+            /** @description Only one of the before_* pair was given, or a cursor with queued */
             400: {
                 headers: {
                     [name: string]: unknown;

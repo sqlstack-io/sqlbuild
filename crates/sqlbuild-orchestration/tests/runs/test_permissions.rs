@@ -27,6 +27,7 @@ use crate::runs::models::{
 };
 use crate::runs::tests::helpers::{request_run, snapshot};
 use crate::runs::tests::test_types::{ExactKeyPlanner, PersonRunPermissionTestCase};
+use crate::runs::types::RunsListing;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -176,7 +177,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         list_person_runs(
                             store,
                             (&context, credentials),
-                            (location_id, "development", (10, None)),
+                            (location_id, "development", RunsListing::Newest(10, None)),
                             DefaultRole::None,
                         )
                         .await

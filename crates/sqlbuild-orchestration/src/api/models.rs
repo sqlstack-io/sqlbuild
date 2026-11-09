@@ -96,11 +96,13 @@ use crate::api::_helpers::resources::{
 ))]
 pub(crate) struct ControlApi;
 
-/// A page of runs, newest first; the `before_*` pair names the last run of the previous page.
+/// A page of runs, newest first; the `before_*` pair names the last run of the previous page. `queued` lists the queue instead.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RunsQuery {
     pub(crate) limit: Option<u32>,
+    #[serde(default)]
+    pub(crate) queued: bool,
     pub(crate) before_queued_at: Option<chrono::DateTime<chrono::Utc>>,
     pub(crate) before_run_id: Option<uuid::Uuid>,
 }

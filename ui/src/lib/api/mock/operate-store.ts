@@ -778,7 +778,7 @@ export class MockOperate {
 		}
 		const waits = this.#queue();
 		for (const rec of this.#ordered()) {
-			if ((waits.get(rec.run.id) ?? []).some((w) => w.kind !== 'priority')) continue;
+			if ((waits.get(rec.run.id) ?? []).some((w) => w.kind !== 'earlier_run')) continue;
 			rec.run.status = 'launched';
 			rec.run.launchedAt = new Date(now).toISOString();
 			if (!rec.script.nodes.length) {
@@ -825,20 +825,22 @@ export class MockOperate {
 			for (const h of holders) {
 				const overlap = h.script.nodes.filter((n) => mine.has(n));
 				if (overlap.length)
-					waits.push({ kind: 'write_claim', runId: h.run.id, jobKey: h.run.jobKey, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
+					waits.push({ kind: 'write_claim', runId: h.run.id, nodeKey: overlap[0], otherNodes: overlap.length - 1 });
 			}
 			const fullGroups: string[] = [];
 			for (const group of rec.script.concurrencyGroups) {
 				const inGroup = holders.filter((h) => h.script.concurrencyGroups.includes(group)).map((h) => h.run.id);
 				const limit = CONCURRENCY_LIMITS[group] ?? 1;
 				if (inGroup.length >= limit) {
-					waits.push({ kind: 'concurrency_group', group, limit, holders: inGroup });
+					waits.push({ kind: 'concurrency_limit', limit: group, holders: inGroup, elsewhere: 0 });
 					fullGroups.push(group);
 				}
 			}
 			if (fullGroups.length) {
-				const before = ahead.filter((a) => a.script.concurrencyGroups.some((g) => fullGroups.includes(g))).map((a) => a.run.id);
-				if (before.length) waits.push({ kind: 'priority', aheadRunIds: before });
+				for (const group of fullGroups) {
+					const first = ahead.find((a) => a.script.concurrencyGroups.includes(group));
+					if (first) waits.push({ kind: 'earlier_run', runId: first.run.id, limit: group });
+				}
 			}
 			if (rec.run.parentRunId) {
 				const parent = this.#byId(rec.run.parentRunId);
@@ -851,7 +853,7 @@ export class MockOperate {
 						if (sibling && isActive(sibling.run.status)) waits.push({ kind: 'upstream_job', runId: sibling.run.id, jobKey: up.jobKey });
 					}
 				}
-				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id, jobKey: parent.run.jobKey ?? '' });
+				if (parent && parent.run.status === 'queued') waits.push({ kind: 'group_parent', runId: parent.run.id });
 			}
 			out.set(rec.run.id, waits);
 			ahead.push(rec);

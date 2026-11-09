@@ -120,22 +120,21 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 		case 'write_claim':
 			return [
 				{ text: 'Waiting: ' },
-				runLink(wait.runId),
+				wait.runId ? runLink(wait.runId) : { text: 'a run in another location' },
 				{ text: ' is updating ' },
 				{ text: wait.nodeKey, href: `/catalog/${wait.nodeKey}` },
 				...(wait.otherNodes ? [{ text: ` and ${wait.otherNodes} more` }] : [])
 			];
-		case 'concurrency_group':
+		case 'concurrency_limit':
 			return [
-				{ text: `Waiting: ${wait.holders.length} of ${wait.limit} ${slotLabel(wait.group)} slot${wait.limit === 1 ? '' : 's'} in use` },
-				...(wait.holders.length ? [{ text: ' (by ' }, ...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]), { text: ')' }] : [])
+				{ text: `Waiting: the ${slotLabel(wait.limit)} limit is in use by ` },
+				...wait.holders.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]),
+				...(wait.elsewhere ? [{ text: `${wait.holders.length ? ' and ' : ''}${wait.elsewhere} run${wait.elsewhere === 1 ? '' : 's'} elsewhere` }] : [])
 			];
-		case 'priority':
-			return [
-				{ text: `Waiting: behind ${wait.aheadRunIds.length} earlier run${wait.aheadRunIds.length === 1 ? '' : 's'} (` },
-				...wait.aheadRunIds.flatMap((id, i) => [...(i ? [{ text: ', ' }] : []), runLink(id)]),
-				{ text: ')' }
-			];
+		case 'earlier_run':
+			return [{ text: 'Waiting: ' }, wait.runId ? runLink(wait.runId) : { text: 'an earlier run elsewhere' }, { text: ` goes first on the ${slotLabel(wait.limit)} limit` }];
+		case 'job_running':
+			return [{ text: 'Waiting: ' }, runLink(wait.runId), { text: ' of the same job is running' }];
 		case 'upstream_job':
 			return [{ text: 'Waiting for ' }, { text: wait.jobKey || shortRunId(wait.runId), href: `/runs/${wait.runId}` }, { text: ' to finish first' }];
 		case 'group_parent':
@@ -145,8 +144,6 @@ export function describeWait(wait: QueueWait): WaitPart[] {
 
 /** The wait as one plain line without links, for status lines and summaries. */
 export function waitText(wait: QueueWait): string {
-	if (wait.kind === 'concurrency_group') return `Waiting: ${wait.holders.length} of ${wait.limit} ${slotLabel(wait.group)} slot${wait.limit === 1 ? '' : 's'} in use`;
-	if (wait.kind === 'priority') return `Waiting: behind ${wait.aheadRunIds.length} earlier run${wait.aheadRunIds.length === 1 ? '' : 's'}`;
 	return describeWait(wait)
 		.map((p) => p.text)
 		.join('');
@@ -156,15 +153,17 @@ export function waitText(wait: QueueWait): string {
 export function waitTechnical(wait: QueueWait): string {
 	switch (wait.kind) {
 		case 'write_claim':
-			return `write claim held by ${wait.runId} on ${wait.nodeKey}${wait.otherNodes ? ` (+${wait.otherNodes})` : ''}`;
-		case 'concurrency_group':
-			return `concurrency group ${wait.group} full (${wait.holders.length}/${wait.limit}): ${wait.holders.join(', ')}`;
-		case 'priority':
-			return `behind ${wait.aheadRunIds.join(', ')} for the same slot (priority, then queue order)`;
+			return `write claim held by ${wait.runId ?? 'another location or target'} on ${wait.nodeKey}${wait.otherNodes ? ` (+${wait.otherNodes})` : ''}`;
+		case 'concurrency_limit':
+			return `concurrency limit ${wait.limit} held by ${[...wait.holders, ...(wait.elsewhere ? [`${wait.elsewhere} elsewhere`] : [])].join(', ')}`;
+		case 'earlier_run':
+			return `${wait.runId ?? 'a run elsewhere'} is ahead on ${wait.limit} (priority, then queue order)`;
+		case 'job_running':
+			return `job already running in ${wait.runId}`;
 		case 'upstream_job':
 			return `upstream job ${wait.jobKey} (${wait.runId}) still active`;
 		case 'group_parent':
-			return `group run ${wait.runId} not claimed yet`;
+			return `group run ${wait.runId} not running yet`;
 	}
 }
 

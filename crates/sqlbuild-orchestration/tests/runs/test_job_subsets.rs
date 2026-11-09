@@ -24,6 +24,7 @@ use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::runs::tests::test_types::{
     ExactKeyPlanner, JobSubsetTestCase, NamedRerunTestCase, NarrowingDenialTestCase,
 };
+use crate::runs::types::RunsListing;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -496,14 +497,22 @@ fn given_a_finished_run_when_rerunning_named_nodes_then_only_those_rerun_for_peo
                 list_person_runs(
                     store,
                     people[0],
-                    (roles.location_id, "development", (1, before)),
+                    (
+                        roles.location_id,
+                        "development",
+                        RunsListing::Newest(1, before),
+                    ),
                     DefaultRole::None,
                 )
             };
             let everything = list_person_runs(
                 store,
                 people[0],
-                (roles.location_id, "development", (1000, None)),
+                (
+                    roles.location_id,
+                    "development",
+                    RunsListing::Newest(1000, None),
+                ),
                 DefaultRole::None,
             )
             .await
