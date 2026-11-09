@@ -153,6 +153,23 @@ pub struct PersonTriggerRecord {
     pub latest_tick: Option<crate::scheduler::models::TickRecord>,
 }
 
+/// One operator change of a trigger, as a person reads it: what changed, who changed it, when and why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonTriggerChange {
+    /// The change's own ID, as recorded in the security audit.
+    pub event_id: uuid::Uuid,
+    pub change: TriggerChange,
+    /// The audited actor, such as `principal:<id>` for a person.
+    pub actor: String,
+    /// The person's name when the actor is a person who still exists.
+    pub actor_name: Option<String>,
+    /// The operator's reason, with credential-shaped text redacted.
+    pub reason: String,
+    pub occurred_at: DateTime<Utc>,
+    /// The publication that was current when the change was made.
+    pub snapshot_id: uuid::Uuid,
+}
+
 /// Operator changes are immutable facts; clearing an override restores the published code default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]

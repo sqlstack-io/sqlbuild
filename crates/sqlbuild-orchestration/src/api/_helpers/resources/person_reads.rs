@@ -9,9 +9,12 @@ use crate::api::errors::ApiError;
 use crate::api::models::{ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery};
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
+use crate::declarations::main::list_person_trigger_changes::list_person_trigger_changes;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
 use crate::declarations::main::read_person_job::read_person_job;
-use crate::declarations::models::{JobDetailRecord, JobRecord, PersonTriggerRecord};
+use crate::declarations::models::{
+    JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord,
+};
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::models::{LocationHealthObservation, PlatformProblems};
@@ -320,6 +323,37 @@ pub(crate) async fn ticks(
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<TickRecord>>, ApiError> {
     list_person_ticks(
+        &store,
+        (&context, principal),
+        (
+            (location_id, &target),
+            (trigger_id, options.limit.unwrap_or(100)),
+        ),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("trigger not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes", operation_id = "listPersonTriggerChanges",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("trigger_id" = Uuid, Path),
+        ("limit" = Option<u32>, Query, description = "Maximum recent changes; defaults to 100, capped at 1000")),
+    responses((status = 200, body = Vec<PersonTriggerChange>, description = "Operator changes, newest first"),
+        (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody),
+        (status = 404, description = "Trigger not found for a person who may view the whole target")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn trigger_changes(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    (Path((location_id, target, trigger_id)), Query(options)): (
+        Path<(Uuid, String, Uuid)>,
+        Query<ReadQuery>,
+    ),
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<PersonTriggerChange>>, ApiError> {
+    list_person_trigger_changes(
         &store,
         (&context, principal),
         (

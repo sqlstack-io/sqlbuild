@@ -706,6 +706,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonTriggerChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/triggers/{trigger_id}/ticks": {
         parameters: {
             query?: never;
@@ -1919,6 +1935,28 @@ export interface components {
             name: string;
             /** Format: uuid */
             principal_id: string;
+        };
+        /** @description One operator change of a trigger, as a person reads it: what changed, who changed it, when and why. */
+        PersonTriggerChange: {
+            /** @description The audited actor, such as `principal:<id>` for a person. */
+            actor: string;
+            /** @description The person's name when the actor is a person who still exists. */
+            actor_name?: string | null;
+            change: components["schemas"]["TriggerChange"];
+            /**
+             * Format: uuid
+             * @description The change's own ID, as recorded in the security audit.
+             */
+            event_id: string;
+            /** Format: date-time */
+            occurred_at: string;
+            /** @description The operator's reason, with credential-shaped text redacted. */
+            reason: string;
+            /**
+             * Format: uuid
+             * @description The publication that was current when the change was made.
+             */
+            snapshot_id: string;
         };
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
@@ -4506,6 +4544,55 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
                 };
+            };
+        };
+    };
+    listPersonTriggerChanges: {
+        parameters: {
+            query?: {
+                /** @description Maximum recent changes; defaults to 100, capped at 1000 */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                trigger_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operator changes, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonTriggerChange"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Trigger not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

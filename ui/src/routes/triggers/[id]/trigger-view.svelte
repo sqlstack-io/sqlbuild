@@ -144,7 +144,7 @@
 					{#each t.stateHistory as e (e.id)}
 						<div class="event">
 							<div><b>{stateEventLabel[e.kind]}</b>{#if e.value} <code>{e.value}</code>{/if}</div>
-							<div class="faint">{e.actor.displayName} ({e.actor.name}) · <span title={formatStamp(e.at)}>{formatAgo(e.at, app.now)}</span></div>
+							<div class="faint">{e.actor.displayName}{#if e.actor.name !== e.actor.displayName} ({e.actor.name}){/if} · <span title={formatStamp(e.at)}>{formatAgo(e.at, app.now)}</span></div>
 							{#if e.reason}<div class="faint">“{e.reason}”</div>{/if}
 						</div>
 					{/each}
