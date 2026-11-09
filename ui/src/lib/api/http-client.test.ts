@@ -795,3 +795,34 @@ describe('getCatalogNode statistics', () => {
 		expect([refreshed?.lastRows, refreshed?.warehouse, reads.length - first]).toEqual([1500, null, 1]);
 	});
 });
+
+describe('listWarehouseConnections', () => {
+	const access = (target: string) => ({ location_id: '0191f0aa-orders', name: 'Orders', target, actions: [] });
+
+	/** Development's health is readable; preview's is refused, as for a partial viewer. */
+	function server() {
+		const health: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
+				if (path.endsWith('/health')) {
+					health.push(path);
+					return path.includes('/targets/preview/') ? Response.json({ error: 'refused' }, { status: 403 }) : Response.json([]);
+				}
+				return Response.json([]);
+			})
+		);
+		return { health, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('asks for a refused target once per page load, since each refusal is audited', async () => {
+		const { health, client } = server();
+		expect((await client.listWarehouseConnections()).map((c) => c.target)).toEqual(['development']);
+		expect((await client.listWarehouseConnections()).map((c) => c.target)).toEqual(['development']);
+		expect(health.filter((p) => p.includes('/preview/'))).toHaveLength(1);
+		expect(health.filter((p) => p.includes('/development/'))).toHaveLength(2);
+	});
+});

@@ -265,6 +265,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	const outputRefused = new Set<string>();
 	// A node's error text needs view.evidence on that node alone.
 	const errorRefused = new Set<string>();
+	// Targets whose health the person may not read; each refusal is audited, so Connections asks once per page load.
+	const healthRefused = new Set<string>();
 	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
 	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
 	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
@@ -608,12 +610,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		},
 		/** Targets whose health the person may not read are left out, as their connection checks are part of it. */
 		async listWarehouseConnections(): Promise<WarehouseConnection[]> {
-			const locations = await bootstrapLocations();
+			const locations = (await bootstrapLocations()).filter((l) => !healthRefused.has(l.id));
 			const read = await Promise.all(
 				locations.map(async (location) => {
 					const { locationId, target } = parseLocationKey(location.id);
 					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
 					if (response.status === 401) onUnauthorized();
+					if (response.status === 403) healthRefused.add(location.id);
 					return data ? [toWarehouseConnection(location, data)] : [];
 				})
 			);
