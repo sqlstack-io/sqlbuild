@@ -1,8 +1,9 @@
 //! The project graph, the resources it is built from and selector failures.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::assembly::project::types::ObjectKey;
+use crate::graph::errors::SelectorError;
 
 /// Dependency lists indexed without losing project insertion order.
 #[derive(Debug, Default)]
@@ -37,6 +38,20 @@ pub struct ProjectGraph {
     pub(crate) upstream_index: HashMap<ObjectKey, usize>,
     pub(crate) downstream_index: HashMap<ObjectKey, usize>,
     pub(crate) name_index: HashMap<String, usize>,
+    /// Each job and job group's resolved selection, or why it fails; `None` until a command attaches jobs.
+    pub jobs: Option<BTreeMap<String, Result<BTreeSet<ObjectKey>, SelectorError>>>,
+}
+
+/// What one job or job group selects: a job's own selector tokens, or a group's member jobs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum JobSelection {
+    Job {
+        select: Vec<String>,
+        exclude: Vec<String>,
+    },
+    Group {
+        members: Vec<String>,
+    },
 }
 
 /// One parsed selector token: `kind:value` (kind `name` when bare) or `start~end`.
