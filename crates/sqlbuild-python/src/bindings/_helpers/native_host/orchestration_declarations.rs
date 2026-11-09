@@ -315,13 +315,23 @@ fn nested_declarations<'py>(
     })
 }
 
-/// Each reachable job's own selector tokens and each group's member names, as publication reads them.
+/// Each reachable job's own selector tokens and each group's member names for `target`, as publication reads them.
 pub(crate) fn job_selections(
     py: Python<'_>,
     roots: &[(Bound<'_, PyAny>, String)],
+    target: Option<&str>,
 ) -> PyResult<BTreeMap<String, JobSelection>> {
     let mut catalog: BTreeMap<String, JobSelection> = BTreeMap::new();
     for (declaration, kind, _) in reachable_declarations(py, roots)? {
+        if kind != JOB_LABEL && kind != GROUP_LABEL {
+            continue;
+        }
+        let targets: Vec<String> = declaration.getattr("targets")?.extract()?;
+        if !targets.is_empty()
+            && !target.is_some_and(|target| targets.iter().any(|name| name == target))
+        {
+            continue;
+        }
         let tokens = |field: &str| -> PyResult<Vec<String>> {
             Ok(declaration
                 .getattr(field)?
