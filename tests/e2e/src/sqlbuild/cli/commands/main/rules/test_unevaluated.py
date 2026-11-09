@@ -316,6 +316,25 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
             ),
         ),
         SnowflakeBodyShapeCase(
+            "table function call outside TABLE( )",
+            (
+                (
+                    "functions/sql/order_lines.sql",
+                    "FUNCTION (\n  description 'Lines of one order.',\n"
+                    "  arguments (p_order_id VARCHAR),\n  returns table (line_id VARCHAR),\n"
+                    "  database warehouse,\n  schema analytics,\n);\n\n"
+                    "SELECT p_order_id AS line_id\n",
+                ),
+                (
+                    "models/orders.sql",
+                    "MODEL (description 'Orders.', database warehouse, schema analytics);\n\n"
+                    "WITH lines AS (\n  SELECT l.line_id\n"
+                    "  FROM __table_fn(\"order_lines\")('B-1') AS l\n)\n\n"
+                    "SELECT line_id FROM lines\n",
+                ),
+            ),
+        ),
+        SnowflakeBodyShapeCase(
             "quoted hook argument where a string is required",
             (
                 (

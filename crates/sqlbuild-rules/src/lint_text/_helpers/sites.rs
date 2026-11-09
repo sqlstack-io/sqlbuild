@@ -13,7 +13,7 @@ use sqlbuild_sqltext::sql_scan::models::QuotePolicy;
 
 use crate::lint_text::constants::{
     CTE_DEFINITION_PATTERN, FORMAT_SITE_PATTERN, FUNCTION_NAMES, LINT_SITE_PATTERN,
-    SENTINEL_SUFFIX, SITE_START_BYTES,
+    SENTINEL_SUFFIX, SITE_START_BYTES, TABLE_FUNCTION_NAME, TABLE_FUNCTION_WRAPPER,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
@@ -174,6 +174,39 @@ fn paren_end(bytes: &[u8], open: usize, policy: QuotePolicy) -> Option<usize> {
         Ok(close) => Some(close + 1),
         Err(_) => None,
     }
+}
+
+/// The end of the call a `__table_fn(...)` site at `start..end` opens, unless `TABLE( )` wraps it.
+pub(crate) fn unwrapped_table_function_end(
+    text: &str,
+    (start, end): (usize, usize),
+    policy: QuotePolicy,
+) -> Option<usize> {
+    let name_end: usize = name_end(text, start, false);
+    if !text[start..name_end].eq_ignore_ascii_case(TABLE_FUNCTION_NAME) {
+        return None;
+    }
+    let open: usize = skip_whitespace(text, end);
+    if text.as_bytes().get(open) != Some(&b'(') || inside_table_wrapper(&text[..start]) {
+        return None;
+    }
+    paren_end(text.as_bytes(), open, policy)
+}
+
+/// Whether `before` ends with `TABLE (`, the wrapper a table function may already be written in.
+fn inside_table_wrapper(before: &str) -> bool {
+    let keyword: &str = TABLE_FUNCTION_WRAPPER.trim_end_matches('(');
+    let Some(before) = before.trim_end().strip_suffix('(') else {
+        return false;
+    };
+    let before: &str = before.trim_end();
+    before.len() >= keyword.len()
+        && before.is_char_boundary(before.len() - keyword.len())
+        && before[before.len() - keyword.len()..].eq_ignore_ascii_case(keyword)
+        && !before[..before.len() - keyword.len()]
+            .chars()
+            .next_back()
+            .is_some_and(|character| python_isalnum(character) || character == '_')
 }
 
 /// A numbered sentinel such as `__sqlclean_interpolation_0__`.

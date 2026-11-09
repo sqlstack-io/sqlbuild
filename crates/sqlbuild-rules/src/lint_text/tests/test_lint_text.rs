@@ -470,6 +470,29 @@ fn given_sql_files_when_formatting_bodies_then_sites_and_fixture_ceremony_surviv
             expected_fault_lines: vec![],
         },
         FormatBodiesTestCase {
+            description: "a Snowflake table function call parses wrapped and restores as written",
+            dialect: "snowflake",
+            relative_parts: Some(vec!["models".to_string(), "lines.sql".to_string()]),
+            contents: "MODEL ();\n\nselect l.a from __table_fn(\"lines\")('B-1') as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\n\nSELECT l.a\nFROM __table_fn(\"lines\")('B-1') AS l\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a table function call already in TABLE( ) stays as written",
+            dialect: "snowflake",
+            relative_parts: Some(vec!["models".to_string(), "lines.sql".to_string()]),
+            contents: "MODEL ();\n\nselect l.a from table(__table_fn(\"lines\")('B-1')) as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\n\nSELECT l.a\nFROM TABLE(__table_fn(\"lines\")('B-1')) AS l\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
             description: "an unparseable body is a fault on its first line",
             dialect: "duckdb",
             relative_parts: None,

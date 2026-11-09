@@ -27,6 +27,13 @@ pub(crate) const FUNCTION_NAMES: [&str; 9] = [
     "__udf",
 ];
 
+/// The intrinsic whose call a table function stands in for.
+pub(crate) const TABLE_FUNCTION_NAME: &str = "__table_fn";
+/// The wrapper Snowflake requires around a table function in `FROM`.
+pub(crate) const TABLE_FUNCTION_WRAPPER: &str = "TABLE(";
+/// The dialect whose grammar accepts a table function only inside `TABLE( )`.
+pub(crate) const TABLE_FUNCTION_WRAPPING_DIALECT: &str = "snowflake";
+
 /// Bytes every lint and format site pattern match starts with.
 pub(crate) const SITE_START_BYTES: [u8; 3] = *b"@$_";
 pub(crate) const LINT_SITE_PATTERN: &str =
