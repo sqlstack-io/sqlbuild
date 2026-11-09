@@ -657,10 +657,14 @@ export type TriggerDetail = Trigger & {
 	upcoming: Iso[] | null;
 	/** Calendar schedules: times are computed ahead and stored up to `storedUntil`. */
 	calendar: {
-		horizon: string;
-		storedUntil: Iso;
-		lastRefreshedAt: Iso;
-		lowHorizonWarningBelow: string;
+		/** Null where the server doesn't report it. */
+		horizon: string | null;
+		/** The last stored time; null when none is stored. */
+		storedUntil: Iso | null;
+		lastRefreshedAt: Iso | null;
+		/** When the location next works out the calendar; absent where the server doesn't report it. */
+		nextRefreshAt?: Iso | null;
+		lowHorizonWarningBelow: string | null;
 		low: boolean;
 	} | null;
 	sensor: {

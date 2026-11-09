@@ -79,16 +79,40 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 	};
 }
 
+/** How many upcoming due times a calendar schedule lists. */
+const UPCOMING_LIMIT = 5;
+
+/**
+ * The server's next due time, and for calendars the stored times from it on, which the scheduler
+ * takes in order. Later cron times would need cron evaluation, which stays on the server.
+ */
+function upcomingOf(d: Wire['TriggerDeclaration'], nextDueAt: string | null): string[] | null {
+	if (!isSchedule(d)) return null;
+	if (d.schedule.kind === 'cron') return nextDueAt ? [nextDueAt] : [];
+	if (!nextDueAt) return [];
+	const next = Date.parse(nextDueAt);
+	return d.schedule.times.filter((t) => Date.parse(t) >= next).sort((a, b) => Date.parse(a) - Date.parse(b)).slice(0, UPCOMING_LIMIT);
+}
+
 /** A trigger's detail; parts with no server source are null and their widgets stay hidden. */
 export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], ticks: Tick[]): TriggerDetail {
 	const d = wire.definition_json;
+	const calendar = isSchedule(d) && d.schedule.kind === 'calendar' ? d.schedule : null;
+	const stored = calendar ? calendar.times.map(Date.parse) : [];
 	return {
 		...trigger,
 		declaration: null,
 		targets: null,
 		catchUp: null,
-		upcoming: null,
-		calendar: null,
+		upcoming: upcomingOf(d, wire.next_due_at ?? null),
+		calendar: calendar && {
+			horizon: null,
+			storedUntil: stored.length ? new Date(Math.max(...stored)).toISOString() : null,
+			lastRefreshedAt: null,
+			nextRefreshAt: calendar.refresh_at,
+			lowHorizonWarningBelow: null,
+			low: false
+		},
 		sensor: isSchedule(d)
 			? null
 			: {

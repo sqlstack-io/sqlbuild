@@ -453,6 +453,12 @@ describe('launchJob', () => {
 		await expect(client.launchJob(ORDERS, 'daily')).rejects.toMatchObject({ status: 502, message: '502 Bad Gateway' });
 	});
 
+	it('shows only the status for a plain-text server failure, which can name internal types', async () => {
+		const text = 'Missing request extension: Extension of type `example::AuditContext` was not found.';
+		const { client } = server(new Response(text, { status: 500, statusText: 'Internal Server Error', headers: { 'content-type': 'text/plain; charset=utf-8' } }));
+		await expect(client.launchJob(ORDERS, 'daily')).rejects.toMatchObject({ status: 500, message: '500 Internal Server Error' });
+	});
+
 	it("shows the server's refusal of a window as it comes", async () => {
 		const { client } = server(Response.json({ error: 'backfill window start must not follow end' }, { status: 400 }));
 		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '20', end: '10' } })).rejects.toMatchObject({
