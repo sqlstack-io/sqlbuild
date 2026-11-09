@@ -62,6 +62,14 @@ pub(crate) struct MarkerNamesTestCase {
     pub(crate) expected_replaced_sql: &'static str,
 }
 
+/// A table function call replaced by a name, with or without dropping a `LATERAL` before it.
+pub(crate) struct CallableMarkerTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) drop_lateral: bool,
+    pub(crate) expected_sql: &'static str,
+}
+
 pub(crate) struct ProtectedRangeTestCase {
     pub(crate) description: &'static str,
     pub(crate) ranges: &'static [(usize, usize)],

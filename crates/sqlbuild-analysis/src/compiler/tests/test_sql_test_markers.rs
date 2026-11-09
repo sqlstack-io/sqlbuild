@@ -1,9 +1,11 @@
 use regex::Regex;
 
 use crate::compiler::_helpers::sql_tests::markers::{
-    in_protected_range, marker_names, replace_named_markers,
+    in_protected_range, marker_names, replace_callable_markers, replace_named_markers,
 };
-use crate::compiler::tests::test_types::{MarkerNamesTestCase, ProtectedRangeTestCase};
+use crate::compiler::tests::test_types::{
+    CallableMarkerTestCase, MarkerNamesTestCase, ProtectedRangeTestCase,
+};
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 #[test]
@@ -39,6 +41,63 @@ fn given_markers_around_comments_and_strings_when_scanning_then_only_code_marker
                 "mock_{name}"
             ))),
             test_case.expected_replaced_sql,
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_a_lateral_table_function_call_when_replacing_it_with_a_relation_then_lateral_goes_with_it()
+{
+    let test_cases = [
+        CallableMarkerTestCase {
+            description: "a mock after a comma LATERAL stands alone",
+            sql: "SELECT l.a FROM b, LATERAL __table_fn(\"f\")(b.id) AS l",
+            drop_lateral: true,
+            expected_sql: "SELECT l.a FROM b, mock_f AS l",
+        },
+        CallableMarkerTestCase {
+            description: "a mock after JOIN lateral, in any case, stands alone",
+            sql: "SELECT l.a FROM b JOIN lateral __table_fn(\"f\")(b.id) AS l ON TRUE",
+            drop_lateral: true,
+            expected_sql: "SELECT l.a FROM b JOIN mock_f AS l ON TRUE",
+        },
+        CallableMarkerTestCase {
+            description: "a rendered call keeps its LATERAL",
+            sql: "SELECT l.a FROM b, LATERAL __table_fn(\"f\")(b.id) AS l",
+            drop_lateral: false,
+            expected_sql: "SELECT l.a FROM b, LATERAL mock_f AS l",
+        },
+        CallableMarkerTestCase {
+            description: "lateral ending a comment before the call is kept",
+            sql: "SELECT l.a FROM b, -- not lateral\n__table_fn(\"f\")(1) AS l",
+            drop_lateral: true,
+            expected_sql: "SELECT l.a FROM b, -- not lateral\nmock_f AS l",
+        },
+        CallableMarkerTestCase {
+            description: "a word ending in lateral before the call is kept",
+            sql: "SELECT l.a FROM collateral, __table_fn(\"f\")(1) AS l",
+            drop_lateral: true,
+            expected_sql: "SELECT l.a FROM collateral, mock_f AS l",
+        },
+    ];
+    let pattern = Regex::new(r#"(?i)__table_fn\("([^"]+)"\)"#).expect("valid marker pattern");
+    let syntax = LexicalSyntax {
+        line_comment_prefixes: vec!["--".to_string()],
+        ..LexicalSyntax::default()
+    };
+    for test_case in test_cases {
+        let replaced = replace_callable_markers(
+            test_case.sql,
+            (&pattern, test_case.drop_lateral),
+            &syntax,
+            |name, _| Some((format!("mock_{name}"), true)),
+        )
+        .map(|(sql, _)| sql);
+        assert_eq!(
+            replaced,
+            Ok(test_case.expected_sql.to_string()),
             "{}",
             test_case.description
         );

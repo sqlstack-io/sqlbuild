@@ -1,5 +1,6 @@
 //! Analysis normalization with a character-offset provenance map.
 
+use crate::relation_markers::main::lateral_start::lateral_start;
 use crate::semantic_checks::constants::UDF_NAME_PREFIX;
 use regex::Regex;
 use sqlbuild_sqltext::sql_scan::main::dialect_lexical_syntax::dialect_lexical_syntax;
@@ -16,8 +17,6 @@ const UDF: &str = "udf";
 const HOOK_PARAMETER_PREFIX: &str = "__sqlbuild_parameter__";
 /// Snowflake's second line comment prefix; only Snowflake SQL reaches the variant scan.
 const SNOWFLAKE_LINE_COMMENT: &str = "//";
-/// The keyword before a table function call; its stub is a plain relation, which LATERAL can't precede.
-const LATERAL_KEYWORD: &str = "LATERAL";
 type Edit = (usize, usize, MappedSql);
 static REFERENCES: LazyLock<Result<Regex, String>> = LazyLock::new(|| {
     Regex::new(r#"__(ref|seed|source|dbt_ref)\((?:"[^"]+"\s*,\s*)?"([^"]+)"\)"#)
@@ -144,9 +143,13 @@ pub(super) fn normalize(
             end = matching_paren(result.sql.as_bytes(), whole.end(), QuotePolicy::COMPILER)
                 .map_err(|error| format!("invalid table-function analysis input: {error:?}"))?
                 + 1;
-            start = lateral_start(&result.sql, start, &non_code)
-                .filter(|lateral| *lateral >= consumed_until)
-                .unwrap_or(start);
+            start = lateral_start(&result.sql, start, |index| {
+                !non_code
+                    .iter()
+                    .any(|&(range_start, range_end)| range_start <= index && index < range_end)
+            })
+            .filter(|lateral| *lateral >= consumed_until)
+            .unwrap_or(start);
             let default = format!("__sqlbuild_table_function_{}", name.as_str());
             stubs.get(&default).cloned().unwrap_or(default)
         };
@@ -250,27 +253,6 @@ pub(crate) fn normalize_dialect_sql(sql: &str, dialect: &str) -> Result<String, 
         return Ok(sql.to_owned());
     }
     normalize_variant(MappedSql::new(sql)).map(|mapped| mapped.sql)
-}
-
-/// The start of a `LATERAL` keyword in code directly before `start`, which a stub relation drops.
-fn lateral_start(sql: &str, start: usize, non_code: &[(usize, usize)]) -> Option<usize> {
-    let before: &str = sql[..start].trim_end();
-    let keyword_start: usize = before.len().checked_sub(LATERAL_KEYWORD.len())?;
-    let in_code = |index: usize| {
-        !non_code
-            .iter()
-            .any(|&(range_start, range_end)| range_start <= index && index < range_end)
-    };
-    (before.is_char_boundary(keyword_start)
-        && before[keyword_start..].eq_ignore_ascii_case(LATERAL_KEYWORD)
-        && before[..keyword_start]
-            .chars()
-            .next_back()
-            .is_none_or(|character| {
-                !(character.is_alphanumeric() || matches!(character, '_' | '$'))
-            })
-        && in_code(keyword_start))
-    .then_some(keyword_start)
 }
 
 fn skip_non_code(sql: &str, index: usize) -> Result<Option<usize>, String> {

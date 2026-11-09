@@ -1693,7 +1693,7 @@ fn resolve_table_function_fixtures<'a>(
     }
     let (replaced, reached) = replace_callable_markers(
         sql,
-        &patterns.table_function,
+        (&patterns.table_function, true),
         &patterns.lexical,
         |name, _call_suffix| {
             fixtures
@@ -1732,8 +1732,11 @@ fn resolve_function_calls(
     } else {
         &patterns.udf
     };
-    let (result, _) =
-        replace_callable_markers(sql, pattern, &patterns.lexical, |name, call_suffix| {
+    let (result, _) = replace_callable_markers(
+        sql,
+        (pattern, false),
+        &patterns.lexical,
+        |name, call_suffix| {
             let function = functions.get(name)?;
             let (prefix, suffix) = if table_function {
                 (
@@ -1747,7 +1750,8 @@ fn resolve_function_calls(
                 )
             };
             Some((format!("{prefix}{call_suffix}{suffix}"), false))
-        })?;
+        },
+    )?;
     Ok(result)
 }
 

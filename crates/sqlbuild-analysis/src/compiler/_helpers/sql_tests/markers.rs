@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use regex::{Captures, Regex};
 
 use crate::compiler::_helpers::sql_tests::planning::compile_error;
+use crate::relation_markers::main::lateral_start::lateral_start;
 use sqlbuild_sqltext::sql_scan::main::dialect_matching_paren::dialect_matching_paren;
 use sqlbuild_sqltext::sql_scan::main::dialect_non_code_ranges::dialect_non_code_ranges;
 use sqlbuild_sqltext::sql_scan::main::skip_whitespace::skip_whitespace;
@@ -12,7 +13,7 @@ use sqlbuild_sqltext::sql_scan::models::{LexicalSyntax, Unclosed};
 
 pub(crate) fn replace_callable_markers<F>(
     sql: &str,
-    pattern: &Regex,
+    (pattern, drop_lateral): (&Regex, bool),
     syntax: &LexicalSyntax,
     mut replacement: F,
 ) -> Result<(String, HashSet<String>), String>
@@ -42,7 +43,14 @@ where
         let Some((value, records_reach)) = replacement(name, call_suffix) else {
             continue;
         };
-        output.push_str(&sql[cursor..full.start()]);
+        let start = if drop_lateral {
+            lateral_start(sql, full.start(), |index| !protected.contains(index))
+                .filter(|lateral| *lateral >= cursor)
+                .unwrap_or(full.start())
+        } else {
+            full.start()
+        };
+        output.push_str(&sql[cursor..start]);
         output.push_str(&value);
         cursor = suffix_end;
         if records_reach {
