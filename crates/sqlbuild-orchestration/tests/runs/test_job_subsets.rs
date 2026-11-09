@@ -10,10 +10,15 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, credentials, orders_grant, role_fixture,
 };
+use crate::runs::main::change_run::change_run;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_job_run::request_job_run;
 use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::models::{JobRunRequest, PersonRunRequest, RunKind, RunNarrowing, RunRequest};
+use crate::runs::main::request_rerun::request_rerun;
+use crate::runs::models::{
+    JobRunRequest, PersonRunRequest, RerunRequest, RunAuthority, RunChange, RunChangeRequest,
+    RunKind, RunNarrowing, RunRequest,
+};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::runs::tests::test_types::{ExactKeyPlanner, JobSubsetTestCase, NarrowingDenialTestCase};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -107,6 +112,7 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
             publish_snapshot(store, &input).await.expect("publish jobs");
             let strings =
                 |tokens: &[&str]| tokens.iter().map(|token| (*token).to_owned()).collect();
+            let mut run_ids: Vec<Uuid> = Vec::new();
             for test_case in &test_cases {
                 let request = JobRunRequest {
                     run_id: Uuid::now_v7(),
@@ -154,6 +160,7 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                     "{backend:?}: {}: the run lists the selectors it was narrowed with, and nothing else it was requested with",
                     test_case.description
                 );
+                run_ids.push(request.run_id);
                 let keys = |keys: &[&str]| -> BTreeSet<String> {
                     keys.iter().map(|key| (*key).to_owned()).collect()
                 };
@@ -176,6 +183,51 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                     test_case.description
                 );
             }
+            let source_id = run_ids[0];
+            let narrowing = RunNarrowing {
+                select: strings(test_cases[0].select),
+                exclude: strings(test_cases[0].exclude),
+            };
+            change_run(
+                store,
+                RunAuthority::Operator(&context),
+                &RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: source_id,
+                    claim_id: None,
+                    change: RunChange::CancelRequested {
+                        actor: context.actor.clone(),
+                        reason: "Stop before it starts".into(),
+                    },
+                },
+            )
+            .await
+            .expect("cancel the queued narrowed run");
+            let rerun_id = Uuid::now_v7();
+            request_rerun(
+                store,
+                (&context, None),
+                &RerunRequest {
+                    run_id: rerun_id,
+                    source_run_id: source_id,
+                    from_failure: false,
+                    reason: "Run the same part again".into(),
+                    priority: 0,
+                },
+            )
+            .await
+            .expect("rerun");
+            let listed = list_runs(store, (location_id, "development"), 50)
+                .await
+                .expect("runs");
+            assert_eq!(
+                listed
+                    .iter()
+                    .find(|run| run.run_id == rerun_id)
+                    .map(|run| run.narrowing.clone()),
+                Some(Some(narrowing)),
+                "{backend:?}: a rerun of part of a job is listed with the same narrowing"
+            );
             let unplanned = JobRunRequest {
                 run_id: Uuid::now_v7(),
                 location_id,
