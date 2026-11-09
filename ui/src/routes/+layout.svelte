@@ -7,6 +7,7 @@
 	import { pageAvailable } from '$lib/nav';
 	import { SERVER_DOCS } from '$lib/boot-failure';
 	import { app } from '$lib/state/app.svelte';
+	import favicon from '$website/public/favicon.png';
 
 	let { children } = $props();
 
@@ -18,7 +19,7 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href="/favicon.png" />
+	<link rel="icon" href={favicon} />
 </svelte:head>
 
 {#if signingIn}

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import logoForDark from '$website/src/assets/logo-dark.png';
+	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
 	import { loginWithPassword } from '$lib/api/http-client';
 	import { safeNext } from '$lib/next';
@@ -38,8 +40,8 @@
 
 <div class="grid h-screen place-items-center p-8">
 	<form class="flex w-full max-w-xs flex-col gap-3" onsubmit={submit}>
-		<img src="/logo-light.png" alt="SQLBuild" class="mb-2 h-7 w-auto self-start dark:hidden" />
-		<img src="/logo.png" alt="SQLBuild" class="mb-2 hidden h-7 w-auto self-start dark:block" />
+		<img src={logoForLight} alt="SQLBuild" class="mb-2 h-7 w-auto self-start dark:hidden" />
+		<img src={logoForDark} alt="SQLBuild" class="mb-2 hidden h-7 w-auto self-start dark:block" />
 		<h1 class="text-[15px] font-semibold">Sign in</h1>
 		<label class="flex flex-col gap-1 text-[12.5px]">
 			Name
