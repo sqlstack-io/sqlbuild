@@ -92,9 +92,11 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                 priority: 0,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             assert!(
-                request_job_run(store, &roles.context, &queued)
+                request_job_run(store, (&roles.context, None), &queued)
                     .await
                     .expect("queued run")
             );

@@ -177,6 +177,12 @@ pub struct JobRunRequest {
     /// Rebuild every selected model from scratch; it rewrites history, as a window does.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub full_refresh: bool,
+    /// Narrow the job with `sqb build` selectors; only nodes already in the job can remain.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub select: Vec<String>,
+    /// Leave nodes out of the job with `sqb build` selectors.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
 }
 
 /// A retry derives its execution scope from a terminal run, never from caller selectors.
@@ -681,7 +687,7 @@ pub struct AdhocCheck {
 
 /// A person's change to the run queue: a published job, a command the planner resolves on the server, or a cancellation.
 pub enum PersonRunRequest<'a> {
-    Job(&'a JobRunRequest),
+    Job(&'a dyn CommandPlanner, &'a JobRunRequest),
     Adhoc(&'a dyn CommandPlanner, &'a AdhocRunRequest),
     Cancel(&'a CancelRunRequest),
     /// A build command planned on the location for `(location_id, target)`; it never becomes a run.

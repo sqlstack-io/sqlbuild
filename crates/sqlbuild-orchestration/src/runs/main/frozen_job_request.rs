@@ -1,17 +1,24 @@
 //! Freeze published jobs for manual and sensor requests in their owning transaction.
 
+use std::collections::BTreeSet;
+
+use uuid::Uuid;
+
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;
+use crate::runs::_helpers::requests::adhoc::publication_plan;
 use crate::runs::constants::FULL_REFRESH_SETTING;
 use crate::runs::models::{JobRunRequest, RunCommand, RunKind, RunOrigin, RunRequest};
+use crate::runs::types::CommandPlanner;
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// Without a planner, a request that narrows the job is refused.
 pub(crate) async fn frozen_job_request(
     transaction: ControlTransaction,
-    context: &AuditContext,
+    (context, planner): (&AuditContext, Option<&dyn CommandPlanner>),
     request: &JobRunRequest,
 ) -> Result<(ControlTransaction, RunRequest), ControlError> {
     let (transaction, jobs) = query(
@@ -36,6 +43,15 @@ pub(crate) async fn frozen_job_request(
         definition
             .settings
             .insert(FULL_REFRESH_SETTING.into(), serde_json::Value::Bool(true));
+    }
+    let mut transaction = transaction;
+    if !request.select.is_empty() || !request.exclude.is_empty() {
+        (transaction, definition.selection) = narrowed(
+            transaction,
+            (planner, snapshot_id, kind),
+            (request, definition.selection),
+        )
+        .await?;
     }
     let (transaction, write_set) =
         job_write_set(transaction, snapshot_id, &definition.selection).await?;
@@ -73,4 +89,45 @@ pub(crate) async fn frozen_job_request(
             concurrency_groups: definition.concurrency_groups,
         },
     ))
+}
+
+/// The job's nodes that `sqb build --select … --exclude …` also selects; never a node outside the job.
+async fn narrowed(
+    transaction: ControlTransaction,
+    (planner, snapshot_id, kind): (Option<&dyn CommandPlanner>, Uuid, RunKind),
+    (request, selection): (&JobRunRequest, BTreeSet<String>),
+) -> Result<(ControlTransaction, BTreeSet<String>), ControlError> {
+    let invalid = |message: &str| Err(ControlError::Invalid(message.into()));
+    if kind == RunKind::Group {
+        return invalid("a job group cannot be narrowed; narrow one of its jobs");
+    }
+    let Some(planner) = planner else {
+        return invalid("this request cannot narrow a job");
+    };
+    if request
+        .select
+        .iter()
+        .chain(&request.exclude)
+        .any(|token| token.trim().is_empty() || token.starts_with('-'))
+    {
+        return invalid("job selectors must be selector tokens, not flags");
+    }
+    let mut command: Vec<String> = vec!["build".into()];
+    for (flag, tokens) in [
+        ("--select", &request.select),
+        ("--exclude", &request.exclude),
+    ] {
+        if !tokens.is_empty() {
+            command.push(flag.into());
+            command.extend(tokens.iter().cloned());
+        }
+    }
+    let (transaction, plan) =
+        publication_plan(transaction, (planner, snapshot_id), &command).await?;
+    let plan = plan.map_err(ControlError::Invalid)?;
+    let narrowed: BTreeSet<String> = selection.intersection(&plan.selection).cloned().collect();
+    if narrowed.is_empty() {
+        return invalid("the selectors leave none of the job's nodes");
+    }
+    Ok((transaction, narrowed))
 }

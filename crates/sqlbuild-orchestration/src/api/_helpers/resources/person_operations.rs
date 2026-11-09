@@ -67,14 +67,17 @@ pub(crate) async fn statistics(
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn request_job(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
-    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+    (Extension(AuthenticatedPerson(principal, _)), Extension(planner)): (
+        Extension<AuthenticatedPerson>,
+        Extension<Arc<dyn CommandPlanner>>,
+    ),
     Json(request): Json<JobRunRequest>,
 ) -> Result<Json<MutationResponse>, ApiError> {
     Ok(Json(MutationResponse {
         applied: request_person_run(
             &store,
             (&context, principal),
-            PersonRunRequest::Job(&request),
+            PersonRunRequest::Job(planner.as_ref(), &request),
         )
         .await?,
     }))
