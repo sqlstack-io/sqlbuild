@@ -76,6 +76,8 @@ mod test_proxy;
 mod test_publish_encoding;
 #[path = "test_reads.rs"]
 mod test_reads;
+#[path = "test_server_errors.rs"]
+mod test_server_errors;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
 #[path = "test_types.rs"]

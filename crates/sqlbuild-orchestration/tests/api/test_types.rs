@@ -177,3 +177,10 @@ pub(crate) struct UiPathTestCase {
     pub(crate) expected_status: u16,
     pub(crate) expected_body: &'static str,
 }
+
+pub(crate) struct ServerErrorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) path: &'static str,
+    pub(crate) expected_status: u16,
+    pub(crate) expected_body: &'static str,
+}

@@ -6,6 +6,7 @@ use axum::{Extension, Json, Router, middleware};
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
 use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
+use crate::api::_helpers::server_errors::generic_server_errors;
 use crate::api::main::openapi_document::openapi_document;
 use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole};
 use crate::authorization::main::publish_group_roles::publish_group_roles;
@@ -49,7 +50,8 @@ pub async fn serve_api(
             get(|| async { Json(openapi_document()) }),
         )
         .with_state(store.clone());
-    let application = development_application(application, development_scope, address);
+    let application = development_application(application, development_scope, address)
+        .layer(middleware::map_response(generic_server_errors));
     let server = axum::serve(
         listener,
         application.into_make_service_with_connect_info::<std::net::SocketAddr>(),
