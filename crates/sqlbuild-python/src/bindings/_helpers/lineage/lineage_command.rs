@@ -364,7 +364,7 @@ fn traced_edges(
 /// Build column lineage under a stderr spinner for large rich-mode requests.
 fn column_lineage<'py>(
     py: Python<'py>,
-    (graph, mode): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    (graph, dialect, mode): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
     candidates: &ColumnCandidates,
 ) -> PyResult<Bound<'py, PyAny>> {
     let count: usize = candidates.model_names.len();
@@ -376,7 +376,7 @@ fn column_lineage<'py>(
         || {
             registry::native(py, NativeAttr::BuildProjectColumnLineage)?.call1((
                 native_field(graph, "project")?,
-                py.None(),
+                dialect,
                 mode,
                 PyFrozenSet::new(py, &candidates.model_names)?,
             ))
@@ -394,7 +394,12 @@ fn column_trace(
     let Some((resource_name, column_name)) = target.rsplit_once(COLUMN_TARGET_SEPARATOR) else {
         return Ok(None);
     };
-    let LineageSource::Compiled { index, graph, .. } = source else {
+    let LineageSource::Compiled {
+        index,
+        graph,
+        adapter,
+    } = source
+    else {
         return Err(compiled_graph_error(
             py,
             "column lineage requires a compiled project graph",
@@ -420,7 +425,8 @@ fn column_trace(
         ));
     }
     let candidates: ColumnCandidates = column_candidates(index, &key, (direction, depth));
-    let lineage: Bound<'_, PyAny> = column_lineage(py, (graph, mode), &candidates)?;
+    let dialect: Bound<'_, PyAny> = adapter.call_method0("sql_analysis_dialect")?;
+    let lineage: Bound<'_, PyAny> = column_lineage(py, (graph, &dialect, mode), &candidates)?;
     if lineage.is_none() {
         return Err(compiled_graph_error(
             py,
