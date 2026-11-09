@@ -1377,7 +1377,7 @@ def project_columns(ctx) -> str:
 
 
 def grant_select(target: str) -> str:
-    return f"GRANT SELECT ON {target} TO analyst_role"
+    return f"INSERT INTO audit.read_grants VALUES ('{target}', 'analyst_role')"
 
 """.strip()
                 + "\n",
@@ -1442,12 +1442,8 @@ sources:
                 "optional_suffix": None,
             },
             run_id="run_123",
-            expected_diagnostic_codes=("P026",),
-            expected_diagnostic_messages=(
-                "SQL analysis skipped for model 'orders' post_hooks[0] inline_sql(\"...\")"
-                " (<project>/models/staging/orders.sql): the duckdb parser cannot read"
-                " Syntax error at or near 'GRANT' at line 1, column 1 of its SQL",
-            ),
+            expected_diagnostic_codes=(),
+            expected_diagnostic_messages=(),
             expected_model_schema_names=("orders",),
             expected_model_config_values=(
                 {
@@ -1456,7 +1452,10 @@ sources:
                     "database": "analytics",
                     "post_hooks": [
                         SqlHookEntry(
-                            statement="GRANT SELECT ON analytics.marts.orders_dev TO analyst_role"
+                            statement=(
+                                "INSERT INTO audit.read_grants"
+                                " VALUES ('analytics.marts.orders_dev', 'analyst_role')"
+                            )
                         )
                     ],
                 },
@@ -1778,7 +1777,7 @@ MODEL (description "Test model orders.",
   alias orders_dev,
   post_hooks [
     inline_sql("select '@@CTX:destination.qualified' as target"),
-    inline_sql("create function @@CTX:destination.database.@@CTX:destination.schema.reconstruct_book() returns integer language sql as 'select 1'"),
+    inline_sql("create macro @@CTX:destination.database.@@CTX:destination.schema.reconstruct_book() as 1"),
     python("notify", message: "@@CTX:destination.qualified"),
   ],
 );
@@ -1800,12 +1799,8 @@ def notify(ctx, message):
             selected_target=None,
             cli_vars=None,
             run_id=None,
-            expected_diagnostic_codes=("P026",),
-            expected_diagnostic_messages=(
-                "SQL analysis skipped for model 'orders' post_hooks[1] inline_sql(\"...\")"
-                " (<project>/models/orders.sql): the duckdb parser cannot read"
-                " Syntax error at or near 'returns' at line 1, column 52 of its SQL",
-            ),
+            expected_diagnostic_codes=(),
+            expected_diagnostic_messages=(),
             expected_model_schema_names=("orders",),
             expected_model_config_values=(
                 {
@@ -1815,10 +1810,7 @@ def notify(ctx, message):
                     "post_hooks": [
                         SqlHookEntry(statement="select 'analytics.marts.orders_dev' as target"),
                         SqlHookEntry(
-                            statement=(
-                                "create function analytics.marts.reconstruct_book() returns "
-                                "integer language sql as 'select 1'"
-                            )
+                            statement="create macro analytics.marts.reconstruct_book() as 1"
                         ),
                         PythonHookEntry(
                             name="notify",
