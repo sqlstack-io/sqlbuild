@@ -7,8 +7,9 @@ type W = components['schemas'];
 
 const SNAPSHOT = '0191f0dd-0000-7000-8000-000000000000';
 
-function trigger(id: string, name: string, jobKey: string, definition: W['TriggerDeclaration'], status: W['TriggerStatus'] = 'running'): W['TriggerRecord'] {
-	return { trigger_id: id, name, job_key: jobKey, definition_json: definition, status, last_tick_for: null, next_due_at: '2026-11-07T06:00:00Z' };
+function trigger(id: string, name: string, jobKey: string, definition: W['TriggerDeclaration'], status: W['TriggerStatus'] = 'running'): W['PersonTriggerRecord'] {
+	const upcoming = 'schedule' in definition ? ['2026-11-07T06:00:00Z', '2026-11-08T06:00:00Z'] : [];
+	return { trigger_id: id, name, job_key: jobKey, definition_json: definition, status, last_tick_for: null, next_due_at: '2026-11-07T06:00:00Z', upcoming };
 }
 
 const daily = trigger('t-daily', 'orders_daily', 'orders', { description: 'Daily orders', job_key: 'orders', schedule: { kind: 'cron', expression: '0 6 * * *', timezone: 'UTC' }, default_status: 'paused' });
@@ -51,8 +52,9 @@ describe('trigger mapping', () => {
 		expect(tick.lateBySeconds).toBe(150);
 		const detail = triggerDetailOf(toTrigger(onInventory, [], tick), onInventory, [tick], []);
 		expect(detail.sensor).toMatchObject({ minimumIntervalSeconds: 60, cursorKnown: false });
-		expect([detail.declaration, detail.upcoming, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, []]);
-		expect(triggerDetailOf(toTrigger(daily, [], null), daily, [], []).sensor).toBeNull();
+		expect([detail.declaration, detail.upcoming, detail.catchUp, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, null, []]);
+		const schedule = triggerDetailOf(toTrigger(daily, [], null), daily, [], []);
+		expect([schedule.sensor, schedule.upcoming, schedule.catchUp]).toEqual([null, ['2026-11-07T06:00:00Z', '2026-11-08T06:00:00Z'], { mode: 'latest', max: 1 }]);
 	});
 
 	it("shows a sensor's checks newest first, its cursor and when it moved, and flags code changed since the last check", () => {
@@ -169,30 +171,18 @@ describe('runWindowOf', () => {
 });
 
 describe('schedule due times', () => {
-	// Stored out of order on purpose; one time is before the server's next due time.
+	// Stored out of order on purpose.
 	const times = ['2026-11-10T09:00:00Z', '2026-11-06T09:00:00Z', '2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z'];
-	const calendar = (nextDueAt: string | null) => ({
-		...trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } }),
-		next_due_at: nextDueAt
-	});
-	const detailOf = (wire: W['TriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, [], []);
+	const calendar = trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } });
+	const detailOf = (wire: W['PersonTriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, [], []);
 
-	it('lists a calendar from the next due time on, in time order, with the last stored time and next refresh', () => {
-		const detail = detailOf(calendar('2026-11-07T09:00:00Z'));
-		expect(detail.upcoming).toEqual(['2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z', '2026-11-10T09:00:00Z']);
-		expect(detail.calendar).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
-	});
-
-	it('has no upcoming calendar times once the server has no next due time', () => {
-		expect(detailOf(calendar(null)).upcoming).toEqual([]);
-	});
-
-	it('shows only the next due time for cron, without working out later ones', () => {
-		expect(detailOf(daily).upcoming).toEqual(['2026-11-07T06:00:00Z']);
+	it('reports the last stored calendar time and the next refresh', () => {
+		expect(detailOf(calendar).calendar).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
 		expect(detailOf(daily).calendar).toBeNull();
 	});
 
-	it('has no due times for a sensor', () => {
+	it('takes due times from the server, and has none for a sensor', () => {
+		expect(detailOf({ ...daily, upcoming: [] }).upcoming).toEqual([]);
 		expect(detailOf(onInventory).upcoming).toBeNull();
 	});
 });

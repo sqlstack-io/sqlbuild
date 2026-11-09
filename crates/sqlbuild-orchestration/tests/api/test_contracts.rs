@@ -84,6 +84,8 @@ mod test_reads;
 mod test_server_errors;
 #[path = "test_statistics_recovery.rs"]
 mod test_statistics_recovery;
+#[path = "test_trigger_upcoming.rs"]
+mod test_trigger_upcoming;
 #[path = "test_types.rs"]
 mod test_types;
 #[path = "test_ui_assets.rs"]

@@ -2,8 +2,9 @@
 
 use chrono::{DateTime, TimeDelta, Utc};
 
+use crate::declarations::constants::UPCOMING_TIMES;
 use crate::declarations::models::{
-    PreviousTriggerState, Schedule, TriggerDefinition, TriggerStatus,
+    PreviousTriggerState, Schedule, TriggerDeclaration, TriggerDefinition, TriggerStatus,
 };
 use crate::scheduler::constants::MAX_TICKS_PER_BATCH;
 use crate::scheduler::main::next_schedule_time::next_schedule_time;
@@ -61,4 +62,22 @@ pub(crate) fn trigger_timing(
         None
     };
     Ok((status, next))
+}
+
+/// The next due times of a running schedule from `next_due_at` on, as the scheduler works them out.
+pub(crate) fn upcoming_times(
+    declaration: &TriggerDeclaration,
+    next_due_at: Option<DateTime<Utc>>,
+) -> Result<Vec<DateTime<Utc>>, ControlError> {
+    let (TriggerDeclaration::Schedule(definition), Some(first)) = (declaration, next_due_at) else {
+        return Ok(Vec::new());
+    };
+    let mut times: Vec<DateTime<Utc>> = vec![first];
+    while times.len() < UPCOMING_TIMES {
+        let Some(next) = next_schedule_time(&definition.schedule, times[times.len() - 1])? else {
+            break;
+        };
+        times.push(next);
+    }
+    Ok(times)
 }

@@ -179,6 +179,8 @@ pub struct PersonTriggerRecord {
     #[serde(flatten)]
     pub trigger: TriggerRecord,
     pub latest_tick: Option<crate::scheduler::models::TickRecord>,
+    /// A running schedule's next due times from `next_due_at` on, at most five; empty otherwise.
+    pub upcoming: Vec<DateTime<Utc>>,
 }
 
 /// One operator change of a trigger, as a person reads it: what changed, who changed it, when and why.

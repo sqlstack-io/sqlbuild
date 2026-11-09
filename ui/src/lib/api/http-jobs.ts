@@ -80,21 +80,6 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 	};
 }
 
-/** How many upcoming due times a calendar schedule lists. */
-const UPCOMING_LIMIT = 5;
-
-/**
- * The server's next due time, and for calendars the stored times from it on, which the scheduler
- * takes in order. Later cron times would need cron evaluation, which stays on the server.
- */
-function upcomingOf(d: Wire['TriggerDeclaration'], nextDueAt: string | null): string[] | null {
-	if (!isSchedule(d)) return null;
-	if (d.schedule.kind === 'cron') return nextDueAt ? [nextDueAt] : [];
-	if (!nextDueAt) return [];
-	const next = Date.parse(nextDueAt);
-	return d.schedule.times.filter((t) => Date.parse(t) >= next).sort((a, b) => Date.parse(a) - Date.parse(b)).slice(0, UPCOMING_LIMIT);
-}
-
 /** A trigger's detail; parts with no server source are null and their widgets stay hidden. */
 const CHANGE_KINDS: Record<Wire['TriggerChange']['kind'], TriggerStateEventKind> = {
 	enable: 'enabled',
@@ -146,7 +131,7 @@ function cursorMovedAt(state: Wire['PersonSensorState'], history: TriggerStateEv
 
 export function triggerDetailOf(
 	trigger: Trigger,
-	wire: Wire['TriggerRecord'],
+	wire: Wire['PersonTriggerRecord'],
 	ticks: Tick[],
 	history: TriggerStateEvent[],
 	state: Wire['PersonSensorState'] | null = null
@@ -161,8 +146,9 @@ export function triggerDetailOf(
 		definitionChanged: !!state && lastEvaluatedFingerprint !== null && lastEvaluatedFingerprint !== state.definition_fingerprint,
 		declaration: null,
 		targets: null,
-		catchUp: null,
-		upcoming: upcomingOf(d, wire.next_due_at ?? null),
+		// The scheduler ticks only the latest missed time after downtime, and a run still waiting covers it.
+		catchUp: isSchedule(d) ? { mode: 'latest', max: 1 } : null,
+		upcoming: isSchedule(d) ? wire.upcoming : null,
 		calendar: calendar && {
 			horizon: null,
 			storedUntil: stored.length ? new Date(Math.max(...stored)).toISOString() : null,

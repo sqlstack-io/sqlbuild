@@ -2166,6 +2166,8 @@ export interface components {
         /** @description A trigger as people list it, with its newest tick so a list needs no read per trigger. */
         PersonTriggerRecord: components["schemas"]["TriggerRecord"] & {
             latest_tick?: null | components["schemas"]["TickRecord"];
+            /** @description A running schedule's next due times from `next_due_at` on, at most five; empty otherwise. */
+            upcoming: string[];
         };
         /** @description Observed physical evidence is not a live warehouse-existence guarantee. */
         PhysicalEvidence: {

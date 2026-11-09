@@ -220,3 +220,10 @@ pub(crate) struct PlanTestCase {
     pub(crate) expected_selection: &'static [&'static str],
     pub(crate) expected_warning: &'static str,
 }
+
+pub(crate) struct UpcomingTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_hourly: [&'static str; 5],
+    pub(crate) expected_calendar: [&'static str; 3],
+}
