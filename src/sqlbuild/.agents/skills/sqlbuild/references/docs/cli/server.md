@@ -13,6 +13,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
 - Run ad-hoc commands
+- Plan builds
 - Define project roles
 
 Run the control API and scheduler without loading project Python:
@@ -230,6 +231,39 @@ configures for the target before any statement runs. An unconfigured warehouse f
 the reason `the requested warehouse is not configured for this target on this location; no
 warehouse statement ran`, which the run page shows. A job's own `warehouse` setting is not
 checked this way.
+
+## Plan builds
+
+Anyone with `view` on every node of a target can see what a `build` command would do before it
+runs. The web UI's plan page does this for every Run button: the location serving the target runs
+[`sqb plan --json`](plan.md) on the command's nodes against the warehouse, and the page
+shows each model's action and reason, backfills, migrations and warnings. Running the command
+still needs `run.adhoc`.
+
+Over the API, queue a plan, then read it until `result_json` is set:
+
+```json
+POST /api/control/locations/{location_id}/targets/{target}/plans
+{ "request_id": "0191f0aa-0000-7000-8000-0000000000a1", "command": ["build", "--select", "+orders"] }
+
+GET /api/control/locations/{location_id}/targets/{target}/plans/{request_id}
+```
+
+`result_json.outcome.kind` is `plan`, with the `sqb plan --json` document in `document`, or
+`superseded` when the location's project files changed while it planned; plan again. A plan never
+appears in Runs and changes nothing in the warehouse.
+
+| Limit | Value |
+| --- | --- |
+| Verbs | `build` only |
+| Flags | Those accepted for an [ad-hoc run](#run-ad-hoc-commands); `--warehouse` and flags `sqb plan` doesn't take, such as `--fail-fast`, don't change the plan |
+| Location | A `sqb location serve` for the target that reported in the last 90 seconds |
+| Plans waiting | One per person and four per target |
+| Expiry | 10 minutes |
+| Plan size | 8 MiB |
+
+Only the person who asked can read a plan. Python source and dependency diffs are left out unless
+they also have `view.sql` on every node, and secrets in warehouse error text are redacted.
 
 ## Define project roles
 
