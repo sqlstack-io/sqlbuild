@@ -160,6 +160,9 @@ pub struct RunRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub window: Option<RunWindow>,
     pub concurrency_groups: BTreeSet<String>,
+    /// The selectors a person narrowed a job run with; reruns copy it with the rest of the request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub narrowing: Option<RunNarrowing>,
 }
 
 /// A trusted operator names a published job; execution inputs are never supplied by the caller.
@@ -236,11 +239,10 @@ pub struct RunRecord {
     pub selection_json: BTreeSet<String>,
     pub node_counts_json: BTreeMap<String, i64>,
     pub last_event_storage_id: i64,
-    /// How a person narrowed this run of a job, as typed; `None` when it runs the whole job.
+    /// How a person narrowed this run of a job, or the run it reruns, as typed; `None` when it runs the whole job.
     #[serde(
         default,
-        alias = "authored_json",
-        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::authored_narrowing"
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_narrowing"
     )]
     pub narrowing: Option<RunNarrowing>,
 }
