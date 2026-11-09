@@ -1641,7 +1641,38 @@ export interface components {
             janitor_events: components["schemas"]["WarehouseJanitorRecord"][];
             migrations: components["schemas"]["WarehouseMigrationRecord"][];
             /** @description Every step recorded for the listed moves, oldest first; same-time steps are not in step order. */
-            old_name_views: components["schemas"]["WarehouseOldNameRecord"][];
+            old_name_views: components["schemas"]["MaintenanceOldNameView"][];
+        };
+        /** @description One old-name view step as people read it: copied grants are counted, never returned as statements. */
+        MaintenanceOldNameView: {
+            archive_name?: string | null;
+            column_aliases?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            destination_model: string;
+            drop_reason?: string | null;
+            event_id: string;
+            event_type: string;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /**
+             * Format: int64
+             * @description How many grants were copied onto the view; null until it exists or when the stored list is unreadable.
+             */
+            grants_copied?: number | null;
+            migration_event_id: string;
+            new_database?: string | null;
+            new_name: string;
+            new_schema: string;
+            old_database?: string | null;
+            old_name: string;
+            old_schema?: string | null;
+            run_id: string;
+            state_database?: string | null;
+            state_schema: string;
+            target_name?: string | null;
+            view_retention?: string | null;
+            view_sql?: string | null;
         };
         /** @description One bounded page of one state table from the registered reader of a published generation. */
         MetadataBatch: {
@@ -2559,33 +2590,6 @@ export interface components {
             event_id: string;
             /** Format: date-time */
             observed_at: string;
-        };
-        /** @description Preserve nullable compatibility-view facts without projecting live warehouse existence. */
-        WarehouseOldNameRecord: {
-            archive_name?: string | null;
-            column_aliases?: string | null;
-            /** Format: date-time */
-            created_at: string;
-            destination_model: string;
-            drop_reason?: string | null;
-            event_id: string;
-            event_type: string;
-            /** Format: date-time */
-            expires_at?: string | null;
-            grants_copied?: string | null;
-            migration_event_id: string;
-            new_database?: string | null;
-            new_name: string;
-            new_schema: string;
-            old_database?: string | null;
-            old_name: string;
-            old_schema?: string | null;
-            run_id: string;
-            state_database?: string | null;
-            state_schema: string;
-            target_name?: string | null;
-            view_retention?: string | null;
-            view_sql?: string | null;
         };
         /** @description Physical namespace of SQLBuild's source-freshness state table, never a source query. */
         WarehouseStateLocation: {

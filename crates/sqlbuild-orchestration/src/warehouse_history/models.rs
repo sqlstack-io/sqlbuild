@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::warehouse_metadata::models::{
-    WarehouseAuditRecord, WarehouseJanitorRecord, WarehouseMigrationRecord, WarehouseOldNameRecord,
+    WarehouseAuditRecord, WarehouseJanitorRecord, WarehouseMigrationRecord,
 };
 
 /// One stored check result. Its SQL, error texts and evidence rows need their own permissions.
@@ -96,12 +96,40 @@ pub struct CheckEvidence {
     pub truncated: Option<String>,
 }
 
+/// One old-name view step as people read it: copied grants are counted, never returned as statements.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MaintenanceOldNameView {
+    pub state_database: Option<String>,
+    pub state_schema: String,
+    pub event_id: String,
+    pub target_name: Option<String>,
+    pub event_type: String,
+    pub migration_event_id: String,
+    pub destination_model: String,
+    pub old_database: Option<String>,
+    pub old_schema: Option<String>,
+    pub old_name: String,
+    pub new_database: Option<String>,
+    pub new_schema: String,
+    pub new_name: String,
+    pub view_retention: Option<String>,
+    pub archive_name: Option<String>,
+    pub column_aliases: Option<String>,
+    /// How many grants were copied onto the view; null until it exists or when the stored list is unreadable.
+    pub grants_copied: Option<u64>,
+    pub view_sql: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub drop_reason: Option<String>,
+    pub run_id: String,
+    pub created_at: DateTime<Utc>,
+}
+
 /// Recorded moves, their old-name view steps and janitor cleanups, newest moves first.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MaintenanceHistory {
     pub migrations: Vec<WarehouseMigrationRecord>,
     /// Every step recorded for the listed moves, oldest first; same-time steps are not in step order.
-    pub old_name_views: Vec<WarehouseOldNameRecord>,
+    pub old_name_views: Vec<MaintenanceOldNameView>,
     /// Empty when the history is for one model; cleanups are not tied to models.
     pub janitor_events: Vec<WarehouseJanitorRecord>,
 }
