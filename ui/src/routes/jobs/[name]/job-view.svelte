@@ -169,7 +169,7 @@
 							{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
 							{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
 							{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
-							{#if def.declaration}<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all'}</dd></div>{/if}
+							{#if def.targets}<div><dt>Targets</dt><dd>{def.targets.join(', ')}</dd></div>{/if}
 							{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
 							{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
 							{#if def.memberOf?.length}

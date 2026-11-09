@@ -1763,6 +1763,7 @@ class NativeOrchestrationWorker:
         traceback: TracebackType | None,
     ) -> None: ...
 
+def declaration_site() -> tuple[str, int] | None: ...
 def build_orchestration_snapshot(
     project: CompiledProjectView,
     metadata_json: str,

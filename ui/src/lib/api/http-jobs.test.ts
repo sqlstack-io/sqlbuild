@@ -57,17 +57,27 @@ describe('trigger mapping', () => {
 });
 
 describe('job mapping', () => {
-	it('links a job to its triggers and newest run, and leaves unreported policy null', () => {
-		const wire: W['JobRecord'] = { job_key: 'orders', kind: 'job', description: 'Build orders', selection: ['model:customers', 'model:orders'], concurrency_groups: ['warehouse_heavy'], snapshot_id: SNAPSHOT };
+	it('links a job to its triggers and newest run, shows where it is declared, and leaves unreported policy null', () => {
+		const wire: W['JobRecord'] = {
+			job_key: 'orders',
+			kind: 'job',
+			description: 'Build orders',
+			selection: ['model:customers', 'model:orders'],
+			concurrency_groups: ['warehouse_heavy'],
+			snapshot_id: SNAPSHOT,
+			select: '+orders',
+			declared_at: { path: 'orchestration/jobs.py', line: 12 }
+		};
 		const triggers = [toTrigger(daily, [], null), toTrigger(onInventory, [], null)];
 		const job = toJob(wire, triggers, [run('r-inv', 'inventory', null), run('r-ord', 'orders', null)]);
-		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: null, overlap: null, priority: null });
+		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: '+orders', sourceFile: 'orchestration/jobs.py:12', overlap: null, priority: null });
 		expect(job.lastRun?.id).toBe('r-ord');
-		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'] });
+		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'], exclude: ' stg_orders  audit_orders', targets: ['production'], cursor_type: 'integer' });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
 		expect(detail.settings).toEqual({ vars: '[REDACTED]', concurrency: '4', empty_ok: true, models: '["a","b"]' });
 		expect([detail.groupMembers, detail.members, detail.memberOf, detail.criticalNodes]).toEqual([null, null, ['nightly'], ['model:orders']]);
-		expect([detail.concurrency, detail.cursorType, detail.declaration]).toEqual([null, null, null]);
+		expect([detail.exclude, detail.targets, detail.cursorType]).toEqual([['stg_orders', 'audit_orders'], ['production'], 'integer']);
+		expect([detail.concurrency, detail.declaration]).toEqual([null, null]);
 		expect(toJob({ ...wire, job_key: 'nightly', kind: 'group' }, triggers, []).kind).toBe('group');
 	});
 
@@ -82,6 +92,11 @@ describe('job mapping', () => {
 			settings: {},
 			member_of: [],
 			critical_nodes: [],
+			select: null,
+			exclude: null,
+			targets: [],
+			declared_at: null,
+			cursor_type: null,
 			members: [
 				{ job_key: 'stock', waits_for: [] },
 				{ job_key: 'orders', waits_for: [] },
@@ -98,6 +113,7 @@ describe('job mapping', () => {
 		]);
 		expect(detail.groupMembers?.flatMap((m) => m.upstream.map((u) => u.source))).toEqual([null, null, null]);
 		expect(detail.members).toEqual(['stock', 'orders', 'customers', 'audit']);
+		expect([detail.select, detail.sourceFile, detail.exclude, detail.targets, detail.cursorType]).toEqual([null, null, [], null, null]);
 	});
 });
 
