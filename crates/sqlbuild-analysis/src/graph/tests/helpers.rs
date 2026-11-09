@@ -1,10 +1,11 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::assembly::project::types::ObjectKey;
 use crate::graph::errors::SelectorError;
+use crate::graph::main::attach_jobs::attach_jobs;
 use crate::graph::main::build_project_graph::build_project_graph;
 use crate::graph::main::resolve_selectors::resolve_selectors;
-use crate::graph::models::{GraphResource, ParsedSelector, ProjectGraph};
+use crate::graph::models::{GraphResource, JobSelection, ParsedSelector, ProjectGraph};
 use crate::graph::tests::test_types::SelectorFailure;
 
 type OwnedFailure = (String, String, Option<String>);
@@ -224,4 +225,43 @@ pub(super) fn path(start: &str, end: &str, upstream: bool, downstream: bool) -> 
         upstream,
         downstream,
     }
+}
+
+/// Jobs over the orders project: valid jobs, a group, and jobs whose own selection fails.
+fn orders_jobs() -> BTreeMap<String, JobSelection> {
+    let job = |select: &[&str], exclude: &[&str]| JobSelection::Job {
+        select: select.iter().map(|value| (*value).to_owned()).collect(),
+        exclude: exclude.iter().map(|value| (*value).to_owned()).collect(),
+    };
+    let group = |members: &[&str]| JobSelection::Group {
+        members: members.iter().map(|value| (*value).to_owned()).collect(),
+    };
+    BTreeMap::from([
+        ("nightly".to_owned(), job(&["orders"], &[])),
+        ("crm".to_owned(), job(&["customers"], &[])),
+        ("marts".to_owned(), job(&["orders+"], &[])),
+        (
+            "marts_without_items".to_owned(),
+            job(&["orders+"], &["order_items"]),
+        ),
+        ("daily_group".to_owned(), group(&["nightly", "crm"])),
+        ("broken".to_owned(), job(&["missing"], &[])),
+        ("nested".to_owned(), job(&["job:nightly"], &[])),
+        ("ghost_group".to_owned(), group(&["nightly", "ghost"])),
+    ])
+}
+
+/// The names `select` minus `exclude` resolves to in the orders project, with or without its jobs.
+pub(super) fn job_selection(
+    attached: bool,
+    select: &[&str],
+    exclude: &[&str],
+) -> Result<BTreeSet<String>, OwnedFailure> {
+    let mut graph: ProjectGraph = attach_jobs(
+        orders_graph(),
+        orders_jobs().into_iter().filter(|_| attached).collect(),
+    );
+    graph.jobs = graph.jobs.filter(|_| attached);
+    resolved_in(&graph, select, exclude)
+        .map(|keys| keys.into_iter().map(|(_, name)| name).collect())
 }
