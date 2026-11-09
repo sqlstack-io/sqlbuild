@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import type { ApiClient, Scope } from '$lib/api';
-import { channelMatches } from '$lib/api';
+import { channelMatches, isRefusal } from '$lib/api';
 import { app } from './app.svelte';
 
 /** How long a burst of change signals may last before one reload starts. */
@@ -89,6 +89,11 @@ export function createResource<T>(
 			},
 			(reason: unknown) => {
 				if (request !== latest) return;
+				// A refusal also drops the earlier answer, so a person whose access went sees the refusal, not old data.
+				if (isRefusal(reason)) {
+					remembered.delete(key);
+					data = undefined;
+				}
 				error = reason instanceof Error ? reason.message : String(reason);
 				loading = false;
 				done();

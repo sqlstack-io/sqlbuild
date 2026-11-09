@@ -145,3 +145,8 @@ export class ApiError extends Error {
 		this.name = 'ApiError';
 	}
 }
+
+/** The server refused the read or no longer has what it names, so an earlier answer must not stay on screen. */
+export function isRefusal(error: unknown): boolean {
+	return error instanceof ApiError && (error.status === 403 || error.status === 404);
+}
