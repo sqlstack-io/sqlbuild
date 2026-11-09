@@ -15,10 +15,14 @@ pub(crate) fn attach(
     graph.jobs = None;
     let mut resolved: BTreeMap<String, Result<Keys, SelectorError>> = BTreeMap::new();
     for (name, selection) in &catalog {
-        if let JobSelection::Job { select, exclude } = selection {
-            let keys = resolve(&graph, select, exclude).map(|keys| keys.into_iter().collect());
-            resolved.insert(name.clone(), keys);
-        }
+        let keys: Result<Keys, SelectorError> = match selection {
+            JobSelection::Job { select, exclude } => {
+                resolve(&graph, select, exclude).map(|keys| keys.into_iter().collect())
+            }
+            JobSelection::Resolved { keys } => Ok(keys.iter().cloned().collect()),
+            JobSelection::Group { .. } => continue,
+        };
+        resolved.insert(name.clone(), keys);
     }
     for (name, selection) in &catalog {
         if let JobSelection::Group { members } = selection {
