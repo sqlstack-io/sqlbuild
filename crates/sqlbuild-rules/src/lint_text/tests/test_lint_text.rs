@@ -745,6 +745,30 @@ fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_w
             )],
             expected_fault_lines: vec![],
         },
+        FormatBodiesTestCase {
+            description: "a call after a comma LATERAL keeps its arguments",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect t.a, l.value from t, lateral __table_fn(\"f\")(t.x) as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT\n  t.a,\n  l.value\nFROM t, LATERAL __table_fn(\"f\")(t.x) AS l\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a call after JOIN LATERAL keeps its arguments",
+            dialect: "snowflake",
+            relative_parts: None,
+            contents: "MODEL ();\nselect t.a from t join lateral __table_fn(\"f\")(t.x) as l on true\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT t.a\nFROM t\nJOIN LATERAL __table_fn(\"f\")(t.x) AS l\n  ON TRUE\n"
+                    .to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
     ];
 
     for test_case in test_cases {

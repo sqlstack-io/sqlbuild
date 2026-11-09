@@ -3,6 +3,8 @@
 /// Sentinel standing in for one interpolation site in lint and format SQL.
 pub const LINT_SENTINEL_PREFIX: &str = sqlclean::constants::INTERPOLATION_PLACEHOLDER_PREFIX;
 pub(crate) const SENTINEL_SUFFIX: &str = "__";
+/// The keyword before a table function call that the parser reads only as a call.
+pub(crate) const LATERAL_KEYWORD: &str = "LATERAL";
 /// An audit's relation parameter, which a `SELECT *` may read alone.
 pub(crate) const AUDIT_PARAMETER_SENTINEL_PREFIX: &str =
     sqlclean::constants::RELATION_PARAMETER_PLACEHOLDER_PREFIX;
