@@ -174,9 +174,10 @@ jobs:
                 ;;
             esac
             case "${path}" in
-              ui/*|clients/typescript/*|.github/workflows/verify.yml)
+              ui/*|clients/typescript/*|.github/workflows/verify.yml|website/src/assets/logo-light.png|website/src/assets/logo-dark.png|website/public/favicon.png)
                 # The web UI's own checks and unit tests; the wheels embed its build. It compiles
-                # against the generated control client, so client changes run them too.
+                # against the generated control client, so client changes run them too, and it
+                # imports the website's logos and favicon, so moving them fails its build.
                 ui=true
                 ;;
             esac
