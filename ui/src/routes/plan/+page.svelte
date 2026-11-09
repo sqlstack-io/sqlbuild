@@ -1,6 +1,7 @@
 <script lang="ts">
 	// Every Run button opens this page with its command. A build is planned by the location against the
 	// warehouse (`sqb plan`); other verbs show the server's dry run. Nothing is queued until Run is pressed.
+	// With a job, the command only narrows that job: Run starts a run of the job, not an ad-hoc command.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import CopyIcon from '@lucide/svelte/icons/copy';
@@ -13,7 +14,7 @@
 	import ScopeGraph from '$lib/lineage/scope-graph.svelte';
 	import { PERMISSIONS } from '$lib/platform/permission-catalog';
 	import { VERBS } from '$lib/run/command-table';
-	import { applySuggestion, commandTokens, parseCommand, suggest, withVerb, type Suggestion } from '$lib/run/command';
+	import { applySuggestion, commandTokens, jobBuildTokens, jobRunProblem, parseCommand, suggest, withVerb, type Suggestion } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
@@ -22,16 +23,36 @@
 
 	let cmd = $state(page.url.searchParams.get('cmd') ?? 'sqb build');
 	let cmdEl = $state<HTMLInputElement>();
+	/** The job this run belongs to; the command then only narrows it. */
+	let job = $state<string | null>(page.url.searchParams.get('job'));
 
 	const parts = $derived(parseCommand(cmd));
 	const verb = $derived(parts.verb);
-	const request = $derived<AdhocRunRequest>({ command: commandTokens(cmd), priority: 0 });
+	const jobProblem = $derived(job ? jobRunProblem(parts) : null);
+	const request = $derived<AdhocRunRequest>({ command: job ? jobBuildTokens(job, parts) : commandTokens(cmd), priority: 0 });
 	const requestKey = $derived(JSON.stringify(request));
-	const mayRun = $derived(app.can('run.adhoc'));
+	const mayRun = $derived(app.can(job ? 'job.run' : 'run.adhoc'));
+	const fullRefresh = $derived(parts.flags['--full-refresh'] === true);
+	/** A job run's permissions, which the server checks when Run is pressed; the dry run only checks ad-hoc ones. */
+	const jobPermissions = $derived(
+		job
+			? [
+					{ action: 'job.run' as const, allowed: app.can('job.run'), reason: null },
+					...(fullRefresh ? [{ action: 'run.rewrite_history' as const, allowed: app.can('run.rewrite_history'), reason: null }] : [])
+				]
+			: []
+	);
+
+	/** Drops the job and keeps what the command selected, as an ad-hoc command. */
+	function detachJob() {
+		if (!job) return;
+		cmd = `sqb ${jobBuildTokens(job, parts).join(' ')}`;
+		job = null;
+	}
 
 	// The command stays in the address, so a plan can be shared or reopened.
 	$effect(() => {
-		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}`;
+		const href = `/plan?cmd=${encodeURIComponent(cmd.trim())}${job ? `&job=${encodeURIComponent(job)}` : ''}`;
 		const timer = setTimeout(() => {
 			if (page.url.pathname === '/plan' && page.url.pathname + page.url.search !== href) void goto(href, { replaceState: true, keepFocus: true, noScroll: true });
 		}, 400);
@@ -84,7 +105,7 @@
 		const timer = setTimeout(async () => {
 			planning = true;
 			try {
-				const result = await app.client.planBuild(scope, commandTokens(cmd));
+				const result = await app.client.planBuild(scope, request.command);
 				if (result.plan) {
 					plan = result.plan;
 					plannedKey = key;
@@ -221,7 +242,8 @@
 
 	let copied = $state(false);
 	async function copy() {
-		await navigator.clipboard.writeText(`${cmd.trim()} --target ${app.target?.name ?? ''}`);
+		const command = job ? `sqb ${request.command.join(' ')}` : cmd.trim();
+		await navigator.clipboard.writeText(`${command} --target ${app.target?.name ?? ''}`);
 		copied = true;
 		setTimeout(() => (copied = false), 1500);
 	}
@@ -230,14 +252,21 @@
 	let launching = $state(false);
 	let launchError = $state<string | null>(null);
 	const planned = $derived(check?.verb !== 'build' || planCurrent);
-	const canLaunch = $derived(fresh && !!check?.launchable && planned);
-	const problem = $derived(checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
+	const allowed = $derived(job ? jobPermissions.every((p) => p.allowed) : !!check?.launchable);
+	const canLaunch = $derived(fresh && !check?.error && !jobProblem && allowed && planned);
+	const problem = $derived(jobProblem ?? checkError ?? (fresh ? check?.error : null) ?? (planError?.key === requestKey ? planError.message : null));
 	const blockedReason = $derived(
 		!mayRun
-			? "You don't have permission to start runs by hand in this target (run.adhoc)"
+			? job
+				? "You don't have permission to run jobs in this target (job.run)"
+				: "You don't have permission to start runs by hand in this target (run.adhoc)"
 			: !fresh
 				? undefined
-				: (check?.error ?? check?.permissions.find((p) => !p.allowed)?.reason ?? (planned ? undefined : (planError?.message ?? 'Waiting for the plan')))
+				: (check?.error ??
+					(job
+						? jobPermissions.find((p) => !p.allowed) && "You don't have permission to rebuild from scratch (run.rewrite_history)"
+						: check?.permissions.find((p) => !p.allowed)?.reason) ??
+					(planned ? undefined : (planError?.message ?? 'Waiting for the plan')))
 	);
 
 	async function launch() {
@@ -246,7 +275,10 @@
 		launching = true;
 		launchError = null;
 		try {
-			const run = await app.client.launchAdhocRun(scope, request);
+			const narrowing = { select: parts.select, exclude: parts.exclude };
+			const run = job
+				? await (fullRefresh ? app.client.launchJobFromScratch(scope, job, narrowing) : app.client.launchJob(scope, job, narrowing))
+				: await app.client.launchAdhocRun(scope, request);
 			await goto(`/runs/${run.id}`);
 		} catch (e) {
 			launchError = e instanceof Error ? e.message : String(e);
@@ -260,11 +292,18 @@
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="cmd">
-		<div class="verbs" role="group" aria-label="Command">
-			{#each VERBS as v (v.name)}
-				<button class:on={verb === v.name} onclick={() => setVerb(v.name)} title={v.description}>{v.name}</button>
-			{/each}
-		</div>
+		{#if job}
+			<span class="jobchip" data-testid="plan-job">
+				<span class="faint">Job</span><a href="/jobs/{encodeURIComponent(job)}">{job}</a>
+				<button onclick={detachJob} title="Run the command on its own, not as part of {job}" aria-label="Remove the job">×</button>
+			</span>
+		{:else}
+			<div class="verbs" role="group" aria-label="Command">
+				{#each VERBS as v (v.name)}
+					<button class:on={verb === v.name} onclick={() => setVerb(v.name)} title={v.description}>{v.name}</button>
+				{/each}
+			</div>
+		{/if}
 		<div class="line">
 			<span class="faint">$</span>
 			<input
@@ -277,7 +316,7 @@
 				onblur={() => setTimeout(() => (acOpen = false), 120)}
 				spellcheck="false"
 				aria-label="Command"
-				placeholder="sqb build --select +orders"
+				placeholder={job ? 'sqb build --exclude orders' : 'sqb build --select +orders'}
 			/>
 			<button class="copy" onclick={() => insertFlag('--')} title="Add an option to the command">＋ Option</button>
 			<button class="copy" onclick={copy} title="Copy the command, to run it with sqb yourself"><CopyIcon size={12} /> {copied ? 'Copied' : 'Copy'}</button>
@@ -373,7 +412,7 @@
 		{#if shown?.verb}
 		<aside class="rail sb-scroll" class:stale={!fresh || !!problem}>
 				<h3>Permissions</h3>
-				{#each shown.permissions as p (p.action)}
+				{#each job ? jobPermissions : shown.permissions as p (p.action)}
 					<p class="decision" data-testid="adhoc-permission">
 						<span class={p.allowed ? 'ok-text' : 'bad-text'}>{p.allowed ? '✓' : '✕'}</span>
 						<span title={p.action}>{PERMISSIONS[p.action].label}</span>
@@ -394,7 +433,7 @@
 		<div class="why">
 			{#if launchError}<span class="problem">{launchError}</span>{:else if !canLaunch && blockedReason && blockedReason !== problem}<span class="faint">{blockedReason}</span>{/if}
 		</div>
-		<GatedButton requires="run.adhoc" variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
+		<GatedButton requires={job ? 'job.run' : 'run.adhoc'} variant={canLaunch ? 'default' : 'outline'} disabled={!canLaunch} reason={blockedReason} busy={launching} onclick={launch}>▷ Run</GatedButton>
 	</div>
 </div>
 
@@ -405,6 +444,28 @@
 		gap: 14px;
 		padding: 10px 24px;
 		border-bottom: 1px solid var(--border);
+	}
+	.jobchip {
+		display: inline-flex;
+		flex-shrink: 0;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 4px 3px 9px;
+		border: 1px solid var(--border);
+		border-radius: 2px;
+		background: var(--sidebar-accent);
+		font-size: 11.5px;
+	}
+	.jobchip a {
+		font-family: var(--font-mono);
+		color: var(--foreground);
+	}
+	.jobchip button {
+		padding: 0 5px;
+		color: var(--muted-foreground);
+	}
+	.jobchip button:hover {
+		color: var(--foreground);
 	}
 	.verbs {
 		display: flex;

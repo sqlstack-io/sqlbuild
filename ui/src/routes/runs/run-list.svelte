@@ -8,7 +8,7 @@
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import RunStatusPill from '$lib/components/operate/run-status-pill.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
-	import { shortRunId } from '$lib/operate/labels';
+	import { narrowingText, shortRunId } from '$lib/operate/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { runKindLabel, runStatusTone } from '$lib/status';
 	import type { RunsState } from './state.svelte';
@@ -110,6 +110,7 @@
 						<div class="line">
 							{#if r.jobKey}
 								{@render chip('job', r.jobKey, r.jobKey, `Show only runs of ${r.jobKey}`)}
+								{#if r.narrowing}<span class="part" title="Ran part of {r.jobKey}: sqb build {narrowingText(r.narrowing)}">part</span>{/if}
 							{:else}
 								<span class="adhoc" title={d.row.selection.join(' ')}>ad hoc: <code>{d.row.selection.join(' ') || 'whole project'}</code></span>
 							{/if}
@@ -278,6 +279,10 @@
 		background: var(--sb-hover);
 	}
 	.what .chip + .chip {
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
+	.part {
 		color: var(--muted-foreground);
 		font-size: 11.5px;
 	}

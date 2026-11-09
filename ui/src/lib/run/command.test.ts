@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotNode } from '$lib/api';
-import { commandTokens, suggest, withVerb } from './command';
+import { commandTokens, jobBuildTokens, jobRunProblem, parseCommand, planHref, suggest, withVerb } from './command';
 
 const node = (key: string, kind: SnapshotNode['kind'], path: string, tags: string[] = []): SnapshotNode => ({ key, kind, group: '', tags, path, cursor: null, upstream: [] });
 
@@ -26,5 +26,21 @@ describe('the plan page command line', () => {
 
 	it('keeps the selection and only the flags the new verb accepts when switching verbs', () => {
 		expect(withVerb('sqb build --select customers --full-refresh --warehouse WH_S', 'test')).toBe('sqb test --select customers --warehouse WH_S ');
+	});
+
+	it('narrows a job run by intersecting every selector with the job, as sqb build would select it', () => {
+		expect(jobBuildTokens('nightly', parseCommand('sqb build --exclude customers'))).toEqual(['build', '--select', 'job:nightly', '--exclude', 'customers']);
+		expect(jobBuildTokens('nightly', parseCommand('sqb build orders +tag:finance --full-refresh'))).toEqual(['build', '--select', 'job:nightly,orders', 'job:nightly,+tag:finance', '--full-refresh']);
+	});
+
+	it('refuses other verbs and options a job run cannot add', () => {
+		expect(jobRunProblem(parseCommand('sqb build --exclude orders --full-refresh'))).toBeNull();
+		expect(jobRunProblem(parseCommand('sqb test orders'))).toMatch(/is a build/);
+		expect(jobRunProblem(parseCommand('sqb build --warehouse WH_S'))).toMatch(/--warehouse can't be added/);
+	});
+
+	it('opens a narrowed job run on the plan page with the job kept beside the command', () => {
+		expect(planHref([], 'build', { job: 'nightly', exclude: ['model:customers', 'seed:countries'] })).toBe(`/plan?cmd=${encodeURIComponent('sqb build --exclude customers seed:countries')}&job=nightly`);
+		expect(planHref(['model:orders'])).toBe(`/plan?cmd=${encodeURIComponent('sqb build --select orders')}`);
 	});
 });

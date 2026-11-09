@@ -776,6 +776,7 @@ export function createOperateFixtures(now: number): OperateFixtures {
 			tickScheduledFor: tick != null ? new Date(tick).toISOString() : null,
 			runKey: seed.runKey ?? null,
 			rerunOfRunId: seed.rerunOf ?? null,
+			narrowing: null,
 			requestedBy: seed.by,
 			priority: seed.priority ?? job?.priority ?? 0,
 			rewriteHistory: '--full-refresh' in flags || Object.keys(flags).some((f) => f.includes('cursor')) || '--reload' in flags,

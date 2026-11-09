@@ -46,6 +46,11 @@ describe('run mapping', () => {
 		expect(scheduler.requestedBy).toEqual({ kind: 'scheduler', name: 'system:scheduler', displayName: 'system:scheduler' });
 	});
 
+	it('keeps how a run of part of a job was narrowed, and nothing for a whole-job run', () => {
+		const [part, whole] = toRuns([wire('p', { narrowing: { select: [], exclude: ['customers'] } }), wire('w')], LOCATION);
+		expect([part.narrowing, whole.narrowing]).toEqual([{ select: [], exclude: ['customers'] }, null]);
+	});
+
 	it('counts cancelled nodes as failed and counts each run’s direct children', () => {
 		const runs = toRuns(
 			[

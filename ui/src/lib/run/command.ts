@@ -87,10 +87,28 @@ export function tokenAt(text: string, caret: number): TokenContext {
 	return { start, end, text: text.slice(start, caret), previousFlag: lastFlag };
 }
 
-/** The plan page for a command, opened by every Run button before anything runs. */
-export function planHref(selection: string[] = [], verb: LaunchVerb = 'build'): string {
-	const command = `sqb ${verb}${selection.length ? ` --select ${selection.map(selectorOf).join(' ')}` : ''}`;
-	return `/plan?cmd=${encodeURIComponent(command)}`;
+/** The plan page for a command, opened by every Run button before anything runs; with `job`, a run of that job narrowed by the command. */
+export function planHref(selection: string[] = [], verb: LaunchVerb = 'build', narrowing: { job?: string; exclude?: string[] } = {}): string {
+	const command = buildCommand({ verb, select: selection.map(selectorOf), exclude: (narrowing.exclude ?? []).map(selectorOf), flags: {} });
+	return `/plan?cmd=${encodeURIComponent(command)}${narrowing.job ? `&job=${encodeURIComponent(narrowing.job)}` : ''}`;
+}
+
+/** The only option a job run adds to the job's own settings. */
+export const JOB_RUN_FLAGS: readonly string[] = ['--full-refresh'];
+
+/** The `sqb build` command that selects what a narrowed run of `job` builds: each selector intersected with the job. */
+export function jobBuildTokens(job: string, parts: CommandParts): string[] {
+	const out = ['build', '--select', ...(parts.select.length ? parts.select.map((s) => `job:${job},${s}`) : [`job:${job}`])];
+	if (parts.exclude.length) out.push('--exclude', ...parts.exclude);
+	for (const [flag, value] of Object.entries(parts.flags)) out.push(...(value === true ? [flag] : [flag, value]));
+	return out;
+}
+
+/** Why the command cannot narrow a job run, or null. */
+export function jobRunProblem(parts: CommandParts): string | null {
+	if (parts.verb !== 'build') return `A job run is a build; remove the job to run sqb ${parts.verb}.`;
+	const other = Object.keys(parts.flags).filter((f) => !JOB_RUN_FLAGS.includes(f));
+	return other.length ? `A job run uses the job's own settings; ${other.join(', ')} can't be added. Remove the job to run it as a command.` : null;
 }
 
 /** How `sqb` names a node in a selector: seeds and sources by kind, everything else by bare name. */
