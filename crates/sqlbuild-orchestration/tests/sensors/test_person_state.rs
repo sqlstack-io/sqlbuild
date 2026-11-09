@@ -6,15 +6,17 @@ use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::models::DefaultRole;
+use crate::credentials::main::identities::create_principal::create_principal;
+use crate::credentials::models::{BuiltinRole, DefaultRole, RoleAssignmentRequest};
 use crate::credentials::tests::role_helpers::{
-    SUPPORT_ROLE, credentials, orders_grant, role_fixture,
+    SUPPORT_ROLE, assign, credentials, orders_grant, role_fixture,
 };
 use crate::declarations::main::list_triggers::list_triggers;
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::sensors::main::begin_sensor_evaluation::begin_sensor_evaluation;
 use crate::sensors::main::complete_builtin_sensor::complete_builtin_sensor;
 use crate::sensors::main::read_person_sensor::read_person_sensor;
+use crate::sensors::models::PersonSensorCursor;
 use crate::sensors::tests::helpers::{append_events, snapshot};
 use crate::sensors::tests::test_types::SensorTestCase;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -169,6 +171,46 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
                 custom.as_deref(),
                 Some("postgres://orders:[REDACTED]@warehouse.example.test/orders"),
                 "{}: a custom cursor passes through secret redaction",
+                test_case.description
+            );
+            let viewer = create_principal(store, &roles.context, "orders-viewer")
+                .await
+                .expect("viewer");
+            assign(
+                store,
+                (&roles.context, &roles.administrator),
+                RoleAssignmentRequest {
+                    principal_id: viewer,
+                    role: BuiltinRole::Viewer.into(),
+                    location_id: None,
+                    target: None,
+                    revoke: false,
+                },
+            )
+            .await;
+            let viewed = read((&roles.context, viewer), trigger.trigger_id, 1)
+                .await
+                .expect("viewer lists the target")
+                .expect("published sensor");
+            assert_eq!(
+                (
+                    viewed.cursor,
+                    viewed.evaluations[0].cursor_after.clone(),
+                    viewed
+                        .run_requests
+                        .iter()
+                        .map(|request| request.run_key.as_str())
+                        .collect::<Vec<_>>(),
+                ),
+                (
+                    Some(PersonSensorCursor {
+                        event_storage_id: 7,
+                        custom: None
+                    }),
+                    checks[0].cursor_after.clone(),
+                    vec![""],
+                ),
+                "{}: view without view.evidence sees positions but not what the sensor computed",
                 test_case.description
             );
 

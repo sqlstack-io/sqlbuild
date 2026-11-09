@@ -1994,7 +1994,7 @@ export interface components {
             role_key: string;
             target?: string | null;
         };
-        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction. */
+        /** @description The control event position built-in conditions read from, and a custom sensor's own value after secret redaction; the value needs view.evidence. */
         PersonSensorCursor: {
             custom?: string | null;
             /** Format: int64 */
@@ -2016,7 +2016,7 @@ export interface components {
             requested_at: string;
             run_count: number;
         };
-        /** @description A run key is redacted like the custom cursor it usually derives from. */
+        /** @description A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence. */
         PersonSensorRunRequest: {
             /** Format: uuid */
             evaluation_id: string;
