@@ -10,9 +10,10 @@ use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, credentials, orders_grant, role_fixture,
 };
+use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_job_run::request_job_run;
 use crate::runs::main::request_person_run::request_person_run;
-use crate::runs::models::{JobRunRequest, PersonRunRequest, RunKind, RunRequest};
+use crate::runs::models::{JobRunRequest, PersonRunRequest, RunKind, RunNarrowing, RunRequest};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
 use crate::runs::tests::test_types::{ExactKeyPlanner, JobSubsetTestCase, NarrowingDenialTestCase};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -136,6 +137,23 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                 let frozen: Option<RunRequest> = stored.first().map(|row| {
                     serde_json::from_value(json_column(&row["request_json"])).expect("frozen")
                 });
+                let listed = list_runs(store, (location_id, "development"), 50)
+                    .await
+                    .expect("runs");
+                assert_eq!(
+                    listed
+                        .iter()
+                        .find(|run| run.run_id == request.run_id)
+                        .map(|run| run.narrowing.clone()),
+                    test_case.expected_selection.map(|_| {
+                        Some(RunNarrowing {
+                            select: request.select.clone(),
+                            exclude: request.exclude.clone(),
+                        })
+                    }),
+                    "{backend:?}: {}: the run lists the selectors it was narrowed with, and nothing else it was requested with",
+                    test_case.description
+                );
                 let keys = |keys: &[&str]| -> BTreeSet<String> {
                     keys.iter().map(|key| (*key).to_owned()).collect()
                 };
