@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.203.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.202.0...v0.203.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* require run.prioritise for job runs and reruns above priority 0
+
+### Features
+
+* **contracts:** prove dynamic pivots from SQLQuack parse trees ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **orchestration:** gzip location snapshot publishes ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* parse rule facts, types and syntax trees with SQLQuack ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* require run.prioritise for job runs and reruns above priority 0 ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* run ad-hoc sqb commands from the web UI ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* show run events, statements, SQL and output to people ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **ui:** wire the platform and admin pages to the control API ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+
+
+### Bug Fixes
+
+* render SQL Server functions, schemas, merges and sources the engine accepts, and list warehouse Recall relations portably ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+* **ui:** stop a burst of control API requests on every live refresh ([7f41309](https://github.com/sqlstack-io/sqlbuild/commit/7f413098ec481f0d3d73fba5c0ae0384baaeb83f))
+
 ## [0.202.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.201.0...v0.202.0) (2026-11-08)
 
 
