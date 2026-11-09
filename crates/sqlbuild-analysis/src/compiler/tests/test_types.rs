@@ -222,3 +222,22 @@ pub(super) struct ProjectedUdfTestCase {
     pub(super) dialect: &'static str,
     pub(super) expected_call: &'static str,
 }
+
+pub(crate) struct SimpleTemplateTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) sql: &'static str,
+    pub(crate) expected_recognized: bool,
+}
+
+pub(crate) struct SimpleTemplateCorpusTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) dialect: &'static str,
+    pub(crate) expected_min_recognized: usize,
+    pub(crate) expected_mismatches: &'static [&'static str],
+}
+
+pub(crate) struct SimpleTemplateCorpusOutcome {
+    pub(crate) recognized: usize,
+    pub(crate) mismatches: Vec<String>,
+}

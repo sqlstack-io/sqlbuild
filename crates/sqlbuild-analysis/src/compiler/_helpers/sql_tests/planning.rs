@@ -39,6 +39,7 @@ use crate::compiler::_helpers::sql_tests::relation_markers::named_marker_calls;
 use crate::compiler::_helpers::sql_tests::rendering::{
     RenderRequest, render_comparison_sql, rendered_chain_steps, sql_test_parser,
 };
+use crate::compiler::_helpers::sql_tests::simple_template::simple_analysis_template;
 use crate::compiler::models::{
     SqlTestAssertionStep, SqlTestChainBatch, SqlTestChainStep, SqlTestCte, SqlTestPlan,
     SqlTestPlanBatch, SqlTestPlanBatchOutcome, SqlTestPlanFunction, SqlTestPlanPayload,
@@ -1504,11 +1505,13 @@ pub(crate) fn analysis_template(
     templates: &AnalysisTemplateCache,
 ) -> Result<Option<AnalysisTemplate>, String> {
     cached_analysis_template(query_sql, templates, || {
-        parsed_analysis_template(query_sql, reader)
+        simple_analysis_template(query_sql, reader.0.name(), reader.1)
+            .or_else(|| parsed_analysis_template(query_sql, reader))
     })
 }
 
-/// The template the parser reads whole from `query_sql`, its relation markers read as names.
+/// The template the parser reads whole from `query_sql`, its relation markers read as names; the
+/// bounded recognizer's differential oracle.
 pub(crate) fn parsed_analysis_template(
     query_sql: &str,
     (parser, patterns): (&dyn NativeDialect, &SqlTestPatterns),
