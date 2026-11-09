@@ -487,11 +487,11 @@ fn given_a_cast_to_a_bigquery_type_when_analysing_then_only_types_bigquery_lacks
             expected_findings: &[],
         },
         FindingTestCase {
-            description: "RANGE<INT64> is no BigQuery type, so its cast stays B218, unplaced",
+            description: "RANGE<INT64> is no BigQuery type, so its cast stays B218, placed at the cast",
             dialect: &BigQueryDialect,
             sql: "SELECT CAST(NULL AS RANGE<INT64>) AS span FROM orders",
             extension_functions: &[],
-            expected_findings: &[("B218", None)],
+            expected_findings: &[("B218", Some((1, 8)))],
         },
     ];
     for test_case in test_cases {

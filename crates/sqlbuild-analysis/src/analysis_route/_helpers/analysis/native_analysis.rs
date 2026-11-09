@@ -19,6 +19,7 @@ use crate::assembly::analysis_session::constants::{
     TRANSFORM_DIRECT, TRANSFORM_EXPRESSION, UNKNOWN_NULLABILITY,
 };
 use crate::assembly::analysis_session::models::{ColumnFact, LineageRow};
+use crate::semantic_validation::main::located_type_spans::located_type_spans;
 use crate::semantic_validation::main::sqlbuild_code::sqlbuild_code;
 use crate::semantic_validation::main::text_findings::text_findings;
 use crate::semantic_validation::models::DiagnosticRow;
@@ -54,12 +55,47 @@ pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
             .collect(),
         has_star: lineage.projects_star,
         star_resolved: !lineage.open_star,
-        diagnostics: statement_name_findings(statement, context)
-            .into_iter()
-            .filter_map(|finding| diagnostic_row(input, finding))
-            .chain(text_findings(input.sql, dialect.name()))
-            .collect(),
+        diagnostics: diagnostics(
+            dialect.name(),
+            input,
+            statement_name_findings(statement, context),
+        ),
     }
+}
+
+/// The findings SQLBuild reports, span-less type findings placed, then SQLBuild's own text checks.
+fn diagnostics(
+    dialect: &str,
+    input: &AnalysisInput<'_>,
+    findings: Vec<NameFinding>,
+) -> Vec<DiagnosticRow> {
+    let spans: Vec<Option<(usize, usize)>> = located_type_spans(
+        input.sql,
+        dialect,
+        &findings
+            .iter()
+            .map(|finding| {
+                (
+                    finding.code,
+                    finding.message.as_str(),
+                    finding.span.map(|span| (span.start, span.end)),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+    let text: Vec<DiagnosticRow> = text_findings(input.sql, dialect);
+    let mut rows: Vec<DiagnosticRow> = findings
+        .into_iter()
+        .zip(spans)
+        .filter_map(|(finding, span)| diagnostic_row(input, finding, span))
+        .filter(|row| {
+            !text
+                .iter()
+                .any(|own| own.code == row.code && own.start == row.start)
+        })
+        .collect();
+    rows.extend(text);
+    rows
 }
 
 /// An output column in the analysis's own type spelling, kept when the dialect can compare it.
@@ -139,7 +175,11 @@ fn referenced_source(
 }
 
 /// A finding in SQLBuild's code at its position in `input.sql`, unless SQLBuild does not report it.
-fn diagnostic_row(input: &AnalysisInput<'_>, finding: NameFinding) -> Option<DiagnosticRow> {
+fn diagnostic_row(
+    input: &AnalysisInput<'_>,
+    finding: NameFinding,
+    span: Option<(usize, usize)>,
+) -> Option<DiagnosticRow> {
     if finding.code == UNKNOWN_FUNCTION_CODE
         && input
             .extension_functions
@@ -149,10 +189,10 @@ fn diagnostic_row(input: &AnalysisInput<'_>, finding: NameFinding) -> Option<Dia
         return None;
     }
     let code: String = sqlbuild_code(finding.code)?;
-    let (line, column, start, end) = match finding.span {
-        Some(span) => {
-            let (line, column) = line_column(input.sql, span.start);
-            (Some(line), Some(column), Some(span.start), Some(span.end))
+    let (line, column, start, end) = match span {
+        Some((start, end)) => {
+            let (line, column) = line_column(input.sql, start);
+            (Some(line), Some(column), Some(start), Some(end))
         }
         None => (None, None, None, None),
     };

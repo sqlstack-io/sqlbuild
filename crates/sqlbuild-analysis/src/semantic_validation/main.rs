@@ -1,6 +1,7 @@
 //! Stable SQLBuild boundary around Polyglot schema-aware validation.
 
 pub mod diagnostics;
+pub mod located_type_spans;
 pub mod map_diagnostics;
 pub mod new_analysis_pool;
 pub mod normalize;
