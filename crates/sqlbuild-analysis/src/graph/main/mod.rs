@@ -1,3 +1,4 @@
+pub mod attach_jobs;
 pub mod build_project_graph;
 pub mod build_resources;
 pub mod downstream_edges;
