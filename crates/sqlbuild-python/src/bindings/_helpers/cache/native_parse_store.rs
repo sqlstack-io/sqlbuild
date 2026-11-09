@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use pyo3::prelude::{PyAnyMethods, PyResult, Python};
+use pyo3::prelude::{PyResult, Python};
 use sqlbuild_analysis::assembly::project::models::SyntaxCheck;
 use sqlbuild_cache::digest::main::content_digest::content_digest;
 use sqlbuild_cache::digest::main::hex_digest::hex_digest;
