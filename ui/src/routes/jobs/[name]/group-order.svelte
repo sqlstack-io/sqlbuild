@@ -20,8 +20,8 @@
 					<b>{m.jobKey}</b>
 					{#if m.upstream.length}
 						{#each m.upstream as u (u.jobKey)}
-							<span class="edge" class:after={u.source === 'after'} title={u.source === 'after' ? 'Set in the code with after=' : 'Because it reads data that job builds (lineage)'}>
-								after {u.jobKey} · {u.source === 'after' ? 'set in code' : 'uses its data'}
+							<span class="edge" class:after={u.source === 'after'} title={u.source === 'after' ? 'Set in the code with after=' : u.source === 'lineage' ? 'Because it reads data that job builds (lineage)' : 'Because it reads data that job builds, or after= in the code'}>
+								after {u.jobKey}{u.source ? ` · ${u.source === 'after' ? 'set in code' : 'uses its data'}` : ''}
 							</span>
 						{/each}
 					{:else}

@@ -8,6 +8,11 @@ pub enum WorkerError {
     Transport(#[from] reqwest::Error),
     #[error("worker API rejected the request with HTTP {0}")]
     Rejected(reqwest::StatusCode),
+    /// A server only refuses the shape of a worker's own report when it is older than the worker.
+    #[error(
+        "the control server is older than this worker and refused its run report; upgrade the server before its workers"
+    )]
+    OlderServer,
     #[error("worker heartbeat could not start: {0}")]
     Heartbeat(#[from] std::io::Error),
     #[error(transparent)]

@@ -127,6 +127,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::jobs),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}",
+            get(crate::api::_helpers::resources::person_reads::job),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/triggers",
             get(crate::api::_helpers::resources::person_reads::triggers),
         )
@@ -181,6 +185,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
         .route(
             "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output",
             get(crate::api::_helpers::resources::person_reads::run_output),
+        )
+        .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error",
+            get(crate::api::_helpers::resources::person_reads::run_node_error),
         )
         .route(
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs",

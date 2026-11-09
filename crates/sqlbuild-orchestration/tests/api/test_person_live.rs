@@ -169,6 +169,7 @@ fn given_people_with_different_roles_when_they_bootstrap_and_subscribe_then_only
                 reason: "manual verification".into(),
                 priority: 0,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &roles.context, &request)

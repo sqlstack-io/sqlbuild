@@ -63,10 +63,41 @@ describe('job mapping', () => {
 		const job = toJob(wire, triggers, [run('r-inv', 'inventory', null), run('r-ord', 'orders', null)]);
 		expect(job).toMatchObject({ key: 'orders', kind: 'job', nodeCount: 2, triggerIds: ['t-daily'], concurrencyGroups: ['warehouse_heavy'], select: null, overlap: null, priority: null });
 		expect(job.lastRun?.id).toBe('r-ord');
-		const detail = jobDetailOf(job, wire);
+		const detail = jobDetailOf(job, { ...wire, settings: { vars: '[REDACTED]', concurrency: 4, empty_ok: true, models: ['a', 'b'] }, members: [], member_of: ['nightly'], critical_nodes: ['model:orders'] });
 		expect(detail.resolvedNodes).toEqual(['model:customers', 'model:orders']);
-		expect([detail.settings, detail.concurrency, detail.memberOf, detail.cursorType]).toEqual([null, null, null, null]);
+		expect(detail.settings).toEqual({ vars: '[REDACTED]', concurrency: '4', empty_ok: true, models: '["a","b"]' });
+		expect([detail.groupMembers, detail.members, detail.memberOf, detail.criticalNodes]).toEqual([null, null, ['nightly'], ['model:orders']]);
+		expect([detail.concurrency, detail.cursorType, detail.declaration]).toEqual([null, null, null]);
 		expect(toJob({ ...wire, job_key: 'nightly', kind: 'group' }, triggers, []).kind).toBe('group');
+	});
+
+	it("steps a group's members by what they wait for, in the server's run order rather than by name", () => {
+		const wire: W['JobDetailRecord'] = {
+			job_key: 'nightly',
+			kind: 'group',
+			description: 'Everything nightly',
+			selection: [],
+			concurrency_groups: [],
+			snapshot_id: SNAPSHOT,
+			settings: {},
+			member_of: [],
+			critical_nodes: [],
+			members: [
+				{ job_key: 'stock', waits_for: [] },
+				{ job_key: 'orders', waits_for: [] },
+				{ job_key: 'customers', waits_for: ['orders'] },
+				{ job_key: 'audit', waits_for: ['customers', 'stock'] }
+			]
+		};
+		const detail = jobDetailOf(toJob(wire, [], []), wire);
+		expect(detail.groupMembers?.map((m) => [m.jobKey, m.stage, m.upstream.map((u) => u.jobKey)])).toEqual([
+			['stock', 0, []],
+			['orders', 0, []],
+			['customers', 1, ['orders']],
+			['audit', 2, ['customers', 'stock']]
+		]);
+		expect(detail.groupMembers?.flatMap((m) => m.upstream.map((u) => u.source))).toEqual([null, null, null]);
+		expect(detail.members).toEqual(['stock', 'orders', 'customers', 'audit']);
 	});
 });
 

@@ -45,6 +45,7 @@ pub(crate) async fn succeed(store: &ControlStore, claim: &RunClaim) {
                 rows_affected: Some(1),
                 error_code: None,
                 skipped_because_of: None,
+                error_message: None,
             }),
     );
     changes.push(RunChange::Finished {

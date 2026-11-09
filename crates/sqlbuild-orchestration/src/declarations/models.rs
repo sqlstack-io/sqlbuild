@@ -108,6 +108,32 @@ pub(crate) struct StoredJob {
     pub definition_json: JobDefinition,
 }
 
+/// One job or group as declared, for a person who may list the target; free-form setting values are withheld.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct JobDetailRecord {
+    pub job_key: String,
+    pub kind: crate::runs::models::RunKind,
+    pub description: String,
+    pub snapshot_id: uuid::Uuid,
+    pub selection: BTreeSet<String>,
+    pub concurrency_groups: BTreeSet<String>,
+    /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
+    pub settings: BTreeMap<String, serde_json::Value>,
+    /// A group's member jobs in run order; empty for a job.
+    pub members: Vec<JobMember>,
+    /// The groups this job belongs to.
+    pub member_of: BTreeSet<String>,
+    /// Selected nodes whose failure stops a group.
+    pub critical_nodes: BTreeSet<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct JobMember {
+    pub job_key: String,
+    /// Members this one waits for, from lineage and from the group's `after`.
+    pub waits_for: BTreeSet<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TriggerRecord {
     pub trigger_id: uuid::Uuid,

@@ -72,6 +72,7 @@ fn given_a_published_job_when_requested_and_retried_after_redeploy_then_audit_an
                     start: "2026-07-03T01:17:23+05:30".parse().expect("start"),
                     end: "2026-07-04T01:17:23+05:30".parse().expect("end"),
                 }),
+                full_refresh: false,
             };
             for invalid in [
                 JobRunRequest {

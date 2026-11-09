@@ -91,7 +91,8 @@ pub(crate) fn execution_scopes(
         .collect()
 }
 
-fn rewrites_history(request: &RunRequest, executions: &[RunRequest]) -> bool {
+/// A window, a full refresh, a cursor setting or an ad-hoc destructive flag on any of `executions`.
+pub(in crate::runs) fn rewrites_history(request: &RunRequest, executions: &[RunRequest]) -> bool {
     if request.window.is_some() {
         return true;
     }

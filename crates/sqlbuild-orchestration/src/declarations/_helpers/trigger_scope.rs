@@ -45,6 +45,7 @@ pub(crate) async fn trigger_scope(
         reason: request.reason.clone(),
         priority: 0,
         window: None,
+        full_refresh: false,
     };
     let (transaction, frozen) = frozen_job_request(transaction, context, &job).await?;
     let (transaction, nodes) =

@@ -22,6 +22,7 @@ import type {
 	RunDetail,
 	RunEventPage,
 	RunListQuery,
+	RunNodeError,
 	RunOutputLine,
 	RunRowPage,
 	RunRowQuery,
@@ -94,6 +95,8 @@ export interface ApiClient extends PlatformApi {
 	/** One statement's SQL, fetched when its row is expanded. `view.sql` */
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql>;
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]>;
+	/** One failed node's error text, fetched when its row is expanded. `view.evidence` on the node */
+	getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError>;
 	/** Queued runs in claim order, with why each one waits. */
 	listQueue(scope: Scope): Promise<QueueEntry[]>;
 	timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline>;

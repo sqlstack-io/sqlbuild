@@ -8,6 +8,7 @@ Online: https://sqlbuild.com/docs/cli/server/
 
 ## Contents
 
+- Upgrade
 - Set retention
 - Grant roles to OIDC groups (beta)
 - Inspect published SQL
@@ -21,6 +22,17 @@ sqb server
 ```
 
 Use `sqb server --help` for service, authentication and launcher options.
+
+## Upgrade
+
+Upgrade the server first, then the locations and workers that connect to it. A worker newer than
+its server can send a run report the server cannot read. The worker then stops with:
+
+```text
+the control server is older than this worker and refused its run report; upgrade the server before its workers
+```
+
+Upgrade the server to the worker's release or newer, then rerun the run.
 
 ## Set retention
 

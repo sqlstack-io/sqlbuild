@@ -210,13 +210,23 @@ export type RunNode = {
 	rowsAffected: number | null;
 	errorCode: string | null;
 	errorMessage: string | null;
-	/** Where in the project the failure points, e.g. the model file and line of the failing statement. */
-	errorLocation: { file: string; line: number } | null;
+	/** Where in the project the failure points: the model file, and the line when it is known. */
+	errorLocation: { file: string; line: number | null } | null;
 	/** Full error text (warehouse message, statement, trace); `errorMessage` is its first line. */
 	errorDetail: string | null;
 	skippedBecauseOf: SkippedBecauseOf | null;
 	/** Node failure stops the whole group (`critical = true`). */
 	critical: boolean;
+};
+
+/** A failed node's error, read on request because it can quote warehouse data. `view.evidence` on the node */
+export type RunNodeError = {
+	nodeKey: string;
+	errorCode: string | null;
+	/** Redacted and cut to 2,000 characters by the server; null when none was recorded. */
+	message: string | null;
+	/** The node's file, relative to the project root. */
+	file: string | null;
 };
 
 export type RunEdge = { from: string; to: string };
@@ -526,14 +536,14 @@ export type ConcurrencyGroup = {
 
 export type JobGroupMember = {
 	jobKey: string;
-	/** Jobs this member waits for: lineage-derived plus declared `after`. */
-	upstream: { jobKey: string; source: 'lineage' | 'after' }[];
+	/** Jobs this member waits for: lineage-derived plus declared `after`; null where the cause isn't reported. */
+	upstream: { jobKey: string; source: 'lineage' | 'after' | null }[];
 	/** Position in the derived order; members in the same stage run side by side. */
 	stage: number;
 };
 
 export type JobDetail = Job & {
-	/** Null where the server doesn't report it, as for `settings`, `concurrency`, `groupMembers` and `memberOf`. */
+	/** Null where the server doesn't report it, as for `declaration`, `concurrency` and `targets`. */
 	declaration: { sourceFile: string; line: number; code: string } | null;
 	exclude: string[];
 	/** Settings are CLI flags validated against the command table. */

@@ -91,6 +91,7 @@ fn given_refused_requests_when_people_send_them_then_no_node_is_named_and_unknow
                 reason: "Refresh orders".into(),
                 priority: 0,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &roles.context, &queued)

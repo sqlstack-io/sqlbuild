@@ -140,6 +140,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         reason: "Refresh order totals".into(),
                         priority: 0,
                         window: None,
+                        full_refresh: false,
                     };
                     assert!(
                         matches!(

@@ -17,7 +17,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -36,11 +36,13 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunStatements',
 	'getStatementSql',
 	'listRunOutput',
+	'getRunNodeError',
 	'cancelRun',
 	'rerunRun',
 	'listJobs',
 	'getJob',
 	'launchJob',
+	'launchJobFromScratch',
 	'listTriggers',
 	'getTrigger',
 	'setTriggerStates',
@@ -235,6 +237,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	// The same for run output, which needs view.evidence on every node the run selected.
 	let evidenceLocations = new Set<string>();
 	const outputRefused = new Set<string>();
+	// A node's error text needs view.evidence on that node alone.
+	const errorRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -294,6 +298,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
 		},
+		async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
+			const refusal = `${scope.locationId}|${runId}|${nodeKey}`;
+			if (!evidenceLocations.has(scope.locationId) || errorRefused.has(refusal)) throw new ApiError("You may not view this node's error text", 403);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error', {
+				params: { path: { ...runPath(scope, runId), node_key: nodeKey } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) errorRefused.add(refusal);
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { nodeKey: data.node_key, errorCode: data.error_code ?? null, message: data.message ?? null, file: data.path ?? null };
+		},
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
@@ -317,21 +332,22 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return jobs.map((job) => toJob(job, triggers, runs));
 		},
 		async getJob(scope: Scope, key: string): Promise<JobDetail | null> {
-			const [jobs, triggers, runs] = await Promise.all([listedJobs(scope), triggersOf(scope), recentRuns(scope)]);
-			const wire = jobs.find((job) => job.job_key === key);
-			return wire ? jobDetailOf(toJob(wire, triggers, runs), wire) : null;
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const [read, triggers, runs] = await Promise.all([
+				http.GET('/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}', { params: { path: { location_id: locationId, target, job_key: key } } }),
+				triggersOf(scope),
+				recentRuns(scope)
+			]);
+			const { data, error, response } = read;
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 404) return null;
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return jobDetailOf(toJob(data, triggers, runs), data);
 		},
 		/** A window makes it a backfill, which the server also checks against `run.rewrite_history`. */
-		async launchJob(scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> {
-			const { locationId, target } = parseLocationKey(scope.locationId);
-			const window = options?.window ? runWindowOf(options.window) : undefined;
-			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason: window ? 'Backfill started from the web UI' : 'Started from the web UI', window };
-			const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
-			if (response.status === 401) onUnauthorized();
-			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
-			return requireRun(scope, body.run_id);
-		},
+		launchJob: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, false),
+		/** The server checks a full refresh against `run.rewrite_history` and refuses it with a window. */
+		launchJobFromScratch: (scope: Scope, key: string, options?: JobLaunchOptions): Promise<Run> => startJob(scope, key, options, true),
 		async listCatalogNodes(scope: Scope): Promise<CatalogNode[]> {
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/nodes', { params: { path: { location_id: locationId, target } } });
@@ -754,6 +770,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const listed = toRuns(wires, scope.locationId);
 		const index = listed.findIndex((r) => r.id === runId);
 		return index < 0 ? null : { run: listed[index], wire: wires[index], listed };
+	}
+
+	/** A window makes it a backfill; the server checks either against `run.rewrite_history` and refuses both together. */
+	async function startJob(scope: Scope, key: string, options: JobLaunchOptions | undefined, fullRefresh: boolean): Promise<Run> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const window = options?.window ? runWindowOf(options.window) : undefined;
+		const reason = fullRefresh ? 'Full refresh started from the web UI' : window ? 'Backfill started from the web UI' : 'Started from the web UI';
+		const body = { run_id: crypto.randomUUID(), location_id: locationId, target, job_key: key, priority: 0, reason, window, full_refresh: fullRefresh || undefined };
+		const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+		inFlight.clear();
+		if (response.status === 401) onUnauthorized();
+		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+		return requireRun(scope, body.run_id);
 	}
 
 	async function requireRun(scope: Scope, runId: string): Promise<Run> {

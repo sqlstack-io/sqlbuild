@@ -176,6 +176,7 @@ fn given_independent_http_observers_when_committed_state_changes_then_scoped_sse
                 reason: "manual verification".into(),
                 priority: 0,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &audit, &request)

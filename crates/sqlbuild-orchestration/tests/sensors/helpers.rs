@@ -169,6 +169,7 @@ pub(crate) async fn finish_run(
             reason: "Exercise terminal sensor scope".into(),
             priority: 10,
             window: None,
+            full_refresh: false,
         },
     )
     .await
@@ -215,6 +216,7 @@ pub(crate) async fn finish_claimed_run(
             rows_affected: None,
             error_code: None,
             skipped_because_of: None,
+            error_message: None,
         });
     }
     for change in changes {

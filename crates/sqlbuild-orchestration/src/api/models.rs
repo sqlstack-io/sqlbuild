@@ -32,7 +32,9 @@ use crate::api::_helpers::resources::{
     person_reads::run_statements,
     person_reads::run_statement_sql,
     person_reads::run_output,
+    person_reads::run_node_error,
     person_reads::jobs,
+    person_reads::job,
     person_reads::triggers,
     person_reads::ticks,
     person_reads::snapshots,
@@ -130,6 +132,14 @@ pub(crate) struct CheckResultPath {
     pub(crate) target: String,
     pub(crate) binding_key: String,
     pub(crate) event_id: uuid::Uuid,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunNodePath {
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) run_id: uuid::Uuid,
+    pub(crate) node_key: String,
 }
 
 #[derive(Debug, Deserialize)]

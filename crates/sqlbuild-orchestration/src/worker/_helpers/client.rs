@@ -3,6 +3,7 @@
 use sqlbuild_recall::records::models::OutputChunk;
 use uuid::Uuid;
 
+use crate::api::errors::ClientError;
 use crate::api::main::client_response::client_response;
 use crate::api::models::{HeartbeatResponse, MutationResponse};
 use crate::runs::models::{OutputPublication, RunChange, RunChangeRequest, RunExecution};
@@ -42,7 +43,13 @@ impl WorkerClient {
                 .post(format!("{}events", self.run_url))
                 .json(&request),
         )
-        .await?;
+        .await
+        .map_err(|error| match error {
+            ClientError::Rejected(reqwest::StatusCode::UNPROCESSABLE_ENTITY) => {
+                WorkerError::OlderServer
+            }
+            other => other.into(),
+        })?;
         Ok(result.applied)
     }
 

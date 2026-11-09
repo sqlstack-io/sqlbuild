@@ -4,6 +4,7 @@ use axum::routing::get;
 use axum::{Extension, Json, Router, middleware};
 
 use crate::api::_helpers::authentication::{bearer::local_request, configure::configure};
+use crate::api::_helpers::resources::server_errors::generic_server_errors;
 use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
@@ -79,10 +80,11 @@ fn development_application(
     address: std::net::SocketAddr,
 ) -> Router {
     let application = serve_ui(application, UI_ASSETS);
-    match scope {
+    let application = match scope {
         Some(scope) => application
             .layer(Extension(scope))
             .layer(middleware::from_fn_with_state(address, local_request)),
         None => application,
-    }
+    };
+    application.layer(middleware::map_response(generic_server_errors))
 }

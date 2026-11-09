@@ -25,7 +25,8 @@ use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::output_helpers::{chunk, output_contract};
 use crate::api::tests::recall_helpers::recall_contract;
 use crate::api::tests::test_types::{
-    ApiContractTestCase, TestApi, WorkerDeadlineTestCase, WorkerRedirectTestCase,
+    ApiContractTestCase, OlderNodeReport, OlderServerReportTestCase, TestApi,
+    WorkerDeadlineTestCase, WorkerRedirectTestCase,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{queue, request, snapshot};
@@ -198,6 +199,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                         rows_affected: Some(7),
                         error_code: None,
                         skipped_because_of: None,
+                        error_message: None,
                     },
                 )
                 .await
@@ -385,6 +387,87 @@ fn given_a_credentialed_worker_when_the_server_redirects_then_the_redirect_is_no
             stop_api(api).await;
         });
     }
+}
+
+#[test]
+fn given_an_older_server_when_a_worker_reports_error_text_then_the_refusal_asks_for_a_server_upgrade()
+ {
+    let test_cases = [
+        OlderServerReportTestCase {
+            description: "a report without error text keeps working",
+            error_message: None,
+            expected_upgrade_refusal: false,
+        },
+        OlderServerReportTestCase {
+            description: "error text the older server cannot read names the upgrade order",
+            error_message: Some("Conversion Error: could not convert 'n/a' to INT32"),
+            expected_upgrade_refusal: true,
+        },
+    ];
+    run(async {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("isolated older server");
+        let url = format!("http://{}", listener.local_addr().expect("address"));
+        let application = Router::new().route(
+            "/api/runs/{run_id}/events",
+            axum::routing::post(|axum::Json(_): axum::Json<OlderNodeReport>| async {
+                axum::Json(serde_json::json!({"applied": true}))
+            }),
+        );
+        let (shutdown, signal) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            axum::serve(listener, application)
+                .with_graceful_shutdown(async {
+                    let _ = signal.await;
+                })
+                .await
+                .map_err(ControlError::from)
+        });
+        let api = TestApi {
+            url,
+            shutdown,
+            task,
+        };
+        let client = connect_worker(
+            &api.url,
+            "synthetic-worker-bearer",
+            (Uuid::now_v7(), Uuid::now_v7()),
+        )
+        .expect("worker client");
+        for test_case in test_cases {
+            let reported = client
+                .report(
+                    Uuid::now_v7(),
+                    RunChange::NodeFinished {
+                        node_key: "model:orders".into(),
+                        outcome: NodeOutcome::Failed,
+                        rows_affected: None,
+                        error_code: Some("R002".into()),
+                        skipped_because_of: None,
+                        error_message: test_case.error_message.map(str::to_owned),
+                    },
+                )
+                .await;
+            let message = reported.as_ref().err().map(ToString::to_string);
+            assert_eq!(
+                (
+                    reported.is_ok(),
+                    matches!(reported, Err(WorkerError::OlderServer)),
+                    message
+                        .is_some_and(|text| text.contains("upgrade the server before its workers")),
+                ),
+                (
+                    !test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal
+                ),
+                "{}",
+                test_case.description
+            );
+        }
+        stop_api(api).await;
+    });
 }
 
 #[test]
