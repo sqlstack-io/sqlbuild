@@ -1,4 +1,4 @@
-"""E2E coverage of Snowflake star outputs, which fold to upper case, against lowercase contracts."""
+"""E2E coverage of Snowflake star outputs, named as the upstream query writes them, against lowercase contracts."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ _CONTRACT: str = "contract enforced, columns (order_id (type INT), status (type 
             description="an undeclared column a star adds is still reported",
             upstream_columns="1 AS order_id, CAST('a' AS VARCHAR) AS status, 2 AS extra",
             expected_exit_code=1,
-            expected_k005_columns=("EXTRA",),
+            expected_k005_columns=("extra",),
         ),
     ],
     ids=lambda case: case.description,

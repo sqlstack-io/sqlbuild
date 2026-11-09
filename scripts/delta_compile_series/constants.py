@@ -98,3 +98,8 @@ DOUBLE_COLUMN: str = "quantity_000 (type DOUBLE"
 FLOAT_COLUMN: str = "quantity_000 (type FLOAT"
 DOUBLE_CAST: str = "AS DOUBLE) AS quantity_000"
 FLOAT_CAST: str = "AS FLOAT) AS quantity_000"
+TSQL_ADAPTER: str = "sqlserver"
+TSQL_SPELLINGS: tuple[tuple[str, str], ...] = (
+    ("UNION ALL BY NAME", "UNION ALL"),
+    ("AS DOUBLE)", "AS FLOAT)"),
+)
