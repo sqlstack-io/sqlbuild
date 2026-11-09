@@ -16,7 +16,7 @@ import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent
 import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
-import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
+import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
@@ -35,6 +35,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getRun',
 	'getRunDetail',
 	'listQueue',
+	'navCounts',
 	'timeline',
 	'listRunEvents',
 	'listRunStatements',
@@ -289,6 +290,18 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return detail;
 		},
 		listQueue: (scope: Scope): Promise<QueueEntry[]> => queueEntries(scope),
+		async navCounts(scope: Scope): Promise<NavCounts> {
+			// The nodes listing goes first: a person who can't list the whole target gets one audited refusal, not five.
+			const nodes = await implemented.listCatalogNodes(scope);
+			const [checks, runs, triggers, events] = await Promise.all([implemented.listChecks(scope), listedRuns(scope), listedTriggers(scope), problems()]);
+			return {
+				catalogNodes: nodes.length,
+				failingChecks: checks.filter((c) => c.latest && ['fail', 'error', 'warn'].includes(c.latest.outcome)).length,
+				activeRuns: toRuns(runs, scope.locationId).filter((r) => !r.parentRunId && isActiveRun(r.status)).length,
+				pausedTriggers: triggers.filter((t) => t.status === 'paused').length,
+				activePlatformEvents: toPlatformEvents(events, Date.now()).filter((e) => e.active).length
+			};
+		},
 		async timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline> {
 			// Runs back to the window's start, at most ten windows; each schedule's recent ticks for covered markers.
 			const reached = (w: Wire['RunRecord'][][]) => w.length >= 10 || (w.at(-1)?.at(-1)?.queued_at ?? '') < window.since;
