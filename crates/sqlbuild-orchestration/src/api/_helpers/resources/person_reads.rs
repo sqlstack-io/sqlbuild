@@ -1,4 +1,4 @@
-//! Person reads of run nodes, node run history, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
+//! Person reads of run nodes and their errors, node run history, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -15,8 +15,10 @@ use crate::platform::main::read_person_location_health::read_person_location_hea
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::models::{LocationHealthObservation, PlatformProblems};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
+use crate::runs::main::read_person_run_node_error::read_person_run_node_error;
 use crate::runs::models::{
-    NodeRunRecord, RunEventRecord, RunNodeRecord, RunOutput, RunStatementRecord, RunStatementSql,
+    NodeRunRecord, RunEventRecord, RunNodeError, RunNodeRecord, RunOutput, RunStatementRecord,
+    RunStatementSql,
 };
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
@@ -188,6 +190,27 @@ pub(crate) async fn run_statement_sql(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("statement not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error", operation_id = "readPersonRunNodeError",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), ("node_key" = String, Path)),
+    responses((status = 200, body = RunNodeError), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on the node"),
+        (status = 404, description = "Node not found in this run")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_node_error(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Path((location_id, target, run_id, node_key)): Path<(Uuid, String, Uuid, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<RunNodeError>, ApiError> {
+    read_person_run_node_error(
+        &store,
+        (&context, principal),
+        (location_id, &target, run_id, &node_key),
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("node not found in this run"))
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output", operation_id = "readPersonRunOutput",

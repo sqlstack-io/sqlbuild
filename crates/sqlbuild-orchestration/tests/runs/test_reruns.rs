@@ -142,6 +142,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                         error_code: None,
                         skipped_because_of: (outcome == NodeOutcome::Skipped)
                             .then(|| "orders".into()),
+                        error_message: None,
                     });
                 }
                 changes.push(RunChange::Finished {

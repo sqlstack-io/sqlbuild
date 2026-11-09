@@ -617,3 +617,57 @@ describe('getCatalogNode', () => {
 		expect(paths.filter((p) => p.endsWith('/sql'))).toHaveLength(1);
 	});
 });
+
+describe('node error text', () => {
+	const RUN = '0191f0ee-0000-7000-8000-000000000001';
+
+	/** Evidence holds on orders but not on customers, as for a person whose grant covers one node. */
+	function serve(actions: string[]) {
+		const paths: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = decodeURIComponent(new URL(request.url).pathname);
+				paths.push(path);
+				if (path.endsWith('/bootstrap')) {
+					return Response.json({ login_mode: 'password', access: { name: 'cara', principal_id: 'p', actions: [], locations: [{ location_id: '0191f0aa-orders', name: 'Orders', target: 'development', actions }] } });
+				}
+				if (path.endsWith(`/runs/${RUN}/nodes/model:orders/error`)) {
+					return Response.json({ node_key: 'model:orders', error_code: 'T002', message: 'Conversion Error: password=[REDACTED]\nLINE 3', path: 'models/orders.sql' });
+				}
+				return Response.json({ error: 'missing view.evidence permission' }, { status: 403 });
+			})
+		);
+		return paths;
+	}
+
+	it('reads one node by its own key and maps the file', async () => {
+		const paths = serve(['view', 'view.evidence']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		expect(await client.getRunNodeError(ORDERS, RUN, 'model:orders')).toEqual({
+			nodeKey: 'model:orders',
+			errorCode: 'T002',
+			message: 'Conversion Error: password=[REDACTED]\nLINE 3',
+			file: 'models/orders.sql'
+		});
+		expect(paths.at(-1)).toBe(`/api/control/locations/0191f0aa-orders/targets/development/runs/${RUN}/nodes/model:orders/error`);
+	});
+
+	it('asks for a refused node once, so each audited refusal happens only once', async () => {
+		const paths = serve(['view', 'view.evidence']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		for (let i = 0; i < 2; i++) await expect(client.getRunNodeError(ORDERS, RUN, 'model:customers')).rejects.toMatchObject({ status: 403 });
+		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(1);
+	});
+
+	it('sends no request where the location grants no evidence', async () => {
+		const paths = serve(['view']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		await expect(client.getRunNodeError(ORDERS, RUN, 'model:orders')).rejects.toMatchObject({ status: 403 });
+		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(0);
+	});
+});

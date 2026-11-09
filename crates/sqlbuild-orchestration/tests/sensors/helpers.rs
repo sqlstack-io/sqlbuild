@@ -215,6 +215,7 @@ pub(crate) async fn finish_claimed_run(
             rows_affected: None,
             error_code: None,
             skipped_because_of: None,
+            error_message: None,
         });
     }
     for change in changes {

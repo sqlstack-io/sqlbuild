@@ -206,6 +206,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     rows_affected: None,
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
             ];
             for change in changes {
@@ -304,6 +305,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     rows_affected: None,
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
             ] {
                 change_run(

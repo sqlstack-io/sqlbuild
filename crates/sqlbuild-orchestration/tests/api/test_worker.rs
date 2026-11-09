@@ -198,6 +198,7 @@ fn given_a_claimed_run_when_a_worker_connects_then_verification_precedes_start_a
                         rows_affected: Some(7),
                         error_code: None,
                         skipped_because_of: None,
+                        error_message: None,
                     },
                 )
                 .await

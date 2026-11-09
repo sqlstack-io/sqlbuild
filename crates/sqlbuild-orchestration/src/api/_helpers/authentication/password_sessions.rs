@@ -183,6 +183,10 @@ pub(crate) fn person_routes() -> Router<ControlStore> {
             get(crate::api::_helpers::resources::person_reads::run_output),
         )
         .route(
+            "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error",
+            get(crate::api::_helpers::resources::person_reads::run_node_error),
+        )
+        .route(
             "/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs",
             get(crate::api::_helpers::resources::person_reads::node_runs),
         )

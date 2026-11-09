@@ -24,6 +24,8 @@ mod test_groups;
 mod test_lifecycle;
 #[path = "test_monitor.rs"]
 mod test_monitor;
+#[path = "test_node_errors.rs"]
+mod test_node_errors;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_requests.rs"]

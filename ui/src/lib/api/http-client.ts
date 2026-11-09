@@ -17,7 +17,7 @@ import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -36,6 +36,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunStatements',
 	'getStatementSql',
 	'listRunOutput',
+	'getRunNodeError',
 	'cancelRun',
 	'rerunRun',
 	'listJobs',
@@ -235,6 +236,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	// The same for run output, which needs view.evidence on every node the run selected.
 	let evidenceLocations = new Set<string>();
 	const outputRefused = new Set<string>();
+	// A node's error text needs view.evidence on that node alone.
+	const errorRefused = new Set<string>();
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -293,6 +296,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 403) return [];
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toRunOutput(data);
+		},
+		async getRunNodeError(scope: Scope, runId: string, nodeKey: string): Promise<RunNodeError> {
+			const refusal = `${scope.locationId}|${runId}|${nodeKey}`;
+			if (!evidenceLocations.has(scope.locationId) || errorRefused.has(refusal)) throw new ApiError("You may not view this node's error text", 403);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error', {
+				params: { path: { ...runPath(scope, runId), node_key: nodeKey } }
+			});
+			if (response.status === 401) onUnauthorized();
+			if (response.status === 403) errorRefused.add(refusal);
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return { nodeKey: data.node_key, errorCode: data.error_code ?? null, message: data.message ?? null, file: data.path ?? null };
 		},
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };

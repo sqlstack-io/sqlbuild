@@ -125,6 +125,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                     rows_affected: Some(11),
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Success,

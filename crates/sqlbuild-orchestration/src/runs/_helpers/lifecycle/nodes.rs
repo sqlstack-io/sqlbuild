@@ -23,6 +23,7 @@ pub(crate) async fn project_node(
             rows_affected,
             error_code,
             skipped_because_of,
+            ..
         } => (
             node_key,
             outcome.as_str(),

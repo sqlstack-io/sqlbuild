@@ -578,6 +578,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunNodeError"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output": {
         parameters: {
             query?: never;
@@ -2011,6 +2027,8 @@ export interface components {
             node_key: string;
         } | {
             error_code?: string | null;
+            /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
+            error_message?: string | null;
             /** @enum {string} */
             kind: "node_finished";
             node_key: string;
@@ -2114,6 +2132,15 @@ export interface components {
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
+        /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
+        RunNodeError: {
+            error_code?: string | null;
+            /** @description Null when the worker reported none or the run's history has been pruned. */
+            message?: string | null;
+            node_key: string;
+            /** @description Relative to the project root, with `/` separators; null when the run's snapshot is gone. */
+            path?: string | null;
+        };
         RunNodeRecord: {
             /** Format: date-time */
             ended_at?: string | null;
@@ -4063,6 +4090,53 @@ export interface operations {
                 };
             };
             /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunNodeError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunNodeError"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on the node */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Node not found in this run */
             404: {
                 headers: {
                     [name: string]: unknown;

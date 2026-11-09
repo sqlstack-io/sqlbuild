@@ -4289,6 +4289,7 @@ dependencies = [
  "openidconnect",
  "proptest",
  "rcgen",
+ "regex",
  "reqwest",
  "rusqlite",
  "serde",

@@ -343,6 +343,17 @@ pub struct RunErrorText {
     pub message: String,
 }
 
+/// A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct RunNodeError {
+    pub node_key: String,
+    pub error_code: Option<String>,
+    /// Null when the worker reported none or the run's history has been pruned.
+    pub message: Option<String>,
+    /// Relative to the project root, with `/` separators; null when the run's snapshot is gone.
+    pub path: Option<String>,
+}
+
 /// One build attempt of a node by a run in this target; the same metadata as the run's node list.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NodeRunRecord {
@@ -428,6 +439,13 @@ pub enum RunChange {
         rows_affected: Option<i64>,
         error_code: Option<String>,
         skipped_because_of: Option<String>,
+        /// Redacted and bounded on the way in, whoever sends it; absent from older workers.
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "crate::runs::_helpers::lifecycle::error_text::bounded_error_text"
+        )]
+        error_message: Option<String>,
     },
     /// Observational attached-check facts never expand the frozen execution selection.
     CheckStarted {

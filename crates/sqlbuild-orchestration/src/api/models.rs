@@ -32,6 +32,7 @@ use crate::api::_helpers::resources::{
     person_reads::run_statements,
     person_reads::run_statement_sql,
     person_reads::run_output,
+    person_reads::run_node_error,
     person_reads::jobs,
     person_reads::triggers,
     person_reads::ticks,
