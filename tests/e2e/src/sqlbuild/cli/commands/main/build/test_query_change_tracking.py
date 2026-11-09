@@ -21,6 +21,48 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
     table_exists,
 )
 
+_OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
+    "sqlbuild_project.toml": dedent(
+        """
+        name = "older_scheme_project"
+        adapter = "duckdb"
+
+        [connection]
+        database = "regression.duckdb"
+
+        [defaults]
+        materialized = "table"
+        """
+    ).strip()
+    + "\n",
+    "sources/raw.yml": dedent(
+        """
+        sources:
+          - name: raw_orders
+            description: Test source raw_orders.
+            schema: main
+            table: raw_orders
+        """
+    ).strip()
+    + "\n",
+    "models/stg_orders.sql": dedent(
+        """
+        MODEL (description "Test model stg_orders.");
+
+        SELECT id AS order_id, amount_cents FROM __source("raw_orders")
+        """
+    ).strip()
+    + "\n",
+    "models/fact_orders.sql": dedent(
+        """
+        MODEL (description "Test model fact_orders.");
+
+        SELECT order_id, amount_cents AS line_total_cents FROM __ref("stg_orders")
+        """
+    ).strip()
+    + "\n",
+}
+
 
 @pytest.mark.parametrize(
     "test_case",
@@ -193,49 +235,6 @@ def test_given_unchanged_project_when_planning_after_build_then_models_are_not_q
     model_name: str
     for model_name in test_case.expected_unchanged_models:
         assert reasons_by_name[model_name] != "query_changed"
-
-
-_OLDER_SCHEME_PROJECT_FILES: dict[str, str] = {
-    "sqlbuild_project.toml": dedent(
-        """
-        name = "older_scheme_project"
-        adapter = "duckdb"
-
-        [connection]
-        database = "regression.duckdb"
-
-        [defaults]
-        materialized = "table"
-        """
-    ).strip()
-    + "\n",
-    "sources/raw.yml": dedent(
-        """
-        sources:
-          - name: raw_orders
-            description: Test source raw_orders.
-            schema: main
-            table: raw_orders
-        """
-    ).strip()
-    + "\n",
-    "models/stg_orders.sql": dedent(
-        """
-        MODEL (description "Test model stg_orders.");
-
-        SELECT id AS order_id, amount_cents FROM __source("raw_orders")
-        """
-    ).strip()
-    + "\n",
-    "models/fact_orders.sql": dedent(
-        """
-        MODEL (description "Test model fact_orders.");
-
-        SELECT order_id, amount_cents AS line_total_cents FROM __ref("stg_orders")
-        """
-    ).strip()
-    + "\n",
-}
 
 
 @pytest.mark.parametrize(

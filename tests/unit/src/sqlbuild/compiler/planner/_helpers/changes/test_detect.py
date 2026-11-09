@@ -440,8 +440,7 @@ def test_given_model_and_snapshot_when_detecting_changes_then_returns_expected(
     assert (
         result.recorded_build_relation_missing == test_case.expected_recorded_build_relation_missing
     )
-    if test_case.expected_definition_hash is not None:
-        assert result.fingerprint_definition_hash == test_case.expected_definition_hash
+    assert test_case.expected_definition_hash in (None, result.fingerprint_definition_hash)
 
 
 @pytest.mark.parametrize(

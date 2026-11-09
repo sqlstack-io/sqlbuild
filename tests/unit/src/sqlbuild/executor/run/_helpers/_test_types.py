@@ -505,3 +505,4 @@ class UntypedSchemaChangeTestCase:
     target_type: str
     delta_type: str
     expected_error: str | None
+    expected_statements: tuple[str, ...] = ()

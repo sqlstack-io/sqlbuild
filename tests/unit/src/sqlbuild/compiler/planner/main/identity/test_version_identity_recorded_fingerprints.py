@@ -26,10 +26,6 @@ _ORDERS_SQL: str = "SELECT 1 AS order_id"
 _SUMMARY_SQL: str = 'SELECT count(*) AS orders FROM __ref("orders")'
 
 
-def _old_scheme_hash(name: str) -> str:
-    return f"old_scheme_{name}"
-
-
 @pytest.mark.parametrize(
     "test_case",
     [
@@ -65,7 +61,7 @@ def test_given_old_scheme_records_when_hashing_graph_then_only_unchanged_models_
                 name=name,
                 node_type="model",
                 definition=definition,
-                definition_hash=_old_scheme_hash(name),
+                definition_hash=f"old_scheme_{name}",
             )
             for name, definition in test_case.recorded_definitions.items()
         }
@@ -83,11 +79,10 @@ def test_given_old_scheme_records_when_hashing_graph_then_only_unchanged_models_
         "orders_summary": test_case.summary_sql,
     }
     for name, query_sql in queries.items():
-        query_fingerprint: str = (
-            _old_scheme_hash(name)
-            if name in test_case.expected_kept
-            else compute_query_hash(query_sql=query_sql, dialect=None)
-        )
+        query_fingerprint: str = {
+            True: f"old_scheme_{name}",
+            False: compute_query_hash(query_sql=query_sql, dialect=None),
+        }[name in test_case.expected_kept]
         expected: str = hashlib.sha256(
             f"{query_fingerprint}\n{baselined.model_metadata_jsons[name]}".encode()
         ).hexdigest()
@@ -151,9 +146,8 @@ def test_given_old_scheme_function_record_when_hashing_then_unchanged_function_k
         body_sql=test_case.body_sql, recorded=recorded
     )
 
-    expected: str = (
-        "old_local_add_one"
-        if test_case.expected_recorded_local_hash
-        else current.function_local_hashes["add_one"]
-    )
+    expected: str = {
+        True: "old_local_add_one",
+        False: current.function_local_hashes["add_one"],
+    }[test_case.expected_recorded_local_hash]
     assert baselined.function_local_hashes["add_one"] == expected
