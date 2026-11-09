@@ -1,4 +1,6 @@
 <script lang="ts">
+	import logoForDark from '$website/src/assets/logo-dark.png';
+	import logoForLight from '$website/src/assets/logo-light.png';
 	import { page } from '$app/state';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { visibleNav, type NavBadge } from '$lib/nav';
@@ -37,8 +39,8 @@
 
 <aside class="app-sidebar bg-sidebar flex h-screen w-56 shrink-0 flex-col border-r border-[var(--sidebar-border)] px-3 py-4">
 	<div class="flex items-center gap-2 px-2 pb-4">
-		<img src="/logo.png" alt="SQLBuild" class="logo-dark h-6 w-auto" />
-		<img src="/logo-light.png" alt="SQLBuild" class="logo-light h-6 w-auto" />
+		<img src={logoForLight} alt="SQLBuild" class="h-6 w-auto dark:hidden" />
+		<img src={logoForDark} alt="SQLBuild" class="hidden h-6 w-auto dark:block" />
 		{#if app.bootstrap?.serverVersion}
 			<span class="text-muted-foreground ml-auto text-[11px]" title="Server version">v{app.bootstrap.serverVersion}</span>
 		{/if}
@@ -101,19 +103,5 @@
 	}
 	.sb-nav {
 		scrollbar-width: thin;
-	}
-	/* default (light theme): show the dark-colored logo */
-	.logo-dark {
-		display: none;
-	}
-	.logo-light {
-		display: block;
-	}
-	/* dark theme: show the light-colored logo */
-	:global(.dark) .logo-dark {
-		display: block;
-	}
-	:global(.dark) .logo-light {
-		display: none;
 	}
 </style>
