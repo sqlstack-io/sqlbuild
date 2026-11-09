@@ -13,12 +13,13 @@ import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
+import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -34,6 +35,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getRun',
 	'getRunDetail',
 	'listQueue',
+	'timeline',
 	'listRunEvents',
 	'listRunStatements',
 	'getStatementSql',
@@ -260,7 +262,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return bootstrap;
 		},
 		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> =>
-			runRowPageOver(await runWindows(scope, parseRunCursor(query.cursor).older), scope.locationId, query),
+			runRowPageOver(await runWindows(scope, (w) => w.length > parseRunCursor(query.cursor).older), scope.locationId, query),
 		async cancelMatchingRuns(scope: Scope, query: RunRowQuery): Promise<BulkRunResult> {
 			const { rows } = runRowPageOver([await listedRuns(scope)], scope.locationId, { ...query, cursor: null, limit: RUN_WINDOW });
 			const result: BulkRunResult = { done: [], failed: [] };
@@ -287,6 +289,14 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return detail;
 		},
 		listQueue: (scope: Scope): Promise<QueueEntry[]> => queueEntries(scope),
+		async timeline(scope: Scope, window: { since: string; until: string }): Promise<Timeline> {
+			// Runs back to the window's start, at most ten windows; each schedule's recent ticks for covered markers.
+			const reached = (w: Wire['RunRecord'][][]) => w.length >= 10 || (w.at(-1)?.at(-1)?.queued_at ?? '') < window.since;
+			const [windows, jobs, triggers] = await Promise.all([runWindows(scope, reached), listedJobs(scope), listedTriggers(scope)]);
+			const schedules = triggers.filter((t) => 'schedule' in t.definition_json);
+			const ticks = (await Promise.all(schedules.map((t) => ticksOf(scope, t.trigger_id, 200)))).flat();
+			return timelineOf({ runs: windows.flat(), jobs, triggers, ticks }, scope.locationId, window, Date.now());
+		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
 			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/events', {
@@ -843,10 +853,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 
 	const listedRuns = (scope: Scope) => shared(`runs ${scope.locationId}`, () => fetchRuns(scope));
 
-	/** The newest window of runs and up to `older` full windows before it. */
-	async function runWindows(scope: Scope, older: number) {
+	/** The newest window of runs, then older full windows until `enough` says so. */
+	async function runWindows(scope: Scope, enough: (windows: Wire['RunRecord'][][]) => boolean) {
 		const windows = [await listedRuns(scope)];
-		for (let last = windows[0]; windows.length <= older && last.length === RUN_WINDOW; windows.push(last)) {
+		for (let last = windows[0]; !enough(windows) && last.length === RUN_WINDOW; windows.push(last)) {
 			last = await olderRuns(scope, last[last.length - 1]);
 		}
 		return windows;
