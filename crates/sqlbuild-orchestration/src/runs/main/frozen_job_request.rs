@@ -2,7 +2,7 @@
 
 use crate::credentials::models::AuditContext;
 use crate::declarations::models::JobDefinition;
-use crate::runs::models::{JobRunRequest, RunKind, RunOrigin, RunRequest};
+use crate::runs::models::{JobRunRequest, RunCommand, RunKind, RunOrigin, RunRequest};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
@@ -42,6 +42,7 @@ pub(crate) async fn frozen_job_request(
             snapshot_id,
             image_id,
             kind,
+            command: RunCommand::Build,
             origin: if request.window.is_some() {
                 RunOrigin::Backfill
             } else {

@@ -6,7 +6,6 @@ use crate::credentials::models::AuditContext;
 use crate::runs::_helpers::requests::adhoc::{
     frozen_adhoc_request, may_view_target, permission_decisions,
 };
-use crate::runs::constants::LAUNCHABLE_VERBS;
 use crate::runs::models::{AdhocCheck, AdhocCheckRequest};
 use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
@@ -49,16 +48,14 @@ pub async fn check_adhoc_run(
     let (transaction, permissions) =
         permission_decisions(transaction, principal_id, &frozen).await?;
     commit(transaction).await?;
-    let error = (!LAUNCHABLE_VERBS.contains(&verb.as_str()))
-        .then(|| format!("workers do not run sqb {verb} yet; only build can launch"));
     Ok(AdhocCheck {
         snapshot_id: Some(frozen.snapshot_id),
-        launchable: error.is_none() && permissions.iter().all(|permission| permission.allowed),
+        launchable: permissions.iter().all(|permission| permission.allowed),
         verb: Some(verb),
         selection: frozen.selection.into_iter().collect(),
         write_set: frozen.write_set.into_iter().collect(),
         settings: frozen.settings,
         permissions,
-        error,
+        error: None,
     })
 }

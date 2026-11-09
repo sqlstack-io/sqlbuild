@@ -942,7 +942,15 @@ export class MockOperate {
 		const resolution = resolveSelection(parts.select, parts.exclude);
 		if (resolution.unknown.length) return refused(`no nodes match selector '${resolution.unknown[0]}'`);
 		if (!resolution.nodes.length) return refused('the selection resolves to no nodes');
-		const writable = resolution.nodes.filter((n) => snapshotNode(n)?.kind !== 'source');
+		const isSource = (n: string) => snapshotNode(n)?.kind === 'source';
+		const selection =
+			parts.verb === 'seed'
+				? resolution.nodes.filter((n) => snapshotNode(n)?.kind === 'seed')
+				: parts.verb === 'freshness'
+					? [...new Set(resolution.nodes.flatMap((n) => [n, ...ancestors(n)]).filter(isSource))]
+					: resolution.nodes;
+		if (!selection.length) return refused(parts.verb === 'seed' ? 'the selectors match no seeds in the current publication' : 'no sources are selected or upstream of the selection');
+		const writable = selection.filter((n) => !isSource(n));
 		const writeSet =
 			parts.verb === 'build'
 				? writable.filter((n) => !(parts.flags['--no-load'] && snapshotNode(n)?.kind === 'loader'))
@@ -951,7 +959,7 @@ export class MockOperate {
 					: [];
 		const scopeTerms = ADHOC_SCOPE[this.#ctx.role()];
 		const granted = scopeTerms === null ? null : new Set(writeSetOf(scopeTerms.length ? scopeTerms : ['__none__'], []));
-		const covered = this.#ctx.can('run.adhoc') && (granted === null || resolution.nodes.every((n) => granted.has(n)));
+		const covered = this.#ctx.can('run.adhoc') && (granted === null || selection.every((n) => granted.has(n)));
 		const decide = (action: Capability, allowed: boolean): AdhocPermission => ({ action, allowed, reason: allowed ? null : `missing ${action} permission for this target` });
 		const gates = [...new Set(Object.keys(parts.flags).flatMap((f) => flagSpec(parts.verb, f)?.requires ?? []))];
 		const permissions = [
@@ -959,15 +967,14 @@ export class MockOperate {
 			...gates.map((action) => decide(action, this.#ctx.can(action))),
 			...(request.priority > 0 ? [decide('run.prioritise', this.#ctx.can('run.prioritise'))] : [])
 		];
-		const error = parts.verb === 'build' ? null : `workers do not run sqb ${parts.verb} yet; only build can launch`;
 		return {
 			verb: parts.verb,
-			selection: resolution.nodes,
+			selection,
 			writeSet,
 			settings: Object.fromEntries(Object.entries(parts.flags).map(([f, v]) => [f.replace(/^--/, '').replaceAll('-', '_'), v])),
 			permissions,
-			error,
-			launchable: error === null && permissions.every((p) => p.allowed)
+			error: null,
+			launchable: permissions.every((p) => p.allowed)
 		};
 	}
 

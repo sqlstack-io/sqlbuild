@@ -67,7 +67,7 @@ pub(crate) fn sql_test_check_id(result: &Bound<'_, PyAny>) -> PyResult<String> {
 
 /// `audit_resource_id` of one audit result.
 pub(crate) fn audit_check_id(result: &Bound<'_, PyAny>) -> PyResult<String> {
-    audit_identity(result)
+    audit_identity(result, "audit_name")
 }
 
 /// The canonical resource name and identifier of an executor result.
