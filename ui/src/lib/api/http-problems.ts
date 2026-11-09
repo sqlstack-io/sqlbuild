@@ -7,7 +7,7 @@ type Wire = components['schemas'];
 
 const placeOf = (name: string, target: string) => `${name} · ${target}`;
 
-/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules per location. */
+/** Live problems as active banner events: a stopped scheduler, each broken location, and late schedules and low calendars per location. */
 export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number): PlatformEvent[] {
 	const events: PlatformEvent[] = [];
 	if (!problems.scheduler_leader) {
@@ -51,6 +51,30 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 			locationId: key,
 			subject: place,
 			message: ticks.length === 1 ? `${oldest.name} in ${place} is late.` : `${ticks.length} schedules in ${place} are late, starting with ${oldest.name}.`
+		});
+	}
+	const low = new Map<string, Wire['LowCalendar'][]>();
+	for (const calendar of problems.low_calendars ?? []) {
+		const key = keyOf(calendar.location_id, calendar.target);
+		low.set(key, [...(low.get(key) ?? []), calendar]);
+	}
+	for (const [key, calendars] of low) {
+		const first = calendars[0];
+		const place = placeOf(first.location_name, first.target);
+		const ends = (c: Wire['LowCalendar']) => c.horizon_end ?? c.refresh_at;
+		const soonest = calendars.reduce((a, b) => (ends(a) <= ends(b) ? a : b));
+		events.push({
+			id: `calendar:${key}`,
+			kind: 'calendar_horizon_low',
+			severity: 'warning',
+			occurredAt: ends(soonest),
+			active: true,
+			locationId: key,
+			subject: place,
+			message:
+				calendars.length === 1
+					? `${soonest.name} in ${place} ${soonest.horizon_end ? 'is running out of dates' : 'has no dates left'}; the location works out more at its next refresh.`
+					: `${calendars.length} calendars in ${place} are running out of dates, starting with ${soonest.name}.`
 		});
 	}
 	return events;

@@ -31,6 +31,31 @@ describe('toPlatformEvents', () => {
 		expect(broken).toMatchObject({ kind: 'location_broken', locationId: 'l2:development', occurredAt: '2026-11-08T11:55:00Z', subject: 'inventory · development' });
 	});
 
+	it('groups low calendars per location, dated and named by the one that runs out first', () => {
+		const calendar = (name: string, location: string, horizon_end: string | null) => ({
+			trigger_id: `c-${name}`,
+			name,
+			location_id: location,
+			location_name: location === 'l1' ? 'orders' : 'inventory',
+			target: 'development',
+			refresh_at: '2026-11-08T13:00:00Z',
+			horizon_end
+		});
+		const events = toPlatformEvents(
+			{
+				scheduler_leader: true,
+				broken_locations: [],
+				overdue_ticks: [],
+				low_calendars: [calendar('month_end', 'l1', '2026-11-09T06:00:00Z'), calendar('quarter_end', 'l1', '2026-11-08T18:00:00Z'), calendar('stock_counts', 'l2', null)]
+			},
+			NOW
+		);
+		expect(events.map((e) => [e.kind, e.locationId, e.occurredAt, e.message])).toEqual([
+			['calendar_horizon_low', 'l1:development', '2026-11-08T18:00:00Z', '2 calendars in orders · development are running out of dates, starting with quarter_end.'],
+			['calendar_horizon_low', 'l2:development', '2026-11-08T13:00:00Z', 'stock_counts in inventory · development has no dates left; the location works out more at its next refresh.']
+		]);
+	});
+
 	it('groups late ticks per location, dated and named by the oldest', () => {
 		const events = toPlatformEvents(
 			{

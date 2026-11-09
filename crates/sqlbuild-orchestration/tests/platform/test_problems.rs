@@ -143,6 +143,22 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 200,
                 "each listed target keeps its own 100 late ticks"
             );
+            assert_eq!(
+                everything
+                    .low_calendars
+                    .iter()
+                    .map(|calendar| (
+                        calendar.location_name.as_str(),
+                        calendar.name.as_str(),
+                        calendar.horizon_end.is_some()
+                    ))
+                    .collect::<Vec<_>>(),
+                vec![
+                    ("inventory", "expired_orders", true),
+                    ("orders", "expired_orders", true)
+                ],
+                "only running calendars whose dates run out within a day, not paused or ten-day ones"
+            );
             let scoped = read(developer).await.expect("developer problems");
             assert_eq!(scoped.scheduler_leader, everything.scheduler_leader);
             assert_eq!(
@@ -155,6 +171,15 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 "only the listed location is reported broken"
             );
             assert_eq!(scoped.overdue_ticks.len(), 100);
+            assert_eq!(
+                scoped
+                    .low_calendars
+                    .iter()
+                    .map(|calendar| calendar.location_id)
+                    .collect::<Vec<_>>(),
+                vec![locations[1]],
+                "another location's low calendar stays hidden"
+            );
             assert!(
                 scoped
                     .overdue_ticks
@@ -165,7 +190,11 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             );
             let hidden = read(outsider).await.expect("outsider problems");
             assert_eq!(hidden.scheduler_leader, everything.scheduler_leader);
-            assert!(hidden.broken_locations.is_empty() && hidden.overdue_ticks.is_empty());
+            assert!(
+                hidden.broken_locations.is_empty()
+                    && hidden.overdue_ticks.is_empty()
+                    && hidden.low_calendars.is_empty()
+            );
             let transaction = begin(store, TransactionMode::Write)
                 .await
                 .expect("observe events");

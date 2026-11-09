@@ -1,4 +1,4 @@
-//! People see the scheduler's state, and broken locations and late ticks only for targets they list.
+//! People see the scheduler's state, and broken locations, late ticks and low calendars only for targets they list.
 
 use std::collections::BTreeSet;
 
@@ -24,6 +24,11 @@ pub async fn read_person_problems(
         .iter()
         .map(|location| (location.location_id, location.target.clone()))
         .chain(scan.late_targets.iter().cloned())
+        .chain(
+            scan.low_calendars
+                .iter()
+                .map(|calendar| (calendar.location_id, calendar.target.clone())),
+        )
         .collect::<BTreeSet<_>>()
     {
         if person_holds_target(
@@ -48,6 +53,11 @@ pub async fn read_person_problems(
             .broken
             .into_iter()
             .filter(|location| listed.contains(&(location.location_id, location.target.clone())))
+            .collect(),
+        low_calendars: scan
+            .low_calendars
+            .into_iter()
+            .filter(|calendar| listed.contains(&(calendar.location_id, calendar.target.clone())))
             .collect(),
     })
 }

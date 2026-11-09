@@ -310,6 +310,34 @@ pub struct PlatformProblems {
     pub scheduler_lease_expires_at: Option<DateTime<Utc>>,
     pub broken_locations: Vec<BrokenLocation>,
     pub overdue_ticks: Vec<OverdueTick>,
+    /// Running calendar schedules whose dates run out within a day.
+    #[serde(default)]
+    pub low_calendars: Vec<LowCalendar>,
+}
+
+/// A running calendar schedule whose last date is at most a day away, or which has none left.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct LowCalendar {
+    pub trigger_id: Uuid,
+    pub name: String,
+    pub location_id: Uuid,
+    pub location_name: String,
+    pub target: String,
+    /// When the location next works out the calendar's dates.
+    pub refresh_at: DateTime<Utc>,
+    /// The calendar's last date; absent when none are left.
+    pub horizon_end: Option<DateTime<Utc>>,
+}
+
+/// A running schedule of a live location, with its declaration.
+#[derive(Debug, Deserialize)]
+pub(crate) struct RunningSchedule {
+    pub(crate) trigger_id: Uuid,
+    pub(crate) name: String,
+    pub(crate) location_id: Uuid,
+    pub(crate) location_name: String,
+    pub(crate) target: String,
+    pub(crate) definition_json: TriggerDefinition,
 }
 
 /// Every instance of this location target has missed two check-ins.
@@ -350,6 +378,7 @@ pub(crate) struct ProblemScan {
     pub(crate) lease: Option<SchedulerLease>,
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
+    pub(crate) low_calendars: Vec<LowCalendar>,
 }
 
 /// Where the control store keeps its data.

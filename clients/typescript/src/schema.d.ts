@@ -1830,6 +1830,26 @@ export interface components {
          * @enum {string}
          */
         LoginMode: "password" | "trusted_proxy" | "oidc";
+        /** @description A running calendar schedule whose last date is at most a day away, or which has none left. */
+        LowCalendar: {
+            /**
+             * Format: date-time
+             * @description The calendar's last date; absent when none are left.
+             */
+            horizon_end?: string | null;
+            /** Format: uuid */
+            location_id: string;
+            location_name: string;
+            name: string;
+            /**
+             * Format: date-time
+             * @description When the location next works out the calendar's dates.
+             */
+            refresh_at: string;
+            target: string;
+            /** Format: uuid */
+            trigger_id: string;
+        };
         /** @description Recorded moves, their old-name view steps and janitor cleanups, newest moves first. */
         MaintenanceHistory: {
             /** @description Empty when the history is for one model; cleanups are not tied to models. */
@@ -2209,6 +2229,8 @@ export interface components {
         /** @description Problems derived from live state when read; nothing here is stored. */
         PlatformProblems: {
             broken_locations: components["schemas"]["BrokenLocation"][];
+            /** @description Running calendar schedules whose dates run out within a day. */
+            low_calendars?: components["schemas"]["LowCalendar"][];
             overdue_ticks: components["schemas"]["OverdueTick"][];
             scheduler_leader: boolean;
             /**
