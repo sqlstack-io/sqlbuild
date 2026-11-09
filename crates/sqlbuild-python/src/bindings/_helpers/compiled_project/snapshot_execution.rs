@@ -1,6 +1,7 @@
 //! Frozen selection, executor callbacks and completion belong to one verified worker build.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError, PyValueError};
@@ -26,6 +27,8 @@ pub(crate) struct WorkerBuild {
     attached: BTreeMap<String, Vec<String>>,
     /// The worst attached outcome of each node, for commands that only run tests or audits.
     checked: Mutex<BTreeMap<String, NodeOutcome>>,
+    /// Whether the command returned, having run every check it planned, rather than being refused or raising.
+    returned: AtomicBool,
     /// Why the worker refused the run before executing anything, reported as the run's status reason.
     refusal: Mutex<Option<String>>,
 }
@@ -42,6 +45,7 @@ impl WorkerBuild {
             checks: Mutex::default(),
             attached,
             checked: Mutex::default(),
+            returned: AtomicBool::new(false),
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
@@ -57,6 +61,11 @@ impl WorkerBuild {
     /// Test and audit runs execute only attached checks, so their nodes take the checks' outcome.
     fn checks_only(&self) -> bool {
         matches!(self.command(), RunCommand::Test | RunCommand::Audit)
+    }
+
+    /// Record that the command returned instead of being refused or raising.
+    pub(crate) fn command_returned(&self) {
+        self.returned.store(true, Ordering::SeqCst);
     }
 
     pub(crate) fn has_work(&self) -> bool {
@@ -407,9 +416,20 @@ impl WorkerBuild {
         let checks_only = self.checks_only();
         if checks_only && !cancelled {
             let checked = self.checked.lock().map_err(|_| poisoned())?.clone();
+            let returned = self.returned.load(Ordering::SeqCst);
             for key in &self.execution.claim.request.selection {
-                let outcome = checked.get(key).copied().unwrap_or(NodeOutcome::Success);
-                self.complete(py, key, (outcome, None, None))?;
+                // A refused or raising command proves only the failures it saw; the rest stay skipped.
+                let seen = checked.get(key).copied();
+                let outcome = if returned {
+                    Some(seen.unwrap_or(NodeOutcome::Success))
+                } else {
+                    seen.filter(|outcome| {
+                        matches!(outcome, NodeOutcome::Failed | NodeOutcome::Cancelled)
+                    })
+                };
+                if let Some(outcome) = outcome {
+                    self.complete(py, key, (outcome, None, None))?;
+                }
             }
         }
         for key in &self.execution.claim.request.selection {
@@ -494,6 +514,9 @@ impl WorkerBuild {
         Ok(outcome)
     }
 }
+
+/// A claimed run's worker build and the project inputs it verified against the frozen snapshot.
+pub(crate) type VerifiedRun<'a, 'py> = (Arc<WorkerBuild>, &'a Bound<'py, PyAny>);
 
 /// Failure outranks cancellation, then warnings, then success.
 fn severity(outcome: NodeOutcome) -> u8 {

@@ -351,6 +351,9 @@ class AdhocVerbTestCase:
     command: list[str]
     expected_selection: list[str]
     expected_run_nodes: list[tuple[str, str, str]]
+    # Files the worker's checkout gains after it verified the final run, which must not run.
+    rewrites: dict[str, str] = field(default_factory=dict)
+    expected_status: str = "success"
 
 
 @dataclass(frozen=True)

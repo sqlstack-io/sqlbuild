@@ -45,7 +45,7 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_com
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
 use crate::bindings::_helpers::compile_outputs::runtime_target::write_test_runtime_target;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::native_host::results::ReadResult;
@@ -693,17 +693,18 @@ pub(crate) fn run_test_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
     run_test(py, request, None)
 }
 
-/// Run one `sqb test` request, reporting each test to a claimed run's `worker`.
-pub(crate) fn run_test(
-    py: Python<'_>,
-    request: &Bound<'_, PyAny>,
-    worker: Option<Arc<WorkerBuild>>,
+/// Run one `sqb test` request; a claimed run's tests come from its verified inputs and report to its worker.
+pub(crate) fn run_test<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyAny>,
+    verified: Option<VerifiedRun<'_, 'py>>,
 ) -> PyResult<i32> {
+    let (worker, discovered) = verified.unzip();
     let inspect_only: bool = request.getattr("inspect")?.is_truthy()?;
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::TestInvocation)?,
-        !inspect_only,
+        (!inspect_only, discovered),
     )?;
     let stream: Bound<'_, PyAny> = invocation.getattr("progress_stream")?;
     let project_dir: Bound<'_, PyAny> = native_field(&invocation, "effective_project_dir")?;

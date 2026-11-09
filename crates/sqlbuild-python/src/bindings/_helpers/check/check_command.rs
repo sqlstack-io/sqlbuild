@@ -649,7 +649,7 @@ pub(crate) fn run_check_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::CheckInvocation)?,
-        true,
+        (true, None),
     )?;
     let stream: Bound<'_, PyAny> = native_field(&invocation, "progress_stream")?;
     stream.call_method1("write", ("\n",))?;

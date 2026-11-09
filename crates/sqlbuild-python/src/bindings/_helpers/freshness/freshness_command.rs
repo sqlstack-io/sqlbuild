@@ -1,7 +1,6 @@
 //! `sqb freshness`: observe selected source freshness without writing state.
 
 use std::collections::BTreeSet;
-use std::sync::Arc;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyErr, PyResult, Python};
@@ -19,7 +18,7 @@ use crate::bindings::_helpers::command_runtime::adapters::resolve_cli_adapter;
 use crate::bindings::_helpers::command_runtime::connection::resolve_project_connection_config;
 use crate::bindings::_helpers::compile_driver::discovery::discover_project_inputs;
 use crate::bindings::_helpers::compile_driver::project::build_project_graph;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::VerifiedRun;
 use crate::bindings::_helpers::contracts::spec_resolution::resolve_effective_adapter_name;
 use crate::bindings::_helpers::freshness::freshness_observe::{PreviousState, observe_freshness};
 use crate::bindings::_helpers::freshness::observation::Observer;
@@ -280,12 +279,13 @@ fn write_json_output(
     )
 }
 
-/// Run one `sqb freshness` request, reporting each source to a claimed run's `worker`.
-pub(crate) fn run_freshness_command(
-    py: Python<'_>,
-    request: &Bound<'_, PyAny>,
-    worker: Option<Arc<WorkerBuild>>,
+/// Run one `sqb freshness` request; a claimed run observes its verified sources and reports to its worker.
+pub(crate) fn run_freshness_command<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyAny>,
+    verified: Option<VerifiedRun<'_, 'py>>,
 ) -> PyResult<i32> {
+    let (worker, verified_inputs) = verified.unzip();
     let fail_on_stale: bool = native_field(request, "fail_on_stale")?.extract()?;
     let fail_on_error: bool = native_field(request, "fail_on_error")?.extract()?;
     if fail_on_stale && !native_field(request, "compare_state")?.extract::<bool>()? {
@@ -298,8 +298,10 @@ pub(crate) fn run_freshness_command(
         directory if !directory.is_none() => directory,
         _ => py.import("pathlib")?.getattr("Path")?.call_method0("cwd")?,
     };
-    let discovered: Bound<'_, PyAny> =
-        discover_project_inputs(py, Some(keywords(py, &[("project_dir", &project_dir)])?))?;
+    let discovered: Bound<'_, PyAny> = match verified_inputs {
+        Some(discovered) => discovered.clone(),
+        None => discover_project_inputs(py, Some(keywords(py, &[("project_dir", &project_dir)])?))?,
+    };
     let select: Bound<'_, PyAny> = native_field(request, "select")?;
     let exclude: Bound<'_, PyAny> = native_field(request, "exclude")?;
     reject_unit_test_selectors(&select, &exclude, &discovered)?;

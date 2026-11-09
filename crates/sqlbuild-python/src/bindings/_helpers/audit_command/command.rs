@@ -25,7 +25,7 @@ use crate::bindings::_helpers::command_runtime::concurrency::resolve_concurrency
 use crate::bindings::_helpers::command_runtime::invocation::resolve_reported_command_invocation;
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::cost_telemetry::context::CostContext;
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
@@ -533,16 +533,17 @@ pub(crate) fn run_audit_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> P
     run_audit(py, request, None)
 }
 
-/// Run one `sqb audit` request, reporting each audit to a claimed run's `worker`.
-pub(crate) fn run_audit(
-    py: Python<'_>,
-    request: &Bound<'_, PyAny>,
-    worker: Option<Arc<WorkerBuild>>,
+/// Run one `sqb audit` request; a claimed run's audits come from its verified inputs and report to its worker.
+pub(crate) fn run_audit<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyAny>,
+    verified: Option<VerifiedRun<'_, 'py>>,
 ) -> PyResult<i32> {
+    let (worker, discovered) = verified.unzip();
     let invocation: Bound<'_, PyAny> = resolve_reported_command_invocation(
         request,
         &record_class(py, RecordId::AuditInvocation)?,
-        true,
+        (true, discovered),
     )?;
     let pipeline: Bound<'_, PyAny> = compile_audits(request, &invocation)?;
     let run: AuditRun<'_> = prepare_run(request, &invocation, &pipeline)?;

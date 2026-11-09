@@ -26,7 +26,7 @@ use crate::bindings::_helpers::command_runtime::invocation::resolve_command_invo
 use crate::bindings::_helpers::compile_driver::pipeline_entries::build_static_pipeline_result;
 use crate::bindings::_helpers::compile_driver::plan_result::connection_with_hooks;
 use crate::bindings::_helpers::compile_driver::static_context::compile_static_command_context;
-use crate::bindings::_helpers::compiled_project::snapshot_execution::WorkerBuild;
+use crate::bindings::_helpers::compiled_project::snapshot_execution::{VerifiedRun, WorkerBuild};
 use crate::bindings::_helpers::dbt_interop::reference_resolver::resolve_external_sql_reference_resolver;
 use crate::bindings::_helpers::native_host::host;
 use crate::bindings::_helpers::planner_entries::command_plans::build_seed_command_plan;
@@ -445,14 +445,18 @@ pub(crate) fn run_seed_command(py: Python<'_>, request: &Bound<'_, PyAny>) -> Py
     run_seed(py, request, None)
 }
 
-/// Run one `sqb seed` request; a claimed run's `worker` refuses seeds outside its write set.
-pub(crate) fn run_seed(
-    py: Python<'_>,
-    request: &Bound<'_, PyAny>,
-    worker: Option<Arc<WorkerBuild>>,
+/// Run one `sqb seed` request; a claimed run's seeds come from its verified inputs and stay in its write set.
+pub(crate) fn run_seed<'py>(
+    py: Python<'py>,
+    request: &Bound<'py, PyAny>,
+    verified: Option<VerifiedRun<'_, 'py>>,
 ) -> PyResult<i32> {
-    let invocation: Bound<'_, PyAny> =
-        resolve_command_invocation(request, &record_class(py, RecordId::SeedInvocation)?)?;
+    let (worker, discovered) = verified.unzip();
+    let invocation: Bound<'_, PyAny> = resolve_command_invocation(
+        request,
+        &record_class(py, RecordId::SeedInvocation)?,
+        discovered,
+    )?;
     let pipeline: Bound<'_, PyAny> = compile_seeds(request, &invocation)?;
     if let Some(worker) = &worker {
         let seeds: Vec<String> = seed_names(&pipeline)?

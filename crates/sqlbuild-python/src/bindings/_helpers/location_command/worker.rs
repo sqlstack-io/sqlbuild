@@ -70,10 +70,10 @@ fn attached_nodes(snapshot: &NativeOrchestrationSnapshot) -> BTreeMap<String, Ve
     attached
 }
 
-/// The frozen command's request and warehouse scope.
+/// The frozen command's request and warehouse scope; build carries the verified inputs in its request.
 fn command_request<'py>(
     py: Python<'py>,
-    discovered: Bound<'py, PyAny>,
+    discovered: &Bound<'py, PyAny>,
     arguments: &KeywordArguments<'py>,
     worker: &Bound<'py, NativeOrchestrationWorker>,
 ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
@@ -142,26 +142,28 @@ fn command_request<'py>(
         ));
     }
     let mut request = Invocation::new(&args)?.value(route.arguments[0].source)?;
-    if request.hasattr("discovered_inputs")? {
-        request = replaced(&request, &[("discovered_inputs", discovered)])?;
+    if command == RunCommand::Build {
+        request = replaced(&request, &[("discovered_inputs", discovered.clone())])?;
     }
     Ok((request, warehouse_scope(&args)?))
 }
 
-/// Run the frozen command, reporting its progress and outcomes to `worker`.
-fn run_command(
-    py: Python<'_>,
+/// Run the frozen command from the verified inputs, reporting its progress and outcomes to `worker`.
+fn run_command<'py>(
+    py: Python<'py>,
     worker: &Arc<WorkerBuild>,
-    request: &Bound<'_, PyAny>,
+    (request, discovered): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<i32> {
-    let reporting: Option<Arc<WorkerBuild>> = Some(Arc::clone(worker));
-    match worker.command() {
-        RunCommand::Build => run_build(py, request, reporting),
-        RunCommand::Test => run_test(py, request, reporting),
-        RunCommand::Seed => run_seed(py, request, reporting),
-        RunCommand::Audit => run_audit(py, request, reporting),
-        RunCommand::Freshness => run_freshness_command(py, request, reporting),
-    }
+    let verified = Some((Arc::clone(worker), discovered));
+    let code = match worker.command() {
+        RunCommand::Build => run_build(py, request, Some(Arc::clone(worker))),
+        RunCommand::Test => run_test(py, request, verified),
+        RunCommand::Seed => run_seed(py, request, verified),
+        RunCommand::Audit => run_audit(py, request, verified),
+        RunCommand::Freshness => run_freshness_command(py, request, verified),
+    }?;
+    worker.command_returned();
+    Ok(code)
 }
 
 /// Why an ad-hoc run's `--warehouse` is refused; published jobs keep their authored warehouse.
@@ -196,10 +198,10 @@ fn unconfigured_warehouse(
 }
 
 /// The heartbeat is native; only driver cancellation crosses the executor host boundary.
-fn run_cancellable(
-    py: Python<'_>,
+fn run_cancellable<'py>(
+    py: Python<'py>,
     worker: &Arc<WorkerBuild>,
-    request: &Bound<'_, PyAny>,
+    command: (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<i32> {
     let state = Arc::clone(worker);
     let (stop, stopping) = mpsc::channel::<()>();
@@ -219,7 +221,7 @@ fn run_cancellable(
             }
         })
         .map_err(|error| PyRuntimeError::new_err(error.to_string()))?;
-    let result = run_command(py, worker, request);
+    let result = run_command(py, worker, command);
     drop(stop);
     py.detach(|| thread.join())
         .map_err(|_| PyRuntimeError::new_err("worker cancellation thread failed"))?;
@@ -265,9 +267,11 @@ pub(super) fn execute_worker<'py>(
             write_stderr(py, &format!("Run refused: {reason}\n"))?;
             return Err(PyValueError::new_err(reason));
         }
-        let (request, scope) = command_request(py, discovered, arguments, &owner)?;
+        let (request, scope) = command_request(py, &discovered, arguments, &owner)?;
         write_stderr(py, "Run inputs verified. Executing frozen selection...\n")?;
-        within(&scope, |_| run_cancellable(py, &worker, &request))
+        within(&scope, |_| {
+            run_cancellable(py, &worker, (&request, &discovered))
+        })
     })();
     let code = result.as_ref().copied().unwrap_or(1);
     let outcome = if recall.is_some() {
