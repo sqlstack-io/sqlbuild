@@ -297,7 +297,8 @@ SQL_HOOK_FILES: dict[str, str] = {
     "macros/python/money.py": 'def cents(value: str) -> str:\n    return f"{value} * 100"\n',
     "hooks/sql/grant_read.sql": (
         "HOOK (description 'Grant read access.');\n\n"
-        "GRANT SELECT ON @@CTX:destination.qualified TO @'role'\n"
+        "INSERT INTO audit.read_grants SELECT '@@CTX:destination.qualified', grantee\n"
+        "FROM unnest([@'role']) AS granted(grantee)\n"
     ),
     "hooks/sql/log_load.sql": (
         "HOOK (description 'Log a load.');\n\n"

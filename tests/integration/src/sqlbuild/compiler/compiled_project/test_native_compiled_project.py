@@ -55,7 +55,7 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 from tests.integration.src.sqlbuild.compiler.graph.helpers import ORDERS_PROJECT_FILES, write_files
 
 if TYPE_CHECKING:
-    from sqlbuild._native import CompileInputsView, CompilerDiagnostic
+    from sqlbuild._native import CompileInputsView
 
 
 @pytest.mark.parametrize(
@@ -536,7 +536,7 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
             description="query the parser rejects",
             model_sql="MODEL ();\nSELECT FROM WHERE (\n",
             expected_message=(
-                "SQL analysis skipped for model 'orders' ({model_path}): "
+                "SQL syntax error in model 'orders' ({model_path}): "
                 "the duckdb parser cannot read Syntax error at or near 'WHERE' at line 2, column 13"
             ),
             expected_help_fragment="skip SQL analysis for this model",
@@ -549,7 +549,7 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
                 "SELECT 1 AS order_id FROM t WHERE order_id >= __cursor_start() AND (\n"
             ),
             expected_message=(
-                "SQL analysis skipped for model 'orders' ({model_path}): "
+                "SQL syntax error in model 'orders' ({model_path}): "
                 "the duckdb parser cannot read Syntax error at or near 'AND' at line 2, column 64"
             ),
             expected_help_fragment="skip SQL analysis for this model",
@@ -557,7 +557,7 @@ def test_given_invalid_model_when_running_native_model_loop_then_attachment_erro
     ],
     ids=lambda case: case.description,
 )
-def test_given_unparseable_model_when_validating_immediately_then_parser_gap_is_reported(
+def test_given_unparseable_model_when_validating_immediately_then_syntax_error_is_raised(
     test_case: ImmediateSyntaxErrorTestCase,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -571,16 +571,14 @@ def test_given_unparseable_model_when_validating_immediately_then_parser_gap_is_
         project_dir=tmp_path / "project",
     )
 
-    inputs: CompileInputsView = build_inputs_with_native_loop(
-        project_dir=project_dir, defer_validation=False
-    )
+    with pytest.raises(CompileInputError) as raised:
+        _ = build_inputs_with_native_loop(project_dir=project_dir, defer_validation=False)
 
-    by_code: dict[str, CompilerDiagnostic] = {item.code: item for item in inputs.diagnostics}
-
-    assert by_code["P026"].message == test_case.expected_message.format(
+    assert raised.value.message == test_case.expected_message.format(
         model_path=project_dir / "models" / "orders.sql"
     )
-    assert test_case.expected_help_fragment in (by_code["P026"].help or "")
+    assert raised.value.code == "P001"
+    assert test_case.expected_help_fragment in (raised.value.help or "")
 
 
 @pytest.mark.parametrize(
