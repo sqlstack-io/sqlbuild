@@ -11,6 +11,7 @@ pub(crate) mod person_location_work;
 pub(crate) mod person_maintenance;
 pub(crate) mod person_node_sql;
 pub(crate) mod person_operations;
+pub(crate) mod person_plans;
 pub(crate) mod person_reads;
 pub(crate) mod request_json;
 pub(crate) mod router;
