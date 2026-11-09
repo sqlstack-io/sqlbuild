@@ -423,7 +423,7 @@
 "contracts",
 {
 "None": "103d29f4aef0090a36226ef7",
-"duckdb": "dfe34264a6edca41378b9402",
+"duckdb": "dc82b458627503ca4311361b",
 "postgres": "dc82b458627503ca4311361b",
 "snowflake": "dfe34264a6edca41378b9402",
 "bigquery": "b0c0b670609049fee2ff6f77",
@@ -591,7 +591,7 @@
 "contracts",
 {
 "None": "bb67625de7198e2dc8e3b23b",
-"duckdb": "6e5f3057275c88687658bb88",
+"duckdb": "2a42e291118d5fa419ada6b8",
 "postgres": "2a42e291118d5fa419ada6b8",
 "snowflake": "6e5f3057275c88687658bb88",
 "bigquery": "bb67625de7198e2dc8e3b23b",

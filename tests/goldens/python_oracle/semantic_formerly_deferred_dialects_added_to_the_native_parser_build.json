@@ -2,23 +2,19 @@
 [
 "completion",
 {
-"mysql": "d54ac41b7924d8d3eb4b07de",
 "tsql": "d54ac41b7924d8d3eb4b07de",
 "databricks": "d54ac41b7924d8d3eb4b07de",
 "sqlite": "d54ac41b7924d8d3eb4b07de",
-"oracle": "d54ac41b7924d8d3eb4b07de",
-"trino": "d54ac41b7924d8d3eb4b07de"
+"clickhouse": "d54ac41b7924d8d3eb4b07de"
 }
 ],
 [
 "completion",
 {
-"mysql": "af4024cbb0b1022278fb0039",
 "tsql": "af4024cbb0b1022278fb0039",
 "databricks": "af4024cbb0b1022278fb0039",
 "sqlite": "af4024cbb0b1022278fb0039",
-"oracle": "af4024cbb0b1022278fb0039",
-"trino": "af4024cbb0b1022278fb0039"
+"clickhouse": "af4024cbb0b1022278fb0039"
 }
 ]
 ]

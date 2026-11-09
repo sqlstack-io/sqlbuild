@@ -3,7 +3,7 @@
 "metadata",
 {
 "duckdb": "f94d387a4480c13db319fdad",
-"mysql": "545e3d1911e6be891c082594",
+"clickhouse": "83431f6feced32f7db4143a6",
 "tsql": "cababa3a33d5afcabd8f3fb8",
 "None": "545e3d1911e6be891c082594",
 "nonsense": "6f6079f31e12e028922d40f2"
@@ -13,7 +13,7 @@
 "metadata",
 {
 "duckdb": "0ed0773a2a4a6fca23c1dcac",
-"mysql": "b5eb71b7238452018577953d",
+"clickhouse": "c9f66e2829627aeb5e4728db",
 "tsql": "c9f66e2829627aeb5e4728db",
 "None": "b5eb71b7238452018577953d",
 "nonsense": "6f6079f31e12e028922d40f2"
@@ -23,7 +23,7 @@
 "metadata",
 {
 "duckdb": "30c78fd5afb3d05479d6c4ca",
-"mysql": "52fa4030275d4145d23acad6",
+"clickhouse": "a86fc9ef8fd7f46e7110dff4",
 "tsql": "a86fc9ef8fd7f46e7110dff4",
 "None": "52fa4030275d4145d23acad6",
 "nonsense": "6f6079f31e12e028922d40f2"
@@ -33,7 +33,7 @@
 "metadata",
 {
 "duckdb": "55da090c1795767af58252eb",
-"mysql": "f500a1f934f47f35fb2c5ff4",
+"clickhouse": "9225fd40168382c4100e98c3",
 "tsql": "9225fd40168382c4100e98c3",
 "None": "f500a1f934f47f35fb2c5ff4",
 "nonsense": "6f6079f31e12e028922d40f2"

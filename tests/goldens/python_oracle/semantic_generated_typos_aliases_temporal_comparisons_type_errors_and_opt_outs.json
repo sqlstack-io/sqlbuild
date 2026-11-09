@@ -21,7 +21,7 @@
 "completion",
 {
 "duckdb": "559b4f8d9d535a8c20a43a68",
-"postgres": "62353b9339584a3bc2715173",
+"postgres": "d106cb543e7422050fa8359b",
 "snowflake": "a7a5c49a1a12ea6a55928d58",
 "bigquery": "391905a2f2b3241b9f017c1d"
 }
@@ -39,7 +39,7 @@
 "completion",
 {
 "duckdb": "7a4e919059d5f2d759a79a0e",
-"postgres": "9b49648e2fb4be6d8afbea9c",
+"postgres": "d72ca349ece74a31d78bf4e7",
 "snowflake": "2e5d4d0063e8d8db7563cc53",
 "bigquery": "0bffda198dbb4f007269080c"
 }
@@ -57,7 +57,7 @@
 "completion",
 {
 "duckdb": "4d6653aafceb276d132e3d5a",
-"postgres": "303eca4e9e93684168a02cfd",
+"postgres": "d1b31ce62eb1e851e6c477f5",
 "snowflake": "49f8133ce7dc3332de1928b8",
 "bigquery": "f7432c7f32261cd8ed0b5055"
 }
