@@ -174,22 +174,22 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "c111f9ebae03412e1165eefc2bdbc3038aa299ba" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "46bbaaaea76fc99042b15537615fc67432540291" }
 # SQL change fingerprints over SQLQuack's tokenizers.
-sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # Scopes, name resolution, types and lineage for the native analysis route.
-sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
+sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293", features = ["bigquery", "clickhouse", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # SQLQuack's Snowflake-family parser and tokenizer, reached as SQLQuack exposes them.
-sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
+sqlquack-parse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
 # SQLQuack's syntax tree and lossless tokens.
-sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
-sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f9e4ae6e9689010ab9a7dd9e698567182ea9eb3f" }
+sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-databricks = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-duckdb = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-postgres = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-sqlite = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
+sqlquack-syntax-sqlserver = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293" }
 stacker = "0.1"
 syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 subtle = "2"
