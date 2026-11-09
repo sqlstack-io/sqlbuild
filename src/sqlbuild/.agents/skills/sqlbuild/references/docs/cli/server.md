@@ -157,7 +157,7 @@ next request, including sessions created by [`sqb login`](login.md).
 ## Run ad-hoc commands
 
 People with `run.adhoc` can run a `sqb` command on the current publication without declaring a
-job. Use the web UI's Run panel, or send the command as argument tokens after `sqb`:
+job. Use the web UI's plan page, or send the command as argument tokens after `sqb`:
 
 ```json
 {

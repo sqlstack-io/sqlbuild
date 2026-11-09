@@ -11,7 +11,7 @@
 			<button onclick={() => resource.refresh()}>Retry</button>
 		</td>
 	{:else if resource.loading && resource.data === undefined}
-		<td {colspan} class="empty">Loading…</td>
+		<td {colspan} class="empty">{resource.slow ? 'Loading…' : ''}</td>
 	{:else}
 		<td {colspan} class="empty">{empty}</td>
 	{/if}

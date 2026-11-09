@@ -37,6 +37,7 @@ use crate::api::_helpers::resources::{
     person_reads::job,
     person_reads::triggers,
     person_reads::ticks,
+    person_reads::trigger_changes,
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,

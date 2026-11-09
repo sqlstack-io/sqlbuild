@@ -18,8 +18,9 @@ use crate::credentials::models::{
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::test_types::RoleFixture;
 use crate::declarations::main::change_person_trigger::change_person_trigger;
+use crate::declarations::main::list_person_trigger_changes::list_person_trigger_changes;
 use crate::declarations::main::list_triggers::list_triggers;
-use crate::declarations::models::{TriggerChange, TriggerChangeRequest};
+use crate::declarations::models::{PersonTriggerChange, TriggerChange, TriggerChangeRequest};
 use crate::runs::main::list_person_runs::list_person_runs;
 use crate::runs::tests::helpers::snapshot;
 use crate::scheduler::tests::contracts::ticks::helpers::calendar_text;
@@ -231,6 +232,50 @@ pub(crate) async fn member_trigger_change(
             reason: "Hold customer refreshes".into(),
             change,
         },
+    )
+    .await
+    .map_err(denial)
+}
+
+/// The administrator's override of the location's only trigger, with its reason.
+pub(crate) async fn administrator_trigger_change(
+    store: &ControlStore,
+    fixture: &RoleFixture,
+    (change, reason): (TriggerChange, &str),
+) -> Uuid {
+    let trigger_id = list_triggers(store, fixture.location_id, "development")
+        .await
+        .expect("triggers")[0]
+        .trigger_id;
+    assert!(
+        change_person_trigger(
+            store,
+            (&fixture.context, credentials(&fixture.administrator)),
+            &TriggerChangeRequest {
+                event_id: Uuid::now_v7(),
+                trigger_id,
+                actor: String::new(),
+                reason: reason.into(),
+                change,
+            },
+        )
+        .await
+        .expect("administrator change")
+    );
+    trigger_id
+}
+
+/// The member's read of a trigger's on/off history: the changes, `None` for an unknown trigger, or the denial.
+pub(crate) async fn member_trigger_changes(
+    store: &ControlStore,
+    fixture: &RoleFixture,
+    trigger_id: Uuid,
+) -> Result<Option<Vec<PersonTriggerChange>>, String> {
+    list_person_trigger_changes(
+        store,
+        (&fixture.context, credentials(&fixture.member)),
+        ((fixture.location_id, "development"), (trigger_id, 100)),
+        DefaultRole::None,
     )
     .await
     .map_err(denial)

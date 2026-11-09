@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { logout } from '$lib/api/http-client';
 import { MockApiClient } from '$lib/api/mock/mock-client';
 import { bootFailure, type BootFailure } from '$lib/boot-failure';
+import { withPrefetch } from './prefetch';
 import {
 	ApiError,
 	channelMatches,
@@ -49,7 +50,7 @@ class AppState {
 	#syncRefused = new Set<string>();
 
 	constructor() {
-		this.client = createClient(new URLSearchParams(browser ? window.location.search : ''), () => this.#signIn());
+		this.client = withPrefetch(createClient(new URLSearchParams(browser ? window.location.search : ''), () => this.#signIn()));
 		this.signOut = this.client instanceof MockApiClient ? null : async () => {
 			await logout();
 			this.#signIn();

@@ -39,9 +39,6 @@
 
 <div class="launch">
 	<p class="title">Run {job.kind === 'group' ? 'group' : 'job'} <code>{job.key}</code> now</p>
-	<p class="faint">
-		{job.kind === 'group' ? `Starts a group run, with one run per job in it${job.members ? ` (${job.members.length})` : ''}.` : `Builds ${job.nodeCount} nodes with the job's options.`} If another run is updating the same data, it waits for it to finish.
-	</p>
 	{#if canFullRefresh || canRewrite}
 	<div class="opts" title={canRewrite ? undefined : "You don't have permission to rebuild history (run.rewrite_history)"}>
 		{#if canFullRefresh}
@@ -61,7 +58,6 @@
 					<span class="faint">to</span>
 					<input bind:value={end} placeholder="2026-10-31T00:00:00Z or 1500" aria-label="Window end" />
 				</div>
-				<p class="faint pad">Both ends are included. Whole numbers backfill an integer cursor; anything else is read as a date and time with its zone.</p>
 				{#if windowInvalid}<p class="err pad">{windowInvalid}</p>{/if}
 			{/if}
 		{/if}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import AlertCircleIcon from '@lucide/svelte/icons/circle-alert';
 	import HistoryIcon from '@lucide/svelte/icons/history';
@@ -8,7 +9,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import GatedButton from '$lib/components/operate/gated-button.svelte';
 	import RunTimeline from '$lib/components/timeline/run-timeline.svelte';
-	import RunPanel from '$lib/run/run-panel.svelte';
+	import { planHref } from '$lib/run/command';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo } from '$lib/format/time';
@@ -50,14 +51,12 @@
 	const showGroups = $derived(data?.groups !== null);
 	const showTimeline = $derived(app.client.supports('timeline'));
 
-	let rebuildOpen = $state(false);
 </script>
 
 <AppTopbar title="Overview">
 	<Button variant="outline" size="sm" onclick={() => overview.refresh()}>↻ Refresh</Button>
 </AppTopbar>
 
-<RunPanel bind:open={rebuildOpen} selection={staleSelection} />
 
 <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-[18px]">
 	{#if overview.error}<div class="error-note mb-[14px]">{overview.error}</div>{/if}
@@ -104,7 +103,7 @@
 								<small>{view.since}</small>
 								<span class="issue-actions">
 									{#if item.kind === 'stale_models'}
-										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => (rebuildOpen = true)}>Rebuild {staleSelection.length}</GatedButton>
+										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => goto(planHref(staleSelection))}>Rebuild {staleSelection.length}</GatedButton>
 									{/if}
 									<a href={view.href}>{view.action} →</a>
 								</span>
@@ -180,7 +179,7 @@
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
-							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
+							<div class="empty">{overview.loading ? (overview.slow ? 'Loading…' : '') : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
 						{/each}
 					</div>
 				</section>{/if}
@@ -200,7 +199,7 @@
 								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 							</a>
 						{:else}
-							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet.'}</div>
+							<div class="empty">{overview.loading ? (overview.slow ? 'Loading…' : '') : 'Nothing deployed yet.'}</div>
 						{/each}
 					</div>
 				</section>

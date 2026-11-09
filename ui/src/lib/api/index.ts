@@ -4,7 +4,7 @@ import { MockApiClient, type MockOptions } from './mock/mock-client';
 import type { BuiltInRole } from './types';
 
 export type { ApiClient } from './client';
-export { ApiError } from './client';
+export { ApiError, isRefusal } from './client';
 export * from './types';
 export * from './signals';
 export { hasCapability, hasAnyCapability, ADMIN_CAPABILITIES } from './capabilities';

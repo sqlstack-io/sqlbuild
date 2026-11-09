@@ -123,7 +123,7 @@
 			{/if}
 		</div>
 	{:else if view.detailRes.loading}
-		<div class="empty">Loading…</div>
+		<div class="empty">{view.detailRes.slow ? 'Loading…' : ''}</div>
 	{:else if view.detailRes.error}
 		<div class="empty">Couldn't load this run: {view.detailRes.error}</div>
 	{:else}
