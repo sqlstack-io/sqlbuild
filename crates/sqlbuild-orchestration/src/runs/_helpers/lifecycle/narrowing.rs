@@ -27,14 +27,13 @@ pub(crate) fn frozen_narrowing<'de, D: Deserializer<'de>>(
     Ok((!narrowing.select.is_empty() || !narrowing.exclude.is_empty()).then_some(narrowing))
 }
 
-/// The backfill window of a stored frozen request, or of an already projected record.
+/// The backfill window of a stored frozen request, or of an already projected record: a stored request always has its run ID, and a projected window never does.
 pub(crate) fn frozen_window<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<RunWindow>, D::Error> {
     let value: Value = frozen(deserializer)?;
     let window: &Value = match value.get("window") {
         Some(window) => window,
-        // A stored request always has its run ID; a projected window never does.
         None if value.get("run_id").is_none() => &value,
         None => return Ok(None),
     };
