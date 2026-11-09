@@ -7,8 +7,9 @@
 	import LoadRow from '$lib/components/list/load-row.svelte';
 	import RelativeTime from '$lib/components/list/relative-time.svelte';
 	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import { hasCapability, type ConnectionTest } from '$lib/api';
 	import { formatAgo, formatStamp } from '$lib/format/time';
-	import { healthTone, healthWords, targetWords, testTone } from '$lib/platform/labels';
+	import { errorMessage, healthTone, healthWords, targetWords, testTone } from '$lib/platform/labels';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import ServerStatus from './server-status.svelte';
@@ -23,6 +24,26 @@
 	const opensDetail = $derived(app.client.supports('getLocation'));
 	const showsServer = $derived(app.client.supports('platformHealth'));
 	const knowsPolicy = $derived(all.some((l) => l.brokenDeployPolicy));
+
+	// Connection tests run per location, so each row checks that location's own permission.
+	const mayTest = (id: string) =>
+		app.client.supports('testConnection') &&
+		(hasCapability(app.bootstrap?.capabilities, 'connection.test') || hasCapability(app.bootstrap?.locations.find((l) => l.id === id)?.capabilities, 'connection.test'));
+	// A fresh result can be newer than the page clock's last tick; it then reads "just now".
+	let testing = $state<Record<string, boolean>>({});
+	let tested = $state<Record<string, ConnectionTest>>({});
+	let testFailures = $state<Record<string, string>>({});
+	async function testConnection(id: string) {
+		testing[id] = true;
+		delete testFailures[id];
+		try {
+			tested[id] = await app.client.testConnection({ locationId: id }, 'warehouse');
+		} catch (error) {
+			testFailures[id] = errorMessage(error);
+		} finally {
+			testing[id] = false;
+		}
+	}
 </script>
 
 <AppTopbar title="Locations">
@@ -52,6 +73,7 @@
 		</thead>
 		<tbody>
 			{#each filtered as l (l.id)}
+				{@const test = tested[l.id] ?? l.connectionTest}
 				<tr class:static={!opensDetail} onclick={() => opensDetail && goto(`/locations/${l.id}`)}>
 					<td>
 						<div class="cell-name">
@@ -81,13 +103,19 @@
 						{/if}
 					</td>
 					<td>
-						{#if l.connectionTest}
-							<span title="{l.connectionTest.message} ({formatStamp(l.connectionTest.at)})">
-								<StatusLabel tone={testTone[l.connectionTest.outcome]} label={l.connectionTest.outcome === 'ok' ? 'Connected' : 'Couldn’t connect'} />
+						{#if testing[l.id]}
+							<StatusLabel tone="var(--sb-running)" label="Testing…" />
+						{:else if test}
+							<span title="{test.message} ({formatStamp(test.at)})">
+								<StatusLabel tone={testTone[test.outcome]} label={test.outcome === 'ok' ? 'Connected' : 'Couldn’t connect'} />
 							</span>
-							<div class="cell-desc">tested {formatAgo(l.connectionTest.at, app.now)}</div>
+							<div class="cell-desc" title={test.message}>{test.trigger === 'manual' ? `tested ${formatAgo(test.at, Math.max(app.now, Date.parse(test.at)))} by you` : `tested ${formatAgo(test.at, app.now)} after deploying`}</div>
 						{:else}
 							<StatusLabel tone="var(--sb-text-faint)" label="Not tested yet" muted />
+						{/if}
+						{#if testFailures[l.id]}<div class="cell-desc err" title={testFailures[l.id]}>{testFailures[l.id]}</div>{/if}
+						{#if mayTest(l.id)}
+							<button class="test" disabled={testing[l.id]} onclick={(e) => (e.stopPropagation(), testConnection(l.id))} title="Ask the location to connect to its warehouse, as sqb debug does">Test connection</button>
 						{/if}
 					</td>
 					<td>
@@ -107,4 +135,8 @@
 	tr.static {
 		cursor: default;
 	}
+	.test { display: block; margin-top: 4px; color: var(--primary); font-size: 12px; }
+	.test:hover:not(:disabled) { text-decoration: underline; }
+	.test:disabled { color: var(--sb-text-faint); }
+	.err { color: var(--sb-error) !important; }
 </style>

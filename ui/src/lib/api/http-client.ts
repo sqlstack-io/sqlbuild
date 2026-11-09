@@ -5,7 +5,7 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { toLocationSummary, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
@@ -15,7 +15,7 @@ import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-j
 import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, LocationSummary, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationSummary, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -67,10 +67,15 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getRole',
 	'getWarehouseSync',
 	'maintenanceHistory',
+	'testConnection',
 	'listSnapshotNodes',
 	'checkAdhocRun',
 	'launchAdhocRun'
 ]);
+
+/** How often a connection test asks for the location's answer, and the longest it waits. */
+const CONNECTION_TEST_POLL_MS = 1000;
+const CONNECTION_TEST_WAIT_MS = 60_000;
 
 /** The server's largest audit page, and how many the audit log reads before it stops looking. */
 const AUDIT_PAGE = 100;
@@ -382,6 +387,31 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return warehouseSyncOf(data);
+		},
+		/** Asks the location to connect, then waits for its answer until the request expires. */
+		async testConnection(scope: Scope): Promise<ConnectionTest> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const path = { location_id: locationId, target };
+			const requestId = crypto.randomUUID();
+			const asked = await http.POST('/api/control/locations/{location_id}/targets/{target}/connection-tests', {
+				body: { request_id: requestId, reason: 'Tested from the web UI' },
+				params: { path, header: { 'x-sqb-csrf': csrfToken(document.cookie) } }
+			});
+			if (asked.response.status === 401) onUnauthorized();
+			if (!asked.response.ok) throw new ApiError(errorText(asked.error, asked.response), asked.response.status);
+			let expiresAt = Date.now() + CONNECTION_TEST_WAIT_MS;
+			while (Date.now() < expiresAt) {
+				await new Promise((resolve) => setTimeout(resolve, CONNECTION_TEST_POLL_MS));
+				const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/connection-tests/{request_id}', {
+					params: { path: { ...path, request_id: requestId } }
+				});
+				if (response.status === 401) onUnauthorized();
+				if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+				const finished = manualConnectionTest(data ?? null);
+				if (finished) return finished;
+				if (data) expiresAt = Math.min(expiresAt, Date.parse(data.expires_at));
+			}
+			throw new ApiError('The location did not answer the connection test in time; check that it is running', 504);
 		},
 		async maintenanceHistory(scope: Scope): Promise<MaintenanceHistory> {
 			const { locationId, target } = parseLocationKey(scope.locationId);

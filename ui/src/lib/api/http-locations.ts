@@ -35,6 +35,24 @@ export function connectionTestOf(observations: Wire['LocationHealthObservation']
 	return { outcome: ok ? 'ok' : 'failed', at: latest.received_at, durationMs: 0, trigger: 'publish', by: null, message: ok ? 'Connected after publishing' : 'Could not connect after publishing' };
 }
 
+/**
+ * A finished manual connection test, or null while the location hasn't answered. The location
+ * reports only whether it connected; `sqb debug` in the location shows why it couldn't.
+ */
+export function manualConnectionTest(record: Wire['LocationWorkRecord'] | null): ConnectionTest | null {
+	const outcome = record?.result_json?.outcome;
+	if (!record?.completed_at || !outcome) return null;
+	if (outcome.kind !== 'connection') throw new Error('A newer request replaced this connection test; test again');
+	return {
+		outcome: outcome.healthy ? 'ok' : 'failed',
+		at: record.completed_at,
+		durationMs: Date.parse(record.completed_at) - Date.parse(record.requested_at),
+		trigger: 'manual',
+		by: null,
+		message: outcome.healthy ? 'Connected to the warehouse' : 'Could not connect to the warehouse; run sqb debug in the location to see why'
+	};
+}
+
 /** `observations` is null when the person may not list the whole target. */
 export function toLocationSummary(location: Location, observations: Wire['LocationHealthObservation'][] | null, published: Wire['PublishedSnapshot'] | null, now: number): LocationSummary {
 	const known = observations ? healthOf(observations, now) : { health: null, liveInstances: 0, lastSeenAt: null };
