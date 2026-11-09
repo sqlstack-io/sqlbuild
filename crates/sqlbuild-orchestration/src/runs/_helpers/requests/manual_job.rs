@@ -3,6 +3,7 @@
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::authorize_person::authorize_person;
 use crate::authorization::main::refuse_unknown::refuse_unknown;
 use crate::credentials::main::audit::append_audit::append_audit;
@@ -19,6 +20,7 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
 
+/// Narrowing resolves selectors over the whole publication, so a person needs view on every node to narrow.
 pub(crate) async fn request_job_run_in(
     mut transaction: ControlTransaction,
     (context, credentials): (&AuditContext, Option<Uuid>),
@@ -39,6 +41,15 @@ pub(crate) async fn request_job_run_in(
             DefaultRole::None,
         )
         .await?;
+        if !request.select.is_empty() || !request.exclude.is_empty() {
+            (transaction, _) = authorize_listing(
+                transaction,
+                (&context, credentials),
+                (request.location_id, &request.target),
+                DefaultRole::None,
+            )
+            .await?;
+        }
     }
     if context.actor.trim().is_empty()
         || context.granting_role.trim().is_empty()
