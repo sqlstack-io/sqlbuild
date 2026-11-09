@@ -9,8 +9,7 @@ pub(crate) async fn generic_server_errors(response: Response) -> Response {
     let plain = response
         .headers()
         .get(header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.starts_with("text/plain"));
+        .is_some_and(|value| value.as_bytes().starts_with(b"text/plain"));
     if !(plain && response.status().is_server_error()) {
         return response;
     }

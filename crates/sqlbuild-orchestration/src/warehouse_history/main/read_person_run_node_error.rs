@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::authorization::main::begin_authorized::begin_authorized;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
-use crate::runs::models::{RunChange, RunChangeRequest, RunNodeError};
+use crate::runs::models::{RunChange, RunChangeRequest, RunNodeFailure};
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
 use crate::store::main::{commit::commit, query::query};
@@ -16,8 +16,9 @@ use crate::store::models::{ControlStore, Parameter};
 pub async fn read_person_run_node_error(
     store: &ControlStore,
     credentials: (&AuditContext, Uuid),
-    (location_id, target, run_id, node_key): (Uuid, &str, Uuid, &str),
-) -> Result<Option<RunNodeError>, ControlError> {
+    (location_id, target): (Uuid, &str),
+    (run_id, node_key): (Uuid, &str),
+) -> Result<Option<RunNodeFailure>, ControlError> {
     let scope = PermissionScope {
         action: Action::ViewEvidence,
         location_id: Some(location_id),
@@ -57,7 +58,7 @@ pub async fn read_person_run_node_error(
         let nodes;
         (transaction, nodes) =
             read_snapshot_nodes(transaction, snapshot_id, Some(&scope.nodes)).await?;
-        result = Some(RunNodeError {
+        result = Some(RunNodeFailure {
             node_key: node_key.into(),
             error_code: row["error_code"].as_str().map(str::to_owned),
             message,

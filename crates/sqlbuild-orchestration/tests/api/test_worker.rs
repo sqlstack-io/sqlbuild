@@ -25,8 +25,8 @@ use crate::api::tests::helpers::{start_api, stop_api};
 use crate::api::tests::output_helpers::{chunk, output_contract};
 use crate::api::tests::recall_helpers::recall_contract;
 use crate::api::tests::test_types::{
-    ApiContractTestCase, OlderServerReportTestCase, TestApi, WorkerDeadlineTestCase,
-    WorkerRedirectTestCase,
+    ApiContractTestCase, OlderNodeReport, OlderServerReportTestCase, TestApi,
+    WorkerDeadlineTestCase, WorkerRedirectTestCase,
 };
 use crate::credentials::tests::location_helpers::create_location;
 use crate::runs::tests::helpers::{queue, request, snapshot};
@@ -389,29 +389,6 @@ fn given_a_credentialed_worker_when_the_server_redirects_then_the_redirect_is_no
     }
 }
 
-/// The node report shape a server had before failed nodes carried error text.
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[allow(dead_code)]
-struct OlderNodeReport {
-    event_id: Uuid,
-    run_id: Uuid,
-    claim_id: Option<Uuid>,
-    change: OlderNodeFinished,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[allow(dead_code)]
-struct OlderNodeFinished {
-    kind: String,
-    node_key: String,
-    outcome: NodeOutcome,
-    rows_affected: Option<i64>,
-    error_code: Option<String>,
-    skipped_because_of: Option<String>,
-}
-
 #[test]
 fn given_an_older_server_when_a_worker_reports_error_text_then_the_refusal_asks_for_a_server_upgrade()
  {
@@ -472,21 +449,19 @@ fn given_an_older_server_when_a_worker_reports_error_text_then_the_refusal_asks_
                     },
                 )
                 .await;
-            let refusal = match &reported {
-                Err(error @ WorkerError::OlderServer) => Some(
-                    error
-                        .to_string()
-                        .contains("upgrade the server before its workers"),
-                ),
-                _ => None,
-            };
+            let message = reported.as_ref().err().map(ToString::to_string);
             assert_eq!(
-                (reported.is_ok(), refusal),
-                if test_case.expected_upgrade_refusal {
-                    (false, Some(true))
-                } else {
-                    (true, None)
-                },
+                (
+                    reported.is_ok(),
+                    matches!(reported, Err(WorkerError::OlderServer)),
+                    message
+                        .is_some_and(|text| text.contains("upgrade the server before its workers")),
+                ),
+                (
+                    !test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal,
+                    test_case.expected_upgrade_refusal
+                ),
                 "{}",
                 test_case.description
             );

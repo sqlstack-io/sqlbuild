@@ -2133,7 +2133,7 @@ export interface components {
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
         /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
-        RunNodeError: {
+        RunNodeFailure: {
             error_code?: string | null;
             /** @description Null when the worker reported none or the run's history has been pruned. */
             message?: string | null;
@@ -4117,7 +4117,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunNodeError"];
+                    "application/json": components["schemas"]["RunNodeFailure"];
                 };
             };
             /** @description Session rejected */

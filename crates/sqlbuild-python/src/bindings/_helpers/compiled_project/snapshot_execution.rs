@@ -8,7 +8,7 @@ use pyo3::exceptions::{PyKeyboardInterrupt, PyRuntimeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::PyStringMethods;
 use sqlbuild_core::models::ResourceKind;
-use sqlbuild_orchestration::runs::main::node_error_text::node_error_text;
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 use sqlbuild_orchestration::runs::models::{
     NodeOutcome, RunChange, RunCommand, RunExecution, RunOutcome,
 };
@@ -50,7 +50,7 @@ impl WorkerBuild {
             refusal: Mutex::default(),
         });
         for key in state.execution.skipped_nodes.keys() {
-            state.complete(worker.py(), key, (NodeOutcome::Skipped, None, None, None))?;
+            state.complete(worker.py(), key, (NodeOutcome::Skipped, None, (None, None)))?;
         }
         Ok(state)
     }
@@ -143,7 +143,7 @@ impl WorkerBuild {
                     } else {
                         NodeOutcome::Skipped
                     };
-                    self.complete(pipeline.py(), &key, (outcome, None, None, None))?;
+                    self.complete(pipeline.py(), &key, (outcome, None, (None, None)))?;
                 }
             }
         }
@@ -153,7 +153,7 @@ impl WorkerBuild {
     /// Nodes `build --changed` leaves unbuilt are up to date, as a planner `no_change` skip is.
     pub(crate) fn unchanged(&self, py: Python<'_>, keys: &[String]) -> PyResult<()> {
         for key in keys {
-            self.complete(py, key, (NodeOutcome::Success, None, None, None))?;
+            self.complete(py, key, (NodeOutcome::Success, None, (None, None)))?;
         }
         Ok(())
     }
@@ -162,11 +162,10 @@ impl WorkerBuild {
         &self,
         py: Python<'_>,
         key: &str,
-        (outcome, rows_affected, error_code, error_message): (
+        (outcome, rows_affected, (error_code, error_message)): (
             NodeOutcome,
             Option<i64>,
-            Option<String>,
-            Option<String>,
+            (Option<String>, Option<String>),
         ),
     ) -> PyResult<()> {
         if !self.execution.claim.request.selection.contains(key) {
@@ -189,7 +188,7 @@ impl WorkerBuild {
                 rows_affected,
                 error_code,
                 skipped_because_of: self.execution.skipped_nodes.get(key).cloned(),
-                error_message: error_message.as_deref().map(node_error_text),
+                error_message: error_message.as_deref().map(redact_error_text),
             },
         )?;
         self.completed
@@ -236,7 +235,7 @@ impl WorkerBuild {
         key: &str,
         outcome: NodeOutcome,
     ) -> PyResult<()> {
-        self.complete(py, key, (outcome, None, None, None))
+        self.complete(py, key, (outcome, None, (None, None)))
     }
 
     /// A test or audit the snapshot records has started; the node it attaches to starts with it.
@@ -355,7 +354,7 @@ impl WorkerBuild {
                 Some(value) => value.extract()?,
                 None => None,
             };
-            self.complete(result.py(), key, (outcome, rows, error, message))?;
+            self.complete(result.py(), key, (outcome, rows, (error, message)))?;
         }
         Ok(())
     }
@@ -438,7 +437,7 @@ impl WorkerBuild {
                     })
                 };
                 if let Some(outcome) = outcome {
-                    self.complete(py, key, (outcome, None, None, None))?;
+                    self.complete(py, key, (outcome, None, (None, None)))?;
                 }
             }
         }
@@ -453,8 +452,7 @@ impl WorkerBuild {
                         NodeOutcome::Skipped
                     },
                     None,
-                    None,
-                    None,
+                    (None, None),
                 ),
             )?;
         }

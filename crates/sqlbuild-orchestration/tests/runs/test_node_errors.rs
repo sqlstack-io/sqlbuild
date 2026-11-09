@@ -8,7 +8,6 @@ use uuid::Uuid;
 use crate::credentials::tests::role_helpers::{credentials, orders_grant, role_fixture};
 use crate::runs::main::change_run::change_run;
 use crate::runs::main::claim_next_run::claim_next_run;
-use crate::runs::main::read_person_run_node_error::read_person_run_node_error;
 use crate::runs::models::{RunAuthority, RunChangeRequest};
 use crate::runs::tests::helpers::{queue, request, rows, snapshot};
 use crate::runs::tests::test_types::RunNodeErrorTestCase;
@@ -19,6 +18,7 @@ use crate::store::main::migrate_store::migrate_store;
 use crate::store::models::Parameter;
 use crate::store::tests::store_helpers::{close_test_store, open_test_store, run};
 use crate::store::tests::store_test_types::Backend;
+use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
 
 const EXPECTED_MESSAGE: &str = "Conversion Error: could not convert 'n/a' to INT32 \
      (password=[REDACTED], url=postgres://orders:[REDACTED]@warehouse.example.test/orders, \
@@ -112,7 +112,7 @@ fn given_a_failed_node_when_people_read_its_error_then_only_evidence_on_that_nod
             let member = (&roles.context, roles.member_id);
             let location = roles.location_id;
             let read = |who, run_id, node: &'static str| {
-                read_person_run_node_error(store, who, (location, "development", run_id, node))
+                read_person_run_node_error(store, who, (location, "development"), (run_id, node))
             };
             let error = read(member, run_id, "orders")
                 .await

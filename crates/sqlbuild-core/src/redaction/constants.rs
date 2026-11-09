@@ -31,3 +31,8 @@ pub(crate) const BEARER_REPLACEMENT: &str = "Bearer [REDACTED]";
 pub(crate) const URI_REPLACEMENT: &str = "${1}[REDACTED]${3}";
 /// Compiled size allowance for the bounded Unicode repetitions above.
 pub(crate) const PATTERN_SIZE_LIMIT: usize = 1 << 28;
+/// `scheme://user:secret` with no `@` after it, as when a warehouse cuts a quoted connection string short.
+pub(crate) const BARE_USERINFO_PATTERN: &str =
+    r#"(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@'"]+:)([^\s/@'"]+)"#;
+/// The most characters of error text kept after redaction.
+pub(crate) const ERROR_TEXT_CHARS: usize = 2000;

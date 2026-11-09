@@ -190,3 +190,26 @@ pub(crate) struct ServerErrorTestCase {
     pub(crate) expected_status: u16,
     pub(crate) expected_body: &'static str,
 }
+
+/// The node report shape a server had before failed nodes carried error text.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) struct OlderNodeReport {
+    event_id: uuid::Uuid,
+    run_id: uuid::Uuid,
+    claim_id: Option<uuid::Uuid>,
+    change: OlderNodeFinished,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub(crate) struct OlderNodeFinished {
+    kind: String,
+    node_key: String,
+    outcome: crate::runs::models::NodeOutcome,
+    rows_affected: Option<i64>,
+    error_code: Option<String>,
+    skipped_because_of: Option<String>,
+}

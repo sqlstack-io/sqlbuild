@@ -134,6 +134,14 @@ pub(crate) struct CheckResultPath {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct RunNodePath {
+    pub(crate) location_id: uuid::Uuid,
+    pub(crate) target: String,
+    pub(crate) run_id: uuid::Uuid,
+    pub(crate) node_key: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct RunRecallPath {
     pub(crate) location_id: uuid::Uuid,
     pub(crate) target: String,

@@ -5,7 +5,7 @@ use axum::routing::get;
 use axum::{Extension, Router, middleware};
 use uuid::Uuid;
 
-use crate::api::_helpers::server_errors::generic_server_errors;
+use crate::api::_helpers::resources::server_errors::generic_server_errors;
 use crate::api::errors::ApiError;
 use crate::api::tests::test_types::ServerErrorTestCase;
 use crate::store::errors::ControlError;

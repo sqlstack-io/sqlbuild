@@ -17,9 +17,3 @@ pub(crate) const RERUN_AUDIT_TAG: &[u8] = b"rerun-request";
 
 /// Ad-hoc requests derive their audit event ID from the run ID so retries find the original.
 pub(crate) const ADHOC_AUDIT_TAG: &[u8] = b"adhoc-run-request";
-
-/// Characters of a failed node's error text kept after redaction.
-pub(crate) const NODE_ERROR_CHARS: usize = 2000;
-/// `scheme://user:secret` with no `@` after it, as when a warehouse cuts a quoted connection string short.
-pub(crate) const BARE_USERINFO_PATTERN: &str =
-    r#"(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@'"]+:)([^\s/@'"]+)"#;

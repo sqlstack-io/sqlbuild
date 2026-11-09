@@ -345,7 +345,7 @@ pub struct RunErrorText {
 
 /// A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-pub struct RunNodeError {
+pub struct RunNodeFailure {
     pub node_key: String,
     pub error_code: Option<String>,
     /// Null when the worker reported none or the run's history has been pruned.

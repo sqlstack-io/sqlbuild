@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Deserializer};
 
-use crate::runs::main::node_error_text::node_error_text;
+use sqlbuild_core::redaction::main::redact_error_text::redact_error_text;
 
 pub(crate) fn bounded_error_text<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<String>, D::Error> {
-    Ok(Option::<String>::deserialize(deserializer)?.map(|text| node_error_text(&text)))
+    Ok(Option::<String>::deserialize(deserializer)?.map(|text| redact_error_text(&text)))
 }
