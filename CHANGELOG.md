@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.205.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.204.0...v0.205.0) (2026-11-09)
+
+
+### Features
+
+* **jobs:** the job page shows a job's settings, its group's members in run order, the groups it belongs to and its critical nodes, and can start a full refresh for people with run.rewrite_history ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+* **runs:** the run page shows a failed node's error text and project file, redacted and limited to 2,000 characters, for people with view.evidence on that node. Upgrade the server before its workers: an older server refuses a newer worker's failed-node report ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+* **ui:** backfill a job or group over a cursor window from its launch form ([757a977](https://github.com/sqlstack-io/sqlbuild/commit/757a977a0265a8359f186faa93be4c71f4cf4f0e))
+* **ui:** job pages draw their nodes as a lineage graph; a group draws each member job as a box around its nodes, with its last run ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** location detail and scheduler status from the server's health reads ([757a977](https://github.com/sqlstack-io/sqlbuild/commit/757a977a0265a8359f186faa93be4c71f4cf4f0e))
+* **ui:** run header shows the start time, project version and sqb command; a group run's log and statements gather its job runs' ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** run page shows the first failed node's error inline, orders the timeline by start, and merges events and output into one filterable log. Opening a run with a failed node now records one error.read audit row for people with view.evidence ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** upcoming schedule times and calendar coverage on the trigger page ([757a977](https://github.com/sqlstack-io/sqlbuild/commit/757a977a0265a8359f186faa93be4c71f4cf4f0e))
+
+
+### Bug Fixes
+
+* **redaction:** diagnostic and error-text redaction now also covers keys glued to a prefix (such as PGPASSWORD), SQL PASSWORD and IDENTIFIED [WITH plugin] BY values, passwords containing @, and digit passwords in cut connection strings ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+* **runs:** runs record whether they rewrite history (backfills and full refreshes), and the job page no longer shows deferral paths ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+* **server:** the maintenance read returns how many grants were copied to an old-name view, not the GRANT statements ([757a977](https://github.com/sqlstack-io/sqlbuild/commit/757a977a0265a8359f186faa93be4c71f4cf4f0e))
+* **server:** the server no longer sends framework error text that names internal types; a plain-text 5xx becomes the generic JSON error ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+* **ui:** a run's origin chip links to its schedule or sensor, or to the run it reruns ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** group runs list each node once, and a job run's statement SQL loads from its own run ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** lineage inspector switches nodes without a loading flash, and its header always names the selected node ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** run statements name their statement kind, and run-level queries read as "run" ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **ui:** top bar popovers such as Run now stay above page graphs ([57f4cff](https://github.com/sqlstack-io/sqlbuild/commit/57f4cff5138f34529165450c2eb2649380eb3fed))
+* **worker:** workers stop with a clear message when an older server refuses their report. Upgrade the server before its locations and workers ([c0971a2](https://github.com/sqlstack-io/sqlbuild/commit/c0971a2c49b3cdacc1496d9bc8ba3c6bba35b7b9))
+
 ## [0.204.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.203.0...v0.204.0) (2026-11-09)
 
 
