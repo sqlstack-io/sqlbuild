@@ -208,8 +208,7 @@ HEADER_CONTRACT_FILES: dict[str, str] = {
         "MODEL (\n  columns (customer_id (type INTEGER)),\n"
         "  dynamic_columns (category_amounts (pivot_column category, value_column amount,"
         ' aggregate max, type INTEGER, name_pattern "^[a-z]+$")),\n);\n'
-        'SELECT * FROM __ref("order_amounts")\n'
-        "PIVOT(MAX(amount) FOR category IN (ANY ORDER BY category))\n"
+        'PIVOT __ref("order_amounts") ON category USING MAX(amount)\n'
     ),
     "models/order_statuses.sql": (
         "MODEL (\n  contract enforced,\n"
