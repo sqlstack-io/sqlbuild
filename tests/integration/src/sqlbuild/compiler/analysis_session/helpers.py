@@ -153,14 +153,6 @@ _PIVOT_SHAPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "motherduck": (_PIVOT_BODIES, _PIVOT_AGGREGATES),
     "snowflake": (_SNOWFLAKE_PIVOT_BODIES, ("MAX", "MIN", "AVG", "SUM")),
 }
-_DIALECT_SPELLINGS: dict[str, dict[str, dict[str, str]]] = {
-    "bigquery": {
-        "_quoted": {"quote": "`"},
-        "_set_operation": {"distinct": " DISTINCT"},
-        "_cte_contract": {"star_except": "* EXCEPT ({a})"},
-    },
-    "postgres": {"_cte_contract": {"star_except": "{b}"}},
-}
 _TYPED_PIVOT: str = (
     _PIVOT_HEADER.format(pivot="status", value="amount", aggregate="MAX")
     + _PIVOT_BODIES[0].format(aggregate="MAX")
@@ -435,6 +427,14 @@ _TEMPLATES: tuple[_Template, ...] = (
     _subquery,
     _cast_constant,
 )
+_DIALECT_SPELLINGS: dict[str, dict[_Template, dict[str, str]]] = {
+    "bigquery": {
+        _quoted: {"quote": "`"},
+        _set_operation: {"distinct": " DISTINCT"},
+        _cte_contract: {"star_except": "* EXCEPT ({a})"},
+    },
+    "postgres": {_cte_contract: {"star_except": "{b}"}},
+}
 
 
 def pivot_project_files() -> dict[str, str]:
@@ -469,7 +469,7 @@ def native_pivot_proofs() -> NativePivotProofs:
 
 
 def generated_analysis_files(
-    *, rng: random.Random, model_count: int, dialect: str = "duckdb"
+    *, rng: random.Random, model_count: int, dialect: str | None = "duckdb"
 ) -> dict[str, str]:
     """Sources (typed, inferred and untyped), a pivot and models drawing on every template.
 
@@ -477,16 +477,16 @@ def generated_analysis_files(
     and pivots only where it has PIVOT.
     """
 
+    named: str = dialect or ""
     files: dict[str, str] = {
         "sqlbuild_project.toml": _PROJECT_TOML,
         "sources/raw.yml": _SOURCES,
-        **_pivot_models(rng, dialect),
+        **_pivot_models(rng, named),
         **_CONTRACT_CTE_MODELS,
     }
-    spellings: dict[str, dict[str, str]] = _DIALECT_SPELLINGS.get(dialect, {})
+    spellings: dict[_Template, dict[str, str]] = _DIALECT_SPELLINGS.get(named, {})
     templates: tuple[_Template, ...] = tuple(
-        functools.partial(template, **spellings.get(template.__name__, {}))
-        for template in _TEMPLATES
+        functools.partial(template, **spellings.get(template, {})) for template in _TEMPLATES
     )
     relations: list[_Relation] = list(_INITIAL_RELATIONS)
     for index in range(model_count):
