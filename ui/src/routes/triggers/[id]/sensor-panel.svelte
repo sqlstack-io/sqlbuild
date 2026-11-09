@@ -57,7 +57,7 @@
 	<div class="cursor">
 		{#if sensor.cursorKnown}
 			<code>{sensor.cursor ?? '(the start: nothing handled yet)'}</code>
-			{#if sensor.cursorUpdatedAt}<span class="faint" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
+			{#if sensor.cursorUpdatedAt}<span class="faint updated" title={formatStamp(sensor.cursorUpdatedAt)}>updated {formatAgo(sensor.cursorUpdatedAt, app.now)}</span>{/if}
 		{/if}
 		<GatedButton requires="sensor.reset_cursor" size="xs" disabled={sensor.cursorKnown && sensor.cursor === null} reason="It's already at the start" onclick={() => (confirmReset = !confirmReset)}>Start over</GatedButton>
 	</div>
@@ -124,6 +124,10 @@
 {/if}
 
 <style>
+	/* Room for the longest relative time, so the button beside it stays put as the time ticks. */
+	.updated {
+		min-width: 15ch;
+	}
 	section {
 		margin-bottom: 24px;
 	}

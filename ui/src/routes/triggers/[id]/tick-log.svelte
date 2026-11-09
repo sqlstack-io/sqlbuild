@@ -85,8 +85,17 @@
 		vertical-align: top;
 	}
 	.outcome {
-		color: var(--c);
-		font-weight: 500;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+	/* Only the dot carries the outcome's colour; a column of the usual outcome stays calm. */
+	.outcome::before {
+		content: '';
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--c);
 	}
 	.tag {
 		margin-left: 6px;

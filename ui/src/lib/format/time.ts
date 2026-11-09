@@ -3,13 +3,14 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** Compact age, e.g. `just now`, `42s ago`, `4m ago`, `3h ago`, `2d ago`. */
+/** Compact age, e.g. `just now`, `40s ago`, `4m ago`, `3h ago`, `2d ago`. */
 export function formatAgo(iso: string | null | undefined, now: number): string {
 	if (!iso) return '—';
 	const diff = now - Date.parse(iso);
 	if (diff < 0) return formatIn(iso, now);
-	if (diff < 5 * SECOND) return 'just now';
-	if (diff < MINUTE) return `${Math.floor(diff / SECOND)}s ago`;
+	if (diff < 10 * SECOND) return 'just now';
+	// Seconds move in steps of ten, so a ticking label changes rarely.
+	if (diff < MINUTE) return `${Math.floor(diff / (10 * SECOND)) * 10}s ago`;
 	if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
 	if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
 	return `${Math.floor(diff / DAY)}d ago`;
@@ -20,7 +21,7 @@ export function formatIn(iso: string | null | undefined, now: number): string {
 	if (!iso) return '—';
 	const diff = Date.parse(iso) - now;
 	if (diff <= 0) return 'now';
-	if (diff < MINUTE) return `in ${Math.ceil(diff / SECOND)}s`;
+	if (diff < MINUTE) return `in ${Math.ceil(diff / (10 * SECOND)) * 10}s`;
 	if (diff < HOUR) return `in ${Math.round(diff / MINUTE)}m`;
 	if (diff < DAY) return `in ${Math.round(diff / HOUR)}h`;
 	return `in ${Math.round(diff / DAY)}d`;
