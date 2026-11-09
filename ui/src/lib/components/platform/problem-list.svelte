@@ -35,6 +35,11 @@
 		return `Sensor ${r.triggerName}: ${reactionLabel[r.outcome]}${attempts}${at}${evaluation}`;
 	}
 
+	const shownLinks = (e: PlatformEventRecord) => e.links.filter((l) => !(l.kind === 'location' && l.id === currentLocationId));
+	// Columns nothing fills are left out, such as reactions where the server doesn't record them.
+	const showAffected = $derived(events.some((e) => shownLinks(e).length));
+	const showReactions = $derived(events.some((e) => e.reactions.length));
+
 	const payload = (p: Record<string, string>) =>
 		Object.entries(p)
 			.map(([k, v]) => `${k}: ${v}`)
@@ -46,8 +51,8 @@
 		<tr>
 			<th>Problem</th>
 			<th>When</th>
-			<th>Affected</th>
-			<th title="Sensors that react to these problems, e.g. to post a message">Sensors that reacted</th>
+			{#if showAffected}<th>Affected</th>{/if}
+			{#if showReactions}<th title="Sensors that react to these problems, e.g. to post a message">Sensors that reacted</th>{/if}
 		</tr>
 	</thead>
 	<tbody>
@@ -74,13 +79,16 @@
 						{#if e.active}still open{:else if e.resolvedAt}fixed after {formatDuration(e.occurredAt, e.resolvedAt, app.now)}{:else}fixed{/if}
 					</div>
 				</td>
+				{#if showAffected}
 				<td>
-					{#each e.links.filter((l) => !(l.kind === 'location' && l.id === currentLocationId)) as link (eventLinkHref(link))}
+					{#each shownLinks(e) as link (eventLinkHref(link))}
 						<a class="link stacked" href={eventLinkHref(link)} onclick={() => followLink(link)}>{eventLinkLabel(link, app.bootstrap?.locations)}</a>
 					{:else}
 						<span class="muted">—</span>
 					{/each}
 				</td>
+				{/if}
+				{#if showReactions}
 				<td>
 					{#each e.reactions as r (r.triggerId)}
 						<a class="link stacked reaction" href={reactionHref(r)} onclick={() => follow(r)} title={reactionTitle(r)}>
@@ -91,10 +99,11 @@
 						<span class="muted" title="No sensor reacts to this kind of problem">—</span>
 					{/each}
 				</td>
+				{/if}
 			</tr>
 		{:else}
 			<tr class="load-row">
-				<td colspan="4" class="empty">
+				<td colspan={2 + Number(showAffected) + Number(showReactions)} class="empty">
 					{#if resource.error}<span class="err">Couldn't load problems: {resource.error}</span>{:else if resource.loading && !events.length}{resource.slow ? 'Loading…' : ''}{:else}{empty}{/if}
 				</td>
 			</tr>

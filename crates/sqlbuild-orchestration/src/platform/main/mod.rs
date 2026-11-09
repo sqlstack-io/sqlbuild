@@ -3,6 +3,7 @@ pub mod claim_location_work;
 pub mod complete_location_work;
 pub mod connect_location_work;
 pub(crate) mod enqueue_location_work;
+pub mod list_person_platform_events;
 pub mod location_health;
 pub mod location_work;
 pub(crate) mod read_location_work;

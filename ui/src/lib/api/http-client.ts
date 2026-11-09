@@ -10,14 +10,14 @@ import { manualConnectionTest, toLocationDetail, toLocationSummary, warehouseSyn
 import { toAccount, toRoleAssignments } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
-import { toPlatformEvents, toPlatformHealth } from './http-problems';
+import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
 import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -73,6 +73,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listLocations',
 	'getLocation',
 	'listPlatformEvents',
+	'listPlatformEventHistory',
 	'platformHealth',
 	'listRoles',
 	'getRole',
@@ -523,6 +524,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return toMaintenanceHistory(data);
 		},
 		listPlatformEvents: async (): Promise<PlatformEvent[]> => toPlatformEvents(await problems(), Date.now()),
+		async listPlatformEventHistory(query: PlatformEventQuery = {}): Promise<PlatformEventRecord[]> {
+			const [open, stored, locations] = await Promise.all([
+				problems().then((p) => toPlatformEvents(p, Date.now())),
+				http.GET('/api/control/platform/events', { params: { query: { limit: query.limit ?? 200 } } }).then(({ data, error, response }) => {
+					if (response.status === 401) onUnauthorized();
+					if (!data) throw new ApiError(errorText(error, response), response.status);
+					return data;
+				}),
+				bootstrapLocations()
+			]);
+			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])));
+			return records.filter(
+				(r) => (query.locationId === undefined || r.locationId === query.locationId) && (!query.kinds?.length || query.kinds.includes(r.kind)) && (!query.activeOnly || r.active)
+			);
+		},
 		platformHealth: async (): Promise<PlatformHealth> => toPlatformHealth(await problems()),
 		/** Each location the person sees, with health only where they may list the whole target. */
 		async listLocations(): Promise<LocationSummary[]> {

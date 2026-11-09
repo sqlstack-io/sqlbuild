@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toPlatformEvents, toPlatformHealth } from './http-problems';
+import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
 
 const NOW = Date.parse('2026-11-08T12:00:00Z');
 const tick = (name: string, location: string, scheduledFor: string) => ({
@@ -56,5 +56,33 @@ describe('toPlatformHealth', () => {
 
 	it('has no lease once the last one ran out, even though its expiry is still reported', () => {
 		expect(toPlatformHealth({ scheduler_leader: false, scheduler_lease_expires_at: '2026-11-08T11:50:00Z', broken_locations: [], overdue_ticks: [] }).scheduler.lease).toBeNull();
+	});
+});
+
+describe('toPlatformEventRecords', () => {
+	it('marks the stored event of an open problem as ongoing instead of listing it twice, and keeps each location target', () => {
+		const open = toPlatformEvents({ scheduler_leader: false, scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] }, NOW);
+		const records = toPlatformEventRecords(
+			open,
+			[
+				{ storage_id: 9, event_id: 'e9', occurred_at: '2026-11-08T11:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'launch_failed', run_id: 'r1', claim_id: 'c1', code: 'image_missing' } },
+				{ storage_id: 4, event_id: 'e4', occurred_at: '2026-11-08T10:00:00Z', event: { kind: 'scheduler_no_leader' } }
+			],
+			new Map([['l1:development', 'orders']])
+		);
+		expect(records.map((r) => [r.kind, r.active, r.locationId])).toEqual([
+			['launch_failed', false, 'l1:development'],
+			['scheduler_no_leader', true, null]
+		]);
+		expect(records[0]).toMatchObject({ subject: 'orders · development', message: "A run in orders · development couldn't start (image_missing).", links: [{ kind: 'run', id: 'r1', locationId: 'l1:development' }], payload: { code: 'image_missing' } });
+	});
+
+	it('lists an open problem nothing was stored for first', () => {
+		const open = toPlatformEvents({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [{ location_id: 'l2', location_name: 'inventory', target: 'development', last_seen_at: '2026-11-08T11:00:00Z' }], overdue_ticks: [] }, NOW);
+		const records = toPlatformEventRecords(open, [{ storage_id: 1, event_id: 'e1', occurred_at: '2026-11-08T09:00:00Z', location_id: 'l1', target: 'development', event: { kind: 'location_broken', location_id: 'l1', target: 'development', last_seen_at: '2026-11-08T08:59:00Z' } }], new Map());
+		expect(records.map((r) => [r.kind, r.active, r.locationId])).toEqual([
+			['location_broken', true, 'l2:development'],
+			['location_broken', false, 'l1:development']
+		]);
 	});
 });

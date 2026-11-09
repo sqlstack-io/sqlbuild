@@ -183,7 +183,7 @@ pub enum PlatformEventKind {
     LaunchFailed,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PlatformEvent {
     Heartbeat {
@@ -259,6 +259,25 @@ pub(crate) struct WatchdogLocation {
     pub(crate) location_id: Uuid,
     pub(crate) target: String,
     pub(crate) last_seen_at: DateTime<Utc>,
+}
+
+/// A stored platform event a person may see; the location target is absent for server-wide events.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonPlatformEvent {
+    pub storage_id: i64,
+    pub event_id: Uuid,
+    pub occurred_at: DateTime<Utc>,
+    pub event: PlatformEvent,
+    pub location_id: Option<Uuid>,
+    pub target: Option<String>,
+}
+
+/// The location target a trigger or run belongs to.
+#[derive(Debug, Deserialize)]
+pub(crate) struct EventScope {
+    pub(crate) id: Uuid,
+    pub(crate) location_id: Uuid,
+    pub(crate) target: String,
 }
 
 /// Stable event identity permits receiver-side deduplication after uncertain acknowledgements.

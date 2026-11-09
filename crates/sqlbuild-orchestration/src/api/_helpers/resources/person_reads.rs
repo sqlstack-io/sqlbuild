@@ -6,7 +6,9 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::{ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery};
+use crate::api::models::{
+    PlatformEventsQuery, ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery,
+};
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_trigger_changes::list_person_trigger_changes;
@@ -15,9 +17,10 @@ use crate::declarations::main::read_person_job::read_person_job;
 use crate::declarations::models::{
     JobDetailRecord, JobRecord, PersonTriggerChange, PersonTriggerRecord,
 };
+use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
-use crate::platform::models::{LocationHealthObservation, PlatformProblems};
+use crate::platform::models::{LocationHealthObservation, PersonPlatformEvent, PlatformProblems};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
     NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
@@ -455,6 +458,27 @@ pub(crate) async fn problems(
 ) -> Result<Json<PlatformProblems>, ApiError> {
     Ok(Json(
         read_person_problems(&store, principal, default_role).await?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/control/platform/events", operation_id = "listPersonPlatformEvents",
+    params(("before" = Option<i64>, Query, description = "Continue after this storage ID of the previous page"),
+        ("limit" = Option<u32>, Query, description = "Events to scan; defaults to 200, clamped to 1..500")),
+    responses((status = 200, body = Vec<PersonPlatformEvent>, description = "Stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists"),
+        (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn platform_events(
+    (State(store), Query(options)): (State<ControlStore>, Query<PlatformEventsQuery>),
+    Extension(default_role): Extension<DefaultRole>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<Vec<PersonPlatformEvent>>, ApiError> {
+    Ok(Json(
+        list_person_platform_events(
+            &store,
+            principal,
+            (options.before, options.limit.unwrap_or(200)),
+            default_role,
+        )
+        .await?,
     ))
 }
 

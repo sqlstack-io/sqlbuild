@@ -1,7 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { locationKey as keyOf } from './http-client';
 import type { PlatformEvent } from './types';
-import type { PlatformHealth } from './types/platform';
+import type { PlatformEventRecord, PlatformHealth } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -63,4 +63,37 @@ export function toPlatformHealth(problems: Wire['PlatformProblems']): PlatformHe
 		scheduler: { lease: problems.scheduler_leader && expiresAt ? { holder: null, acquiredAt: null, renewedAt: null, expiresAt } : null, instances: null },
 		heartbeat: null
 	};
+}
+
+/** Stored events newest first; an open problem marks the newest stored event of its kind and place as ongoing, or comes first when none was stored. */
+export function toPlatformEventRecords(open: PlatformEvent[], stored: Wire['PersonPlatformEvent'][], names: Map<string, string>): PlatformEventRecord[] {
+	const records = stored.map((wire) => storedRecord(wire, names));
+	const unmatched: PlatformEventRecord[] = [];
+	for (const event of open) {
+		const latest = records.find((r) => !r.active && r.kind === event.kind && r.locationId === event.locationId);
+		if (latest) latest.active = true;
+		else unmatched.push({ ...event, resolvedAt: null, links: [], reactions: [], payload: {} });
+	}
+	return [...unmatched, ...records];
+}
+
+function storedRecord(wire: Wire['PersonPlatformEvent'], names: Map<string, string>): PlatformEventRecord {
+	const key = wire.location_id && wire.target ? keyOf(wire.location_id, wire.target) : null;
+	const place = key && wire.target ? placeOf(names.get(key) ?? 'A location', wire.target) : null;
+	const base = { id: wire.event_id, occurredAt: wire.occurred_at, active: false, locationId: key, subject: place, resolvedAt: null, reactions: [] };
+	const event = wire.event;
+	switch (event.kind) {
+		case 'scheduler_no_leader':
+			return { ...base, kind: event.kind, severity: 'critical', message: 'No server held the scheduler lease, so schedules and sensors stopped starting runs.', links: [], payload: {} };
+		case 'location_broken':
+			return { ...base, kind: event.kind, severity: 'critical', message: `${place} stopped checking in.`, links: key ? [{ kind: 'location', id: key }] : [], payload: { last_seen_at: event.last_seen_at } };
+		case 'tick_overdue':
+			return { ...base, kind: event.kind, severity: 'warning', message: `A schedule in ${place ?? 'a location'} was late.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'schedule', locationId: key }] : [], payload: { scheduled_for: event.scheduled_for } };
+		case 'calendar_horizon_low':
+			return { ...base, kind: event.kind, severity: 'warning', message: `A calendar in ${place ?? 'a location'} was running out of dates.`, links: key ? [{ kind: 'trigger', id: event.trigger_id, name: 'calendar', locationId: key }] : [], payload: { refresh_at: event.refresh_at, ...(event.horizon_end ? { horizon_end: event.horizon_end } : {}) } };
+		case 'launch_failed':
+			return { ...base, kind: event.kind, severity: 'critical', message: `A run in ${place ?? 'a location'} couldn't start (${event.code}).`, links: key ? [{ kind: 'run', id: event.run_id, locationId: key }] : [], payload: { code: event.code } };
+		case 'heartbeat':
+			return { ...base, kind: event.kind, severity: 'info', message: 'A server checked in.', links: [], payload: {} };
+	}
 }

@@ -786,6 +786,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/platform/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listPersonPlatformEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/platform/problems": {
         parameters: {
             query?: never;
@@ -1982,6 +1998,19 @@ export interface components {
             /** Format: uuid */
             principal_id: string;
         };
+        /** @description A stored platform event a person may see; the location target is absent for server-wide events. */
+        PersonPlatformEvent: {
+            event: components["schemas"]["PlatformEvent"];
+            /** Format: uuid */
+            event_id: string;
+            /** Format: uuid */
+            location_id?: string | null;
+            /** Format: date-time */
+            occurred_at: string;
+            /** Format: int64 */
+            storage_id: number;
+            target?: string | null;
+        };
         /** @description A role assigned to one person, everywhere or on one location and target. */
         PersonRole: {
             /** Format: uuid */
@@ -2098,6 +2127,47 @@ export interface components {
             command: string[];
             /** Format: uuid */
             request_id: string;
+        };
+        PlatformEvent: {
+            /** @enum {string} */
+            kind: "heartbeat";
+            /** Format: uuid */
+            replica_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "scheduler_no_leader";
+        } | {
+            /** @enum {string} */
+            kind: "tick_overdue";
+            /** Format: date-time */
+            scheduled_for: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** Format: date-time */
+            horizon_end?: string | null;
+            /** @enum {string} */
+            kind: "calendar_horizon_low";
+            /** Format: date-time */
+            refresh_at: string;
+            /** Format: uuid */
+            trigger_id: string;
+        } | {
+            /** @enum {string} */
+            kind: "location_broken";
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: uuid */
+            location_id: string;
+            target: string;
+        } | {
+            /** Format: uuid */
+            claim_id: string;
+            code: string;
+            /** @enum {string} */
+            kind: "launch_failed";
+            /** Format: uuid */
+            run_id: string;
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
@@ -4976,6 +5046,38 @@ export interface operations {
             };
             /** @description Trigger not found for a person who may view the whole target */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPersonPlatformEvents: {
+        parameters: {
+            query?: {
+                /** @description Continue after this storage ID of the previous page */
+                before?: number;
+                /** @description Events to scan; defaults to 200, clamped to 1..500 */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonPlatformEvent"][];
+                };
+            };
+            /** @description Session rejected */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

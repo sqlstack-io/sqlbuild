@@ -110,6 +110,7 @@ export type Bootstrap = {
 
 export type PlatformEventKind =
 	| 'tick_overdue'
+	| 'calendar_horizon_low'
 	| 'scheduler_no_leader'
 	| 'location_broken'
 	| 'launch_failed'

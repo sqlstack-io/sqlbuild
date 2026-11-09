@@ -42,6 +42,7 @@ use crate::api::_helpers::resources::{
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,
+    person_reads::platform_events,
     person_operations::catalog,
     person_operations::statistics,
     person_operations::fingerprint,
@@ -105,6 +106,14 @@ pub(crate) struct RunsQuery {
     pub(crate) queued: bool,
     pub(crate) before_queued_at: Option<chrono::DateTime<chrono::Utc>>,
     pub(crate) before_run_id: Option<uuid::Uuid>,
+}
+
+/// A page of platform events, newest first; `before` is the last storage ID of the previous page.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PlatformEventsQuery {
+    pub(crate) before: Option<i64>,
+    pub(crate) limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
