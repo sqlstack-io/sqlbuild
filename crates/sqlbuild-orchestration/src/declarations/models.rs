@@ -86,6 +86,11 @@ pub struct TriggerDefinition {
     pub starts_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub default_status: TriggerStatus,
+    /// The targets the declaration is limited to; empty for every target.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub targets: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<DeclaredAt>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

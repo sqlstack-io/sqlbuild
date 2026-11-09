@@ -532,6 +532,7 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
     }
     trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
     assert trigger["job_key"] == "nightly_orders"
+    assert trigger["targets"] == ["development"]
     assert trigger["schedule"] == {
         "kind": "cron",
         "expression": "15 2 * * *",
@@ -749,6 +750,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 7,
                     "default_status": "paused",
+                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 61},
                 },
                 "edge_job_outcomes": {
                     "description": "Keep warning and partial outcomes distinct from success.",
@@ -760,6 +762,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "paused",
+                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 77},
                 },
                 "edge_group_outcomes": {
                     "description": "Observe group completion including cancellation and presumed failure.",
@@ -772,9 +775,16 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "paused",
+                    "declared_at": {"path": "orchestration/edge_cases/definitions.py", "line": 84},
                 },
             },
             expected_schedules=("edge_snapshot_orders",),
+            expected_trigger_declared_at={
+                "edge_snapshot_orders": {
+                    "path": "orchestration/edge_cases/definitions.py",
+                    "line": 14,
+                },
+            },
             expected_declared_at={
                 "edge_snapshot_orders": {
                     "path": "orchestration/edge_cases/definitions.py",
@@ -842,6 +852,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
                 }
             },
         ),
@@ -866,6 +877,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
                 }
             },
         ),
@@ -887,6 +899,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "when": {"kind": "source_new_data", "selection": ["source:raw_orders"]},
                     "minimum_interval_seconds": 1,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/orders.py", "line": 10},
                 }
             },
         ),
@@ -912,6 +925,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 1,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
                 }
             },
         ),
@@ -935,6 +949,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     },
                     "minimum_interval_seconds": 30,
                     "default_status": "running",
+                    "declared_at": {"path": "orchestration/orders.py", "line": 7},
                 }
             },
         ),
@@ -953,6 +968,8 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                     "when": {"kind": "platform_event", "kinds": ["tick_overdue"]},
                     "minimum_interval_seconds": 7,
                     "default_status": "paused",
+                    "targets": ["development"],
+                    "declared_at": {"path": "orchestration/health.py", "line": 9},
                 }
             },
         ),
@@ -1003,6 +1020,10 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
     assert {
         name: definitions[name].get("declared_at") for name in test_case.expected_declared_at
     } == test_case.expected_declared_at
+    assert {
+        name: publication["documents"]["triggers"][name].get("declared_at")
+        for name in test_case.expected_trigger_declared_at
+    } == test_case.expected_trigger_declared_at
 
 
 @pytest.mark.parametrize(

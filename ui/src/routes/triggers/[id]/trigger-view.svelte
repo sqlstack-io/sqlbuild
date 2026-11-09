@@ -101,7 +101,7 @@
 					{#if t.cron}<div><dt>Cron</dt><dd><code>{t.cron}</code></dd></div>{/if}
 					{#if t.timezone}<div><dt>Time zone</dt><dd>{t.timezone}</dd></div>{/if}
 					{#if t.catchUp}<div><dt>After downtime</dt><dd title="Catch-up policy: {t.catchUp.mode}">{t.catchUp.mode === 'latest' ? 'at most one run, for the latest missed time' : `runs for each missed time, up to ${t.catchUp.max}`}</dd></div>{/if}
-					{#if t.declaration}<div><dt>Targets</dt><dd>{t.targets?.join(', ') ?? 'all targets'}</dd></div>{/if}
+					{#if t.targets}<div><dt>Targets</dt><dd>{t.targets.join(', ')}</dd></div>{/if}
 					<div><dt>In the code</dt><dd>{t.defaultState === 'running' ? 'on' : 'paused'}</dd></div>
 					{#if t.sourceFile}<div><dt>Defined in</dt><dd><code>{t.sourceFile}</code></dd></div>{/if}
 				</dl>

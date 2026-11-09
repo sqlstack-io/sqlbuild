@@ -130,6 +130,40 @@ fn given_a_checked_sensor_when_people_read_its_state_then_listing_view_gates_it_
                 "{}: both checks finished on the published definition",
                 test_case.description
             );
+            input.generation = 3;
+            input.documents.get_mut("triggers").expect("triggers")["health_orders"]
+                .as_object_mut()
+                .expect("sensor")
+                .extend([
+                    ("targets".into(), json!(["development"])),
+                    (
+                        "declared_at".into(),
+                        json!({"path": "orchestration/health.py", "line": 12}),
+                    ),
+                ]);
+            publish_snapshot(store, &input)
+                .await
+                .expect("republish moved sensor");
+            let moved = read(administrator, trigger.trigger_id, 1)
+                .await
+                .expect("administrator")
+                .expect("published sensor");
+            let listed = list_triggers(store, roles.location_id, "development")
+                .await
+                .expect("triggers")
+                .remove(0);
+            assert_eq!(
+                (
+                    moved.definition_fingerprint,
+                    json!(listed.definition_json)["declared_at"].clone(),
+                ),
+                (
+                    state.definition_fingerprint.clone(),
+                    json!({"path": "orchestration/health.py", "line": 12}),
+                ),
+                "{}: where a sensor is written is published but does not change its definition",
+                test_case.description
+            );
             let newest = read(administrator, trigger.trigger_id, 1)
                 .await
                 .expect("administrator")

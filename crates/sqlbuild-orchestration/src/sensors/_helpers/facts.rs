@@ -1,5 +1,7 @@
 //! Sensor evaluation phases are recorded once; the latest cursor lives on the trigger's state.
 
+use std::collections::BTreeSet;
+
 use serde_json::json;
 use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
@@ -12,11 +14,16 @@ use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
 
-/// Evaluations record the fingerprint of the definition they ran, so a later definition shows as changed.
+/// Evaluations record the fingerprint of the definition they ran, so a later definition shows as changed; where it is written is not part of it.
 pub(crate) fn definition_fingerprint(
     definition: &SensorDefinition,
 ) -> Result<String, ControlError> {
-    Ok(sha256_hex(&serde_json::to_vec(definition).map_err(
+    let behaviour: SensorDefinition = SensorDefinition {
+        targets: BTreeSet::new(),
+        declared_at: None,
+        ..definition.clone()
+    };
+    Ok(sha256_hex(&serde_json::to_vec(&behaviour).map_err(
         |error| ControlError::Invalid(error.to_string()),
     )?))
 }

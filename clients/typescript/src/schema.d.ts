@@ -2767,11 +2767,14 @@ export interface components {
             kind: "custom";
         };
         SensorDefinition: {
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
             /** Format: int32 */
             minimum_interval_seconds: number;
+            /** @description The targets the declaration is limited to; empty for every target. */
+            targets?: string[];
             when: components["schemas"]["SensorCondition"];
         };
         /** @description How long the server keeps each kind of record. */
@@ -2963,12 +2966,15 @@ export interface components {
         /** @description Legacy schedule documents retain their stored shape; sensors add a distinct condition shape. */
         TriggerDeclaration: components["schemas"]["TriggerDefinition"] | components["schemas"]["SensorDefinition"];
         TriggerDefinition: {
+            declared_at?: null | components["schemas"]["DeclaredAt"];
             default_status?: components["schemas"]["TriggerStatus"];
             description: string;
             job_key: string;
             schedule: components["schemas"]["Schedule"];
             /** Format: date-time */
             starts_at?: string | null;
+            /** @description The targets the declaration is limited to; empty for every target. */
+            targets?: string[];
         };
         TriggerRecord: {
             definition_json: components["schemas"]["TriggerDeclaration"];

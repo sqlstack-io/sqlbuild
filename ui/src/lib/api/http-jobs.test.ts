@@ -41,6 +41,18 @@ describe('trigger mapping', () => {
 		expect(toTrigger(onInventory, runs, null).lastRun).toBeNull();
 	});
 
+	it('shows where a trigger is declared and the targets it is limited to, and nothing for an older snapshot', () => {
+		const declared = trigger('t-cal', 'fulfillment_calendar', 'orders', {
+			...onInventory.definition_json,
+			targets: ['production'],
+			declared_at: { path: 'orchestration/orders.py', line: 8 }
+		} as W['SensorDefinition']);
+		const detail = triggerDetailOf(toTrigger(declared, [], null), declared, [], []);
+		expect([detail.sourceFile, detail.targets]).toEqual(['orchestration/orders.py:8', ['production']]);
+		const older = triggerDetailOf(toTrigger(daily, [], null), daily, [], []);
+		expect([older.sourceFile, older.targets]).toEqual([null, null]);
+	});
+
 	it('links a group trigger to its group run, not a child listed before it', () => {
 		const child = { ...run('r-child', 'orders_member', 't-daily'), parentRunId: 'r-group' } as Run;
 		const group = { ...run('r-group', 'orders', 't-daily'), status: 'failed' } as Run;

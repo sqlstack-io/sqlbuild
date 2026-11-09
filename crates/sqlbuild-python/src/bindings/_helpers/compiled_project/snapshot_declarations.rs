@@ -1,7 +1,7 @@
 //! Compile authoring records against retained graph data before publication.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Component, Path};
+use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, Py, PyAny, PyResult, Python};
@@ -21,7 +21,7 @@ use sqlbuild_orchestration::declarations::models::{
 use sqlbuild_orchestration::snapshots::models::SnapshotInput;
 
 use crate::bindings::_helpers::native_host::orchestration_declarations::{
-    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, module_jobs,
+    AuthoredDeclaration, AuthoredGroup, AuthoredJob, AuthoredSensor, declared_at, module_jobs,
 };
 use crate::bindings::_helpers::native_host::orchestration_triggers::{
     compile_calendars, compile_cron, compile_sensors,
@@ -54,33 +54,6 @@ pub(crate) fn discover_declarations<'py>(
         }
     }
     Ok(declarations)
-}
-
-/// A declaration's file relative to the project; code outside the project keeps its location private.
-fn declared_at(project_dir: &Path, written: Option<(String, u32)>) -> PyResult<Option<DeclaredAt>> {
-    let Some((file, line)) = written else {
-        return Ok(None);
-    };
-    let file = Path::new(&file);
-    let roots = [
-        project_dir.canonicalize()?,
-        std::path::absolute(project_dir)?,
-    ];
-    let Some(root) = roots.iter().find(|root| file.starts_with(root)) else {
-        return Ok(None);
-    };
-    let parts: Option<Vec<&str>> = file
-        .components()
-        .skip(root.components().count())
-        .map(|component| match component {
-            Component::Normal(part) => part.to_str(),
-            _ => None,
-        })
-        .collect();
-    Ok(parts.map(|parts| DeclaredAt {
-        path: parts.join("/"),
-        line,
-    }))
 }
 
 pub(crate) fn compile_declarations(
@@ -145,10 +118,16 @@ pub(crate) fn compile_declarations(
                 .into_iter()
                 .map(|(kind, name)| format!("{kind}:{name}"))
                 .collect();
+        let declared_at: Option<DeclaredAt> = declared_at(project_dir, job.declared_at)?;
+        let targets: BTreeSet<String> = job.targets.into_iter().collect();
         if let Some(schedule) = job.schedule {
             triggers.insert(
                 job.name.clone(),
-                compile_cron(schedule.bind(py), &job.name, &job.description)?,
+                TriggerDefinition {
+                    targets: targets.clone(),
+                    declared_at: declared_at.clone(),
+                    ..compile_cron(schedule.bind(py), &job.name, &job.description)?
+                },
             );
         }
         jobs.insert(
@@ -160,8 +139,8 @@ pub(crate) fn compile_declarations(
                 concurrency_groups: job.concurrency_groups.into_iter().collect(),
                 select: Some(job.select),
                 exclude: Some(job.exclude).filter(|exclude| !exclude.trim().is_empty()),
-                targets: job.targets.into_iter().collect(),
-                declared_at: declared_at(project_dir, job.declared_at)?,
+                targets,
+                declared_at,
             },
         );
     }
@@ -190,10 +169,16 @@ pub(crate) fn compile_declarations(
             .iter()
             .flat_map(|name| jobs[name].selection.iter().cloned())
             .collect();
+        let declared_at: Option<DeclaredAt> = declared_at(project_dir, group.declared_at)?;
+        let targets: BTreeSet<String> = group.targets.into_iter().collect();
         if let Some(schedule) = group.schedule {
             triggers.insert(
                 group.name.clone(),
-                compile_cron(schedule.bind(py), &group.name, &group.description)?,
+                TriggerDefinition {
+                    targets: targets.clone(),
+                    declared_at: declared_at.clone(),
+                    ..compile_cron(schedule.bind(py), &group.name, &group.description)?
+                },
             );
         }
         groups.insert(
@@ -206,8 +191,8 @@ pub(crate) fn compile_declarations(
                     concurrency_groups: group.concurrency_groups.into_iter().collect(),
                     select: None,
                     exclude: None,
-                    targets: group.targets.into_iter().collect(),
-                    declared_at: declared_at(project_dir, group.declared_at)?,
+                    targets,
+                    declared_at,
                 },
                 jobs: dependencies,
             },

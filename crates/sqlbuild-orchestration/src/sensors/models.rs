@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::declarations::models::TriggerStatus;
+use crate::declarations::models::{DeclaredAt, TriggerStatus};
 use crate::platform::models::PlatformEventKind;
 use crate::runs::models::{NodeOutcome, RunOutcome};
 
@@ -104,6 +104,11 @@ pub struct SensorDefinition {
     pub minimum_interval_seconds: NonZeroU32,
     #[serde(default)]
     pub default_status: TriggerStatus,
+    /// The targets the declaration is limited to; empty for every target.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub targets: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub declared_at: Option<DeclaredAt>,
 }
 
 /// Storage order is authoritative even when a fact's occurrence time predates earlier pages.

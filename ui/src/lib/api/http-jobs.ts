@@ -74,7 +74,7 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 		lastTick,
 		// Group children copy the group's trigger, so only top-level runs are the trigger's own.
 		lastRun: newest(runs, (r) => r.triggerId === wire.trigger_id && !r.parentRunId),
-		sourceFile: null,
+		sourceFile: d.declared_at ? `${d.declared_at.path}:${d.declared_at.line}` : null,
 		definitionChanged: false,
 		warning: null
 	};
@@ -145,7 +145,7 @@ export function triggerDetailOf(
 		...trigger,
 		definitionChanged: !!state && lastEvaluatedFingerprint !== null && lastEvaluatedFingerprint !== state.definition_fingerprint,
 		declaration: null,
-		targets: null,
+		targets: d.targets?.length ? d.targets : null,
 		// The scheduler ticks only the latest missed time after downtime, and a run still waiting covers it.
 		catchUp: isSchedule(d) ? { mode: 'latest', max: 1 } : null,
 		upcoming: isSchedule(d) ? wire.upcoming : null,

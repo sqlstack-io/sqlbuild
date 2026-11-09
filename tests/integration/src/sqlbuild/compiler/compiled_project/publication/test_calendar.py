@@ -192,6 +192,10 @@ def test_given_a_served_calendar_when_time_passes_and_a_provider_fails_then_refr
                 "fulfillment_calendar",
                 "overdue_orders",
             }
+            assert first["documents"]["triggers"]["fulfillment_calendar"]["declared_at"] == {
+                "path": "orchestration/orders.py",
+                "line": 8,
+            }
             with sqlite3.connect(tmp_path / "control/.sqlbuild/control.sqlite3") as control:
                 stored, next_due = control.execute(
                     "SELECT definition_json, next_due_at FROM sqb_triggers JOIN sqb_trigger_state USING (trigger_id) WHERE kind = 'schedule'"

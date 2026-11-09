@@ -1,7 +1,7 @@
 //! The public authoring records enter native compilation here, never scheduler execution.
 
 use std::collections::{BTreeMap, HashSet};
-use std::path::Path;
+use std::path::{Component, Path};
 
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
@@ -11,6 +11,7 @@ use serde_json::Value;
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
+use sqlbuild_orchestration::declarations::models::DeclaredAt;
 
 use crate::bindings::_helpers::native_host::constants::{
     AUTHORING_MODULE, CALENDAR_LABEL, CONSTRUCTING_MODULES, GROUP_LABEL, JOB_LABEL,
@@ -79,6 +80,8 @@ pub(crate) struct AuthoredSensor {
     pub(crate) minimum_interval_seconds: Value,
     pub(crate) default_status: String,
     pub(crate) targets: Vec<String>,
+    #[pyo3(attribute("_declared_at"))]
+    pub(crate) declared_at: Option<(String, u32)>,
 }
 
 pub(crate) enum AuthoredDeclaration {
@@ -107,6 +110,36 @@ pub(crate) fn declaration_site(py: Python<'_>) -> PyResult<Option<(String, u32)>
         frame = frame.getattr("f_back")?;
     }
     Ok(None)
+}
+
+/// A declaration's file relative to the project; code outside the project keeps its location private.
+pub(crate) fn declared_at(
+    project_dir: &Path,
+    written: Option<(String, u32)>,
+) -> PyResult<Option<DeclaredAt>> {
+    let Some((file, line)) = written else {
+        return Ok(None);
+    };
+    let file = Path::new(&file);
+    let roots = [
+        project_dir.canonicalize()?,
+        std::path::absolute(project_dir)?,
+    ];
+    let Some(root) = roots.iter().find(|root| file.starts_with(root)) else {
+        return Ok(None);
+    };
+    let parts: Option<Vec<&str>> = file
+        .components()
+        .skip(root.components().count())
+        .map(|component| match component {
+            Component::Normal(part) => part.to_str(),
+            _ => None,
+        })
+        .collect();
+    Ok(parts.map(|parts| DeclaredAt {
+        path: parts.join("/"),
+        line,
+    }))
 }
 
 /// JSON authoring values cross once; the interpreter rejects circular user containers safely.

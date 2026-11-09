@@ -77,6 +77,10 @@ class CalendarSchedule:
     default_status: Literal["running", "paused"] = "running"
     targets: tuple[str, ...] = ()
     function: Callable[..., Iterable[datetime]] | None = field(default=None, repr=False)
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
     def __call__(self, function: Callable[..., Iterable[datetime]]) -> CalendarSchedule:
         return replace(self, function=function)
@@ -147,6 +151,10 @@ class Sensor:
     function: Callable[..., Iterable[RunRequest] | SkipReason] | None = field(
         default=None, repr=False, kw_only=True
     )
+    _declared_at: tuple[str, int] | None = field(default=None, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_declared_at", declaration_site())
 
     def __call__(self, function: Callable[..., Iterable[RunRequest] | SkipReason]) -> Sensor:
         return replace(self, function=function)
