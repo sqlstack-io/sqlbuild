@@ -105,6 +105,22 @@ describe('runs list', () => {
 	});
 });
 
+describe('backfill window', () => {
+	it('shows both ends of an integer or timestamp window as typed, and none for other runs', () => {
+		const [integer, timestamp, plain] = toRuns(
+			[
+				wire('i', { origin: 'backfill', window: { kind: 'integer', start: -3, end: 11 } }),
+				wire('t', { window: { kind: 'timestamp', start: '2026-10-01T00:00:00Z', end: '2026-10-31T00:00:00Z' } }),
+				wire('p')
+			],
+			LOCATION
+		);
+		expect(integer.window).toEqual({ start: '-3', end: '11' });
+		expect(timestamp.window).toEqual({ start: '2026-10-01T00:00:00Z', end: '2026-10-31T00:00:00Z' });
+		expect(plain.window).toBeNull();
+	});
+});
+
 describe('run queue', () => {
 	it('keeps claim order, drops runs that started meanwhile and never names a run elsewhere', () => {
 		const entries = queueEntriesOf(

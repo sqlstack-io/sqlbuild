@@ -2488,6 +2488,7 @@ export interface components {
             /** Format: uuid */
             trigger_id?: string | null;
             trigger_name?: string | null;
+            window?: null | components["schemas"]["RunWindow"];
         };
         /** @description The authorized selection and pinned execution inputs are immutable once requested. */
         RunRequest: {

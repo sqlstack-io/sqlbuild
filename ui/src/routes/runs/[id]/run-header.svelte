@@ -36,6 +36,9 @@
 				{#if run.narrowing}
 					<span class="chip part" title="Ran part of {run.jobKey}: sqb build {narrowingText(run.narrowing)}" data-testid="run-narrowing">part · <code>{narrowingText(run.narrowing)}</code></span>
 				{/if}
+				{#if run.window}
+					<span class="chip part" title="Processed only this cursor range, both ends included" data-testid="run-window">window · <code>{run.window.start} → {run.window.end}</code></span>
+				{/if}
 				{#if run.triggerId}
 					<a class="chip link" href="/triggers/{run.triggerId}" title="Open the {runOriginLabel[run.origin].toLowerCase()} that started this run">{runOriginLabel[run.origin].toLowerCase()}{#if run.triggerName}: {run.triggerName}{/if}</a>
 				{:else if run.rerunOfRunId}

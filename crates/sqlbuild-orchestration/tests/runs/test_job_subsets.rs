@@ -150,6 +150,10 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                 let listed = list_runs(store, (location_id, "development"), 50)
                     .await
                     .expect("runs");
+                assert!(
+                    listed.iter().all(|run| run.window.is_none()),
+                    "a run without a backfill window lists none"
+                );
                 assert_eq!(
                     listed
                         .iter()

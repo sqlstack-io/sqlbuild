@@ -322,17 +322,22 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 advance_groups(store, &lease, (&limits, scope))
                     .await
                     .expect("finish rerun");
+                let listed = list_runs(store, scope, 20)
+                    .await
+                    .expect("list finished reruns");
+                let finished = listed
+                    .iter()
+                    .find(|run| run.run_id == request.run_id)
+                    .expect("finished rerun exists");
                 assert_eq!(
-                    list_runs(store, scope, 20)
-                        .await
-                        .expect("list finished reruns")
-                        .iter()
-                        .find(|run| run.run_id == request.run_id)
-                        .expect("finished rerun exists")
-                        .status,
-                    test_case.expected_status,
+                    finished.status, test_case.expected_status,
                     "{}",
                     test_case.description
+                );
+                assert_eq!(
+                    finished.window,
+                    Some(RunWindow::Integer { start: -3, end: 11 }),
+                    "a rerun of a backfill is listed with its window"
                 );
                 assert!(slot_counts(store).await.is_empty());
                 assert!(

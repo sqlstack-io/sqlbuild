@@ -920,6 +920,7 @@ export class MockOperate {
 				runKey: null,
 				rerunOfRunId: spec.rerunOf ?? null,
 				narrowing: spec.narrowing ?? null,
+				window: null,
 				requestedBy: spec.by,
 				priority: spec.priority,
 				rewriteHistory: Object.keys(spec.flags).some((f) => flagSpec(spec.verb ?? 'build', f)?.requires === 'run.rewrite_history'),

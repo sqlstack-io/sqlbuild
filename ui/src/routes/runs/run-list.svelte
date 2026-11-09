@@ -110,7 +110,7 @@
 						<div class="line">
 							{#if r.jobKey}
 								{@render chip('job', r.jobKey, r.jobKey, `Show only runs of ${r.jobKey}`)}
-								{#if r.narrowing}<span class="part" title="Ran part of {r.jobKey}: sqb build {narrowingText(r.narrowing)}">part</span>{/if}
+								{#if r.narrowing}<span class="part" title="Ran part of {r.jobKey}: sqb build {narrowingText(r.narrowing)}">part</span>{/if}{#if r.window}<span class="part" title="Processed the cursor range {r.window.start} → {r.window.end}">window</span>{/if}
 							{:else}
 								<span class="adhoc" title={d.row.selection.join(' ')}>ad hoc: <code>{d.row.selection.join(' ') || 'whole project'}</code></span>
 							{/if}

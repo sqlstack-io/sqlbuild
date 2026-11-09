@@ -248,6 +248,14 @@ pub struct RunRecord {
         deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_narrowing"
     )]
     pub narrowing: Option<RunNarrowing>,
+    /// The cursor window a backfill processes; `None` for every other run.
+    #[serde(
+        default,
+        alias = "backfill_window",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::runs::_helpers::lifecycle::narrowing::frozen_window"
+    )]
+    pub window: Option<RunWindow>,
     /// Set only when listing the queue: where the run stands and what it waits on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queue: Option<RunQueueState>,

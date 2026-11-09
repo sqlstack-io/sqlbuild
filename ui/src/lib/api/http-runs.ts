@@ -92,6 +92,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		runKey: null,
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
 		narrowing: wire.narrowing ?? null,
+		window: wire.window ? { start: String(wire.window.start), end: String(wire.window.end) } : null,
 		requestedBy: requesterOf(wire),
 		priority: wire.priority,
 		rewriteHistory: wire.rewrite_history,

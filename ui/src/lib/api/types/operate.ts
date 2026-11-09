@@ -69,6 +69,8 @@ export type Run = {
 	rerunOfRunId: string | null;
 	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
 	narrowing: { select: string[]; exclude: string[] } | null;
+	/** The cursor window a backfill processes, inclusive; null for every other run. */
+	window: { start: string; end: string } | null;
 	requestedBy: Principal;
 	priority: number;
 	/** Full refresh or an explicit cursor window was requested. */
