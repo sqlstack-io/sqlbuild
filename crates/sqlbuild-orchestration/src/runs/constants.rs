@@ -23,3 +23,6 @@ pub(crate) const FULL_REFRESH_SETTING: &str = "full_refresh";
 
 /// The reason recorded on a person's plan request; plans carry no reason of their own.
 pub(crate) const PLAN_REASON: &str = "plan";
+
+/// A plan only reads warehouse metadata, so it never takes a warehouse a viewer names; `run.warehouse` gates that for runs.
+pub(crate) const PLAN_IGNORED_SETTING: &str = "warehouse";
