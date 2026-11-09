@@ -204,7 +204,7 @@ pub struct PersonSensorState {
     pub run_requests: Vec<PersonSensorRunRequest>,
 }
 
-/// The control event position built-in conditions read from, and a custom sensor's own value after secret redaction.
+/// The control event position built-in conditions read from, and a custom sensor's own value after secret redaction; the value needs view.evidence.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonSensorCursor {
     pub event_storage_id: i64,
@@ -227,7 +227,7 @@ pub struct PersonSensorEvaluation {
     pub definition_fingerprint: String,
 }
 
-/// A run key is redacted like the custom cursor it usually derives from.
+/// A run key is redacted and withheld like the custom cursor it usually derives from: empty without view.evidence.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PersonSensorRunRequest {
     pub run_key: String,

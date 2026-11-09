@@ -1,4 +1,4 @@
-//! A person sees a sensor's cursor, recent checks and run requests only with view on every current node.
+//! A person sees a sensor's cursor, recent checks and run requests only with view on every current node; values the sensor computed also need view.evidence.
 
 use std::collections::BTreeMap;
 
@@ -6,7 +6,8 @@ use sqlbuild_core::redaction::main::redact_text::redact_text;
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
-use crate::credentials::models::{AuditContext, DefaultRole};
+use crate::authorization::main::person_holds_target::person_holds_target;
+use crate::credentials::models::{Action, AuditContext, DefaultRole};
 use crate::sensors::_helpers::facts::definition_fingerprint;
 use crate::sensors::models::{
     PersonSensorCursor, PersonSensorEvaluation, PersonSensorRunRequest, PersonSensorState,
@@ -23,6 +24,13 @@ pub async fn read_person_sensor(
     ((location_id, target), (trigger_id, limit)): ((Uuid, &str), (Uuid, u32)),
     default_role: DefaultRole,
 ) -> Result<Option<PersonSensorState>, ControlError> {
+    let evidence = person_holds_target(
+        store,
+        credentials,
+        (Action::ViewEvidence, location_id, target),
+        default_role,
+    )
+    .await?;
     let (transaction, _) = authorize_listing(
         begin(store, TransactionMode::Write).await?,
         (context, credentials),
@@ -47,7 +55,8 @@ pub async fn read_person_sensor(
         return Ok(None);
     };
     let limit = Parameter::Integer(i64::from(limit.min(1000)));
-    let (transaction, evaluations) = evaluations(transaction, trigger_id, limit.clone()).await?;
+    let (transaction, evaluations) =
+        evaluations(transaction, (trigger_id, limit.clone()), evidence).await?;
     let (transaction, requests): (_, Vec<StoredRunRequest>) = query_records(
         transaction,
         "SELECT q.run_key, q.run_id, q.evaluation_id, r.queued_at, r.status FROM sqb_run_requests q \
@@ -58,13 +67,20 @@ pub async fn read_person_sensor(
     .await?;
     commit(transaction).await?;
     Ok(Some(PersonSensorState {
-        cursor: sensor.cursor_json.as_ref().map(shown_cursor),
+        cursor: sensor
+            .cursor_json
+            .as_ref()
+            .map(|cursor| shown_cursor(cursor, evidence)),
         definition_fingerprint: definition_fingerprint(&sensor.definition_json)?,
         evaluations,
         run_requests: requests
             .into_iter()
             .map(|request| PersonSensorRunRequest {
-                run_key: redact_text(&request.run_key),
+                run_key: if evidence {
+                    redact_text(&request.run_key)
+                } else {
+                    String::new()
+                },
                 run_id: request.run_id,
                 evaluation_id: request.evaluation_id,
                 queued_at: request.queued_at,
@@ -77,8 +93,8 @@ pub async fn read_person_sensor(
 /// The newest `limit` checks, each projected from its recorded phases.
 async fn evaluations(
     transaction: ControlTransaction,
-    trigger_id: Uuid,
-    limit: Parameter,
+    (trigger_id, limit): (Uuid, Parameter),
+    evidence: bool,
 ) -> Result<(ControlTransaction, Vec<PersonSensorEvaluation>), ControlError> {
     let (transaction, events): (_, Vec<StoredEvaluationEvent>) = query_records(
         transaction,
@@ -98,7 +114,7 @@ async fn evaluations(
                 phase: SensorEvaluationOutcome::Requested.phase().into(),
                 requested_at: request.requested_at,
                 finished_at: None,
-                cursor_before: shown_cursor(&request.cursor),
+                cursor_before: shown_cursor(&request.cursor, evidence),
                 cursor_after: None,
                 run_count: 0,
                 failure_code: None,
@@ -112,7 +128,7 @@ async fn evaluations(
         check.finished_at = Some(event.occurred_at);
         match outcome {
             SensorEvaluationOutcome::Completed { cursor, run_ids } => {
-                check.cursor_after = Some(shown_cursor(&cursor));
+                check.cursor_after = Some(shown_cursor(&cursor, evidence));
                 check.run_count = run_ids.len();
             }
             SensorEvaluationOutcome::Failed { code } => check.failure_code = Some(code),
@@ -126,9 +142,14 @@ async fn evaluations(
     Ok((transaction, checks))
 }
 
-fn shown_cursor(cursor: &SensorCursor) -> PersonSensorCursor {
+/// A custom value is what the sensor computed from data it read, so it shows only with view.evidence.
+fn shown_cursor(cursor: &SensorCursor, evidence: bool) -> PersonSensorCursor {
     PersonSensorCursor {
         event_storage_id: cursor.event_storage_id,
-        custom: cursor.custom.as_deref().map(redact_text),
+        custom: cursor
+            .custom
+            .as_deref()
+            .filter(|_| evidence)
+            .map(redact_text),
     }
 }
