@@ -37,8 +37,10 @@
 	);
 	const stale = $derived(data?.attention.find((i) => i.kind === 'stale_models'));
 	const staleSelection = $derived(stale && stale.kind === 'stale_models' ? [...new Set([...stale.changed, ...stale.behind])] : []);
+	// Until the first read settles there is nothing to judge, so the banner stays neutral rather than claiming health.
+	const loaded = $derived(data !== null);
 	const healthTone = $derived(
-		issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning' || i.view.tone === 'stale') ? 'var(--sb-warning)' : 'var(--sb-success)'
+		!loaded ? 'var(--sb-text-faint)' : issues.some((i) => i.view.tone === 'error') ? 'var(--sb-error)' : issues.some((i) => i.view.tone === 'warning' || i.view.tone === 'stale') ? 'var(--sb-warning)' : 'var(--sb-success)'
 	);
 	const latest = $derived(data?.latestRun ?? null);
 	const latestText = $derived(latest ? `Last run ${runStatusLabel[latest.status].toLowerCase()} ${formatAgo(latest.endedAt, app.now)}` : 'No runs yet');
@@ -47,8 +49,8 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
-	// Parts without a server read stay hidden rather than showing zeros.
-	const showGroups = $derived(data?.groups !== null);
+	// Parts without a server read stay hidden rather than showing zeros, and wait for the read so they don't appear and vanish.
+	const showGroups = $derived(!!data && data.groups !== null);
 	const showTimeline = $derived(app.client.supports('timeline'));
 
 </script>
@@ -77,11 +79,16 @@
 			<section class="health" style:--tone={healthTone}>
 				<div class="health-head">
 					<div class="health-icon">
-						{#if issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
+						{#if loaded && issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
 					</div>
 					<div class="health-copy">
-						<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
-						<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
+						{#if !loaded}
+							<strong>{app.location?.name}</strong>
+							<span>{overview.error ? 'Couldn’t check its health' : 'Checking…'}</span>
+						{:else}
+							<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
+							<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
+						{/if}
 					</div>
 					{#if m}
 						<div class="health-facts">
