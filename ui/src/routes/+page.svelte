@@ -21,7 +21,8 @@
 	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
 	// Null data means the person may view only part of the target, so the page offers others instead.
-	const partial = $derived(overview.data === null);
+	// A reload keeps the previous data, so only a settled, error-free null counts.
+	const partial = $derived(overview.data === null && !overview.loading && !overview.error);
 	const otherPages = $derived(pagesBeyondTarget(app.client, app.capabilities));
 
 	const attentionIcon: Record<AttentionTone, typeof AlertCircleIcon> = {
@@ -59,6 +60,7 @@
 <RunPanel bind:open={rebuildOpen} selection={staleSelection} />
 
 <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-[18px]">
+	{#if overview.error}<div class="error-note mb-[14px]">{overview.error}</div>{/if}
 	{#if partial}
 		<section class="surface-panel partial">
 			<h2>You can see only part of {app.location?.name} · {app.target?.name}</h2>
@@ -73,7 +75,6 @@
 		</section>
 	{:else}
 		<div class="flex flex-col gap-[14px]">
-			{#if overview.error}<div class="error-note">{overview.error}</div>{/if}
 			<section class="health" style:--tone={healthTone}>
 				<div class="health-head">
 					<div class="health-icon">
