@@ -666,3 +666,48 @@ fn given_sql_macro_bodies_when_linting_then_frames_and_generated_comments_are_no
         );
     }
 }
+
+#[test]
+fn given_snowflake_table_function_calls_when_formatting_then_each_call_is_kept_whole()
+-> Result<(), LintTextError> {
+    let test_cases = [
+        FormatBodiesTestCase {
+            description: "a call outside TABLE( ) stands as one relation",
+            relative_parts: None,
+            contents: "MODEL ();\nselect l.a from __table_fn(\"f\")('B-1', 2) as l\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT l.a\nFROM __table_fn(\"f\")('B-1', 2) AS l\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+        FormatBodiesTestCase {
+            description: "a call the author wrapped in TABLE( ) keeps its arguments",
+            relative_parts: None,
+            contents: "MODEL ();\nselect a from table(__table_fn(\"f\")( 42 ))\n",
+            expected_formatted: vec![(
+                0,
+                "MODEL ();\nSELECT a\nFROM TABLE(__table_fn(\"f\")(42))\n".to_string(),
+            )],
+            expected_fault_lines: vec![],
+        },
+    ];
+
+    for test_case in test_cases {
+        let files = [FormatFile {
+            relative_parts: test_case.relative_parts.clone(),
+            contents: test_case.contents.to_string(),
+        }];
+
+        let result = format_sql_bodies(&files, "snowflake", 100)?;
+        let fault_lines: Vec<usize> = result.faults.iter().map(|fault| fault.line).collect();
+
+        assert_eq!(
+            (result.formatted, fault_lines),
+            (test_case.expected_formatted, test_case.expected_fault_lines),
+            "{}",
+            test_case.description
+        );
+    }
+    Ok(())
+}
