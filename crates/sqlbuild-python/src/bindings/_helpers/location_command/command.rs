@@ -27,7 +27,6 @@ use crate::bindings::_helpers::location_command::snapshot::{
 };
 use crate::bindings::_helpers::location_command::worker::execute_worker;
 use crate::bindings::_helpers::native_host::host::write_console;
-use crate::bindings::_helpers::native_host::orchestration_declarations::declaration_site;
 use crate::bindings::_helpers::query_command::project::{
     ProjectAdapter, ProjectInputs, project_adapter,
 };
@@ -324,6 +323,5 @@ pub(crate) fn run_location<'py>(
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(build_orchestration_snapshot, module)?)?;
-    module.add_function(wrap_pyfunction!(declaration_site, module)?)?;
     module.add_function(wrap_pyfunction!(run_location_command, module)?)
 }
