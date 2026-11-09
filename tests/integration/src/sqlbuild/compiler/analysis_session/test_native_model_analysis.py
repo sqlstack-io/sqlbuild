@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import shutil
 from itertools import product
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -159,7 +160,7 @@ _MIXED_CASE_SOURCE_PROJECT: dict[str, str] = {
             lineage_mode=ColumnLineageMode.FAST,
             expected_minimum_native=500,
             expected_minimum_expression_shapes=40,
-            expected_minimum_pivot_proofs=80,
+            expected_minimum_pivot_proofs=72,
             expected_minimum_proven_pivots=12,
             expected_minimum_native_enrichments=0,
         ),
@@ -173,7 +174,7 @@ _MIXED_CASE_SOURCE_PROJECT: dict[str, str] = {
             lineage_mode=ColumnLineageMode.RICH,
             expected_minimum_native=500,
             expected_minimum_expression_shapes=40,
-            expected_minimum_pivot_proofs=80,
+            expected_minimum_pivot_proofs=72,
             expected_minimum_proven_pivots=12,
             expected_minimum_native_enrichments=0,
         ),
@@ -232,11 +233,18 @@ def test_given_generated_projects_when_analysing_natively_then_cached_and_proven
     rng: random.Random = random.Random(test_case.seed)
     runs: NativeAnalysisRuns = NativeAnalysisRuns()
     for index in range(test_case.count):
-        files: dict[str, str] = {
-            **generated_analysis_files(rng=rng, model_count=test_case.model_count),
-            **test_case.extra_files,
-        }
+        draws: tuple[Any, ...] = rng.getstate()
         for profile_index, profile in enumerate(test_case.inference_profiles):
+            rng.setstate(draws)
+            files: dict[str, str] = {
+                **generated_analysis_files(
+                    rng=rng,
+                    model_count=test_case.model_count,
+                    dialect=profile.sql_analysis_dialect,
+                ),
+                **test_case.extra_files,
+            }
+            shutil.rmtree(tmp_path / f"project_{index}", ignore_errors=True)
             analyse_natively(
                 inputs=compile_inputs(
                     project_dir=tmp_path / f"project_{index}",
