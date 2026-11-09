@@ -8,11 +8,11 @@ use crate::declarations::_helpers::job_detail::{
     critical_nodes, groups_running, members_in_order, shown_settings,
 };
 use crate::declarations::main::frozen_definitions::frozen_definitions;
-use crate::declarations::models::JobDetailRecord;
+use crate::declarations::models::{JobDetailRecord, StoredJob};
 use crate::runs::models::RunKind;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
 use crate::store::errors::ControlError;
-use crate::store::main::{begin::begin, commit::commit, query::query};
+use crate::store::main::{begin::begin, commit::commit, query_records::query_records};
 use crate::store::models::{ControlStore, ControlTransaction, Parameter, TransactionMode};
 
 /// `None` when the target publishes no job by that name; refusal comes first either way.
@@ -70,9 +70,10 @@ async fn published_snapshot(
     transaction: ControlTransaction,
     (location_id, target, job_key): (Uuid, &str, &str),
 ) -> Result<(ControlTransaction, Option<Uuid>), ControlError> {
-    let (transaction, rows) = query(
+    let (transaction, stored): (_, Vec<StoredJob>) = query_records(
         transaction,
-        "SELECT snapshot_id FROM sqb_jobs WHERE location_id=$1 AND target=$2 AND job_key=$3",
+        "SELECT job_key, kind, snapshot_id, definition_json FROM sqb_jobs \
+         WHERE location_id=$1 AND target=$2 AND job_key=$3",
         vec![
             Parameter::Id(location_id),
             Parameter::Text(target.into()),
@@ -80,10 +81,5 @@ async fn published_snapshot(
         ],
     )
     .await?;
-    let snapshot_id = rows
-        .first()
-        .map(|row| serde_json::from_value(row["snapshot_id"].clone()))
-        .transpose()
-        .map_err(|error| ControlError::Invalid(error.to_string()))?;
-    Ok((transaction, snapshot_id))
+    Ok((transaction, stored.first().map(|job| job.snapshot_id)))
 }
