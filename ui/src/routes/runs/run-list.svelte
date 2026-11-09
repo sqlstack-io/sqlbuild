@@ -162,7 +162,7 @@
 						{#if list.error}
 							<span class="err">Couldn't load runs: {list.error}</span> <button class="retry" onclick={() => list.refresh()}>Retry</button>
 						{:else if list.loading}
-							Loading…
+							{list.slow ? 'Loading…' : ''}
 						{:else}
 							{emptyText}
 						{/if}

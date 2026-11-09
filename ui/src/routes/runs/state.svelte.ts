@@ -12,6 +12,11 @@ const SIGNAL_GAP_MS = 300;
 /** Safety refresh in case a signal was missed. */
 const SAFETY_MS = 5 * 60_000;
 
+/** A first load faster than this shows no loading text, so it doesn't flash. */
+const SLOW_MS = 400;
+/** The first page of each filter, for this page load only, so coming back to the list shows it at once while it reloads. */
+const remembered = new Map<string, { rows: RunRow[]; nextCursor: string | null; counts: RunTabCounts | null }>();
+
 function message(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
@@ -25,6 +30,7 @@ export function createRunsState() {
 	let rows = $state<RunRow[]>([]);
 	let nextCursor = $state<string | null>(null);
 	let loading = $state(true);
+	let slow = $state(false);
 	let loadingMore = $state(false);
 	let error = $state<string | null>(null);
 	let updatedAt = $state<number | null>(null);
@@ -33,6 +39,8 @@ export function createRunsState() {
 	let expanded = $state<Set<string>>(new Set());
 	let children = $state<Record<string, RunRow[]>>({});
 	let request = 0;
+
+	const memoryKey = (locationId: string) => `${app.user?.name ?? ''}|${locationId}|${key}`;
 
 	function update(patch: Partial<ListParams>) {
 		void goto(writeParams(page.url, { ...params, ...patch }), { replaceState: true, noScroll: true, keepFocus: true });
@@ -48,6 +56,7 @@ export function createRunsState() {
 			loadingMore = true;
 		} else {
 			loading = true;
+			if (!rows.length) setTimeout(() => (slow = id === request && loading && !rows.length), SLOW_MS);
 		}
 		try {
 			const result = await app.client.listRunRows(scope, {
@@ -60,11 +69,13 @@ export function createRunsState() {
 			nextCursor = result.nextCursor;
 			error = null;
 			updatedAt = Date.now();
+			if (mode === 'reset') remembered.set(memoryKey(scope.locationId), { rows: result.rows, nextCursor, counts });
 		} catch (e) {
 			if (id === request) error = message(e);
 		} finally {
 			if (id === request) {
 				loading = false;
+				slow = false;
 				loadingMore = false;
 			}
 		}
@@ -76,6 +87,8 @@ export function createRunsState() {
 		try {
 			counts = await app.client.runTabCounts(scope, toQuery(params, Date.now(), 'all'));
 			countsError = false;
+			const kept = remembered.get(memoryKey(scope.locationId));
+			if (kept) kept.counts = counts;
 		} catch {
 			countsError = true;
 		}
@@ -103,8 +116,10 @@ export function createRunsState() {
 		void key;
 		if (!app.scope) return;
 		untrack(() => {
-			rows = [];
-			nextCursor = null;
+			const kept = remembered.get(memoryKey(app.scope!.locationId));
+			rows = kept?.rows ?? [];
+			nextCursor = kept?.nextCursor ?? null;
+			if (kept?.counts) counts = kept.counts;
 			selected = new Set();
 			armed = null;
 			void loadRows('reset');
@@ -272,6 +287,9 @@ export function createRunsState() {
 		},
 		get loading() {
 			return loading;
+		},
+		get slow() {
+			return slow;
 		},
 		get loadingMore() {
 			return loadingMore;

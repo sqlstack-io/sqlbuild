@@ -180,7 +180,7 @@
 								<b class:error-text={g.failed}>{g.failed || '—'}</b>
 							</a>
 						{:else}
-							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
+							<div class="empty">{overview.loading ? (overview.slow ? 'Loading…' : '') : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
 						{/each}
 					</div>
 				</section>{/if}
@@ -200,7 +200,7 @@
 								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 							</a>
 						{:else}
-							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet.'}</div>
+							<div class="empty">{overview.loading ? (overview.slow ? 'Loading…' : '') : 'Nothing deployed yet.'}</div>
 						{/each}
 					</div>
 				</section>
