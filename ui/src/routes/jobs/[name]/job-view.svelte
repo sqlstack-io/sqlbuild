@@ -9,7 +9,7 @@
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
 	import { formatNodeCounts, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
 	import { formatCost, onFailureHelp, onFailurePlain, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
-	import GroupOrder from './group-order.svelte';
+	import JobGraph from './job-graph.svelte';
 	import LaunchForm from './launch-form.svelte';
 
 	let { name }: { name: string } = $props();
@@ -17,10 +17,23 @@
 	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs', 'snapshot']);
 	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 12 }), ['runs']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
-	const nodes = createResource((client, scope) => client.listSnapshotNodes(scope), ['snapshot']);
+	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'warehouse']);
+	// Each member's nodes and last run, so a group's graph can box every member job around what it builds.
+	// Reading `job.data` here reloads it with the job; it stays null until the job has loaded.
+	const members = createResource(async (client, scope) => {
+		const detail = job.data;
+		if (!detail) return null;
+		const keys = detail.groupMembers?.map((m) => m.jobKey) ?? [];
+		if (!keys.length) return { nodes: new Map<string, string[]>(), lastRuns: new Map() };
+		const jobs = await client.listJobs(scope);
+		const details = await Promise.all(keys.map((k) => client.getJob(scope, k)));
+		return {
+			nodes: new Map(keys.map((k, i) => [k, details[i]?.resolvedNodes ?? []])),
+			lastRuns: new Map(jobs.map((j) => [j.key, j.lastRun]))
+		};
+	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
-	const kindOf = $derived(new Map((nodes.data ?? []).map((n) => [n.key, n.kind])));
 	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 	const runs = $derived(jobRuns.data ?? []);
 	const showCost = $derived(runs.some((r) => r.cost !== null));
@@ -39,15 +52,6 @@
 		}
 	}
 
-	const KIND_TONE: Record<string, string> = {
-		source: 'var(--sb-layer-source)',
-		loader: 'var(--sb-layer-source)',
-		seed: 'var(--sb-layer-staging)',
-		view: 'var(--sb-layer-staging)',
-		table: 'var(--sb-layer-marts)',
-		incremental: 'var(--sb-layer-intermediate)',
-		task: 'var(--sb-stale)'
-	};
 	const targetBlocked = $derived(!!def?.targets && !def.targets.includes(app.target?.name ?? ''));
 </script>
 
@@ -83,19 +87,20 @@
 	{#if def}
 		<div class="flex min-h-0 flex-1">
 			<div class="main sb-scroll">
-				{#if def.declaration}
-					<section>
-						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
-						<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={24} />
-					</section>
-				{/if}
-
-				{#if def.kind === 'group' && def.groupMembers}
-					<section>
-						<h3>Jobs in this group, in order <span>from the data each job reads and writes, plus any <code>after</code> in the code</span></h3>
-						<GroupOrder job={def} />
-					</section>
-				{/if}
+				<section>
+					<h3>What it builds · {def.resolvedNodes.length} nodes <span>{def.select ? `--select ${def.select}` : def.kind === 'group' ? 'each box is one of its jobs; arrows are the data each node reads' : ''}{def.exclude.length ? ` --exclude ${def.exclude.join(' ')}` : ''}</span></h3>
+					{#if catalog.data && (def.kind !== 'group' || members.data)}
+						<JobGraph job={def} catalog={catalog.data} memberNodes={members.data?.nodes ?? new Map()} lastRuns={members.data?.lastRuns ?? new Map()} />
+					{:else}
+						<p class="faint">{catalog.error ?? members.error ?? 'Loading…'}</p>
+					{/if}
+					{#if def.criticalNodes.length}
+						<p class="critical">
+							Critical (if one fails, the whole group stops):
+							{#each def.criticalNodes as n, i (n)}{i ? ', ' : ''}<a href="/catalog/{n}"><code>{n}</code></a>{/each}
+						</p>
+					{/if}
+				</section>
 
 				<section>
 					<h3>Recent runs</h3>
@@ -121,19 +126,12 @@
 					{/if}
 				</section>
 
-				<section>
-					<h3>What it builds · {def.resolvedNodes.length} nodes <span>{def.select ? `--select ${def.select}` : def.kind === 'group' ? 'everything its jobs build' : ''}{def.exclude.length ? ` --exclude ${def.exclude.join(' ')}` : ''}</span></h3>
-					<div class="nodes">
-						{#each def.resolvedNodes as n (n)}
-							<a href="/catalog/{n}" class="node">
-								<i style:background={KIND_TONE[kindOf.get(n) ?? ''] ?? 'var(--sb-text-faint)'}></i>
-								<span>{n}</span>
-								<em>{kindOf.get(n) ?? ''}</em>
-								{#if def.criticalNodes.includes(n)}<b title="Marked critical: if it fails, the whole group stops">critical</b>{/if}
-							</a>
-						{/each}
-					</div>
-				</section>
+				{#if def.declaration}
+					<section>
+						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
+						<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={24} />
+					</section>
+				{/if}
 			</div>
 
 			<aside class="rail sb-scroll">
@@ -280,46 +278,10 @@
 	.num {
 		text-align: right;
 	}
-	.nodes {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 6px;
-	}
-	.node {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--secondary);
+	.critical {
+		margin-top: 8px;
+		color: var(--muted-foreground);
 		font-size: 12px;
-	}
-	.node:hover {
-		background: var(--sb-hover);
-	}
-	.node i {
-		width: 9px;
-		height: 9px;
-		flex-shrink: 0;
-		border-radius: 2px;
-	}
-	.node span {
-		overflow: hidden;
-		font-family: var(--font-mono);
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.node em {
-		margin-left: auto;
-		color: var(--sb-text-faint);
-		font-size: 11px;
-		font-style: normal;
-	}
-	.node b {
-		color: var(--sb-warning);
-		font-size: 10.5px;
-		font-weight: 500;
 	}
 	.rail {
 		width: 320px;
