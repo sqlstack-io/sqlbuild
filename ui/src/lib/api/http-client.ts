@@ -7,7 +7,7 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, toLocationDetail, toLocationSummary, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
@@ -18,7 +18,7 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -81,6 +81,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'getWarehouseSync',
 	'maintenanceHistory',
 	'testConnection',
+	'listWarehouseConnections',
 	'listSnapshotNodes',
 	'checkAdhocRun',
 	'launchAdhocRun',
@@ -604,6 +605,19 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 					return toLocationSummary(location, health.data ?? null, snapshot, open, Date.now());
 				})
 			);
+		},
+		/** Targets whose health the person may not read are left out, as their connection checks are part of it. */
+		async listWarehouseConnections(): Promise<WarehouseConnection[]> {
+			const locations = await bootstrapLocations();
+			const read = await Promise.all(
+				locations.map(async (location) => {
+					const { locationId, target } = parseLocationKey(location.id);
+					const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path: { location_id: locationId, target } } });
+					if (response.status === 401) onUnauthorized();
+					return data ? [toWarehouseConnection(location, data)] : [];
+				})
+			);
+			return read.flat();
 		},
 		/** Null for a location the person can't see; a refused health read fails the page, as the target's listings do. */
 		async getLocation(locationId: string): Promise<LocationDetail | null> {

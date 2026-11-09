@@ -4,53 +4,62 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import ConnectionTest from '$lib/components/platform/connection-test.svelte';
 	import Panel from '$lib/components/platform/panel.svelte';
-	import type { SettingField, WarehouseConnection } from '$lib/api';
+	import StatusLabel from '$lib/components/list/status-label.svelte';
+	import { formatMs, formatNumber } from '$lib/build-area/labels';
+	import { formatAgo, formatStamp } from '$lib/format/time';
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
-	const connections = createResource((client, scope) => client.listWarehouseConnections(scope));
+	const connections = createResource((client) => client.listWarehouseConnections(), ['warehouse_sync']);
+	const list = $derived(connections.data ?? []);
 
-	const warehouse = $derived(connections.data ?? []);
-
-	function shownValue(c: WarehouseConnection, field: SettingField): string {
-		if (field.type === 'secret') return field.secretSource ?? 'not set';
-		const value = c.values[field.key] ?? field.default;
-		return value === undefined ? '—' : String(value);
-	}
+	const where = (s: { database: string | null; schema: string }) => (s.database ? `${s.database}.${s.schema}` : s.schema);
 </script>
 
 <AppTopbar title="Connections">
 	<Button variant="outline" size="sm" onclick={() => connections.refresh()}>↻ Refresh</Button>
 </AppTopbar>
 
-<div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
+<div class="min-h-0 flex-1 overflow-auto px-6 pt-5 pb-12">
 	{#if connections.error}
 		<p class="err">Couldn't load connections: {connections.error} <button class="retry" onclick={() => connections.refresh()}>Retry</button></p>
 	{/if}
 
-	<Panel title="Warehouse" note="Test a connection to check SQLBuild can sign in and reach the warehouse (the same check as sqb debug)">
-		{#each warehouse as c (c.name)}
-			<div class="warehouse">
-				<div class="warehouse-head">
+	{#each list as c (c.id)}
+		<Panel title="{c.location} · {c.target}" note={c.stateLocation ? `State tables in ${where(c.stateLocation)}` : undefined}>
+			<div class="connection">
+				<div class="head">
 					<DatabaseIcon size={15} strokeWidth={1.75} />
-					<a href="/connections/{c.name}" class="name">{c.name}</a>
-					<span class="muted" title={c.purpose === 'catalog' ? 'catalog_connection' : undefined}>{c.adapter} · {c.purpose === 'catalog' ? 'used to read SQLBuild’s own tables back (warehouse sync)' : `builds target ${c.target}`} · {c.sourceFile}</span>
+					<a href="/locations/{encodeURIComponent(c.id)}" class="name">Warehouse</a>
+					<div class="test"><ConnectionTest scope={{ locationId: c.id }} connection={c.target} last={c.lastTest} ontested={() => connections.refresh()} /></div>
 				</div>
-				<dl class="settings">
-					{#each c.settings as f (f.key)}
-						<div title={f.description}>
-							<dt>{f.key}</dt>
-							<dd class:secret={f.type === 'secret'} class:default={f.type !== 'secret' && c.values[f.key] === undefined}>{shownValue(c, f)}</dd>
-						</div>
-					{/each}
-				</dl>
-				<ConnectionTest scope={{ locationId: app.locationId }} connection={c.name} last={c.lastTest} />
+				{#if c.tables.length}
+					<table class="sb-list">
+						<thead><tr><th>Synced table</th><th>Newest sync</th><th>Records</th><th>Took</th><th>Last clean sync</th></tr></thead>
+						<tbody>
+							{#each c.tables as t (t.table)}
+								<tr>
+									<td><code>{t.table}</code></td>
+									<td>
+										<span title={formatStamp(t.at)}>
+											{#if t.failure}<StatusLabel tone="var(--sb-error)" label={t.failure} />{:else}<StatusLabel tone="var(--sb-success)" label="synced {formatAgo(t.at, app.now)}" />{/if}
+										</span>
+									</td>
+									<td>{formatNumber(t.recordsSent)}</td>
+									<td>{formatMs(t.elapsedMs)}</td>
+									<td class="muted" title={t.lastSyncedAt ? formatStamp(t.lastSyncedAt) : undefined}>{t.lastSyncedAt ? formatAgo(t.lastSyncedAt, app.now) : 'never'}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="muted">No warehouse sync reported yet.</p>
+				{/if}
 			</div>
-		{:else}
-			<p class="muted">{connections.data ? 'This location’s target has no warehouse connection. Add one to the target in the project config.' : connections.error ? '' : 'Loading…'}</p>
-		{/each}
-	</Panel>
-
+		</Panel>
+	{:else}
+		<p class="muted">{connections.data ? 'No location you can see in full has reported yet.' : connections.slow ? 'Loading…' : ''}</p>
+	{/each}
 </div>
 
 <style>
@@ -67,22 +76,18 @@
 		color: var(--muted-foreground);
 		font-size: 12.5px;
 	}
-	.warehouse {
+	.connection {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-		margin-bottom: 10px;
-		padding: 12px 14px;
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--card);
+		margin-bottom: 18px;
 	}
-	.warehouse-head {
+	.head {
 		display: flex;
 		align-items: center;
 		gap: 9px;
 	}
-	.warehouse-head :global(svg) {
+	.head :global(svg) {
 		color: var(--muted-foreground);
 	}
 	.name {
@@ -92,30 +97,12 @@
 	.name:hover {
 		color: var(--primary);
 	}
-	.settings {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-		gap: 8px 16px;
-		margin: 0;
-		font-size: 12.5px;
+	.test {
+		flex: 1;
+		min-width: 0;
+		margin-left: 12px;
 	}
-	.settings dt {
-		color: var(--sb-text-faint);
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-	}
-	.settings dd {
-		margin: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.settings dd.default {
-		color: var(--muted-foreground);
-	}
-	.settings dd.secret {
-		color: var(--muted-foreground);
-		font-family: var(--font-mono);
-		font-size: 12px;
+	code {
+		font: 12px var(--font-mono);
 	}
 </style>

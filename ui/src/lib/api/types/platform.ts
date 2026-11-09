@@ -215,17 +215,28 @@ export type SettingField = {
 	secretSource?: string;
 };
 
+/** A location target's warehouse connection as its checks and syncs report it; locations publish no connection settings. */
 export type WarehouseConnection = {
-	name: string;
+	/** The location key, `location_id:target`. */
+	id: string;
+	location: string;
 	target: string;
-	adapter: string;
-	/** `catalog_connection` override used by the warehouse sync, if any. */
-	purpose: 'target' | 'catalog';
-	sourceFile: string;
-	settings: SettingField[];
-	/** Configured values; secrets are never returned. */
-	values: Record<string, string | number | boolean>;
+	/** Where SQLBuild's own tables are read back from; null before a sync reports it. */
+	stateLocation: { database: string | null; schema: string } | null;
 	lastTest: ConnectionTest | null;
+	/** The newest sync of each SQLBuild table, in table order. */
+	tables: WarehouseTableSync[];
+};
+
+export type WarehouseTableSync = {
+	table: string;
+	at: Iso;
+	recordsSent: number;
+	elapsedMs: number;
+	/** What the newest sync was doing when it failed; null when it succeeded. */
+	failure: string | null;
+	/** The newest sync of the table that succeeded. */
+	lastSyncedAt: Iso | null;
 };
 
 /** A connection to something other than the warehouse (an API, object storage, a chat webhook), declared in project code. */

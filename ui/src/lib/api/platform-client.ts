@@ -57,8 +57,8 @@ export interface PlatformApi {
 	revokeLocationToken(tokenId: string): Promise<LocationToken>;
 
 	// ---- warehouse connections and providers ----
-	/** Warehouse connections of the selected target. */
-	listWarehouseConnections(scope: Scope): Promise<WarehouseConnection[]>;
+	/** The warehouse connection of every location target the person may list whole. */
+	listWarehouseConnections(): Promise<WarehouseConnection[]>;
 	/** Providers declared in the project, with where each one is used. Read-only. */
 	listProviders(scope: Scope): Promise<ProviderConnection[]>;
 

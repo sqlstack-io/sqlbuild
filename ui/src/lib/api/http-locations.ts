@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
 import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
-import type { ConnectionTest, LocationDetail, LocationInstance, LocationSummary } from './types/platform';
+import type { ConnectionTest, LocationDetail, LocationInstance, LocationSummary, WarehouseConnection, WarehouseTableSync } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -126,13 +126,44 @@ const SYNC_STAGE: Record<Wire['WarehouseSyncFailure'], string> = {
 	delivery: 'sending results to the server'
 };
 
-/** When a table last synced cleanly, and which tables' newest sync failed; null without any sync report. */
-export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
-	type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
+type Sync = Wire['LocationHealthObservation'] & { report: { health: Extract<Wire['LocationHealth'], { kind: 'warehouse_sync' }> } };
+
+/** Sync reports newest first, and the newest of each table. */
+function syncsOf(observations: Wire['LocationHealthObservation'][]): { syncs: Sync[]; newest: Map<string, Sync> } {
 	const syncs = observations.filter((o): o is Sync => o.report.health.kind === 'warehouse_sync').sort((a, b) => b.received_at.localeCompare(a.received_at));
-	if (!syncs.length) return null;
 	const newest = new Map<string, Sync>();
 	for (const sync of syncs) if (!newest.has(sync.report.health.table)) newest.set(sync.report.health.table, sync);
+	return { syncs, newest };
+}
+
+/** A location target's connection from its health reports: the newest connection check, where its state tables are read from, and each table's newest sync. */
+export function toWarehouseConnection(location: Location, observations: Wire['LocationHealthObservation'][]): WarehouseConnection {
+	const { syncs, newest } = syncsOf(observations);
+	const tables: WarehouseTableSync[] = [...newest.values()]
+		.map(({ received_at, report: { health } }) => ({
+			table: health.table,
+			at: received_at,
+			recordsSent: health.records_sent,
+			elapsedMs: health.elapsed_millis,
+			failure: health.failure ? `Failed while ${SYNC_STAGE[health.failure]}` : null,
+			lastSyncedAt: syncs.find((s) => s.report.health.table === health.table && !s.report.health.failure)?.received_at ?? null
+		}))
+		.sort((a, b) => a.table.localeCompare(b.table));
+	const state = syncs[0]?.report.health.location;
+	return {
+		id: location.id,
+		location: location.name,
+		target: location.target.name,
+		stateLocation: state ? { database: state.database ?? null, schema: state.schema } : null,
+		lastTest: connectionTestOf(observations),
+		tables
+	};
+}
+
+/** When a table last synced cleanly, and which tables' newest sync failed; null without any sync report. */
+export function warehouseSyncOf(observations: Wire['LocationHealthObservation'][]): WarehouseSync | null {
+	const { syncs, newest } = syncsOf(observations);
+	if (!syncs.length) return null;
 	const failing = [...newest.values()].flatMap((s) => (s.report.health.failure ? [`${s.report.health.table}: failed while ${SYNC_STAGE[s.report.health.failure]}`] : []));
 	return {
 		lastSyncedAt: syncs.find((s) => !s.report.health.failure)?.received_at ?? null,

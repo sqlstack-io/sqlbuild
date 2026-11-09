@@ -38,7 +38,7 @@ const PAGE_READS: [RegExp, Read][] = [
 	[/^\/maintenance$/, (c, s) => [c.maintenanceHistory(s)]],
 	[/^\/locations$/, (c) => [c.listLocations(), c.platformHealth()]],
 	[/^\/locations\/([^/]+)$/, (c, _, m) => [c.getLocation(part(m))]],
-	[/^\/connections(\/[^/]+)?$/, (c, s) => [c.listWarehouseConnections(s)]],
+	[/^\/connections$/, (c) => [c.listWarehouseConnections()]],
 	[/^\/providers(\/[^/]+)?$/, (c, s) => [c.listProviders(s)]]
 ];
 
