@@ -117,7 +117,7 @@ pub struct JobDetailRecord {
     pub snapshot_id: uuid::Uuid,
     pub selection: BTreeSet<String>,
     pub concurrency_groups: BTreeSet<String>,
-    /// Command settings; `vars` shows as `[REDACTED]` and text values pass through secret redaction.
+    /// Command settings; `vars` and a `defer_*` value that is not a target name show as `[REDACTED]`, and text values pass through secret redaction.
     pub settings: BTreeMap<String, serde_json::Value>,
     /// A group's member jobs in run order; empty for a job.
     pub members: Vec<JobMember>,
