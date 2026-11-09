@@ -1,6 +1,6 @@
 import type { components } from '$control/schema.d.ts';
-import type { Location, LocationHealth, WarehouseSync } from './types';
-import type { ConnectionTest, LocationSummary } from './types/platform';
+import type { Location, LocationHealth, Snapshot, WarehouseSync } from './types';
+import type { ConnectionTest, LocationDetail, LocationInstance, LocationSummary } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -53,8 +53,28 @@ export function manualConnectionTest(record: Wire['LocationWorkRecord'] | null):
 	};
 }
 
-/** `observations` is null when the person may not list the whole target. */
-export function toLocationSummary(location: Location, observations: Wire['LocationHealthObservation'][] | null, published: Wire['PublishedSnapshot'] | null, now: number): LocationSummary {
+function snapshotOf(published: Wire['PublishedSnapshot'] | null): Snapshot | null {
+	return published
+		? {
+				id: published.snapshot_id,
+				generation: published.generation,
+				gitRevision: published.git_revision ?? '',
+				gitDirty: published.git_dirty,
+				gitAuthor: published.git_author ?? '',
+				publishedAt: published.published_at,
+				sqbVersion: published.sqb_version
+			}
+		: null;
+}
+
+/** `observations` is null when the person may not list the whole target; `activeProblems` counts the problems read's events. */
+export function toLocationSummary(
+	location: Location,
+	observations: Wire['LocationHealthObservation'][] | null,
+	published: Wire['PublishedSnapshot'] | null,
+	activeProblems: number,
+	now: number
+): LocationSummary {
 	const known = observations ? healthOf(observations, now) : { health: null, liveInstances: 0, lastSeenAt: null };
 	return {
 		id: location.id,
@@ -64,18 +84,39 @@ export function toLocationSummary(location: Location, observations: Wire['Locati
 		brokenDeployPolicy: null,
 		failedDeploy: null,
 		connectionTest: observations ? connectionTestOf(observations) : null,
-		activeProblems: 0,
-		snapshot: published
-			? {
-					id: published.snapshot_id,
-					generation: published.generation,
-					gitRevision: published.git_revision ?? '',
-					gitDirty: published.git_dirty,
-					gitAuthor: published.git_author ?? '',
-					publishedAt: published.published_at,
-					sqbVersion: published.sqb_version
-				}
-			: null
+		activeProblems,
+		snapshot: snapshotOf(published)
+	};
+}
+
+/** One process per reporting session, newest check-in first; the server keeps no image, commit or start time for them. */
+export function instancesOf(observations: Wire['LocationHealthObservation'][], now: number): LocationInstance[] {
+	const lastSeen = new Map<string, string>();
+	for (const o of observations) {
+		const seen = lastSeen.get(o.report.session_id);
+		if (!seen || o.received_at > seen) lastSeen.set(o.report.session_id, o.received_at);
+	}
+	return [...lastSeen]
+		.sort(([, a], [, b]) => b.localeCompare(a))
+		.map(([id, lastSeenAt]) => ({ id, imageId: null, gitRevision: null, startedAt: null, lastSeenAt, state: now - Date.parse(lastSeenAt) <= LIVE_WINDOW_MS ? 'live' : 'stale' }));
+}
+
+/** A location's page from its health observations and newest snapshot; locations never send compile error text, so a failed reload shows only as its health. */
+export function toLocationDetail(location: Location, observations: Wire['LocationHealthObservation'][], published: Wire['PublishedSnapshot'] | null, now: number): LocationDetail {
+	const { health } = healthOf(observations, now);
+	return {
+		id: location.id,
+		name: location.name,
+		health,
+		createdAt: null,
+		brokenDeployPolicy: null,
+		failedDeploy: null,
+		lastLoadError: null,
+		instances: instancesOf(observations, now),
+		target: location.target,
+		snapshot: snapshotOf(published),
+		warehouseConnection: null,
+		connectionTest: connectionTestOf(observations)
 	};
 }
 

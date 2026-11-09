@@ -27,16 +27,18 @@ export type SchedulerInstance = {
 };
 
 export type SchedulerLease = {
-	holder: string;
-	acquiredAt: Iso;
-	renewedAt: Iso;
+	/** Null when the server doesn't say which replica holds it, nor since when. */
+	holder: string | null;
+	acquiredAt: Iso | null;
+	renewedAt: Iso | null;
 	expiresAt: Iso;
 };
 
 export type SchedulerStatus = {
 	/** Null when no replica holds the leader lease. */
 	lease: SchedulerLease | null;
-	instances: SchedulerInstance[];
+	/** Null when the server doesn't list its replicas. */
+	instances: SchedulerInstance[] | null;
 };
 
 export type HeartbeatStatus = {
@@ -62,9 +64,10 @@ export type SinkStatus = {
 
 export type PlatformHealth = {
 	scheduler: SchedulerStatus;
-	heartbeat: HeartbeatStatus;
-	/** Null when no server-side sink is configured. */
-	sink: SinkStatus | null;
+	/** Null when the server doesn't report its heartbeat. */
+	heartbeat: HeartbeatStatus | null;
+	/** Null when no server-side sink is configured; absent when the server doesn't report forwarding. */
+	sink?: SinkStatus | null;
 };
 
 export type PlatformEventLink =
@@ -137,9 +140,10 @@ export type ConnectionTest = {
 
 export type LocationInstance = {
 	id: string;
-	imageId: string;
-	gitRevision: string;
-	startedAt: Iso;
+	/** Null when the server doesn't report what the process runs or when it started. */
+	imageId: string | null;
+	gitRevision: string | null;
+	startedAt: Iso | null;
 	lastSeenAt: Iso;
 	/** `stale` once heartbeats stop; `gone` after deregistering. */
 	state: 'live' | 'stale' | 'gone';
@@ -149,17 +153,20 @@ export type LocationDetail = {
 	id: string;
 	name: string;
 	health: LocationHealth;
-	createdAt: Iso;
-	brokenDeployPolicy: BrokenDeployPolicy;
+	/** Null when the server doesn't report it. */
+	createdAt: Iso | null;
+	/** Null when the server doesn't report it. */
+	brokenDeployPolicy: BrokenDeployPolicy | null;
 	/** The latest deploy that never published; null when the latest deploy is current. */
 	failedDeploy: FailedDeploy | null;
 	lastLoadError: string | null;
 	instances: LocationInstance[];
 	target: LocationTarget;
 	snapshot: Snapshot | null;
-	/** Image the current snapshot was published from; runs start from it. Null for local processes. */
-	imageId: string | null;
-	warehouseConnection: string;
+	/** Image the current snapshot was published from; runs start from it. Null for local processes; absent when the server doesn't report it. */
+	imageId?: string | null;
+	/** Null when the server doesn't name it. */
+	warehouseConnection: string | null;
 	connectionTest: ConnectionTest | null;
 };
 

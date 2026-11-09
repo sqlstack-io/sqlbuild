@@ -24,6 +24,7 @@
 	const opensDetail = $derived(app.client.supports('getLocation'));
 	const showsServer = $derived(app.client.supports('platformHealth'));
 	const knowsPolicy = $derived(all.some((l) => l.brokenDeployPolicy));
+	const partialTitle = 'You need view on every node of this location to see its health, deploys and processes';
 
 	// Connection tests run per location, so each row checks that location's own permission.
 	const mayTest = (id: string) =>
@@ -74,12 +75,13 @@
 		<tbody>
 			{#each filtered as l (l.id)}
 				{@const test = tested[l.id] ?? l.connectionTest}
-				<tr class:static={!opensDetail} onclick={() => opensDetail && goto(`/locations/${l.id}`)}>
+				{@const opens = opensDetail && l.health !== null}
+				<tr class:static={!opens} onclick={() => opens && goto(`/locations/${l.id}`)}>
 					<td>
 						<div class="cell-name">
 							<MapPinIcon size={15} strokeWidth={1.75} />
 							<div class="min-w-0">
-								{#if opensDetail}<a href="/locations/{l.id}" onclick={(e) => e.stopPropagation()}>{l.name}</a>{:else}{l.name}{/if}
+								{#if opens}<a href="/locations/{l.id}" onclick={(e) => e.stopPropagation()}>{l.name}</a>{:else}{l.name}{/if}
 								<div class="cell-desc" title={l.target.connectionSummary}>{targetWords(l.target)}</div>
 							</div>
 						</div>
@@ -88,14 +90,16 @@
 						{#if l.health}
 							<StatusLabel tone={l.failedDeploy || l.activeProblems ? healthTone[l.health === 'healthy' ? 'degraded' : l.health] : healthTone[l.health]} label={healthWords(l)} />
 						{:else}
-							<span title="You need view on every node of this location to see its health"><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
+							<span title={partialTitle}><StatusLabel tone="var(--sb-text-faint)" label="Unknown" muted /></span>
 						{/if}
 						{#if l.activeProblems}
 							<div class="cell-desc"><a class="link" href="/locations/{l.id}#problems" onclick={(e) => e.stopPropagation()}>{l.activeProblems} open problem{l.activeProblems === 1 ? '' : 's'}</a></div>
 						{/if}
 					</td>
 					<td>
-						{#if l.snapshot}
+						{#if l.health === null}
+							<span class="muted" title={partialTitle}>—</span>
+						{:else if l.snapshot}
 							<div title="Commit {l.snapshot.gitRevision} by {l.snapshot.gitAuthor}, deployed {formatStamp(l.snapshot.publishedAt)} (snapshot generation {l.snapshot.generation})">Version {l.snapshot.generation}</div>
 							<div class="cell-desc">deployed {formatAgo(l.snapshot.publishedAt, app.now)}</div>
 						{:else}
@@ -110,6 +114,8 @@
 								<StatusLabel tone={testTone[test.outcome]} label={test.outcome === 'ok' ? 'Connected' : 'Couldn’t connect'} />
 							</span>
 							<div class="cell-desc" title={test.message}>{test.trigger === 'manual' ? `tested ${formatAgo(test.at, Math.max(app.now, Date.parse(test.at)))} by you` : `tested ${formatAgo(test.at, app.now)} after deploying`}</div>
+						{:else if l.health === null}
+							<span class="muted" title={partialTitle}>—</span>
 						{:else}
 							<StatusLabel tone="var(--sb-text-faint)" label="Not tested yet" muted />
 						{/if}
@@ -119,8 +125,8 @@
 						{/if}
 					</td>
 					<td>
-						<div>{l.liveInstances === 1 ? 'Running' : l.liveInstances === 0 ? 'Not running' : `${l.liveInstances} running`}</div>
-						{#if l.lastSeenAt}<RelativeTime value="last check-in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} />{/if}
+						{#if l.health === null}<span class="muted" title={partialTitle}>—</span>{:else}<div>{l.liveInstances === 1 ? 'Running' : l.liveInstances === 0 ? 'Not running' : `${l.liveInstances} running`}</div>
+						{#if l.lastSeenAt}<RelativeTime value="last check-in {formatAgo(l.lastSeenAt, app.now)}" exact={formatStamp(l.lastSeenAt)} />{/if}{/if}
 					</td>
 					{#if knowsPolicy}<td class="muted">{l.brokenDeployPolicy === 'fallback' ? 'Keep running the previous version' : l.brokenDeployPolicy ? 'Hold scheduled runs until a deploy works' : '—'}</td>{/if}
 				</tr>

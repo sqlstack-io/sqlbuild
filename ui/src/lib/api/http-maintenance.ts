@@ -25,19 +25,16 @@ function columnAliases(text: string | null | undefined): OldNameView['columnAlia
 	return text ? Object.entries(JSON.parse(text) as Record<string, string>).map(([old, renamed]) => ({ old, new: renamed })) : [];
 }
 
-/** Stored as a JSON list of the grant statements copied to the view. */
-const grantCount = (text: string | null | undefined): number | null => (text ? (JSON.parse(text) as string[]).length : null);
-
 /** One view per move, from its append-only steps (oldest first); each fact comes from the newest step that records it. */
-function toOldNameViews(rows: Wire['WarehouseOldNameRecord'][], migrationOrder: string[]): OldNameView[] {
-	const steps = new Map<string, Wire['WarehouseOldNameRecord'][]>();
+function toOldNameViews(rows: Wire['MaintenanceOldNameView'][], migrationOrder: string[]): OldNameView[] {
+	const steps = new Map<string, Wire['MaintenanceOldNameView'][]>();
 	for (const row of rows) steps.set(row.migration_event_id, [...(steps.get(row.migration_event_id) ?? []), row]);
 	const rank = (id: string) => (migrationOrder.includes(id) ? migrationOrder.indexOf(id) : migrationOrder.length);
 	return [...steps.entries()]
 		.sort(([a], [b]) => rank(a) - rank(b))
 		.map(([migrationEventId, recorded]) => {
 			const first = recorded[0];
-			const newest = <K extends keyof Wire['WarehouseOldNameRecord']>(key: K) => [...recorded].reverse().find((r) => r[key] != null)?.[key] ?? null;
+			const newest = <K extends keyof Wire['MaintenanceOldNameView']>(key: K) => [...recorded].reverse().find((r) => r[key] != null)?.[key] ?? null;
 			return {
 				migrationEventId,
 				destinationModel: first.destination_model,
@@ -46,7 +43,7 @@ function toOldNameViews(rows: Wire['WarehouseOldNameRecord'][], migrationOrder: 
 				retention: (newest('view_retention') as string | null) ?? '',
 				archiveName: newest('archive_name') as string | null,
 				columnAliases: columnAliases(newest('column_aliases') as string | null),
-				grantsCopied: grantCount(newest('grants_copied') as string | null),
+				grantsCopied: newest('grants_copied') as number | null,
 				expiresAt: newest('expires_at') as string | null,
 				dropReason: newest('drop_reason') as string | null,
 				steps: recorded.map((r) => ({ eventType: r.event_type as OldNameEventType, at: r.created_at, runId: r.run_id }))

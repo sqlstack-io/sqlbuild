@@ -25,7 +25,7 @@ function migration(eventId: string, originSchema: string | null, createdAt: stri
 	};
 }
 
-function step(migrationEventId: string, eventType: string, createdAt: string, facts: Partial<W['WarehouseOldNameRecord']> = {}): W['WarehouseOldNameRecord'] {
+function step(migrationEventId: string, eventType: string, createdAt: string, facts: Partial<W['MaintenanceOldNameView']> = {}): W['MaintenanceOldNameView'] {
 	return {
 		state_schema: 'sqlbuild_state',
 		event_id: `${migrationEventId}-${eventType}`,
@@ -49,7 +49,7 @@ describe('maintenance history mapping', () => {
 		old_name_views: [
 			step('orders', 'required', '2026-11-07T10:00:00Z', { view_retention: '30d' }),
 			step('customers', 'required', '2026-11-08T10:00:00Z', { view_retention: 'false' }),
-			step('orders', 'view_created', '2026-11-07T10:01:00Z', { expires_at: '2026-12-07T10:01:00Z', column_aliases: '{"amount":"total","id":"order_id"}', grants_copied: '["GRANT SELECT"]' }),
+			step('orders', 'view_created', '2026-11-07T10:01:00Z', { expires_at: '2026-12-07T10:01:00Z', column_aliases: '{"amount":"total","id":"order_id"}', grants_copied: 3 }),
 			step('orders', 'view_dropped', '2026-11-08T11:00:00Z', { drop_reason: 'Removed by hand' })
 		],
 		janitor_events: []
@@ -64,7 +64,7 @@ describe('maintenance history mapping', () => {
 
 	it('takes each fact from the step that recorded it', () => {
 		const orders = history.oldNameViews[1];
-		expect([orders.retention, orders.expiresAt, orders.dropReason, orders.grantsCopied]).toEqual(['30d', '2026-12-07T10:01:00Z', 'Removed by hand', 1]);
+		expect([orders.retention, orders.expiresAt, orders.dropReason, orders.grantsCopied]).toEqual(['30d', '2026-12-07T10:01:00Z', 'Removed by hand', 3]);
 		expect(orders.columnAliases).toEqual([
 			{ old: 'amount', new: 'total' },
 			{ old: 'id', new: 'order_id' }

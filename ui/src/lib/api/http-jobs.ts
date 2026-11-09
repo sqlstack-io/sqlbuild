@@ -1,5 +1,6 @@
 import type { components } from '$control/schema.d.ts';
-import type { Job, JobDetail, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
+import { ApiError } from './client';
+import type { CursorWindow, Job, JobDetail, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -78,16 +79,40 @@ export function toTrigger(wire: Wire['TriggerRecord'], runs: Run[], lastTick: Ti
 	};
 }
 
+/** How many upcoming due times a calendar schedule lists. */
+const UPCOMING_LIMIT = 5;
+
+/**
+ * The server's next due time, and for calendars the stored times from it on, which the scheduler
+ * takes in order. Later cron times would need cron evaluation, which stays on the server.
+ */
+function upcomingOf(d: Wire['TriggerDeclaration'], nextDueAt: string | null): string[] | null {
+	if (!isSchedule(d)) return null;
+	if (d.schedule.kind === 'cron') return nextDueAt ? [nextDueAt] : [];
+	if (!nextDueAt) return [];
+	const next = Date.parse(nextDueAt);
+	return d.schedule.times.filter((t) => Date.parse(t) >= next).sort((a, b) => Date.parse(a) - Date.parse(b)).slice(0, UPCOMING_LIMIT);
+}
+
 /** A trigger's detail; parts with no server source are null and their widgets stay hidden. */
 export function triggerDetailOf(trigger: Trigger, wire: Wire['TriggerRecord'], ticks: Tick[]): TriggerDetail {
 	const d = wire.definition_json;
+	const calendar = isSchedule(d) && d.schedule.kind === 'calendar' ? d.schedule : null;
+	const stored = calendar ? calendar.times.map(Date.parse) : [];
 	return {
 		...trigger,
 		declaration: null,
 		targets: null,
 		catchUp: null,
-		upcoming: null,
-		calendar: null,
+		upcoming: upcomingOf(d, wire.next_due_at ?? null),
+		calendar: calendar && {
+			horizon: null,
+			storedUntil: stored.length ? new Date(Math.max(...stored)).toISOString() : null,
+			lastRefreshedAt: null,
+			nextRefreshAt: calendar.refresh_at,
+			lowHorizonWarningBelow: null,
+			low: false
+		},
 		sensor: isSchedule(d)
 			? null
 			: {
@@ -142,4 +167,17 @@ export function jobDetailOf(job: Job, wire: Wire['JobRecord']): JobDetail {
 		memberOf: null,
 		cursorType: null
 	};
+}
+
+/**
+ * A backfill's bounds as typed: whole numbers on both ends make an integer window, anything else
+ * goes as timestamps for the server to validate. Only integers JSON would round are refused here.
+ */
+export function runWindowOf(window: CursorWindow): Wire['RunWindow'] {
+	const start = (window.start ?? '').trim();
+	const end = (window.end ?? '').trim();
+	if (![start, end].every((v) => /^-?\d+$/.test(v))) return { kind: 'timestamp', start, end };
+	const [from, to] = [start, end].map(Number);
+	if (![from, to].every(Number.isSafeInteger)) throw new ApiError(`Whole numbers beyond ${Number.MAX_SAFE_INTEGER} can't be sent exactly`, 400);
+	return { kind: 'integer', start: from, end: to };
 }

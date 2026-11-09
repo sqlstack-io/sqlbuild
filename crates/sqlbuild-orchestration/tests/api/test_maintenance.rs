@@ -110,6 +110,32 @@ fn given_moves_views_and_cleanups_when_people_read_maintenance_then_each_model_s
                 "another target's steps never appear"
             );
             assert_eq!(ids(&all, "janitor_events"), ["cleanup-2", "cleanup-1"]);
+            let grants: Vec<(&str, &Value)> = all["old_name_views"]
+                .as_array()
+                .expect("views")
+                .iter()
+                .map(|view| {
+                    (
+                        view["event_id"].as_str().expect("id"),
+                        &view["grants_copied"],
+                    )
+                })
+                .collect();
+            assert_eq!(
+                grants,
+                [
+                    ("view-orders-old-1", &Value::Null),
+                    ("view-customers-1", &Value::Null),
+                    ("view-orders-1", &Value::Null),
+                    ("view-orders-2", &json!(2))
+                ],
+                "copied grants are counted, and unreadable stored text reads as unknown"
+            );
+            let body = all.to_string();
+            assert!(
+                !body.contains("GRANT") && !body.contains("support_analysts"),
+                "no grant statement or grantee reaches people: {body}"
+            );
             assert_eq!(all["migrations"][0]["origin_model"], Value::Null);
             assert_eq!(all["migrations"][0]["discovery"], "automatic");
 
