@@ -86,3 +86,32 @@ describe('runWindowOf', () => {
 		expect(() => typed('9007199254740993', '9007199254740995')).toThrow('exactly');
 	});
 });
+
+describe('schedule due times', () => {
+	// Stored out of order on purpose; one time is before the server's next due time.
+	const times = ['2026-11-10T09:00:00Z', '2026-11-06T09:00:00Z', '2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z'];
+	const calendar = (nextDueAt: string | null) => ({
+		...trigger('t-cal', 'business_days', 'orders', { description: 'Business days', job_key: 'orders', schedule: { kind: 'calendar', times, refresh_at: '2026-11-08T00:00:00Z' } }),
+		next_due_at: nextDueAt
+	});
+	const detailOf = (wire: W['TriggerRecord']) => triggerDetailOf(toTrigger(wire, [], null), wire, []);
+
+	it('lists a calendar from the next due time on, in time order, with the last stored time and next refresh', () => {
+		const detail = detailOf(calendar('2026-11-07T09:00:00Z'));
+		expect(detail.upcoming).toEqual(['2026-11-07T09:00:00Z', '2026-11-08T09:00:00Z', '2026-11-10T09:00:00Z']);
+		expect(detail.calendar).toMatchObject({ storedUntil: '2026-11-10T09:00:00.000Z', nextRefreshAt: '2026-11-08T00:00:00Z', horizon: null, low: false });
+	});
+
+	it('has no upcoming calendar times once the server has no next due time', () => {
+		expect(detailOf(calendar(null)).upcoming).toEqual([]);
+	});
+
+	it('shows only the next due time for cron, without working out later ones', () => {
+		expect(detailOf(daily).upcoming).toEqual(['2026-11-07T06:00:00Z']);
+		expect(detailOf(daily).calendar).toBeNull();
+	});
+
+	it('has no due times for a sensor', () => {
+		expect(detailOf(onInventory).upcoming).toBeNull();
+	});
+});

@@ -122,10 +122,11 @@
 				{#if t.calendar}
 					<h3 title="Calendar horizon">Calendar</h3>
 					<dl>
-						<div><dt>Worked out ahead</dt><dd>{t.calendar.horizon}</dd></div>
-						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{formatStamp(t.calendar.storedUntil)}</dd></div>
-						<div><dt>Last updated</dt><dd>{formatAgo(t.calendar.lastRefreshedAt, app.now)}</dd></div>
-						<div><dt>Warns when under</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>
+						{#if t.calendar.horizon}<div><dt>Worked out ahead</dt><dd>{t.calendar.horizon}</dd></div>{/if}
+						<div><dt>Known until</dt><dd class:warn={t.calendar.low}>{t.calendar.storedUntil ? formatStamp(t.calendar.storedUntil) : 'no times stored'}</dd></div>
+						{#if t.calendar.lastRefreshedAt}<div><dt>Last updated</dt><dd>{formatAgo(t.calendar.lastRefreshedAt, app.now)}</dd></div>{/if}
+						{#if t.calendar.nextRefreshAt}<div><dt>Next update</dt><dd title={formatStamp(t.calendar.nextRefreshAt)}>{Date.parse(t.calendar.nextRefreshAt) > app.now ? formatIn(t.calendar.nextRefreshAt, app.now) : `due ${formatAgo(t.calendar.nextRefreshAt, app.now)}`}</dd></div>{/if}
+						{#if t.calendar.lowHorizonWarningBelow}<div><dt>Warns when under</dt><dd>{t.calendar.lowHorizonWarningBelow}</dd></div>{/if}
 					</dl>
 					<p class="help">The calendar's code runs in the location after each deploy and on a regular refresh, and the dates it returns are saved. If they run out, the schedule stops starting runs.</p>
 				{/if}
