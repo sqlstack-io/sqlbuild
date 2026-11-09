@@ -4,3 +4,6 @@ mod _helpers;
 pub mod constants;
 pub mod main;
 pub(crate) mod models;
+
+#[cfg(test)]
+mod tests;

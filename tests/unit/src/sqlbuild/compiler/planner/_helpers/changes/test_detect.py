@@ -51,6 +51,7 @@ from tests.unit.src.sqlbuild.compiler.planner._helpers.changes._test_types impor
 _QUERY_SQL: str = "SELECT id, name FROM orders"
 _MATCHING_HASH: str = compute_query_hash(query_sql=_QUERY_SQL, dialect=None)
 _DIFFERENT_HASH: str = "completely_different_hash"
+_OLD_SCHEME_HASH: str = "fingerprint_from_an_older_scheme"
 
 
 @pytest.mark.parametrize(
@@ -165,6 +166,73 @@ _DIFFERENT_HASH: str = "completely_different_hash"
             full_refresh=False,
             expected_change_kind=ChangeKind.QUERY_CHANGED,
             expected_backfill_action=BackfillAction.BOUNDED,
+        ),
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint of the unchanged query is no change",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"replay_on_change": "bounded-30d"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition="select id,\n  name\nfrom orders -- staged",
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.NO_CHANGE,
+            expected_backfill_action=BackfillAction.FORWARD_ONLY,
+            expected_definition_hash=_OLD_SCHEME_HASH,
+        ),
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint of an edited query is a query change",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"replay_on_change": "bounded-30d"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition="SELECT id FROM orders",
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.QUERY_CHANGED,
+            expected_backfill_action=BackfillAction.BOUNDED,
+        ),
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint with an empty definition is a query change once",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"replay_on_change": "bounded-30d"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition="",
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.QUERY_CHANGED,
+            expected_backfill_action=BackfillAction.BOUNDED,
+        ),
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint of an unchanged replaying incremental model never replays",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"materialized": "incremental", "replay_on_change": "full"},
+            fingerprint_config_values={"materialized": "incremental", "replay_on_change": "full"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition=_QUERY_SQL,
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.NO_CHANGE,
+            expected_backfill_action=BackfillAction.FORWARD_ONLY,
+            expected_definition_hash=_OLD_SCHEME_HASH,
         ),
         DetectModelChangesTestCase(
             description="schema finding of an unchanged model never replays",
@@ -372,6 +440,8 @@ def test_given_model_and_snapshot_when_detecting_changes_then_returns_expected(
     assert (
         result.recorded_build_relation_missing == test_case.expected_recorded_build_relation_missing
     )
+    if test_case.expected_definition_hash is not None:
+        assert result.fingerprint_definition_hash == test_case.expected_definition_hash
 
 
 @pytest.mark.parametrize(

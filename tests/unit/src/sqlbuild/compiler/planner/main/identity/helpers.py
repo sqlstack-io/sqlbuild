@@ -1,5 +1,6 @@
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,11 +12,13 @@ from sqlbuild._native import (
     CompiledResourceType,
     CompileModelConfig,
     DirectModelVersionIdentities,
+    Fingerprint,
     FunctionArgument,
     FunctionReturnColumn,
     PlannerScope,
     SchemaColumn,
     SeedCsvSettings,
+    WarehouseFingerprints,
     build_direct_model_version_identities,
     build_downstream_deps,
     build_model_version_identity_metadata_json,
@@ -195,3 +198,95 @@ def build_chain_graph_identities(*, depth: int) -> DirectModelVersionIdentities:
         execution_order=tuple(reversed(keys)),
     )
     return build_direct_model_version_identities(functions=(), scope=scope, dialect=None)
+
+
+_RECORDED_TS: datetime = datetime(2026, 1, 15, 12, 0, 0, tzinfo=UTC)
+
+
+def recorded_fingerprint(
+    *, name: str, node_type: str, definition: str, definition_hash: str, metadata_json: str = "{}"
+) -> Fingerprint:
+    """A fingerprint row as an earlier SQLBuild version recorded it."""
+
+    return Fingerprint(
+        node_type=node_type,
+        node_name=name,
+        target_database=None,
+        target_schema=None,
+        target_name=name,
+        run_id="run_001",
+        definition_hash=definition_hash,
+        schema_fingerprint="schema_a",
+        definition=definition,
+        ts=_RECORDED_TS,
+        metadata_json=metadata_json,
+        version_hash="recorded_version",
+    )
+
+
+def build_two_model_graph_identities(
+    *, orders_sql: str, summary_sql: str, recorded: WarehouseFingerprints | None
+) -> DirectModelVersionIdentities:
+    """Identities of `orders` and its downstream `orders_summary`, optionally over recorded rows."""
+
+    orders_key: CompiledObjectKey = CompiledObjectKey(
+        resource_type=CompiledResourceType.MODEL, name="orders"
+    )
+    summary_key: CompiledObjectKey = CompiledObjectKey(
+        resource_type=CompiledResourceType.MODEL, name="orders_summary"
+    )
+    upstream: dict[CompiledObjectKey, tuple[CompiledObjectKey, ...]] = {
+        orders_key: (),
+        summary_key: (orders_key,),
+    }
+    scope: PlannerScope = PlannerScope(
+        upstream_deps=upstream,
+        downstream_deps=build_downstream_deps(upstream),
+        all_keys={key.name: key for key in upstream},
+        models_by_name={
+            "orders": _build_model(key=orders_key, query_sql=orders_sql, deps=()),
+            "orders_summary": _build_model(
+                key=summary_key, query_sql=summary_sql, deps=(orders_key,)
+            ),
+        },
+        selected_keys=frozenset(upstream),
+        execution_order=(orders_key, summary_key),
+    )
+    return build_direct_model_version_identities(
+        functions=(), scope=scope, dialect=None, recorded_fingerprints=recorded
+    )
+
+
+def build_function_identities(
+    *, body_sql: str, recorded: WarehouseFingerprints | None
+) -> DirectModelVersionIdentities:
+    """Identities of one SQL function and a model calling it, optionally over recorded rows."""
+
+    function_key: CompiledObjectKey = CompiledObjectKey(
+        resource_type=CompiledResourceType.UDF, name="add_one"
+    )
+    model_key: CompiledObjectKey = CompiledObjectKey(
+        resource_type=CompiledResourceType.MODEL, name="orders"
+    )
+    function: CompiledFunction = replace(
+        build_compiled_function(body_sql=body_sql), key=function_key, name="add_one"
+    )
+    upstream: dict[CompiledObjectKey, tuple[CompiledObjectKey, ...]] = {
+        function_key: (),
+        model_key: (function_key,),
+    }
+    scope: PlannerScope = PlannerScope(
+        upstream_deps=upstream,
+        downstream_deps=build_downstream_deps(upstream),
+        all_keys={key.name: key for key in upstream},
+        models_by_name={
+            "orders": _build_model(
+                key=model_key, query_sql="SELECT add_one(1) AS order_id", deps=(function_key,)
+            )
+        },
+        selected_keys=frozenset(upstream),
+        execution_order=(function_key, model_key),
+    )
+    return build_direct_model_version_identities(
+        functions=(function,), scope=scope, dialect=None, recorded_fingerprints=recorded
+    )

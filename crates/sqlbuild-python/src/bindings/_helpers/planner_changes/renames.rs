@@ -15,7 +15,7 @@ use sqlbuild_rules::lint_text::main::neutralize_interpolation::neutralize_interp
 use crate::bindings::_helpers::boundary::panics::value_error;
 use crate::bindings::_helpers::boundary::python_calls::{KeywordArguments, call_with, imported};
 use crate::bindings::_helpers::compiled_views::model_reads;
-use crate::bindings::_helpers::planner_identity::hashing::model_query_hash;
+use crate::bindings::_helpers::planner_identity::hashing::baselined_model_query_hash;
 use crate::bindings::_helpers::planner_scope::retained::scope_data;
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -245,13 +245,14 @@ fn changed_referencing_query(
             }
         }
         if references_models
-            && model_query_hash(
+            && baselined_model_query_hash(
                 py,
                 &model_reads::model_name(&model)?,
                 (
                     &model_reads::query_sql(&model)?.extract::<String>()?,
                     dialect.as_deref(),
                 ),
+                &recorded,
             )? != native_field(&recorded, "definition_hash")?.extract::<String>()?
         {
             return Ok(true);

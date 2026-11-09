@@ -50,7 +50,7 @@ def try_write_fingerprint(
         )
     try:
         schema_fp: str = hashlib.sha256(b"").hexdigest()
-        definition_hash: str = compute_query_hash(
+        definition_hash: str = entry.fingerprint_definition_hash or compute_query_hash(
             query_sql=entry.fingerprint_query_sql, dialect=adapter.sql_analysis_dialect()
         )
         metadata_json: str = model_fingerprint_metadata_with_audit_gate(

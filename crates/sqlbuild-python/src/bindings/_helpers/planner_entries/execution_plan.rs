@@ -152,13 +152,13 @@ fn planned_output<'py>(
     let origin_failures = deferred_migration_origins(args, scopes, &deferral)?;
     let warehouse = gather_planner_warehouse_state(runtime, scopes, overrides, &deferral)?;
     let started = Instant::now();
+    let snapshot = warehouse_field(&warehouse, |warehouse| &warehouse.snapshot)?;
     let identities = build_planner_identity_context(
         &project,
-        scopes,
+        (scopes, &snapshot),
         native_field(&policies, "selection_diagnostics")?.extract()?,
     )?;
     check_selected_scope_buildability(runtime, scopes, &warehouse, &deferral)?;
-    let snapshot = warehouse_field(&warehouse, |warehouse| &warehouse.snapshot)?;
     let (changes, stale_warning_changes) = change_results(
         &project,
         (scopes, &snapshot, &identities),

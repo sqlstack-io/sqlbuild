@@ -38,7 +38,7 @@ use crate::bindings::_helpers::planner_changes::results::{
     backfill_result, change_kind, planner_enum, replay_policy_error, schema_findings,
 };
 use crate::bindings::_helpers::planner_identity::hashing::{
-    function_definition_hash, model_query_hash,
+    baselined_function_definition_hash, baselined_model_query_hash,
 };
 use crate::bindings::_helpers::planner_identity::metadata::{
     compiled_function_fingerprint_sql, function_local_hashes, model_declared_columns_hash,
@@ -132,7 +132,7 @@ pub(crate) fn detect_changes<'py>(
                 if fingerprint.is_none() {
                     "first_run"
                 } else if query_change_tracking
-                    && function_definition_hash(
+                    && baselined_function_definition_hash(
                         py,
                         &name.extract::<String>()?,
                         (
@@ -142,6 +142,7 @@ pub(crate) fn detect_changes<'py>(
                                 .extract::<String>()?,
                             dialect.as_deref(),
                         ),
+                        &fingerprint,
                     )? != native_field(&fingerprint, "definition_hash")?.extract::<String>()?
                 {
                     "query_changed"
@@ -227,6 +228,7 @@ pub(crate) fn scope_model_changes<'py>(
         native_field(project, "sql_analysis_dialect")?
             .extract::<Option<String>>()?
             .as_deref(),
+        &native_field(snapshot, "fingerprints")?,
     )?
     .into_any();
     let hook_version_hashes: Bound<'py, PyDict> = PyDict::new(py);
@@ -313,13 +315,14 @@ pub(crate) fn model_change<'py>(
     let recorded: Option<Recorded> = recorded_fingerprint(&fingerprint)?;
     let dialect: Bound<'py, PyAny> = native_field(snapshot, "column_dialect")?;
     let compiled_query_hash: Option<String> = if pass.query_change_tracking && recorded.is_some() {
-        Some(model_query_hash(
+        Some(baselined_model_query_hash(
             py,
             &model_name.extract::<String>()?,
             (
                 &model_reads::query_sql(model)?.extract::<String>()?,
                 dialect.extract::<Option<String>>()?.as_deref(),
             ),
+            &fingerprint,
         )?)
     } else {
         None
@@ -327,6 +330,7 @@ pub(crate) fn model_change<'py>(
     if let Some(recorded) = &recorded {
         result.previous(recorded);
     }
+    result.definition_hash.clone_from(&compiled_query_hash);
     let definition_changed: bool = match (&compiled_query_hash, &recorded) {
         (Some(hash), Some(recorded)) => *hash != recorded.definition_hash,
         _ => false,
@@ -652,6 +656,7 @@ struct ChangeResult<'py> {
     model_name: Bound<'py, PyAny>,
     metadata_json: String,
     version_hash: Option<String>,
+    definition_hash: Option<String>,
     previous_metadata_json: Option<String>,
     previous_version_hash: Option<String>,
     query_changed: bool,
@@ -673,6 +678,7 @@ impl<'py> ChangeResult<'py> {
             model_name: model_name.clone(),
             metadata_json: metadata_json.to_owned(),
             version_hash: version_hash.map(str::to_owned),
+            definition_hash: None,
             previous_metadata_json: None,
             previous_version_hash: None,
             query_changed: false,
@@ -732,6 +738,10 @@ impl<'py> ChangeResult<'py> {
                 (
                     "previous_version_hash",
                     self.previous_version_hash.into_pyobject(py)?.into_any(),
+                ),
+                (
+                    "fingerprint_definition_hash",
+                    self.definition_hash.into_pyobject(py)?.into_any(),
                 ),
                 (
                     "schema_findings",
