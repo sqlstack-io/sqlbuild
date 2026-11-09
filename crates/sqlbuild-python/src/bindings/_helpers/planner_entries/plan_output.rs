@@ -731,6 +731,10 @@ pub(crate) fn plan_output_fields<'py>(
             "python_identity_fingerprints",
             native_field(&native_field(&snapshot, "fingerprints")?, "python_nodes")?,
         ),
+        (
+            "recorded_fingerprints",
+            native_field(&snapshot, "fingerprints")?,
+        ),
     ])
 }
 

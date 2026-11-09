@@ -864,6 +864,7 @@ class ChangeDetectionResult(NativeRecord):
     previous_metadata_json: str | None
     fingerprint_version_hash: str | None
     previous_version_hash: str | None
+    fingerprint_definition_hash: str | None
     schema_findings: tuple[SchemaFinding, ...]
     backfill: BackfillResult
     recorded_build_relation_missing: bool
@@ -878,6 +879,7 @@ class ChangeDetectionResult(NativeRecord):
         previous_metadata_json: str | None = ...,
         fingerprint_version_hash: str | None = ...,
         previous_version_hash: str | None = ...,
+        fingerprint_definition_hash: str | None = ...,
         schema_findings: tuple[SchemaFinding, ...] = ...,
         backfill: BackfillResult = ...,
         recorded_build_relation_missing: bool = ...,
@@ -6151,6 +6153,7 @@ def build_direct_model_version_identities(
     seeds: Iterable[CompiledSeedView] = (),
     source_version_hashes: Mapping[str, str] | None = None,
     hook_functions: Iterable[DiscoveredHookFunction] = (),
+    recorded_fingerprints: WarehouseFingerprints | None = None,
 ) -> DirectModelVersionIdentities: ...
 def merge_recomputed_model_changes(
     *, resolved_actions: PlannerResolvedActions, changes: PlannerChangeResults
@@ -13935,6 +13938,7 @@ class ModelPlanEntry(NativeRecord):
     previous_metadata_json: str | None
     fingerprint_version_hash: str | None
     previous_version_hash: str | None
+    fingerprint_definition_hash: str | None
     query_changed: bool
     config_changed: bool
     schema_actions: tuple[SchemaAction, ...]
@@ -14022,6 +14026,7 @@ class ModelPlanEntry(NativeRecord):
         previous_metadata_json: str | None = ...,
         fingerprint_version_hash: str | None = ...,
         previous_version_hash: str | None = ...,
+        fingerprint_definition_hash: str | None = ...,
         query_changed: bool = ...,
         config_changed: bool = ...,
         schema_actions: tuple[SchemaAction, ...] = ...,
@@ -14424,6 +14429,7 @@ class PlanOutput(NativeRecord):
     provider_usages: tuple[PlanProviderUsage, ...]
     source_freshness: DirectSourceFreshnessPlanningResult | None
     python_identity_fingerprints: dict[tuple[str, str], Fingerprint]
+    recorded_fingerprints: WarehouseFingerprints | None
     metadata: dict[str, object]
     cursor_overrides: CursorOverrides | None
     existing_model_names: frozenset[str]
@@ -14459,6 +14465,7 @@ class PlanOutput(NativeRecord):
         provider_usages: tuple[PlanProviderUsage, ...] = ...,
         source_freshness: DirectSourceFreshnessPlanningResult | None = ...,
         python_identity_fingerprints: dict[tuple[str, str], Fingerprint] = ...,
+        recorded_fingerprints: WarehouseFingerprints | None = ...,
         metadata: dict[str, object] = ...,
         cursor_overrides: CursorOverrides | None = ...,
         existing_model_names: frozenset[str] = ...,

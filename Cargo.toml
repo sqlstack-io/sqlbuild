@@ -175,10 +175,12 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "cf79656d247277a30bc81ef39b6dee420e721221" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "17983fcf4ffa5a2bedea5f7921b1f7d0623d670a" }
+# SQL change fingerprints over SQLQuack's tokenizers.
+sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "395ced6dbd4b3a484c0755fc62d6648ed608f83a" }
 # Scopes, name resolution, types and lineage for the native analysis route.
 sqlquack-semantics = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "395ced6dbd4b3a484c0755fc62d6648ed608f83a" }
-# The lossless SQL tokenizer behind query fingerprints.
+# SQLQuack's lossless SQL tokenizer.
 sqlquack-syntax = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "395ced6dbd4b3a484c0755fc62d6648ed608f83a" }
 sqlquack-syntax-bigquery = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "395ced6dbd4b3a484c0755fc62d6648ed608f83a" }
 sqlquack-syntax-clickhouse = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "395ced6dbd4b3a484c0755fc62d6648ed608f83a" }

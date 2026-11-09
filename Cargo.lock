@@ -4141,7 +4141,7 @@ dependencies = [
  "sqlbuild-render",
  "sqlbuild-scopes",
  "sqlbuild-sqltext",
- "sqlclean",
+ "sqlquack-fingerprint",
  "sqlquack-semantics",
  "sqlquack-syntax",
  "sqlquack-syntax-bigquery",
@@ -4491,16 +4491,19 @@ dependencies = [
 
 [[package]]
 name = "sqlclean"
-version = "0.4.3"
-source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=cf79656d247277a30bc81ef39b6dee420e721221#cf79656d247277a30bc81ef39b6dee420e721221"
+version = "0.6.0"
+source = "git+https://github.com/sqlstack-io/sqlclean.git?rev=17983fcf4ffa5a2bedea5f7921b1f7d0623d670a#17983fcf4ffa5a2bedea5f7921b1f7d0623d670a"
 dependencies = [
- "polyglot-sql",
- "polyglot-sql-function-catalogs",
  "rayon",
  "rustc-hash",
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "sqlquack-fingerprint",
+ "sqlquack-format",
+ "sqlquack-lint",
+ "sqlquack-syntax",
+ "sqlquack-syntax-sqlserver",
 ]
 
 [[package]]
@@ -4511,6 +4514,43 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlquack-syntax",
+]
+
+[[package]]
+name = "sqlquack-fingerprint"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=395ced6dbd4b3a484c0755fc62d6648ed608f83a#395ced6dbd4b3a484c0755fc62d6648ed608f83a"
+dependencies = [
+ "sha2 0.10.9",
+ "sqlquack-syntax",
+ "sqlquack-syntax-postgres",
+]
+
+[[package]]
+name = "sqlquack-format"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=395ced6dbd4b3a484c0755fc62d6648ed608f83a#395ced6dbd4b3a484c0755fc62d6648ed608f83a"
+dependencies = [
+ "serde_json",
+ "sqlquack-syntax",
+ "sqlquack-syntax-bigquery",
+ "sqlquack-syntax-postgres",
+ "sqlquack-syntax-sqlserver",
+]
+
+[[package]]
+name = "sqlquack-lint"
+version = "0.2.0"
+source = "git+https://github.com/sqlstack-io/sqlquack.git?rev=395ced6dbd4b3a484c0755fc62d6648ed608f83a#395ced6dbd4b3a484c0755fc62d6648ed608f83a"
+dependencies = [
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "sqlquack-syntax",
+ "sqlquack-syntax-bigquery",
+ "sqlquack-syntax-databricks",
+ "sqlquack-syntax-postgres",
 ]
 
 [[package]]

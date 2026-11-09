@@ -20,7 +20,7 @@ use crate::bindings::_helpers::compiled_views::function_reads;
 use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::native_host::host;
-use crate::bindings::_helpers::planner_identity::hashing::{graph_key, model_query_hash};
+use crate::bindings::_helpers::planner_identity::hashing::{baselined_model_query_hash, graph_key};
 use crate::bindings::_helpers::planner_identity::metadata::{
     function_local_hashes, model_version_identity_metadata_json, seed_identity,
 };
@@ -78,7 +78,12 @@ pub(crate) fn build_direct_model_version_identities<'py>(
         options,
         (
             &["functions", "scope", "dialect"],
-            &["seeds", "source_version_hashes", "hook_functions"],
+            &[
+                "seeds",
+                "source_version_hashes",
+                "hook_functions",
+                "recorded_fingerprints",
+            ],
         ),
     )?;
     direct_model_version_identities(
@@ -89,17 +94,25 @@ pub(crate) fn build_direct_model_version_identities<'py>(
             &arguments.value("source_version_hashes")?,
             &arguments.value("hook_functions")?,
         ),
+        &arguments.value("recorded_fingerprints")?,
     )
 }
 
-/// Current direct model identities of `(functions, scope)` with optional seeds, source hashes and hooks.
+/// Direct model identities of `(functions, scope)`; unchanged nodes keep their `recorded` fingerprints.
 pub(crate) fn direct_model_version_identities<'py>(
     (functions, scope): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     dialect: Option<String>,
     (seeds, source_hashes, hooks): (&Bound<'py, PyAny>, &Bound<'py, PyAny>, &Bound<'py, PyAny>),
+    recorded: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let py: Python<'py> = functions.py();
-    let function_hashes: Bound<'py, PyDict> = function_local_hashes(functions, dialect.as_deref())?;
+    let function_hashes: Bound<'py, PyDict> =
+        function_local_hashes(functions, dialect.as_deref(), recorded)?;
+    let recorded_models: Bound<'py, PyAny> = if recorded.is_none() {
+        PyDict::new(py).into_any()
+    } else {
+        native_field(recorded, "models")?
+    };
     let hook_hashes: Bound<'py, PyDict> = if hooks.is_none() {
         PyDict::new(py)
     } else {
@@ -169,13 +182,15 @@ pub(crate) fn direct_model_version_identities<'py>(
             Some(function_hashes.as_any()),
             Some(hook_hashes.as_any()),
         )?;
-        let query_fingerprint: String = model_query_hash(
+        let recorded_model: Bound<'py, PyAny> = mapping_get(&recorded_models, &name)?;
+        let query_fingerprint: String = baselined_model_query_hash(
             py,
             &name,
             (
                 &model_reads::query_sql(&model)?.extract::<String>()?,
                 dialect.as_deref(),
             ),
+            &recorded_model,
         )?;
         let local_hash: String = model_local_identity_hash(&query_fingerprint, &metadata_json);
         model_metadata.set_item(&name, metadata_json)?;

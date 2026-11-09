@@ -1,5 +1,7 @@
 //! Version identity metadata JSON and hashes of models, functions and seeds, byte-identical to the recorded fingerprints.
 
+use std::collections::HashMap;
+
 use pyo3::prelude::{Bound, PyAny, PyAnyMethods, PyModule, PyModuleMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyString, PyTuple};
 use pyo3::{pyfunction, wrap_pyfunction};
@@ -20,7 +22,9 @@ use crate::bindings::_helpers::compiled_views::model_reads;
 use crate::bindings::_helpers::compiled_views::seed_reads;
 use crate::bindings::_helpers::discovery::hook_entries::hook_entries;
 use crate::bindings::_helpers::model_config::typed_config::{config_value, model_values};
-use crate::bindings::_helpers::planner_identity::hashing::function_definition_hash;
+use crate::bindings::_helpers::planner_identity::hashing::{
+    baselined_function_definition_hash, function_definition_hash,
+};
 use crate::bindings::_helpers::planner_identity::json_values::{COMPACT, SPACED, sorted_dumps};
 use crate::bindings::_helpers::records::fields::field as native_field;
 use crate::bindings::_helpers::records::fields::mapping_get;
@@ -275,13 +279,73 @@ pub(crate) fn model_declared_columns_hash(model: &Bound<'_, PyAny>) -> PyResult<
     )?))
 }
 
-/// Local-only semantic hashes of functions by name; SQL bodies ignore layout and comments.
+/// Whether the function's recorded fingerprint came from an older scheme for the same definition.
+fn recorded_function_unchanged(
+    function: &Bound<'_, PyAny>,
+    (name, dialect): (&str, Option<&str>),
+    recorded: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
+    if recorded.is_none() {
+        return Ok(false);
+    }
+    let fingerprint: Bound<'_, PyAny> = mapping_get(&native_field(recorded, "functions")?, name)?;
+    if fingerprint.is_none() {
+        return Ok(false);
+    }
+    let py: Python<'_> = function.py();
+    let language: String = function_reads::language(function)?.str()?.extract()?;
+    let fingerprint_sql: String = compiled_function_fingerprint_sql(function)?;
+    let current: String =
+        function_definition_hash(py, name, (&fingerprint_sql, &language, dialect))?;
+    Ok(baselined_function_definition_hash(
+        py,
+        name,
+        (&fingerprint_sql, &language, dialect),
+        &fingerprint,
+    )? != current)
+}
+
+/// Each function's local hash in the most recently recorded model metadata that names it.
+fn latest_recorded_function_hashes(
+    recorded: &Bound<'_, PyAny>,
+) -> PyResult<HashMap<String, String>> {
+    let mut rows: Vec<(f64, String)> = Vec::new();
+    for item in mapping_items(&native_field(recorded, "models")?)?.try_iter()? {
+        let (_, fingerprint): (Bound<'_, PyAny>, Bound<'_, PyAny>) = item?.extract()?;
+        rows.push((
+            native_field(&fingerprint, "ts")?
+                .call_method0("timestamp")?
+                .extract()?,
+            native_field(&fingerprint, "metadata_json")?.extract()?,
+        ));
+    }
+    rows.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let mut latest: HashMap<String, String> = HashMap::new();
+    for (_, metadata) in &rows {
+        let Ok(serde_json::Value::Object(object)) = serde_json::from_str(metadata) else {
+            continue;
+        };
+        let Some(serde_json::Value::Object(hashes)) = object.get(LOCAL_FUNCTION_HASHES_KEY) else {
+            continue;
+        };
+        for (name, hash) in hashes {
+            if let Some(hash) = hash.as_str() {
+                latest.insert(name.clone(), hash.to_owned());
+            }
+        }
+    }
+    Ok(latest)
+}
+
+/// Local hashes of functions by name; unchanged functions keep the latest local hash `recorded` models saw.
 pub(crate) fn function_local_hashes<'py>(
     functions: &Bound<'py, PyAny>,
     dialect: Option<&str>,
+    recorded: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let py: Python<'py> = functions.py();
     let hashes: Bound<'py, PyDict> = PyDict::new(py);
+    let mut recorded_local: Option<HashMap<String, String>> = None;
     for function in functions.try_iter()? {
         let function: Bound<'py, PyAny> = function?;
         let name: String = function_reads::name(&function)?.extract()?;
@@ -314,10 +378,18 @@ pub(crate) fn function_local_hashes<'py>(
         )?;
         payload.set_item("entry_point", function_reads::entry_point(&function)?)?;
         payload.set_item("packages", function_reads::packages(&function)?)?;
-        hashes.set_item(
-            name,
-            stable_identity_hash(&sorted_dumps(payload.as_any(), SPACED, true)?),
-        )?;
+        let mut local_hash: String =
+            stable_identity_hash(&sorted_dumps(payload.as_any(), SPACED, true)?);
+        if recorded_function_unchanged(&function, (&name, dialect), recorded)? {
+            let latest = match &mut recorded_local {
+                Some(latest) => latest,
+                None => recorded_local.insert(latest_recorded_function_hashes(recorded)?),
+            };
+            if let Some(previous) = latest.get(&name) {
+                local_hash.clone_from(previous);
+            }
+        }
+        hashes.set_item(name, local_hash)?;
     }
     Ok(hashes)
 }
@@ -494,7 +566,11 @@ pub(crate) fn build_function_local_hashes<'py>(
     functions: &Bound<'py, PyAny>,
     dialect: Option<&str>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    function_local_hashes(functions, dialect)
+    function_local_hashes(
+        functions,
+        dialect,
+        &functions.py().None().into_bound(functions.py()),
+    )
 }
 
 /// Stable function definition text used for change fingerprints.

@@ -49,6 +49,7 @@ pub(crate) fn planner_identity_work_info(
 fn version_identities<'py>(
     project: &Bound<'py, PyAny>,
     scope: Bound<'py, PyAny>,
+    recorded_fingerprints: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyAny>> {
     identity_work(project.py())?.identity_builds += 1;
     direct_model_version_identities(
@@ -59,22 +60,26 @@ fn version_identities<'py>(
             &project.py().None().into_bound(project.py()),
             &native_field(project, "hook_functions")?,
         ),
+        recorded_fingerprints,
     )
 }
 
 pub(crate) fn build_planner_identity_context<'py>(
     project: &Bound<'py, PyAny>,
-    scopes: &Bound<'py, PyAny>,
+    (scopes, snapshot): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     include_stale_warning_identities: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let recorded_fingerprints: Bound<'py, PyAny> = native_field(snapshot, "fingerprints")?;
     let identities = version_identities(
         project,
         class_field(scopes, |s: &PlannerScopeResolution| &s.inspection_scope)?,
+        &recorded_fingerprints,
     )?;
     let stale = if include_stale_warning_identities {
         version_identities(
             project,
             class_field(scopes, |s: &PlannerScopeResolution| &s.stale_warning_scope)?,
+            &recorded_fingerprints,
         )?
     } else {
         identities.clone()

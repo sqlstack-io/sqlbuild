@@ -1997,7 +1997,7 @@ def _microbatch_run_type(*, context: ModelMaterializationContext) -> MicrobatchR
 
 
 def _definition_hash(*, context: ModelMaterializationContext) -> str:
-    return compute_query_hash(
+    return context.entry.fingerprint_definition_hash or compute_query_hash(
         query_sql=context.entry.fingerprint_query_sql,
         dialect=context.adapter.sql_analysis_dialect(),
     )
