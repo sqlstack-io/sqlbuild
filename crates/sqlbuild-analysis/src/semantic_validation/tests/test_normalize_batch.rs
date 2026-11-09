@@ -180,6 +180,30 @@ fn given_cursor_stubs_when_normalizing_for_a_native_parser_then_only_whole_names
             sql: "SELECT 1 FROM t // __cursor_end()\n",
             expected_sql: "SELECT 1 FROM t // __cursor_end()\n",
         },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a table function after a comma LATERAL stands as its stub relation alone",
+            sql: "SELECT l.a FROM b, LATERAL __table_fn(\"f\")(b.id) AS l",
+            expected_sql: "SELECT l.a FROM b, __sqlbuild_table_function_f AS l",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a table function after JOIN lateral, in any case, stands as its stub relation alone",
+            sql: "SELECT l.a FROM b JOIN lateral __table_fn(\"f\")(b.id) AS l ON TRUE",
+            expected_sql: "SELECT l.a FROM b JOIN __sqlbuild_table_function_f AS l ON TRUE",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "a word ending in lateral before a table function is kept",
+            sql: "SELECT l.a FROM collateral, __table_fn(\"f\")(1) AS l",
+            expected_sql: "SELECT l.a FROM collateral, __sqlbuild_table_function_f AS l",
+        },
+        NativeStubTestCase {
+            dialect: "snowflake",
+            description: "lateral at the end of a comment before a table function is kept",
+            sql: "SELECT l.a FROM b, -- not lateral\n__table_fn(\"f\")(1) AS l",
+            expected_sql: "SELECT l.a FROM b, -- not lateral\n__sqlbuild_table_function_f AS l",
+        },
     ];
     for test_case in test_cases {
         assert_eq!(
