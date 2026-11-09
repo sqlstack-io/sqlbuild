@@ -335,6 +335,7 @@ fn given_browser_session_roles_when_work_is_requested_then_scope_revocation_and_
                         "/api/admin/people".to_owned(),
                         "/api/admin/roles".to_owned(),
                         format!("/api/admin/locations/{location}/targets/development/roles"),
+                        "/api/admin/server".to_owned(),
                     ] {
                         let listed = request(
                             &provider.client,
