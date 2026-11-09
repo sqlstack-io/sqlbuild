@@ -15,14 +15,18 @@ Use `sqb server --help` for service, authentication and launcher options.
 
 ## Upgrade
 
-Upgrade the server first, then the locations and workers that connect to it. A worker newer than
-its server can send a run report the server cannot read. The worker then stops with:
+Upgrade the server first, then the locations and workers that connect to it. Don't downgrade the
+server after a location or worker has connected from a newer release; the server can't read what
+they wrote.
+
+| Newer than the server | What happens | Fix |
+| --- | --- | --- |
+| Worker | The worker refuses the run and stops with the message below. | Upgrade the server, then rerun the run. |
+| Location | The server refuses the location's publication with `API rejected the request with HTTP 400 Bad Request`. The previous snapshot stays current. | Upgrade the server, then restart the location so it publishes again. |
 
 ```text
 the control server is older than this worker and refused its run report; upgrade the server before its workers
 ```
-
-Upgrade the server to the worker's release or newer, then rerun the run.
 
 ## Set retention
 
