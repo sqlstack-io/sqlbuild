@@ -17,11 +17,11 @@ class GeneratedAssemblyParityTestCase:
 
 @dataclass(frozen=True)
 class AssemblyDeferralTestCase:
-    """A project whose model or hook SQL the native parser cannot read."""
+    """A project whose model or hook SQL the native parser reports as a syntax error."""
 
     description: str
     files: dict[str, str]
-    expected_warning: str
+    expected_message_fragment: str
 
 
 @dataclass(frozen=True)

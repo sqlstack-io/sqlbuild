@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from sqlbuild._native import assemble_project
+from sqlbuild._native import CompileInputError, assemble_project
 from sqlbuild.adapter.contract.models import ExpressionInferenceProfile
 from sqlbuild.compiler.compile.types import CompiledProjectView
 from tests.integration.src.sqlbuild.compiler.helpers import (
@@ -159,7 +159,7 @@ def test_given_projects_python_rejects_when_assembling_natively_then_matches_pyt
                 "sqlbuild_project.toml": _PROJECT_TOML,
                 "models/orders.sql": 'MODEL (description "Orders");\n\nSELECT FROM WHERE (\n',
             },
-            expected_warning=(
+            expected_message_fragment=(
                 "the duckdb parser cannot read Syntax error at or near 'WHERE' at line 3, column 13"
             ),
         ),
@@ -172,7 +172,7 @@ def test_given_projects_python_rejects_when_assembling_natively_then_matches_pyt
                     ");\n\nSELECT 1 AS n\n"
                 ),
             },
-            expected_warning=(
+            expected_message_fragment=(
                 "the duckdb parser cannot read Syntax error at or near end of input"
                 " at line 1, column 14 of its SQL"
             ),
@@ -180,18 +180,19 @@ def test_given_projects_python_rejects_when_assembling_natively_then_matches_pyt
     ],
     ids=lambda case: case.description,
 )
-def test_given_model_sql_the_parser_rejects_when_assembling_then_skips_its_analysis(
+def test_given_model_sql_the_parser_rejects_when_assembling_then_reports_a_syntax_error(
     test_case: AssemblyDeferralTestCase,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    inputs: CompileInputsView = project_inputs(project_dir=tmp_path, files=test_case.files)
+    with pytest.raises(CompileInputError) as raised:
+        inputs: CompileInputsView = project_inputs(project_dir=tmp_path, files=test_case.files)
+        _ = assemble_with(inputs=inputs, monkeypatch=monkeypatch)
 
-    project: CompiledProjectView = assemble_with(inputs=inputs, monkeypatch=monkeypatch)
-
-    assert [
-        (item.code, test_case.expected_warning in item.message) for item in project.diagnostics
-    ] == [("P026", True)]
+    assert (raised.value.code, test_case.expected_message_fragment in raised.value.message) == (
+        "P001",
+        True,
+    )
 
 
 @pytest.mark.parametrize(
@@ -277,20 +278,21 @@ def test_given_sql_analysis_opt_outs_when_attaching_natively_then_python_rejecti
 def test_given_truncated_hook_sql_when_assembling_then_reports_it_without_python_retry(
     test_case: TruncatedHookTestCase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    inputs: CompileInputsView = project_inputs(
-        project_dir=tmp_path / "project",
-        files=test_case.files,
-        sql_analysis_dialect=test_case.dialect,
-    )
     calls: Counter[str] = python_resource_calls(monkeypatch=monkeypatch)
 
-    project: CompiledProjectView = assemble_project(
-        inputs=inputs,
-        inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=test_case.dialect),
-    )
+    with pytest.raises(CompileInputError) as raised:
+        inputs: CompileInputsView = project_inputs(
+            project_dir=tmp_path / "project",
+            files=test_case.files,
+            sql_analysis_dialect=test_case.dialect,
+        )
+        _ = assemble_project(
+            inputs=inputs,
+            inference_profile=ExpressionInferenceProfile(sql_analysis_dialect=test_case.dialect),
+        )
 
-    assert [
-        (item.code, test_case.expected_message_fragment in item.message)
-        for item in project.diagnostics
-    ] == [("P026", True)]
+    assert (raised.value.code, test_case.expected_message_fragment in raised.value.message) == (
+        "P001",
+        True,
+    )
     assert calls == Counter()
