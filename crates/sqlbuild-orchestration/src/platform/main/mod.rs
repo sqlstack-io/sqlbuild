@@ -1,3 +1,4 @@
+pub(in crate::platform) mod _read_target_work;
 pub mod claim_location_work;
 pub mod complete_location_work;
 pub mod connect_location_work;
