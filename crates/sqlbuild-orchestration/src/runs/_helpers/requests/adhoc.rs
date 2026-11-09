@@ -9,6 +9,7 @@ use crate::authorization::main::authorize_listing::authorize_listing;
 use crate::authorization::main::decide_person_scopes::decide_person_scopes;
 use crate::credentials::main::audit::append_audit::append_audit;
 use crate::credentials::models::{Action, AuditContext, DefaultRole, PermissionScope};
+use crate::declarations::main::frozen_definitions::frozen_definitions;
 use crate::runs::_helpers::requests::permissions::{authorize_execution, execution_scopes};
 use crate::runs::_helpers::requests::publication::{
     publish_request, record_authored, request_retry,
@@ -18,7 +19,7 @@ use crate::runs::models::{
     AdhocCheckRequest, AdhocPermission, AdhocRunRequest, PlannerResource, RunCommand, RunKind,
     RunOrigin, RunRequest,
 };
-use crate::runs::types::CommandPlanner;
+use crate::runs::types::{CommandPlanner, PublishedJobs};
 use crate::snapshots::main::job_write_set::job_write_set;
 use crate::snapshots::main::read_current_record::read_current_record;
 use crate::snapshots::main::read_snapshot_nodes::read_snapshot_nodes;
@@ -45,7 +46,19 @@ pub(crate) async fn frozen_adhoc_request(
         ));
     };
     let (transaction, nodes) = read_snapshot_nodes(transaction, snapshot.snapshot_id, None).await?;
-    let plan = match planner.plan(&request.command, &planner_resources(&nodes)) {
+    let (transaction, definitions) = frozen_definitions(transaction, snapshot.snapshot_id).await?;
+    let jobs: PublishedJobs = definitions
+        .jobs
+        .into_iter()
+        .map(|(name, job)| (name, job.selection))
+        .chain(
+            definitions
+                .groups
+                .into_iter()
+                .map(|(name, group)| (name, group.job.selection)),
+        )
+        .collect();
+    let plan = match planner.plan(&request.command, (&planner_resources(&nodes), &jobs)) {
         Ok(plan) => plan,
         Err(refusal) => return Ok((transaction, Err(refusal))),
     };
