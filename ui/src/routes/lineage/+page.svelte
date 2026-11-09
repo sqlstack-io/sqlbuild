@@ -644,8 +644,10 @@
 					{#if d}<a href="/catalog/{primarySlug}" class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
 				</div>
 				<div class="inspector-meta">
-					<span>{d ? kindLine(d) : primary?.data.kind}</span>
-					{#if d}{#if d.group}<span>{d.group}</span>{/if}{#if d.owner.length}<span>{d.owner.join(', ')}</span>{/if}{/if}
+					<!-- From the selected card, so the header never names the previous node's facts while its detail is held. -->
+					<span>{primary?.data.kind}</span>
+					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
+					{#if (primary?.data.owner as string[] | undefined)?.length}<span>{(primary?.data.owner as string[]).join(', ')}</span>{/if}
 				</div>
 			</div>
 		{/if}
