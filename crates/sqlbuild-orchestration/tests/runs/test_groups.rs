@@ -80,14 +80,16 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                 priority: 1,
                 window: None,
                 full_refresh: false,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             assert!(
-                request_job_run(store, &context, &request)
+                request_job_run(store, (&context, None), &request)
                     .await
                     .expect("request group")
             );
             assert!(
-                !request_job_run(store, &context, &request)
+                !request_job_run(store, (&context, None), &request)
                     .await
                     .expect("retry group")
             );
@@ -226,7 +228,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                 job_key: "staging".into(),
                 ..request.clone()
             };
-            request_job_run(store, &context, &standalone)
+            request_job_run(store, (&context, None), &standalone)
                 .await
                 .expect("standalone request");
             assert!(
@@ -346,7 +348,7 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
             for job_key in ["orders_group", "inventory_group"] {
                 request_job_run(
                     store,
-                    &context,
+                    (&context, None),
                     &JobRunRequest {
                         run_id: Uuid::now_v7(),
                         location_id: location,
@@ -356,6 +358,8 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
                         priority: 1,
                         window: None,
                         full_refresh: false,
+                        select: Vec::new(),
+                        exclude: Vec::new(),
                     },
                 )
                 .await

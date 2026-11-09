@@ -17,7 +17,7 @@ use crate::runs::main::{
 };
 use crate::runs::models::{JobRunRequest, PersonRunRequest, RunRecord, RunRequest, RunWindow};
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
-use crate::runs::tests::test_types::JobDetailTestCase;
+use crate::runs::tests::test_types::{ExactKeyPlanner, JobDetailTestCase};
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
@@ -169,6 +169,8 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 priority: 0,
                 window: None,
                 full_refresh: true,
+                select: Vec::new(),
+                exclude: Vec::new(),
             };
             let refused = launch("daily_orders");
             assert!(
@@ -176,7 +178,7 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     request_person_run(
                         store,
                         (&roles.context, operator),
-                        PersonRunRequest::Job(&refused)
+                        PersonRunRequest::Job(&ExactKeyPlanner, &refused)
                     )
                     .await,
                     Err(ControlError::Denied { .. })
@@ -190,7 +192,12 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
             };
             assert!(
                 matches!(
-                    request_person_run(store, administrator, PersonRunRequest::Job(&both)).await,
+                    request_person_run(
+                        store,
+                        administrator,
+                        PersonRunRequest::Job(&ExactKeyPlanner, &both)
+                    )
+                    .await,
                     Err(ControlError::Invalid(_))
                 ),
                 "{}: a window and a full refresh are refused together",
@@ -200,9 +207,13 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
             let full_job = launch("daily_orders");
             for request in [full_job.clone(), group_launch.clone()] {
                 assert!(
-                    request_person_run(store, administrator, PersonRunRequest::Job(&request))
-                        .await
-                        .expect("administrator launch"),
+                    request_person_run(
+                        store,
+                        administrator,
+                        PersonRunRequest::Job(&ExactKeyPlanner, &request)
+                    )
+                    .await
+                    .expect("administrator launch"),
                     "{}: an administrator may rebuild from scratch",
                     test_case.description
                 );
@@ -223,9 +234,13 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 full_refresh: false,
                 ..launch("customers")
             };
-            request_person_run(store, administrator, PersonRunRequest::Job(&plain))
-                .await
-                .expect("ordinary launch");
+            request_person_run(
+                store,
+                administrator,
+                PersonRunRequest::Job(&ExactKeyPlanner, &plain),
+            )
+            .await
+            .expect("ordinary launch");
             let lease = acquire_lease(store, Uuid::now_v7())
                 .await
                 .expect("elect")

@@ -184,6 +184,8 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                     priority,
                     window,
                     full_refresh: false,
+                    select: texts(namespace, "admin_select").unwrap_or_default(),
+                    exclude: texts(namespace, "admin_exclude").unwrap_or_default(),
                 }));
             }
             if action.as_deref() == Some("cancel-run") {

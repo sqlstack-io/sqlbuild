@@ -168,7 +168,7 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
             };
             request_job_run(
                 store,
-                &context,
+                (&context, None),
                 &JobRunRequest {
                     run_id,
                     location_id: location,
@@ -178,6 +178,8 @@ fn given_any_run_rebuilds_when_consuming_then_only_genuine_scoped_successes_queu
                     priority: 10,
                     window: None,
                     full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
                 },
             )
             .await

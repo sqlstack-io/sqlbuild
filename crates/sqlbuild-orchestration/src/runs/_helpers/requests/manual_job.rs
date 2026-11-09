@@ -14,6 +14,7 @@ use crate::runs::_helpers::requests::publication::{
 use crate::runs::constants::MANUAL_JOB_AUDIT_TAG;
 use crate::runs::main::frozen_job_request::frozen_job_request;
 use crate::runs::models::{JobRunRequest, RunWindow};
+use crate::runs::types::CommandPlanner;
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{ControlTransaction, Parameter};
@@ -21,7 +22,7 @@ use crate::store::models::{ControlTransaction, Parameter};
 pub(crate) async fn request_job_run_in(
     mut transaction: ControlTransaction,
     (context, credentials): (&AuditContext, Option<Uuid>),
-    request: &JobRunRequest,
+    (planner, request): (Option<&dyn CommandPlanner>, &JobRunRequest),
 ) -> Result<(ControlTransaction, bool), ControlError> {
     let mut context = context.clone();
     let scope = PermissionScope {
@@ -72,7 +73,8 @@ pub(crate) async fn request_job_run_in(
         Some(credentials) => known_job(transaction, (&context, credentials), request).await?,
         None => transaction,
     };
-    let (mut transaction, frozen) = frozen_job_request(transaction, &context, request).await?;
+    let (mut transaction, frozen) =
+        frozen_job_request(transaction, (&context, planner), request).await?;
     if let Some(credentials) = credentials {
         (transaction, context) = authorize_execution(
             transaction,
