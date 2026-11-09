@@ -7,6 +7,7 @@ import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
+import { overviewOf } from './http-overview';
 import { toPlatformEvents } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
@@ -14,7 +15,7 @@ import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTab
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
-import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, SnapshotChange, ColumnLineage } from './types/build';
+import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
@@ -23,6 +24,7 @@ type Wire = components['schemas'];
 const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'supports',
 	'bootstrap',
+	'overview',
 	'changes',
 	'listRunRows',
 	'runTabCounts',
@@ -446,6 +448,17 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
 			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
+		},
+		async overview(scope: Scope): Promise<Overview> {
+			// A week of publications for the models metric; the server returns at most 100.
+			const [runs, checks, nodes, changes, events] = await Promise.all([
+				recentRuns(scope),
+				implemented.listChecks(scope),
+				implemented.listCatalogNodes(scope),
+				implemented.listSnapshotChanges(scope, { limit: 100 }),
+				implemented.listPlatformEvents()
+			]);
+			return overviewOf({ runs, checks, nodes, changes, events, now: Date.now() });
 		},
 		listChecks: async (scope: Scope): Promise<Check[]> => (await checkResults(scope)).map(toCheck),
 		getCheck: async (scope: Scope, id: string): Promise<CheckDetail | null> => checkDetailOf(await checkResults(scope, id)),

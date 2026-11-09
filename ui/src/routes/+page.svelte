@@ -41,6 +41,9 @@
 	const successRate = $derived(m && finished ? Math.round(((m.runs24h.success + m.runs24h.warn) / finished) * 100) : null);
 	const costChange = $derived(m?.cost && m.cost.baseline ? Math.round(((m.cost.last24h - m.cost.baseline) / m.cost.baseline) * 100) : null);
 	const groups = $derived(data?.groups ?? []);
+	// Parts without a server read stay hidden rather than showing zeros.
+	const showGroups = $derived(data?.groups !== null);
+	const showTimeline = $derived(app.client.supports('timeline'));
 
 	let rebuildOpen = $state(false);
 </script>
@@ -65,8 +68,8 @@
 				</div>
 				{#if m}
 					<div class="health-facts">
-						{#if m.stale.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-						{#if m.stale.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
+						{#if m.stale?.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
+						{#if m.stale?.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
 						{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 					</div>
 				{/if}
@@ -93,7 +96,7 @@
 			{/if}
 		</section>
 
-		<section class="metric-strip" class:with-cost={!!m?.cost}>
+		<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
 			{#if m}
 				<div class="metric">
 					<span class="metric-label">Models</span>
@@ -110,11 +113,13 @@
 					<div><strong>{m.checks.passing}</strong><small>of {m.checks.total}</small></div>
 					<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{m.checks.failing} failing · {m.checks.warning} warning</span>
 				</div>
-				<div class="metric">
-					<span class="metric-label">Stale</span>
-					<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-					<span>{m.stale.changed} changed · {m.stale.behind} behind · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late</span>
-				</div>
+				{#if m.stale}
+					<div class="metric">
+						<span class="metric-label">Stale</span>
+						<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
+						<span>{m.stale.changed} changed · {m.stale.behind} behind · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late</span>
+					</div>
+				{/if}
 				{#if m.cost}
 					<div class="metric">
 						<span class="metric-label">Cost · 24h</span>
@@ -125,16 +130,18 @@
 			{/if}
 		</section>
 
-		<section class="surface-panel flex min-w-0 flex-col">
-			<div class="panel-heading">
-				<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
-				<a href="/runs?view=timeline">Open full timeline →</a>
-			</div>
-			<RunTimeline scroll={false} stickyTop={0} />
-		</section>
+		{#if showTimeline}
+			<section class="surface-panel flex min-w-0 flex-col">
+				<div class="panel-heading">
+					<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
+					<a href="/runs?view=timeline">Open full timeline →</a>
+				</div>
+				<RunTimeline scroll={false} stickyTop={0} />
+			</section>
+		{/if}
 
-		<div class="lower-grid">
-			<section class="surface-panel">
+		<div class="lower-grid" class:single={!showGroups}>
+			{#if showGroups}<section class="surface-panel">
 				<div class="panel-heading">
 					<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
 					<a href="/catalog">Open catalog →</a>
@@ -158,7 +165,7 @@
 						<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
 					{/each}
 				</div>
-			</section>
+			</section>{/if}
 			<section class="surface-panel">
 				<div class="panel-heading">
 					<div><h2>Recent changes</h2><span>Recent deploys</span></div>
@@ -167,12 +174,12 @@
 				<div>
 					{#each data?.recentChanges ?? [] as c (c.snapshotId)}
 						<a class="change" href="/changes#gen-{c.generation}">
-							<span class="change-rev" title="Snapshot generation {c.generation}"><code>{c.gitRevision}</code><small>version {c.generation}</small></span>
+							<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
 							<span class="change-copy">
 								<strong>{summarizeChange(c)}</strong>
 								<span>{c.nodes.slice(0, 3).map((n) => `${changeOpLabel[n.op].toLowerCase()} ${n.key}`).join(' · ') || 'No node changes'}</span>
 							</span>
-							<small>{c.gitAuthor} · {formatAgo(c.publishedAt, app.now)}</small>
+							<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
 						</a>
 					{:else}
 						<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet.'}</div>
@@ -221,8 +228,7 @@
 	.health-facts span { display: flex; align-items: center; gap: 6px; }
 	.health-facts b { color: var(--foreground); font-weight: 500; }
 	.health-head > a, .panel-heading > a { margin-left: auto; color: var(--primary); font: 500 12.5px var(--font-sans); }
-	.metric-strip { display: grid; min-height: 98px; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
-	.metric-strip.with-cost { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+	.metric-strip { display: grid; min-height: 98px; grid-template-columns: repeat(var(--metrics), minmax(0, 1fr)); overflow: hidden; }
 	.metric { min-width: 0; padding: 15px 16px 14px; border-right: 1px solid var(--border); }
 	.metric:last-child { border-right: 0; }
 	.metric-label { display: block; color: var(--muted-foreground); font: 500 12px var(--font-sans); }
@@ -234,6 +240,7 @@
 	.metric .warning-note { color: var(--sb-warning); }
 	.stale-value { color: var(--sb-stale); }
 	.lower-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr); gap: 14px; align-items: start; }
+	.lower-grid.single { grid-template-columns: 1fr; }
 	.panel-heading { display: flex; min-height: 53px; align-items: center; padding: 0 14px 0 16px; border-bottom: 1px solid var(--border); }
 	.panel-heading > div:first-child { margin-right: auto; }
 	.panel-heading h2 { margin: 0; font: 600 13.5px var(--font-sans); }
