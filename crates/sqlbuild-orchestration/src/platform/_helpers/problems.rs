@@ -3,6 +3,7 @@
 use chrono::{DateTime, TimeDelta, Utc};
 use uuid::Uuid;
 
+use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{LateTarget, OverdueTick, ProblemScan};
 use crate::store::errors::ControlError;
 use crate::store::main::decode_row::decode_row;
@@ -25,7 +26,7 @@ pub(crate) async fn scan_problems(store: &ControlStore) -> Result<ProblemScan, C
          FROM sqb_location_instances i JOIN sqb_locations l ON l.location_id=i.location_id \
          WHERE l.archived_at IS NULL GROUP BY i.location_id,l.name,i.target \
          HAVING MAX(i.last_seen_at)<$1 ORDER BY i.location_id,i.target",
-        vec![Parameter::Time(now - TimeDelta::seconds(90))],
+        vec![Parameter::Time(now - TimeDelta::seconds(LOCATION_SILENCE_SECONDS))],
     )
     .await?;
     let (transaction, late_targets) = query(
