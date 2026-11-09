@@ -456,7 +456,7 @@ export type SnapshotNode = {
 	upstream: string[];
 };
 
-// ---- ad-hoc runs (the run panel) ----
+// ---- ad-hoc runs (the plan page) ----
 
 export type LaunchVerb = 'build' | 'test' | 'seed' | 'audit' | 'freshness';
 

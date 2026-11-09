@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.206.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.205.1...v0.206.0) (2026-11-09)
+
+
+### Features
+
+* **triggers:** people who can view a whole target can read a trigger's on/off history: each pause, switch-on, reset and cursor change, with who made it, when and why. Credentials in the reason are redacted ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** a click stays on the current page until the next page's data is ready, then switches; a slow switch shows a thin bar along the top ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** clicking nodes in a job's graph selects them (Shift, Ctrl or Cmd adds more), and the selected nodes can be run on their own ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** every Run button opens a plan page that shows what the command selects and why each node would run; nothing starts until you press Run there ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** printed output in the run log sits behind a "Show printed output" switch; a failing run's last printed block, which holds its errors, is always shown ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** the job page puts its schedules, latest run and critical nodes in the header, with Overview, Runs and Code tabs, so the graph fills the page ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** the run log shows one row per node, with that node's queries folded under it; run-level queries stay in the Statements tab ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** the trigger page's On/off history shows those changes ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+
+
+### Bug Fixes
+
+* **ui:** a refused reload clears the remembered data, so someone whose access was removed sees the refusal, not old data ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** pages you return to show their last data at once and refresh it behind the scenes; "Loading…" appears only when a first load is slow ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+* **ui:** the trigger page shows the reason box only to people who can pause or switch on the trigger ([8d64fb7](https://github.com/sqlstack-io/sqlbuild/commit/8d64fb785b26733b1a756f4e05f50ba0f96cfa98))
+
 ## [0.205.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.205.0...v0.205.1) (2026-11-09)
 
 

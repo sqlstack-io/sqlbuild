@@ -1,14 +1,33 @@
+import { browser } from '$app/environment';
 import type { ApiClient, Scope } from '$lib/api';
-import { channelMatches } from '$lib/api';
+import { channelMatches, isRefusal } from '$lib/api';
 import { app } from './app.svelte';
 
 /** How long a burst of change signals may last before one reload starts. */
 const SIGNAL_PAUSE_MS = 300;
+/** A first load faster than this shows no loading text, so it doesn't flash. */
+const SLOW_MS = 400;
+
+/**
+ * The last answer of each read, kept in memory for this page load only, so returning to a page shows
+ * it at once while it reloads. Keyed by person, location, page and read; signing out reloads the page,
+ * which empties it.
+ */
+const remembered = new Map<string, unknown>();
+const REMEMBER_MAX = 200;
+
+function remember(key: string, value: unknown) {
+	remembered.delete(key);
+	remembered.set(key, value);
+	if (remembered.size > REMEMBER_MAX) remembered.delete(remembered.keys().next().value!);
+}
 
 export type Resource<T> = {
 	readonly data: T | undefined;
 	readonly error: string | null;
 	readonly loading: boolean;
+	/** Loading with nothing to show for longer than a moment; pages show loading text only then. */
+	readonly slow: boolean;
 	refresh(): void;
 };
 
@@ -22,6 +41,8 @@ export type Resource<T> = {
  *
  * Must be called during component initialisation. Reactive values read
  * synchronously inside `load` (such as route params) are also dependencies.
+ *
+ * A page that has loaded before shows its remembered data straight away and reloads it behind.
  */
 export function createResource<T>(
 	load: (client: ApiClient, scope: Scope) => Promise<T>,
@@ -30,6 +51,9 @@ export function createResource<T>(
 	let data = $state<T | undefined>(undefined);
 	let error = $state<string | null>(null);
 	let loading = $state(true);
+	let slow = $state(false);
+	let slowTimer: ReturnType<typeof setTimeout> | null = null;
+	let shownKey = '';
 	let latest = 0;
 	let settled = 0;
 	let reloadAgain = false;
@@ -37,8 +61,17 @@ export function createResource<T>(
 
 	function run(scope: Scope) {
 		const request = ++latest;
+		// The page's path and query tell apart reads of different jobs, runs and filters made by the same code.
+		const key = `${app.user?.name ?? ''}|${scope.locationId}|${browser ? window.location.pathname + window.location.search : ''}|${load}`;
+		if (key !== shownKey && remembered.has(key)) data = remembered.get(key) as T;
+		shownKey = key;
 		loading = true;
+		if (slowTimer) clearTimeout(slowTimer);
+		slowTimer = setTimeout(() => (slow = data === undefined), SLOW_MS);
 		const done = () => {
+			if (slowTimer) clearTimeout(slowTimer);
+			slowTimer = null;
+			slow = false;
 			settled = request;
 			if (reloadAgain && request === latest) {
 				reloadAgain = false;
@@ -48,6 +81,7 @@ export function createResource<T>(
 		load(app.client, scope).then(
 			(value) => {
 				if (request !== latest) return;
+				remember(key, value);
 				data = value;
 				error = null;
 				loading = false;
@@ -55,6 +89,11 @@ export function createResource<T>(
 			},
 			(reason: unknown) => {
 				if (request !== latest) return;
+				// A refusal also drops the earlier answer, so a person whose access went sees the refusal, not old data.
+				if (isRefusal(reason)) {
+					remembered.delete(key);
+					data = undefined;
+				}
 				error = reason instanceof Error ? reason.message : String(reason);
 				loading = false;
 				done();
@@ -87,6 +126,7 @@ export function createResource<T>(
 		});
 		return () => {
 			unsubscribe();
+			if (slowTimer) clearTimeout(slowTimer);
 			if (pause) clearTimeout(pause);
 			pause = null;
 		};
@@ -101,6 +141,9 @@ export function createResource<T>(
 		},
 		get loading() {
 			return loading;
+		},
+		get slow() {
+			return slow;
 		},
 		refresh
 	};
