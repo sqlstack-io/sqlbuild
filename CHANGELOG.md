@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.205.1](https://github.com/sqlstack-io/sqlbuild/compare/v0.205.0...v0.205.1) (2026-11-09)
+
+
+### Performance Improvements
+
+* stop mimalloc asking for transparent huge pages ([#1391](https://github.com/sqlstack-io/sqlbuild/issues/1391)) ([eebb756](https://github.com/sqlstack-io/sqlbuild/commit/eebb75664c654fe4809130f6abc51f27dbcfe087))
+
 ## [0.205.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.204.0...v0.205.0) (2026-11-09)
 
 
