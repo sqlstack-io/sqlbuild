@@ -413,6 +413,55 @@ describe('locations', () => {
 	});
 });
 
+describe('launchJob', () => {
+	function server(answer: Response) {
+		const posts: unknown[] = [];
+		vi.stubGlobal('document', { cookie: 'sqb-csrf=token-1' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				if (request.method === 'POST') {
+					posts.push(await request.json());
+					return answer.clone();
+				}
+				return Response.json([]);
+			})
+		);
+		return { posts, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('sends a backfill window with the job run request', async () => {
+		const { posts, client } = server(Response.json({ error: 'stop here' }, { status: 409 }));
+		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '1200', end: '1500' } })).rejects.toThrow();
+		expect(posts[0]).toMatchObject({ job_key: 'daily', target: 'development', window: { kind: 'integer', start: 1200, end: 1500 } });
+	});
+
+	it('leaves the window out of an ordinary run', async () => {
+		const { posts, client } = server(Response.json({ error: 'stop here' }, { status: 409 }));
+		await expect(client.launchJob(ORDERS, 'daily')).rejects.toThrow();
+		expect(posts[0]).not.toHaveProperty('window');
+	});
+
+	it("shows a plain-text refusal of a body the server couldn't read", async () => {
+		const text = 'Failed to deserialize the JSON body into the target type: window: input contains invalid characters';
+		const { client } = server(new Response(text, { status: 422, headers: { 'content-type': 'text/plain; charset=utf-8' } }));
+		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '2026-10-01', end: '2026-10-31T00:00:00Z' } })).rejects.toMatchObject({ status: 422, message: text });
+	});
+
+	it('shows the status, not an HTML error page from something in front of the server', async () => {
+		const { client } = server(new Response('<html><body>Bad gateway</body></html>', { status: 502, statusText: 'Bad Gateway', headers: { 'content-type': 'text/html' } }));
+		await expect(client.launchJob(ORDERS, 'daily')).rejects.toMatchObject({ status: 502, message: '502 Bad Gateway' });
+	});
+
+	it("shows the server's refusal of a window as it comes", async () => {
+		const { client } = server(Response.json({ error: 'backfill window start must not follow end' }, { status: 400 }));
+		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '20', end: '10' } })).rejects.toMatchObject({
+			status: 400,
+			message: expect.stringContaining('backfill window start must not follow end')
+		});
+	});
+});
+
 describe('administration writes', () => {
 	const ada = { principal_id: 'p-ada', name: 'ada', created_at: '2026-11-01T00:00:00Z', disabled_at: null, has_password: true, groups: [], active_sessions: 2, last_signed_in_at: null };
 

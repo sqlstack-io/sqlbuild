@@ -1,5 +1,6 @@
 import type { components } from '$control/schema.d.ts';
-import type { Job, JobDetail, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
+import { ApiError } from './client';
+import type { CursorWindow, Job, JobDetail, Run, RunRef, Tick, Trigger, TriggerDetail, TriggerKind } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -142,4 +143,17 @@ export function jobDetailOf(job: Job, wire: Wire['JobRecord']): JobDetail {
 		memberOf: null,
 		cursorType: null
 	};
+}
+
+/**
+ * A backfill's bounds as typed: whole numbers on both ends make an integer window, anything else
+ * goes as timestamps for the server to validate. Only integers JSON would round are refused here.
+ */
+export function runWindowOf(window: CursorWindow): Wire['RunWindow'] {
+	const start = (window.start ?? '').trim();
+	const end = (window.end ?? '').trim();
+	if (![start, end].every((v) => /^-?\d+$/.test(v))) return { kind: 'timestamp', start, end };
+	const [from, to] = [start, end].map(Number);
+	if (![from, to].every(Number.isSafeInteger)) throw new ApiError(`Whole numbers beyond ${Number.MAX_SAFE_INTEGER} can't be sent exactly`, 400);
+	return { kind: 'integer', start: from, end: to };
 }
