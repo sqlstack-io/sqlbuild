@@ -86,7 +86,7 @@
 	</div>
 	{#if hasOutput}
 		<label class="switch" title="What sqb printed while the run worked. A failing run's last block, with its failures, is always shown.">
-			<input type="checkbox" bind:checked={printed} /> Show printed output <span>{hidden}</span>
+			<input type="checkbox" class="sb-check" bind:checked={printed} /> Show printed output <span>{hidden}</span>
 		</label>
 	{/if}
 	<label class="search">
