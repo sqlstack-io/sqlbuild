@@ -7,15 +7,17 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 	import { formatAgo, formatDuration, formatStamp } from '$lib/format/time';
-	import { formatNodeCounts, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
-	import { formatCost, onFailureHelp, onFailurePlain, overlapHelp, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
+	import { formatNodeCounts, nodeOutcomeLabel, nodeOutcomeTone, runOriginLabel, runStatusLabel, runStatusTone } from '$lib/status';
+	import { kindLine } from '$lib/build-area/labels';
+	import RunPanel from '$lib/run/run-panel.svelte';
+	import { formatCost, onFailurePlain, overlapPlain, shortRunId, slotLabel } from '$lib/operate/labels';
 	import JobGraph from './job-graph.svelte';
 	import LaunchForm from './launch-form.svelte';
 
 	let { name }: { name: string } = $props();
 
 	const job = createResource((client, scope) => client.getJob(scope, name), ['jobs', 'runs', 'snapshot']);
-	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 12 }), ['runs']);
+	const jobRuns = createResource((client, scope) => client.listRuns(scope, { jobKey: name, limit: 50 }), ['runs']);
 	const triggers = createResource((client, scope) => client.listTriggers(scope), ['triggers', 'ticks']);
 	const catalog = createResource((client, scope) => client.listCatalogNodes(scope), ['snapshot', 'runs', 'warehouse']);
 	// Each member's nodes and last run, so a group's graph can box every member job around what it builds.
@@ -34,11 +36,20 @@
 	}, ['jobs', 'runs', 'snapshot']);
 
 	const def = $derived(job.data ?? null);
-	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
 	const runs = $derived(jobRuns.data ?? []);
-	const showCost = $derived(runs.some((r) => r.cost !== null));
+	const jobTriggers = $derived((triggers.data ?? []).filter((t) => def?.triggerIds.includes(t.id)));
+		const showCost = $derived(runs.some((r) => r.cost !== null));
 	const canToggle = $derived(app.can('trigger.toggle'));
 	let launchOpen = $state(false);
+	let tab = $state<'overview' | 'runs' | 'code'>('overview');
+	// Nodes picked in the graph, by catalog key; running them starts an ad-hoc run of just those.
+	let picked = $state<string[]>([]);
+	let graph = $state<{ clear: () => void }>();
+	let runOpen = $state(false);
+	const byKey = $derived(new Map((catalog.data ?? []).map((n) => [n.key, n])));
+	const pickedNodes = $derived(picked.map((k) => byKey.get(k)).filter((n) => !!n));
+	const canRunPicked = $derived(app.client.supports('launchAdhocRun'));
+	const latest = $derived(runs[0] ?? null);
 	let actionError = $state<string | null>(null);
 
 	async function toggleTrigger(t: Trigger) {
@@ -56,25 +67,48 @@
 </script>
 
 <AppTopbar title="Jobs">
-	<div class="relative">
-		<GatedButton
-			requires="job.run"
-			variant="default"
-			disabled={!def || targetBlocked}
-			reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
-			onclick={() => (launchOpen = !launchOpen)}
-		>▷ Run now</GatedButton>
-		{#if launchOpen && def}<LaunchForm job={def} onclose={() => (launchOpen = false)} />{/if}
-	</div>
+	{#if picked.length && canRunPicked}
+		<button class="clear" onclick={() => graph?.clear()}>Clear selection</button>
+		<GatedButton requires="run.adhoc" variant="default" onclick={() => (runOpen = true)}>▷ Run {picked.length} selected</GatedButton>
+	{:else}
+		<div class="relative">
+			<GatedButton
+				requires="job.run"
+				variant="default"
+				disabled={!def || targetBlocked}
+				reason={targetBlocked ? `This job only runs on ${def?.targets?.join(', ')}` : undefined}
+				onclick={() => (launchOpen = !launchOpen)}
+			>▷ Run now</GatedButton>
+			{#if launchOpen && def}<LaunchForm job={def} onclose={() => (launchOpen = false)} />{/if}
+		</div>
+	{/if}
 </AppTopbar>
+{#if canRunPicked}<RunPanel bind:open={runOpen} selection={pickedNodes.map((n) => n.key)} />{/if}
 
 <div class="flex min-h-0 flex-1 flex-col">
 	<div class="head">
 		<a href="/jobs" class="back">← Jobs</a>
 		<span class="font-display text-[17px] font-semibold">{name}</span>
 		{#if def}
-			<span class="faint">{def.kind === 'group' ? (def.members ? `Group of ${def.members.length} jobs` : 'Group') : 'Job'} · {def.nodeCount} nodes</span>
-			<span class="faint">{def.description}</span>
+			<span class="chip">{def.kind === 'group' ? `Group${def.members ? ` · ${def.members.length} jobs` : ''}` : 'Job'} · {def.nodeCount} nodes</span>
+			{#each jobTriggers as t (t.id)}
+				<span class="chip" class:off={t.state === 'paused'}>
+					<a href="/triggers/{t.id}" title={t.name}>{t.cadence}</a>
+					<span title={canToggle ? (t.state === 'running' ? 'Pause' : 'Turn on') : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
+						<button class="sb-toggle small" class:on={t.state === 'running'} disabled={!canToggle} onclick={() => toggleTrigger(t)} aria-label="{t.state === 'running' ? 'Pause' : 'Turn on'} {t.name}"></button>
+					</span>
+				</span>
+			{/each}
+			{#if latest}
+				<a class="chip" href="/runs/{latest.id}" title={formatStamp(latest.queuedAt)}>
+					<i style:background={runStatusTone[latest.status]}></i>Latest run: {runStatusLabel[latest.status]} · {formatAgo(latest.startedAt ?? latest.queuedAt, app.now)}
+				</a>
+			{/if}
+			{#if def.criticalNodes.length}
+				<span class="chip" title="If one of these fails, the whole group stops">
+					Critical: {#each def.criticalNodes as n, i (n)}{i ? ', ' : ''}<a href="/catalog/{n}" class="mono">{n}</a>{/each}
+				</span>
+			{/if}
 		{/if}
 	</div>
 	{#if job.error}
@@ -85,135 +119,178 @@
 	{#if actionError}<div class="msg err">{actionError}</div>{/if}
 
 	{#if def}
-		<div class="flex min-h-0 flex-1">
-			<div class="main sb-scroll">
-				<section>
-					<h3>What it builds · {def.resolvedNodes.length} nodes <span>{def.select ? `--select ${def.select}` : def.kind === 'group' ? 'each box is one of its jobs; arrows are the data each node reads' : ''}{def.exclude.length ? ` --exclude ${def.exclude.join(' ')}` : ''}</span></h3>
+		<nav class="tabs">
+			<button class:on={tab === 'overview'} onclick={() => (tab = 'overview')}>Overview</button>
+			<button class:on={tab === 'runs'} onclick={() => (tab = 'runs')}>Runs{runs.length ? ` · ${runs.length}` : ''}</button>
+			{#if def.declaration}<button class:on={tab === 'code'} onclick={() => (tab = 'code')}>Code</button>{/if}
+		</nav>
+
+		{#if tab === 'overview'}
+			<div class="flex min-h-0 flex-1">
+				<div class="canvas">
 					{#if catalog.data && (def.kind !== 'group' || members.data)}
-						<JobGraph job={def} catalog={catalog.data} memberNodes={members.data?.nodes ?? new Map()} lastRuns={members.data?.lastRuns ?? new Map()} />
+						<JobGraph bind:this={graph} job={def} catalog={catalog.data} memberNodes={members.data?.nodes ?? new Map()} lastRuns={members.data?.lastRuns ?? new Map()} onselect={(keys) => (picked = keys)} />
 					{:else}
-						<!-- Holds the graph's height, so nothing jumps when it arrives. -->
-						<p class="faint graph-wait" style:height="{def.kind === 'group' ? 420 : 340}px">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
+						<p class="faint graph-wait">{catalog.error ?? members.error ?? (catalog.slow || members.slow ? 'Loading…' : '')}</p>
 					{/if}
-					{#if def.criticalNodes.length}
-						<p class="critical">
-							Critical (if one fails, the whole group stops):
-							{#each def.criticalNodes as n, i (n)}{i ? ', ' : ''}<a href="/catalog/{n}"><code>{n}</code></a>{/each}
-						</p>
-					{/if}
-				</section>
+				</div>
 
-				<section>
-					<h3>Recent runs</h3>
-					{#if runs.length}
-						<table class="runs">
-							<tbody>
-								{#each runs as r (r.id)}
-									<tr onclick={() => goto(`/runs/${r.id}`)}>
-										<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
-										<td><a href="/runs/{r.id}" class="mono" title={r.id}>{shortRunId(r.id)}</a></td>
-										<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
-										<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
-										<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
-										<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
-										<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
-										{#if showCost}<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+				<aside class="rail sb-scroll">
+					{#if pickedNodes.length === 1}
+						{@const n = pickedNodes[0]}
+						<p class="label">{kindLine(n)}</p>
+						<h2 class="mono">{n.key}</h2>
+						<a class="open" href="/catalog/{n.key}">Open in Catalog ↗</a>
+						{#if n.description}<p class="desc">{n.description}</p>{/if}
+						<dl>
+							{#if n.lastOutcome || n.lastBuild}<div><dt>Last build</dt><dd><i style:background={nodeOutcomeTone[n.lastOutcome ?? 'success']}></i>{n.lastOutcome ? nodeOutcomeLabel[n.lastOutcome] : 'Built'}{n.lastBuild ? ` · ${formatAgo(n.lastBuild.builtAt, app.now)}` : ''}</dd></div>{/if}
+							{#if n.relation}<div><dt>Writes</dt><dd class="mono">{[n.relation.database, n.relation.schema, n.relation.name].filter(Boolean).join('.')}</dd></div>{/if}
+							{#if n.owner.length}<div><dt>Owner</dt><dd>{n.owner.join(', ')}</dd></div>{/if}
+							{#if n.path}<div><dt>Defined in</dt><dd class="mono">{n.path}</dd></div>{/if}
+						</dl>
+					{:else if pickedNodes.length > 1}
+						<h2>{pickedNodes.length} nodes selected</h2>
+						<ul class="picked">
+							{#each pickedNodes as n (n.key)}<li><a href="/catalog/{n.key}" class="mono">{n.key}</a></li>{/each}
+						</ul>
 					{:else}
-						<p class="faint">{jobRuns.loading ? (jobRuns.slow ? 'Loading…' : '') : 'No runs yet. Use Run now, or turn on a schedule.'}</p>
+						{#if def.description}<h3 class="first">Description</h3><p class="desc">{def.description}</p>{/if}
+						<dl>
+							{#if def.select}<div><dt>Selection</dt><dd class="mono">{def.select}</dd></div>{/if}
+							{#if def.exclude.length}<div><dt>Excludes</dt><dd class="mono">{def.exclude.join(' ')}</dd></div>{/if}
+							{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
+							{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
+							{#if def.priority !== null}<div><dt>Priority</dt><dd>{def.priority}</dd></div>{/if}
+							{#if def.declaration}<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all'}</dd></div>{/if}
+							{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
+							{#if def.sourceFile}<div><dt>Defined in</dt><dd class="mono">{def.sourceFile}</dd></div>{/if}
+							{#if def.memberOf?.length}
+								<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href="/jobs/{g}">{g}</a>{/each}</dd></div>
+							{/if}
+						</dl>
+						{#if def.settings && Object.keys(def.settings).length}
+							<h3>Options</h3>
+							{#each Object.entries(def.settings) as [flag, value] (flag)}
+								<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
+							{/each}
+						{/if}
+						{#if def.concurrency?.length}
+							<h3>Shared slots</h3>
+							{#each def.concurrency as g (g.key)}
+								<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
+									<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} in use</span>
+									{#each g.holders as h (h)}<a class="mono" href="/runs/{h}" title={h}>{shortRunId(h)}</a>{/each}
+								</p>
+							{/each}
+						{:else if def.concurrency === null && def.concurrencyGroups.length}
+							<h3>Shared slots</h3>
+							{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}">{slotLabel(g)}</p>{/each}
+						{/if}
 					{/if}
-				</section>
-
-				{#if def.declaration}
-					<section>
-						<h3>Code <span>read-only; change it in the project and deploy</span></h3>
-						<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={24} />
-					</section>
+				</aside>
+			</div>
+		{:else if tab === 'runs'}
+			<div class="main sb-scroll">
+				{#if runs.length}
+					<table class="runs">
+						<thead>
+							<tr><th>Status</th><th>Run</th><th>Started by</th><th>Nodes</th><th>Took</th><th>Started</th><th>Who</th>{#if showCost}<th class="num">Cost</th>{/if}</tr>
+						</thead>
+						<tbody>
+							{#each runs as r (r.id)}
+								<tr onclick={() => goto(`/runs/${r.id}`)}>
+									<td><i style:background={runStatusTone[r.status]}></i>{runStatusLabel[r.status]}</td>
+									<td><a href="/runs/{r.id}" class="mono" title={r.id}>{shortRunId(r.id)}</a></td>
+									<td class="faint">{runOriginLabel[r.origin]}{r.parentRunId ? ` in group run ${shortRunId(r.parentRunId)}` : r.triggerName ? ` · ${r.triggerName}` : ''}</td>
+									<td class="faint">{formatNodeCounts(r.nodeCounts)}</td>
+									<td class="faint">{r.startedAt ? formatDuration(r.startedAt, r.endedAt, app.now) : '—'}</td>
+									<td class="faint" title={formatStamp(r.queuedAt)}>{formatAgo(r.startedAt ?? r.queuedAt, app.now)}</td>
+									<td class="faint" title={r.requestedBy.name}>{r.requestedBy.displayName}</td>
+									{#if showCost}<td class="faint num" title={r.cost ? `Estimated warehouse cost: ${r.cost.source}` : 'No cost reported'}>{formatCost(r.cost)}</td>{/if}
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				{:else}
+					<p class="faint">{jobRuns.loading ? (jobRuns.slow ? 'Loading…' : '') : 'No runs yet.'}</p>
 				{/if}
 			</div>
-
-			<aside class="rail sb-scroll">
-				<h3>How it runs</h3>
-				<dl>
-					<div><dt>Kind</dt><dd>{def.kind === 'group' ? 'Group of jobs' : 'Job'}</dd></div>
-					{#if def.select}<div><dt>Selection</dt><dd><code>{def.select}</code></dd></div>{/if}
-					{#if def.overlap}<div><dt>If already running</dt><dd title="overlap = {def.overlap}">{overlapPlain[def.overlap]}</dd></div>{/if}
-					{#if def.onFailure}<div><dt>If something fails</dt><dd title="on_failure = {def.onFailure}">{onFailurePlain[def.onFailure]}</dd></div>{/if}
-					{#if def.priority !== null}<div><dt>Priority</dt><dd title="Higher priority runs go first when they wait for the same slot">{def.priority}</dd></div>{/if}
-					{#if def.declaration}<div><dt>Targets</dt><dd>{def.targets?.join(', ') ?? 'all targets'}</dd></div>{/if}
-					{#if def.owner}<div><dt>Owner</dt><dd>{def.owner}</dd></div>{/if}
-					{#if def.sourceFile}<div><dt>Defined in</dt><dd><code>{def.sourceFile}</code></dd></div>{/if}
-					{#if def.memberOf?.length}
-						<div><dt>In groups</dt><dd>{#each def.memberOf as g, i (g)}{i ? ', ' : ''}<a href="/jobs/{g}">{g}</a>{/each}</dd></div>
-					{/if}
-				</dl>
-				{#if def.overlap && def.onFailure}<p class="help">{overlapHelp[def.overlap]}. {onFailureHelp[def.onFailure]}.</p>{/if}
-
-				{#if def.settings}
-					<h3>Extra options</h3>
-					{#if Object.keys(def.settings).length}
-						{#each Object.entries(def.settings) as [flag, value] (flag)}
-							<p class="setting"><code>{flag}{value === true ? '' : ` ${value}`}</code></p>
-						{/each}
-					{:else}
-						<p class="faint">None; it runs with the defaults.</p>
-					{/if}
-				{/if}
-
-				<h3>Shared slots</h3>
-				{#if def.concurrency === null}
-					{#if def.concurrencyGroups.length}
-						{#each def.concurrencyGroups as g (g)}<p class="setting" title="Concurrency group {g}"><span>Uses {slotLabel(g)} slots</span></p>{/each}
-					{:else}
-						<p class="faint">None. It only waits for runs that update the same data.</p>
-					{/if}
-				{:else if def.concurrency.length}
-					{#each def.concurrency as g (g.key)}
-						<p class="setting" title="Concurrency group {g.key}: at most {g.limit} runs at once">
-							<span>{g.holders.length} of {g.limit} {slotLabel(g.key)} slot{g.limit === 1 ? '' : 's'} in use</span>
-							{#each g.holders as h (h)}<a class="mono" href="/runs/{h}" title={h}>{shortRunId(h)}</a>{/each}
-						</p>
-					{/each}
-				{:else}
-					<p class="faint">None. It only waits for runs that update the same data.</p>
-				{/if}
-
-				<h3>Schedules and sensors · {jobTriggers.length}</h3>
-				{#if jobTriggers.length === 0}
-					<p class="faint">Nothing starts it automatically. Run it by hand{def.memberOf?.length ? ', or through its groups' : ''}.</p>
-				{:else}
-					{#each jobTriggers as t (t.id)}
-						<div class="trigger" class:off={t.state === 'paused'}>
-							<div class="min-w-0">
-								<a href="/triggers/{t.id}">{t.name}</a>
-								<div class="faint">{t.cadence}{t.state !== t.defaultState ? ` · ${t.defaultState === 'running' ? 'on' : 'paused'} in the code` : ''}</div>
-							</div>
-							<span title={canToggle ? (t.state === 'running' ? 'Pause: stop starting runs' : 'Turn on') : "You don't have permission to pause or turn on schedules and sensors (trigger.toggle)"}>
-								<button class="sb-toggle" class:on={t.state === 'running'} disabled={!canToggle} onclick={() => toggleTrigger(t)} aria-label="{t.state === 'running' ? 'Pause' : 'Turn on'} {t.name}"></button>
-							</span>
-						</div>
-					{/each}
-				{/if}
-			</aside>
-		</div>
+		{:else if def.declaration}
+			<div class="main sb-scroll">
+				<CodePreview file="{def.declaration.sourceFile}:{def.declaration.line}" code={def.declaration.code} language="text" maxLines={200} />
+			</div>
+		{/if}
 	{/if}
 </div>
 
 <style>
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 12px;
-		padding: 12px 24px;
-		border-bottom: 1px solid var(--border);
+		gap: 8px 10px;
+		padding: 10px 24px;
 		font-size: 12.5px;
 	}
 	.back {
+		margin-right: 2px;
 		color: var(--muted-foreground);
 		font-size: 13px;
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 24px;
+		padding: 0 8px;
+		border: 1px solid var(--border);
+		border-radius: 3px;
+		background: var(--card);
+		color: var(--muted-foreground);
+		font-size: 12px;
+		white-space: nowrap;
+	}
+	a.chip:hover,
+	.chip a:hover {
+		color: var(--primary);
+	}
+	.chip.off {
+		opacity: 0.7;
+	}
+	.chip i,
+	dd i,
+	.runs td i {
+		display: inline-block;
+		width: 7px;
+		height: 7px;
+		margin-right: 6px;
+		border-radius: 50%;
+	}
+	.chip i {
+		margin-right: 0;
+	}
+	.tabs {
+		display: flex;
+		gap: 18px;
+		padding: 0 24px;
+		border-bottom: 1px solid var(--border);
+	}
+	.tabs button {
+		padding: 8px 0 7px;
+		border-bottom: 2px solid transparent;
+		color: var(--muted-foreground);
+		font-size: 13px;
+	}
+	.tabs button.on {
+		border-color: var(--primary);
+		color: var(--foreground);
+	}
+	.clear {
+		color: var(--muted-foreground);
+		font-size: 12.5px;
+	}
+	.clear:hover {
+		color: var(--foreground);
 	}
 	.faint {
 		color: var(--muted-foreground);
@@ -227,31 +304,103 @@
 	.err {
 		color: var(--sb-error);
 	}
+	.canvas {
+		position: relative;
+		min-width: 0;
+		flex: 1;
+	}
+	.graph-wait {
+		height: 100%;
+		padding: 14px 24px;
+		background: var(--sb-inset);
+	}
 	.main {
 		min-width: 0;
 		flex: 1;
 		overflow: auto;
-		padding: 18px 24px;
+		padding: 12px 24px;
 	}
-	section {
-		margin-bottom: 26px;
+	.rail {
+		width: 280px;
+		flex-shrink: 0;
+		overflow: auto;
+		padding: 16px 18px;
+		border-left: 1px solid var(--border);
+		font-size: 12.5px;
 	}
-	h3 {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin-bottom: 8px;
+	.rail h2 {
+		margin-bottom: 4px;
+		font-size: 13.5px;
+		font-weight: 600;
+		word-break: break-all;
+	}
+	.rail h3 {
+		margin: 16px 0 4px;
 		color: var(--sb-text-faint);
 		font-size: 12px;
 		font-weight: 500;
 	}
-	h3 span {
-		font-weight: 400;
+	.rail h3.first {
+		margin-top: 0;
+	}
+	.runs th {
+		padding: 6px 12px 6px 0;
+		border-bottom: 1px solid var(--border);
+		color: var(--sb-text-faint);
+		font-size: 11.5px;
+		font-weight: 500;
+		text-align: left;
+	}
+	.runs thead tr {
+		cursor: default;
+	}
+	.runs thead tr:hover {
+		background: none;
+	}
+	.label {
+		color: var(--sb-text-faint);
+		font-size: 11.5px;
+	}
+	.open {
+		display: inline-block;
+		margin-bottom: 10px;
+		color: var(--primary);
+		font-size: 12px;
+	}
+	.desc {
+		margin-bottom: 12px;
+		line-height: 1.5;
+	}
+	dl div {
+		display: flex;
+		justify-content: space-between;
+		gap: 12px;
+		padding: 3px 0;
+	}
+	dt {
+		flex-shrink: 0;
+		color: var(--muted-foreground);
+	}
+	dd {
+		min-width: 0;
+		overflow-wrap: anywhere;
+		text-align: right;
+	}
+	.picked li {
+		padding: 2px 0;
 	}
 	code,
 	.mono {
 		font-family: var(--font-mono);
 		font-size: 11.5px;
+	}
+	.setting {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 8px;
+		padding: 2px 0;
+		font-size: 12px;
 	}
 	.runs {
 		width: 100%;
@@ -269,82 +418,8 @@
 		border-bottom: 1px solid var(--border-subtle);
 		white-space: nowrap;
 	}
-	.runs td i {
-		display: inline-block;
-		width: 7px;
-		height: 7px;
-		margin-right: 7px;
-		border-radius: 50%;
-	}
 	.num {
 		text-align: right;
-	}
-	.graph-wait {
-		border: 1px solid var(--border);
-		border-radius: 2px;
-		background: var(--sb-inset);
-		padding: 14px;
-	}
-	.critical {
-		margin-top: 8px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
-	.rail {
-		width: 320px;
-		flex-shrink: 0;
-		overflow: auto;
-		padding: 18px 20px;
-		border-left: 1px solid var(--border);
-	}
-	.rail h3 {
-		margin-top: 18px;
-	}
-	.rail h3:first-child {
-		margin-top: 0;
-	}
-	dl div {
-		display: flex;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 3px 0;
-		font-size: 12.5px;
-	}
-	dt {
-		color: var(--muted-foreground);
-	}
-	dd {
-		text-align: right;
-	}
-	.help {
-		margin-top: 6px;
-		color: var(--sb-text-faint);
-		font-size: 11.5px;
-		line-height: 1.5;
-	}
-	.setting {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 8px;
-		padding: 2px 0;
-		font-size: 12px;
-	}
-	.trigger {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 6px;
-		padding: 8px 10px;
-		border: 1px solid var(--border-subtle);
-		border-radius: 2px;
-		font-size: 12.5px;
-	}
-	.trigger.off {
-		opacity: 0.7;
-	}
-	.trigger span:last-child {
-		margin-left: auto;
 	}
 	a:hover {
 		color: var(--primary);
