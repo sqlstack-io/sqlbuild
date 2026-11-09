@@ -16,13 +16,10 @@ pub(crate) fn template_patterns() -> SqlTestPatterns {
     .expect("the SQL-test patterns compile")
 }
 
-/// Generated templates, each with every token deleted and with stray tokens inserted before it,
-/// counted where the recognizer reads them and listed where its facts differ from the parser's.
-pub(crate) fn simple_template_corpus_outcome(dialect_name: &str) -> SimpleTemplateCorpusOutcome {
-    let dialect = match dialect_name {
-        "duckdb" => Dialect::DuckDB,
-        _ => Dialect::Snowflake,
-    };
+/// Generated templates and their one-token mutations, where the recognizer differs from the parser.
+pub(crate) fn simple_template_corpus_outcome(
+    (dialect_name, dialect): (&str, Dialect),
+) -> SimpleTemplateCorpusOutcome {
     let parser = sql_test_parser(Some(dialect_name)).expect("a native test dialect");
     let patterns = template_patterns();
     let mut queries: Vec<String> = Vec::new();

@@ -1510,8 +1510,7 @@ pub(crate) fn analysis_template(
     })
 }
 
-/// The template the parser reads whole from `query_sql`, its relation markers read as names; the
-/// bounded recognizer's differential oracle.
+/// The template the parser reads whole from `query_sql`, its relation markers read as names.
 pub(crate) fn parsed_analysis_template(
     query_sql: &str,
     (parser, patterns): (&dyn NativeDialect, &SqlTestPatterns),

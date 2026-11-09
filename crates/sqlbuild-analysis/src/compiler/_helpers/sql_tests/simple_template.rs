@@ -28,8 +28,14 @@ pub(crate) fn simple_analysis_template(
     if !query_sql.is_ascii() {
         return None;
     }
-    let (sql, named) = markers_as_names(query_sql, &patterns.lexical).ok()?;
-    let tokens: Vec<Token> = dialect_tokens(&sql, dialect).ok()?;
+    let (sql, named) = match markers_as_names(query_sql, &patterns.lexical) {
+        Ok(renamed) => renamed,
+        Err(_unscannable) => return None,
+    };
+    let tokens: Vec<Token> = match dialect_tokens(&sql, dialect) {
+        Ok(tokens) => tokens,
+        Err(_untokenizable) => return None,
+    };
     if !covers_all_but_whitespace(&sql, &tokens) {
         return None;
     }
@@ -184,10 +190,12 @@ impl<'a> TemplateReader<'a> {
     /// A relation name and optional alias; a name `markers_as_names` gave a marker call reads back as it.
     fn relation(&mut self) -> Option<Option<MarkerCall>> {
         let name = self.identifier()?;
-        let call = name
-            .strip_prefix(MARKER_NAME_PREFIX)
-            .and_then(|index| index.parse::<usize>().ok())
-            .and_then(|index| self.named.get(index).cloned());
+        let call =
+            name.strip_prefix(MARKER_NAME_PREFIX)
+                .and_then(|index| match index.parse::<usize>() {
+                    Ok(index) => self.named.get(index).cloned(),
+                    Err(_not_a_marker) => None,
+                });
         if self.take(TokenType::As) {
             self.identifier()?;
         }

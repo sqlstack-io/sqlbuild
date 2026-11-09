@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use sqlquack_syntax::Dialect;
+
 use crate::compiler::_helpers::sql_tests::planning::{analysis_template, parsed_analysis_template};
 use crate::compiler::_helpers::sql_tests::rendering::sql_test_parser;
 use crate::compiler::_helpers::sql_tests::simple_template::simple_analysis_template;
@@ -130,9 +132,12 @@ SELECT id, amount FROM final"#;
             "{}",
             test_case.description
         );
-        if fast.is_some() {
-            assert_eq!(fast, expected, "{}", test_case.description);
-        }
+        assert_eq!(
+            fast,
+            expected.clone().filter(|_| test_case.expected_recognized),
+            "{}",
+            test_case.description
+        );
         let cache = Mutex::new(HashMap::new());
         let actual =
             analysis_template(test_case.sql, (parser, &patterns), &cache).expect("template cache");
@@ -145,13 +150,13 @@ fn given_generated_and_mutated_queries_when_recognized_then_every_fact_matches_t
     let test_cases = [
         SimpleTemplateCorpusTestCase {
             description: "DuckDB combinations, token deletions and insertions",
-            dialect: "duckdb",
+            dialect: ("duckdb", Dialect::DuckDB),
             expected_min_recognized: 200,
             expected_mismatches: &[],
         },
         SimpleTemplateCorpusTestCase {
             description: "Snowflake combinations, token deletions and insertions",
-            dialect: "snowflake",
+            dialect: ("snowflake", Dialect::Snowflake),
             expected_min_recognized: 200,
             expected_mismatches: &[],
         },

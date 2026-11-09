@@ -1,4 +1,5 @@
 use sqlbuild_sqltext::sql_scan::models::Unclosed;
+use sqlquack_syntax::Dialect;
 
 pub(crate) struct SqlTestExtractionTestCase {
     pub(crate) description: &'static str,
@@ -232,7 +233,7 @@ pub(crate) struct SimpleTemplateTestCase {
 
 pub(crate) struct SimpleTemplateCorpusTestCase {
     pub(crate) description: &'static str,
-    pub(crate) dialect: &'static str,
+    pub(crate) dialect: (&'static str, Dialect),
     pub(crate) expected_min_recognized: usize,
     pub(crate) expected_mismatches: &'static [&'static str],
 }

@@ -9,12 +9,11 @@ use sqlbuild_cache::digest::main::hex_digest::hex_digest;
 use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_cache::store::models::NativeStore;
 
-use crate::bindings::_helpers::boundary::python_calls::imported;
 use crate::bindings::_helpers::cache::native_store::{
     current_code_identity, open_store, save_store,
 };
+use crate::bindings::_helpers::cache::sql_test_scan_store::debug;
 
-const PARSE_CACHE_LOGGER: &str = "sqlbuild.compile";
 /// The native store kind holding read-whole verdicts.
 const NATIVE_PARSE_STORE_KIND: &str = "native-parses";
 /// The store file below the compile cache folder.
@@ -71,11 +70,4 @@ pub(crate) fn parse_key(dialect: &str, check: &SyntaxCheck) -> ContentDigest {
         parts.push(value);
     }
     content_digest(&parts)
-}
-
-fn debug(py: Python<'_>, message: &str, error: &str) -> PyResult<()> {
-    imported(py, "logging", "getLogger")?
-        .call1((PARSE_CACHE_LOGGER,))?
-        .call_method1("debug", (message, error))?;
-    Ok(())
 }

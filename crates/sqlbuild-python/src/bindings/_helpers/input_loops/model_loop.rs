@@ -869,8 +869,7 @@ impl NativeModelLoop {
         })
     }
 
-    /// Analysed, rejected opt-out, skipped; a native route reads no SQL whose calls P012 failed.
-    /// A native parse is queued on `gaps`, which unmarks the model when it finds a gap.
+    /// Analysed, rejected opt-out, skipped; a native parse queued on `gaps` unmarks it on a gap.
     fn analysis<'py>(
         &self,
         context: &LoopContext<'_, 'py>,

@@ -1,5 +1,4 @@
-//! The model loop's fixed compile pool off the GIL: header facts before the ordered loop, and work
-//! the loop hands off while it continues.
+//! The model loop's compile pool off the GIL: header facts first, then work the loop hands off.
 
 use std::sync::{Arc, OnceLock};
 
