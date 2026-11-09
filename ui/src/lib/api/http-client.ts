@@ -1,9 +1,10 @@
 import createFetch from 'openapi-fetch';
+import { shortName } from '$lib/build-area/labels';
 import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
-import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
+import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverage, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, toLocationDetail, toLocationSummary, warehouseSyncOf } from './http-locations';
@@ -100,6 +101,10 @@ const AUDIT_PAGES = 10;
 /** The server's largest platform event scan, and how many event history reads before it stops looking. */
 const EVENT_PAGE = 500;
 const EVENT_SCANS = 10;
+
+/** How many statistics pages of 100 a node read follows, and how many samples a relation keeps. */
+const STATISTICS_PAGES = 10;
+const STATISTICS_KEPT = 1000;
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -255,6 +260,34 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	const outputRefused = new Set<string>();
 	// A node's error text needs view.evidence on that node alone.
 	const errorRefused = new Set<string>();
+	// Statistics samples per relation, oldest first, with the cursor after the newest; a refresh reads only newer samples.
+	const samples = new Map<string, { records: Wire['WarehouseStatisticsRecord'][]; after: Wire['WarehouseMirrorCursor'] }>();
+	async function relationStatistics(scope: Scope, relation: { database: string | null; schema: string; name: string }): Promise<Wire['WarehouseStatisticsRecord'][]> {
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const key = JSON.stringify([scope.locationId, relation.database, relation.schema, relation.name]);
+		const held = samples.get(key);
+		let after = held?.after;
+		const fresh: Wire['StatisticsObservation'][] = [];
+		for (let page = 0; page < STATISTICS_PAGES; page++) {
+			const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/statistics', {
+				params: {
+					path: { location_id: locationId, target },
+					query: { database: relation.database ?? undefined, schema: relation.schema, name: relation.name, after_observed_at: after?.observed_at, after_event_id: after?.event_id }
+				}
+			});
+			if (response.status === 401) onUnauthorized();
+			// Statistics need the same view as the node; a refusal leaves the samples out rather than failing the page.
+			if (!data) return held?.records ?? [];
+			fresh.push(...data.records);
+			const last = data.records.at(-1);
+			if (last) after = { observed_at: last.record.observed_at, event_id: last.event_id };
+			if (!data.next_after) break;
+		}
+		if (!after) return [];
+		const records = [...(held?.records ?? []), ...fresh.map((o) => o.record)].slice(-STATISTICS_KEPT);
+		samples.set(key, { records, after });
+		return records;
+	}
 	const implemented = {
 		supports: (method: keyof ApiClient) => SUPPORTED.has(method),
 		changes: new HttpChangeFeed(baseUrl, (scope) => feedAllowed(baseUrl, scope, onUnauthorized)),
@@ -620,7 +653,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const path = { location_id: locationId, target };
-			const [status, sql, checks, runs, jobs] = await Promise.all([
+			const [status, sql, checks, runs, jobs, statistics, coverage] = await Promise.all([
 				http.GET('/api/control/locations/{location_id}/targets/{target}/node-status', { params: { path, query: { node_key: node.key } } }),
 				sqlLocations.has(scope.locationId) && !sqlRefused.has(`${scope.locationId}|${node.key}`)
 					? http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/sql', { params: { path: { ...path, node_key: node.key } } })
@@ -629,12 +662,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 				node.kind === 'source'
 					? null
 					: http.GET('/api/control/locations/{location_id}/targets/{target}/nodes/{node_key}/runs', { params: { path: { ...path, node_key: node.key }, query: { limit: 100 } } }),
-				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null)
+				Promise.all([listedJobs(scope), listedTriggers(scope)]).then(([j, t]) => nodeJobsOf(node.key, j, t)).catch(() => null),
+				node.relation ? relationStatistics(scope, node.relation) : [],
+				node.materialization?.includes('microbatch')
+					? http.GET('/api/control/locations/{location_id}/targets/{target}/microbatches/{model}', { params: { path: { ...path, model: shortName(node.key) } } })
+					: null
 			]);
 			if (status.response.status === 401 || sql?.response.status === 401 || runs?.response.status === 401) onUnauthorized();
 			if (sql?.response.status === 403) sqlRefused.add(`${scope.locationId}|${node.key}`);
 			// Status and SQL have their own permissions; a refusal leaves that part out rather than failing the page.
-			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), { runs: runs?.data ? toNodeRuns(runs.data) : null, jobs });
+			return nodeDetailOf(nodes, node, status.data ?? null, sql?.data ?? null, checks.map(toCheck), {
+				runs: runs?.data ? toNodeRuns(runs.data) : null,
+				jobs,
+				statistics,
+				microbatch: coverage?.data ? toMicrobatchCoverage(coverage.data) : null
+			});
 		},
 		async overview(scope: Scope): Promise<Overview | null> {
 			// A week of publications for the models metric; the server returns at most 100.

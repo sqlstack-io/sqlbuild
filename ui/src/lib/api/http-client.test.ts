@@ -740,3 +740,37 @@ describe('listPlatformEventHistory', () => {
 		expect(scans).toEqual([null, '9']);
 	});
 });
+
+describe('getCatalogNode statistics', () => {
+	const sample = (event_id: string, observed_at: string, row_count: number) => ({ event_id, record: { name: 'orders', state_schema: 'main', observed_at, row_count } });
+
+	/** Two samples at first; a refresh after them finds a third. Everything else answers empty. */
+	function server() {
+		const reads: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const url = new URL(request.url);
+				if (url.pathname.endsWith('/nodes'))
+					return Response.json([{ node_key: 'model:orders', kind: 'model', name: 'orders', materialization: 'table', tags: [], dependencies: [], snapshot_id: 's', relation: { schema: 'main', name: 'orders' } }]);
+				if (url.pathname.endsWith('/statistics')) {
+					const after = url.searchParams.get('after_event_id');
+					reads.push(`${url.searchParams.get('schema')}.${url.searchParams.get('name')} after ${after}`);
+					return Response.json({ records: after ? [sample('e3', '2026-11-09T03:00:00Z', 30)] : [sample('e1', '2026-11-09T01:00:00Z', 10), sample('e2', '2026-11-09T02:00:00Z', 20)] });
+				}
+				if (url.pathname.endsWith('/node-status')) return Response.json(null);
+				return Response.json([]);
+			})
+		);
+		return { reads, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('reads only the samples after the newest one it holds on a refresh, and keeps the earlier ones', async () => {
+		const { reads, client } = server();
+		const scope = { locationId: '0191f0aa-orders:development' };
+		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(20);
+		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(30);
+		expect(reads).toEqual(['main.orders after null', 'main.orders after e2']);
+	});
+});
