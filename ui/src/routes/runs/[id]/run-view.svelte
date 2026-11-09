@@ -42,6 +42,14 @@
 	let topFrac = $state(0.5);
 	let dragging = $state(false);
 	let splitEl = $state<HTMLDivElement>();
+	// The timeline starts as tall as its rows, so a short run leaves the room to the log below.
+	let sized = false;
+	$effect(() => {
+		if (sized || !splitEl || !nodes.length || !hasBottom || !splitEl.clientHeight) return;
+		sized = true;
+		const rows = nodes.length + (groups.length > 1 ? groups.length : 0);
+		topFrac = Math.min(0.6, Math.max(0.22, (125 + rows * 32) / splitEl.clientHeight));
+	});
 	function onDrag(e: PointerEvent) {
 		if (!dragging || !splitEl) return;
 		const r = splitEl.getBoundingClientRect();

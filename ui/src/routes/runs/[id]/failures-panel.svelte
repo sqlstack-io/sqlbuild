@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { app } from '$lib/state/app.svelte';
 	import CopyButton from '$lib/components/copy-button.svelte';
 	import type { RunNode, RunNodeError } from '$lib/api';
@@ -29,6 +30,15 @@
 			errors[key] = { failure: errorMessage(error) };
 		}
 	}
+
+	// The first failure opens on its own, so the error is on screen without a click: one audited read per visit.
+	let opened = false;
+	$effect(() => {
+		const first = failed[0];
+		if (opened || !first || !(first.errorDetail || readable)) return;
+		opened = true;
+		untrack(() => void toggle(first));
+	});
 
 	function read(key: string): RunNodeError | null {
 		const found = errors[key];

@@ -296,8 +296,8 @@ export class MockOperate {
 	listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 		const rec = this.#require(runId);
 		const now = Date.now();
-		const all = [rec, ...this.#children(rec)]
-			.flatMap((r) => execution(r, this.#nodesOf(r, now)).events)
+		// Each run's own, as the server returns; the run page gathers a group's job runs itself.
+		const all = execution(rec, this.#nodesOf(rec, now)).events
 			.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt) || a.storageId - b.storageId)
 			.map((e, i) => ({ ...e, storageId: i + 1 }));
 		const after = query.after ?? 0;
@@ -310,16 +310,14 @@ export class MockOperate {
 	listRunStatements(scope: Scope, runId: string): Promise<RunStatement[]> {
 		const rec = this.#require(runId);
 		const now = Date.now();
-		return this.#ctx.reply([rec, ...this.#children(rec)].flatMap((r) => execution(r, this.#nodesOf(r, now), now).statements));
+		return this.#ctx.reply(execution(rec, this.#nodesOf(rec, now), now).statements);
 	}
 
 	getStatementSql(scope: Scope, runId: string, statementId: string): Promise<StatementSql> {
 		this.#need('view.sql');
 		const rec = this.#require(runId);
 		const now = Date.now();
-		const statement = [rec, ...this.#children(rec)]
-			.flatMap((r) => execution(r, this.#nodesOf(r, now), now).statements)
-			.find((st) => st.id === statementId);
+		const statement = execution(rec, this.#nodesOf(rec, now), now).statements.find((st) => st.id === statementId);
 		if (!statement) throw new ApiError(`Unknown statement ${statementId}`, 404);
 		return this.#ctx.reply({ statementId, sql: statement.sqlRecorded ? sqlFor(statement.nodeKey, statement.kind, this.#ctx.target(scope)) : null });
 	}
@@ -327,7 +325,7 @@ export class MockOperate {
 	listRunOutput(scope: Scope, runId: string): Promise<RunOutputLine[]> {
 		const rec = this.#require(runId);
 		const now = Date.now();
-		return this.#ctx.reply([rec, ...this.#children(rec)].flatMap((r) => execution(r, this.#nodesOf(r, now)).output));
+		return this.#ctx.reply(execution(rec, this.#nodesOf(rec, now)).output);
 	}
 
 	listQueue(scope: Scope): Promise<QueueEntry[]> {

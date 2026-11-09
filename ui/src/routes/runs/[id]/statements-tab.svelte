@@ -11,7 +11,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatSpan } from './utils';
 
-	let { statements, total, grouped, runId }: { statements: RunStatement[]; total: number; grouped: boolean; runId: string } = $props();
+	let { statements, total, grouped }: { statements: RunStatement[]; total: number; grouped: boolean } = $props();
 
 	type SqlState = { state: 'loading' } | { state: 'ok'; sql: string | null } | { state: 'error'; message: string };
 	let open = $state<Set<string>>(new Set());
@@ -23,7 +23,7 @@
 		if (!scope || sql[st.id]?.state === 'ok' || sql[st.id]?.state === 'loading') return;
 		sql = { ...sql, [st.id]: { state: 'loading' } };
 		try {
-			const res = await app.client.getStatementSql(scope, runId, st.id);
+			const res = await app.client.getStatementSql(scope, st.runId, st.id);
 			sql = { ...sql, [st.id]: { state: 'ok', sql: res.sql } };
 		} catch (e) {
 			sql = { ...sql, [st.id]: { state: 'error', message: e instanceof Error ? e.message : String(e) } };

@@ -226,6 +226,15 @@ export function runDetailOf(run: Run, wire: Wire['RunRecord'], listed: Run[], no
 	};
 }
 
+/**
+ * A run's nodes with its job runs' nodes. A group run's own rows repeat its job runs' nodes, so they
+ * stay only for nodes no job run has, such as those of members that never started.
+ */
+export function groupRunNodes(own: RunNode[], children: RunNode[]): RunNode[] {
+	const covered = new Set(children.map((n) => n.nodeKey));
+	return [...own.filter((n) => !covered.has(n.nodeKey)), ...children];
+}
+
 const KNOWN_EVENTS: ReadonlySet<string> = new Set(RECALL_EVENT_TYPES);
 /** Scheduler facts are stored as `run_<fact>` events in the scheduler invocation. */
 const SCHEDULER_EVENTS: ReadonlySet<string> = new Set(SCHEDULER_FACTS.map((f) => `run_${f}`));
