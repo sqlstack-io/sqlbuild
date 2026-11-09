@@ -52,3 +52,17 @@ pub(super) struct ProjectSelectorErrorTestCase {
     pub(super) select: &'static [&'static str],
     pub(super) expected_error: SelectorFailure,
 }
+
+pub(super) struct JobSelectorTestCase {
+    pub(super) description: &'static str,
+    pub(super) select: &'static [&'static str],
+    pub(super) exclude: &'static [&'static str],
+    pub(super) expected_names: &'static [&'static str],
+}
+
+pub(super) struct JobSelectorErrorTestCase {
+    pub(super) description: &'static str,
+    pub(super) attached: bool,
+    pub(super) select: &'static [&'static str],
+    pub(super) expected_error: SelectorFailure,
+}
