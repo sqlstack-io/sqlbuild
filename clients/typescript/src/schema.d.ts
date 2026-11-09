@@ -434,6 +434,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/maintenance": {
         parameters: {
             query?: never;
@@ -570,6 +586,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["listPersonRunNodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPersonRunNodeError"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1479,6 +1511,31 @@ export interface components {
             failed: components["schemas"]["Table"][];
             failure?: string | null;
         };
+        /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
+        JobDetailRecord: {
+            concurrency_groups: string[];
+            /** @description Selected nodes whose failure stops a group. */
+            critical_nodes: string[];
+            description: string;
+            job_key: string;
+            kind: components["schemas"]["RunKind"];
+            /** @description The groups this job belongs to. */
+            member_of: string[];
+            /** @description A group's member jobs in run order; empty for a job. */
+            members: components["schemas"]["JobMember"][];
+            selection: string[];
+            /** @description Command settings; `vars` shows as `[REDACTED]` and text values pass through secret redaction. */
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            snapshot_id: string;
+        };
+        JobMember: {
+            job_key: string;
+            /** @description Members this one waits for, from lineage and from the group's `after`. */
+            waits_for: string[];
+        };
         /** @description A job or group of the current published snapshot. Settings are left out of person reads. */
         JobRecord: {
             concurrency_groups: string[];
@@ -1492,6 +1549,8 @@ export interface components {
         };
         /** @description A trusted operator names a published job; execution inputs are never supplied by the caller. */
         JobRunRequest: {
+            /** @description Rebuild every selected model from scratch; it rewrites history, as a window does. */
+            full_refresh?: boolean;
             job_key: string;
             /** Format: uuid */
             location_id: string;
@@ -2011,6 +2070,8 @@ export interface components {
             node_key: string;
         } | {
             error_code?: string | null;
+            /** @description Redacted and bounded on the way in, whoever sends it; absent from older workers. */
+            error_message?: string | null;
             /** @enum {string} */
             kind: "node_finished";
             node_key: string;
@@ -2114,6 +2175,15 @@ export interface components {
         };
         /** @enum {string} */
         RunKind: "job" | "group" | "adhoc";
+        /** @description A node's outcome error in one run: redacted, bounded text and the project file of the node, never its SQL. */
+        RunNodeFailure: {
+            error_code?: string | null;
+            /** @description Null when the worker reported none or the run's history has been pruned. */
+            message?: string | null;
+            node_key: string;
+            /** @description Relative to the project root, with `/` separators; null when the run's snapshot is gone. */
+            path?: string | null;
+        };
         RunNodeRecord: {
             /** Format: date-time */
             ended_at?: string | null;
@@ -3687,6 +3757,52 @@ export interface operations {
             };
         };
     };
+    readPersonJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                job_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobDetailRecord"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view on every current node of the target */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description No published job by that name */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     readPersonMaintenance: {
         parameters: {
             query?: {
@@ -4063,6 +4179,53 @@ export interface operations {
                 };
             };
             /** @description Run not found for a person who may view the whole target */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readPersonRunNodeError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                run_id: string;
+                node_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunNodeFailure"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Needs view.evidence on the node */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Node not found in this run */
             404: {
                 headers: {
                     [name: string]: unknown;

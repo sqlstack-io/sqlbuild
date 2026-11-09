@@ -165,6 +165,7 @@ async fn finish_group(
                 rows_affected: node.rows_affected,
                 error_code: node.error_code.clone(),
                 skipped_because_of: node.skipped_because_of.clone(),
+                error_message: None,
             },
         )
         .await?;

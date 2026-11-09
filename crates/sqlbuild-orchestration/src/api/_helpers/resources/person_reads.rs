@@ -1,4 +1,4 @@
-//! Person reads of run nodes, node run history, catalog nodes, jobs, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
+//! Person reads of run nodes and their errors, node run history, catalog nodes, jobs and one job's declaration, triggers, ticks and publications; refusal precedes every lookup, so unknown objects look forbidden.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -6,17 +6,19 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::{ReadQuery, RunEventsQuery, StatementSqlQuery};
+use crate::api::models::{ReadQuery, RunEventsQuery, RunNodePath, StatementSqlQuery};
 use crate::credentials::models::{AuditContext, AuthenticatedPerson, DefaultRole};
 use crate::declarations::main::list_person_jobs::list_person_jobs;
 use crate::declarations::main::list_person_triggers::list_person_triggers;
-use crate::declarations::models::{JobRecord, PersonTriggerRecord};
+use crate::declarations::main::read_person_job::read_person_job;
+use crate::declarations::models::{JobDetailRecord, JobRecord, PersonTriggerRecord};
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::models::{LocationHealthObservation, PlatformProblems};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
-    NodeRunRecord, RunEventRecord, RunNodeRecord, RunOutput, RunStatementRecord, RunStatementSql,
+    NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
+    RunStatementSql,
 };
 use crate::scheduler::main::list_person_ticks::list_person_ticks;
 use crate::scheduler::models::TickRecord;
@@ -25,6 +27,7 @@ use crate::snapshots::models::PublishedSnapshot;
 use crate::store::models::ControlStore;
 use crate::warehouse_history::main::read_person_node_runs::read_person_node_runs;
 use crate::warehouse_history::main::read_person_run_events::read_person_run_events;
+use crate::warehouse_history::main::read_person_run_node_error::read_person_run_node_error;
 use crate::warehouse_history::main::read_person_run_output::read_person_run_output;
 use crate::warehouse_history::main::read_person_run_statement_sql::read_person_run_statement_sql;
 use crate::warehouse_history::main::read_person_run_statements::read_person_run_statements;
@@ -190,6 +193,28 @@ pub(crate) async fn run_statement_sql(
     .ok_or_else(|| not_found("statement not found"))
 }
 
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/nodes/{node_key}/error", operation_id = "readPersonRunNodeError",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path), ("node_key" = String, Path)),
+    responses((status = 200, body = RunNodeFailure), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view.evidence on the node"),
+        (status = 404, description = "Node not found in this run")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn run_node_error(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Path(path): Path<RunNodePath>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<RunNodeFailure>, ApiError> {
+    read_person_run_node_error(
+        &store,
+        (&context, principal),
+        (path.location_id, &path.target),
+        (path.run_id, &path.node_key),
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("node not found in this run"))
+}
+
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs/{run_id}/output", operation_id = "readPersonRunOutput",
     params(("location_id" = Uuid, Path), ("target" = String, Path), ("run_id" = Uuid, Path)),
     responses((status = 200, body = RunOutput), (status = 401, description = "Session rejected"),
@@ -211,6 +236,29 @@ pub(crate) async fn run_output(
     .await?
     .map(Json)
     .ok_or_else(|| not_found("run not found"))
+}
+
+#[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/jobs/{job_key}", operation_id = "readPersonJob",
+    params(("location_id" = Uuid, Path), ("target" = String, Path), ("job_key" = String, Path)),
+    responses((status = 200, body = JobDetailRecord), (status = 401, description = "Session rejected"),
+        (status = 403, body = crate::api::models::ApiErrorBody, description = "Needs view on every current node of the target"),
+        (status = 404, description = "No published job by that name")),
+    security(("session" = []), ("cliSession" = [])))]
+pub(crate) async fn job(
+    (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
+    Extension(default_role): Extension<DefaultRole>,
+    Path((location_id, target, job_key)): Path<(Uuid, String, String)>,
+    Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
+) -> Result<Json<JobDetailRecord>, ApiError> {
+    read_person_job(
+        &store,
+        (&context, principal),
+        (location_id, &target, &job_key),
+        default_role,
+    )
+    .await?
+    .map(Json)
+    .ok_or_else(|| not_found("job not found"))
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/jobs", operation_id = "listPersonJobs",

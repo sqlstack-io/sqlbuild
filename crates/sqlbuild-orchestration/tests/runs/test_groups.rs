@@ -79,6 +79,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                 reason: "Build the group".into(),
                 priority: 1,
                 window: None,
+                full_refresh: false,
             };
             assert!(
                 request_job_run(store, &context, &request)
@@ -125,6 +126,7 @@ fn given_a_pinned_group_when_redeployed_and_cancelled_then_children_keep_scope_a
                     rows_affected: Some(11),
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Success,
@@ -353,6 +355,7 @@ fn given_opposing_parent_and_child_limits_when_advancing_groups_then_both_groups
                         reason: "Build independent groups".into(),
                         priority: 1,
                         window: None,
+                        full_refresh: false,
                     },
                 )
                 .await

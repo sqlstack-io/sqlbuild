@@ -436,9 +436,17 @@ describe('launchJob', () => {
 		expect(posts[0]).toMatchObject({ job_key: 'daily', target: 'development', window: { kind: 'integer', start: 1200, end: 1500 } });
 	});
 
-	it('leaves the window out of an ordinary run', async () => {
+	it('leaves the window and full refresh out of an ordinary run', async () => {
 		const { posts, client } = server(Response.json({ error: 'stop here' }, { status: 409 }));
 		await expect(client.launchJob(ORDERS, 'daily')).rejects.toThrow();
+		expect(posts[0]).not.toHaveProperty('window');
+		expect(posts[0]).not.toHaveProperty('full_refresh');
+	});
+
+	it("asks for a full refresh and shows the server's refusal as it comes", async () => {
+		const { posts, client } = server(Response.json({ error: 'run.rewrite_history is required; decision 7' }, { status: 403 }));
+		await expect(client.launchJobFromScratch(ORDERS, 'daily')).rejects.toMatchObject({ status: 403, message: expect.stringContaining('run.rewrite_history') });
+		expect(posts[0]).toMatchObject({ job_key: 'daily', full_refresh: true, reason: 'Full refresh started from the web UI' });
 		expect(posts[0]).not.toHaveProperty('window');
 	});
 
@@ -465,6 +473,22 @@ describe('launchJob', () => {
 			status: 400,
 			message: expect.stringContaining('backfill window start must not follow end')
 		});
+	});
+});
+
+describe('getJob', () => {
+	function server(job: Response) {
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => (new URL(request.url).pathname.endsWith('/jobs/nightly') ? job.clone() : Response.json([])))
+		);
+		return createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+	}
+
+	it('treats an unknown job as not found, and keeps a refusal as an error', async () => {
+		await expect(server(Response.json({ error: 'job not found' }, { status: 404 })).getJob(ORDERS, 'nightly')).resolves.toBeNull();
+		await expect(server(Response.json({ error: 'view is required; decision 3' }, { status: 403 })).getJob(ORDERS, 'nightly')).rejects.toMatchObject({ status: 403 });
 	});
 });
 
@@ -621,5 +645,59 @@ describe('getCatalogNode', () => {
 		const loads = [await client.getCatalogNode(ORDERS, 'orders'), await client.getCatalogNode(ORDERS, 'orders')];
 		expect(loads.map((d) => [d?.key, d?.sql])).toEqual([['model:orders', null], ['model:orders', null]]);
 		expect(paths.filter((p) => p.endsWith('/sql'))).toHaveLength(1);
+	});
+});
+
+describe('node error text', () => {
+	const RUN = '0191f0ee-0000-7000-8000-000000000001';
+
+	/** Evidence holds on orders but not on customers, as for a person whose grant covers one node. */
+	function serve(actions: string[]) {
+		const paths: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = decodeURIComponent(new URL(request.url).pathname);
+				paths.push(path);
+				if (path.endsWith('/bootstrap')) {
+					return Response.json({ login_mode: 'password', access: { name: 'cara', principal_id: 'p', actions: [], locations: [{ location_id: '0191f0aa-orders', name: 'Orders', target: 'development', actions }] } });
+				}
+				if (path.endsWith(`/runs/${RUN}/nodes/model:orders/error`)) {
+					return Response.json({ node_key: 'model:orders', error_code: 'T002', message: 'Conversion Error: password=[REDACTED]\nLINE 3', path: 'models/orders.sql' });
+				}
+				return Response.json({ error: 'missing view.evidence permission' }, { status: 403 });
+			})
+		);
+		return paths;
+	}
+
+	it('reads one node by its own key and maps the file', async () => {
+		const paths = serve(['view', 'view.evidence']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		expect(await client.getRunNodeError(ORDERS, RUN, 'model:orders')).toEqual({
+			nodeKey: 'model:orders',
+			errorCode: 'T002',
+			message: 'Conversion Error: password=[REDACTED]\nLINE 3',
+			file: 'models/orders.sql'
+		});
+		expect(paths.at(-1)).toBe(`/api/control/locations/0191f0aa-orders/targets/development/runs/${RUN}/nodes/model:orders/error`);
+	});
+
+	it('asks for a refused node once, so each audited refusal happens only once', async () => {
+		const paths = serve(['view', 'view.evidence']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		for (let i = 0; i < 2; i++) await expect(client.getRunNodeError(ORDERS, RUN, 'model:customers')).rejects.toMatchObject({ status: 403 });
+		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(1);
+	});
+
+	it('sends no request where the location grants no evidence', async () => {
+		const paths = serve(['view']);
+		const client = createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+		await client.bootstrap();
+		await expect(client.getRunNodeError(ORDERS, RUN, 'model:orders')).rejects.toMatchObject({ status: 403 });
+		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(0);
 	});
 });

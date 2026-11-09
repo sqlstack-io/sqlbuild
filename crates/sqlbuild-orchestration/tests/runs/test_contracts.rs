@@ -20,10 +20,14 @@ mod test_faults;
 mod test_group_admission;
 #[path = "test_groups.rs"]
 mod test_groups;
+#[path = "test_job_detail.rs"]
+mod test_job_detail;
 #[path = "test_lifecycle.rs"]
 mod test_lifecycle;
 #[path = "test_monitor.rs"]
 mod test_monitor;
+#[path = "test_node_errors.rs"]
+mod test_node_errors;
 #[path = "test_permissions.rs"]
 mod test_permissions;
 #[path = "test_requests.rs"]

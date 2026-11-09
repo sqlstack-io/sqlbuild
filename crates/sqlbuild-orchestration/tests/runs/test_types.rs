@@ -191,3 +191,15 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
         Ok(plan)
     }
 }
+
+pub(crate) struct RunNodeErrorTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_message: &'static str,
+}
+
+pub(crate) struct JobDetailTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) backend: Backend,
+    pub(crate) expected_order: [&'static str; 2],
+}

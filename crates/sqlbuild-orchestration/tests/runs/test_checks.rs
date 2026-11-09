@@ -250,6 +250,7 @@ fn given_attached_checks_when_a_claim_reports_observations_then_frozen_membershi
                     rows_affected: Some(1),
                     error_code: None,
                     skipped_because_of: None,
+                    error_message: None,
                 },
                 RunChange::Finished {
                     outcome: RunOutcome::Failed,
