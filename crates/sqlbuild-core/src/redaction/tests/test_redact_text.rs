@@ -51,6 +51,11 @@ fn given_diagnostic_text_when_redacting_then_matches_python_substitutions() {
             expected_text: "CREATE USER orders IDENTIFIED BY [REDACTED]; ALTER USER stock IDENTIFIED BY [REDACTED]",
         },
         RedactTestCase {
+            description: "IDENTIFIED WITH a plugin BY a password, as ClickHouse writes it",
+            text: "CREATE USER orders IDENTIFIED WITH sha256_password BY 'orders-pass' HOST ANY",
+            expected_text: "CREATE USER orders IDENTIFIED WITH sha256_password BY [REDACTED] HOST ANY",
+        },
+        RedactTestCase {
             description: "near miss: prose about passwords and IDENTIFIED WITH keep their words",
             text: "password authentication failed for user \"orders\"; IDENTIFIED WITH caching_sha2_password",
             expected_text: "password authentication failed for user \"orders\"; IDENTIFIED WITH caching_sha2_password",
@@ -94,6 +99,11 @@ fn given_error_text_with_cut_uris_when_redacting_then_position_tells_a_port_from
             description: "a password cut at a closing quote",
             text: "dsn 'postgres://orders:orders-pass' rejected",
             expected_text: "dsn 'postgres://orders:[REDACTED]' rejected",
+        },
+        RedactTestCase {
+            description: "a cut password containing / is not a port",
+            text: "cut 'postgres://orders:pa/ss",
+            expected_text: "cut 'postgres://orders:[REDACTED]/ss",
         },
         RedactTestCase {
             description: "near miss: a port the authority ends after stays",

@@ -40,15 +40,15 @@ pub(crate) fn substituted(
     }
 }
 
-/// By position: a value the authority ends after (`/`, `?`, `#`) is a port; a cut-off value may be a password.
+/// A port is all digits and the authority ends after it (`/`, `?`, `#`); anything else may be a password.
 pub(crate) fn bare_userinfo_redacted(text: &str) -> String {
     match BARE_USERINFO.as_ref() {
         Ok(regex) => regex
             .replace_all(text, |found: &Captures<'_>| {
-                if found[3].is_empty() {
-                    format!("{}[REDACTED]", &found[1])
-                } else {
+                if !found[3].is_empty() && found[2].bytes().all(|byte| byte.is_ascii_digit()) {
                     found[0].to_owned()
+                } else {
+                    format!("{}[REDACTED]{}", &found[1], &found[3])
                 }
             })
             .into_owned(),

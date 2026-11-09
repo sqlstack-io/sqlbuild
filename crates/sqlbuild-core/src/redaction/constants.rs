@@ -30,10 +30,10 @@ pub(crate) const URI_CREDENTIAL_PATTERN: &str = concat!(
     r"(?i)\b([a-z][a-z0-9+.-]*://[^\s:/@]+:)([^\s]+?)",
     r#"(@[^\s@/?#,;'"]*)([\s/?#,;'"]|$)"#,
 );
-/// SQL that sets a password: `PASSWORD '…'` (quoted only, so prose such as "password authentication" stays) and `IDENTIFIED BY …`.
+/// SQL that sets a password: `PASSWORD '…'` (quoted only, so prose such as "password authentication" stays) and `IDENTIFIED [WITH plugin] BY …`.
 pub(crate) const DDL_PASSWORD_PATTERN: &str = concat!(
     r#"(?i)\b(password)(\s+)("[^"\r\n]{0,512}"|'[^'\r\n]{0,512}')|"#,
-    r#"\b(identified\s+by)(\s+)("[^"\r\n]{0,512}"|'[^'\r\n]{0,512}'|[^\s,;]{1,512})"#,
+    r#"\b(identified\s+(?:with\s+\w+\s+)?by)(\s+)("[^"\r\n]{0,512}"|'[^'\r\n]{0,512}'|[^\s,;]{1,512})"#,
 );
 pub(crate) const DDL_REPLACEMENT: &str = "${1}${2}${4}${5}[REDACTED]";
 pub(crate) const PAIR_REPLACEMENT: &str = "${1}${2}[REDACTED]";
