@@ -17,9 +17,10 @@ use crate::dsl_headers::models::HeaderSpan;
 use crate::lint_text::_helpers::sites::compiled;
 use crate::lint_text::constants::{
     DECLARATION_GROUP_DIRECTORY, DECLINED_WITHOUT_REASON, EXPRESSION_SELECT_PREFIX,
-    FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, GLOBAL_NAMED_ROOTS, GROUPED_NAMED_ROLES,
-    LINE_COMMENT_PREFIX, MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH, MOVED_OMITTED_SELECT,
-    OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN, STRING_QUOTES,
+    FIXTURE_HEADER_KINDS, FORMAT_API_VERSION, FUNCTION_HEADER_KIND, GLOBAL_NAMED_ROOTS,
+    GROUPED_NAMED_ROLES, LINE_COMMENT_PREFIX, MACRO_HEADER_KIND, MAX_FUNCTION_CALL_DEPTH,
+    MOVED_OMITTED_SELECT, OMITTED_CEREMONIAL_SELECT_SQL, OMITTED_SELECT_SUFFIX_PATTERN,
+    STRING_QUOTES,
 };
 use crate::lint_text::errors::LintTextError;
 use crate::lint_text::main::neutralize_interpolation::neutralize_interpolation;
@@ -120,6 +121,9 @@ pub(crate) fn prepare_file(
     let sql_macro: bool = headers
         .iter()
         .any(|header| header.kind == MACRO_HEADER_KIND);
+    let function: bool = headers
+        .iter()
+        .any(|header| header.kind == FUNCTION_HEADER_KIND);
     let syntax: LexicalSyntax = LexicalSyntax {
         line_comment_prefixes: vec![LINE_COMMENT_PREFIX.to_string()],
         ..LexicalSyntax::default()
@@ -133,13 +137,10 @@ pub(crate) fn prepare_file(
             .map_or(0, |index| index + 1);
         let mut core: String = body[..core_end].iter().collect();
         let mut trailing: String = body[core_end..].iter().collect();
-        let form: Option<MacroBodyForm> = sql_macro.then(|| macro_body_form(&core));
+        let form: Option<MacroBodyForm> = (sql_macro || function).then(|| macro_body_form(&core));
         let wraps_expression: bool = matches!(form, Some(MacroBodyForm::Expression));
-        let omitted: Option<usize> = if let Some(form) = &form {
-            match form {
-                MacroBodyForm::CteList => Some(core.chars().count()),
-                MacroBodyForm::ColumnList | MacroBodyForm::Expression => None,
-            }
+        let omitted: Option<usize> = if sql_macro {
+            matches!(form, Some(MacroBodyForm::CteList)).then(|| core.chars().count())
         } else if omits {
             match omitted_select_offset(&core, &syntax) {
                 OmittedSelect::At(offset) => Some(offset),
@@ -177,7 +178,7 @@ pub(crate) fn prepare_file(
     Ok(prepared)
 }
 
-/// How a SQL macro body starts, which decides how it is formatted.
+/// How a SQL macro or function body starts, which decides how it is formatted.
 enum MacroBodyForm {
     /// A `WITH` list, formatted with a final query added and removed again.
     CteList,
@@ -187,7 +188,7 @@ enum MacroBodyForm {
     Expression,
 }
 
-/// The form of a SQL macro body, read from its first word after comments.
+/// The form of a SQL macro or function body, read from its first word after comments.
 fn macro_body_form(body: &str) -> MacroBodyForm {
     let mut rest: &str = body;
     loop {

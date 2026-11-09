@@ -71,6 +71,8 @@ pub(crate) const OMITTED_SELECT_SUFFIX_PATTERN: &str = r"(?i)\s*\bSELECT\s+1\s*\
 pub(crate) const FIXTURE_HEADER_KINDS: [&str; 2] = ["TEST", "SCENARIO"];
 /// The header of a SQL macro file, whose body is an expression, a CTE list or a column list.
 pub(crate) const MACRO_HEADER_KIND: &str = "MACRO";
+/// The header of a SQL function file, whose body is an expression or, for a table function, a query.
+pub(crate) const FUNCTION_HEADER_KIND: &str = "FUNCTION";
 pub(crate) const LINE_COMMENT_PREFIX: &str = "--";
 pub(crate) const DECLINED_WITHOUT_REASON: &str = "native formatter declined without a reason";
 pub(crate) const MOVED_OMITTED_SELECT: &str =

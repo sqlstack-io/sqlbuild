@@ -11,12 +11,18 @@ from tests.e2e.src.sqlbuild.cli.commands.main.rules._test_types import (
     EvaluatedModelRulesCase,
     EvaluatedPredicateCase,
     GroupedRulesCase,
+    SnowflakeBodyShapeCase,
     UnevaluatedResourceCase,
     UnevaluatedRuleCase,
 )
 from tests.e2e.src.sqlbuild.cli.commands.main.rules.helpers import (
     run_unevaluated_rules_cli,
     write_unevaluated_rules_project,
+)
+from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import prepare_inline_project, run_sqb
+
+_SNOWFLAKE_RULES_PROJECT: str = (
+    'name = "shop"\nadapter = "snowflake"\n\n[rules]\nselect = ["SQLCLEAN001"]\n'
 )
 
 
@@ -288,6 +294,69 @@ def test_given_one_failed_resource_and_multiple_rules_when_running_cli_then_grou
         assert finding["message"].startswith(
             f"{len(test_case.expected_rules)} selected Rules could not evaluate this resource:"
         )
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        SnowflakeBodyShapeCase(
+            "scalar function expression body",
+            (
+                (
+                    "functions/sql/next_quantity.sql",
+                    "FUNCTION (\n  description 'Next order quantity.',\n"
+                    "  arguments (quantity INTEGER),\n  returns INTEGER,\n"
+                    "  database warehouse,\n  schema analytics,\n);\n\nquantity + 1\n",
+                ),
+                (
+                    "models/orders.sql",
+                    "MODEL (description 'Orders.', database warehouse, schema analytics);\n\n"
+                    'SELECT __udf("next_quantity")(2) AS quantity\n',
+                ),
+            ),
+        ),
+        SnowflakeBodyShapeCase(
+            "quoted hook argument where a string is required",
+            (
+                (
+                    "hooks/sql/comment_on_relation.sql",
+                    "HOOK (description 'Comment on a relation.');\n\n"
+                    "COMMENT ON TABLE @relation IS @'comment'\n",
+                ),
+                (
+                    "models/orders.sql",
+                    "MODEL (\n  description 'Orders.',\n  database warehouse,\n  schema analytics,\n"
+                    "  post_hooks [\n"
+                    '    sql("comment_on_relation", relation: "@@CTX:destination.qualified", '
+                    'comment: "Order facts"),\n  ],\n);\n\nSELECT 1 AS order_id\n',
+                ),
+            ),
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_snowflake_body_shape_when_compiling_and_formatting_then_rules_and_format_read_it(
+    test_case: SnowflakeBodyShapeCase,
+    tmp_path: Path,
+) -> None:
+    project_dir: Path = prepare_inline_project(
+        tmp_path=tmp_path,
+        project_name="shop",
+        repo_files={"sqlbuild_project.toml": _SNOWFLAKE_RULES_PROJECT, **dict(test_case.files)},
+    )
+
+    compiled: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("--no-color", "compile", "--no-cache")
+    )
+    formatted: subprocess.CompletedProcess[str] = run_sqb(
+        project_dir=project_dir, command=("--no-color", "format", "--check")
+    )
+
+    assert compiled.returncode == test_case.expected_compile_exit, compiled.stdout + compiled.stderr
+    assert "rules-unevaluated" not in compiled.stdout + compiled.stderr
+    assert formatted.returncode == test_case.expected_format_exit, (
+        formatted.stdout + formatted.stderr
+    )
 
 
 if __name__ == "__main__":
