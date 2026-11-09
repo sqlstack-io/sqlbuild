@@ -1,7 +1,7 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { untrack } from 'svelte';
-import { channelMatches, type RunRow, type RunTabCounts } from '$lib/api';
+import { channelMatches, isRefusal, type RunRow, type RunTabCounts } from '$lib/api';
 import { app } from '$lib/state/app.svelte';
 import type { BulkAction, DisplayRow, Freshness, ListParams } from './types';
 import { eligibleIds, readParams, toQuery, writeParams } from './utils';
@@ -71,7 +71,15 @@ export function createRunsState() {
 			updatedAt = Date.now();
 			if (mode === 'reset') remembered.set(memoryKey(scope.locationId), { rows: result.rows, nextCursor, counts });
 		} catch (e) {
-			if (id === request) error = message(e);
+			if (id !== request) return;
+			error = message(e);
+			// A refusal also drops the earlier rows, so a person whose access went sees the refusal, not old data.
+			if (isRefusal(e)) {
+				remembered.delete(memoryKey(scope.locationId));
+				rows = [];
+				nextCursor = null;
+				counts = null;
+			}
 		} finally {
 			if (id === request) {
 				loading = false;
