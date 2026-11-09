@@ -43,7 +43,7 @@
 			</div>
 			<div class="meta">
 				{#if run.startedAt}
-					<span title={formatStamp(run.startedAt)}>Started {formatAgo(run.startedAt, app.now)}</span>
+					<span title={formatStamp(run.startedAt)}>Started {formatStamp(run.startedAt)} <span class="faint">({formatAgo(run.startedAt, app.now)})</span></span>
 					<span>·</span>
 					<span class:live={view.active}>{view.active ? 'running for ' : 'took '}{formatDuration(run.startedAt, run.endedAt, app.now)}</span>
 				{:else}
@@ -57,8 +57,17 @@
 						{view.progress.done}/{view.progress.total} nodes
 					</span>
 				{/if}
+				{#if view.detail?.provenance}
+					{@const p = view.detail.provenance}
+					<span>·</span>
+					<a href="/changes" title="Project version {p.snapshotGeneration}, commit {p.gitRevision}{p.gitDirty ? ' with uncommitted changes' : ''}">version {p.snapshotGeneration}</a>
+				{/if}
 				<button class="details-btn" onclick={() => view.toggleDetails()} aria-expanded={view.showDetails} title="Version, command, image, worker and other technical details">{view.showDetails ? 'Hide details' : 'Details'}</button>
 			</div>
+			{#if view.detail?.provenance?.command}
+				{@const command = view.detail.provenance.command}
+				<div class="command"><span class="faint">$</span> <code>{command}</code> <CopyButton value={command} label="Copy command" /></div>
+			{/if}
 		{:else if view.detailRes.error}
 			<p class="err">Couldn't load this run: {view.detailRes.error}</p>
 		{:else if view.detailRes.data === null}
@@ -88,6 +97,19 @@
 {#if view.actionError}<div class="action-error" role="alert">{view.actionError}</div>{/if}
 
 <style>
+	.command {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 6px;
+		color: var(--muted-foreground);
+		font-size: 12px;
+	}
+	.command code {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.head {
 		display: flex;
 		align-items: flex-start;

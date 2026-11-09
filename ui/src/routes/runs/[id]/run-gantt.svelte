@@ -76,11 +76,14 @@
 		gutterW = Math.min(GUTTER_MAX, Math.max(GUTTER_MIN, e.clientX - ganttEl.getBoundingClientRect().left));
 	}
 
+	// Rows run in start order, so the bars read as a cascade; nodes that never started go last.
+	const ordered = $derived([...nodes].sort((a, b) => (a.startedAt ?? '\uffff').localeCompare(b.startedAt ?? '\uffff')));
+
 	type Row = { type: 'group'; group: GanttGroup; count: number } | { type: 'node'; node: RunNode };
 	const rows = $derived.by((): Row[] => {
-		if (groups.length < 2) return nodes.map((node) => ({ type: 'node', node }));
+		if (groups.length < 2) return ordered.map((node) => ({ type: 'node', node }));
 		return groups.flatMap((group): Row[] => {
-			const own = nodes.filter((n) => n.runId === group.runId);
+			const own = ordered.filter((n) => n.runId === group.runId);
 			return [{ type: 'group', group, count: own.length }, ...own.map((node): Row => ({ type: 'node', node }))];
 		});
 	});
