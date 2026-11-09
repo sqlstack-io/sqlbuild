@@ -18,10 +18,12 @@ import time
 import zipfile
 from bisect import bisect_left
 from collections.abc import Callable, Iterator
+from concurrent.futures import ProcessPoolExecutor
 from contextlib import contextmanager, redirect_stdout
 from dataclasses import replace
 from functools import partial
 from io import StringIO
+from multiprocessing import get_context
 from pathlib import Path
 from types import FrameType, ModuleType
 from typing import Any, NamedTuple, cast
@@ -41,6 +43,7 @@ from scripts.cold_compile_performance.main.read_compile_measurement import read_
 from scripts.cold_compile_performance.main.semantic_compile_fingerprint import (
     semantic_compile_fingerprint,
 )
+from scripts.compile_performance_ratio._helpers.report import cpu_model
 from scripts.compiler_differential.constants import FAILURE_BASE_FILES
 from scripts.delta_compile_series.models import DeltaCompileOutcome
 from sqlbuild._native import COMPILE_REUSE_DISABLE_ENV_VAR as REUSE_DISABLE_ENV_VAR
@@ -931,49 +934,71 @@ def prepare_small_inspection_project(*, project_dir: Path, model_count: int) -> 
     )
 
 
+# Each repeated edit writes a value the cache has not seen, so every edit recompiles the edited
+# model; the last writes the value the expected edit fingerprint and the oracle describe.
+_DENSE_EDIT_AMOUNTS: tuple[str, ...] = ("1001", "1002", "1000")
+_DENSE_WARM_RUNS: int = 3
+
+
+class DenseWarmEditMeasurements(NamedTuple):
+    """Cached cold, repeated warm and one-model edit compiles, and a from-scratch oracle."""
+
+    cold: FreshProcessCompileBenchmarkResult
+    warm: tuple[FreshProcessCompileBenchmarkResult, ...]
+    edit: tuple[FreshProcessCompileBenchmarkResult, ...]
+    oracle: FreshProcessCompileBenchmarkResult
+
+
 def run_dense_warm_edit_benchmark(
     *,
     project_dir: Path,
     edited_model_path: Path,
     expected_warm_max_seconds: float,
     expected_edit_max_seconds: float,
-) -> dict[str, FreshProcessCompileBenchmarkResult]:
-    """Measure cached cold, warm, and one-model edit plus a from-scratch oracle of the edit."""
+) -> DenseWarmEditMeasurements:
+    """Measure cached cold, three warm and three one-model edit compiles, then the edit's oracle."""
 
-    measurements: dict[str, FreshProcessCompileBenchmarkResult] = {
-        "cold": _run_fresh_process_compile_benchmark(
-            project_dir=project_dir,
-            label="dense-cold",
-            expected_max_wall_seconds=4 * expected_warm_max_seconds,
-            compile_args=(),
-        ),
-        "warm": _run_fresh_process_compile_benchmark(
-            project_dir=project_dir,
-            label="dense-warm",
-            expected_max_wall_seconds=expected_warm_max_seconds,
-            compile_args=(),
-        ),
-    }
-    _replace_benchmark_text(
-        path=edited_model_path,
-        old="COALESCE(b.amount, 0) + CAST(b.id AS DOUBLE)",
-        new="COALESCE(b.amount, 1000) + CAST(b.id AS DOUBLE)",
-    )
-    measurements["edit"] = _run_fresh_process_compile_benchmark(
+    cold: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=project_dir,
-        label="dense-edit",
-        expected_max_wall_seconds=expected_edit_max_seconds,
+        label="dense-cold",
+        expected_max_wall_seconds=4 * expected_warm_max_seconds,
         compile_args=(),
     )
+    warm: tuple[FreshProcessCompileBenchmarkResult, ...] = tuple(
+        _run_fresh_process_compile_benchmark(
+            project_dir=project_dir,
+            label=f"dense-warm-{run}",
+            expected_max_wall_seconds=expected_warm_max_seconds,
+            compile_args=(),
+        )
+        for run in range(_DENSE_WARM_RUNS)
+    )
+    edits: list[FreshProcessCompileBenchmarkResult] = []
+    previous: str = "0"
+    for amount in _DENSE_EDIT_AMOUNTS:
+        _replace_benchmark_text(
+            path=edited_model_path,
+            old=f"COALESCE(b.amount, {previous}) + CAST(b.id AS DOUBLE)",
+            new=f"COALESCE(b.amount, {amount}) + CAST(b.id AS DOUBLE)",
+        )
+        edits.append(
+            _run_fresh_process_compile_benchmark(
+                project_dir=project_dir,
+                label=f"dense-edit-{len(edits)}",
+                expected_max_wall_seconds=expected_edit_max_seconds,
+                compile_args=(),
+            )
+        )
+        previous = amount
     oracle_dir: Path = project_dir.with_name(f"{project_dir.name}_oracle")
     _ = shutil.copytree(project_dir, oracle_dir, ignore=shutil.ignore_patterns("target"))
-    measurements["oracle"] = _run_fresh_process_compile_benchmark(
+    oracle: FreshProcessCompileBenchmarkResult = _run_fresh_process_compile_benchmark(
         project_dir=oracle_dir,
         label="dense-oracle",
         expected_max_wall_seconds=4 * expected_edit_max_seconds,
         compile_args=("--no-cache",),
     )
-    return measurements
+    return DenseWarmEditMeasurements(cold=cold, warm=warm, edit=tuple(edits), oracle=oracle)
 
 
 class DeltaEditLoopMeasurements(NamedTuple):
@@ -1104,6 +1129,79 @@ def median_cpu_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...]) 
     """The median CPU seconds of same-runner compiles."""
 
     return statistics.median(result.cpu_seconds for result in results)
+
+
+def median_wall_seconds(results: tuple[FreshProcessCompileBenchmarkResult, ...]) -> float:
+    """The median wall seconds of same-runner compiles."""
+
+    return statistics.median(result.elapsed_seconds for result in results)
+
+
+# The slowest fastest-repetition seen on the hosted runner classes the dense budgets fit as they
+# are. A measurably slower runner scales the budgets by its own fastest repetition over this; a
+# faster one keeps them unchanged.
+_RUNNER_CALIBRATION_REFERENCE_SECONDS: float = 0.55
+_RUNNER_CALIBRATION_CHECKSUM: int = 2910182
+_RUNNER_CALIBRATION_REPETITIONS: int = 7
+_RUNNER_CALIBRATION_VALUES: int = 600_000
+
+
+class RunnerCalibration(NamedTuple):
+    """How much slower this runner is than the budgets' reference runner, from fixed work."""
+
+    cpu_model: str
+    seconds: tuple[float, ...]
+    factor: float
+
+
+def _runner_calibration_workload() -> int:
+    """Generate, count, sort and format pseudo-random integers; return a checksum of the work."""
+
+    state: int = 1
+    values: list[int] = []
+    for _ in range(_RUNNER_CALIBRATION_VALUES):
+        state = (state * 6364136223846793005 + 1442695040888963407) % 2**64
+        values.append(state >> 33)
+    counts: dict[int, int] = {}
+    for value in values:
+        counts[value & 0xFFFF] = counts.get(value & 0xFFFF, 0) + 1
+    values.sort()
+    rows: list[tuple[int, str]] = [(value, str(value)) for value in values[::2]]
+    return sum(len(text) for _, text in rows) + len(counts)
+
+
+def _time_runner_calibration() -> tuple[tuple[float, ...], int]:
+    """Each repetition's seconds and the workload checksum, which pins the work done."""
+
+    seconds: list[float] = []
+    checksum: int = 0
+    for _ in range(_RUNNER_CALIBRATION_REPETITIONS):
+        started: float = time.perf_counter()
+        checksum = _runner_calibration_workload()
+        seconds.append(time.perf_counter() - started)
+    return tuple(seconds), checksum
+
+
+def measure_runner_calibration() -> RunnerCalibration:
+    """Time the fixed calibration workload in a fresh interpreter and derive the budget factor."""
+
+    # A fresh interpreter keeps the test process's heap and collector out of the timing.
+    with ProcessPoolExecutor(max_workers=1, mp_context=get_context("spawn")) as pool:
+        seconds, checksum = pool.submit(_time_runner_calibration).result(timeout=120)
+    assert checksum == _RUNNER_CALIBRATION_CHECKSUM
+    # The fastest repetition measures the machine; a busy moment only ever adds time to it.
+    calibration: RunnerCalibration = RunnerCalibration(
+        cpu_model=cpu_model(),
+        seconds=seconds,
+        factor=max(1.0, min(seconds) / _RUNNER_CALIBRATION_REFERENCE_SECONDS),
+    )
+    print(
+        f"runner calibration cpu={calibration.cpu_model!r} "
+        f"runs={[round(run, 3) for run in seconds]} fastest={min(seconds):.3f}s "
+        f"reference={_RUNNER_CALIBRATION_REFERENCE_SECONDS:.3f}s factor={calibration.factor:.3f}",
+        flush=True,
+    )
+    return calibration
 
 
 def _append_benchmark_edit(path: Path, label: str) -> None:
