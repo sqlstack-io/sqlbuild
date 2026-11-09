@@ -119,7 +119,7 @@ def test_given_raw_query_when_normalizing_then_returns_expected_text(
             "SQL Server bracket identifiers",
             "sqlserver",
             "SELECT TOP 10 [o].[id], N'order' AS kind FROM [dbo].[orders] AS o",
-            "f1525ee25924f9402677bc2cbd96f7066745948da73671d13fac2b8da03cbf0c",
+            "f4fac3edb7682bbeddf4f73cc199493d45f1419bc8e2cd1d972fead2d67e6b71",
         ),
     ],
     ids=lambda case: case.description,
