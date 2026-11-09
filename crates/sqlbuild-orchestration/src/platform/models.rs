@@ -351,3 +351,29 @@ pub(crate) struct ProblemScan {
     pub(crate) broken: Vec<BrokenLocation>,
     pub(crate) late_targets: std::collections::BTreeSet<(Uuid, String)>,
 }
+
+/// Where the control store keeps its data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum StorageKind {
+    Sqlite,
+    Postgresql,
+}
+
+/// The control store's installation and schema, as recorded when it was created.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct InstallationRecord {
+    pub storage: StorageKind,
+    pub installed_at: DateTime<Utc>,
+    /// Digest of the schema; a server starts only on the exact schema it creates.
+    pub schema_checksum: String,
+    pub schema_applied_at: DateTime<Utc>,
+}
+
+/// The stored installation and schema rows.
+#[derive(Debug, Deserialize)]
+pub(crate) struct StoredInstallation {
+    pub(crate) installed_at: DateTime<Utc>,
+    pub(crate) schema_checksum: String,
+    pub(crate) schema_applied_at: DateTime<Utc>,
+}

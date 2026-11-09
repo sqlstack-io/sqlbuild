@@ -6,6 +6,7 @@ pub(crate) mod enqueue_location_work;
 pub mod list_person_platform_events;
 pub mod location_health;
 pub mod location_work;
+pub mod read_installation;
 pub(crate) mod read_location_work;
 pub mod read_person_connection_test;
 pub mod read_person_location_health;

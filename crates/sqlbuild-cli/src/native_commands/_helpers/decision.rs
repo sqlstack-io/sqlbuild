@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
-use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin};
+use sqlbuild_orchestration::api::models::{ApiAuthentication, HumanLogin, ServerFacts};
 use sqlbuild_orchestration::credentials::models::{AuditRetention, CredentialScope};
 use sqlbuild_orchestration::declarations::models::TriggerChange;
 use sqlbuild_orchestration::platform::models::{LocationWork, LocationWorkRequest};
@@ -263,16 +263,11 @@ pub(crate) fn control_address(
     Ok(Some(SocketAddr::new(host, port)))
 }
 
-/// API settings are validated together before any store is opened.
+/// API settings are validated together before any store is opened; `standalone` always runs the scheduler.
 pub(crate) fn control_api_settings(
     namespace: &Namespace,
-) -> Result<
-    (
-        ApiAuthentication,
-        (StatisticsRetention, AuditRetention, SnapshotRetention),
-    ),
-    ControlError,
-> {
+    standalone: bool,
+) -> Result<(ApiAuthentication, ServerFacts), ControlError> {
     let statistics = match retention_setting(namespace, "statistics-retention-days")? {
         Some(days) => StatisticsRetention::days(days)?,
         None => StatisticsRetention::default(),
@@ -287,7 +282,13 @@ pub(crate) fn control_api_settings(
     };
     Ok((
         control_authentication(namespace)?,
-        (statistics, audit, snapshots),
+        ServerFacts {
+            version: env!("CARGO_PKG_VERSION").into(),
+            scheduler: standalone || !flag(namespace, "control_no_scheduler"),
+            audit,
+            statistics,
+            snapshots,
+        },
     ))
 }
 

@@ -903,9 +903,9 @@ export class MockPlatformApi implements PlatformApi {
 		return this.#ctx.reply({
 			serverVersion: this.#ctx.serverVersion,
 			storage: 'postgresql',
-			schemaVersion: 14,
-			latestSchemaVersion: 14,
-			schemaMigratedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
+			installedAt: new Date(this.#ctx.now - 120 * DAY).toISOString(),
+			schemaChecksum: '6f1c2a9e4b7d0c3f8a5e2b1d9c4f7a0e3b6d8c1f5a2e9b4d7c0f3a6e1b8d5c2f',
+			schemaAppliedAt: new Date(this.#ctx.now - 5 * DAY).toISOString(),
 			authMode: 'oidc',
 			schedulerEnabled: true,
 			retention: [

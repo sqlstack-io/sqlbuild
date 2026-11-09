@@ -526,10 +526,12 @@ export type RetentionSetting = { name: string; value: string; description: strin
 export type ServerSettings = {
 	serverVersion: string;
 	storage: 'postgresql' | 'sqlite';
-	schemaVersion: number;
-	latestSchemaVersion: number;
-	schemaMigratedAt: Iso;
+	installedAt: Iso;
+	/** A server starts only on the exact schema it creates, so a running server's schema is always current. */
+	schemaChecksum: string;
+	schemaAppliedAt: Iso;
 	authMode: AuthMode;
+	/** Whether this server runs the scheduler; another server may hold the lease. */
 	schedulerEnabled: boolean;
 	retention: RetentionSetting[];
 };

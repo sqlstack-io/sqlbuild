@@ -8,7 +8,7 @@ import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toMicrobatchCoverag
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { manualConnectionTest, toLocationDetail, toLocationSummary, toWarehouseConnection, warehouseSyncOf } from './http-locations';
-import { toAccount, toRoleAssignments } from './http-people';
+import { toAccount, toRoleAssignments, toServerSettings } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
 import { toPlatformEventRecords, toPlatformEvents, toPlatformHealth } from './http-problems';
@@ -18,7 +18,7 @@ import { timelineOf } from './http-timeline';
 import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, queueEntriesOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, NavCounts, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, ServerSettings, WarehouseConnection, LocationSummary, PlatformEventQuery, PlatformEventRecord, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, QueueEntry, Timeline, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -82,6 +82,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'maintenanceHistory',
 	'testConnection',
 	'listWarehouseConnections',
+	'serverSettings',
 	'listSnapshotNodes',
 	'checkAdhocRun',
 	'launchAdhocRun',
@@ -631,6 +632,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			return toLocationDetail(location, health.data, snapshot, Date.now());
 		},
 		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
+		async serverSettings(): Promise<ServerSettings> {
+			const { data, error, response } = await http.GET('/api/admin/server');
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toServerSettings(data);
+		},
 		listRoles: async (locationId: string): Promise<RoleDefinition[]> => (await roleOverviews(locationId)).map(toRoleDefinition),
 		async getRole(locationId: string, name: string): Promise<RoleDetail | null> {
 			const [roles, assignments] = await Promise.all([roleOverviews(locationId), implemented.listRoleAssignments()]);

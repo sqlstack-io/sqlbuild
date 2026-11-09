@@ -10,7 +10,9 @@
 	import { app } from '$lib/state/app.svelte';
 	import { createResource } from '$lib/state/resource.svelte';
 
-	const settings = createResource((client) => client.serverSettings());
+	// Server facts are for administrators; others aren't asked, since each refusal is audited.
+	const admin = $derived(app.can('user.manage'));
+	const settings = createResource((client) => (admin ? client.serverSettings() : Promise.resolve(null)));
 	const s = $derived(settings.data ?? null);
 
 	const authLabel: Record<AuthMode, string> = {
@@ -24,8 +26,8 @@
 <AppTopbar title="Settings" />
 
 <div class="min-h-0 flex-1 overflow-auto px-6 pt-5">
-	<div class="columns">
-		<div>
+	<div class="columns" class:single={!admin}>
+		{#if admin}<div>
 			<Panel title="Server" note="Read-only; set in the server config and at start-up">
 				{#if settings.error}
 					<p class="err">Couldn't load: {settings.error}</p>
@@ -34,16 +36,12 @@
 						rows={[
 							{ label: 'Version', value: s.serverVersion },
 							{ label: 'Storage', value: s.storage === 'postgresql' ? 'PostgreSQL' : 'SQLite' },
-							{
-								label: 'Database',
-								value: s.schemaVersion === s.latestSchemaVersion ? `Up to date (schema ${s.schemaVersion}), updated ${formatAgo(s.schemaMigratedAt, app.now)}` : `Needs upgrading: schema ${s.schemaVersion} of ${s.latestSchemaVersion}`,
-								title: formatStamp(s.schemaMigratedAt),
-								tone: s.schemaVersion === s.latestSchemaVersion ? undefined : 'var(--sb-warning)'
-							},
+							{ label: 'Installed', value: formatAgo(s.installedAt, app.now), title: formatStamp(s.installedAt) },
+							{ label: 'Schema', value: `${s.schemaChecksum.slice(0, 12)} · set up ${formatAgo(s.schemaAppliedAt, app.now)}`, title: `${s.schemaChecksum}\n${formatStamp(s.schemaAppliedAt)}`, mono: true },
 							{ label: 'Authentication', value: authLabel[s.authMode] },
 							{
 								label: 'Scheduler',
-								value: s.schedulerEnabled ? 'Runs on this server' : 'Not on this server (started with --no-scheduler)',
+								value: s.schedulerEnabled ? 'Runs on this server' : 'Runs elsewhere (this server started with --no-scheduler)',
 								tone: s.schedulerEnabled ? undefined : 'var(--sb-warning)'
 							}
 						]}
@@ -68,7 +66,7 @@
 					</tbody>
 				</table>
 			</Panel>
-		</div>
+		</div>{/if}
 
 		<div>
 			<Panel title="Your access" note="What your roles allow; the server checks every action">
@@ -76,8 +74,8 @@
 					<KeyValues
 						rows={[
 							{ label: 'Signed in as', value: `${app.user.displayName} (${app.user.name})` },
-							{ label: 'Role', value: app.user.role }
-						]}
+							app.user.role && { label: 'Role', value: app.user.role }
+						].filter((row) => !!row)}
 					/>
 					<table class="caps">
 						<tbody>
@@ -95,9 +93,11 @@
 					<p class="cli">On the command line, sign in with <code>sqb login</code>: it opens this browser and keeps a short-lived session, so you don't need an API token.</p>
 				{/if}
 			</Panel>
-			<Panel title="Why can or can't I?" note="Paste a denial ID from an error, or pick an action">
-				<AccessChecker sampleDecision="dec-5r2w9j" />
-			</Panel>
+			{#if app.client.supports('explainAccess')}
+				<Panel title="Why can or can't I?" note="Paste a denial ID from an error, or pick an action">
+					<AccessChecker sampleDecision="dec-5r2w9j" />
+				</Panel>
+			{/if}
 		</div>
 	</div>
 </div>
@@ -117,6 +117,9 @@
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 0 40px;
 		max-width: 1280px;
+	}
+	.columns.single {
+		grid-template-columns: minmax(0, 640px);
 	}
 	.err {
 		color: var(--sb-error);

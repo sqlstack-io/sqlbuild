@@ -8,23 +8,18 @@ use crate::api::_helpers::resources::server_errors::generic_server_errors;
 use crate::api::_helpers::resources::ui_assets::{UI_ASSETS, serve_ui};
 use crate::api::_helpers::resources::{changes, router::router};
 use crate::api::main::openapi_document::openapi_document;
-use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole};
+use crate::api::models::{ApiAuthentication, ChangeFeed, DevelopmentScope, GroupRole, ServerFacts};
 use crate::authorization::main::publish_group_roles::publish_group_roles;
 use crate::runs::types::RunHandoff;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
 use crate::store::main::subscribe_changes::subscribe_changes;
 use crate::store::models::ControlStore;
-use crate::warehouse_metadata::models::StatisticsRetention;
 
 pub async fn serve_api(
     store: ControlStore,
     listener: tokio::net::TcpListener,
-    (authentication, (images, planner), retention): (
-        ApiAuthentication,
-        RunHandoff,
-        StatisticsRetention,
-    ),
+    (authentication, (images, planner), facts): (ApiAuthentication, RunHandoff, ServerFacts),
     (ready, shutdown): (
         impl FnOnce() + Send + 'static,
         impl Future<Output = ()> + Send + 'static,
@@ -44,7 +39,8 @@ pub async fn serve_api(
         .merge(authentication_routes.layer(Extension(feed)))
         .layer(Extension(std::sync::Arc::new(images)))
         .layer(Extension(planner))
-        .layer(Extension(retention))
+        .layer(Extension(facts.statistics))
+        .layer(Extension(facts))
         .route(
             "/api/openapi.json",
             get(|| async { Json(openapi_document()) }),

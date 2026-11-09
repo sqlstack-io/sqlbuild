@@ -64,6 +64,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readServerSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/cli/approve": {
         parameters: {
             query?: never;
@@ -1597,6 +1613,16 @@ export interface components {
             failed: components["schemas"]["Table"][];
             failure?: string | null;
         };
+        /** @description The control store's installation and schema, as recorded when it was created. */
+        InstallationRecord: {
+            /** Format: date-time */
+            installed_at: string;
+            /** Format: date-time */
+            schema_applied_at: string;
+            /** @description Digest of the schema; a server starts only on the exact schema it creates. */
+            schema_checksum: string;
+            storage: components["schemas"]["StorageKind"];
+        };
         /** @description One job or group as declared, for a person who may list the target; free-form setting values are withheld. */
         JobDetailRecord: {
             concurrency_groups: string[];
@@ -2724,6 +2750,35 @@ export interface components {
             minimum_interval_seconds: number;
             when: components["schemas"]["SensorCondition"];
         };
+        /** @description How long the server keeps each kind of record. */
+        ServerRetention: {
+            /** Format: int64 */
+            audit_days: number;
+            /** Format: int64 */
+            heartbeat_days: number;
+            /** Format: int64 */
+            location_health_days: number;
+            /** Format: int64 */
+            platform_alert_days: number;
+            /** Format: int64 */
+            sensor_evaluation_days: number;
+            /**
+             * Format: int64
+             * @description Publications kept per location target.
+             */
+            snapshots_kept: number;
+            /** Format: int64 */
+            statistics_days: number;
+        };
+        /** @description The server's version, storage, sign-in and retention, for administrators. */
+        ServerSettings: {
+            installation: components["schemas"]["InstallationRecord"];
+            login_mode: components["schemas"]["LoginMode"];
+            retention: components["schemas"]["ServerRetention"];
+            /** @description Whether this server runs the scheduler; another server may hold the lease. */
+            scheduler: boolean;
+            version: string;
+        };
         SessionIdentity: {
             /** Format: date-time */
             expires_at: string;
@@ -2817,6 +2872,11 @@ export interface components {
             /** Format: uuid */
             next_after?: string | null;
         };
+        /**
+         * @description Where the control store keeps its data.
+         * @enum {string}
+         */
+        StorageKind: "sqlite" | "postgresql";
         /**
          * @description The tables Recall writes.
          * @enum {string}
@@ -3181,6 +3241,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readServerSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSettings"];
                 };
             };
             /** @description Session rejected */

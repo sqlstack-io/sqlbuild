@@ -17,6 +17,7 @@ use crate::api::_helpers::resources::{
     administrators::people,
     administrators::holdings,
     administrators::definitions,
+    administrators::server,
     audit::read,
     person_operations::request_job,
     person_operations::request_adhoc,
@@ -499,4 +500,39 @@ pub(crate) struct BoundedReader<R> {
     pub(crate) inner: R,
     pub(crate) remaining: usize,
     pub(crate) exceeded: bool,
+}
+
+/// What the server was started with, reported by the settings read.
+#[derive(Clone, Debug, Default)]
+pub struct ServerFacts {
+    pub version: String,
+    /// Whether this process runs the scheduler loop.
+    pub scheduler: bool,
+    pub audit: crate::credentials::models::AuditRetention,
+    pub statistics: crate::warehouse_metadata::models::StatisticsRetention,
+    pub snapshots: crate::snapshots::models::SnapshotRetention,
+}
+
+/// The server's version, storage, sign-in and retention, for administrators.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+pub struct ServerSettings {
+    pub version: String,
+    pub login_mode: LoginMode,
+    /// Whether this server runs the scheduler; another server may hold the lease.
+    pub scheduler: bool,
+    pub installation: crate::platform::models::InstallationRecord,
+    pub retention: ServerRetention,
+}
+
+/// How long the server keeps each kind of record.
+#[derive(Clone, Debug, Serialize, utoipa::ToSchema)]
+pub struct ServerRetention {
+    pub audit_days: i64,
+    pub statistics_days: i64,
+    /// Publications kept per location target.
+    pub snapshots_kept: i64,
+    pub platform_alert_days: i64,
+    pub heartbeat_days: i64,
+    pub location_health_days: i64,
+    pub sensor_evaluation_days: i64,
 }
