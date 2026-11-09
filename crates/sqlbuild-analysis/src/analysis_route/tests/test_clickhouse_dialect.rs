@@ -209,11 +209,12 @@ fn given_clickhouse_model_sql_when_probing_the_native_parser_then_only_unreadabl
 }
 
 #[test]
-fn given_a_clickhouse_type_when_normalising_then_it_is_polyglots_type_family_included() {
+fn given_a_clickhouse_type_when_normalising_then_it_matches_the_shared_type_normaliser() {
     let test_cases = [TypeSpellingsTestCase {
         description: "every corpus spelling and its case, nesting and width variants",
         spellings: CLICKHOUSE_SPELLINGS,
-        expected_mismatches: &[],
+        // ClickHouse refuses both types; the shared normaliser keeps their text with a parse error.
+        expected_mismatches: &["BINARY", "Nullable(Nullable(INT))"],
     }];
     for test_case in test_cases {
         let mismatches: Vec<&str> = test_case
@@ -221,10 +222,10 @@ fn given_a_clickhouse_type_when_normalising_then_it_is_polyglots_type_family_inc
             .iter()
             .copied()
             .filter(|spelling| {
-                let polyglot = normalize_type(spelling, CLICKHOUSE_DIALECT)
+                let shared = normalize_type(spelling, CLICKHOUSE_DIALECT)
                     .ok()
                     .map(|typed| typed.normalized);
-                ClickHouseDialect.normalize_type(spelling) != polyglot
+                ClickHouseDialect.normalize_type(spelling) != shared
             })
             .collect();
         assert_eq!(

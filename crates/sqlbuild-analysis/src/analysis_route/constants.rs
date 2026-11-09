@@ -281,14 +281,15 @@ pub(crate) const SQLITE_TYPE_SPELLING: TypeSpelling = TypeSpelling {
     verbatim: &[],
     arrays: false,
 };
-/// Polyglot's ClickHouse respelling of each SQL type alias (`{}` keeps the arguments) and family.
+/// Polyglot's ClickHouse respelling of each SQL type alias (`{}` keeps the arguments) and family;
+/// BINARY(n) is the engine's FixedString(n), as the shared type normaliser spells it.
 pub(crate) const CLICKHOUSE_TYPE_ALIASES: &[(&str, &str, Option<TypeFamily>)] = &[
     ("BOOLEAN", "Bool", None),
     ("CHAR", "String", None),
     ("TEXT", "String", None),
     ("VARCHAR", "String", None),
     ("NUMERIC", "Decimal{}", None),
-    ("BINARY", "Nullable(BINARY{})", None),
+    ("BINARY", "FixedString{}", None),
     ("TINYINT", "Nullable(Int8)", Some(TypeFamily::Integer)),
     ("SMALLINT", "Nullable(Int16)", Some(TypeFamily::Integer)),
     ("INT", "Nullable(Int32)", Some(TypeFamily::Integer)),
