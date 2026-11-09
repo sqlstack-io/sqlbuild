@@ -163,7 +163,10 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
     fn plan(
         &self,
         command: &[String],
-        resources: &[crate::runs::models::PlannerResource],
+        (resources, _jobs): (
+            &[crate::runs::models::PlannerResource],
+            &crate::runs::types::PublishedJobs,
+        ),
     ) -> Result<crate::runs::models::CommandPlan, String> {
         let mut plan = crate::runs::models::CommandPlan {
             verb: command.first().cloned().unwrap_or_default(),
