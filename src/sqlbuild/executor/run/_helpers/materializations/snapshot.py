@@ -56,6 +56,7 @@ from sqlbuild.executor.run._helpers.materializations.full_refresh import (
     relation_exists,
     resolve_full_refresh_relations,
 )
+from sqlbuild.executor.run._helpers.materializations.incremental import untyped_side
 from sqlbuild.executor.run._helpers.reuse.fingerprinting import try_write_fingerprint
 from sqlbuild.executor.run._helpers.validation.configured_columns import require_quoted_spelling
 from sqlbuild.executor.run._helpers.validation.contracts import validate_runtime_contract
@@ -1004,6 +1005,9 @@ def _apply_snapshot_schema_change(
         column.name
         for column in delta_columns
         if column.name.lower() in target_map
+        and not untyped_side(
+            adapter=adapter, types=(target_map[column.name.lower()].type, column.type)
+        )
         and not _snapshot_types_compatible(
             target_type=target_map[column.name.lower()].type,
             delta_type=column.type,
