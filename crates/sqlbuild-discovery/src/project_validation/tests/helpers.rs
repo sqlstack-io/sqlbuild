@@ -101,13 +101,13 @@ pub(super) fn declared(name: &str, kind: &'static str) -> OrchestrationNameFact 
 }
 
 /// A global unique-name conflict that `message` begins.
-pub(super) fn collision(message: &str) -> Result<(), String> {
+pub(super) fn collision(message: &str, advice: &str) -> Result<(), String> {
     failure(
         FailureKind::Conflict,
         &format!(
             "{message}; model, source, seed, function, loader, task, asset, check, provider, \
              hook, unit test, scenario, job, job group, sensor, and calendar schedule names must \
-             be globally unique"
+             be globally unique; rename one of them{advice}"
         ),
     )
 }

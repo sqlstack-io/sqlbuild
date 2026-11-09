@@ -5,6 +5,9 @@ use crate::project_validation::models::{
 use crate::project_validation::tests::helpers::{collision, declared, model, named};
 use crate::project_validation::tests::test_types::ValidationTestCase;
 
+const RENAME_DECLARATION: &str = " (a job, job group or sensor takes its name from its first \
+     argument, and a calendar schedule from the function it decorates)";
+
 #[test]
 fn given_orchestration_names_when_validating_then_they_share_the_project_namespace() {
     let test_cases = [
@@ -32,6 +35,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
             expected_failure: collision(
                 "Project resource name 'orders' is declared as both model in models/orders.sql \
                  and job in orchestration/daily.py",
+                RENAME_DECLARATION,
             ),
         },
         ValidationTestCase {
@@ -47,6 +51,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
             expected_failure: collision(
                 "Project resource name 'orders_arrived' is declared as both unit test in \
                  tests/orders_arrived.sql and sensor in orchestration/daily.py",
+                RENAME_DECLARATION,
             ),
         },
         ValidationTestCase {
@@ -59,6 +64,23 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
             expected_failure: collision(
                 "Project resource name 'fulfillment' is declared as both provider in \
                  providers/fulfillment.py and calendar schedule in orchestration/daily.py",
+                RENAME_DECLARATION,
+            ),
+        },
+        ValidationTestCase {
+            description: "a unit test named like a model gets no orchestration advice",
+            facts: ProjectFacts {
+                models: vec![model("orders")],
+                tests: vec![TestFileFact {
+                    file: named("orders", "tests/orders.sql"),
+                    blocks: vec![TestBlockFact::default()],
+                }],
+                ..ProjectFacts::default()
+            },
+            expected_failure: collision(
+                "Project resource name 'orders' is declared as both model in models/orders.sql \
+                 and unit test in tests/orders.sql",
+                "",
             ),
         },
         ValidationTestCase {
@@ -70,6 +92,7 @@ fn given_orchestration_names_when_validating_then_they_share_the_project_namespa
             expected_failure: collision(
                 "Project resource name 'daily' is declared as both job in orchestration/daily.py \
                  and job group in orchestration/daily.py",
+                RENAME_DECLARATION,
             ),
         },
     ];

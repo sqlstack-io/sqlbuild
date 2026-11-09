@@ -4,27 +4,20 @@ use std::collections::{HashMap, HashSet};
 
 use crate::project_validation::_helpers::conflicts::{conflict, schema_seeds};
 use crate::project_validation::_helpers::identities::block_or_file_name;
+use crate::project_validation::constants::ORCHESTRATION_RENAME_ADVICE;
 use crate::project_validation::models::{NodeKind, ProjectFacts, ValidationFailure};
 
 /// Reject the first resource name declared twice across models, sources, seeds and the rest.
 pub(crate) fn validate_unique_project_resource_names(
     facts: &ProjectFacts,
 ) -> Result<(), ValidationFailure> {
-    let mut seen: HashMap<String, (String, String)> = HashMap::new();
-    let mut declare = |name: &str, kind: &str, path: &str| -> Result<(), ValidationFailure> {
-        if let Some((existing_kind, existing_path)) = seen.get(name) {
-            return Err(conflict(format!(
-                "Project resource name '{name}' is declared as both {existing_kind} in \
-                 {existing_path} and {kind} in {path}; model, source, seed, function, loader, \
-                 task, asset, check, provider, hook, unit test, scenario, job, job group, sensor, \
-                 and calendar schedule names must be globally unique"
-            )));
-        }
-        seen.insert(name.to_owned(), (kind.to_owned(), path.to_owned()));
-        Ok(())
-    };
+    let mut seen: HashMap<String, Declared> = HashMap::new();
     for model in &facts.models {
-        declare(&model.file.name, "model", &model.file.path)?;
+        declare(
+            &mut seen,
+            (&model.file.name, "model", &model.file.path),
+            false,
+        )?;
     }
     let mut managed_sources: HashSet<&str> = HashSet::new();
     for file in &facts.sources {
@@ -32,32 +25,48 @@ pub(crate) fn validate_unique_project_resource_names(
             if entry.managed {
                 managed_sources.insert(&entry.name);
             }
-            declare(&entry.name, "source", &file.path)?;
+            declare(&mut seen, (&entry.name, "source", &file.path), false)?;
         }
     }
     for seed in schema_seeds(facts) {
-        declare(&seed.name, "seed", &seed.path)?;
+        declare(&mut seen, (&seed.name, "seed", &seed.path), false)?;
     }
     for function in facts.sql_functions.iter().chain(&facts.python_functions) {
-        declare(&function.name, "function", &function.path)?;
+        declare(
+            &mut seen,
+            (&function.name, "function", &function.path),
+            false,
+        )?;
     }
     for node in &facts.nodes {
         if node.kind == NodeKind::Loader && managed_sources.contains(node.name.as_str()) {
             continue;
         }
-        declare(&node.name, node.kind.label(), &node.path)?;
+        declare(
+            &mut seen,
+            (&node.name, node.kind.label(), &node.path),
+            false,
+        )?;
     }
     for provider in &facts.providers {
-        declare(&provider.name, "provider", &provider.path)?;
+        declare(
+            &mut seen,
+            (&provider.name, "provider", &provider.path),
+            false,
+        )?;
     }
     for hook in &facts.sql_hooks {
-        declare(&hook.name, "sql hook", &hook.path)?;
+        declare(&mut seen, (&hook.name, "sql hook", &hook.path), false)?;
     }
     for hook in &facts.hook_functions {
-        declare(&hook.name, "python hook", &hook.path)?;
+        declare(&mut seen, (&hook.name, "python hook", &hook.path), false)?;
     }
     for scenario in &facts.scenarios {
-        declare(&scenario.name, "scenario", &scenario.path)?;
+        declare(
+            &mut seen,
+            (&scenario.name, "scenario", &scenario.path),
+            false,
+        )?;
     }
     let mut test_names: HashSet<&str> = HashSet::new();
     for test in &facts.tests {
@@ -66,11 +75,44 @@ pub(crate) fn validate_unique_project_resource_names(
             if !test_names.insert(name) {
                 continue;
             }
-            declare(name, "unit test", &test.file.path)?;
+            declare(&mut seen, (name, "unit test", &test.file.path), false)?;
         }
     }
     for declaration in &facts.orchestration {
-        declare(&declaration.name, declaration.kind, &declaration.path)?;
+        declare(
+            &mut seen,
+            (&declaration.name, declaration.kind, &declaration.path),
+            true,
+        )?;
     }
+    Ok(())
+}
+
+/// A name's first declaration: its kind, its file and whether it is an orchestration declaration.
+type Declared = (String, String, bool);
+
+/// Record one declaration, or name both declarations and say how to rename one of them.
+fn declare(
+    seen: &mut HashMap<String, Declared>,
+    (name, kind, path): (&str, &str, &str),
+    orchestration: bool,
+) -> Result<(), ValidationFailure> {
+    if let Some((existing_kind, existing_path, existing_orchestration)) = seen.get(name) {
+        let advice: &str = if orchestration || *existing_orchestration {
+            ORCHESTRATION_RENAME_ADVICE
+        } else {
+            ""
+        };
+        return Err(conflict(format!(
+            "Project resource name '{name}' is declared as both {existing_kind} in \
+             {existing_path} and {kind} in {path}; model, source, seed, function, loader, task, \
+             asset, check, provider, hook, unit test, scenario, job, job group, sensor, and \
+             calendar schedule names must be globally unique; rename one of them{advice}"
+        )));
+    }
+    seen.insert(
+        name.to_owned(),
+        (kind.to_owned(), path.to_owned(), orchestration),
+    );
     Ok(())
 }

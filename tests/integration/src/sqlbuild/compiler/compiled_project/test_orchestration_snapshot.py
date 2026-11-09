@@ -50,9 +50,11 @@ from tests.integration.src.sqlbuild.compiler.compiled_project.helpers import (
 )
 from tests.integration.src.sqlbuild.compiler.graph.helpers import write_files
 
-GLOBALLY_UNIQUE: str = (
+ORCHESTRATION_NAME_CONFLICT: str = (
     "; model, source, seed, function, loader, task, asset, check, provider, hook, unit test, "
-    "scenario, job, job group, sensor, and calendar schedule names must be globally unique"
+    "scenario, job, job group, sensor, and calendar schedule names must be globally unique; "
+    "rename one of them (a job, job group or sensor takes its name from its first argument, and "
+    "a calendar schedule from the function it decorates)"
 )
 
 
@@ -1060,7 +1062,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
                 "Project resource name 'daily' is declared as both job in orchestration/jobs.py "
-                "and job in orchestration/jobs.py" + GLOBALLY_UNIQUE
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
@@ -1073,7 +1075,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
                 "Project resource name 'orders' is declared as both model in models/orders.sql "
-                "and job in orchestration/jobs.py" + GLOBALLY_UNIQUE
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
@@ -1088,7 +1090,7 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
             expected_error=DiscoveryConflictError,
             expected_message=re.escape(
                 "Project resource name 'daily' is declared as both sensor in orchestration/jobs.py "
-                "and job in orchestration/jobs.py" + GLOBALLY_UNIQUE
+                "and job in orchestration/jobs.py" + ORCHESTRATION_NAME_CONFLICT
             ),
         ),
         SnapshotDiscoveryRejectionTestCase(
