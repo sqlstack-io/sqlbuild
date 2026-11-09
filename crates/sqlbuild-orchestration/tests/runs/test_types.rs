@@ -216,6 +216,13 @@ impl crate::runs::types::CommandPlanner for ExactKeyPlanner {
     }
 }
 
+pub(crate) struct NarrowingDenialTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) select: &'static [&'static str],
+    pub(crate) exclude: &'static [&'static str],
+    pub(crate) expected_denied: bool,
+}
+
 pub(crate) struct JobSubsetTestCase {
     pub(crate) description: &'static str,
     pub(crate) job_key: &'static str,
