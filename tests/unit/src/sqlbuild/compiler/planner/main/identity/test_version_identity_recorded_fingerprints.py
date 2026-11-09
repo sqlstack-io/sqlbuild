@@ -19,15 +19,13 @@ from tests.unit.src.sqlbuild.compiler.planner.main.identity._test_types import (
 from tests.unit.src.sqlbuild.compiler.planner.main.identity.helpers import (
     build_function_identities,
     build_two_model_graph_identities,
+    old_scheme_hash,
     recorded_fingerprint,
 )
 
 _ORDERS_SQL: str = "SELECT 1 AS order_id"
 _SUMMARY_SQL: str = 'SELECT count(*) AS orders FROM __ref("orders")'
-
-
-def _old_scheme_hash(name: str) -> str:
-    return f"old_scheme_{name}"
+_RECORDED_LOCAL_HASH: str = "old_local_add_one"
 
 
 @pytest.mark.parametrize(
@@ -65,7 +63,7 @@ def test_given_old_scheme_records_when_hashing_graph_then_only_unchanged_models_
                 name=name,
                 node_type="model",
                 definition=definition,
-                definition_hash=_old_scheme_hash(name),
+                definition_hash=old_scheme_hash(name),
             )
             for name, definition in test_case.recorded_definitions.items()
         }
@@ -78,20 +76,17 @@ def test_given_old_scheme_records_when_hashing_graph_then_only_unchanged_models_
         orders_sql=test_case.orders_sql, summary_sql=test_case.summary_sql, recorded=recorded
     )
 
-    queries: dict[str, str] = {
-        "orders": test_case.orders_sql,
-        "orders_summary": test_case.summary_sql,
-    }
-    for name, query_sql in queries.items():
-        query_fingerprint: str = (
-            _old_scheme_hash(name)
-            if name in test_case.expected_kept
-            else compute_query_hash(query_sql=query_sql, dialect=None)
-        )
-        expected: str = hashlib.sha256(
+    query_fingerprints: dict[str, str] = {
+        "orders": compute_query_hash(query_sql=test_case.orders_sql, dialect=None),
+        "orders_summary": compute_query_hash(query_sql=test_case.summary_sql, dialect=None),
+    } | {name: old_scheme_hash(name) for name in test_case.expected_kept}
+    expected: dict[str, str] = {
+        name: hashlib.sha256(
             f"{query_fingerprint}\n{baselined.model_metadata_jsons[name]}".encode()
         ).hexdigest()
-        assert baselined.model_local_hashes[name] == expected, name
+        for name, query_fingerprint in query_fingerprints.items()
+    }
+    assert {name: baselined.model_local_hashes[name] for name in expected} == expected
     assert (
         baselined.model_version_hashes["orders_summary"]
         != current.model_version_hashes["orders_summary"]
@@ -105,13 +100,13 @@ def test_given_old_scheme_records_when_hashing_graph_then_only_unchanged_models_
             description="unchanged function keeps the local hash its callers recorded",
             body_sql="order_status = 'completed'",
             recorded_body_sql="order_status  =  'completed'  -- final",
-            expected_recorded_local_hash=True,
+            expected_matches_recorded_and_current=(True, False),
         ),
         RecordedFunctionHashTestCase(
             description="edited function gets its current local hash",
             body_sql="order_status = 'completed'",
             recorded_body_sql="order_status = 'shipped'",
-            expected_recorded_local_hash=False,
+            expected_matches_recorded_and_current=(False, True),
         ),
     ],
     ids=lambda case: case.description,
@@ -130,7 +125,7 @@ def test_given_old_scheme_function_record_when_hashing_then_unchanged_function_k
                 definition="SELECT add_one(1) AS order_id",
                 definition_hash="old_scheme_orders",
                 metadata_json=json.dumps(
-                    {"local_function_hashes": {"add_one": "old_local_add_one"}}
+                    {"local_function_hashes": {"add_one": _RECORDED_LOCAL_HASH}}
                 ),
             )
         },
@@ -151,9 +146,8 @@ def test_given_old_scheme_function_record_when_hashing_then_unchanged_function_k
         body_sql=test_case.body_sql, recorded=recorded
     )
 
-    expected: str = (
-        "old_local_add_one"
-        if test_case.expected_recorded_local_hash
-        else current.function_local_hashes["add_one"]
-    )
-    assert baselined.function_local_hashes["add_one"] == expected
+    local_hash: str = baselined.function_local_hashes["add_one"]
+    assert (
+        local_hash == _RECORDED_LOCAL_HASH,
+        local_hash == current.function_local_hashes["add_one"],
+    ) == test_case.expected_matches_recorded_and_current

@@ -182,7 +182,6 @@ _OLD_SCHEME_HASH: str = "fingerprint_from_an_older_scheme"
             full_refresh=False,
             expected_change_kind=ChangeKind.NO_CHANGE,
             expected_backfill_action=BackfillAction.FORWARD_ONLY,
-            expected_definition_hash=_OLD_SCHEME_HASH,
         ),
         DetectModelChangesTestCase(
             description="old-scheme fingerprint of an edited query is a query change",
@@ -232,7 +231,6 @@ _OLD_SCHEME_HASH: str = "fingerprint_from_an_older_scheme"
             full_refresh=False,
             expected_change_kind=ChangeKind.NO_CHANGE,
             expected_backfill_action=BackfillAction.FORWARD_ONLY,
-            expected_definition_hash=_OLD_SCHEME_HASH,
         ),
         DetectModelChangesTestCase(
             description="schema finding of an unchanged model never replays",
@@ -440,8 +438,61 @@ def test_given_model_and_snapshot_when_detecting_changes_then_returns_expected(
     assert (
         result.recorded_build_relation_missing == test_case.expected_recorded_build_relation_missing
     )
-    if test_case.expected_definition_hash is not None:
-        assert result.fingerprint_definition_hash == test_case.expected_definition_hash
+
+
+@pytest.mark.parametrize(
+    "test_case",
+    [
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint of the unchanged query is no change",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"replay_on_change": "bounded-30d"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition="select id,\n  name\nfrom orders -- staged",
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.NO_CHANGE,
+            expected_backfill_action=BackfillAction.FORWARD_ONLY,
+            expected_definition_hash=_OLD_SCHEME_HASH,
+        ),
+        DetectModelChangesTestCase(
+            description="old-scheme fingerprint of an unchanged replaying incremental model never replays",
+            model_name="orders",
+            query_sql=_QUERY_SQL,
+            config_values={"materialized": "incremental", "replay_on_change": "full"},
+            fingerprint_config_values={"materialized": "incremental", "replay_on_change": "full"},
+            schema_columns=(),
+            relation_exists=True,
+            fingerprint_query_hash=_OLD_SCHEME_HASH,
+            fingerprint_definition=_QUERY_SQL,
+            warehouse_column_names=(),
+            sql_analysis_enabled=False,
+            query_change_tracking=True,
+            full_refresh=False,
+            expected_change_kind=ChangeKind.NO_CHANGE,
+            expected_backfill_action=BackfillAction.FORWARD_ONLY,
+            expected_definition_hash=_OLD_SCHEME_HASH,
+        ),
+    ],
+    ids=lambda case: case.description,
+)
+def test_given_old_scheme_fingerprint_of_unchanged_query_when_detecting_then_keeps_recorded_hash(
+    test_case: DetectModelChangesTestCase,
+) -> None:
+    result: ChangeDetectionResult = detect_model_changes(
+        model=build_model_from_test_case(test_case),
+        snapshot=build_snapshot_from_test_case(test_case),
+        sql_analysis_enabled=test_case.sql_analysis_enabled,
+        query_change_tracking=test_case.query_change_tracking,
+        full_refresh=test_case.full_refresh,
+    )
+
+    assert result.fingerprint_definition_hash == test_case.expected_definition_hash
 
 
 @pytest.mark.parametrize(

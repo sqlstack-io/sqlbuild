@@ -78,4 +78,4 @@ class RecordedFunctionHashTestCase:
     description: str
     body_sql: str
     recorded_body_sql: str
-    expected_recorded_local_hash: bool
+    expected_matches_recorded_and_current: tuple[bool, bool]

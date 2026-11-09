@@ -290,3 +290,9 @@ def build_function_identities(
     return build_direct_model_version_identities(
         functions=(function,), scope=scope, dialect=None, recorded_fingerprints=recorded
     )
+
+
+def old_scheme_hash(name: str) -> str:
+    """The definition hash an older fingerprint scheme recorded for `name`."""
+
+    return f"old_scheme_{name}"
