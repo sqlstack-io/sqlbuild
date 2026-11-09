@@ -2,12 +2,13 @@
 
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use sqlbuild_state::events::main::decoded_grants::decoded_grants;
 use uuid::Uuid;
 
 use crate::store::errors::ControlError;
 use crate::store::main::query_records::query_records;
 use crate::store::models::{ControlTransaction, Parameter};
-use crate::warehouse_history::models::MaintenanceHistory;
+use crate::warehouse_history::models::{MaintenanceHistory, MaintenanceOldNameView};
 use crate::warehouse_metadata::models::{
     WarehouseJanitorRecord, WarehouseMigrationRecord, WarehouseOldNameRecord,
 };
@@ -55,7 +56,7 @@ pub(crate) async fn maintenance_history(
             }
         };
     let mut transaction = transaction;
-    let mut old_name_views: Vec<WarehouseOldNameRecord> = Vec::new();
+    let mut stored_views: Vec<WarehouseOldNameRecord> = Vec::new();
     if !migrations.is_empty() {
         let mut parameters = scope.clone();
         parameters.extend(
@@ -64,7 +65,7 @@ pub(crate) async fn maintenance_history(
                 .map(|migration| Parameter::Text(migration.event_id.clone())),
         );
         let placeholders = Parameter::placeholders(3..=parameters.len());
-        (transaction, old_name_views) = records(transaction,
+        (transaction, stored_views) = records(transaction,
             &format!("SELECT record_json AS record FROM sqb_warehouse_old_name_views WHERE location_id=$1 AND target=$2 \
                       AND migration_event_id IN ({placeholders}) ORDER BY observed_at,event_id"),
             parameters).await?;
@@ -80,8 +81,37 @@ pub(crate) async fn maintenance_history(
         transaction,
         MaintenanceHistory {
             migrations,
-            old_name_views,
+            old_name_views: stored_views.into_iter().map(old_name_view).collect(),
             janitor_events,
         },
     ))
+}
+
+/// The stored step with its grant statements reduced to their number, read the way local `sqb` reads them.
+fn old_name_view(record: WarehouseOldNameRecord) -> MaintenanceOldNameView {
+    MaintenanceOldNameView {
+        grants_copied: decoded_grants(record.grants_copied.as_deref())
+            .map(|statements| statements.len() as u64),
+        state_database: record.state_database,
+        state_schema: record.state_schema,
+        event_id: record.event_id,
+        target_name: record.target_name,
+        event_type: record.event_type,
+        migration_event_id: record.migration_event_id,
+        destination_model: record.destination_model,
+        old_database: record.old_database,
+        old_schema: record.old_schema,
+        old_name: record.old_name,
+        new_database: record.new_database,
+        new_schema: record.new_schema,
+        new_name: record.new_name,
+        view_retention: record.view_retention,
+        archive_name: record.archive_name,
+        column_aliases: record.column_aliases,
+        view_sql: record.view_sql,
+        expires_at: record.expires_at,
+        drop_reason: record.drop_reason,
+        run_id: record.run_id,
+        created_at: record.created_at,
+    }
 }
