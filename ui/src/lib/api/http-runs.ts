@@ -91,6 +91,7 @@ export function toRun(wire: Wire['RunRecord'], locationId: string, childRunCount
 		tickScheduledFor: null,
 		runKey: null,
 		rerunOfRunId: wire.rerun_of_run_id ?? null,
+		narrowing: wire.narrowing ?? null,
 		requestedBy: requesterOf(wire),
 		priority: wire.priority,
 		rewriteHistory: wire.rewrite_history,

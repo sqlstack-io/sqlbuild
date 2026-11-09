@@ -67,6 +67,8 @@ export type Run = {
 	/** Sensor run requests are de-duplicated by run key. */
 	runKey: string | null;
 	rerunOfRunId: string | null;
+	/** How a person narrowed this run of a job, as typed; null when it runs the whole job. */
+	narrowing: { select: string[]; exclude: string[] } | null;
 	requestedBy: Principal;
 	priority: number;
 	/** Full refresh or an explicit cursor window was requested. */
@@ -528,6 +530,10 @@ export type CursorWindow = {
 
 export type JobLaunchOptions = {
 	window?: CursorWindow;
+	/** Runs only the job's nodes these `sqb build` selectors also select; the run stays a run of the job. */
+	select?: string[];
+	/** Leaves the job's nodes these selectors select out of the run. */
+	exclude?: string[];
 };
 
 /** `selected` reruns exactly the nodes passed with the request. */
