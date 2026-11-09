@@ -1,13 +1,13 @@
 import type { RunNode, RunNodeStatus } from '$lib/api';
 
-export type BottomTab = 'statements' | 'events' | 'output';
+export type BottomTab = 'log' | 'statements';
 
 /** The node panel's groups, in display order. */
 export type NodeGroupKey = 'running' | 'failed' | 'skipped' | 'succeeded' | 'not_run';
 export type NodeGroup = { key: NodeGroupKey; label: string; tone: string; statuses: RunNodeStatus[]; nodes: RunNode[] };
 
 /** Event categories for the Events tab filter. */
-export type EventCategory = 'run' | 'nodes' | 'queries' | 'checks';
+export type EventCategory = 'run' | 'nodes' | 'queries' | 'checks' | 'output';
 
 export type BannerTone = 'info' | 'warn' | 'error';
 export type BannerPart = { text: string; href?: string };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -176,3 +176,16 @@ describe('run Recall reads', () => {
 	});
 });
 
+
+describe('group run nodes', () => {
+	it("keeps each job run's node and the group's own row only where no job run has the node", () => {
+		const group = toRuns([wire('g', { kind: 'group', job_key: 'nightly' })], LOCATION)[0];
+		const staging = toRuns([wire('s', { parent_run_id: 'g', job_key: 'staging' })], LOCATION)[0];
+		const node = (key: string, status: string, owner = group) => toRunNode({ node_key: key, status } as W['RunNodeRecord'], owner);
+		const nodes = groupRunNodes([node('model:raw', 'success'), node('model:report', 'pending')], [node('model:raw', 'failed', staging)]);
+		expect(nodes.map((n) => [n.nodeKey, n.runId, n.status])).toEqual([
+			['model:report', 'g', 'pending'],
+			['model:raw', 's', 'failed']
+		]);
+	});
+});

@@ -1,29 +1,27 @@
 <script lang="ts">
 	import XIcon from '@lucide/svelte/icons/x';
 	import { app } from '$lib/state/app.svelte';
-	import EventsTab from './events-tab.svelte';
-	import OutputTab from './output-tab.svelte';
+	import LogTab from './log-tab.svelte';
 	import type { RunDetailState } from './state.svelte';
 	import StatementsTab from './statements-tab.svelte';
 	import type { BottomTab } from './types';
-	import { bottomTabs } from './utils';
+	import { bottomTabs, logEntries } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
 	const sel = $derived(new Set(view.selected));
 	const filtering = $derived(sel.size > 0);
-	const events = $derived(view.eventsRes.data?.events ?? []);
-	const output = $derived(view.outputRes.data ?? []);
+	const entries = $derived(logEntries(view.eventsRes.data ?? [], view.outputRes.data ?? []));
 	const statements = $derived(filtering ? view.statements.filter((s) => sel.has(s.nodeKey)) : view.statements);
-	const shownEvents = $derived(filtering ? events.filter((e) => e.nodeKey && sel.has(e.nodeKey)) : events);
-	const shownOutput = $derived(filtering ? output.filter((l) => view.selected.some((k) => l.text.includes(k))) : output);
+	// Printed lines name no node, so a node filter keeps the lines that mention one of the selected nodes.
+	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : view.selected.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c)));
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});
-	const count = (t: BottomTab) => (t === 'statements' ? statements.length : t === 'events' ? shownEvents.length : shownOutput.length);
+	const count = (t: BottomTab) => (t === 'statements' ? statements.length : shownEntries.length);
 	const chipText = $derived(view.selected.length === 1 ? view.selected[0] : `${view.selected.length} nodes`);
 </script>
 
@@ -45,11 +43,9 @@
 
 <div class="body sb-scroll">
 	{#if view.tab === 'statements'}
-		<StatementsTab {statements} total={view.statements.length} {grouped} runId={view.run?.id ?? ''} />
-	{:else if view.tab === 'events'}
-		<EventsTab events={shownEvents} {grouped} />
+		<StatementsTab {statements} total={view.statements.length} {grouped} />
 	{:else}
-		<OutputTab lines={shownOutput} total={output.length} runId={view.run?.id ?? ''} filteredBy={view.selected} />
+		<LogTab entries={shownEntries} {grouped} runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </div>
 

@@ -11,7 +11,7 @@
 	import { app } from '$lib/state/app.svelte';
 	import { formatSpan } from './utils';
 
-	let { statements, total, grouped, runId }: { statements: RunStatement[]; total: number; grouped: boolean; runId: string } = $props();
+	let { statements, total, grouped }: { statements: RunStatement[]; total: number; grouped: boolean } = $props();
 
 	type SqlState = { state: 'loading' } | { state: 'ok'; sql: string | null } | { state: 'error'; message: string };
 	let open = $state<Set<string>>(new Set());
@@ -23,7 +23,7 @@
 		if (!scope || sql[st.id]?.state === 'ok' || sql[st.id]?.state === 'loading') return;
 		sql = { ...sql, [st.id]: { state: 'loading' } };
 		try {
-			const res = await app.client.getStatementSql(scope, runId, st.id);
+			const res = await app.client.getStatementSql(scope, st.runId, st.id);
 			sql = { ...sql, [st.id]: { state: 'ok', sql: res.sql } };
 		} catch (e) {
 			sql = { ...sql, [st.id]: { state: 'error', message: e instanceof Error ? e.message : String(e) } };
@@ -67,6 +67,7 @@
 				<th>Time</th>
 				{#if grouped}<th>Job run</th>{/if}
 				<th>Node</th>
+				<th>Statement</th>
 				<th>Outcome</th>
 				<th class="num">Rows</th>
 				<th class="num">Took</th>
@@ -80,7 +81,8 @@
 					<td class="num faint">{st.sequence}</td>
 					<td class="faint nowrap" title={formatStamp(st.startedAt)}>{clockTime(st.startedAt)}</td>
 					{#if grouped}<td class="mono faint">{shortRunId(st.runId)}</td>{/if}
-					<td class="mono">{st.nodeKey}</td>
+					<td class="mono">{#if st.nodeKey}{st.nodeKey}{:else}<span class="faint" title="Run-level query, such as setup or state bookkeeping, not tied to one node">run</span>{/if}</td>
+					<td class="mono faint">{st.kind}</td>
 					<td>
 						<span class="outcome {st.status}" title="{st.kind} · {st.status}">
 							{#if st.status === 'completed'}<CircleCheckIcon size={13} />{:else if st.status === 'failed'}<CircleXIcon size={13} />{:else if st.status === 'running'}<LoaderIcon size={13} class="spin" />{:else}<CircleSlashIcon size={13} />{/if}
@@ -100,7 +102,7 @@
 				</tr>
 				{#if st.error}
 					<tr class="err-row">
-						<td colspan={grouped ? 9 : 8}>
+						<td colspan={grouped ? 10 : 9}>
 							<button class="err" class:clamp={!fullError.has(st.id)} onclick={() => toggleError(st.id)} title={fullError.has(st.id) ? 'Show less' : 'Show the full error'}>{st.error}</button>
 						</td>
 					</tr>
@@ -108,7 +110,7 @@
 				{#if open.has(st.id)}
 					{@const loaded = sql[st.id]}
 					<tr class="sql-row">
-						<td colspan={grouped ? 9 : 8}>
+						<td colspan={grouped ? 10 : 9}>
 							{#if !app.can('view.sql')}
 								<p class="note">You need permission to see SQL (view.sql).</p>
 							{:else if !st.sqlRecorded || (loaded?.state === 'ok' && loaded.sql === null)}

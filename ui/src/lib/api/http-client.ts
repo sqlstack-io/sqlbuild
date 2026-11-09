@@ -12,7 +12,7 @@ import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
@@ -259,8 +259,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!found) return null;
 			const { run, wire, listed } = found;
 			const owners = [run, ...listed.filter((r) => r.parentRunId === run.id)];
-			const nodes = (await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))))).flat();
-			return runDetailOf(run, wire, listed, nodes);
+			const [own, ...children] = await Promise.all(owners.map(async (owner) => (await runNodes(scope, owner.id)).map((n) => toRunNode(n, owner))));
+			return runDetailOf(run, wire, listed, groupRunNodes(own, children.flat()));
 		},
 		async listRunEvents(scope: Scope, runId: string, query: { after?: number; limit?: number } = {}): Promise<RunEventPage> {
 			const limit = query.limit ?? 1000;
@@ -502,8 +502,8 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toColumnLineage(data, nodes);
 		},
-		async getCatalogNode(scope: Scope, ref: string): Promise<CatalogNodeDetail | null> {
-			const nodes = await implemented.listCatalogNodes(scope);
+		async getCatalogNode(scope: Scope, ref: string, listing?: CatalogNode[]): Promise<CatalogNodeDetail | null> {
+			const nodes = listing ?? (await implemented.listCatalogNodes(scope));
 			const node = findNode(nodes, ref);
 			if (!node) return null;
 			const { locationId, target } = parseLocationKey(scope.locationId);

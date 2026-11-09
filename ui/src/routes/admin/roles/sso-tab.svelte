@@ -14,10 +14,6 @@
 </script>
 
 <div class="px-6 pt-5 pb-8">
-	<p class="lede">
-		Members of these identity-provider groups get the role when they sign in. Configured in the server config; read-only here. To change who's in a group, use your identity
-		provider.
-	</p>
 	{#if unseen.length}
 		<p class="note">
 			{plural(unseen.length, 'group')} in the config {unseen.length === 1 ? 'has' : 'have'} no members seen yet: {#each unseen as m, i (m.group)}{#if i},&nbsp;{/if}<code>{m.group}</code>{/each}.
@@ -55,12 +51,6 @@
 <style>
 	:global(.sb-list.static tbody tr) {
 		cursor: default;
-	}
-	.lede {
-		max-width: 860px;
-		margin-bottom: 14px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
 	}
 	.note {
 		max-width: 860px;

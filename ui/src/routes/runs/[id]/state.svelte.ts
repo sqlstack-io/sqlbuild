@@ -14,9 +14,22 @@ function message(error: unknown): string {
 export function createRunDetailState(runId: string) {
 	const topics = [`run:${runId}`, 'runs'];
 	const detailRes = createResource((client, scope) => client.getRunDetail(scope, runId), topics);
-	const eventsRes = createResource((client, scope) => (client.supports('listRunEvents') ? client.listRunEvents(scope, runId, { limit: 5000 }) : Promise.resolve({ events: [], nextCursor: null })), topics);
-	const outputRes = createResource((client, scope) => (client.supports('listRunOutput') && app.can('view.evidence') ? client.listRunOutput(scope, runId) : Promise.resolve([])), topics);
-	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? client.listRunStatements(scope, runId) : Promise.resolve([])), topics);
+	// A group run's own reads are nearly empty, so its log and statements gather its job runs' too.
+	// A string, so the reads below reload only when the set of runs changes, not on every detail reload.
+	const runKey = $derived([runId, ...(detailRes.data?.children ?? []).map((c) => c.id)].join(','));
+	const eachRun = async <T>(read: (id: string) => Promise<T[]>): Promise<T[]> => (await Promise.all(runKey.split(',').map(read))).flat();
+	const eventsRes = createResource(
+		(client, scope) => (client.supports('listRunEvents') ? eachRun(async (id) => (await client.listRunEvents(scope, id, { limit: 5000 })).events).then((events) => events.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) : Promise.resolve([])),
+		topics
+	);
+	const outputRes = createResource(
+		(client, scope) =>
+			client.supports('listRunOutput') && app.can('view.evidence')
+				? eachRun(async (id) => (await client.listRunOutput(scope, id)).map((line) => ({ ...line, runId: id }))).then((lines) => lines.sort((a, b) => a.at.localeCompare(b.at)))
+				: Promise.resolve([]),
+		topics
+	);
+	const statementsRes = createResource((client, scope) => (client.supports('listRunStatements') ? eachRun((id) => client.listRunStatements(scope, id)) : Promise.resolve([])), topics);
 
 	const detail = $derived(detailRes.data ?? null);
 	const run = $derived(detail?.run ?? null);
@@ -31,7 +44,7 @@ export function createRunDetailState(runId: string) {
 
 	// ---- node selection: the one filter model for timeline, panel and bottom tabs ----
 	let selected = $state<string[]>([]);
-	let tab = $state<BottomTab>('statements');
+	let tab = $state<BottomTab>('log');
 
 	/** Click selects one node (or clears it); with `add`, toggles it in a multi-selection. */
 	function selectNode(key: string, add = false) {

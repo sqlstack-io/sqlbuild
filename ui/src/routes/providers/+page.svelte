@@ -21,9 +21,6 @@
 </AppTopbar>
 
 <ListToolbar bind:query placeholder="Search providers" total="{shown.length} of {all.length} providers">
-	{#snippet actions()}
-		<span class="note">Connections to APIs, storage and webhooks that models, loaders and sensors use. Declared in code; read-only here.</span>
-	{/snippet}
 </ListToolbar>
 
 <div class="sb-list-wrap">
@@ -60,9 +57,4 @@
 </div>
 
 <style>
-	.note {
-		margin-left: 8px;
-		color: var(--muted-foreground);
-		font-size: 12px;
-	}
 </style>

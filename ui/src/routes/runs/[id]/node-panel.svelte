@@ -3,12 +3,20 @@
 	import { shortRunId } from '$lib/operate/labels';
 	import type { RunDetailState } from './state.svelte';
 	import type { NodeGroupKey } from './types';
-	import { groupNodes, notRunReason } from './utils';
+	import { formatSpan, groupNodes, notRunReason } from './utils';
 
 	let { view }: { view: RunDetailState } = $props();
 
 	const groups = $derived(groupNodes(view.nodes));
-	let closed = $state<Set<NodeGroupKey>>(new Set(['succeeded']));
+	// Small runs show every node; large ones start with the successes folded away.
+	let closed = $state<Set<NodeGroupKey>>(new Set());
+	let folded = false;
+	$effect(() => {
+		if (folded || !view.nodes.length) return;
+		folded = true;
+		if (view.nodes.length > 40) closed = new Set(['succeeded']);
+	});
+	const took = (n: RunNode) => (n.startedAt && n.endedAt ? formatSpan((Date.parse(n.endedAt) - Date.parse(n.startedAt)) / 1000) : null);
 
 	function toggle(key: NodeGroupKey) {
 		const next = new Set(closed);
@@ -37,6 +45,7 @@
 							<button class="node" onclick={(e) => pick(e, n)} title="Click to filter below; Ctrl- or Cmd-click to add to the selection">
 								<span class="mono">{n.nodeKey}</span>
 								{#if n.status === 'warn'}<span class="tag warn">warnings</span>{/if}
+								{#if took(n)}<span class="took">{took(n)}</span>{/if}
 							</button>
 							{#if n.skippedBecauseOf}
 								{@const why = n.skippedBecauseOf}
@@ -63,6 +72,12 @@
 </div>
 
 <style>
+	.took {
+		margin-left: auto;
+		color: var(--sb-text-faint);
+		font-size: 11px;
+		white-space: nowrap;
+	}
 	.panel {
 		width: 260px;
 		flex-shrink: 0;

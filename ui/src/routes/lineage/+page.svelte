@@ -245,11 +245,28 @@
 	// Inspector detail for the primary selection; the scale-test graph is synthetic, so it has none.
 	// Without a detail read the inspector shows what the catalog listing reports.
 	const detailSupported = app.client.supports('getCatalogNode');
-	const detail = createResource(
-		(client, scope) => (scaleMode || !primarySlug || !detailSupported ? Promise.resolve(null) : client.getCatalogNode(scope, String(primarySlug))),
-		['runs', 'checks', 'snapshot', 'node_status']
-	);
-	const d = $derived(detail.data && detail.data.key === primarySlug ? detail.data : null);
+	// The page already holds the listing, so a click reads only the node's own facts. Reloading with
+	// each new listing keeps both from one moment, so a change signal reloads each once.
+	const detail = createResource((client, scope) => {
+		const listing = catalog.data;
+		return scaleMode || !primarySlug || !detailSupported || !listing ? Promise.resolve(null) : client.getCatalogNode(scope, String(primarySlug), listing);
+	});
+	const fresh = $derived(detail.data && detail.data.key === primarySlug ? detail.data : null);
+	// While the next node loads, the inspector keeps the last one instead of collapsing to
+	// "Loading…"; it dims only if the switch is slow, and gives up on it after a while.
+	let held = $state.raw<typeof fresh>(null);
+	let heldTooLong = $state(false);
+	$effect(() => {
+		if (fresh) held = fresh;
+	});
+	$effect(() => {
+		void primarySlug;
+		heldTooLong = false;
+		const timer = setTimeout(() => (heldTooLong = true), 1500);
+		return () => clearTimeout(timer);
+	});
+	const d = $derived(fresh ?? (heldTooLong || detail.error || catalog.error ? null : held));
+	const switching = $derived(!!d && d !== fresh);
 	const listed = $derived(detailSupported ? null : (catalogByKey.get(String(primarySlug)) ?? null));
 	const isSource = $derived(d?.kind === 'source');
 	const hasSql = $derived(!!d?.sql);
@@ -627,12 +644,14 @@
 					{#if d}<a href="/catalog/{primarySlug}" class="head-link ml-auto" title="Open in Catalog">Catalog ↗</a>{/if}
 				</div>
 				<div class="inspector-meta">
-					<span>{d ? kindLine(d) : primary?.data.kind}</span>
-					{#if d}{#if d.group}<span>{d.group}</span>{/if}{#if d.owner.length}<span>{d.owner.join(', ')}</span>{/if}{/if}
+					<!-- From the selected card, so the header never names the previous node's facts while its detail is held. -->
+					<span>{primary?.data.kind}</span>
+					{#if primary?.data.group}<span>{primary.data.group}</span>{/if}
+					{#if (primary?.data.owner as string[] | undefined)?.length}<span>{(primary?.data.owner as string[]).join(', ')}</span>{/if}
 				</div>
 			</div>
 		{/if}
-		<div class="insp-body">
+		<div class="insp-body" class:switching aria-busy={switching}>
 			{#if !scaleMode && !primary}
 				<InspectorSection title="Details"><p class="insp-description">Select a node to see its details.</p></InspectorSection>
 			{:else}
@@ -651,7 +670,7 @@
 					</dl>
 				</InspectorSection>
 			{:else if !d}
-				<InspectorSection title="Details"><p class="insp-description">{detail.error ?? 'Loading…'}</p></InspectorSection>
+				<InspectorSection title="Details"><p class="insp-description">{detail.error ?? catalog.error ?? 'Loading…'}</p></InspectorSection>
 			{:else if isSource}
 				<InspectorSection title="Source">
 					<dl class="kv">
@@ -1247,6 +1266,12 @@
 	.insp-body {
 		display: flex;
 		flex-direction: column;
+		transition: opacity 120ms;
+	}
+	/* A quick switch never dims; only one that takes longer than 150ms does. */
+	.insp-body.switching {
+		opacity: 0.55;
+		transition: opacity 120ms 150ms;
 	}
 	.mini-run {
 		display: grid;
