@@ -448,6 +448,11 @@ describe('launchJob', () => {
 		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '2026-10-01', end: '2026-10-31T00:00:00Z' } })).rejects.toMatchObject({ status: 422, message: text });
 	});
 
+	it('shows the status, not an HTML error page from something in front of the server', async () => {
+		const { client } = server(new Response('<html><body>Bad gateway</body></html>', { status: 502, statusText: 'Bad Gateway', headers: { 'content-type': 'text/html' } }));
+		await expect(client.launchJob(ORDERS, 'daily')).rejects.toMatchObject({ status: 502, message: '502 Bad Gateway' });
+	});
+
 	it("shows the server's refusal of a window as it comes", async () => {
 		const { client } = server(Response.json({ error: 'backfill window start must not follow end' }, { status: 400 }));
 		await expect(client.launchJob(ORDERS, 'daily', { window: { type: 'timestamp', start: '20', end: '10' } })).rejects.toMatchObject({

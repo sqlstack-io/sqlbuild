@@ -780,9 +780,9 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}) as unknown as ApiClient;
 }
 
-/** The server's message: a JSON error body's text, or a plain-text body such as a request the route couldn't read. */
+/** The server's message: a JSON error body's text, or a plain-text body such as a request the route couldn't read; never an HTML page. */
 function errorText(error: unknown, response: Response): string {
-	if (typeof error === 'string' && error.trim()) return error.trim();
+	if (typeof error === 'string' && error.trim() && response.headers.get('content-type')?.startsWith('text/plain')) return error.trim();
 	const message = (error as { message?: unknown; error?: unknown } | undefined)?.message ?? (error as { error?: unknown } | undefined)?.error;
 	return typeof message === 'string' ? message : `${response.status} ${response.statusText}`;
 }
