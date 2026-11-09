@@ -98,7 +98,8 @@ export const accountSourceLabel: Record<AccountSource, string> = {
 /** `SCHEMA.NAME`, or `DB.SCHEMA.NAME` when `withDatabase`. */
 export function formatRelation(relation: RelationName, withDatabase = false): string {
 	const parts = withDatabase && relation.database ? [relation.database, relation.schema, relation.name] : [relation.schema, relation.name];
-	return parts.join('.');
+	// A relation recorded without its schema shows its bare name.
+	return parts.filter(Boolean).join('.');
 }
 
 /** Short image ID, e.g. `sha256:4be1c07d9a52` → `4be1c07`. */
