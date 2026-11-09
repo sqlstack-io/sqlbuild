@@ -92,6 +92,8 @@ sqb build --select "job:nightly_orders,tag:finance"
 ```
 
 A job selects its own `select` minus its own `exclude`. A job group selects the union of its jobs.
+A job or job group declared with `targets` is selectable only when the command's target is one of
+them, as on the server.
 Job selectors compose with `+`, `,` and `--exclude` like any other selector. A job's own selection
 cannot name another job, and path-between selectors cannot start or end at a job.
 
