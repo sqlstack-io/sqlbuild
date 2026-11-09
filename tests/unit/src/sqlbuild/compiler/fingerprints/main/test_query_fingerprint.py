@@ -91,6 +91,19 @@ def test_given_raw_query_when_normalizing_then_returns_expected_text(
             "fda88b9b0f26486bdd25b8e3bab5a982fbb387901ab229091b17772d044aebd0",
         ),
         ComputeQueryHashTestCase(
+            "SQLite doubled quote, cast and quoted identifier",
+            "sqlite",
+            "SELECT o.id, 'it''s' AS note, CAST(o.amount AS REAL) AS amount "
+            'FROM "orders" AS o LIMIT 5',
+            "2fbcff962cec52c938214e9f1a743d54acad8141b4856272b8fe6a58cbefafe7",
+        ),
+        ComputeQueryHashTestCase(
+            "MotherDuck fingerprints like DuckDB",
+            "motherduck",
+            "SELECT o.id, $$note$$ AS note FROM orders AS o",
+            "7c0da9a2c301b18c78cf1c61daa53ad4c42b2ff01692ec88e84632ac235c14a3",
+        ),
+        ComputeQueryHashTestCase(
             "BigQuery raw string and backtick path",
             "bigquery",
             "SELECT o.id, r'raw\\d' AS pattern FROM `project.dataset.orders` AS o",
