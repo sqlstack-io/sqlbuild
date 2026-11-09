@@ -1,5 +1,6 @@
 //! Metadata reads hold live permission checks and results in the same transaction.
 
+use crate::runs::types::RunsPage;
 use uuid::Uuid;
 
 use crate::authorization::main::authorize_listing::authorize_listing;
@@ -10,10 +11,11 @@ use crate::store::errors::ControlError;
 use crate::store::main::{begin::begin, commit::commit};
 use crate::store::models::{ControlStore, TransactionMode};
 
+/// `before` is the queue time and ID of the last run of the previous page.
 pub async fn list_person_runs(
     store: &ControlStore,
     (context, credentials): (&AuditContext, Uuid),
-    (location_id, target, limit): (Uuid, &str, u32),
+    (location_id, target, page): (Uuid, &str, RunsPage),
     default_role: DefaultRole,
 ) -> Result<Vec<RunRecord>, ControlError> {
     let (transaction, _) = authorize_listing(
@@ -23,7 +25,7 @@ pub async fn list_person_runs(
         default_role,
     )
     .await?;
-    let (transaction, runs) = list_runs_in(transaction, (location_id, target), limit).await?;
+    let (transaction, runs) = list_runs_in(transaction, (location_id, target), page).await?;
     commit(transaction).await?;
     Ok(runs)
 }

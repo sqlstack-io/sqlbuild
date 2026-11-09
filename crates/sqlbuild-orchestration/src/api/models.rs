@@ -96,6 +96,15 @@ use crate::api::_helpers::resources::{
 ))]
 pub(crate) struct ControlApi;
 
+/// A page of runs, newest first; the `before_*` pair names the last run of the previous page.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunsQuery {
+    pub(crate) limit: Option<u32>,
+    pub(crate) before_queued_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub(crate) before_run_id: Option<uuid::Uuid>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ReadQuery {

@@ -1,4 +1,5 @@
 import createFetch from 'openapi-fetch';
+import { isActiveRun } from '$lib/status';
 import type { components, paths } from '$control/schema.d.ts';
 import { ApiError, type ApiClient } from './client';
 import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-checks';
@@ -12,12 +13,12 @@ import { overviewOf } from './http-overview';
 import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, runWindowOf, toJob, toTick, toTrigger, toTriggerStateEvent, triggerDetailOf } from './http-jobs';
-import { RUN_WINDOW, groupRunNodes, planResultOf, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
+import { RUN_WINDOW, groupRunNodes, parseRunCursor, planResultOf, toAdhocCheck, runDetailOf, runRowPageOver, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
 import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
-import type { AdhocRunCheck, AdhocRunRequest, PlanResult, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
+import type { AdhocRunCheck, AdhocRunRequest, BulkRunResult, PlanResult, Job, JobDetail, JobLaunchOptions, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunNodeError, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
 type Wire = components['schemas'];
 
@@ -38,7 +39,9 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRunOutput',
 	'getRunNodeError',
 	'cancelRun',
+	'cancelMatchingRuns',
 	'rerunRun',
+	'rerunSelectedNodes',
 	'listJobs',
 	'getJob',
 	'launchJob',
@@ -255,7 +258,21 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			evidenceLocations = new Set(bootstrap.locations.filter((l) => l.capabilities?.includes('view.evidence')).map((l) => l.id));
 			return bootstrap;
 		},
-		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> => runRowPage(await listedRuns(scope), scope.locationId, query),
+		listRunRows: async (scope: Scope, query: RunRowQuery = {}): Promise<RunRowPage> =>
+			runRowPageOver(await runWindows(scope, parseRunCursor(query.cursor).older), scope.locationId, query),
+		async cancelMatchingRuns(scope: Scope, query: RunRowQuery): Promise<BulkRunResult> {
+			const { rows } = runRowPageOver([await listedRuns(scope)], scope.locationId, { ...query, cursor: null, limit: RUN_WINDOW });
+			const result: BulkRunResult = { done: [], failed: [] };
+			for (const { run } of rows.filter((row) => isActiveRun(row.run.status) && !row.cancelRequestedAt)) {
+				const body = { run_id: run.id, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
+				const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+				if (response.status === 401) onUnauthorized();
+				if (response.ok) result.done.push(run.id);
+				else result.failed.push({ runId: run.id, error: errorText(error, response) });
+			}
+			forgetPending();
+			return result;
+		},
 		runTabCounts: async (scope: Scope, query: RunRowQuery = {}): Promise<RunTabCounts> => runTabCountsOf(await listedRuns(scope), scope.locationId, query),
 		getRun: async (scope: Scope, runId: string): Promise<Run | null> => (await findRun(scope, runId))?.run ?? null,
 		async getRunDetail(scope: Scope, runId: string): Promise<RunDetail | null> {
@@ -316,16 +333,25 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		async cancelRun(scope: Scope, runId: string): Promise<Run> {
 			const body = { run_id: runId, event_id: crypto.randomUUID(), reason: 'Cancelled from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/cancel', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, runId);
+		},
+		async rerunSelectedNodes(scope: Scope, runId: string, nodes: string[]): Promise<Run> {
+			const source = await requireRun(scope, runId);
+			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: false, nodes, priority: source.priority, reason: 'Rerun selected nodes from the web UI' };
+			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
+			forgetPending();
+			if (response.status === 401) onUnauthorized();
+			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
+			return requireRun(scope, body.run_id);
 		},
 		async rerunRun(scope: Scope, runId: string, mode: Exclude<RerunMode, 'selected'>): Promise<Run> {
 			const source = await requireRun(scope, runId);
 			const body = { run_id: crypto.randomUUID(), source_run_id: runId, from_failure: mode === 'from_failure', priority: source.priority, reason: 'Rerun from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/rerun', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -375,7 +401,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			const { locationId, target } = parseLocationKey(scope.locationId);
 			const body = { run_id: crypto.randomUUID(), location_id: locationId, target, command: request.command, priority: request.priority, reason: 'Started from the web UI' };
 			const { error, response } = await http.POST('/api/control/runs/adhoc', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-			inFlight.clear();
+			forgetPending();
 			if (response.status === 401) onUnauthorized();
 			if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 			return requireRun(scope, body.run_id);
@@ -638,6 +664,12 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	 * instead of each asking the server again. A write clears it, so reads after a write see it.
 	 */
 	const inFlight = new Map<string, Promise<unknown>>();
+	/** Windows of runs older than the newest, by the run each starts after; a mutation here forgets them. */
+	const olderWindows = new Map<string, Promise<Wire['RunRecord'][]>>();
+	function forgetPending() {
+		inFlight.clear();
+		olderWindows.clear();
+	}
 	function shared<T>(key: string, load: () => Promise<T>): Promise<T> {
 		const pending = inFlight.get(key) as Promise<T> | undefined;
 		if (pending) return pending;
@@ -800,12 +832,40 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	async function changeTrigger(triggerId: string, change: Wire['TriggerChange'], reason?: string | null) {
 		const body = { trigger_id: triggerId, event_id: crypto.randomUUID(), actor: '', reason: reason?.trim() || 'Changed from the web UI', change };
 		const { error, response } = await http.POST('/api/control/triggers', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-		inFlight.clear();
+		forgetPending();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 	}
 
 	const listedRuns = (scope: Scope) => shared(`runs ${scope.locationId}`, () => fetchRuns(scope));
+
+	/** The newest window of runs and up to `older` full windows before it. */
+	async function runWindows(scope: Scope, older: number) {
+		const windows = [await listedRuns(scope)];
+		for (let last = windows[0]; windows.length <= older && last.length === RUN_WINDOW; windows.push(last)) {
+			last = await olderRuns(scope, last[last.length - 1]);
+		}
+		return windows;
+	}
+
+	function olderRuns(scope: Scope, after: Wire['RunRecord']) {
+		const key = `${scope.locationId}|${after.queued_at}|${after.run_id}`;
+		const cached = olderWindows.get(key);
+		if (cached) return cached;
+		const { locationId, target } = parseLocationKey(scope.locationId);
+		const load = http
+			.GET('/api/control/locations/{location_id}/targets/{target}/runs', {
+				params: { path: { location_id: locationId, target }, query: { limit: RUN_WINDOW, before_queued_at: after.queued_at, before_run_id: after.run_id } }
+			})
+			.then(({ data, error, response }) => {
+				if (response.status === 401) onUnauthorized();
+				if (!data) throw new ApiError(errorText(error, response), response.status);
+				return data;
+			});
+		olderWindows.set(key, load);
+		load.catch(() => olderWindows.delete(key));
+		return load;
+	}
 
 	/** The newest runs of the location, up to the server's cap. */
 	async function fetchRuns(scope: Scope) {
@@ -844,7 +904,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			exclude: options?.exclude?.length ? options.exclude : undefined
 		};
 		const { error, response } = await http.POST('/api/control/runs', { body, params: { header: { 'x-sqb-csrf': csrfToken(document.cookie) } } });
-		inFlight.clear();
+		forgetPending();
 		if (response.status === 401) onUnauthorized();
 		if (!response.ok) throw new ApiError(errorText(error, response), response.status);
 		return requireRun(scope, body.run_id);

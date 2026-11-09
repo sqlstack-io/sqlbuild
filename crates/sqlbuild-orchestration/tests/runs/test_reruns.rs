@@ -94,6 +94,7 @@ fn given_a_partial_group_when_rerun_after_redeploy_then_only_failed_and_skipped_
                 from_failure: true,
                 reason: "Retry failed orders".into(),
                 priority: 7,
+                nodes: Vec::new(),
             };
             assert!(
                 request_rerun(store, (&context, None), &retry)

@@ -7,7 +7,7 @@ use axum::{Extension, Json};
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
-use crate::api::models::{MutationResponse, ReadQuery};
+use crate::api::models::{MutationResponse, RunsQuery};
 use crate::credentials::models::AuthenticatedPerson;
 use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::declarations::main::change_person_trigger::change_person_trigger;
@@ -21,6 +21,7 @@ use crate::runs::models::{
     PersonRunRequest, RerunRequest, RunRecord,
 };
 use crate::runs::types::CommandPlanner;
+use crate::store::errors::ControlError;
 use crate::store::models::ControlStore;
 use crate::warehouse_metadata::main::read_person_catalog::read_person_catalog;
 use crate::warehouse_metadata::main::read_person_column_lineage::read_person_column_lineage;
@@ -171,20 +172,34 @@ pub(crate) async fn change_trigger(
 }
 
 #[utoipa::path(get, path = "/api/control/locations/{location_id}/targets/{target}/runs", operation_id = "listPersonRuns",
-    params(("location_id" = Uuid, Path), ("target" = String, Path), ("limit" = Option<u32>, Query)),
-    responses((status = 200, body = Vec<RunRecord>), (status = 401, description = "Session rejected"),
+    params(("location_id" = Uuid, Path), ("target" = String, Path),
+        ("limit" = Option<u32>, Query, description = "Page size; defaults to 100, capped at 1000"),
+        ("before_queued_at" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "With before_run_id: continue after this run of the previous page"),
+        ("before_run_id" = Option<Uuid>, Query)),
+    responses((status = 200, body = Vec<RunRecord>, description = "Runs newest first"), (status = 400, description = "Only one of the before_* pair was given"),
+        (status = 401, description = "Session rejected"),
         (status = 403, body = crate::api::models::ApiErrorBody)), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn recent_runs(
     (State(store), Extension(context)): (State<ControlStore>, Extension<AuditContext>),
     Extension(default_role): Extension<DefaultRole>,
-    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<ReadQuery>),
+    (Path((location_id, target)), Query(options)): (Path<(Uuid, String)>, Query<RunsQuery>),
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
 ) -> Result<Json<Vec<RunRecord>>, ApiError> {
+    let before = match (options.before_queued_at, options.before_run_id) {
+        (Some(queued_at), Some(run_id)) => Some((queued_at, run_id)),
+        (None, None) => None,
+        _ => {
+            return Err(ControlError::Invalid(
+                "before_queued_at and before_run_id go together".into(),
+            )
+            .into());
+        }
+    };
     Ok(Json(
         list_person_runs(
             &store,
             (&context, principal),
-            (location_id, &target, options.limit.unwrap_or(100)),
+            (location_id, &target, (options.limit.unwrap_or(100), before)),
             default_role,
         )
         .await?,

@@ -197,6 +197,9 @@ pub struct RerunRequest {
     pub from_failure: bool,
     pub reason: String,
     pub priority: i64,
+    /// Rerun only these nodes of the source run; each must be in its selection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<String>,
 }
 
 /// Browser cancellation cannot supply an actor, claim or lifecycle transition.

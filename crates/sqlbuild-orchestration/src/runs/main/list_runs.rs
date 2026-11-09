@@ -16,7 +16,8 @@ pub async fn list_runs(
     limit: u32,
 ) -> Result<Vec<RunRecord>, ControlError> {
     let transaction = begin(store, TransactionMode::Read).await?;
-    let (transaction, runs) = list_runs_in(transaction, (location_id, target), limit).await?;
+    let (transaction, runs) =
+        list_runs_in(transaction, (location_id, target), (limit, None)).await?;
     commit(transaction).await?;
     Ok(runs)
 }

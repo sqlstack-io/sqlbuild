@@ -2171,6 +2171,8 @@ export interface components {
         /** @description A retry derives its execution scope from a terminal run, never from caller selectors. */
         RerunRequest: {
             from_failure: boolean;
+            /** @description Rerun only these nodes of the source run; each must be in its selection. */
+            nodes?: string[];
             /** Format: int64 */
             priority: number;
             reason: string;
@@ -4316,7 +4318,11 @@ export interface operations {
     listPersonRuns: {
         parameters: {
             query?: {
+                /** @description Page size; defaults to 100, capped at 1000 */
                 limit?: number;
+                /** @description With before_run_id: continue after this run of the previous page */
+                before_queued_at?: string;
+                before_run_id?: string;
             };
             header?: never;
             path: {
@@ -4327,6 +4333,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Runs newest first */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4334,6 +4341,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunRecord"][];
                 };
+            };
+            /** @description Only one of the before_* pair was given */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Session rejected */
             401: {

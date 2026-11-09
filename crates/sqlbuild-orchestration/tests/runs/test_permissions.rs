@@ -176,7 +176,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         list_person_runs(
                             store,
                             (&context, credentials),
-                            (location_id, "development", 10),
+                            (location_id, "development", (10, None)),
                             DefaultRole::None,
                         )
                         .await
@@ -288,6 +288,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                             from_failure: false,
                             reason: "Rerun the original frozen execution".into(),
                             priority: 0,
+                            nodes: Vec::new(),
                         };
                         for expected in [true, false] {
                             let result =
@@ -335,6 +336,7 @@ fn given_scoped_person_roles_when_jobs_request_sensitive_settings_then_only_admi
                         from_failure: false,
                         reason: "Repeat ad-hoc execution".into(),
                         priority: 0,
+                        nodes: Vec::new(),
                     };
                     let can_rerun_adhoc = test_case.role == BuiltinRole::Admin
                         || (test_case.role == BuiltinRole::Developer && settings_index == 0);

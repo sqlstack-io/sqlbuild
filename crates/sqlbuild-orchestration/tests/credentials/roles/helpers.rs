@@ -323,10 +323,15 @@ pub(crate) async fn member_listings(
         .await
         .map(|_| ())
         .map_err(denial),
-        list_person_runs(store, member, (scope.0, scope.1, 10), DefaultRole::None)
-            .await
-            .map(|_| ())
-            .map_err(denial),
+        list_person_runs(
+            store,
+            member,
+            (scope.0, scope.1, (10, None)),
+            DefaultRole::None,
+        )
+        .await
+        .map(|_| ())
+        .map_err(denial),
     ]
 }
 

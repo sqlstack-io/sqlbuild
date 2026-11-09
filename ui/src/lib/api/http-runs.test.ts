@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { components } from '$control/schema.d.ts';
-import { groupRunNodes, planResultOf, runDetailOf, runRowPage, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
+import { groupRunNodes, parseRunCursor, planResultOf, runDetailOf, runRowPage, runRowPageOver, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunStatements, toRunOutput } from './http-runs';
 
 type RunRecord = components['schemas']['RunRecord'];
 type W = components['schemas'];
@@ -102,6 +102,43 @@ describe('runs list', () => {
 		expect(runTabCountsOf(listing, LOCATION, { includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['ada admin'] }, includeChildren: true })).toEqual({ active: 3, queued: 2 });
 		expect(runTabCountsOf(listing, LOCATION, { filter: { requestedBy: ['someone else'] } })).toEqual({ active: 0, queued: 0 });
+	});
+});
+
+describe('runs past the newest window', () => {
+	const runWindow = (prefix: string, size: number) => Array.from({ length: size }, (_, i) => wire(`${prefix}${i}`));
+	const ids = (page: { rows: { run: { id: string } }[] }) => page.rows.map((r) => r.run.id);
+
+	it('reads the window count after the offset', () => {
+		expect(parseRunCursor(null)).toEqual({ offset: 0, older: 0 });
+		expect(parseRunCursor('7')).toEqual({ offset: 7, older: 0 });
+		expect(parseRunCursor('1000+2')).toEqual({ offset: 1000, older: 2 });
+	});
+
+	it('stops at the end of a window shorter than a full one', () => {
+		const page = runRowPageOver([runWindow('n', 30)], LOCATION, { tab: 'all', limit: 20, cursor: '20' });
+		expect(ids(page)).toEqual(Array.from({ length: 10 }, (_, i) => `n${i + 20}`));
+		expect(page.nextCursor).toBeNull();
+	});
+
+	it('asks for one more window once a full window runs out', () => {
+		const newest = runWindow('n', 1000);
+		const first = runRowPageOver([newest], LOCATION, { tab: 'all', limit: 600 });
+		expect(first.nextCursor).toBe('600');
+		const second = runRowPageOver([newest], LOCATION, { tab: 'all', limit: 600, cursor: first.nextCursor });
+		expect(second.rows).toHaveLength(400);
+		expect(second.nextCursor).toBe('1000+1');
+	});
+
+	it('pages into the older window and keeps its count on the cursor', () => {
+		const windows = [runWindow('n', 1000), runWindow('o', 1000)];
+		const page = runRowPageOver(windows, LOCATION, { tab: 'all', limit: 600, cursor: '1000+1' });
+		expect(ids(page)[0]).toBe('o0');
+		expect(ids(page)).toHaveLength(600);
+		expect(page.nextCursor).toBe('1600+1');
+		const last = runRowPageOver([runWindow('n', 1000), runWindow('o', 3)], LOCATION, { tab: 'all', limit: 600, cursor: '1000+1' });
+		expect(ids(last)).toEqual(['o0', 'o1', 'o2']);
+		expect(last.nextCursor).toBeNull();
 	});
 });
 

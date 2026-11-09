@@ -122,6 +122,7 @@ pub(crate) fn control_admin(namespace: &Namespace) -> Result<ControlAdmin, Contr
                         from_failure: flag(namespace, "admin_from_failure"),
                         reason,
                         priority,
+                        nodes: Vec::new(),
                     }));
                 }
                 let target = text(namespace, "admin_target").unwrap_or_default();

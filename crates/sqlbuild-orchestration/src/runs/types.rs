@@ -17,6 +17,9 @@ pub trait CommandPlanner: Send + Sync {
     ) -> Result<CommandPlan, String>;
 }
 
+/// A page of runs, newest first: at most this many, after the queue time and ID of a previous page's last run.
+pub type RunsPage = (u32, Option<(chrono::DateTime<chrono::Utc>, uuid::Uuid)>);
+
 /// What the API hands runs to workers with: their Docker images and the command planner.
 pub type RunHandoff = (
     Vec<crate::api::models::DockerImageSource>,

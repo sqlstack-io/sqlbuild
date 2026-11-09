@@ -5,12 +5,13 @@ use std::collections::BTreeSet;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::credentials::models::AuditContext;
+use crate::credentials::models::{AuditContext, DefaultRole};
 use crate::credentials::tests::location_helpers::create_location;
 use crate::credentials::tests::role_helpers::{
     SUPPORT_ROLE, credentials, orders_grant, role_fixture,
 };
 use crate::runs::main::change_run::change_run;
+use crate::runs::main::list_person_runs::list_person_runs;
 use crate::runs::main::list_runs::list_runs;
 use crate::runs::main::request_job_run::request_job_run;
 use crate::runs::main::request_person_run::request_person_run;
@@ -20,7 +21,9 @@ use crate::runs::models::{
     RunKind, RunNarrowing, RunRequest,
 };
 use crate::runs::tests::helpers::{json_column, rows, snapshot};
-use crate::runs::tests::test_types::{ExactKeyPlanner, JobSubsetTestCase, NarrowingDenialTestCase};
+use crate::runs::tests::test_types::{
+    ExactKeyPlanner, JobSubsetTestCase, NamedRerunTestCase, NarrowingDenialTestCase,
+};
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
 use crate::store::errors::ControlError;
 use crate::store::main::migrate_store::migrate_store;
@@ -213,6 +216,7 @@ fn given_a_published_job_when_a_run_narrows_it_then_only_the_jobs_own_selected_n
                     from_failure: false,
                     reason: "Run the same part again".into(),
                     priority: 0,
+                    nodes: Vec::new(),
                 },
             )
             .await
@@ -334,6 +338,191 @@ fn given_a_member_without_view_on_every_node_when_narrowing_a_job_then_every_sel
                     test_case.description
                 );
             }
+            close_test_store(fixture).await;
+        });
+    }
+}
+
+#[test]
+fn given_a_finished_run_when_rerunning_named_nodes_then_only_those_rerun_for_people_who_list_the_target()
+ {
+    let test_cases = [
+        NamedRerunTestCase {
+            description: "two of the run's nodes",
+            nodes: &["orders", "inventory"],
+            from_failure: false,
+            by_member: false,
+            expected_selection: Some(&["inventory", "orders"]),
+            expected_denied: false,
+        },
+        NamedRerunTestCase {
+            description: "a node outside the run",
+            nodes: &["orders", "products"],
+            from_failure: false,
+            by_member: false,
+            expected_selection: None,
+            expected_denied: false,
+        },
+        NamedRerunTestCase {
+            description: "named nodes and from failure together",
+            nodes: &["orders"],
+            from_failure: true,
+            by_member: false,
+            expected_selection: None,
+            expected_denied: false,
+        },
+        NamedRerunTestCase {
+            description: "a member without view on every node, naming a node they may rerun",
+            nodes: &["orders"],
+            from_failure: false,
+            by_member: true,
+            expected_selection: None,
+            expected_denied: true,
+        },
+        NamedRerunTestCase {
+            description: "a member without view on every node, naming a node outside the run",
+            nodes: &["products"],
+            from_failure: false,
+            by_member: true,
+            expected_selection: None,
+            expected_denied: true,
+        },
+    ];
+    for backend in [Backend::Sqlite, Backend::Postgres] {
+        run(async {
+            let Some(fixture) = open_test_store(backend).await else {
+                return;
+            };
+            let store = &fixture.store;
+            migrate_store(store).await.expect("migrate");
+            let roles = role_fixture(store).await;
+            let mut input = snapshot(roles.location_id);
+            input.generation = 2;
+            input.documents.insert(
+                "roles".into(),
+                json!({SUPPORT_ROLE: {"description": "Answer order questions",
+                    "grants": [orders_grant(json!(["view", "run.rerun"]), &["orders"])]}}),
+            );
+            input.documents.insert("jobs".into(), json!({"daily_orders": {
+                "description": "Orders and stock", "selection": ["customers", "inventory", "orders"]}}));
+            publish_snapshot(store, &input).await.expect("publish jobs");
+            let owner = AuditContext {
+                actor: "test-operator".into(),
+                granting_role: "control-store-owner".into(),
+                request_id: Uuid::now_v7(),
+                ip_address: None,
+            };
+            let source_id = Uuid::now_v7();
+            request_job_run(
+                store,
+                (&owner, None),
+                &JobRunRequest {
+                    run_id: source_id,
+                    location_id: roles.location_id,
+                    target: "development".into(),
+                    job_key: "daily_orders".into(),
+                    reason: "Build orders and stock".into(),
+                    priority: 0,
+                    window: None,
+                    full_refresh: false,
+                    select: Vec::new(),
+                    exclude: Vec::new(),
+                },
+            )
+            .await
+            .expect("source run");
+            change_run(
+                store,
+                RunAuthority::Operator(&owner),
+                &RunChangeRequest {
+                    event_id: Uuid::now_v7(),
+                    run_id: source_id,
+                    claim_id: None,
+                    change: RunChange::CancelRequested {
+                        actor: owner.actor.clone(),
+                        reason: "Stop before it starts".into(),
+                    },
+                },
+            )
+            .await
+            .expect("finish the source run");
+            let people = [
+                (&roles.context, credentials(&roles.administrator)),
+                (&roles.context, credentials(&roles.member)),
+            ];
+            for test_case in &test_cases {
+                let request = RerunRequest {
+                    run_id: Uuid::now_v7(),
+                    source_run_id: source_id,
+                    from_failure: test_case.from_failure,
+                    reason: "Rerun part of the run".into(),
+                    priority: 0,
+                    nodes: test_case
+                        .nodes
+                        .iter()
+                        .map(|node| (*node).to_owned())
+                        .collect(),
+                };
+                let (context, principal) = people[usize::from(test_case.by_member)];
+                let outcome = request_rerun(store, (context, Some(principal)), &request).await;
+                let stored = rows(
+                    store,
+                    "SELECT request_json FROM sqb_runs WHERE run_id=$1",
+                    vec![Parameter::Id(request.run_id)],
+                )
+                .await;
+                let frozen: Option<RunRequest> = stored.first().map(|row| {
+                    serde_json::from_value(json_column(&row["request_json"])).expect("frozen")
+                });
+                let keys = |keys: &[&str]| -> BTreeSet<String> {
+                    keys.iter().map(|key| (*key).to_owned()).collect()
+                };
+                assert_eq!(
+                    (
+                        frozen.map(|frozen| (frozen.selection, frozen.write_set)),
+                        matches!(outcome, Err(ControlError::Denied { .. })),
+                    ),
+                    (
+                        test_case
+                            .expected_selection
+                            .map(|expected| (keys(expected), keys(expected))),
+                        test_case.expected_denied,
+                    ),
+                    "{backend:?}: {}: {outcome:?}",
+                    test_case.description
+                );
+            }
+            let list = |before| {
+                list_person_runs(
+                    store,
+                    people[0],
+                    (roles.location_id, "development", (1, before)),
+                    DefaultRole::None,
+                )
+            };
+            let everything = list_person_runs(
+                store,
+                people[0],
+                (roles.location_id, "development", (1000, None)),
+                DefaultRole::None,
+            )
+            .await
+            .expect("all runs");
+            let mut paged: Vec<Uuid> = Vec::new();
+            let mut before = None;
+            for _ in 0..everything.len() {
+                let page = list(before).await.expect("page");
+                paged.extend(page.iter().map(|run| run.run_id));
+                before = page.last().map(|run| (run.queued_at, run.run_id));
+            }
+            assert_eq!(
+                (paged, everything.len()),
+                (
+                    everything.iter().map(|run| run.run_id).collect::<Vec<_>>(),
+                    2
+                ),
+                "{backend:?}: pages of one continue after the last run of the previous page, newest first"
+            );
             close_test_store(fixture).await;
         });
     }

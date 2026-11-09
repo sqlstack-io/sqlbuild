@@ -232,6 +232,17 @@ pub(crate) struct JobSubsetTestCase {
     pub(crate) expected_selection: Option<&'static [&'static str]>,
 }
 
+pub(crate) struct NamedRerunTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) nodes: &'static [&'static str],
+    pub(crate) from_failure: bool,
+    /// The member holds view and run.rerun on `orders` only; otherwise the administrator asks.
+    pub(crate) by_member: bool,
+    /// The rerun's frozen selection, or `None` when it is refused.
+    pub(crate) expected_selection: Option<&'static [&'static str]>,
+    pub(crate) expected_denied: bool,
+}
+
 pub(crate) struct RunNodeErrorTestCase {
     pub(crate) description: &'static str,
     pub(crate) backend: Backend,

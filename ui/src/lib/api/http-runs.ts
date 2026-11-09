@@ -196,6 +196,22 @@ export function runRowPage(wires: Wire['RunRecord'][], locationId: string, query
 	};
 }
 
+/** A rows cursor: the offset into the matching rows, then `+N` when N windows older than the newest are loaded. */
+export function parseRunCursor(cursor: string | null | undefined): { offset: number; older: number } {
+	const [offset, older] = (cursor ?? '0').split('+');
+	return { offset: Number(offset) || 0, older: Number(older) || 0 };
+}
+
+/** A page over the loaded windows, newest first; once they run out and the oldest was full, the next page loads one more window. */
+export function runRowPageOver(windows: Wire['RunRecord'][][], locationId: string, query: RunRowQuery): RunRowPage {
+	const { offset, older } = parseRunCursor(query.cursor);
+	const page = runRowPage(windows.flat(), locationId, { ...query, cursor: String(offset) });
+	const more = windows.at(-1)?.length === RUN_WINDOW;
+	const next = page.nextCursor ?? (more ? String(offset + page.rows.length) : null);
+	const loaded = page.nextCursor ? older : older + 1;
+	return { rows: page.rows, nextCursor: next !== null && loaded ? `${next}+${loaded}` : next };
+}
+
 export function runTabCountsOf(wires: Wire['RunRecord'][], locationId: string, query: RunRowQuery): RunTabCounts {
 	const runs = toRuns(wires, locationId).filter((run, i) => matches(run, wires[i], query));
 	return {
