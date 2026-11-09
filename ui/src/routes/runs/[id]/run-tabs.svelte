@@ -16,12 +16,15 @@
 	// Printed lines name no node, so a node filter keeps the lines that mention one of the selected nodes.
 	const shownEntries = $derived(filtering ? entries.filter((e) => (e.nodeKey ? sel.has(e.nodeKey) : view.selected.some((k) => e.text.includes(k)))) : entries);
 	const grouped = $derived((view.detail?.children.length ?? 0) > 0);
+	// Kept here so the choice survives switching tabs, and the Log count matches the rows shown.
+	let printed = $state(false);
+	const logCount = $derived(shownEntries.filter((e) => printed || e.category !== 'output' || e.pinned).length);
 
 	const TABS = $derived(bottomTabs(app.client, (c) => app.can(c)));
 	$effect(() => {
 		if (TABS.length && !TABS.some((t) => t.value === view.tab)) view.tab = TABS[0].value;
 	});
-	const count = (t: BottomTab) => (t === 'statements' ? statements.length : shownEntries.length);
+	const count = (t: BottomTab) => (t === 'statements' ? statements.length : logCount);
 	const chipText = $derived(view.selected.length === 1 ? view.selected[0] : `${view.selected.length} nodes`);
 </script>
 
@@ -45,7 +48,7 @@
 	{#if view.tab === 'statements'}
 		<StatementsTab {statements} total={view.statements.length} {grouped} />
 	{:else}
-		<LogTab entries={shownEntries} {grouped} runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
+		<LogTab entries={shownEntries} {grouped} bind:printed runId={view.run?.id ?? ''} filteredBy={view.selected} onstatement={app.client.supports('listRunStatements') ? (key) => view.focusNode(key, 'statements') : undefined} />
 	{/if}
 </div>
 

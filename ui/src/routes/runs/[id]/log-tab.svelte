@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { RunEventLevel } from '$lib/api';
@@ -12,12 +13,15 @@
 		grouped,
 		runId,
 		filteredBy,
+		printed = $bindable(false),
 		onstatement
 	}: {
 		entries: LogEntry[];
 		grouped: boolean;
 		runId: string;
 		filteredBy: string[];
+		/** Whether what the run printed is shown; a failing run's last printed block always is. */
+		printed?: boolean;
 		/** Opens a query's statement, with its SQL. */
 		onstatement?: (nodeKey: string) => void;
 	} = $props();
@@ -29,17 +33,24 @@
 		{ value: 'debug', label: 'Debug' }
 	];
 	let levels = $state<Set<RunEventLevel>>(new Set(['info', 'warn', 'error']));
-	let categories = $state<Set<EventCategory>>(new Set(['run', 'nodes', 'queries', 'checks', 'output']));
+	let categories = $state<Set<EventCategory>>(new Set(['run', 'nodes', 'queries', 'checks']));
 	let query = $state('');
 	// Long printed blocks fold to their first lines.
 	const FOLD = 4;
 	let open = $state<Set<string>>(new Set());
+	// Nodes whose queries are listed under their outcome row.
+	let expanded = $state<Set<string>>(new Set());
 
-	const present = $derived(EVENT_CATEGORIES.filter((c) => c.value !== 'output' || entries.some((e) => e.category === 'output')));
+	// Printed output has its own switch; a kind chip shows only when the log has that kind.
+	const present = $derived(EVENT_CATEGORIES.filter((c) => c.value !== 'output' && entries.some((e) => e.category === c.value)));
+	const hasOutput = $derived(entries.some((e) => e.category === 'output'));
+	const hidden = $derived(entries.filter((e) => e.category === 'output' && !e.pinned).length);
+	const kindShown = (e: LogEntry) => (e.category === 'output' ? printed || e.pinned : categories.has(e.category));
 	const q = $derived(query.trim().toLowerCase());
-	const byCategory = $derived(entries.filter((e) => categories.has(e.category)));
+	const matches = (e: LogEntry) => !q || [e.nodeKey ?? '', e.text, e.title, ...e.queries.map((x) => x.text)].join(' ').toLowerCase().includes(q);
+	const byCategory = $derived(entries.filter(kindShown));
 	const byLevel = $derived(entries.filter((e) => levels.has(e.level)));
-	const shown = $derived(entries.filter((e) => levels.has(e.level) && categories.has(e.category) && (!q || `${e.nodeKey ?? ''} ${e.text} ${e.title}`.toLowerCase().includes(q))));
+	const shown = $derived(entries.filter((e) => levels.has(e.level) && kindShown(e) && matches(e)));
 	const levelCount = (l: RunEventLevel) => byCategory.filter((e) => e.level === l).length;
 	const categoryCount = (c: EventCategory) => byLevel.filter((e) => e.category === c).length;
 
@@ -51,7 +62,8 @@
 	}
 
 	function download() {
-		const text = shown.map((e) => [e.at, grouped ? e.runId : null, e.level, e.nodeKey ?? '', e.text].filter((v) => v !== null).join('\t')).join('\n');
+		const line = (e: LogEntry, indent = '') => [e.at, grouped ? e.runId : null, e.level, e.nodeKey ?? '', indent + e.text].filter((v) => v !== null).join('\t');
+		const text = shown.flatMap((e) => [line(e), ...e.queries.map((x) => line(x, '  '))]).join('\n');
 		const url = URL.createObjectURL(new Blob([text + '\n'], { type: 'text/plain' }));
 		const a = document.createElement('a');
 		a.href = url;
@@ -72,6 +84,11 @@
 			<button class:on={categories.has(c.value)} onclick={() => (categories = toggle(categories, c.value))}>{c.label} <span>{categoryCount(c.value)}</span></button>
 		{/each}
 	</div>
+	{#if hasOutput}
+		<label class="switch" title="What sqb printed while the run worked. A failing run's last block, with its failures, is always shown.">
+			<input type="checkbox" bind:checked={printed} /> Show printed output <span>{hidden}</span>
+		</label>
+	{/if}
 	<label class="search">
 		<SearchIcon size={13} />
 		<input bind:value={query} placeholder="Search the log" aria-label="Search the log" />
@@ -107,12 +124,32 @@
 						{#if lines.length > FOLD}<button class="more" onclick={() => (open = toggle(open, e.id))}>{open.has(e.id) ? 'Show less' : `Show all ${lines.length} lines`}</button>{/if}
 					{:else}
 						<span class="dot" style:background={e.tone}></span><span title={e.title}>{e.text}</span>
+						{#if e.queries.length}
+							<button class="fold" class:open={expanded.has(e.id)} onclick={() => (expanded = toggle(expanded, e.id))} aria-expanded={expanded.has(e.id)}>
+								<ChevronRightIcon size={12} />{e.queries.length} {e.queries.length === 1 ? 'query' : 'queries'}
+							</button>
+						{/if}
 					{/if}
 					{#if e.statementId && e.nodeKey && onstatement && e.category === 'queries'}
 						<button class="sql" onclick={() => onstatement(e.nodeKey!)} title="Show this node's queries and their SQL">SQL</button>
 					{/if}
 				</td>
 			</tr>
+			{#if expanded.has(e.id)}
+				{#each e.queries as x (x.id)}
+					<tr class="query" class:error={x.level === 'error'}>
+						<td class="faint nowrap" title={formatStamp(x.at)}>{clockTime(x.at)}</td>
+						{#if grouped}<td></td>{/if}
+						<td></td>
+						<td>
+							<span class="dot" style:background={x.tone}></span><span title={x.title}>{x.text}</span>
+							{#if x.statementId && x.nodeKey && onstatement}
+								<button class="sql" onclick={() => onstatement(x.nodeKey!)} title="Show this node's queries and their SQL">SQL</button>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			{/if}
 		{:else}
 			<tr><td colspan={grouped ? 4 : 3} class="empty">{entries.length ? 'Nothing in the log matches these filters.' : 'Nothing logged yet.'}</td></tr>
 		{/each}
@@ -151,6 +188,41 @@
 	}
 	.chips span {
 		color: var(--sb-text-faint);
+	}
+	.switch {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+		white-space: nowrap;
+	}
+	.switch span {
+		color: var(--sb-text-faint);
+	}
+	.fold {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		margin-left: 8px;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
+	}
+	.fold:hover {
+		color: var(--primary);
+	}
+	.fold :global(svg) {
+		transition: transform 0.12s;
+	}
+	.fold.open :global(svg) {
+		transform: rotate(90deg);
+	}
+	tr.query td {
+		padding-top: 3px;
+		padding-bottom: 3px;
+		border-bottom: 0;
+		color: var(--muted-foreground);
+		font-size: 11.5px;
 	}
 	.search {
 		display: flex;
