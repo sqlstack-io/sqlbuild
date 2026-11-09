@@ -18,9 +18,11 @@ use sqlbuild_analysis::compiled_project::main::text_position::text_position;
 use sqlbuild_analysis::compiled_project::models::ModelLoopSettings;
 use sqlbuild_analysis::compiled_project::models::{SplicedSpan, TextPosition};
 use sqlbuild_attachments::cursor_intrinsics::main::replace_intrinsics::replace_intrinsics;
+use sqlbuild_cache::digest::types::ContentDigest;
 use sqlbuild_core::constants::PANIC_MESSAGE;
 use sqlbuild_core::panics::main::catch_compiler_panic::catch_compiler_panic;
 
+use crate::bindings::_helpers::cache::native_parse_store::{NativeParseStore, parse_key};
 use crate::bindings::_helpers::compiled_project::project::NativeCompiledProject;
 use crate::bindings::_helpers::input_loops::model_loop_prepass::spawned;
 
@@ -192,41 +194,61 @@ pub(crate) fn gap_job(
     })
 }
 
+/// A queued model: its input record index, name, relative path and statement keys.
+struct QueuedGap {
+    record: usize,
+    name: String,
+    relative_path: String,
+    keys: Vec<ContentDigest>,
+}
+
 /// Each queued gap parse, settled in loop order before the model loop returns.
 pub(crate) struct GapQueue {
     sender: Sender<(usize, GapOutcome)>,
     receiver: Receiver<(usize, GapOutcome)>,
-    /// Each queued model's input record index, name and relative path, in loop order.
-    queued: Vec<(usize, String, String)>,
+    queued: Vec<QueuedGap>,
     next_record: usize,
+    /// Statements read whole by earlier compiles, which are not parsed again.
+    parsed: Option<NativeParseStore>,
 }
 
-impl Default for GapQueue {
-    fn default() -> Self {
+impl GapQueue {
+    /// A queue that skips statements `parsed` holds and records each it reads whole.
+    pub(crate) fn new(parsed: Option<NativeParseStore>) -> Self {
         let (sender, receiver) = channel();
         Self {
             sender,
             receiver,
             queued: Vec::new(),
             next_record: 0,
+            parsed,
         }
     }
-}
 
-impl GapQueue {
     /// The input record index the model being finished will be retained at.
     pub(crate) fn expect_record(&mut self, index: usize) {
         self.next_record = index;
     }
 
-    /// Parse the model's statements on the compile pool.
+    /// Parse the model's statements on the compile pool, unless each was read whole before.
     pub(crate) fn queue(&mut self, job: GapJob) {
+        let keys: Vec<ContentDigest> = job
+            .checks
+            .iter()
+            .map(|site| parse_key(job.dialect.name(), &site.check))
+            .collect();
+        if let Some(parsed) = self.parsed.as_mut()
+            && keys.iter().all(|key| parsed.read_whole(key))
+        {
+            return;
+        }
         let slot: usize = self.queued.len();
-        self.queued.push((
-            self.next_record,
-            job.name.clone(),
-            job.relative_path.clone(),
-        ));
+        self.queued.push(QueuedGap {
+            record: self.next_record,
+            name: job.name.clone(),
+            relative_path: job.relative_path.clone(),
+            keys,
+        });
         let sender: Sender<(usize, GapOutcome)> = self.sender.clone();
         spawned(move || {
             let outcome: GapOutcome = catch_compiler_panic(|| job.outcome());
@@ -245,25 +267,38 @@ impl GapQueue {
             sender,
             receiver,
             queued,
+            mut parsed,
             ..
         } = self;
         drop(sender);
         let count: usize = queued.len();
-        let outcomes: Vec<Option<GapOutcome>> = project.py().detach(move || {
+        let py: Python<'_> = project.py();
+        let outcomes: Vec<Option<GapOutcome>> = py.detach(move || {
             let mut outcomes: Vec<Option<GapOutcome>> = (0..count).map(|_| None).collect();
             for (slot, outcome) in receiver.iter().take(count) {
                 outcomes[slot] = Some(outcome);
             }
             outcomes
         });
-        for ((record, name, relative_path), outcome) in queued.into_iter().zip(outcomes) {
+        for (model, outcome) in queued.into_iter().zip(outcomes) {
             let outcome: GapOutcome = outcome.unwrap_or_else(|| Err(PANIC_MESSAGE.to_owned()));
-            let skipped: bool = settle_gap(settings, context, (&name, &relative_path), outcome)?;
-            if skipped && record < project.borrow().inputs().len() {
-                project.borrow_mut().mark_analysis_skipped(record)?;
+            if let (Ok(None), Some(parsed)) = (&outcome, parsed.as_mut()) {
+                model.keys.into_iter().for_each(|key| parsed.record(key));
+            }
+            let skipped: bool = settle_gap(
+                settings,
+                context,
+                (&model.name, &model.relative_path),
+                outcome,
+            )?;
+            if skipped && model.record < project.borrow().inputs().len() {
+                project.borrow_mut().mark_analysis_skipped(model.record)?;
             }
         }
-        Ok(())
+        match parsed {
+            Some(parsed) => parsed.save(py),
+            None => Ok(()),
+        }
     }
 }
 

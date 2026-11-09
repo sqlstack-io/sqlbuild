@@ -188,7 +188,11 @@ fn compile_inputs<'py>(py: Python<'py>, request: &InputsRequest) -> PyResult<Bou
             ),
         ],
     )?;
-    let models: ModelBuild<'py> = model_build(request, &discovered, &model_context)?;
+    let models: ModelBuild<'py> = model_build(
+        request,
+        &discovered,
+        (&model_context, &target.compile_cache_dir),
+    )?;
     let attached: AttachedResources<'py> = attached_resources(
         request,
         &adapter_context,
@@ -323,7 +327,7 @@ fn target_context<'py>(
 fn model_build<'py>(
     request: &InputsRequest,
     discovered: &Bound<'py, PyAny>,
-    context: &Bound<'py, PyAny>,
+    (context, compile_cache_dir): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
 ) -> PyResult<ModelBuild<'py>> {
     let py: Python<'py> = discovered.py();
     let (enums, constants) = public_declaration_indexes(discovered.clone())?;
@@ -360,6 +364,7 @@ fn model_build<'py>(
                     request.external_sql_reference_resolver.bind(py).clone(),
                 ),
                 ("native_project", native_project.clone()),
+                ("compile_cache_dir", compile_cache_dir.clone()),
             ],
         )?),
     )?

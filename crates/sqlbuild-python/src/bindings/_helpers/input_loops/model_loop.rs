@@ -1,6 +1,7 @@
 //! The compile-input model loop: each model's steps run in the attachment's order, natively.
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use pyo3::prelude::{
     Bound, Py, PyAny, PyAnyMethods, PyErr, PyModule, PyModuleMethods, PyResult, Python,
@@ -30,6 +31,7 @@ use sqlbuild_sqltext::sql_references::models::ReferenceExtraction;
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
 
 use crate::bindings::_helpers::boundary::panics::compiler_error;
+use crate::bindings::_helpers::cache::native_parse_store::NativeParseStore;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AttachedSqlTests;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditFileRow;
 use crate::bindings::_helpers::compiled_project::attachment_inputs::AuditSettings;
@@ -367,7 +369,7 @@ impl NativeModelLoop {
         py: Python<'py>,
         project: Bound<'py, NativeCompiledProject>,
         host: Bound<'py, ConstantRendering>,
-        models: Vec<ModelLoopRow>,
+        (models, cache_dir): (Vec<ModelLoopRow>, Option<PathBuf>),
     ) -> PyResult<Vec<Bound<'py, NativeModelInput>>> {
         let contracts: ContractClasses<'py> = self.contract_classes.bind(py).extract()?;
         let classes: LoopClasses<'py> = self.loop_classes.bind(py).extract()?;
@@ -384,7 +386,13 @@ impl NativeModelLoop {
         let configs: ModelConfigs<'py> = ModelConfigs::default();
         let visibility: ModelVisibility<'py> = ModelVisibility::default();
         let signatures: HookSignatures = HookSignatures::default();
-        let mut gaps: GapQueue = GapQueue::default();
+        let parsed: Option<NativeParseStore> = match (self.route, cache_dir) {
+            (AnalysisRoute::Native(_), Some(cache_dir)) => {
+                NativeParseStore::open_in(py, &cache_dir)?
+            }
+            _ => None,
+        };
+        let mut gaps: GapQueue = GapQueue::new(parsed);
         let attached: PyResult<()> = (|| -> PyResult<()> {
             for row in models {
                 let ModelFileTexts {
@@ -447,7 +455,7 @@ impl NativeModelLoop {
         slf: &Bound<'py, Self>,
         project: Bound<'py, NativeCompiledProject>,
         host: Bound<'py, ConstantRendering>,
-        model_files: Vec<Py<NativeModelFile>>,
+        (model_files, cache_dir): (Vec<Py<NativeModelFile>>, Option<PathBuf>),
     ) -> PyResult<Vec<Bound<'py, NativeModelInput>>> {
         let py: Python<'py> = slf.py();
         let classes: LoopClasses<'py> = slf.get().loop_classes.bind(py).extract()?;
@@ -463,7 +471,7 @@ impl NativeModelLoop {
         project
             .borrow_mut()
             .keep_attachment_loop(slf.clone().unbind().into_any(), host.clone().unbind());
-        slf.get().run_models(py, project, host, models)
+        slf.get().run_models(py, project, host, (models, cache_dir))
     }
 
     /// Attach every discovered source in order into `project`; return each source's view.
