@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use crate::analysis_route::main::analysis_route::analysis_route;
 use crate::analysis_route::models::{AnalysisRoute, TypeMatch};
+use crate::analysis_route::types::NativeDialect;
 use crate::contracts::constants::UPPER_FOLDING_DIALECT;
 use crate::contracts::models::{DeclaredColumn, InferredOutputColumn};
 use crate::type_system::errors::TypeNormalizationError;
@@ -26,7 +27,11 @@ pub(crate) struct TypeComparer<'a> {
     /// The dialect's route: a native module compares types itself, and no route compares none.
     route: AnalysisRoute,
     normalized: RefCell<HashMap<String, Result<NormalizedType, TypeNormalizationError>>>,
+    /// A native route's matches by declared type, inferred type and its nullability.
+    native_matches: RefCell<HashMap<NativeMatchKey, TypeMatch>>,
 }
+
+type NativeMatchKey = (String, Option<String>, bool);
 
 impl<'a> TypeComparer<'a> {
     /// Whether the dialect folds unquoted identifiers to upper case, as star expansion names them.
@@ -39,6 +44,7 @@ impl<'a> TypeComparer<'a> {
             dialect,
             route: analysis_route(Some(dialect)),
             normalized: RefCell::new(HashMap::new()),
+            native_matches: RefCell::new(HashMap::new()),
         }
     }
 
@@ -52,7 +58,7 @@ impl<'a> TypeComparer<'a> {
             AnalysisRoute::Legacy => {}
             AnalysisRoute::Unavailable => return Ok(TypeComparison::NotCompared),
             AnalysisRoute::Native(dialect) => {
-                return Ok(match dialect.type_match(left, Some(right), false) {
+                return Ok(match self.native_match(dialect, left, Some(right), false) {
                     TypeMatch::NotCompared { .. } => TypeComparison::NotCompared,
                     TypeMatch::Compared {
                         same_type: true, ..
@@ -99,7 +105,8 @@ impl<'a> TypeComparer<'a> {
             return false;
         };
         matches!(
-            dialect.type_match(
+            self.native_match(
+                dialect,
                 declared_type,
                 inferred.inferred_type.as_deref(),
                 inferred.nullable
@@ -111,6 +118,27 @@ impl<'a> TypeComparer<'a> {
                 nullable_into_non_null: true
             }
         )
+    }
+
+    /// `dialect.type_match`, computed once per declared type, inferred type and nullability.
+    fn native_match(
+        &self,
+        dialect: &dyn NativeDialect,
+        declared: &str,
+        inferred: Option<&str>,
+        inferred_nullable: bool,
+    ) -> TypeMatch {
+        let key: NativeMatchKey = (
+            declared.to_owned(),
+            inferred.map(str::to_owned),
+            inferred_nullable,
+        );
+        if let Some(found) = self.native_matches.borrow().get(&key) {
+            return *found;
+        }
+        let found: TypeMatch = dialect.type_match(declared, inferred, inferred_nullable);
+        self.native_matches.borrow_mut().insert(key, found);
+        found
     }
 
     fn normalized(&self, type_sql: &str) -> Result<NormalizedType, TypeNormalizationError> {
