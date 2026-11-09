@@ -780,9 +780,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 	}) as unknown as ApiClient;
 }
 
-/** The server's message: a JSON error body's text, or a plain-text body such as a request the route couldn't read; never an HTML page. */
+/** The server's message: a JSON error body's text, or a 4xx plain-text body such as a request the route couldn't read; never an HTML page. */
 function errorText(error: unknown, response: Response): string {
-	if (typeof error === 'string' && error.trim() && response.headers.get('content-type')?.startsWith('text/plain')) return error.trim();
+	// Plain text comes from the server's request rejections; a 5xx one can name internal types, so it shows as the status.
+	if (typeof error === 'string' && error.trim() && response.status < 500 && response.headers.get('content-type')?.startsWith('text/plain')) return error.trim();
 	const message = (error as { message?: unknown; error?: unknown } | undefined)?.message ?? (error as { error?: unknown } | undefined)?.error;
 	return typeof message === 'string' ? message : `${response.status} ${response.statusText}`;
 }
