@@ -2,14 +2,14 @@
 
 use sqlquack_syntax::expressions::names::models::{Identifier, TableRef};
 use sqlquack_syntax::expressions::queries::models::With;
-use sqlquack_syntax::{Expression, ExpressionWalk, Parsed};
+use sqlquack_syntax::{Expression, ExpressionWalk};
 
 use crate::analysis_route::types::NativeDialect;
 
+use crate::sql_macros::_helpers::parsing::body::parsed_statement;
 use crate::sql_macros::_helpers::parsing::lexing::{Token, tokens};
 use crate::sql_macros::_helpers::parsing::parameters::{
-    ParameterReference, declarations_masked, in_lists_parenthesised, parameter_references,
-    placeholder, using_reads_joined, with_placeholders,
+    ParameterReference, parameter_references, placeholder, with_placeholders,
 };
 use crate::sql_macros::_helpers::typing::typed_calls::spliced;
 use crate::sql_macros::constants::{ARGUMENT_CODE, CTE_ARGUMENT, CTE_NAME_SEPARATOR};
@@ -110,7 +110,7 @@ pub(crate) fn renamed_ctes(
         tokens(sql).map_err(|_| "it has an unclosed quote or comment".to_owned())?;
     let references: Vec<ParameterReference> = parameter_references(sql, &scanned);
     let parsed_text: String = format!("{}{CTE_SUFFIX}", with_placeholders(sql, &references));
-    let statement: Expression = parsed(parser, &parsed_text)?;
+    let statement: Expression = parsed_statement(parser, &parsed_text)?;
     let Expression::Select(select) = &statement else {
         return Err("it is not a WITH list".to_owned());
     };
@@ -324,29 +324,6 @@ fn source_named<'s>(sources: &'s [ScopeSource], name: &str) -> Option<&'s ScopeS
     sources
         .iter()
         .find(|source| source.name.eq_ignore_ascii_case(name))
-}
-
-/// The one statement `text` parses to in the project's parser, or why it cannot read it.
-fn parsed(parser: &dyn NativeDialect, text: &str) -> Result<Expression, String> {
-    let Parsed {
-        mut statements,
-        gaps,
-    } = parser
-        .parse(&in_lists_parenthesised(&using_reads_joined(
-            &declarations_masked(text),
-        )))
-        .map_err(|gap| gap.message)?;
-    if let Some(gap) = gaps.first() {
-        return Err(format!(
-            "the {} parser cannot read {}",
-            parser.name(),
-            gap.construct
-        ));
-    }
-    match (statements.pop(), statements.is_empty()) {
-        (Some(statement), true) => Ok(statement),
-        _ => Err("it holds more than one statement".to_owned()),
-    }
 }
 
 /// The byte offset in `sql` of byte `offset` of `sql` with its references as placeholders.

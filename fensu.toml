@@ -2931,3 +2931,19 @@ reason = "The override keeps queue.Queue.put's positional protocol, which every 
 rule = "FFS201"
 path = "src/sqlbuild/orchestration_declarations/models/sensor_context.py"
 reason = "Only SensorContext lives here: invocation-local ctx.cursor assignment proposes progress, committed solely by native fenced completion. The package regression guards this declaration-only scope; class-symbol exceptions are unsupported."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/bigquery_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/databricks_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/duckdb_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/postgres_dialect.rs", "crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/sqlite_dialect.rs"]
+reason = "Each native module maps its own parser crate's StrictFailure, a distinct type per dialect, into a ParserGap, and decides per dialect whether an uncovered construct counts as syntax."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/dialects/bigquery_dialect.rs", "crates/sqlbuild-rules/src/lint_text/_helpers/sql_requests.rs"]
+reason = "BigQuery STRUCT fields split at angle brackets and backquoted names; lint arguments split at square brackets and string quotes. Different grammars in different crates."
+
+[[dupes.allowlist]]
+paths = ["scripts/compiler_differential/classes/analysis_features.py", "scripts/compiler_differential/classes/render_features.py"]
+reason = "Each differential feature writes its own model fixture; what remains alike is the call that adds a model."
+
+[[dupes.allowlist]]
+paths = ["crates/sqlbuild-analysis/src/analysis_route/_helpers/analysis/revalidation.rs", "crates/sqlbuild-config/src/dbt_manifest/_helpers/fields.rs"]
+reason = "A relation's declared columns and a dbt manifest's string field are unrelated lookups in different crates; only the find-non-empty shape is alike."

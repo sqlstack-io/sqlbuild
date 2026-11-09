@@ -69,6 +69,17 @@ pub(crate) fn parsed(
 
 /// The single SELECT `text` holds, parsed by the project's parser, or why that parser cannot read it.
 fn parsed_text(parser: &dyn NativeDialect, text: &str) -> Result<ParsedBody, String> {
+    match parsed_statement(parser, text)? {
+        Expression::Select(select) => Ok(ParsedBody { select }),
+        _ => Err("it is not a SELECT fragment".to_owned()),
+    }
+}
+
+/// The one statement `text` parses to in the project's parser, or why it cannot read it.
+pub(crate) fn parsed_statement(
+    parser: &dyn NativeDialect,
+    text: &str,
+) -> Result<Expression, String> {
     let Parsed {
         mut statements,
         gaps,
@@ -85,8 +96,7 @@ fn parsed_text(parser: &dyn NativeDialect, text: &str) -> Result<ParsedBody, Str
         ));
     }
     match (statements.pop(), statements.is_empty()) {
-        (Some(Expression::Select(select)), true) => Ok(ParsedBody { select }),
-        (Some(_), true) => Err("it is not a SELECT fragment".to_owned()),
+        (Some(statement), true) => Ok(statement),
         _ => Err("it holds more than one statement".to_owned()),
     }
 }
