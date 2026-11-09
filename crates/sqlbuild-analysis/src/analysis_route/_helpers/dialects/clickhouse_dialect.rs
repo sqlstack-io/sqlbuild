@@ -1,13 +1,12 @@
 //! ClickHouse's native module: SQLQuack's ClickHouse parser, profile and type spellings.
 
 use sqlquack_semantics::dialects::constants::CLICKHOUSE;
-use sqlquack_semantics::dialects::main::clickhouse_type::clickhouse_type;
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::Parsed;
 use sqlquack_syntax_clickhouse::parse_strict;
 
 use crate::analysis_route::_helpers::dialects::clickhouse_types::{
-    clickhouse_spelling, clickhouse_type_match,
+    clickhouse_spelling, clickhouse_type, clickhouse_type_match,
 };
 use crate::analysis_route::constants::{CLICKHOUSE_DIALECT, UNQUOTED_STUB_PREFIX};
 use crate::analysis_route::models::{ClickHouseDialect, ParserGap, TypeMatch};

@@ -2,11 +2,10 @@
 
 use std::num::IntErrorKind;
 
+use sqlquack_parse::{StrictFailure, parse_strict};
 use sqlquack_semantics::dialects::constants::{SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
 use sqlquack_semantics::dialects::types::DialectProfile;
-use sqlquack_syntax::{
-    Dialect, Error, Expression, ParseOptions, Parsed, StrictFailure, TokenizeFailure, parse_strict,
-};
+use sqlquack_syntax::{Dialect, Error, Expression, ParseOptions, Parsed, TokenizeFailure};
 
 use crate::analysis_route::_helpers::dialects::engine_types::snowflake_engine_type;
 use crate::analysis_route::_helpers::dialects::type_spelling::respelt;

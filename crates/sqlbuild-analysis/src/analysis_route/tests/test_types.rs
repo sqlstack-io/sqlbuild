@@ -1,8 +1,9 @@
+use sqlquack_parse::parse_strict;
 use sqlquack_semantics::dialects::constants::{DUCKDB, POSTGRES, SNOWFLAKE};
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_semantics::lineage::models::{Nullability, NullabilityRule};
 use sqlquack_syntax::expressions::statements::models::Command;
-use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed, parse_strict};
+use sqlquack_syntax::{Dialect, Expression, ParseOptions, Parsed};
 
 use crate::analysis_route::models::{AnalysisRoute, GapSite, LocatedGap, ParserGap, TypeMatch};
 use crate::analysis_route::types::NativeDialect;

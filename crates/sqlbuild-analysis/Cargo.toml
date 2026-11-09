@@ -25,6 +25,7 @@ sqlbuild-render.workspace = true
 sqlbuild-scopes.workspace = true
 sqlbuild-sqltext.workspace = true
 sqlquack-fingerprint.workspace = true
+sqlquack-parse.workspace = true
 sqlquack-semantics.workspace = true
 sqlquack-syntax.workspace = true
 sqlquack-syntax-bigquery.workspace = true

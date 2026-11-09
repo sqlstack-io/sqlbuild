@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 
+use sqlquack_parse::dialect_tokens;
 use sqlquack_syntax::Dialect;
-use sqlquack_syntax::dialect_tokens;
 use sqlquack_syntax::tokens::models::{Token, TokenType};
 
 use crate::compiler::_helpers::sql_tests::planning::{AnalysisTemplate, SqlTestPatterns};

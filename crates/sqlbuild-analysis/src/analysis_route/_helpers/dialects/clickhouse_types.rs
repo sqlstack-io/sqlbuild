@@ -1,7 +1,10 @@
 //! ClickHouse type text: Polyglot-equal normalization, and declared and inferred types compared.
 
 use crate::analysis_route::constants::{
-    CLICKHOUSE_TYPE_ALIASES, CLICKHOUSE_VERBATIM_TYPES, LOW_CARDINALITY_WRAPPER, NULLABLE_WRAPPER,
+    CLICKHOUSE_ALIASES, CLICKHOUSE_CASELESS_FAMILIES, CLICKHOUSE_DECIMAL_DEFAULT,
+    CLICKHOUSE_DECIMAL_WIDTHS, CLICKHOUSE_EXACT_FAMILIES, CLICKHOUSE_NUMBER_FAMILIES,
+    CLICKHOUSE_TYPE_ALIASES, CLICKHOUSE_VERBATIM_TYPES, CLICKHOUSE_WRAPPERS,
+    LOW_CARDINALITY_WRAPPER, NULLABLE_WRAPPER,
 };
 use crate::analysis_route::models::TypeMatch;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
@@ -223,4 +226,104 @@ fn wrapped<'a>(type_sql: &'a str, wrapper: &str) -> Option<&'a str> {
         }
     }
     Some(inner.trim())
+}
+
+/// The type `spelling` denotes, as `toTypeName` spells it; `None` for a spelling it does not know.
+pub(crate) fn clickhouse_type(spelling: &str) -> Option<String> {
+    let text: &str = spelling.trim();
+    let (base, arguments): (&str, Option<&str>) = match text.find('(') {
+        Some(open) => (
+            text[..open].trim(),
+            Some(text[open + 1..].strip_suffix(')')?),
+        ),
+        None => (text, None),
+    };
+    let words: String = base.split_whitespace().collect::<Vec<&str>>().join(" ");
+    if let Some(wrapper) = CLICKHOUSE_WRAPPERS
+        .iter()
+        .find(|wrapper| **wrapper == words)
+    {
+        return Some(format!("{wrapper}({})", clickhouse_type(arguments?)?));
+    }
+    let family: &str = family(&words)?;
+    match (family, arguments) {
+        ("String", _) => Some(family.to_owned()),
+        ("Decimal", None) => Some(CLICKHOUSE_DECIMAL_DEFAULT.to_owned()),
+        ("Decimal", Some(arguments)) => decimal(arguments),
+        ("FixedString", None) => None,
+        (_, None) => Some(family.to_owned()),
+        (_, Some(_))
+            if CLICKHOUSE_NUMBER_FAMILIES
+                .iter()
+                .any(|prefix| family.starts_with(prefix)) =>
+        {
+            Some(family.to_owned())
+        }
+        (_, Some(arguments)) => {
+            let width: Option<&(&str, u32)> = CLICKHOUSE_DECIMAL_WIDTHS
+                .iter()
+                .find(|(name, _)| *name == family);
+            match width {
+                Some((_, precision)) => Some(format!("Decimal({precision}, {})", arguments.trim())),
+                None => Some(format!("{family}({})", listed(arguments))),
+            }
+        }
+    }
+}
+
+/// The family a type name or alias stands for, matched with case where ClickHouse does.
+fn family(words: &str) -> Option<&'static str> {
+    if let Some(exact) = CLICKHOUSE_EXACT_FAMILIES
+        .iter()
+        .find(|name| **name == words)
+    {
+        return Some(exact);
+    }
+    let upper: String = words.to_ascii_uppercase();
+    CLICKHOUSE_CASELESS_FAMILIES
+        .iter()
+        .find(|name| name.to_ascii_uppercase() == upper)
+        .copied()
+        .or_else(|| {
+            CLICKHOUSE_ALIASES
+                .iter()
+                .find(|(alias, _)| *alias == upper)
+                .map(|(_, family)| *family)
+        })
+}
+
+/// Type arguments as `toTypeName` writes them: trimmed, `, `-separated outside quoted strings.
+fn listed(arguments: &str) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current: String = String::new();
+    let mut quoted: bool = false;
+    for character in arguments.chars() {
+        if character == ',' && !quoted {
+            parts.push(current.trim().to_owned());
+            current.clear();
+            continue;
+        }
+        quoted ^= character == '\'';
+        current.push(character);
+    }
+    parts.push(current.trim().to_owned());
+    parts.join(", ")
+}
+
+/// `Decimal(P)` or `Decimal(P, S)`, as `Decimal(P, S)`.
+fn decimal(arguments: &str) -> Option<String> {
+    let parts: Vec<&str> = arguments.split(',').map(str::trim).collect();
+    let numbers: Vec<u32> = match parts
+        .iter()
+        .map(|part| part.parse::<u32>())
+        .collect::<Result<Vec<u32>, _>>()
+    {
+        Ok(numbers) => numbers,
+        Err(_not_a_number) => return None,
+    };
+    match numbers.as_slice() {
+        [precision] => Some(format!("Decimal({precision}, 0)")),
+        [precision, scale] => Some(format!("Decimal({precision}, {scale})")),
+        _ => None,
+    }
 }

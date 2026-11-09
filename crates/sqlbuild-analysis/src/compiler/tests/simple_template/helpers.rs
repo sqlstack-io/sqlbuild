@@ -1,5 +1,6 @@
 use sqlbuild_sqltext::sql_scan::models::LexicalSyntax;
-use sqlquack_syntax::{Dialect, dialect_tokens};
+use sqlquack_parse::dialect_tokens;
+use sqlquack_syntax::Dialect;
 
 use crate::compiler::_helpers::sql_tests::planning::{
     AnalysisTemplate, SqlTestPatterns, parsed_analysis_template,

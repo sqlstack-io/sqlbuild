@@ -9,7 +9,7 @@ use crate::sql_tree::models::TreeParser;
 /// The statements of `sql` under `parser`; a non-syntax PostgreSQL failure or a skipped statement is unanalysable.
 pub(crate) fn parse(sql: &str, parser: TreeParser) -> Result<Vec<Expression>, SqlTreeError> {
     match parser {
-        TreeParser::Shared(dialect) => sqlquack_syntax::parse_statements_with(
+        TreeParser::Shared(dialect) => sqlquack_parse::parse_statements_with(
             sql,
             dialect,
             &ParseOptions::default(),
