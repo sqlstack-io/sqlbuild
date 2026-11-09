@@ -546,6 +546,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/control/locations/{location_id}/targets/{target}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requestPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/control/locations/{location_id}/targets/{target}/plans/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/control/locations/{location_id}/targets/{target}/runs": {
         parameters: {
             query?: never;
@@ -1646,6 +1678,12 @@ export interface components {
             evaluation: Record<string, never>;
             /** @enum {string} */
             kind: "evaluate_sensor";
+        } | {
+            command: string[];
+            /** @enum {string} */
+            kind: "plan";
+            selection: string[];
+            settings: Record<string, never>;
         };
         LocationWorkClaim: {
             /** Format: uuid */
@@ -1666,6 +1704,10 @@ export interface components {
             /** @enum {string} */
             kind: "sensor_evaluation";
             outcome: components["schemas"]["CustomSensorOutcome"];
+        } | {
+            document: Record<string, never>;
+            /** @enum {string} */
+            kind: "plan";
         } | {
             /** @enum {string} */
             kind: "superseded";
@@ -1971,6 +2013,12 @@ export interface components {
             reason: string;
             /** @enum {string} */
             status: "unavailable";
+        };
+        /** @description A person's build command to plan on the location; the server freezes it like an ad-hoc run. */
+        PlanRequest: {
+            command: string[];
+            /** Format: uuid */
+            request_id: string;
         };
         /** @enum {string} */
         PlatformEventKind: "heartbeat" | "scheduler_no_leader" | "tick_overdue" | "calendar_horizon_low" | "location_broken" | "launch_failed";
@@ -4071,6 +4119,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": null | components["schemas"]["NodeSql"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    requestPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-sqb-csrf": string;
+            };
+            path: {
+                location_id: string;
+                target: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            /** @description Session rejected */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    readPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                location_id: string;
+                target: string;
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null | components["schemas"]["LocationWorkRecord"];
                 };
             };
             /** @description Session rejected */

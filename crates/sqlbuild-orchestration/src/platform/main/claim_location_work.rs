@@ -1,11 +1,12 @@
-//! Serialized leases fence results from replaced location instances and uncertain poll retries.
+//! Serialized leases fence results from replaced location instances and uncertain poll retries; plans go last.
 
 use chrono::Duration;
 use uuid::Uuid;
 
+use crate::platform::constants::PLAN_LEASE_SECONDS;
 use crate::platform::main::read_location_work::read_location_work;
 use crate::platform::main::require_instance::require_instance;
-use crate::platform::models::{LocationWorkClaim, LocationWorkPoll};
+use crate::platform::models::{LocationWork, LocationWorkClaim, LocationWorkPoll};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
 use crate::store::main::commit::commit;
@@ -27,7 +28,7 @@ pub async fn claim_location_work(
         "SELECT w.request_id FROM sqb_location_work w WHERE w.location_id=$1 AND w.target=$2 \
          AND w.expires_at>$3 AND w.completed_at IS NULL \
          AND (w.claimed_until IS NULL OR w.claimed_until<=$3 OR w.session_id=$4) \
-         AND (w.request_json->'work'->>'kind'='check_connection' OR EXISTS ( \
+         AND (w.request_json->'work'->>'kind' IN ('check_connection','plan') OR EXISTS ( \
          SELECT 1 FROM sqb_sensor_evaluation_events e JOIN sqb_triggers t ON t.trigger_id=e.trigger_id \
          JOIN sqb_trigger_state s ON s.trigger_id=t.trigger_id JOIN sqb_scheduler_lease l ON l.name='scheduler' \
          WHERE e.evaluation_id=w.request_id AND e.phase='requested' AND s.status='running' \
@@ -35,7 +36,7 @@ pub async fn claim_location_work(
          AND l.epoch=CAST(e.fact_json->'request'->>'epoch' AS BIGINT) \
          AND NOT EXISTS (SELECT 1 FROM sqb_sensor_evaluation_events f \
          WHERE f.evaluation_id=e.evaluation_id AND f.phase<>'requested'))) \
-         ORDER BY w.requested_at, w.request_id LIMIT 1",
+         ORDER BY CASE WHEN w.request_json->'work'->>'kind'='plan' THEN 1 ELSE 0 END, w.requested_at, w.request_id LIMIT 1",
         vec![Parameter::Id(location_id), Parameter::Text(poll.target.clone()), Parameter::Time(now), Parameter::Id(poll.session_id)]).await?;
     let Some(row) = rows.first() else {
         commit(transaction).await?;
@@ -45,6 +46,11 @@ pub async fn claim_location_work(
         .map_err(|error| ControlError::Invalid(format!("invalid work identity: {error}")))?;
     let (transaction, stored) = read_location_work(transaction, request_id).await?;
     let stored = stored.ok_or_else(|| ControlError::Invalid("location work disappeared".into()))?;
+    let lease = if matches!(stored.record.request_json.work, LocationWork::Plan { .. }) {
+        PLAN_LEASE_SECONDS
+    } else {
+        60
+    };
     let retained = stored.session_id == Some(poll.session_id)
         && stored.claimed_until.is_some_and(|until| until > now);
     let (claim_id, lease_expires_at) = if retained {
@@ -55,7 +61,7 @@ pub async fn claim_location_work(
     } else {
         (
             Uuid::now_v7(),
-            (now + Duration::seconds(60)).min(stored.record.expires_at),
+            (now + Duration::seconds(lease)).min(stored.record.expires_at),
         )
     };
     let (transaction, _) = query(transaction,

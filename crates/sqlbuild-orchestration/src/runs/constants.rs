@@ -20,3 +20,6 @@ pub(crate) const ADHOC_AUDIT_TAG: &[u8] = b"adhoc-run-request";
 
 /// The build setting a full-refresh launch adds to the frozen request and each group child.
 pub(crate) const FULL_REFRESH_SETTING: &str = "full_refresh";
+
+/// The reason recorded on a person's plan request; plans carry no reason of their own.
+pub(crate) const PLAN_REASON: &str = "plan";

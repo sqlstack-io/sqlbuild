@@ -4,6 +4,7 @@ use chrono::TimeDelta;
 use uuid::Uuid;
 
 use crate::platform::_helpers::observations::observe;
+use crate::platform::constants::LOCATION_SILENCE_SECONDS;
 use crate::platform::models::{PlatformEvent, WatchdogLocation};
 use crate::store::errors::ControlError;
 use crate::store::main::begin::begin;
@@ -19,7 +20,9 @@ pub(crate) async fn scan_location_page(
     after: Option<(Uuid, String)>,
 ) -> Result<Option<(Uuid, String)>, ControlError> {
     let transaction = begin(store, TransactionMode::Write).await?;
-    let mut parameters = vec![Parameter::Time(transaction.now - TimeDelta::seconds(90))];
+    let mut parameters = vec![Parameter::Time(
+        transaction.now - TimeDelta::seconds(LOCATION_SILENCE_SECONDS),
+    )];
     let cursor = if let Some((location_id, target)) = after {
         parameters.extend([Parameter::Id(location_id), Parameter::Text(target)]);
         "AND (i.location_id>$2 OR (i.location_id=$2 AND i.target>$3))"
