@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectionTestOf, healthOf, warehouseSyncOf } from './http-locations';
+import { connectionTestOf, healthOf, instancesOf, toLocationDetail, warehouseSyncOf } from './http-locations';
 
 const now = Date.parse('2026-11-08T12:00:00Z');
 const at = (secondsAgo: number) => new Date(now - secondsAgo * 1000).toISOString();
@@ -29,6 +29,30 @@ describe('location health', () => {
 		const observations = [seen(5, { kind: 'connection', generation: 2, healthy: false }), seen(60, { kind: 'connection', generation: 1, healthy: true })];
 		expect(healthOf(observations, now).health).toBe('degraded');
 		expect(connectionTestOf(observations)).toMatchObject({ outcome: 'failed', at: at(5) });
+	});
+});
+
+describe('location processes', () => {
+	it('lists each session once by its newest check-in, newest first, and stale after 90 seconds', () => {
+		const observations = [seen(200, { kind: 'heartbeat' }, 'old'), seen(30, { kind: 'heartbeat' }), seen(95, { kind: 'heartbeat' }, 'old'), seen(5, { kind: 'connection', generation: 2, healthy: true })];
+		expect(instancesOf(observations, now).map((i) => [i.id, i.lastSeenAt, i.state])).toEqual([
+			['s-1', at(5), 'live'],
+			['old', at(95), 'stale']
+		]);
+	});
+});
+
+describe('toLocationDetail', () => {
+	const location = { id: 'loc:prod', name: 'orders', health: null, lastSeenAt: null, target: { name: 'prod', adapter: null, connectionSummary: null }, warehouseSync: { lastSyncedAt: null, lastError: null } };
+
+	it('shows a failed reload as its health, without inventing a failed deploy or error text', () => {
+		const detail = toLocationDetail(location, [seen(5, { kind: 'heartbeat' }), seen(20, { kind: 'compile_failed', generation: 3 }), seen(40, { kind: 'connection', generation: 2, healthy: true })], null, now);
+		expect([detail.health, detail.failedDeploy, detail.lastLoadError, detail.snapshot]).toEqual(['falling_back', null, null, null]);
+	});
+
+	it('is healthy again once a newer generation connects', () => {
+		const detail = toLocationDetail(location, [seen(5, { kind: 'connection', generation: 4, healthy: true }), seen(20, { kind: 'compile_failed', generation: 3 })], null, now);
+		expect([detail.health, detail.connectionTest?.outcome]).toEqual(['healthy', 'ok']);
 	});
 });
 

@@ -354,6 +354,65 @@ describe('overview', () => {
 	});
 });
 
+describe('locations', () => {
+	const access = (target: string) => ({ location_id: '0191f0aa-orders', name: 'Orders', target, actions: [] });
+	const report = (session: string, secondsAgo: number) => ({
+		received_at: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+		report: { event_id: `e-${session}-${secondsAgo}`, session_id: session, target: 'development', health: { kind: 'heartbeat' } }
+	});
+
+	/** Orders development is readable and orders preview refuses its health read, as for a partial viewer. */
+	function server() {
+		const paths: string[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				paths.push(path);
+				if (path.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [access('development'), access('preview')] } });
+				if (path.endsWith('/platform/problems'))
+					return Response.json({
+						scheduler_leader: true,
+						scheduler_lease_expires_at: '2026-11-09T10:00:30Z',
+						broken_locations: [{ location_id: '0191f0aa-orders', location_name: 'Orders', target: 'development', last_seen_at: '2026-11-09T09:00:00Z' }],
+						overdue_ticks: []
+					});
+				if (path.includes('/targets/preview/')) return Response.json({ error: 'refused' }, { status: 403 });
+				if (path.endsWith('/health')) return Response.json([report('s-2', 10), report('s-1', 400), report('s-2', 20)]);
+				return Response.json([]);
+			})
+		);
+		return { paths, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it('opens a readable location with one process per session', async () => {
+		const detail = await server().client.getLocation('0191f0aa-orders:development');
+		expect(detail?.instances.map((i) => [i.id, i.state])).toEqual([
+			['s-2', 'live'],
+			['s-1', 'stale']
+		]);
+	});
+
+	it('fails the page with the refusal when the person may not read the target health', async () => {
+		await expect(server().client.getLocation('0191f0aa-orders:preview')).rejects.toMatchObject({ status: 403 });
+	});
+
+	it('is null for a location the person is not given, without reading its health', async () => {
+		const { paths, client } = server();
+		expect(await client.getLocation('0191f0aa-orders:production')).toBeNull();
+		expect(paths.some((p) => p.endsWith('/health'))).toBe(false);
+	});
+
+	it('counts open problems per location target', async () => {
+		const listed = await server().client.listLocations();
+		expect(listed.map((l) => [l.id, l.activeProblems, l.health])).toEqual([
+			['0191f0aa-orders:development', 1, 'healthy'],
+			['0191f0aa-orders:preview', 0, null]
+		]);
+	});
+});
+
 describe('administration writes', () => {
 	const ada = { principal_id: 'p-ada', name: 'ada', created_at: '2026-11-01T00:00:00Z', disabled_at: null, has_password: true, groups: [], active_sessions: 2, last_signed_in_at: null };
 

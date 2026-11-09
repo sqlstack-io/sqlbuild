@@ -5,17 +5,17 @@ import { checkDetailOf, toCheck, toCheckEvidence, toCheckSql } from './http-chec
 import { findNode, nodeDetailOf, toCatalogNodes, nodeJobsOf, toNodeRuns, toColumnLineage } from './http-catalog';
 import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
-import { manualConnectionTest, toLocationSummary, warehouseSyncOf } from './http-locations';
+import { manualConnectionTest, toLocationDetail, toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
 import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
-import { toPlatformEvents } from './http-problems';
+import { toPlatformEvents, toPlatformHealth } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
 import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-jobs';
 import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationSummary, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, ConnectionTest, LocationDetail, LocationSummary, PlatformHealth, MaintenanceHistory, RoleAssignment, RoleAssignmentRequest, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -62,7 +62,9 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'disableAccount',
 	'enableAccount',
 	'listLocations',
+	'getLocation',
 	'listPlatformEvents',
+	'platformHealth',
 	'listRoles',
 	'getRole',
 	'getWarehouseSync',
@@ -420,29 +422,26 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return toMaintenanceHistory(data);
 		},
-		async listPlatformEvents(): Promise<PlatformEvent[]> {
-			const { data, error, response } = await http.GET('/api/control/platform/problems');
-			if (response.status === 401) onUnauthorized();
-			if (!data) throw new ApiError(errorText(error, response), response.status);
-			return toPlatformEvents(data, Date.now());
-		},
+		listPlatformEvents: async (): Promise<PlatformEvent[]> => toPlatformEvents(await problems(), Date.now()),
+		platformHealth: async (): Promise<PlatformHealth> => toPlatformHealth(await problems()),
 		/** Each location the person sees, with health only where they may list the whole target. */
 		async listLocations(): Promise<LocationSummary[]> {
-			const { data, error, response } = await http.GET('/api/control/bootstrap');
-			if (response.status === 401) onUnauthorized();
-			if (!data) throw new ApiError(errorText(error, response), response.status);
+			const [locations, events] = await Promise.all([bootstrapLocations(), problems().then((p) => toPlatformEvents(p, Date.now()))]);
 			return Promise.all(
-				toBootstrap(data).locations.map(async (location) => {
-					const { locationId, target } = parseLocationKey(location.id);
-					const path = { location_id: locationId, target };
-					const [health, snapshots] = await Promise.all([
-						http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path } }),
-						http.GET('/api/control/locations/{location_id}/targets/{target}/snapshots', { params: { path, query: { limit: 1 } } })
-					]);
-					if (health.response.status === 401 || snapshots.response.status === 401) onUnauthorized();
-					return toLocationSummary(location, health.data ?? null, snapshots.data?.[0] ?? null, Date.now());
+				locations.map(async (location) => {
+					const [health, snapshot] = await locationHealth(location.id);
+					const open = events.filter((e) => e.locationId === location.id).length;
+					return toLocationSummary(location, health.data ?? null, snapshot, open, Date.now());
 				})
 			);
+		},
+		/** Null for a location the person can't see; a refused health read fails the page, as the target's listings do. */
+		async getLocation(locationId: string): Promise<LocationDetail | null> {
+			const location = (await bootstrapLocations()).find((l) => l.id === locationId);
+			if (!location) return null;
+			const [health, snapshot] = await locationHealth(location.id);
+			if (!health.data) throw new ApiError(errorText(health.error, health.response), health.response.status);
+			return toLocationDetail(location, health.data, snapshot, Date.now());
 		},
 		listAccounts: async (): Promise<Account[]> => (await people()).map(toAccount),
 		listRoles: async (locationId: string): Promise<RoleDefinition[]> => (await roleOverviews(locationId)).map(toRoleDefinition),
@@ -671,6 +670,32 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		if (response.status === 401) onUnauthorized();
 		if (!data) throw new ApiError(errorText(error, response), response.status);
 		return data;
+	}
+
+	async function problems() {
+		const { data, error, response } = await http.GET('/api/control/platform/problems');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return data;
+	}
+
+	async function bootstrapLocations() {
+		const { data, error, response } = await http.GET('/api/control/bootstrap');
+		if (response.status === 401) onUnauthorized();
+		if (!data) throw new ApiError(errorText(error, response), response.status);
+		return toBootstrap(data).locations;
+	}
+
+	/** The target's health read, kept whole so a refusal can be shown or left out, and its newest snapshot. */
+	async function locationHealth(locationKey: string) {
+		const { locationId, target } = parseLocationKey(locationKey);
+		const path = { location_id: locationId, target };
+		const [health, snapshots] = await Promise.all([
+			http.GET('/api/control/locations/{location_id}/targets/{target}/health', { params: { path } }),
+			http.GET('/api/control/locations/{location_id}/targets/{target}/snapshots', { params: { path, query: { limit: 1 } } })
+		]);
+		if (health.response.status === 401 || snapshots.response.status === 401) onUnauthorized();
+		return [health, snapshots.data?.[0] ?? null] as const;
 	}
 
 	/** The newest result of every check, or one check's results newest first. */
