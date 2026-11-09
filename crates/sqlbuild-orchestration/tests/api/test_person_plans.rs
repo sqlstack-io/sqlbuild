@@ -267,10 +267,9 @@ fn given_person_plans_when_requested_claimed_and_read_then_they_stay_location_wo
                 "{description}",
                 description = test_case.description
             );
-            assert_eq!(
-                settings["warehouse"],
-                json!("WH_PLAN"),
-                "{description}",
+            assert!(
+                !settings.contains_key("warehouse"),
+                "{description}: a plan never takes a named warehouse",
                 description = test_case.description
             );
             let lease = (claimed.lease_expires_at - chrono::Utc::now()).num_seconds();
