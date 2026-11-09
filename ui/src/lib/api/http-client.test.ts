@@ -326,6 +326,34 @@ function queuedAdhocRun(id: string) {
 	};
 }
 
+describe('overview', () => {
+	function server(nodesStatus: number) {
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const path = new URL(request.url).pathname;
+				if (path.endsWith('/nodes') && nodesStatus !== 200) return Response.json({ error: 'refused' }, { status: nodesStatus });
+				if (path.endsWith('/platform/problems')) return Response.json({ scheduler_leader: 'server-1', scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				return Response.json([]);
+			})
+		);
+		return createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} });
+	}
+
+	it('is null for a person who may view only part of the target, with no partial counts', async () => {
+		expect(await server(403).overview(ORDERS)).toBeNull();
+	});
+
+	it('still fails on any other error', async () => {
+		await expect(server(500).overview(ORDERS)).rejects.toMatchObject({ status: 500 });
+	});
+
+	it('summarises the target when every listing is allowed', async () => {
+		expect((await server(200).overview(ORDERS))?.metrics.runs24h.total).toBe(0);
+	});
+});
+
 describe('getCatalogNode', () => {
 	/** Answers the reads a node page makes; anything else, such as node status, is refused. */
 	function serve(actions: string[], sqlStatus = 200) {

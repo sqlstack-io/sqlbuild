@@ -218,7 +218,7 @@ export class MockBuild {
 
 	// ---- overview ----
 
-	async overview(scope: Scope): Promise<Overview> {
+	async overview(scope: Scope): Promise<Overview | null> {
 		const states = this.#states(scope);
 		const checks = this.#checks(scope, states);
 		const nodes = SNAPSHOT_NODES.map((sn) => this.#catalogNode(states.get(sn.key)!, checks));

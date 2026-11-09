@@ -16,9 +16,13 @@
 	import { attentionRank, attentionView, type AttentionTone } from '$lib/build-area/attention';
 	import { changeOpLabel, formatCredits } from '$lib/build-area/labels';
 	import { summarizeChange } from '$lib/build-area/changes';
+	import { pagesBeyondTarget } from '$lib/nav';
 
 	const overview = createResource((client, scope) => client.overview(scope), ['runs', 'checks', 'node_status', 'snapshot', 'platform_events', 'triggers']);
 	const data = $derived(overview.data ?? null);
+	// Null data means the person may view only part of the target, so the page offers others instead.
+	const partial = $derived(overview.data === null);
+	const otherPages = $derived(pagesBeyondTarget(app.client, app.capabilities));
 
 	const attentionIcon: Record<AttentionTone, typeof AlertCircleIcon> = {
 		error: AlertCircleIcon,
@@ -55,139 +59,153 @@
 <RunPanel bind:open={rebuildOpen} selection={staleSelection} />
 
 <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-[18px]">
-	<div class="flex flex-col gap-[14px]">
-		{#if overview.error}<div class="error-note">{overview.error}</div>{/if}
-		<section class="health" style:--tone={healthTone}>
-			<div class="health-head">
-				<div class="health-icon">
-					{#if issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
-				</div>
-				<div class="health-copy">
-					<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
-					<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
-				</div>
-				{#if m}
-					<div class="health-facts">
-						{#if m.stale?.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
-						{#if m.stale?.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
-						{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
+	{#if partial}
+		<section class="surface-panel partial">
+			<h2>You can see only part of {app.location?.name} · {app.target?.name}</h2>
+			<p>The Overview sums up the whole target, so it needs view on every node in it. An administrator can give you view on the rest.</p>
+			{#if otherPages.length}
+				<p>Pages you can use:</p>
+				<ul>
+					{#each otherPages as item (item.href)}<li><a href={item.href}>{item.label} →</a></li>{/each}
+				</ul>
+			{/if}
+			{#if (app.bootstrap?.locations.length ?? 0) > 1}<p>Or choose another location from the menu at the top of the sidebar.</p>{/if}
+		</section>
+	{:else}
+		<div class="flex flex-col gap-[14px]">
+			{#if overview.error}<div class="error-note">{overview.error}</div>{/if}
+			<section class="health" style:--tone={healthTone}>
+				<div class="health-head">
+					<div class="health-icon">
+						{#if issues.length}<AlertCircleIcon size={15} />{:else}<ActivityIcon size={15} />{/if}
 					</div>
-				{/if}
-				{#if latest}<a href="/runs/{latest.id}">View latest run →</a>{/if}
-			</div>
-			{#if issues.length}
-				<div class="issues">
-					{#each issues as { item, view } (view.key)}
-						{@const Glyph = attentionIcon[view.tone]}
-						<div class="issue">
-							<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
-							<a class="issue-title" href={view.href}>{view.title}</a>
-							<span class="issue-detail" title={view.detail}>{view.detail}</span>
-							<small>{view.since}</small>
-							<span class="issue-actions">
-								{#if item.kind === 'stale_models'}
-									<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => (rebuildOpen = true)}>Rebuild {staleSelection.length}</GatedButton>
-								{/if}
-								<a href={view.href}>{view.action} →</a>
-							</span>
+					<div class="health-copy">
+						<strong>{issues.length ? `${app.location?.name} needs attention` : `${app.location?.name} is healthy`}</strong>
+						<span>{issues.length ? `${issues.length} ${issues.length === 1 ? 'item' : 'items'} · ${latestText}` : latestText}</span>
+					</div>
+					{#if m}
+						<div class="health-facts">
+							{#if m.stale?.changed}<span><i class="status-dot stale"></i><b>{m.stale.changed}</b> changed</span>{/if}
+							{#if m.stale?.behind}<span><i class="status-dot warning"></i><b>{m.stale.behind}</b> behind</span>{/if}
+							{#if m.checks.failing}<span><i class="status-dot error"></i><b>{m.checks.failing}</b> failing {m.checks.failing === 1 ? 'check' : 'checks'}</span>{/if}
 						</div>
-					{/each}
+					{/if}
+					{#if latest}<a href="/runs/{latest.id}">View latest run →</a>{/if}
 				</div>
-			{/if}
-		</section>
-
-		<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
-			{#if m}
-				<div class="metric">
-					<span class="metric-label">Models</span>
-					<div><strong>{m.models.total}</strong><small>deployed</small></div>
-					<span class:success-note={m.models.addedThisWeek > 0}>{m.models.addedThisWeek || m.models.removedThisWeek ? `+${m.models.addedThisWeek} / −${m.models.removedThisWeek} this week` : 'No changes this week'}</span>
-				</div>
-				<div class="metric">
-					<span class="metric-label">Runs · 24h</span>
-					<div><strong>{m.runs24h.total}</strong><small>{successRate === null ? 'none finished' : `${successRate}% succeeded`}</small></div>
-					<span class:warning-note={m.runs24h.partial + m.runs24h.failed > 0}>{m.runs24h.partial} partial · {m.runs24h.failed} failed · {m.runs24h.active} active</span>
-				</div>
-				<div class="metric">
-					<span class="metric-label">Checks passing</span>
-					<div><strong>{m.checks.passing}</strong><small>of {m.checks.total}</small></div>
-					<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{m.checks.failing} failing · {m.checks.warning} warning</span>
-				</div>
-				{#if m.stale}
-					<div class="metric">
-						<span class="metric-label">Stale</span>
-						<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
-						<span>{m.stale.changed} changed · {m.stale.behind} behind · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late</span>
+				{#if issues.length}
+					<div class="issues">
+						{#each issues as { item, view } (view.key)}
+							{@const Glyph = attentionIcon[view.tone]}
+							<div class="issue">
+								<span class="issue-icon {view.tone}"><Glyph size={14} /></span>
+								<a class="issue-title" href={view.href}>{view.title}</a>
+								<span class="issue-detail" title={view.detail}>{view.detail}</span>
+								<small>{view.since}</small>
+								<span class="issue-actions">
+									{#if item.kind === 'stale_models'}
+										<GatedButton requires="run.adhoc" size="xs" variant="default" onclick={() => (rebuildOpen = true)}>Rebuild {staleSelection.length}</GatedButton>
+									{/if}
+									<a href={view.href}>{view.action} →</a>
+								</span>
+							</div>
+						{/each}
 					</div>
 				{/if}
-				{#if m.cost}
+			</section>
+
+			<section class="metric-strip" style:--metrics={3 + (m?.stale ? 1 : 0) + (m?.cost ? 1 : 0)}>
+				{#if m}
 					<div class="metric">
-						<span class="metric-label">Cost · 24h</span>
-						<div><strong>{formatCredits(m.cost.last24h)}</strong></div>
-						<span class:warning-note={(costChange ?? 0) >= 20}>{costChange === null ? '—' : `${costChange >= 0 ? '+' : ''}${costChange}%`} vs {m.cost.baselineDays}-day average</span>
+						<span class="metric-label">Models</span>
+						<div><strong>{m.models.total}</strong><small>deployed</small></div>
+						<span class:success-note={m.models.addedThisWeek > 0}>{m.models.addedThisWeek || m.models.removedThisWeek ? `+${m.models.addedThisWeek} / −${m.models.removedThisWeek} this week` : 'No changes this week'}</span>
 					</div>
+					<div class="metric">
+						<span class="metric-label">Runs · 24h</span>
+						<div><strong>{m.runs24h.total}</strong><small>{successRate === null ? 'none finished' : `${successRate}% succeeded`}</small></div>
+						<span class:warning-note={m.runs24h.partial + m.runs24h.failed > 0}>{m.runs24h.partial} partial · {m.runs24h.failed} failed · {m.runs24h.active} active</span>
+					</div>
+					<div class="metric">
+						<span class="metric-label">Checks passing</span>
+						<div><strong>{m.checks.passing}</strong><small>of {m.checks.total}</small></div>
+						<span class:warning-note={m.checks.warning + m.checks.failing > 0}>{m.checks.failing} failing · {m.checks.warning} warning</span>
+					</div>
+					{#if m.stale}
+						<div class="metric">
+							<span class="metric-label">Stale</span>
+							<div><strong class="stale-value">{m.stale.nodes}</strong><small>nodes</small></div>
+							<span>{m.stale.changed} changed · {m.stale.behind} behind · {m.stale.sources} {m.stale.sources === 1 ? 'source' : 'sources'} late</span>
+						</div>
+					{/if}
+					{#if m.cost}
+						<div class="metric">
+							<span class="metric-label">Cost · 24h</span>
+							<div><strong>{formatCredits(m.cost.last24h)}</strong></div>
+							<span class:warning-note={(costChange ?? 0) >= 20}>{costChange === null ? '—' : `${costChange >= 0 ? '+' : ''}${costChange}%`} vs {m.cost.baselineDays}-day average</span>
+						</div>
+					{/if}
 				{/if}
+			</section>
+
+			{#if showTimeline}
+				<section class="surface-panel flex min-w-0 flex-col">
+					<div class="panel-heading">
+						<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
+						<a href="/runs?view=timeline">Open full timeline →</a>
+					</div>
+					<RunTimeline scroll={false} stickyTop={0} />
+				</section>
 			{/if}
-		</section>
 
-		{#if showTimeline}
-			<section class="surface-panel flex min-w-0 flex-col">
-				<div class="panel-heading">
-					<div><h2>Activity</h2><span>Past runs, and when schedules will run next</span></div>
-					<a href="/runs?view=timeline">Open full timeline →</a>
-				</div>
-				<RunTimeline scroll={false} stickyTop={0} />
-			</section>
-		{/if}
-
-		<div class="lower-grid" class:single={!showGroups}>
-			{#if showGroups}<section class="surface-panel">
-				<div class="panel-heading">
-					<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
-					<a href="/catalog">Open catalog →</a>
-				</div>
-				<div class="groups">
-					<div class="group-row head"><span>Group</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
-					{#each groups as g (g.group)}
-						<a class="group-row" href="/catalog?group={g.group}">
-							<span>{g.group}</span>
-							<span class="group-bar" title="{g.current} of {g.total} current">
-								<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
-								<i class="stale-segment" style:width="{(g.changed / g.total) * 100}%"></i>
-								<i class="fail-segment" style:width="{(g.failed / g.total) * 100}%"></i>
-							</span>
-							<b>{g.current}/{g.total}</b>
-							<b class:stale-text={g.changed}>{g.changed || '—'}</b>
-							<b class:warn-text={g.behind}>{g.behind || '—'}</b>
-							<b class:error-text={g.failed}>{g.failed || '—'}</b>
-						</a>
-					{:else}
-						<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
-					{/each}
-				</div>
-			</section>{/if}
-			<section class="surface-panel">
-				<div class="panel-heading">
-					<div><h2>Recent changes</h2><span>Recent deploys</span></div>
-					<a href="/changes">All changes →</a>
-				</div>
-				<div>
-					{#each data?.recentChanges ?? [] as c (c.snapshotId)}
-						<a class="change" href="/changes#gen-{c.generation}">
-							<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
-							<span class="change-copy">
-								<strong>{summarizeChange(c)}</strong>
-								<span>{c.nodes.slice(0, 3).map((n) => `${changeOpLabel[n.op].toLowerCase()} ${n.key}`).join(' · ') || 'No node changes'}</span>
-							</span>
-							<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
-						</a>
-					{:else}
-						<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet.'}</div>
-					{/each}
-				</div>
-			</section>
+			<div class="lower-grid" class:single={!showGroups}>
+				{#if showGroups}<section class="surface-panel">
+					<div class="panel-heading">
+						<div><h2>Build status by group</h2><span>Current, stale and failed nodes · {app.location?.name}</span></div>
+						<a href="/catalog">Open catalog →</a>
+					</div>
+					<div class="groups">
+						<div class="group-row head"><span>Group</span><span></span><span>Current</span><span>Changed</span><span>Behind</span><span>Failed</span></div>
+						{#each groups as g (g.group)}
+							<a class="group-row" href="/catalog?group={g.group}">
+								<span>{g.group}</span>
+								<span class="group-bar" title="{g.current} of {g.total} current">
+									<i class="fresh" style:width="{(g.current / g.total) * 100}%"></i>
+									<i class="stale-segment" style:width="{(g.changed / g.total) * 100}%"></i>
+									<i class="fail-segment" style:width="{(g.failed / g.total) * 100}%"></i>
+								</span>
+								<b>{g.current}/{g.total}</b>
+								<b class:stale-text={g.changed}>{g.changed || '—'}</b>
+								<b class:warn-text={g.behind}>{g.behind || '—'}</b>
+								<b class:error-text={g.failed}>{g.failed || '—'}</b>
+							</a>
+						{:else}
+							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet. Deploy the project to see its models here.'}</div>
+						{/each}
+					</div>
+				</section>{/if}
+				<section class="surface-panel">
+					<div class="panel-heading">
+						<div><h2>Recent changes</h2><span>Recent deploys</span></div>
+						<a href="/changes">All changes →</a>
+					</div>
+					<div>
+						{#each data?.recentChanges ?? [] as c (c.snapshotId)}
+							<a class="change" href="/changes#gen-{c.generation}">
+								<span class="change-rev" title={c.gitRevision ? `Commit ${c.gitRevision}` : 'Published outside a git checkout'}><code>{c.gitRevision?.slice(0, 7) ?? '—'}</code><small>version {c.generation}</small></span>
+								<span class="change-copy">
+									<strong>{summarizeChange(c)}</strong>
+									<span>{c.nodes.slice(0, 3).map((n) => `${changeOpLabel[n.op].toLowerCase()} ${n.key}`).join(' · ') || 'No node changes'}</span>
+								</span>
+								<small>{c.gitAuthor ? `${c.gitAuthor} · ` : ''}{formatAgo(c.publishedAt, app.now)}</small>
+							</a>
+						{:else}
+							<div class="empty">{overview.loading ? 'Loading…' : 'Nothing deployed yet.'}</div>
+						{/each}
+					</div>
+				</section>
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>
 
 <style>
@@ -264,6 +282,11 @@
 	.warn-text { color: var(--sb-warning) !important; }
 	.error-text { color: var(--sb-error) !important; }
 	.empty { padding: 18px 16px; color: var(--muted-foreground); font-size: 12.5px; }
+	.partial { max-width: 640px; padding: 18px 20px; font-size: 13px; }
+	.partial h2 { margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+	.partial p { margin-top: 6px; color: var(--muted-foreground); }
+	.partial ul { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; }
+	.partial a { color: var(--primary); font-weight: 500; }
 	.error-note { padding: 10px 14px; border: 1px solid var(--sb-error); color: var(--sb-error); font-size: 12.5px; }
 	@media (max-width: 1250px) {
 		.lower-grid { grid-template-columns: 1fr; }
