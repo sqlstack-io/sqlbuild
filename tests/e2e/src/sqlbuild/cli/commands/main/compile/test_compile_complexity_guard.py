@@ -45,7 +45,7 @@ def test_given_deep_trusted_model_when_compiling_then_sql_analysis_completes(
                 'schema = "dev"\n'
             ),
             "models/deep_expression.sql": (
-                "MODEL (description 'Test model deep_expression.', columns (resolved_value (type NUMBER)));\n\n"
+                "MODEL (description 'Test model deep_expression.', columns (resolved_value (type INTEGER)));\n\n"
                 f"SELECT {nested_coalesce_expression(function_depth=test_case.function_depth)} "
                 "AS resolved_value\n"
             ),

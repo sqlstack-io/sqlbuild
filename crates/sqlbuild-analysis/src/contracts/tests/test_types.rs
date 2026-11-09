@@ -51,3 +51,14 @@ pub(crate) struct EnumLiteralDialectTestCase {
     pub(crate) dialect: &'static str,
     pub(crate) expected_count: usize,
 }
+
+pub(crate) struct CastingBuildTestCase {
+    pub(crate) description: &'static str,
+    pub(crate) declared_type: &'static str,
+    pub(crate) inferred_type: &'static str,
+    pub(crate) materialized: &'static str,
+    pub(crate) incremental_mode: Option<&'static str>,
+    pub(crate) staged_promotion: bool,
+    /// Whether the column's type is reported as a K002 mismatch.
+    pub(crate) expected_mismatch: bool,
+}

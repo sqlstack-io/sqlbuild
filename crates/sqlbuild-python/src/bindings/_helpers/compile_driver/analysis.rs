@@ -227,7 +227,7 @@ fn analyzed<'py>(
         early_lint_wait_ms = early_lint.borrow().stop(py)?.into_pyobject(py)?.into_any();
     }
     let (lineage, lineage_ms): (Bound<'py, PyAny>, u64) = driver.lineage(&graph, &dialect)?;
-    let contracts: ContractPhase<'py> = driver.contracts(&project, &dialect)?;
+    let contracts: ContractPhase<'py> = driver.contracts(&project, (&dialect, &adapter))?;
     crate::bindings::_helpers::compile_context::delta::stop_on_errors(any_error(&native_field(
         &contracts.result,
         "diagnostics",
@@ -448,7 +448,7 @@ impl<'py> Driver<'_, 'py> {
     fn contracts(
         &self,
         project: &Bound<'py, PyAny>,
-        dialect: &Bound<'py, PyAny>,
+        (dialect, adapter): (&Bound<'py, PyAny>, &Bound<'py, PyAny>),
     ) -> PyResult<ContractPhase<'py>> {
         let py: Python<'py> = self.py;
         let thread_time: Bound<'py, PyAny> = imported(py, "time", "thread_time")?;
@@ -465,7 +465,12 @@ impl<'py> Driver<'_, 'py> {
         } else {
             self.status.start("Validating model contracts...")?;
             count_stage(py, MODEL_CONTRACTS, 1)?;
-            evaluate_model_contracts(py, project, Some(dialect))?
+            evaluate_model_contracts(
+                py,
+                project,
+                Some(dialect),
+                Some(&adapter.call_method0("default_table_promotion_mode")?),
+            )?
         };
         let wall_ms: u64 = elapsed_ms(started);
         let cpu_ended: f64 = thread_time.call0()?.extract()?;

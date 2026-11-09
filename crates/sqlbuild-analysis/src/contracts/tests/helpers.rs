@@ -8,6 +8,8 @@ pub(crate) fn model(contract: Option<&str>, schema: Option<ContractSchema>) -> C
     ContractModel {
         name: "orders".to_owned(),
         contract: contract.map(str::to_owned),
+        materialized: Some("table".to_owned()),
+        incremental_mode: None,
         schema,
         inferred_columns: None,
         fast_lineage_has_star: false,

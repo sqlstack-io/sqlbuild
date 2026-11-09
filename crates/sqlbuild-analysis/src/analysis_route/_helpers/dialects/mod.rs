@@ -3,6 +3,7 @@ pub(crate) mod clickhouse_dialect;
 pub(crate) mod clickhouse_types;
 pub(crate) mod databricks_dialect;
 pub(crate) mod duckdb_dialect;
+pub(crate) mod engine_types;
 pub(crate) mod postgres_dialect;
 pub(crate) mod snowflake_dialect;
 pub(crate) mod sqlite_dialect;

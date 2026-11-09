@@ -4,6 +4,7 @@ use sqlquack_semantics::dialects::constants::DUCKDB;
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax_duckdb::{Parsed, StrictFailure, parse_strict};
 
+use crate::analysis_route::_helpers::dialects::engine_types::duckdb_engine_type;
 use crate::analysis_route::_helpers::dialects::type_spelling::respelt;
 use crate::analysis_route::constants::{
     DUCKDB_DIALECT, DUCKDB_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
@@ -47,5 +48,10 @@ impl NativeDialect for DuckDbDialect {
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         respelt(spelling, &DUCKDB_TYPE_SPELLING)
             .map(|respelt| normalize_text_type(&respelt, Some(TypeDialect::DuckDb)))
+    }
+
+    /// Whether the engine stores both types as one, its synonyms and defaults met.
+    fn same_type(&self, declared: &NormalizedType, inferred: &NormalizedType) -> bool {
+        duckdb_engine_type(declared) == duckdb_engine_type(inferred)
     }
 }

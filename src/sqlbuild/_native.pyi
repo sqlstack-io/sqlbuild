@@ -4802,7 +4802,10 @@ def edit_contract_model(
     *, model: CompiledModelView, physical_columns: tuple[ColumnInfo, ...], overwrite: bool
 ) -> tuple[str | None, str | None]: ...
 def evaluate_model_contracts(
-    *, project: CompiledProjectView, dialect: TypeDialect | str | None = None
+    *,
+    project: CompiledProjectView,
+    dialect: TypeDialect | str | None = None,
+    adapter_default: TablePromotionMode | None = None,
 ) -> ContractValidationResult: ...
 def promotion_conflict_diagnostics(
     *, project: CompiledProjectView, adapter_default: TablePromotionMode, settings_file: str

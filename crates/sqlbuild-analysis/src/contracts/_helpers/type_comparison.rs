@@ -70,6 +70,20 @@ impl<'a> TypeComparer<'a> {
         })
     }
 
+    /// Whether casting a value of `inferred` type to `declared` keeps it, so a casting build stores it.
+    pub(crate) fn casts_losslessly(&self, declared: &str, inferred: &str) -> bool {
+        let AnalysisRoute::Native(dialect) = self.route else {
+            return false;
+        };
+        match (
+            dialect.normalize_type(declared),
+            dialect.normalize_type(inferred),
+        ) {
+            (Some(declared), Some(inferred)) => dialect.casts_losslessly(&declared, &inferred),
+            _ => false,
+        }
+    }
+
     /// Whether a column that may be null meets a declaration that does not allow it.
     pub(crate) fn nullable_into_non_null(
         &self,

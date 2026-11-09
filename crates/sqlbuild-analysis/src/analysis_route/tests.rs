@@ -8,6 +8,8 @@ mod test_clickhouse_dialect;
 mod test_clickhouse_type_match;
 #[path = "tests/test_databricks_dialect.rs"]
 mod test_databricks_dialect;
+#[path = "tests/test_engine_types.rs"]
+mod test_engine_types;
 #[path = "tests/test_native_arms.rs"]
 mod test_native_arms;
 #[path = "tests/test_native_dialect.rs"]

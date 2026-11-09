@@ -6,6 +6,7 @@ use sqlquack_syntax::{
     Dialect, Error, Expression, ParseOptions, Parsed, StrictFailure, TokenizeFailure, parse_strict,
 };
 
+use crate::analysis_route::_helpers::dialects::engine_types::snowflake_engine_type;
 use crate::analysis_route::_helpers::dialects::type_spelling::respelt;
 use crate::analysis_route::constants::{
     SNOWFLAKE_DIALECT, SNOWFLAKE_TYPE_SPELLING, UNQUOTED_STUB_PREFIX, UNSCANNED_CONSTRUCT,
@@ -13,7 +14,7 @@ use crate::analysis_route::constants::{
 use crate::analysis_route::models::{AnalysisInput, ParserGap, SnowflakeDialect};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
-use crate::type_system::models::{NormalizedType, TypeDialect};
+use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
 
 impl NativeDialect for SnowflakeDialect {
     fn name(&self) -> &'static str {
@@ -44,6 +45,22 @@ impl NativeDialect for SnowflakeDialect {
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
         respelt(spelling, &SNOWFLAKE_TYPE_SPELLING)
             .map(|respelt| normalize_text_type(&respelt, Some(TypeDialect::Snowflake)))
+    }
+
+    /// Whether the engine stores both types as one, its synonyms and defaults met.
+    fn same_type(&self, declared: &NormalizedType, inferred: &NormalizedType) -> bool {
+        snowflake_engine_type(declared) == snowflake_engine_type(inferred)
+    }
+
+    /// Whether `inferred` is a NUMBER of scale 0 whose precision fits a declared NUMBER of scale 0.
+    fn casts_losslessly(&self, declared: &NormalizedType, inferred: &NormalizedType) -> bool {
+        match (
+            integer_precision(&snowflake_engine_type(declared)),
+            integer_precision(&snowflake_engine_type(inferred)),
+        ) {
+            (Some(declared), Some(inferred)) => inferred <= declared,
+            _ => false,
+        }
     }
 }
 
@@ -85,4 +102,17 @@ fn unplaced(error: Error) -> String {
         | Error::Syntax { message, .. } => message,
         other => other.to_string(),
     }
+}
+
+/// The precision of a scale-0 Snowflake NUMBER.
+fn integer_precision(normalized: &NormalizedType) -> Option<u32> {
+    if normalized.family != TypeFamily::Decimal
+        || normalized
+            .scale
+            .as_ref()
+            .is_none_or(|scale| !scale.is_zero())
+    {
+        return None;
+    }
+    normalized.precision.as_ref()?.as_str().parse().ok()
 }

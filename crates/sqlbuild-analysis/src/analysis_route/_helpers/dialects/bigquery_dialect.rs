@@ -8,6 +8,7 @@ use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_bigquery::{Parsed, StrictFailure, parse_strict};
 
 use crate::analysis_route::_helpers::analysis::native_analysis::native_analysis;
+use crate::analysis_route::_helpers::dialects::type_spelling::family_session_type;
 use crate::analysis_route::constants::{
     BIGNUMERIC_DIGITS, BIGQUERY_DIALECT, CAST_TYPE_PREFIX, DECIMAL_RADIX, NUMERIC_DIGITS,
     POLYGLOT_MAX_DROPPED, POLYGLOT_NESTED_TYPE_NAMES, POLYGLOT_TOP_LEVEL_TYPE_NAMES,
@@ -64,19 +65,18 @@ impl NativeDialect for BigQueryDialect {
 
     /// A spelling BigQuery cannot read, such as TEXT or DOUBLE, takes its family's BigQuery type.
     fn session_type(&self, spelling: &str) -> String {
-        if self.normalize_type(spelling).is_some() {
-            return spelling.to_owned();
-        }
-        let native: &str = match normalize_text_type(spelling, None).family {
-            TypeFamily::String => "STRING",
-            TypeFamily::Integer => "INT64",
-            TypeFamily::Float => "FLOAT64",
-            TypeFamily::Decimal => "NUMERIC",
-            TypeFamily::Boolean => "BOOL",
-            TypeFamily::Date => "DATE",
-            _ => spelling,
-        };
-        native.to_owned()
+        family_session_type(
+            self,
+            spelling,
+            &[
+                (TypeFamily::String, "STRING"),
+                (TypeFamily::Integer, "INT64"),
+                (TypeFamily::Float, "FLOAT64"),
+                (TypeFamily::Decimal, "NUMERIC"),
+                (TypeFamily::Boolean, "BOOL"),
+                (TypeFamily::Date, "DATE"),
+            ],
+        )
     }
 
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {

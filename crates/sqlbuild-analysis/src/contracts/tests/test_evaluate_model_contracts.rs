@@ -4,7 +4,7 @@ use crate::contracts::tests::helpers::{
     declared, dynamic_model, inferred, model, outcome_lines, proof, schema, with_inferred,
 };
 use crate::contracts::tests::test_types::{
-    ContractTestCase, SharedTypesTestCase, UnknownDialectTestCase,
+    CastingBuildTestCase, ContractTestCase, SharedTypesTestCase, UnknownDialectTestCase,
 };
 
 #[test]
@@ -204,6 +204,7 @@ fn given_model_contracts_when_evaluating_then_diagnostics_follow_python_order() 
         let request = ContractRequest {
             dialect: "duckdb".to_owned(),
             implicit_column_contracts: test_case.implicit,
+            staged_promotion: true,
             models: vec![test_case.model],
         };
         let outcomes: Vec<Vec<ContractDiagnostic>> =
@@ -255,6 +256,7 @@ fn given_models_sharing_types_when_evaluating_together_then_each_matches_its_own
         let request = |models: Vec<ContractModel>| ContractRequest {
             dialect: "duckdb".to_owned(),
             implicit_column_contracts: true,
+            staged_promotion: true,
             models,
         };
         let together: Vec<String> = evaluate_model_contracts(&request(test_case.models.clone()))
@@ -299,6 +301,7 @@ fn given_a_dialect_no_native_module_reads_when_comparing_types_then_types_are_no
         let request = ContractRequest {
             dialect: test_case.dialect.to_owned(),
             implicit_column_contracts: true,
+            staged_promotion: true,
             models: vec![with_inferred(
                 model(
                     Some("enforced"),
@@ -315,6 +318,153 @@ fn given_a_dialect_no_native_module_reads_when_comparing_types_then_types_are_no
         assert_eq!(
             findings.map(|models| models.iter().any(|model| !model.is_empty())),
             Ok(test_case.expected_compared),
+            "{}",
+            test_case.description
+        );
+    }
+}
+
+#[test]
+fn given_snowflake_integer_precisions_when_a_build_casts_to_declared_types_then_only_narrower_ones_fit()
+ {
+    let test_cases = [
+        CastingBuildTestCase {
+            description: "a narrower integer NUMBER fits a staged table's declared NUMBER",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: false,
+        },
+        CastingBuildTestCase {
+            description: "a one-digit integer literal fits a declared INT",
+            declared_type: "INT",
+            inferred_type: "NUMBER(1,0)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: false,
+        },
+        CastingBuildTestCase {
+            description: "a merge incremental casts its delta before storing it",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "incremental",
+            incremental_mode: Some("merge"),
+            staged_promotion: true,
+            expected_mismatch: false,
+        },
+        CastingBuildTestCase {
+            description: "an equal precision stays equal",
+            declared_type: "NUMBER(18,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "view",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: false,
+        },
+        CastingBuildTestCase {
+            description: "a wider inferred precision would not fit",
+            declared_type: "NUMBER(18,0)",
+            inferred_type: "NUMBER(38,0)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "a declared scale of 2 is not an integer",
+            declared_type: "NUMBER(38,2)",
+            inferred_type: "NUMBER(38,0)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "an inferred scale of 2 is not an integer",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,2)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "an integer is not a string",
+            declared_type: "VARCHAR",
+            inferred_type: "INTEGER",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "a view stores the query's own type",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "view",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "a snapshot does not cast its delta",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "snapshot",
+            incremental_mode: None,
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "a microbatch checks the schema before it casts",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "incremental",
+            incremental_mode: Some("microbatch"),
+            staged_promotion: true,
+            expected_mismatch: true,
+        },
+        CastingBuildTestCase {
+            description: "immediate promotion does not cast",
+            declared_type: "NUMBER(38,0)",
+            inferred_type: "NUMBER(18,0)",
+            materialized: "table",
+            incremental_mode: None,
+            staged_promotion: false,
+            expected_mismatch: true,
+        },
+    ];
+    for test_case in test_cases {
+        let mut model: ContractModel = with_inferred(
+            model(
+                None,
+                Some(schema(
+                    vec![declared("amount", Some(test_case.declared_type), false)],
+                    true,
+                )),
+            ),
+            vec![inferred("amount", Some(test_case.inferred_type), false)],
+        );
+        model.materialized = Some(test_case.materialized.to_owned());
+        model.incremental_mode = test_case.incremental_mode.map(str::to_owned);
+        let request = ContractRequest {
+            dialect: "snowflake".to_owned(),
+            implicit_column_contracts: true,
+            staged_promotion: test_case.staged_promotion,
+            models: vec![model],
+        };
+
+        let diagnostics: Vec<Vec<ContractDiagnostic>> =
+            evaluate_model_contracts(&request).expect("snowflake types normalize");
+        assert_eq!(
+            diagnostics
+                .iter()
+                .flatten()
+                .any(|diagnostic| diagnostic.code == "K002"),
+            test_case.expected_mismatch,
             "{}",
             test_case.description
         );

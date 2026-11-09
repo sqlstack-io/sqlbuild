@@ -5,12 +5,13 @@ use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{DataType, Expression};
 use sqlquack_syntax_databricks::{Parsed, StrictFailure, parse_strict};
 
+use crate::analysis_route::_helpers::dialects::type_spelling::family_session_type;
 use crate::analysis_route::constants::{
     DATABRICKS_BOOLEAN_TYPE, DATABRICKS_CAST_TYPE_PREFIX, DATABRICKS_DATE_TYPE,
     DATABRICKS_DEFAULT_DECIMAL, DATABRICKS_DIALECT, DATABRICKS_STRING_TYPE, UNQUOTED_STUB_PREFIX,
     UNSCANNED_CONSTRUCT,
 };
-use crate::analysis_route::models::{DatabricksDialect, ParserGap, TypeMatch};
+use crate::analysis_route::models::{DatabricksDialect, ParserGap};
 use crate::analysis_route::types::NativeDialect;
 use crate::type_system::main::normalize_text_type::normalize_text_type;
 use crate::type_system::models::{NormalizedType, TypeDialect, TypeFamily};
@@ -43,21 +44,15 @@ impl NativeDialect for DatabricksDialect {
 
     /// A spelling Databricks cannot read takes its family's type where the family has only one.
     fn session_type(&self, spelling: &str) -> String {
-        if self.normalize_type(spelling).is_some() {
-            return spelling.to_owned();
-        }
-        let native: &str = match normalize_text_type(spelling, None).family {
-            TypeFamily::String => DATABRICKS_STRING_TYPE,
-            TypeFamily::Boolean => DATABRICKS_BOOLEAN_TYPE,
-            TypeFamily::Date => DATABRICKS_DATE_TYPE,
-            TypeFamily::Integer
-            | TypeFamily::Decimal
-            | TypeFamily::Float
-            | TypeFamily::Timestamp
-            | TypeFamily::Datetime
-            | TypeFamily::Other => spelling,
-        };
-        native.to_owned()
+        family_session_type(
+            self,
+            spelling,
+            &[
+                (TypeFamily::String, DATABRICKS_STRING_TYPE),
+                (TypeFamily::Boolean, DATABRICKS_BOOLEAN_TYPE),
+                (TypeFamily::Date, DATABRICKS_DATE_TYPE),
+            ],
+        )
     }
 
     fn normalize_type(&self, spelling: &str) -> Option<NormalizedType> {
@@ -69,27 +64,10 @@ impl NativeDialect for DatabricksDialect {
         UNQUOTED_STUB_PREFIX
     }
 
-    fn type_match(
-        &self,
-        declared: &str,
-        inferred: Option<&str>,
-        inferred_nullable: bool,
-    ) -> TypeMatch {
-        let _ = inferred_nullable;
-        match (
-            self.normalize_type(declared),
-            inferred.and_then(|inferred| self.normalize_type(inferred)),
-        ) {
-            (Some(declared), Some(inferred)) => TypeMatch::Compared {
-                same_type: declared == inferred
-                    || overlays_string(&declared, &inferred)
-                    || overlays_string(&inferred, &declared),
-                nullable_into_non_null: false,
-            },
-            _ => TypeMatch::NotCompared {
-                nullable_into_non_null: false,
-            },
-        }
+    fn same_type(&self, declared: &NormalizedType, inferred: &NormalizedType) -> bool {
+        declared == inferred
+            || overlays_string(declared, inferred)
+            || overlays_string(inferred, declared)
     }
 }
 

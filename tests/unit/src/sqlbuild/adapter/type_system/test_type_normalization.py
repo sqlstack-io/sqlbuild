@@ -104,6 +104,27 @@ def test_given_type_string_when_normalizing_then_it_returns_expected_shape(
             expected_equal=True,
         ),
         TypeEqualityTestCase(
+            description="treats a duckdb varchar length as the varchar duckdb stores",
+            dialect="duckdb",
+            left_type="VARCHAR",
+            right_type="TEXT(5)",
+            expected_equal=True,
+        ),
+        TypeEqualityTestCase(
+            description="keeps duckdb varchar distinct from integer",
+            dialect="duckdb",
+            left_type="VARCHAR(5)",
+            right_type="INTEGER",
+            expected_equal=False,
+        ),
+        TypeEqualityTestCase(
+            description="keeps snowflake varchar lengths distinct",
+            dialect="snowflake",
+            left_type="VARCHAR(5)",
+            right_type="VARCHAR(10)",
+            expected_equal=False,
+        ),
+        TypeEqualityTestCase(
             description="keeps snowflake timestamp time zone variants distinct",
             dialect="snowflake",
             left_type="TIMESTAMP_NTZ",

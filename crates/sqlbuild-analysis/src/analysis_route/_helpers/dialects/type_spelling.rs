@@ -2,6 +2,9 @@
 
 use crate::analysis_route::constants::{FALLBACK_TIMESTAMP_WORD, MAX_TYPE_NAME_WORDS};
 use crate::analysis_route::models::TypeSpelling;
+use crate::analysis_route::types::NativeDialect;
+use crate::type_system::main::normalize_text_type::normalize_text_type;
+use crate::type_system::models::TypeFamily;
 
 /// `spelling` with each type name renamed by `rules`, or `None` when it is not one type.
 pub(crate) fn respelt(spelling: &str, rules: &TypeSpelling) -> Option<String> {
@@ -14,6 +17,23 @@ pub(crate) fn respelt(spelling: &str, rules: &TypeSpelling) -> Option<String> {
     let respelt: String = reader.data_type(true)?;
     reader.blank();
     (reader.position == reader.text.len()).then_some(respelt)
+}
+
+/// `spelling` as `dialect` reads it, else its family's type in `family_types`, else as written.
+pub(crate) fn family_session_type(
+    dialect: &dyn NativeDialect,
+    spelling: &str,
+    family_types: &[(TypeFamily, &str)],
+) -> String {
+    if dialect.normalize_type(spelling).is_some() {
+        return spelling.to_owned();
+    }
+    let family: TypeFamily = normalize_text_type(spelling, None).family;
+    family_types
+        .iter()
+        .find(|(known, _)| *known == family)
+        .map_or(spelling, |(_, native)| native)
+        .to_owned()
 }
 
 struct Reader<'a> {

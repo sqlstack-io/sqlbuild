@@ -99,12 +99,22 @@ pub trait NativeDialect: Sync {
             inferred.and_then(|inferred| self.normalize_type(inferred)),
         ) {
             (Some(declared), Some(inferred)) => TypeMatch::Compared {
-                same_type: declared == inferred,
+                same_type: self.same_type(&declared, &inferred),
                 nullable_into_non_null: false,
             },
             _ => TypeMatch::NotCompared {
                 nullable_into_non_null: false,
             },
         }
+    }
+
+    /// Whether two normalized types are the same type in this dialect's engine.
+    fn same_type(&self, declared: &NormalizedType, inferred: &NormalizedType) -> bool {
+        declared == inferred
+    }
+
+    /// Whether the engine casts every `inferred` value to `declared` without changing it.
+    fn casts_losslessly(&self, _declared: &NormalizedType, _inferred: &NormalizedType) -> bool {
+        false
     }
 }
