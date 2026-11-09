@@ -8,6 +8,7 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
 use serde_json::Value;
+use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
 
@@ -235,11 +236,11 @@ pub(crate) fn collect_declarations<'py>(
     Ok(collected)
 }
 
-/// Every named declaration reachable from `roots`, labelled with the module of the root that reaches it first.
-pub(crate) fn orchestration_names(
-    py: Python<'_>,
-    roots: &[(Bound<'_, PyAny>, String)],
-) -> PyResult<Vec<OrchestrationNameFact>> {
+/// Every declaration reachable from `roots`, once each, with its kind and the module of the root that reaches it first.
+pub(crate) fn reachable_declarations<'py>(
+    py: Python<'py>,
+    roots: &[(Bound<'py, PyAny>, String)],
+) -> PyResult<Vec<(Bound<'py, PyAny>, &'static str, String)>> {
     let authoring = py.import(AUTHORING_MODULE)?;
     let classes = [
         (authoring.getattr("Job")?, JOB_LABEL),
@@ -248,9 +249,9 @@ pub(crate) fn orchestration_names(
         (authoring.getattr("CalendarSchedule")?, CALENDAR_LABEL),
     ];
     let mut seen: HashSet<usize> = HashSet::new();
-    let mut names: Vec<OrchestrationNameFact> = Vec::new();
+    let mut reached: Vec<(Bound<'py, PyAny>, &'static str, String)> = Vec::new();
     for (root, path) in roots {
-        let mut pending: Vec<Bound<'_, PyAny>> = vec![root.clone()];
+        let mut pending: Vec<Bound<'py, PyAny>> = vec![root.clone()];
         while let Some(declaration) = pending.pop() {
             if !seen.insert(declaration.as_ptr() as usize) {
                 continue;
@@ -263,20 +264,28 @@ pub(crate) fn orchestration_names(
                 continue;
             };
             pending.extend(nested_declarations(&declaration, kind)?);
-            let name: Option<String> = if kind == CALENDAR_LABEL {
-                let function = declaration.getattr("function")?;
-                (!function.is_none())
-                    .then(|| function.getattr("__name__")?.extract())
-                    .transpose()?
-            } else {
-                Some(declaration.getattr("name")?.extract()?)
-            };
-            names.extend(name.map(|name| OrchestrationNameFact {
-                name,
-                kind,
-                path: path.clone(),
-            }));
+            reached.push((declaration, kind, path.clone()));
         }
+    }
+    Ok(reached)
+}
+
+/// Every named declaration reachable from `roots`, labelled with the module of the root that reaches it first.
+pub(crate) fn orchestration_names(
+    py: Python<'_>,
+    roots: &[(Bound<'_, PyAny>, String)],
+) -> PyResult<Vec<OrchestrationNameFact>> {
+    let mut names: Vec<OrchestrationNameFact> = Vec::new();
+    for (declaration, kind, path) in reachable_declarations(py, roots)? {
+        let name: Option<String> = if kind == CALENDAR_LABEL {
+            let function = declaration.getattr("function")?;
+            (!function.is_none())
+                .then(|| function.getattr("__name__")?.extract())
+                .transpose()?
+        } else {
+            Some(declaration.getattr("name")?.extract()?)
+        };
+        names.extend(name.map(|name| OrchestrationNameFact { name, kind, path }));
     }
     Ok(names)
 }
@@ -304,4 +313,43 @@ fn nested_declarations<'py>(
         }
         _ => Vec::new(),
     })
+}
+
+/// Each reachable job's own selector tokens and each group's member names, as publication reads them.
+pub(crate) fn job_selections(
+    py: Python<'_>,
+    roots: &[(Bound<'_, PyAny>, String)],
+) -> PyResult<BTreeMap<String, JobSelection>> {
+    let mut catalog: BTreeMap<String, JobSelection> = BTreeMap::new();
+    for (declaration, kind, _) in reachable_declarations(py, roots)? {
+        let tokens = |field: &str| -> PyResult<Vec<String>> {
+            Ok(declaration
+                .getattr(field)?
+                .extract::<String>()?
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect())
+        };
+        let selection: JobSelection = match kind {
+            JOB_LABEL => JobSelection::Job {
+                select: tokens("select")?,
+                exclude: tokens("exclude")?,
+            },
+            GROUP_LABEL => JobSelection::Group {
+                members: declaration
+                    .getattr("jobs")?
+                    .try_iter()?
+                    .map(|job| job?.getattr("name")?.extract())
+                    .collect::<PyResult<_>>()?,
+            },
+            _ => continue,
+        };
+        let name: String = declaration.getattr("name")?.extract()?;
+        if catalog.insert(name.clone(), selection).is_some() {
+            return Err(PyValueError::new_err(format!(
+                "job name '{name}' is declared twice"
+            )));
+        }
+    }
+    Ok(catalog)
 }
