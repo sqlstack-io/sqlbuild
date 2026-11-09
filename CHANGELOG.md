@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.204.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.203.0...v0.204.0) (2026-11-09)
+
+
+### Features
+
+* publish column lineage and show it on catalog node pages ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* run test, seed, audit and freshness ad-hoc commands on workers ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** give and remove roles and disable people from the admin pages ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show renames, old names and clean-ups on the Maintenance page ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show the Overview from live runs, checks, models and deploys ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** tell a partial viewer why the Overview is empty ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** test a location's warehouse connection from the Locations page ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+
+
+### Bug Fixes
+
+* run every ad-hoc verb from the worker's verified project ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+* **ui:** show the approved logos and favicon from the website ([4070f12](https://github.com/sqlstack-io/sqlbuild/commit/4070f12355b3864e8e93de1ab467da2f87fa0798))
+
 ## [0.203.0](https://github.com/sqlstack-io/sqlbuild/compare/v0.202.0...v0.203.0) (2026-11-09)
 
 
