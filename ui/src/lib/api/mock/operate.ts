@@ -1001,7 +1001,6 @@ export function createOperateFixtures(now: number): OperateFixtures {
 	const fingerprint = (name: string, version = 1) => `fp:${name.length.toString(16)}${version}a${(name.charCodeAt(0) * 7919).toString(16)}`;
 	const evalOf = (name: string, seq: number, at: number, outcome: SensorEvaluation['outcome'], extra: Partial<SensorEvaluation> = {}): SensorEvaluation => ({
 		id: `eval-${name.replace(/_/g, '-')}-${seq}`,
-		sequence: seq,
 		outcome,
 		requestedAt: new Date(at).toISOString(),
 		finishedAt: outcome === 'requested' ? null : new Date(at + 1400).toISOString(),

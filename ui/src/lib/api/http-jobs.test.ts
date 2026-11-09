@@ -54,6 +54,40 @@ describe('trigger mapping', () => {
 		expect([detail.declaration, detail.upcoming, detail.evaluations, detail.stateHistory]).toEqual([null, null, null, []]);
 		expect(triggerDetailOf(toTrigger(daily, [], null), daily, [], []).sensor).toBeNull();
 	});
+
+	it("shows a sensor's checks newest first, its cursor and when it moved, and flags code changed since the last check", () => {
+		const check = (id: string, at: string, before: W['PersonSensorCursor'], after: W['PersonSensorCursor'] | null, fingerprint: string): W['PersonSensorEvaluation'] => ({
+			evaluation_id: id,
+			phase: after ? 'completed' : 'failed',
+			requested_at: at,
+			finished_at: at.replace(':00Z', ':05Z'),
+			cursor_before: before,
+			cursor_after: after,
+			run_count: after ? 2 : 0,
+			failure_code: after ? null : 'location_unreachable',
+			definition_fingerprint: fingerprint
+		});
+		const state: W['PersonSensorState'] = {
+			cursor: { event_storage_id: 42, custom: 'feed/page-[REDACTED]' },
+			definition_fingerprint: 'v2',
+			evaluations: [
+				check('e-new', '2026-11-07T06:10:00Z', { event_storage_id: 40, custom: null }, null, 'v1'),
+				check('e-old', '2026-11-07T06:00:00Z', { event_storage_id: 0, custom: null }, { event_storage_id: 40, custom: null }, 'v1')
+			],
+			run_requests: [{ run_key: 'stock-7', run_id: 'r-7', evaluation_id: 'e-old', queued_at: '2026-11-07T06:00:05Z', status: 'success' }]
+		};
+		const reset = { id: 'c1', at: '2026-11-07T05:00:00Z', kind: 'cursor_reset', actor: { kind: 'user', name: 'ada', displayName: 'ada' }, reason: null, value: null } as const;
+		const detail = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [reset], state);
+		expect(detail.sensor).toMatchObject({ cursor: 'feed/page-[REDACTED]', cursorKnown: true, cursorUpdatedAt: '2026-11-07T06:00:05Z', currentFingerprint: 'v2', lastEvaluatedFingerprint: 'v1' });
+		expect(detail.definitionChanged).toBe(true);
+		expect(detail.evaluations?.map((e) => [e.id, e.outcome, e.cursorBefore, e.cursorAfter, e.error])).toEqual([
+			['e-new', 'failed', 'event 40', null, 'location_unreachable'],
+			['e-old', 'completed', null, 'event 40', null]
+		]);
+		expect(detail.runRequests).toEqual([{ runKey: 'stock-7', runId: 'r-7', evaluationId: 'e-old', requestedAt: '2026-11-07T06:00:05Z', runStatus: 'success' }]);
+		const fresh = triggerDetailOf(toTrigger(onInventory, [], null), onInventory, [], [], { ...state, cursor: null, evaluations: [] });
+		expect([fresh.sensor?.cursor, fresh.sensor?.cursorKnown, fresh.definitionChanged, fresh.sensor?.cursorUpdatedAt]).toEqual([null, true, false, null]);
+	});
 });
 
 describe('job mapping', () => {

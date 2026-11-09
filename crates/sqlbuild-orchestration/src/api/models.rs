@@ -38,6 +38,7 @@ use crate::api::_helpers::resources::{
     person_reads::triggers,
     person_reads::ticks,
     person_reads::trigger_changes,
+    person_reads::sensor_state,
     person_reads::snapshots,
     person_reads::health,
     person_reads::problems,

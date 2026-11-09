@@ -1,14 +1,25 @@
 //! Sensor evaluation phases are recorded once; the latest cursor lives on the trigger's state.
 
 use serde_json::json;
+use sqlbuild_recall::records::main::sha256_hex::sha256_hex;
 use uuid::Uuid;
 
 use crate::sensors::models::{
-    SensorCursor, SensorEvaluationFact, SensorEvaluationOutcome, SensorEvaluationRequest,
+    SensorCursor, SensorDefinition, SensorEvaluationFact, SensorEvaluationOutcome,
+    SensorEvaluationRequest,
 };
 use crate::store::errors::ControlError;
 use crate::store::main::query::query;
 use crate::store::models::{Change, ControlTransaction, Parameter};
+
+/// Evaluations record the fingerprint of the definition they ran, so a later definition shows as changed.
+pub(crate) fn definition_fingerprint(
+    definition: &SensorDefinition,
+) -> Result<String, ControlError> {
+    Ok(sha256_hex(&serde_json::to_vec(definition).map_err(
+        |error| ControlError::Invalid(error.to_string()),
+    )?))
+}
 
 pub(crate) async fn append_evaluation(
     transaction: ControlTransaction,
