@@ -1,6 +1,7 @@
 import type { components } from '$control/schema.d.ts';
 import { locationKey as keyOf } from './http-client';
 import type { PlatformEvent } from './types';
+import type { PlatformHealth } from './types/platform';
 
 type Wire = components['schemas'];
 
@@ -53,4 +54,13 @@ export function toPlatformEvents(problems: Wire['PlatformProblems'], now: number
 		});
 	}
 	return events;
+}
+
+/** The scheduler from the problems read: whether a lease is live and when it runs out. Replicas, heartbeat and forwarding aren't reported. */
+export function toPlatformHealth(problems: Wire['PlatformProblems']): PlatformHealth {
+	const expiresAt = problems.scheduler_lease_expires_at;
+	return {
+		scheduler: { lease: problems.scheduler_leader && expiresAt ? { holder: null, acquiredAt: null, renewedAt: null, expiresAt } : null, instances: null },
+		heartbeat: null
+	};
 }

@@ -15,7 +15,7 @@ export type ProcessSummary = {
  * than one is (usually a deploy overlap while a new process loads).
  */
 export function summariseProcesses(instances: readonly LocationInstance[]): ProcessSummary {
-	const byStart = [...instances].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+	const byStart = [...instances].sort((a, b) => (b.startedAt ?? b.lastSeenAt).localeCompare(a.startedAt ?? a.lastSeenAt));
 	const live = byStart.filter((i) => i.state === 'live');
 	if (live.length === 1) return { live, listed: [] };
 	return { live, listed: live.length > 1 ? live : byStart };

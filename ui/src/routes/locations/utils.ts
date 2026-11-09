@@ -1,6 +1,6 @@
 // Server status in plain words for the Locations page. Pure.
 
-import type { HeartbeatStatus, SchedulerStatus, SinkStatus } from '$lib/api';
+import type { HeartbeatStatus, PlatformEvent, PlatformEventRecord, SchedulerStatus, SinkStatus } from '$lib/api';
 import { formatAgo, formatIn, formatStamp } from '$lib/format/time';
 
 export type StatusWords = { text: string; tone: string; title: string; checkIn?: string };
@@ -14,6 +14,9 @@ export function schedulerWords(scheduler: SchedulerStatus, now: number): StatusW
 			tone: 'var(--sb-error)',
 			title: 'No server holds the scheduler lease, so schedules and sensors aren’t starting runs. Another server takes over automatically when one is available.'
 		};
+	}
+	if (!lease.holder || !lease.acquiredAt || !lease.renewedAt) {
+		return { text: 'running', tone: 'var(--sb-success)', title: `A server holds the scheduler lease and renews it before it runs out ${formatIn(lease.expiresAt, now)}` };
 	}
 	return {
 		text: `running (${lease.holder})`,
@@ -44,4 +47,9 @@ export function heartbeatLate(heartbeat: HeartbeatStatus, now: number): boolean 
 /** A server is live while it was seen within the last minute. */
 export function replicaLive(lastSeenAt: string, now: number): boolean {
 	return now - Date.parse(lastSeenAt) < 60_000;
+}
+
+/** A problem the server derives now, as a record without history, links or sensor reactions. */
+export function openRecord(event: PlatformEvent): PlatformEventRecord {
+	return { ...event, resolvedAt: null, links: [], reactions: [], payload: {} };
 }

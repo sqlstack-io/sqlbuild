@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { toPlatformEvents } from './http-problems';
+import { toPlatformEvents, toPlatformHealth } from './http-problems';
 
 const NOW = Date.parse('2026-11-08T12:00:00Z');
 const tick = (name: string, location: string, scheduledFor: string) => ({
@@ -44,5 +44,17 @@ describe('toPlatformEvents', () => {
 			['l1:development', '2026-11-08T11:10:00Z', '2 schedules in orders · development are late, starting with daily_orders.'],
 			['l2:development', '2026-11-08T11:59:00Z', 'stock_levels in inventory · development is late.']
 		]);
+	});
+});
+
+describe('toPlatformHealth', () => {
+	it('reports a lease only while a server leads, with the replica and heartbeat left unknown', () => {
+		const leading = toPlatformHealth({ scheduler_leader: true, scheduler_lease_expires_at: '2026-11-08T12:00:10Z', broken_locations: [], overdue_ticks: [] });
+		expect(leading).toEqual({ scheduler: { lease: { holder: null, acquiredAt: null, renewedAt: null, expiresAt: '2026-11-08T12:00:10Z' }, instances: null }, heartbeat: null });
+		expect('sink' in leading).toBe(false);
+	});
+
+	it('has no lease once the last one ran out, even though its expiry is still reported', () => {
+		expect(toPlatformHealth({ scheduler_leader: false, scheduler_lease_expires_at: '2026-11-08T11:50:00Z', broken_locations: [], overdue_ticks: [] }).scheduler.lease).toBeNull();
 	});
 });
