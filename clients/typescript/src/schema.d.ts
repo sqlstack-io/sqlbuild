@@ -2011,6 +2011,15 @@ export interface components {
             storage_id: number;
             target?: string | null;
         };
+        /** @description One scan of stored platform events, keeping those the person may see. */
+        PersonPlatformEventPage: {
+            /**
+             * Format: int64
+             * @description The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
+             */
+            before?: number | null;
+            events: components["schemas"]["PersonPlatformEvent"][];
+        };
         /** @description A role assigned to one person, everywhere or on one location and target. */
         PersonRole: {
             /** Format: uuid */
@@ -5067,13 +5076,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists */
+            /** @description One scan of stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PersonPlatformEvent"][];
+                    "application/json": components["schemas"]["PersonPlatformEventPage"];
                 };
             };
             /** @description Session rejected */

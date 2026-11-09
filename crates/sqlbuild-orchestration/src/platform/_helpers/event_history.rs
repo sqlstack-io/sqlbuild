@@ -11,12 +11,13 @@ use crate::store::errors::ControlError;
 use crate::store::main::{decode_row::decode_row, query::query, query_records::query_records};
 use crate::store::models::{ControlTransaction, Parameter};
 
-/// Up to `limit` events before `before`, heartbeats left out, with their location targets resolved.
+/// Up to `limit` events before `before` without heartbeats or orphans, targets resolved, and where a further scan continues.
 pub(crate) async fn event_history(
     transaction: ControlTransaction,
     (before, limit): (Option<i64>, u32),
-) -> Result<(ControlTransaction, Vec<PersonPlatformEvent>), ControlError> {
-    let mut parameters = vec![Parameter::Integer(i64::from(limit.clamp(1, 500)))];
+) -> Result<(ControlTransaction, Vec<PersonPlatformEvent>, Option<i64>), ControlError> {
+    let limit: u32 = limit.clamp(1, 500);
+    let mut parameters = vec![Parameter::Integer(i64::from(limit))];
     let older = before.map_or("", |storage_id| {
         parameters.push(Parameter::Integer(storage_id));
         "AND storage_id<$2 "
@@ -39,17 +40,20 @@ pub(crate) async fn event_history(
         scopes_of(transaction, ("sqb_triggers", "trigger_id"), &triggers).await?;
     let (transaction, run_scopes) = scopes_of(transaction, ("sqb_runs", "run_id"), &runs).await?;
     scopes.extend(run_scopes);
+    let next: Option<i64> = (events.len() == limit as usize)
+        .then(|| events.last().map(|envelope| envelope.storage_id))
+        .flatten();
     let history: Vec<PersonPlatformEvent> = events
         .into_iter()
-        .map(|envelope| person_event(envelope, &scopes))
+        .filter_map(|envelope| person_event(envelope, &scopes))
         .collect();
-    Ok((transaction, history))
+    Ok((transaction, history, next))
 }
 
 fn person_event(
     envelope: PlatformEventEnvelope,
     scopes: &BTreeMap<Uuid, (Uuid, String)>,
-) -> PersonPlatformEvent {
+) -> Option<PersonPlatformEvent> {
     let scope: Option<(Uuid, String)> = match &envelope.payload.platform {
         PlatformEvent::LocationBroken {
             location_id,
@@ -57,21 +61,23 @@ fn person_event(
             ..
         } => Some((*location_id, target.clone())),
         PlatformEvent::TickOverdue { trigger_id, .. }
-        | PlatformEvent::CalendarHorizonLow { trigger_id, .. } => scopes.get(trigger_id).cloned(),
-        PlatformEvent::LaunchFailed { run_id, .. } => scopes.get(run_id).cloned(),
+        | PlatformEvent::CalendarHorizonLow { trigger_id, .. } => {
+            Some(scopes.get(trigger_id).cloned()?)
+        }
+        PlatformEvent::LaunchFailed { run_id, .. } => Some(scopes.get(run_id).cloned()?),
         PlatformEvent::Heartbeat { .. } | PlatformEvent::SchedulerNoLeader => None,
     };
     let (location_id, target) = scope.map_or((None, None), |(location_id, target)| {
         (Some(location_id), Some(target))
     });
-    PersonPlatformEvent {
+    Some(PersonPlatformEvent {
         storage_id: envelope.storage_id,
         event_id: envelope.event_id,
         occurred_at: envelope.occurred_at,
         location_id,
         target,
         event: envelope.payload.platform,
-    }
+    })
 }
 
 async fn scopes_of(

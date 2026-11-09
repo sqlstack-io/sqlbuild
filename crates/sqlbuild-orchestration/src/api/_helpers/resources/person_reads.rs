@@ -20,7 +20,9 @@ use crate::declarations::models::{
 use crate::platform::main::list_person_platform_events::list_person_platform_events;
 use crate::platform::main::read_person_location_health::read_person_location_health;
 use crate::platform::main::read_person_problems::read_person_problems;
-use crate::platform::models::{LocationHealthObservation, PersonPlatformEvent, PlatformProblems};
+use crate::platform::models::{
+    LocationHealthObservation, PersonPlatformEventPage, PlatformProblems,
+};
 use crate::runs::main::list_person_run_nodes::list_person_run_nodes;
 use crate::runs::models::{
     NodeRunRecord, RunEventRecord, RunNodeFailure, RunNodeRecord, RunOutput, RunStatementRecord,
@@ -464,13 +466,13 @@ pub(crate) async fn problems(
 #[utoipa::path(get, path = "/api/control/platform/events", operation_id = "listPersonPlatformEvents",
     params(("before" = Option<i64>, Query, description = "Continue after this storage ID of the previous page"),
         ("limit" = Option<u32>, Query, description = "Events to scan; defaults to 200, clamped to 1..500")),
-    responses((status = 200, body = Vec<PersonPlatformEvent>, description = "Stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists"),
+    responses((status = 200, body = PersonPlatformEventPage, description = "One scan of stored platform events newest first, without heartbeats: server-wide ones, and those of targets the person lists"),
         (status = 401, description = "Session rejected")), security(("session" = []), ("cliSession" = [])))]
 pub(crate) async fn platform_events(
     (State(store), Query(options)): (State<ControlStore>, Query<PlatformEventsQuery>),
     Extension(default_role): Extension<DefaultRole>,
     Extension(AuthenticatedPerson(principal, _)): Extension<AuthenticatedPerson>,
-) -> Result<Json<Vec<PersonPlatformEvent>>, ApiError> {
+) -> Result<Json<PersonPlatformEventPage>, ApiError> {
     Ok(Json(
         list_person_platform_events(
             &store,

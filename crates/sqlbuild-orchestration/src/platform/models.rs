@@ -272,6 +272,14 @@ pub struct PersonPlatformEvent {
     pub target: Option<String>,
 }
 
+/// One scan of stored platform events, keeping those the person may see.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PersonPlatformEventPage {
+    pub events: Vec<PersonPlatformEvent>,
+    /// The `before` that continues the scan, absent once no older events remain; a page can be empty and still continue.
+    pub before: Option<i64>,
+}
+
 /// The location target a trigger or run belongs to.
 #[derive(Debug, Deserialize)]
 pub(crate) struct EventScope {

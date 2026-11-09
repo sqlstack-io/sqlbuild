@@ -97,6 +97,10 @@ const PLAN_POLL_MS = 750;
 const AUDIT_PAGE = 100;
 const AUDIT_PAGES = 10;
 
+/** The server's largest platform event scan, and how many event history reads before it stops looking. */
+const EVENT_PAGE = 500;
+const EVENT_SCANS = 10;
+
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
 	return `${locationId}:${target}`;
@@ -525,15 +529,25 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		},
 		listPlatformEvents: async (): Promise<PlatformEvent[]> => toPlatformEvents(await problems(), Date.now()),
 		async listPlatformEventHistory(query: PlatformEventQuery = {}): Promise<PlatformEventRecord[]> {
-			const [open, stored, locations] = await Promise.all([
-				problems().then((p) => toPlatformEvents(p, Date.now())),
-				http.GET('/api/control/platform/events', { params: { query: { limit: query.limit ?? 200 } } }).then(({ data, error, response }) => {
+			const limit = query.limit ?? 200;
+			const wanted = (wire: Wire['PersonPlatformEvent']) =>
+				(query.locationId === undefined || (wire.location_id && wire.target ? locationKey(wire.location_id, wire.target) : null) === query.locationId) &&
+				(!query.kinds?.length || query.kinds.includes(wire.event.kind));
+			/** Each scan skips the events the person may not see, so one can come back short; keep scanning until enough match. */
+			async function storedEvents(): Promise<Wire['PersonPlatformEvent'][]> {
+				const kept: Wire['PersonPlatformEvent'][] = [];
+				let before: number | undefined;
+				for (let scan = 0; scan < EVENT_SCANS && kept.length < limit; scan++) {
+					const { data, error, response } = await http.GET('/api/control/platform/events', { params: { query: { limit: EVENT_PAGE, before } } });
 					if (response.status === 401) onUnauthorized();
 					if (!data) throw new ApiError(errorText(error, response), response.status);
-					return data;
-				}),
-				bootstrapLocations()
-			]);
+					kept.push(...data.events.filter(wanted));
+					if (data.before === null || data.before === undefined) break;
+					before = data.before;
+				}
+				return kept.slice(0, limit);
+			}
+			const [open, stored, locations] = await Promise.all([problems().then((p) => toPlatformEvents(p, Date.now())), storedEvents(), bootstrapLocations()]);
 			const records = toPlatformEventRecords(open, stored, new Map(locations.map((l) => [l.id, l.name])));
 			return records.filter(
 				(r) => (query.locationId === undefined || r.locationId === query.locationId) && (!query.kinds?.length || query.kinds.includes(r.kind)) && (!query.activeOnly || r.active)

@@ -701,3 +701,42 @@ describe('node error text', () => {
 		expect(paths.filter((p) => p.endsWith('/error'))).toHaveLength(0);
 	});
 });
+
+describe('listPlatformEventHistory', () => {
+	const event = (storage_id: number, target: string) => ({
+		storage_id,
+		event_id: `e-${storage_id}`,
+		occurred_at: '2026-11-09T09:00:00Z',
+		location_id: '0191f0aa-orders',
+		target,
+		event: { kind: 'location_broken', location_id: '0191f0aa-orders', target, last_seen_at: '2026-11-09T08:00:00Z' }
+	});
+
+	/** The newest scan holds only another target's event, and the next scan holds the one asked for. */
+	function server() {
+		const scans: (string | null)[] = [];
+		vi.stubGlobal('document', { cookie: '' });
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (request: Request) => {
+				const url = new URL(request.url);
+				if (url.pathname.endsWith('/bootstrap')) return Response.json({ login_mode: 'password', access: { name: 'ada', principal_id: 'p', actions: [], locations: [] } });
+				if (url.pathname.endsWith('/platform/problems')) return Response.json({ scheduler_leader: true, scheduler_lease_expires_at: null, broken_locations: [], overdue_ticks: [] });
+				if (url.pathname.endsWith('/platform/events')) {
+					const before = url.searchParams.get('before');
+					scans.push(before);
+					return Response.json(before === null ? { events: [event(9, 'preview')], before: 9 } : { events: [event(4, 'development')], before: null });
+				}
+				return Response.json([]);
+			})
+		);
+		return { scans, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
+	}
+
+	it("keeps scanning past a scan without the location's events until the server says none are older", async () => {
+		const { scans, client } = server();
+		const history = await client.listPlatformEventHistory({ locationId: '0191f0aa-orders:development' });
+		expect(history.map((r) => r.id)).toEqual(['e-4']);
+		expect(scans).toEqual([null, '9']);
+	});
+});

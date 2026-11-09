@@ -8,7 +8,8 @@ use crate::platform::main::list_person_platform_events::list_person_platform_eve
 use crate::platform::main::read_person_problems::read_person_problems;
 use crate::platform::main::report_location_health::report_location_health;
 use crate::platform::models::{
-    LocationHealth, LocationHealthReport, PersonPlatformEvent, PlatformEvent, PlatformEventKind,
+    LocationHealth, LocationHealthReport, PersonPlatformEvent, PersonPlatformEventPage,
+    PlatformEvent, PlatformEventKind,
 };
 use crate::scheduler::tests::contracts::helpers::acquire_lease;
 use crate::snapshots::main::publish_snapshot::publish_snapshot;
@@ -209,7 +210,8 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
             };
             let all = history(admin, (None, 100))
                 .await
-                .expect("administrator events");
+                .expect("administrator events")
+                .events;
             assert_eq!(
                 kinds(&all),
                 [
@@ -226,15 +228,50 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                 "a tick's event names its trigger's location target"
             );
             let first = history(admin, (None, 1)).await.expect("first page");
-            let second = history(admin, (Some(first[0].storage_id), 1))
+            let second = history(admin, (first.before, 1))
                 .await
                 .expect("second page");
-            assert_eq!(kinds(&second), [PlatformEventKind::LocationBroken]);
+            assert_eq!(kinds(&second.events), [PlatformEventKind::LocationBroken]);
+            assert_eq!(
+                history(developer, (None, 1))
+                    .await
+                    .expect("developer's first page"),
+                PersonPlatformEventPage {
+                    events: Vec::new(),
+                    before: Some(all[0].storage_id)
+                },
+                "a page whose events are all hidden still continues the scan"
+            );
+            let hidden = history(developer, (None, 1))
+                .await
+                .expect("developer's first page");
+            let broken = history(developer, (hidden.before, 1))
+                .await
+                .expect("developer's second page");
+            let no_leader = history(developer, (broken.before, 1))
+                .await
+                .expect("developer's third page");
+            let end = history(developer, (no_leader.before, 1))
+                .await
+                .expect("developer's last page");
+            assert_eq!(
+                (kinds(&broken.events), kinds(&no_leader.events), end),
+                (
+                    vec![PlatformEventKind::LocationBroken],
+                    vec![PlatformEventKind::SchedulerNoLeader],
+                    PersonPlatformEventPage {
+                        events: Vec::new(),
+                        before: None
+                    }
+                ),
+                "paging through hidden events reaches older visible ones and then ends"
+            );
             assert_eq!(
                 kinds(
                     &history(developer, (None, 100))
                         .await
                         .expect("developer events")
+                        .events
                 ),
                 [
                     PlatformEventKind::LocationBroken,
@@ -247,6 +284,7 @@ fn given_broken_locations_and_late_ticks_when_people_read_problems_then_only_lis
                     &history(outsider, (None, 100))
                         .await
                         .expect("outsider events")
+                        .events
                 ),
                 [PlatformEventKind::SchedulerNoLeader],
                 "only server-wide events without a listed target"
