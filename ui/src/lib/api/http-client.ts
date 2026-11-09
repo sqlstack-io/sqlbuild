@@ -7,6 +7,7 @@ import { auditMatches, toAuditEntry } from './http-audit';
 import { toSnapshotChanges } from './http-changes';
 import { toLocationSummary, warehouseSyncOf } from './http-locations';
 import { toAccount, toRoleAssignments } from './http-people';
+import { toMaintenanceHistory } from './http-maintenance';
 import { overviewOf } from './http-overview';
 import { toPlatformEvents } from './http-problems';
 import { roleDetailOf, toRoleDefinition } from './http-roles';
@@ -14,7 +15,7 @@ import { jobDetailOf, toJob, toTick, toTrigger, triggerDetailOf } from './http-j
 import { RUN_WINDOW, toAdhocCheck, runDetailOf, runRowPage, runsMatching, runTabCountsOf, toRunNode, toRuns, toRunEvent, toRunOutput, toRunStatements } from './http-runs';
 import type { ChangeSubscription, ChangedChannel, ChangedSignal, ConnectionState } from './signals';
 import type { AuthMode, Bootstrap, Capability, Location, PlatformEvent, Scope, WarehouseSync } from './types';
-import type { Account, AuditEntry, AuditQuery, LocationSummary, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
+import type { Account, AuditEntry, AuditQuery, LocationSummary, MaintenanceHistory, RoleAssignment, RoleDefinition, RoleDetail } from './types/platform';
 import type { CatalogNode, CatalogNodeDetail, Check, CheckDetail, CheckEvidence, CheckSql, Overview, SnapshotChange, ColumnLineage } from './types/build';
 import type { AdhocRunCheck, AdhocRunRequest, Job, JobDetail, RerunMode, SnapshotNode, Run, RunDetail, RunListQuery, RunRowPage, RunRowQuery, RunTabCounts, Trigger, TriggerDetail, TriggerState, RunEventPage, RunOutputLine, RunStatement, StatementSql } from './types/operate';
 
@@ -61,6 +62,7 @@ const SUPPORTED: ReadonlySet<string> = new Set<keyof ApiClient>([
 	'listRoles',
 	'getRole',
 	'getWarehouseSync',
+	'maintenanceHistory',
 	'listSnapshotNodes',
 	'checkAdhocRun',
 	'launchAdhocRun'
@@ -376,6 +378,13 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (response.status === 401) onUnauthorized();
 			if (!data) throw new ApiError(errorText(error, response), response.status);
 			return warehouseSyncOf(data);
+		},
+		async maintenanceHistory(scope: Scope): Promise<MaintenanceHistory> {
+			const { locationId, target } = parseLocationKey(scope.locationId);
+			const { data, error, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/maintenance', { params: { path: { location_id: locationId, target } } });
+			if (response.status === 401) onUnauthorized();
+			if (!data) throw new ApiError(errorText(error, response), response.status);
+			return toMaintenanceHistory(data);
 		},
 		async listPlatformEvents(): Promise<PlatformEvent[]> {
 			const { data, error, response } = await http.GET('/api/control/platform/problems');
