@@ -44,12 +44,6 @@
 {#if !allowed}
 	<NoAccess what="people" requires={['user.manage', 'role.assign']} />
 {:else}
-	<div class="intro">
-		<p>
-			Everyone who has signed in, with what they can do in each location. People sign in with single sign-on, or <code>sqb login</code> on the command line.
-			{#if opensPeople}Open someone to see their effective access and why.{/if}
-		</p>
-	</div>
 	<ListToolbar bind:query={people.query} placeholder="Search people and roles" total="{people.shown.length} of {people.accounts.length} people">
 		{#snippet filters()}
 			<ChoiceFilter label="Role" bind:value={people.role} options={people.roleNames.map((r) => ({ value: r, label: r }))} all="Any role" />
@@ -116,13 +110,6 @@
 {/if}
 
 <style>
-	.intro {
-		flex: 0 0 auto;
-		max-width: 900px;
-		padding: 14px 20px 10px;
-		font-size: 12.5px;
-		line-height: 1.55;
-	}
 	code {
 		font-family: var(--font-mono);
 		font-size: 12px;

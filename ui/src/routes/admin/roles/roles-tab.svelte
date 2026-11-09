@@ -11,10 +11,6 @@
 </script>
 
 <div class="px-6 pt-5 pb-8">
-	<p class="lede">
-		Roles in <b>{app.location?.name}</b>. Built-in roles act on every node; custom roles add actions on chosen nodes. Custom roles come from the project's roles file and are
-		read-only here.
-	</p>
 	<table class="sb-list framed">
 		<thead>
 			<tr>
@@ -46,16 +42,6 @@
 </div>
 
 <style>
-	.lede {
-		max-width: 860px;
-		margin-bottom: 18px;
-		color: var(--muted-foreground);
-		font-size: 12.5px;
-	}
-	.lede b {
-		color: var(--foreground);
-		font-weight: 500;
-	}
 	.framed {
 		border-top: 1px solid var(--border);
 	}
