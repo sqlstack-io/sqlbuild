@@ -49,8 +49,8 @@ from tests.e2e.src.sqlbuild.cli.commands.shared.helpers import (
             command=("--no-color", "build"),
             expected_exit_code=1,
             expected_stderr_fragments=(
-                "Polyglot could not parse model 'orders' pre_hooks[0] inline_sql(\"...\")",
-                "Invalid expression / Unexpected token",
+                "error[P001]: SQL syntax error in model 'orders' pre_hooks[0] inline_sql(\"...\")",
+                "the duckdb parser cannot read Syntax error at or near 'THIS'",
                 "  = help: if this SQL is valid for your warehouse, skip SQL analysis for this "
                 "model, add this to the MODEL header:\n"
                 "            MODEL (\n"

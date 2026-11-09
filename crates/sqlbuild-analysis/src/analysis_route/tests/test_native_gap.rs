@@ -215,8 +215,8 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
                     column: 18,
                 }),
             },
-            expected_code: "P026",
-            expected_message: "SQL analysis skipped for model 'orders' (models/orders.sql): the \
+            expected_code: "P001",
+            expected_message: "SQL syntax error in model 'orders' (models/orders.sql): the \
                                postgres parser cannot read syntax error at line 5, column 18: \
                                syntax error at or near \"FROM\"",
         },
@@ -240,8 +240,8 @@ fn given_a_located_gap_when_skipping_analysis_then_p026_names_the_model_its_site
                     column: 13,
                 }),
             },
-            expected_code: "P026",
-            expected_message: "SQL analysis skipped for model 'customer_totals' post_hooks[0] \
+            expected_code: "P001",
+            expected_message: "SQL syntax error in model 'customer_totals' post_hooks[0] \
                                sql(\"record_refresh\") (hooks/sql/record_refresh.sql): the duckdb \
                                parser cannot read Syntax error at or near 'WHERE' at line 1, \
                                column 13 of its SQL",

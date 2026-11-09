@@ -122,7 +122,7 @@ pub(crate) fn rejected_opt_out<'py>(
     }
 }
 
-/// Whether a native route analyses the model: P026 warns, or raises, when its parser cannot read it.
+/// Whether a native route analyses the model: P026 warns or raises when its parser cannot read it, and P001 raises when the parser reports invalid syntax.
 pub(crate) fn skip_unreadable(
     settings: ModelLoopSettings,
     dialect: &dyn NativeDialect,
@@ -138,12 +138,16 @@ pub(crate) fn skip_unreadable(
         path: &check.path,
         position: gap_position(model, check, &gap),
     };
-    report_skip(
-        settings,
-        context,
-        model,
-        skipped_analysis(model.name, dialect.name(), &gap, &site),
-    )?;
+    let (code, message) = skipped_analysis(model.name, dialect.name(), &gap, &site);
+    if gap.syntax {
+        return Err(new_helped_error(
+            model.config.py(),
+            ErrorId::CompileInput,
+            (message, code),
+            Some(&context.classes.syntax_help),
+        ));
+    }
+    report_skip(settings, context, model, (code, message))?;
     Ok(false)
 }
 
@@ -268,20 +272,24 @@ fn model_checks(
         .collect())
 }
 
-/// The native parser's first gap across `checks`, with its check; none when it reads each whole.
+/// The native parser's first syntax error across `checks`, else its first gap, with its check.
 fn first_gap<'a>(
     dialect: &dyn NativeDialect,
     context: &LoopContext<'_, '_>,
     checks: &'a [SiteCheck],
 ) -> PyResult<Option<(&'a SiteCheck, LocatedGap)>> {
+    let mut first: Option<(&'a SiteCheck, LocatedGap)> = None;
     for site in checks {
         if let Some(gap) = native_gap(dialect, &site.check)
             .map_err(|message| compile_error(context.classes, &message, None))?
         {
-            return Ok(Some((site, gap)));
+            if gap.syntax {
+                return Ok(Some((site, gap)));
+            }
+            first = first.or(Some((site, gap)));
         }
     }
-    Ok(None)
+    Ok(first)
 }
 
 /// `validate_sql_syntax`: raise the model's SQL syntax error before its references are scanned.
