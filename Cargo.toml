@@ -174,7 +174,7 @@ sqlbuild-scopes = { path = "crates/sqlbuild-scopes" }
 sqlbuild-sqltext = { path = "crates/sqlbuild-sqltext" }
 sqlbuild-state = { path = "crates/sqlbuild-state" }
 # SQL lint Rules, quality Rules and the formatter.
-sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "46bbaaaea76fc99042b15537615fc67432540291" }
+sqlclean = { git = "https://github.com/sqlstack-io/sqlclean.git", rev = "e397b73b4d3cf9c245476484a2b0f7781bef663a" }
 # SQL change fingerprints over SQLQuack's tokenizers.
 sqlquack-fingerprint = { git = "https://github.com/sqlstack-io/sqlquack.git", rev = "f53c6a076ad05c5c12047a2dcc9c58e3ddfbe293", features = ["bigquery", "databricks", "duckdb", "postgres", "snowflake", "sqlite", "sqlserver"] }
 # Scopes, name resolution, types and lineage for the native analysis route.
