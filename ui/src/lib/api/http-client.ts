@@ -105,6 +105,10 @@ const EVENT_SCANS = 10;
 /** How many statistics pages of 100 a node read follows, and how many samples a relation keeps. */
 const STATISTICS_PAGES = 10;
 const STATISTICS_KEPT = 1000;
+/** How many hours back a first statistics read starts, at one sample an hour with a page to spare. */
+const STATISTICS_FIRST_HOURS = STATISTICS_PAGES * 100 - 100;
+const HOUR_MS = 3_600_000;
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 /** A UI location is one server location and target; its id carries both. */
 export function locationKey(locationId: string, target: string): string {
@@ -266,7 +270,10 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 		const { locationId, target } = parseLocationKey(scope.locationId);
 		const key = JSON.stringify([scope.locationId, relation.database, relation.schema, relation.name]);
 		const held = samples.get(key);
-		let after = held?.after;
+		// The server pages oldest first from its retention cutoff and keeps up to one sample an hour, so a first read starts
+		// late enough that its pages reach the newest sample.
+		const since = { observed_at: new Date(Date.now() - STATISTICS_FIRST_HOURS * HOUR_MS).toISOString(), event_id: NIL_UUID };
+		let after = held?.after ?? since;
 		const fresh: Wire['StatisticsObservation'][] = [];
 		for (let page = 0; page < STATISTICS_PAGES; page++) {
 			const { data, response } = await http.GET('/api/control/locations/{location_id}/targets/{target}/statistics', {
@@ -283,7 +290,7 @@ export function createHttpClient({ baseUrl = '', onUnauthorized }: HttpClientOpt
 			if (last) after = { observed_at: last.record.observed_at, event_id: last.event_id };
 			if (!data.next_after) break;
 		}
-		if (!after) return [];
+		if (!held && !fresh.length) return [];
 		const records = [...(held?.records ?? []), ...fresh.map((o) => o.record)].slice(-STATISTICS_KEPT);
 		samples.set(key, { records, after });
 		return records;

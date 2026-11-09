@@ -742,10 +742,15 @@ describe('listPlatformEventHistory', () => {
 });
 
 describe('getCatalogNode statistics', () => {
-	const sample = (event_id: string, observed_at: string, row_count: number) => ({ event_id, record: { name: 'orders', state_schema: 'main', observed_at, row_count } });
+	const HOUR = 3_600_000;
+	const now = Date.parse('2026-11-09T12:00:00Z');
+	/** One sample an hour for 1,500 hours up to now, served oldest first in pages of 100 after a cursor, as the server does. */
+	const stored = Array.from({ length: 1500 }, (_, i) => ({
+		event_id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, '0')}`,
+		record: { name: 'orders', state_schema: 'main', observed_at: new Date(now - (1499 - i) * HOUR).toISOString(), row_count: i + 1 }
+	}));
 
-	/** Two samples at first; a refresh after them finds a third. Everything else answers empty. */
-	function server() {
+	function server(samples: typeof stored) {
 		const reads: string[] = [];
 		vi.stubGlobal('document', { cookie: '' });
 		vi.stubGlobal(
@@ -755,9 +760,12 @@ describe('getCatalogNode statistics', () => {
 				if (url.pathname.endsWith('/nodes'))
 					return Response.json([{ node_key: 'model:orders', kind: 'model', name: 'orders', materialization: 'table', tags: [], dependencies: [], snapshot_id: 's', relation: { schema: 'main', name: 'orders' } }]);
 				if (url.pathname.endsWith('/statistics')) {
-					const after = url.searchParams.get('after_event_id');
-					reads.push(`${url.searchParams.get('schema')}.${url.searchParams.get('name')} after ${after}`);
-					return Response.json({ records: after ? [sample('e3', '2026-11-09T03:00:00Z', 30)] : [sample('e1', '2026-11-09T01:00:00Z', 10), sample('e2', '2026-11-09T02:00:00Z', 20)] });
+					const at = url.searchParams.get('after_observed_at') ?? '';
+					const id = url.searchParams.get('after_event_id') ?? '';
+					reads.push(`${url.searchParams.get('schema')}.${url.searchParams.get('name')}`);
+					const page = samples.filter((s) => s.record.observed_at > at || (s.record.observed_at === at && s.event_id > id)).slice(0, 100);
+					const last = page.at(-1);
+					return Response.json({ records: page, next_after: page.length === 100 && last ? { observed_at: last.record.observed_at, event_id: last.event_id } : null });
 				}
 				if (url.pathname.endsWith('/node-status')) return Response.json(null);
 				return Response.json([]);
@@ -766,11 +774,24 @@ describe('getCatalogNode statistics', () => {
 		return { reads, client: createHttpClient({ baseUrl: 'http://ui.test', onUnauthorized: () => {} }) };
 	}
 
+	beforeEach(() => vi.useFakeTimers({ now, toFake: ['Date'] }));
+	afterEach(() => vi.useRealTimers());
+
+	it('shows the newest sample on the first open, however much older history the server keeps', async () => {
+		const { reads, client } = server(stored);
+		expect((await client.getCatalogNode({ locationId: '0191f0aa-orders:development' }, 'orders'))?.lastRows).toBe(1500);
+		expect(reads.every((r) => r === 'main.orders')).toBe(true);
+		expect(reads.length).toBeLessThanOrEqual(11);
+	});
+
 	it('reads only the samples after the newest one it holds on a refresh, and keeps the earlier ones', async () => {
-		const { reads, client } = server();
+		const samples = stored.slice(0, 1499);
+		const { reads, client } = server(samples);
 		const scope = { locationId: '0191f0aa-orders:development' };
-		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(20);
-		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(30);
-		expect(reads).toEqual(['main.orders after null', 'main.orders after e2']);
+		expect((await client.getCatalogNode(scope, 'orders'))?.lastRows).toBe(1499);
+		const first = reads.length;
+		samples.push(stored[1499]);
+		const refreshed = await client.getCatalogNode(scope, 'orders');
+		expect([refreshed?.lastRows, refreshed?.warehouse, reads.length - first]).toEqual([1500, null, 1]);
 	});
 });
