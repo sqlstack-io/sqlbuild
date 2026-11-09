@@ -182,6 +182,16 @@ pub struct ProjectFacts {
     pub orchestration: Vec<OrchestrationNameFact>,
 }
 
+/// One name in the project's resource namespace, as a name conflict reports it.
+#[derive(Debug)]
+pub(crate) struct DeclaredName<'a> {
+    pub(crate) name: &'a str,
+    pub(crate) kind: &'a str,
+    pub(crate) path: &'a str,
+    /// A job, job group, sensor or calendar schedule, whose conflicts say how it is named.
+    pub(crate) orchestration: bool,
+}
+
 /// A named orchestration declaration: its name, its kind as conflicts word it, and its module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OrchestrationNameFact {

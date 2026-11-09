@@ -5,19 +5,35 @@ use std::collections::{HashMap, HashSet};
 use crate::project_validation::_helpers::conflicts::{conflict, schema_seeds};
 use crate::project_validation::_helpers::identities::block_or_file_name;
 use crate::project_validation::constants::ORCHESTRATION_RENAME_ADVICE;
-use crate::project_validation::models::{NodeKind, ProjectFacts, ValidationFailure};
+use crate::project_validation::models::{
+    DeclaredName, NamedPath, NodeKind, ProjectFacts, ValidationFailure,
+};
 
 /// Reject the first resource name declared twice across models, sources, seeds and the rest.
 pub(crate) fn validate_unique_project_resource_names(
     facts: &ProjectFacts,
 ) -> Result<(), ValidationFailure> {
-    let mut seen: HashMap<String, Declared> = HashMap::new();
+    let seeds: Vec<NamedPath> = schema_seeds(facts);
+    let mut seen: HashMap<&str, DeclaredName<'_>> = HashMap::new();
+    for declared in declarations(facts, &seeds) {
+        if let Some(first) = seen.get(declared.name) {
+            return Err(name_conflict(first, &declared));
+        }
+        seen.insert(declared.name, declared);
+    }
+    Ok(())
+}
+
+/// Every declared name in the order conflicts are reported.
+fn declarations<'a>(facts: &'a ProjectFacts, seeds: &'a [NamedPath]) -> Vec<DeclaredName<'a>> {
+    let mut declared: Vec<DeclaredName<'a>> = Vec::new();
     for model in &facts.models {
-        declare(
-            &mut seen,
-            (&model.file.name, "model", &model.file.path),
-            false,
-        )?;
+        declared.push(DeclaredName {
+            name: &model.file.name,
+            kind: "model",
+            path: &model.file.path,
+            orchestration: false,
+        });
     }
     let mut managed_sources: HashSet<&str> = HashSet::new();
     for file in &facts.sources {
@@ -25,94 +41,109 @@ pub(crate) fn validate_unique_project_resource_names(
             if entry.managed {
                 managed_sources.insert(&entry.name);
             }
-            declare(&mut seen, (&entry.name, "source", &file.path), false)?;
+            declared.push(DeclaredName {
+                name: &entry.name,
+                kind: "source",
+                path: &file.path,
+                orchestration: false,
+            });
         }
     }
-    for seed in schema_seeds(facts) {
-        declare(&mut seen, (&seed.name, "seed", &seed.path), false)?;
+    for seed in seeds {
+        declared.push(DeclaredName {
+            name: &seed.name,
+            kind: "seed",
+            path: &seed.path,
+            orchestration: false,
+        });
     }
     for function in facts.sql_functions.iter().chain(&facts.python_functions) {
-        declare(
-            &mut seen,
-            (&function.name, "function", &function.path),
-            false,
-        )?;
+        declared.push(DeclaredName {
+            name: &function.name,
+            kind: "function",
+            path: &function.path,
+            orchestration: false,
+        });
     }
     for node in &facts.nodes {
         if node.kind == NodeKind::Loader && managed_sources.contains(node.name.as_str()) {
             continue;
         }
-        declare(
-            &mut seen,
-            (&node.name, node.kind.label(), &node.path),
-            false,
-        )?;
+        declared.push(DeclaredName {
+            name: &node.name,
+            kind: node.kind.label(),
+            path: &node.path,
+            orchestration: false,
+        });
     }
     for provider in &facts.providers {
-        declare(
-            &mut seen,
-            (&provider.name, "provider", &provider.path),
-            false,
-        )?;
+        declared.push(DeclaredName {
+            name: &provider.name,
+            kind: "provider",
+            path: &provider.path,
+            orchestration: false,
+        });
     }
     for hook in &facts.sql_hooks {
-        declare(&mut seen, (&hook.name, "sql hook", &hook.path), false)?;
+        declared.push(DeclaredName {
+            name: &hook.name,
+            kind: "sql hook",
+            path: &hook.path,
+            orchestration: false,
+        });
     }
     for hook in &facts.hook_functions {
-        declare(&mut seen, (&hook.name, "python hook", &hook.path), false)?;
+        declared.push(DeclaredName {
+            name: &hook.name,
+            kind: "python hook",
+            path: &hook.path,
+            orchestration: false,
+        });
     }
     for scenario in &facts.scenarios {
-        declare(
-            &mut seen,
-            (&scenario.name, "scenario", &scenario.path),
-            false,
-        )?;
+        declared.push(DeclaredName {
+            name: &scenario.name,
+            kind: "scenario",
+            path: &scenario.path,
+            orchestration: false,
+        });
     }
     let mut test_names: HashSet<&str> = HashSet::new();
     for test in &facts.tests {
         for block in &test.blocks {
             let name: &str = block_or_file_name(block.name.as_deref(), &test.file.name);
-            if !test_names.insert(name) {
-                continue;
+            if test_names.insert(name) {
+                declared.push(DeclaredName {
+                    name,
+                    kind: "unit test",
+                    path: &test.file.path,
+                    orchestration: false,
+                });
             }
-            declare(&mut seen, (name, "unit test", &test.file.path), false)?;
         }
     }
     for declaration in &facts.orchestration {
-        declare(
-            &mut seen,
-            (&declaration.name, declaration.kind, &declaration.path),
-            true,
-        )?;
+        declared.push(DeclaredName {
+            name: &declaration.name,
+            kind: declaration.kind,
+            path: &declaration.path,
+            orchestration: true,
+        });
     }
-    Ok(())
+    declared
 }
 
-/// A name's first declaration: its kind, its file and whether it is an orchestration declaration.
-type Declared = (String, String, bool);
-
-/// Record one declaration, or name both declarations and say how to rename one of them.
-fn declare(
-    seen: &mut HashMap<String, Declared>,
-    (name, kind, path): (&str, &str, &str),
-    orchestration: bool,
-) -> Result<(), ValidationFailure> {
-    if let Some((existing_kind, existing_path, existing_orchestration)) = seen.get(name) {
-        let advice: &str = if orchestration || *existing_orchestration {
-            ORCHESTRATION_RENAME_ADVICE
-        } else {
-            ""
-        };
-        return Err(conflict(format!(
-            "Project resource name '{name}' is declared as both {existing_kind} in \
-             {existing_path} and {kind} in {path}; model, source, seed, function, loader, task, \
-             asset, check, provider, hook, unit test, scenario, job, job group, sensor, and \
-             calendar schedule names must be globally unique; rename one of them{advice}"
-        )));
-    }
-    seen.insert(
-        name.to_owned(),
-        (kind.to_owned(), path.to_owned(), orchestration),
-    );
-    Ok(())
+/// Name both declarations and say how to rename one of them.
+fn name_conflict(first: &DeclaredName<'_>, second: &DeclaredName<'_>) -> ValidationFailure {
+    let advice: &str = if first.orchestration || second.orchestration {
+        ORCHESTRATION_RENAME_ADVICE
+    } else {
+        ""
+    };
+    conflict(format!(
+        "Project resource name '{}' is declared as both {} in {} and {} in {}; model, source, seed, function, loader, task, asset, check, provider, \
+         hook, unit test, scenario, job, job group, sensor, and calendar schedule names must be \
+         globally unique; rename one of them{advice}",
+        first.name, first.kind, first.path, second.kind, second.path
+    ))
 }
