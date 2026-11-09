@@ -1,21 +1,24 @@
-//! Jobs loaded for selection only when a selector names one, since loading imports user modules.
+//! Jobs for the command's target, as publication keeps them, loaded only when a selector names one.
 
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::{Bound, PyAny, PyResult, Python};
 use sqlbuild_analysis::graph::main::attach_jobs::attach_jobs;
 use sqlbuild_analysis::graph::main::selectors_need_jobs::selectors_need_jobs;
 use sqlbuild_analysis::graph::models::{JobSelection, ProjectGraph};
+use sqlbuild_cli::native_commands::main::effective_target::effective_target;
 
 use crate::bindings::_helpers::compiled_project::snapshot_declarations::discover_declarations;
 use crate::bindings::_helpers::native_host::orchestration_declarations::job_selections;
 
-/// The running command's project directory and, once loaded, its jobs.
+/// The running command's project directory, its `--target` and, once loaded, its jobs.
 struct JobScope {
     project_dir: PathBuf,
+    selected_target: Option<String>,
     catalog: Option<BTreeMap<String, JobSelection>>,
 }
 
@@ -25,10 +28,14 @@ thread_local! {
 }
 
 /// Run one command with jobs selectable from `project_dir`, restoring the enclosing scope after.
-pub(crate) fn with_job_scope<T>(project_dir: PathBuf, run: impl FnOnce() -> T) -> T {
+pub(crate) fn with_job_scope<T>(
+    (project_dir, selected_target): (PathBuf, Option<String>),
+    run: impl FnOnce() -> T,
+) -> T {
     let previous = JOB_SCOPE.with(|scope| {
         scope.replace(Some(JobScope {
             project_dir,
+            selected_target,
             catalog: None,
         }))
     });
@@ -61,20 +68,22 @@ pub(crate) fn job_names(py: Python<'_>) -> PyResult<Vec<String>> {
 }
 
 fn job_catalog(py: Python<'_>) -> PyResult<Option<BTreeMap<String, JobSelection>>> {
-    let Some(project_dir) = JOB_SCOPE.with(|scope| {
+    let Some(scope) = JOB_SCOPE.with(|scope| {
         scope.borrow().as_ref().map(|scope| match &scope.catalog {
             Some(catalog) => Ok(catalog.clone()),
-            None => Err(scope.project_dir.clone()),
+            None => Err((scope.project_dir.clone(), scope.selected_target.clone())),
         })
     }) else {
         return Ok(None);
     };
-    let project_dir: PathBuf = match project_dir {
+    let (project_dir, selected_target): (PathBuf, Option<String>) = match scope {
         Ok(catalog) => return Ok(Some(catalog)),
-        Err(project_dir) => project_dir,
+        Err(scope) => scope,
     };
+    let target: Option<String> =
+        effective_target(&project_dir, selected_target).map_err(PyValueError::new_err)?;
     let roots: Vec<(Bound<'_, PyAny>, String)> = discover_declarations(py, &project_dir)?;
-    let catalog: BTreeMap<String, JobSelection> = job_selections(py, &roots)?;
+    let catalog: BTreeMap<String, JobSelection> = job_selections(py, &roots, target.as_deref())?;
     JOB_SCOPE.with(|scope| {
         if let Some(scope) = scope.borrow_mut().as_mut() {
             scope.catalog = Some(catalog.clone());

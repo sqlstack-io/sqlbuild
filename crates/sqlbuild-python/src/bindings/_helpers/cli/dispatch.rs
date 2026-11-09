@@ -468,7 +468,11 @@ fn routed_command<'py>(
                 return Err(user_error(py, failure));
             }
             let project_dir: PathBuf = invocation.value(Source::EffectiveProjectDir)?.extract()?;
-            with_job_scope(project_dir, || {
+            let selected_target: Option<String> = match invocation.value(Source::Attr("target")) {
+                Ok(target) => optional_text(&target)?,
+                Err(_) => None,
+            };
+            with_job_scope((project_dir, selected_target), || {
                 call_route(&invocation, route, handler, recall)
             })
         }
