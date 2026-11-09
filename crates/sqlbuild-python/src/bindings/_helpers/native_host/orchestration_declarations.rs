@@ -3,17 +3,18 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use pyo3::FromPyObject;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::{Bound, Py, PyAny, PyAnyMethods, PyResult, Python};
 use pyo3::types::{PyDict, PyDictMethods, PyList, PyListMethods, PyTuple};
+use pyo3::{FromPyObject, pyfunction};
 use serde_json::Value;
 use sqlbuild_analysis::graph::models::JobSelection;
 use sqlbuild_discovery::project_validation::models::OrchestrationNameFact;
 use sqlbuild_host::entries::models::UserCodeHost;
 
 use crate::bindings::_helpers::native_host::constants::{
-    AUTHORING_MODULE, CALENDAR_LABEL, GROUP_LABEL, JOB_LABEL, RUN_EVENT_CONDITION, SENSOR_LABEL,
+    AUTHORING_MODULE, CALENDAR_LABEL, CONSTRUCTING_MODULES, GROUP_LABEL, JOB_LABEL,
+    RUN_EVENT_CONDITION, SENSOR_LABEL,
 };
 use crate::bindings::_helpers::native_host::host::entry;
 
@@ -30,6 +31,8 @@ pub(crate) struct AuthoredJob {
     pub(crate) concurrency_groups: Vec<String>,
     pub(crate) schedule: Option<Py<PyAny>>,
     pub(crate) targets: Vec<String>,
+    #[pyo3(attribute("_declared_at"))]
+    pub(crate) declared_at: Option<(String, u32)>,
 }
 
 #[derive(FromPyObject, PartialEq, Eq, PartialOrd, Ord)]
@@ -46,6 +49,8 @@ pub(crate) struct AuthoredGroup {
     pub(crate) concurrency_groups: Vec<String>,
     pub(crate) schedule: Option<Py<PyAny>>,
     pub(crate) targets: Vec<String>,
+    #[pyo3(attribute("_declared_at"))]
+    pub(crate) declared_at: Option<(String, u32)>,
 }
 
 #[derive(FromPyObject)]
@@ -81,6 +86,27 @@ pub(crate) enum AuthoredDeclaration {
     Group(AuthoredGroup),
     Calendar(Py<PyAny>),
     Sensor(AuthoredSensor),
+}
+
+/// The file and line of the author's code constructing a declaration; `None` for code without a source file.
+#[pyfunction]
+pub(crate) fn declaration_site(py: Python<'_>) -> PyResult<Option<(String, u32)>> {
+    let mut frame = py.import("sys")?.call_method1("_getframe", (0,))?;
+    while !frame.is_none() {
+        let module: Option<String> = frame
+            .getattr("f_globals")?
+            .cast::<PyDict>()?
+            .get_item("__name__")?
+            .map(|name| name.extract())
+            .transpose()?;
+        if !module.is_some_and(|module| CONSTRUCTING_MODULES.contains(&module.as_str())) {
+            let file: String = frame.getattr("f_code")?.getattr("co_filename")?.extract()?;
+            let line: u32 = frame.getattr("f_lineno")?.extract()?;
+            return Ok((!file.starts_with('<')).then_some((file, line)));
+        }
+        frame = frame.getattr("f_back")?;
+    }
+    Ok(None)
 }
 
 /// JSON authoring values cross once; the interpreter rejects circular user containers safely.

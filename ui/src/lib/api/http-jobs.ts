@@ -159,8 +159,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		key: wire.job_key,
 		kind: wire.kind === 'group' ? 'group' : 'job',
 		description: wire.description,
-		// The server stores the resolved node list, not the selector text.
-		select: null,
+		select: wire.select ?? null,
 		members: null,
 		nodeCount: wire.selection.length,
 		overlap: null,
@@ -168,7 +167,7 @@ export function toJob(wire: Wire['JobRecord'], triggers: Trigger[], runs: Run[])
 		concurrencyGroups: wire.concurrency_groups,
 		priority: null,
 		owner: null,
-		sourceFile: null,
+		sourceFile: wire.declared_at ? `${wire.declared_at.path}:${wire.declared_at.line}` : null,
 		triggerIds: triggers.filter((t) => t.jobKey === wire.job_key).map((t) => t.id),
 		lastRun: newest(runs, (r) => r.jobKey === wire.job_key)
 	};
@@ -192,16 +191,17 @@ export function jobDetailOf(job: Job, wire: Wire['JobDetailRecord']): JobDetail 
 	return {
 		...job,
 		members: wire.kind === 'group' ? wire.members.map((m) => m.job_key) : null,
+		// Published snapshots record where a job is declared but not its code.
 		declaration: null,
-		exclude: [],
+		exclude: wire.exclude?.split(/\s+/).filter(Boolean) ?? [],
 		settings: Object.fromEntries(Object.entries(wire.settings).map(([name, value]) => [name, shownSetting(value)])),
 		resolvedNodes: wire.selection,
 		concurrency: null,
-		targets: null,
+		targets: wire.targets.length ? wire.targets : null,
 		groupMembers: wire.kind === 'group' ? groupMembersOf(wire.members) : null,
 		criticalNodes: wire.critical_nodes,
 		memberOf: wire.member_of,
-		cursorType: null
+		cursorType: wire.cursor_type === 'integer' || wire.cursor_type === 'timestamp' ? wire.cursor_type : null
 	};
 }
 

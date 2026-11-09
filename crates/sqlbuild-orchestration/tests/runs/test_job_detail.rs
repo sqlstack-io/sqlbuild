@@ -63,7 +63,9 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                     "defer_to": "/srv/orders/state",
                     "defer_sources_to": "production",
                     "warehouse": "postgres://orders:orders-db-pass@warehouse.example.test/orders",
-                    "concurrency": 4}},
+                    "concurrency": 4},
+                    "select": "orders", "targets": ["development"],
+                    "declared_at": {"path": "orchestration/jobs.py", "line": 7}},
                 "customers": {"description": "Build customers", "selection": ["customers"]},
             }));
             input.documents.insert(
@@ -76,7 +78,14 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 .nodes
                 .get_mut("orders")
                 .expect("orders node")
-                .definition = json!({"materialization": "table", "config": {"critical": true}});
+                .definition = json!({"materialization": "table",
+                    "config": {"critical": true, "cursor_type": "integer"}});
+            input
+                .nodes
+                .get_mut("customers")
+                .expect("customers node")
+                .definition =
+                json!({"materialization": "table", "config": {"cursor_type": "timestamp"}});
             publish_snapshot(store, &input).await.expect("publish jobs");
             let administrator = (&roles.context, credentials(&roles.administrator));
             let location = roles.location_id;
@@ -111,10 +120,39 @@ fn given_published_jobs_when_people_read_and_launch_them_then_listing_view_and_r
                 "{}: vars and a deferral path are withheld, a target name shows, URI passwords are redacted",
                 test_case.description
             );
+            assert_eq!(
+                (
+                    job.select.as_deref(),
+                    job.exclude.as_deref(),
+                    json!(job.targets),
+                    json!(job.declared_at),
+                    job.cursor_type.as_deref()
+                ),
+                (
+                    Some("orders"),
+                    None,
+                    json!(["development"]),
+                    json!({"path": "orchestration/jobs.py", "line": 7}),
+                    Some("integer")
+                ),
+                "{}: the selector as written, its targets, where it is declared and its nodes' cursor type",
+                test_case.description
+            );
             let group = read(administrator, "orders_group")
                 .await
                 .expect("administrator")
                 .expect("published group");
+            assert_eq!(
+                (
+                    group.select,
+                    json!(group.targets),
+                    group.declared_at,
+                    group.cursor_type
+                ),
+                (None, json!([]), None, None),
+                "{}: a snapshot without authored text reads as before, and mixed cursor types give none",
+                test_case.description
+            );
             assert_eq!(
                 group
                     .members

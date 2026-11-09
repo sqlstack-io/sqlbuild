@@ -523,6 +523,9 @@ def test_given_authored_jobs_when_compiling_then_native_snapshots_resolve_select
                 "warehouse": "reporting",
             },
             "concurrency_groups": ["order_reporting"],
+            "select": "+orders",
+            "exclude": "stg_orders",
+            "targets": ["development"],
         }
     }
     trigger: dict[str, Any] = first["documents"]["triggers"]["nightly_orders"]
@@ -770,6 +773,16 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 },
             },
             expected_schedules=("edge_snapshot_orders",),
+            expected_declared_at={
+                "edge_snapshot_orders": {
+                    "path": "orchestration/edge_cases/definitions.py",
+                    "line": 14,
+                },
+                "edge_snapshot_group": {
+                    "path": "orchestration/edge_cases/definitions.py",
+                    "line": 30,
+                },
+            },
         ),
         SnapshotDiscoveryTestCase(
             description="sensor-only roots collect source groups and destination jobs natively",
@@ -791,6 +804,7 @@ def test_given_invalid_declarations_when_compiling_then_native_validation_reject
                 ),
             ),
             expected_jobs=("inventory", "source_orders"),
+            expected_declared_at={"inventory": None, "source_group": None},
             expected_groups={"source_group": {"source_orders": []}},
             expected_sensors={
                 "on_orders": {
@@ -980,6 +994,13 @@ def test_given_declaration_modules_when_compiling_then_native_discovery_collects
     )
     for definition in publication["documents"].get("jobs", {}).values():
         assert set(definition["selection"]) <= publication["nodes"].keys()
+    definitions: dict[str, Any] = {
+        **publication["documents"].get("jobs", {}),
+        **publication["documents"].get("groups", {}),
+    }
+    assert {
+        name: definitions[name].get("declared_at") for name in test_case.expected_declared_at
+    } == test_case.expected_declared_at
 
 
 @pytest.mark.parametrize(
