@@ -40,6 +40,14 @@ class UnevaluatedRuleCase:
 
 
 @dataclass(frozen=True)
+class SnowflakeBodyShapeCase:
+    description: str
+    files: tuple[tuple[str, str], ...]
+    expected_compile_exit: int = 0
+    expected_format_exit: int = 0
+
+
+@dataclass(frozen=True)
 class UnevaluatedResourceCase:
     description: str
     path: str
