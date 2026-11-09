@@ -1,5 +1,7 @@
 //! Snowflake's native module: SQLQuack's Snowflake parser reads its SQL. Validation only.
 
+use std::num::IntErrorKind;
+
 use sqlquack_semantics::dialects::constants::{SNOWFLAKE, SNOWFLAKE_QUOTED_IGNORING_CASE};
 use sqlquack_semantics::dialects::types::DialectProfile;
 use sqlquack_syntax::{
@@ -104,7 +106,7 @@ fn unplaced(error: Error) -> String {
     }
 }
 
-/// The precision of a scale-0 Snowflake NUMBER.
+/// The precision of a scale-0 Snowflake NUMBER; one too large for `u32` counts as `u32::MAX`.
 fn integer_precision(normalized: &NormalizedType) -> Option<u32> {
     if normalized.family != TypeFamily::Decimal
         || normalized
@@ -114,5 +116,9 @@ fn integer_precision(normalized: &NormalizedType) -> Option<u32> {
     {
         return None;
     }
-    normalized.precision.as_ref()?.as_str().parse().ok()
+    match normalized.precision.as_ref()?.as_str().parse::<u32>() {
+        Ok(precision) => Some(precision),
+        Err(error) if *error.kind() == IntErrorKind::PosOverflow => Some(u32::MAX),
+        Err(_) => None,
+    }
 }

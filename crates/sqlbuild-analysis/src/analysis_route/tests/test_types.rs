@@ -179,6 +179,14 @@ pub(super) struct NativeTypeMatchTestCase {
     pub(super) expected_match: TypeMatch,
 }
 
+/// One engine type spelling compared with a declared contract type, nullability aside.
+pub(super) struct EngineTypeMatchTestCase {
+    pub(super) description: &'static str,
+    pub(super) declared: &'static str,
+    pub(super) inferred: &'static str,
+    pub(super) expected_same_type: bool,
+}
+
 pub(super) struct TypeMatchTestCase {
     pub(super) description: &'static str,
     pub(super) declared: &'static str,

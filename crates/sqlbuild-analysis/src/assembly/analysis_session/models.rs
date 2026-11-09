@@ -10,7 +10,9 @@ use sqlbuild_cache::store::models::NativeStore;
 use sqlquack_semantics::lineage::models::{NullabilityRule, SchemaColumn};
 use sqlquack_semantics::lineage::types::LineageSchema;
 
-use crate::assembly::analysis_session::_helpers::catalog_state::SessionCatalog;
+use crate::assembly::analysis_session::_helpers::catalog_state::{
+    SessionCatalog, relation_columns,
+};
 use crate::assembly::analysis_session::_helpers::mappings::ShapeTable;
 use crate::assembly::analysis_session::types::{NullabilityRuleFn, OutputSources, Pairs, Shapes};
 use crate::semantic_validation::models::DiagnosticRow;
@@ -393,22 +395,6 @@ impl LineageSchema for SessionSchema {
             .find(|(function, _)| function.eq_ignore_ascii_case(name))
             .map(|(_, rule)| *rule)
     }
-}
-
-/// A relation's columns by exact name, else by the first name equal to it without case.
-fn relation_columns<'a>(
-    shapes: &'a HashMap<String, Vec<SchemaColumn>>,
-    relation: &str,
-) -> Option<&'a [SchemaColumn]> {
-    shapes
-        .get(relation)
-        .or_else(|| {
-            shapes
-                .iter()
-                .find(|(name, _)| name.eq_ignore_ascii_case(relation))
-                .map(|(_, columns)| columns)
-        })
-        .map(Vec::as_slice)
 }
 
 /// One compile's model analysis, advanced phase by phase.

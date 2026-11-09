@@ -43,6 +43,12 @@ pub(crate) const SNOWFLAKE_DIALECT: &str = "snowflake";
 pub(crate) const SQLITE_DIALECT: &str = "sqlite";
 /// The stub prefix BigQuery, ClickHouse, Databricks, PostgreSQL, Snowflake and SQLite read as one unquoted name.
 pub(crate) const UNQUOTED_STUB_PREFIX: &str = "__sqlbuild_";
+/// DuckDB's blank-padded character type, which it stores as VARCHAR.
+pub(crate) const BLANK_PADDED_CHAR_NAME: &str = "BPCHAR";
+/// The DATETIME synonym DuckDB and Snowflake store as their timestamp without a zone.
+pub(crate) const DATETIME_NAME: &str = "DATETIME";
+/// A TIME written without a fractional-second precision.
+pub(crate) const BARE_TIME_NAME: &str = "TIME";
 /// The word that makes SQLBuild's type fallback call a type it cannot split into name and flat parameters a timestamp.
 pub(crate) const FALLBACK_TIMESTAMP_WORD: &str = "TIMESTAMP";
 /// The most words a type name spans, as in `TIMESTAMP WITH LOCAL TIME ZONE`.

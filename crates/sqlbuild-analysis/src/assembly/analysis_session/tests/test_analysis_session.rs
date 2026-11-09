@@ -9,9 +9,9 @@ use crate::assembly::analysis_session::tests::helpers::{
     proven, recovered_facts, session_lines, session_steps, started,
 };
 use crate::assembly::analysis_session::tests::test_types::{
-    CteRecoveryTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase, ModelSpec, PivotTestCase,
-    SessionFactsTestCase, SessionFailureTestCase, SessionTestCase, StarExpansionTestCase,
-    UnscheduledTestCase,
+    BareFunctionTestCase, CteRecoveryTestCase, KeptAnalysisTestCase, LegacyAnalysisTestCase,
+    ModelSpec, PivotTestCase, SessionFactsTestCase, SessionFailureTestCase, SessionTestCase,
+    StarExpansionTestCase, UnscheduledTestCase,
 };
 
 /// A model whose missing column stays untyped over a known input, so completion re-analyses it.
@@ -742,40 +742,49 @@ fn given_a_finished_session_when_reading_model_analyses_then_keeps_typed_columns
 
 #[test]
 fn given_a_project_function_called_by_its_bare_name_when_running_the_session_then_it_is_known() {
-    let test_cases: [(&str, &[&str], &str, &str); 3] = [
-        (
-            "a declared project function is not an unknown function",
-            &["is_large_order", "__sqlbuild_udf_is_large_order"],
-            "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
-            "succeeded=true star=false/true diagnostics=[]",
-        ),
-        (
-            "the same call without the declaration is an unknown function",
-            &[],
-            "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
-            "succeeded=true star=false/true diagnostics=[\"B101\"]",
-        ),
-        (
-            "a misspelt built-in stays an unknown function beside a declared one",
-            &["is_large_order"],
-            "SELECT order_id, lenght('x') AS n FROM __source(\"raw_orders\")",
-            "succeeded=true star=false/true diagnostics=[\"B101\"]",
-        ),
+    let test_cases = [
+        BareFunctionTestCase {
+            description: "a declared project function is not an unknown function",
+            known_functions: &["is_large_order", "__sqlbuild_udf_is_large_order"],
+            sql: "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[]",
+        },
+        BareFunctionTestCase {
+            description: "the same call without the declaration is an unknown function",
+            known_functions: &[],
+            sql: "SELECT order_id, is_large_order(amount) AS is_large FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[\"B101\"]",
+        },
+        BareFunctionTestCase {
+            description: "a misspelt built-in stays an unknown function beside a declared one",
+            known_functions: &["is_large_order"],
+            sql: "SELECT order_id, lenght('x') AS n FROM __source(\"raw_orders\")",
+            expected_last_line: "succeeded=true star=false/true diagnostics=[\"B101\"]",
+        },
     ];
-    for (description, known, sql, expected) in test_cases {
-        let mut request = orders_request(vec![model("orders", sql, &["raw_orders"], &[])]);
-        request.known_functions = known.iter().map(|name| (*name).to_owned()).collect();
+    for test_case in test_cases {
+        let mut request =
+            orders_request(vec![model("orders", test_case.sql, &["raw_orders"], &[])]);
+        request.known_functions = test_case
+            .known_functions
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
         let (_, outcomes, finished) = completed(started(request));
+        let undeclared: Vec<&str> = test_case
+            .known_functions
+            .iter()
+            .copied()
+            .filter(|name| !finished.declared_functions.contains(&(*name).to_owned()))
+            .collect();
         assert_eq!(
-            described(&outcomes[0]).last().map(String::as_str),
-            Some(expected),
-            "{description}"
-        );
-        assert!(
-            known
-                .iter()
-                .all(|name| finished.declared_functions.iter().any(|kept| kept == name)),
-            "{description}: revalidation knows the declared functions"
+            (
+                described(&outcomes[0]).last().map(String::as_str),
+                undeclared
+            ),
+            (Some(test_case.expected_last_line), Vec::new()),
+            "{}",
+            test_case.description
         );
     }
 }

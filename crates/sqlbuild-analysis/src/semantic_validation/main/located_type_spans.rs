@@ -12,14 +12,7 @@ pub fn located_type_spans(
     dialect: &str,
     findings: &[SpannedFinding<'_>],
 ) -> Vec<Option<(usize, usize)>> {
-    let mut errors: Vec<ValidationError> = findings
-        .iter()
-        .map(|(code, message, span)| ValidationError {
-            start: span.map(|(start, _)| start),
-            end: span.map(|(_, end)| end),
-            ..ValidationError::error(*message, *code)
-        })
-        .collect();
+    let mut errors: Vec<ValidationError> = findings.iter().map(validation_error).collect();
     let unplaced: Vec<Option<(usize, usize)>> = findings.iter().map(|(_, _, span)| *span).collect();
     match parser_dialect(Some(dialect))
         .map_err(str::to_owned)
@@ -30,5 +23,14 @@ pub fn located_type_spans(
             .map(|error| error.start.zip(error.end))
             .collect(),
         Err(_) => unplaced,
+    }
+}
+
+/// A finding as the validation error type placement fills in, with any span it already has.
+fn validation_error((code, message, span): &SpannedFinding<'_>) -> ValidationError {
+    ValidationError {
+        start: span.map(|(start, _)| start),
+        end: span.map(|(_, end)| end),
+        ..ValidationError::error(*message, *code)
     }
 }

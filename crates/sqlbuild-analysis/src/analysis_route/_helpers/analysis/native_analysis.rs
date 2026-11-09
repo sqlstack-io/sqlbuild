@@ -23,6 +23,7 @@ use crate::semantic_validation::main::located_type_spans::located_type_spans;
 use crate::semantic_validation::main::sqlbuild_code::sqlbuild_code;
 use crate::semantic_validation::main::text_findings::text_findings;
 use crate::semantic_validation::models::DiagnosticRow;
+use crate::semantic_validation::types::SpannedFinding;
 
 /// The analysis of `statement`, the one statement of `input.sql`, under `dialect`'s profile.
 pub(crate) fn native_analysis<D: NativeDialect + ?Sized>(
@@ -72,30 +73,29 @@ fn diagnostics(
     let spans: Vec<Option<(usize, usize)>> = located_type_spans(
         input.sql,
         dialect,
-        &findings
-            .iter()
-            .map(|finding| {
-                (
-                    finding.code,
-                    finding.message.as_str(),
-                    finding.span.map(|span| (span.start, span.end)),
-                )
-            })
-            .collect::<Vec<_>>(),
+        &findings.iter().map(spanned_finding).collect::<Vec<_>>(),
     );
     let text: Vec<DiagnosticRow> = text_findings(input.sql, dialect);
     let mut rows: Vec<DiagnosticRow> = findings
         .into_iter()
         .zip(spans)
         .filter_map(|(finding, span)| diagnostic_row(input, finding, span))
-        .filter(|row| {
-            !text
-                .iter()
-                .any(|own| own.code == row.code && own.start == row.start)
-        })
+        .filter(|row| !reported_by_text(&text, row))
         .collect();
     rows.extend(text);
     rows
+}
+
+/// A finding as `(code, message, span)`, the shape span placement reads.
+fn spanned_finding(finding: &NameFinding) -> SpannedFinding<'_> {
+    let span: Option<(usize, usize)> = finding.span.map(|span| (span.start, span.end));
+    (finding.code, finding.message.as_str(), span)
+}
+
+/// Whether SQLBuild's own text checks already report `row`'s code at its start.
+fn reported_by_text(text: &[DiagnosticRow], row: &DiagnosticRow) -> bool {
+    text.iter()
+        .any(|own| own.code == row.code && own.start == row.start)
 }
 
 /// An output column in the analysis's own type spelling, kept when the dialect can compare it.

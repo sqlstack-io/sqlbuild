@@ -285,9 +285,7 @@ fn model_resource_type(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     enum_from_value(py, RecordId::CompiledResourceType, MODEL_RESOURCE)
 }
 
-/// Every model's column contract diagnostics, in model order.
-///
-/// `adapter_default` is the adapter's table promotion mode; without it no build counts as staged.
+/// Every model's column contract diagnostics in model order; no build is staged without `adapter_default`.
 #[pyfunction]
 #[pyo3(signature = (*, project, dialect = None, adapter_default = None))]
 pub(crate) fn evaluate_model_contracts<'py>(

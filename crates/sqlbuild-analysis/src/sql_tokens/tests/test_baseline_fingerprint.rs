@@ -1,84 +1,84 @@
 use crate::sql_tokens::main::baseline_fingerprint::baseline_fingerprint;
 use crate::sql_tokens::main::compiler_query_fingerprint::compiler_query_fingerprint;
+use crate::sql_tokens::tests::test_types::BaselineFingerprintTestCase;
 
 const OLD_SCHEME_HASH: &str = "fingerprint-from-an-older-scheme";
-
-struct BaselineCase {
-    description: &'static str,
-    current_sql: &'static str,
-    recorded_definition: &'static str,
-    recorded_hash: Option<&'static str>,
-    keeps_recorded: bool,
-}
-
-fn current_fingerprint(sql: &str) -> String {
-    compiler_query_fingerprint(sql, Some("duckdb")).expect("fingerprint")
-}
+const DIALECT: Option<&str> = Some("duckdb");
 
 #[test]
-fn given_recorded_fingerprint_when_baselining_then_only_unchanged_sql_keeps_it() {
-    let cases: [BaselineCase; 5] = [
-        BaselineCase {
+fn given_recorded_fingerprint_when_baselining_then_only_unchanged_sql_keeps_it()
+-> Result<(), String> {
+    let test_cases = [
+        BaselineFingerprintTestCase {
             description: "old-scheme hash of the same SQL is kept",
             current_sql: "select id, amount from orders",
             recorded_definition: "select id, amount from orders",
             recorded_hash: Some(OLD_SCHEME_HASH),
-            keeps_recorded: true,
+            recorded_fingerprint_failure: None,
+            expected_matches_recorded_and_current: (true, false),
         },
-        BaselineCase {
+        BaselineFingerprintTestCase {
             description: "old-scheme hash of SQL differing only in layout and case is kept",
             current_sql: "select id, amount from orders",
             recorded_definition: "SELECT id,\n       amount\n  FROM orders -- totals",
             recorded_hash: Some(OLD_SCHEME_HASH),
-            keeps_recorded: true,
+            recorded_fingerprint_failure: None,
+            expected_matches_recorded_and_current: (true, false),
         },
-        BaselineCase {
+        BaselineFingerprintTestCase {
             description: "a real edit is still a change",
             current_sql: "select id, amount * 2 as amount from orders",
             recorded_definition: "select id, amount from orders",
             recorded_hash: Some(OLD_SCHEME_HASH),
-            keeps_recorded: false,
+            recorded_fingerprint_failure: None,
+            expected_matches_recorded_and_current: (false, true),
         },
-        BaselineCase {
+        BaselineFingerprintTestCase {
             description: "an empty recorded definition counts as changed",
             current_sql: "select id, amount from orders",
             recorded_definition: "",
             recorded_hash: Some(OLD_SCHEME_HASH),
-            keeps_recorded: false,
+            recorded_fingerprint_failure: None,
+            expected_matches_recorded_and_current: (false, true),
         },
-        BaselineCase {
+        BaselineFingerprintTestCase {
             description: "a current-scheme hash stays current",
             current_sql: "select id, amount from orders",
             recorded_definition: "select id, amount from orders",
             recorded_hash: None,
-            keeps_recorded: false,
+            recorded_fingerprint_failure: None,
+            expected_matches_recorded_and_current: (false, true),
+        },
+        BaselineFingerprintTestCase {
+            description: "a recorded definition that cannot be fingerprinted leaves the current hash",
+            current_sql: "select 1",
+            recorded_definition: "select 1",
+            recorded_hash: Some(OLD_SCHEME_HASH),
+            recorded_fingerprint_failure: Some("tokenizer failed"),
+            expected_matches_recorded_and_current: (false, true),
         },
     ];
-    for case in cases {
-        let current: String = current_fingerprint(case.current_sql);
-        let recorded_hash: String = case
+    for test_case in test_cases {
+        let current: String = compiler_query_fingerprint(test_case.current_sql, DIALECT)?;
+        let recorded_hash: String = test_case
             .recorded_hash
             .map_or_else(|| current.clone(), str::to_owned);
         let baseline: String = baseline_fingerprint(
             current.clone(),
-            (case.recorded_definition, &recorded_hash),
-            |sql| compiler_query_fingerprint(sql, Some("duckdb")),
+            (test_case.recorded_definition, &recorded_hash),
+            |sql| {
+                test_case.recorded_fingerprint_failure.map_or_else(
+                    || compiler_query_fingerprint(sql, DIALECT),
+                    |failure| Err(failure.to_owned()),
+                )
+            },
         );
-        let expected: &str = if case.keeps_recorded {
-            OLD_SCHEME_HASH
-        } else {
-            &current
-        };
-        assert_eq!(baseline, expected, "{}", case.description);
+        assert_eq!(
+            (baseline == OLD_SCHEME_HASH, baseline == current),
+            test_case.expected_matches_recorded_and_current,
+            "{}",
+            test_case.description
+        );
     }
-}
-
-#[test]
-fn given_unfingerprintable_recorded_definition_when_baselining_then_current_wins() {
-    let current: String = current_fingerprint("select 1");
-    let baseline: String =
-        baseline_fingerprint(current.clone(), ("select 1", OLD_SCHEME_HASH), |_| {
-            Err("tokenizer failed".to_owned())
-        });
-    assert_eq!(baseline, current);
+    Ok(())
 }

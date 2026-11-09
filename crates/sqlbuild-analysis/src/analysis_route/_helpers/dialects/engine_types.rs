@@ -1,5 +1,6 @@
 //! The type each engine stores for a normalized type: its documented synonyms and defaults met.
 
+use crate::analysis_route::constants::{BARE_TIME_NAME, BLANK_PADDED_CHAR_NAME, DATETIME_NAME};
 use crate::type_system::models::{NormalizedType, PythonInteger, TypeFamily};
 
 /// DuckDB's integer, float, boolean, timestamp and blob aliases, by the type DuckDB stores.
@@ -27,10 +28,10 @@ const SNOWFLAKE_TIME_PRECISION: &str = "TIME(9)";
 /// The type DuckDB stores for `normalized`: string lengths dropped, aliases and defaults met.
 pub(crate) fn duckdb_engine_type(normalized: &NormalizedType) -> NormalizedType {
     let name: &str = &normalized.normalized_name;
-    if normalized.family == TypeFamily::String || name == "BPCHAR" {
+    if normalized.family == TypeFamily::String || name == BLANK_PADDED_CHAR_NAME {
         return named("VARCHAR", TypeFamily::String);
     }
-    if name == "DATETIME" {
+    if name == DATETIME_NAME {
         return named("TIMESTAMP", TypeFamily::Timestamp);
     }
     if name.starts_with("DECIMAL") {
@@ -70,10 +71,10 @@ pub(crate) fn snowflake_engine_type(normalized: &NormalizedType) -> NormalizedTy
     if SNOWFLAKE_FLOATS.contains(&name) {
         return named("FLOAT", TypeFamily::Float);
     }
-    if name == "DATETIME" {
+    if name == DATETIME_NAME {
         return named("TIMESTAMP_NTZ", TypeFamily::Timestamp);
     }
-    if name == "TIME" {
+    if name == BARE_TIME_NAME {
         return named(SNOWFLAKE_TIME_PRECISION, normalized.family);
     }
     let character: bool = SNOWFLAKE_CHARACTER_NAMES
